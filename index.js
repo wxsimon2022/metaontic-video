@@ -550,6 +550,51 @@ function fileStamp(date = new Date()) {
     + `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
 }
 
+/**
+ * 宿主要求工具返回值是「无损 JSON」：只要出现 undefined、NaN/Infinity/-0、
+ * 非纯对象（Error/Date 实例等）或循环引用，整条结果就会被丢弃并报
+ * 「value is not lossless JSON」。这里统一清洗成严格 JSON。
+ */
+function toJsonSafe(value, seen = new Set()) {
+  if (value === null) return null;
+  const type = typeof value;
+  if (type === 'string' || type === 'boolean') return value;
+  if (type === 'number') {
+    return Number.isFinite(value) && !Object.is(value, -0) ? value : String(value);
+  }
+  if (type === 'bigint') return value.toString();
+  if (type === 'undefined' || type === 'function' || type === 'symbol') return undefined;
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Error) return value.message ? `${value.name}: ${value.message}` : value.name;
+  if (seen.has(value)) return '[circular]';
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      return Array.from(value, (item) => toJsonSafe(item, seen) ?? null);
+    }
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return String(value);
+    const plain = {};
+    for (const [key, item] of Object.entries(value)) {
+      const safe = toJsonSafe(item, seen);
+      if (safe !== undefined) plain[key] = safe;
+    }
+    return plain;
+  } finally {
+    seen.delete(value);
+  }
+}
+
+/** 把工具 execute 的返回值清洗成宿主接受的无损 JSON，避免整条结果被丢弃。 */
+function jsonSafeTool(tool) {
+  return {
+    ...tool,
+    async execute(...args) {
+      return toJsonSafe(await tool.execute(...args));
+    },
+  };
+}
+
 async function exists(file) {
   try {
     await stat(file);
@@ -1870,13 +1915,13 @@ function configTool(config, settings) {
 export function apply(ctx, config = {}) {
   const deps = {};
   const disposers = [
-    ctx.tools.register(videoTool(config, deps)),
-    ctx.tools.register(extendTool(config)),
-    ctx.tools.register(taskTool(config)),
+    ctx.tools.register(jsonSafeTool(videoTool(config, deps))),
+    ctx.tools.register(jsonSafeTool(extendTool(config))),
+    ctx.tools.register(jsonSafeTool(taskTool(config))),
   ];
   // 配置工具依赖宿主的 settings 服务；没有该服务时插件其余功能照常可用。
   const cleanup = ctx.inject(['settings'], (settingsCtx) => {
-    disposers.push(settingsCtx.tools.register(configTool(config, settingsCtx.settings)));
+    disposers.push(settingsCtx.tools.register(jsonSafeTool(configTool(config, settingsCtx.settings))));
   });
   if (typeof cleanup === 'function') disposers.push(cleanup);
   // 会话工作目录也是可选的：宿主不提供时合并结果落在进程 cwd 下。
