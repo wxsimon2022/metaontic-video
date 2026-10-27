@@ -1,0 +1,157 @@
+# MetaOnticVideo（DeepSeek Harness 插件）
+
+把 VideoFlow AI 里已经跑通的「视频延长 / 向后续拍」能力封装成 Harness 插件。
+显示名 **MetaOnticVideo**，npm 包名 `metaontic-video`，profile 条目 id `metaontic-video`。
+它不改动 VideoFlow 后端，只复用同一套上游语义：
+
+- 提示词以「向后延长视频1」开头，说明续拍秒数与衔接约束；
+- `content` 里用 `{"type":"video_url","video_url":{"url":...},"role":"reference_video"}` 传参考视频；
+- seedance 2.5 自动改用 `ratio=adaptive` 与 `omni_reference_task_type=extend`；
+- 多段延长时，每段都用上一段的成片 URL 继续参考，避免重复拼接。
+
+## 提供的工具
+
+| 工具 | 作用 |
+| --- | --- |
+| `seedance_extend` | 以一段公网视频为参考向后延长，可一次连续延长多段，返回每段任务 ID 与最终视频链接 |
+| `seedance_extend_task` | 按任务 ID 查询延长任务状态（单次调用超时后用它取结果） |
+| `seedance_extend_config` | 读取/修改插件自己的配置（不改 YAML 也能换中转站地址、模型、时长） |
+
+## 两种上游：New API 中转站 / 火山方舟官方
+
+`provider: newapi`（默认）走 New API 中转站的火山原生路由：
+
+| 配置 | 默认值（newapi） |
+| --- | --- |
+| `baseUrl` | 空；读 `NEWAPI_VIDEO_BASE_URL` / `NEWAPI_BASE_URL`，都没有时必须在 config 里填 |
+| `submitPath` | `/doubao/api/v3/contents/generations/tasks` |
+| `queryPath` | `/doubao/api/v3/contents/generations/tasks/{task_id}` |
+| `apiKey` | 读 `NEWAPI_API_KEY`，回退 `ARK_API_KEY` |
+| `model` | 读 `NEWAPI_VIDEO_MODEL`，回退 `doubao-seedance-2-0-mini-260615` |
+
+`provider: ark` 走火山官方接口（`https://ark.cn-beijing.volces.com/api/v3`、`/contents/generations/tasks`）。
+
+注意：延长必须用「接受火山原生 content 格式」的接口。
+VideoFlow 的后端文档里也写明，中转站的 `/video/generations` 不接受原生 content 格式，
+所以要按中转站文档填成它给豆包模型分流的那条路径（例如 `/doubao/api/v3/...`）。
+
+中转站响应形状不同也能解析：状态别名（`success` / `completed` …）、
+任务 ID 字段（`id` / `task_id` / `taskId`）、深层取件（`data.content.video_url` / `download_url`），
+并会跳过 `cover_url`、首尾帧等图片字段；额度不足、鉴权失败、限流、内容审核拒绝会分别给出可读提示。
+
+## 让别人安装
+
+插件管理页（侧栏**插件** → 安装）里填下面任意一种 spec 即可：
+
+| 来源 | 填什么 |
+| --- | --- |
+| npm | `metaontic-video`（装指定版本：`metaontic-video@1.0.0`） |
+| GitHub | `github:wxsimon2022/metaontic-video`（也可以带 tag：`github:wxsimon2022/metaontic-video#v1.0.0`） |
+| 本地目录 / 压缩包 | 绝对路径，或 `npm pack` 出来的 `.tgz` 路径 |
+
+命令行等价写法：`dsh plugin --profile <profile> add metaontic-video`。
+
+## 发布
+
+```bash
+npm pack --dry-run          # 先看会打包哪些文件
+npm login                   # 第一次发布前
+npm version patch           # 或 minor / major，写入 git tag
+npm publish                 # 无作用域包直接发布
+git push --follow-tags
+```
+
+推 tag 后 `.github/workflows/publish.yml` 会用仓库 secret `NPM_TOKEN` 自动发布（带 provenance）。
+
+## 安装
+
+在 Harness 里让 Agent 用 `plugin_manager` 的 `install_bundle` 安装本目录
+（用绝对路径作为 `target`）。插件管理页只能开关组合包，改配置要写 profile 的 patch 层。
+
+## 配置写在哪儿
+
+配置写在 profile 的 patch 层文件里：
+
+```
+~/.dsh/profiles/<profile>/cordis.patch.yml
+```
+
+（桌面端当前 profile 是 `desktop`，即 `~/.dsh/profiles/desktop/cordis.patch.yml`；
+如果这个文件里已经有 `- id: metaontic-video` 的覆盖项，就改那一项，覆盖项会整体替换 `config`。）
+
+中转站（New API）示例：
+
+```yaml
+- id: metaontic-video
+  name: 'metaontic-video'
+  config:
+    provider: newapi
+    apiKey: 'sk-...'                  # 也可用环境变量 NEWAPI_API_KEY
+    baseUrl: 'https://ai.bileego.com' # 不带 /v1，也不要重复 /api/v3
+    model: 'doubao-seedance-2-0-mini-260615'
+    duration: 5
+```
+
+官方（火山方舟）示例：
+
+```yaml
+- id: metaontic-video
+  name: 'metaontic-video'
+  config:
+    provider: ark
+    apiKey: 'sk-...'                  # 也可用环境变量 ARK_API_KEY
+    model: 'doubao-seedance-2-5-260628'
+    duration: 5
+```
+
+除了这两项差异，其余可调项相同：
+
+```yaml
+    mode: continuous     # continuous 同机位续拍 / closeup 切近景续拍
+    resolution: 720p
+    ratio: adaptive
+    generateAudio: true
+    watermark: false
+    pollIntervalMs: 5000
+    maxWaitMs: 600000
+    extraParams: '{}'    # JSON 对象字符串，合并进请求体
+```
+
+## 在插件里改配置
+
+配置字段都用 `.volatile()` 声明，所以它们是宿主管理的「可热改」字段：
+插件通过宿主 `settings` 服务读写，改动写进 profile 的 `cordis.patch.yml`，重载后立即生效。
+
+- 对话里改：Agent 调 `seedance_extend_config`
+  - 「看一下 seedance_extend 现在用的什么配置」→ `action: get`
+  - 「把 baseUrl 换成 https://new-relay.example，模型换成 doubao-seedance-2-5-260628」→ `action: set`
+  - 工具内部用 `settings.describe()` 取修订号，再 `settings.update(...)` 合并写入，
+    所以不会覆盖你手写的其它字段，也不会踩到并发改动。
+- 手改：直接编辑 profile patch（见上一节），效果相同。
+
+### App 内的配置页
+
+本插件自带浏览器半侧（`client.js`），在侧栏**插件**页里给本插件加了一张配置卡片：
+
+- 卡片摘要显示「上游 · 模型 · 每段秒数」，没配好的时候提示先去选上游填密钥。
+- 打开卡片就是表单：上游、API Key、基础地址、模型、每段秒数、续拍方式、分辨率、画面比例、
+  音频/水印开关，以及提交路径、查询路径、额外参数、轮询间隔、最长等待。
+- 改完点**保存**只写你改过的字段（`form.set`），**恢复默认**清除 profile 里的覆盖（`form.unset`）；
+  写入带宿主修订号校验，被更高层配置覆盖时不会静默写坏。
+- API Key 只显示「是否已配置」，留空表示保持原值，不会把掩码值写回去。
+- 页面用宿主主题 token（`--dsw-alias-*`）着色、控件自己实现，没有 import 任何 Harness 客户端包；
+  只有宿主确实提供本插件命名空间时卡片才出现（`configForms.whileServed`）。
+
+页面只做「改配置」；连线测试（真的提交一次延长）仍走 `seedance_extend` 工具。
+
+## 使用示例
+
+- 「把 `https://.../cat.mp4` 往后延长 5 秒，继续橘猫舔爪子」
+- 「这段 15 秒的口播再加 5 秒，用近景切到听众反应」（`mode: closeup`）
+- 「连续延长 2 段，每段 5 秒，做成 10 秒续片」（`segments: 2`）
+
+## 限制
+
+- 参考视频必须是上游能直接拉取的公网 URL；本地文件路径不支持。
+- 含人脸续拍通常需要同一上游账号下的受信原始产物，否则会被内容审核拒绝。
+- 不保证人脸、声线、口型和背景完全连续；上游返回的成品链接一般 24 小时内有效。

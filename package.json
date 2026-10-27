@@ -1,0 +1,65 @@
+{
+  "name": "metaontic-video",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness plugin: extend an existing video by appending new footage with Seedance (New API relay or Volcano Ark), with an in-app configuration page.",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "seedance",
+    "video",
+    "video-extension",
+    "new-api"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wxsimon2022/metaontic-video.git"
+  },
+  "homepage": "https://github.com/wxsimon2022/metaontic-video#readme",
+  "bugs": {
+    "url": "https://github.com/wxsimon2022/metaontic-video/issues"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.5"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/schemastery": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
+    }
+  }
+}

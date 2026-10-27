@@ -1,0 +1,4 @@
+- insert:
+    - id: metaontic-video
+      name: 'metaontic-video'
+      config: {}
