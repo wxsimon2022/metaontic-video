@@ -56,7 +56,7 @@ window.__ModuleLoader__.load({
       dirty: '有未保存的改动',
       clean: '没有改动',
       loading: '读取配置中…',
-      unavailable: '宿主还没有把本插件列为可编辑条目：请先在 profile 的 cordis.patch.yml 里加一条 id 为 metaontic-video 的覆盖项。',
+      unavailable: '宿主还没有把本条目当作可编辑设置项提供服务（配置命名空间 metaontic-video 未就绪）。若 profile 的 cordis.patch.yml 里已有该条目，请重启 Harness 让宿主重新加载；重启后仍是这句话，就是宿主版本与插件的设置接口不匹配。',
       readOnly: '当前 profile 不接受表单写入。',
     };
     const en = {
@@ -93,7 +93,7 @@ window.__ModuleLoader__.load({
       dirty: 'Unsaved changes',
       clean: 'No changes',
       loading: 'Reading configuration…',
-      unavailable: 'This Host does not expose the plugin as an editable entry yet: add an override row with id metaontic-video to the profile cordis.patch.yml first.',
+      unavailable: 'This Host does not serve this entry as an editable setting yet (namespace metaontic-video is not ready). If the row already exists in the profile cordis.patch.yml, restart Harness so the Host reloads it; if the message persists, the Host version and the plugin settings interface do not match.',
       readOnly: 'This profile does not accept form writes.',
     };
 
@@ -309,13 +309,15 @@ window.__ModuleLoader__.load({
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'metaontic-video: dictionaries');
         const form = ctx.configForms.get(NAMESPACE);
         const Page = makePage({ form, t });
-        ctx.effect(() => ctx.configForms.whileServed([NAMESPACE], () => ctx.slots.inject('plugins.item', () => ctx.slots.register({
+        // 卡片无条件注册：宿主还没把本条目当作可编辑设置项服务时，页面上会显示
+        // 具体原因（见 makePage 的 notice 分支），而不是一片空白。
+        ctx.effect(() => ctx.slots.inject('plugins.item', () => ctx.slots.register({
           name: 'plugins.item',
           id: NAMESPACE,
           order: 30,
           label: () => t('title'),
           locale: NS,
-        }, Page))), 'metaontic-video: configuration page');
+        }, Page)), 'metaontic-video: configuration page');
       },
     };
   },
