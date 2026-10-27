@@ -6,7 +6,7 @@
  *   - `ctx.configForms.get('<entry id>')` 取得该条目的表单控制器；
  *   - `form.getSnapshot()` 读当前值/修订号，`form.subscribe()` 订阅变化；
  *   - `form.set(field, value)` / `form.unset(field)` 排队写入，修订号由宿主校验。
- * 页面注册进插件页的 `plugins.item` 槽位，只有宿主确实提供该命名空间时才出现。
+ * 页面注册进插件页的 `plugins.bundle.config` 槽位，key 为本包名 metaontic-video；
  *
  * 样式只用宿主主题 token（`--dsw-alias-*`），并都带兜底值；不 import 任何
  * Harness 客户端包，控件是本模块自己实现的。
@@ -25,7 +25,7 @@ window.__ModuleLoader__.load({
     const zh = {
       title: 'MetaOnticVideo',
       summaryEmpty: '未配置：先在中转站/官方之间选一个上游并填好密钥。',
-      summary: (provider, model, duration) => `${provider} · ${model} · 每段 ${duration}s`,
+      summary: '{provider} · {model} · 每段 {duration}s',
       provider: '上游',
       providerNewapi: 'New API 中转站',
       providerArk: '火山方舟官方',
@@ -62,7 +62,7 @@ window.__ModuleLoader__.load({
     const en = {
       title: 'MetaOnticVideo',
       summaryEmpty: 'Not configured: pick New API or Volcano Ark and set the key.',
-      summary: (provider, model, duration) => `${provider} · ${model} · ${duration}s per segment`,
+      summary: '{provider} · {model} · {duration}s per segment',
       provider: 'Provider',
       providerNewapi: 'New API relay',
       providerArk: 'Volcano Ark',
@@ -173,7 +173,7 @@ window.__ModuleLoader__.load({
         if (props && props.view === 'summary') {
           const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
           const text = configured
-            ? t('summary', value.provider === 'ark' ? t('providerArk') : t('providerNewapi'), value.model || '-', value.duration ?? '-')
+            ? t('summary', { provider: value.provider === 'ark' ? t('providerArk') : t('providerNewapi'), model: value.model || '-', duration: value.duration ?? '-' })
             : t('summaryEmpty');
           return h('span', { style: { color: TOKENS.muted } }, text);
         }
@@ -309,13 +309,11 @@ window.__ModuleLoader__.load({
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'metaontic-video: dictionaries');
         const form = ctx.configForms.get(NAMESPACE);
         const Page = makePage({ form, t });
-        // 卡片无条件注册：宿主还没把本条目当作可编辑设置项服务时，页面上会显示
-        // 具体原因（见 makePage 的 notice 分支），而不是一片空白。
-        ctx.effect(() => ctx.slots.inject('plugins.item', () => ctx.slots.register({
-          name: 'plugins.item',
-          id: NAMESPACE,
-          order: 30,
-          label: () => t('title'),
+        // 第三方 bundle 的配置页注册到 plugins.bundle.config，以 npm 包名为 key；
+        // 打开「已安装插件」里的 metaontic-video 详情页时显示在描述与组件行之间。
+        ctx.effect(() => ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register({
+          name: 'plugins.bundle.config',
+          key: NAMESPACE,
           locale: NS,
         }, Page)), 'metaontic-video: configuration page');
       },
