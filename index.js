@@ -413,10 +413,27 @@ function resolveSegmentSeconds(config, requested) {
  */
 function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
   if (totalSeconds <= singleMax) return [{ kind: 'generate', seconds: totalSeconds }];
-  const plan = [{ kind: 'generate', seconds: singleMax }];
-  let remaining = totalSeconds - singleMax;
+
+  // 尾段不足最小分段秒数（4 秒）时先把首段缩短一点，避免拆出 1-3 秒的非法分段。
+  let base = singleMax;
+  let remaining = totalSeconds - base;
+  if (remaining < MIN_SEGMENT_SECONDS) {
+    const trimmed = MIN_SEGMENT_SECONDS - remaining;
+    if (base - trimmed >= MIN_SEGMENT_SECONDS) {
+      base -= trimmed;
+      remaining = totalSeconds - base;
+    }
+  }
+
+  const plan = [{ kind: 'generate', seconds: base }];
   while (remaining > 0 && plan.length < MAX_SEGMENTS) {
-    const seconds = Math.min(remaining, segmentSeconds);
+    let seconds = Math.min(remaining, segmentSeconds);
+    const rest = remaining - seconds;
+    if (rest > 0 && rest < MIN_SEGMENT_SECONDS) {
+      if (seconds + rest <= MAX_SEGMENT_SECONDS) seconds += rest;
+      else seconds -= MIN_SEGMENT_SECONDS - rest;
+    }
+    if (seconds < MIN_SEGMENT_SECONDS) seconds = MIN_SEGMENT_SECONDS;
     plan.push({ kind: 'extend', seconds });
     remaining -= seconds;
   }
@@ -1434,6 +1451,10 @@ function videoTool(config, deps) {
       if (plannedTotal < total) {
         notes.push(
           `目标 ${total} 秒超过单次最多 ${MAX_SEGMENTS} 段的上限，本次按 ${plannedTotal} 秒执行。`,
+        );
+      } else if (plannedTotal > total) {
+        notes.push(
+          `目标 ${total} 秒拆不出完全等长的分段（每段 4-15 秒），本次按 ${plannedTotal} 秒执行。`,
         );
       }
 
