@@ -2,11 +2,11 @@
  * MetaOnticVideo —— Seedance 短视频生成 + 视频延长（向后续拍）Host plugin.
  *
  * 注册的工具：
- *   - `seedance_video`        生成一段完整视频：总时长不超过单段上限（默认 15 秒）时直接生成；
- *                             更长时先直出首段，再逐段延长，最后用 ffmpeg 合并成一个本地成片
- *   - `seedance_extend`       以一段公网视频为参考，向后延长指定秒数；可一次连续延长多段
- *   - `seedance_extend_task`  按任务 ID 查询任务的状态
- *   - `seedance_extend_config` 读取/写回本插件自己的配置（走宿主的 settings 服务，
+ *   - `video_generate`  生成一段完整视频：总时长不超过单段上限（默认 15 秒）时直接生成；
+ *                       更长时先直出首段，再逐段延长，最后用 ffmpeg 合并成一个本地成片
+ *   - `video_extend`    以一段公网视频为输入素材，向前或向后延长指定秒数；可一次连续延长多段
+ *   - `video_status`    按任务 ID 查询任务的状态
+ *   - `video_config`    读取/写回本插件自己的配置（走宿主的 settings 服务，
  *                             写进 profile 的 cordis.patch.yml；配置字段都是 .volatile()，
  *                             宿主重载后立即生效，不必手改 YAML）
  *
@@ -1026,7 +1026,7 @@ function renderResult(value) {
         text: [
           '延长任务仍在生成中（已超出单次等待时间）。',
           ...lines,
-          `可用 seedance_extend_task 查询任务 ${
+          `可用 video_status 查询任务 ${
             segments.at(-1)?.taskId || '（未知）'
           } 的状态与视频链接。`,
         ].join('\n'),
@@ -1062,7 +1062,7 @@ const SEGMENT_OUTPUT_SCHEMA = {
 
 function extendTool(config) {
   return {
-    name: 'seedance_extend',
+    name: 'video_extend',
     description:
       '把一段已有的视频向前或向后延长：以公网视频 URL 作为输入素材（提示词里用「视频1」指代），'
       + '调用 Seedance 视频模型生成衔接片段，保持人物、服装、场景光线和声音连续。'
@@ -1083,7 +1083,7 @@ function extendTool(config) {
         taskId: {
           type: 'string',
           description:
-            '已有的 seedance_video / seedance_extend 任务 ID，用它的成片作为参考视频。与 videoUrl 二选一。',
+            '已有的 video_generate / video_extend 任务 ID，用它的成片作为输入素材。与 videoUrl 二选一。',
         },
         duration: {
           type: 'integer',
@@ -1308,14 +1308,14 @@ function renderVideoResult(value) {
   if (videoUrl) parts.push(`最后一段上游链接（约 24 小时内有效）：${videoUrl}`);
   if (note) parts.push(note);
   if (status === 'timeout') {
-    parts.push(`可用 seedance_extend_task 查询任务 ${segments.at(-1)?.taskId || '（未知）'} 的状态。`);
+    parts.push(`可用 video_status 查询任务 ${segments.at(-1)?.taskId || '（未知）'} 的状态。`);
   }
   return [{ type: 'text', text: parts.filter(Boolean).join('\n') }];
 }
 
 function videoTool(config, deps) {
   return {
-    name: 'seedance_video',
+    name: 'video_generate',
     description:
       '生成一段完整视频：目标总时长不超过单段上限（默认 15 秒）时直接调用 Seedance 生成；'
       + '更长时先直出首段，再用视频延长能力逐段续拍（默认每段 5 秒），'
@@ -1586,15 +1586,16 @@ function videoTool(config, deps) {
 
 function taskTool(config) {
   return {
-    name: 'seedance_extend_task',
+    name: 'video_status',
     description:
-      '根据任务 ID 查询 Seedance 视频延长任务的状态；任务完成（status 为 succeeded）时返回视频下载链接。',
+      '按任务 ID 查询 Seedance 视频任务（生成、延长与合并）的状态；'
+      + '任务完成（status 为 succeeded）时返回视频下载链接。',
     parameters: {
       type: 'object',
       properties: {
         taskId: {
           type: 'string',
-          description: '由 seedance_extend 返回的延长任务 ID。',
+          description: '由 video_generate / video_extend 返回的任务 ID。',
         },
       },
       required: ['taskId'],
@@ -1723,9 +1724,9 @@ async function writeProfileConfig(settings, config, patch) {
 
 function configTool(config, settings) {
   return {
-    name: 'seedance_extend_config',
+    name: 'video_config',
     description:
-      '读取或修改 seedance_extend 插件自己的配置（provider、apiKey、baseUrl、submitPath、'
+      '读取或修改 MetaOnticVideo 插件自己的配置（provider、apiKey、baseUrl、submitPath、'
       + 'queryPath、model、duration、singleMaxSeconds、mode、resolution、ratio、generateAudio、'
       + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、outputDir、keepSegments、'
       + 'ffmpegBinary、ffprobeBinary）。改动写进 profile 的 cordis.patch.yml，'

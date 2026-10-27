@@ -15,14 +15,14 @@
 
 | 工具 | 作用 |
 | --- | --- |
-| `seedance_video` | 生成一段完整视频：不超过单段上限直出；更长时直出首段 + 逐段延长，最后合并成本地 mp4 |
-| `seedance_extend` | 以一段公网视频为参考向后延长，可一次连续延长多段，返回每段任务 ID 与最终视频链接 |
-| `seedance_extend_task` | 按任务 ID 查询延长任务状态（单次调用超时后用它取结果） |
-| `seedance_extend_config` | 读取/修改插件自己的配置（不改 YAML 也能换中转站地址、模型、时长） |
+| `video_generate` | 生成一段完整视频：不超过单段上限直出；更长时直出首段 + 逐段延长，最后合并成本地 mp4 |
+| `video_extend` | 把已有视频向前或向后延长，可一次连续延长多段，返回每段任务 ID 与最终视频链接 |
+| `video_status` | 按任务 ID 查询任务状态（单次调用超时后用它取结果） |
+| `video_config` | 读取/修改插件自己的配置（不改 YAML 也能换中转站地址、模型、时长） |
 
 ## 生成一段完整视频：≤15 秒直出，更长自动续拍再合并
 
-`seedance_video` 按目标总时长决定走哪条路：
+`video_generate` 按目标总时长决定走哪条路：
 
 | 目标时长 | 做法 |
 | --- | --- |
@@ -175,8 +175,8 @@ git push --follow-tags
 配置字段都用 `.volatile()` 声明，所以它们是宿主管理的「可热改」字段：
 插件通过宿主 `settings` 服务读写，改动写进 profile 的 `cordis.patch.yml`，重载后立即生效。
 
-- 对话里改：Agent 调 `seedance_extend_config`
-  - 「看一下 seedance_extend 现在用的什么配置」→ `action: get`
+- 对话里改：Agent 调 `video_config`
+  - 「看一下现在的视频插件配置」→ `action: get`
   - 「把 baseUrl 换成 https://new-relay.example，模型换成 doubao-seedance-2-5-260628」→ `action: set`
   - 工具内部用 `settings.describe()` 取修订号，再 `settings.update(...)` 合并写入，
     所以不会覆盖你手写的其它字段，也不会踩到并发改动。
@@ -196,7 +196,7 @@ git push --follow-tags
 - 页面用宿主主题 token（`--dsw-alias-*`）着色、控件自己实现，没有 import 任何 Harness 客户端包；
   只有宿主确实提供本插件命名空间时卡片才出现（`configForms.whileServed`）。
 
-页面只做「改配置」；连线测试（真的提交一次延长）仍走 `seedance_extend` 工具。
+页面只做「改配置」；连线测试（真的提交一次延长）仍走 `video_extend` 或 `video_generate` 工具。
 
 ## 使用示例
 
