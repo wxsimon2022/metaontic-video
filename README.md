@@ -1,8 +1,8 @@
 # MetaOnticVideo（DeepSeek Harness 插件）
 
-把 VideoFlow AI 里已经跑通的「视频延长 / 向后续拍」能力封装成 Harness 插件。
+把 Seedance 的「视频延长 / 向后续拍」能力封装成 Harness 插件。
 显示名 **MetaOnticVideo**，npm 包名 `metaontic-video`，profile 条目 id `metaontic-video`。
-它不改动 VideoFlow 后端，只复用同一套上游语义：
+它不依赖任何特定平台，只复用同一套上游语义：
 
 - 提示词以「向后延长视频1」开头，说明续拍秒数与衔接约束；
 - `content` 里用 `{"type":"video_url","video_url":{"url":...},"role":"reference_video"}` 传参考视频；
@@ -32,7 +32,7 @@
 `provider: ark` 走火山官方接口（`https://ark.cn-beijing.volces.com/api/v3`、`/contents/generations/tasks`）。
 
 注意：延长必须用「接受火山原生 content 格式」的接口。
-VideoFlow 的后端文档里也写明，中转站的 `/video/generations` 不接受原生 content 格式，
+中转站的 `/video/generations` 不接受原生 content 格式，
 所以要按中转站文档填成它给豆包模型分流的那条路径（例如 `/doubao/api/v3/...`）。
 
 中转站响应形状不同也能解析：状态别名（`success` / `completed` …）、

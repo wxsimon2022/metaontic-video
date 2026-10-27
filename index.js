@@ -13,7 +13,7 @@
  *   GET  {baseUrl}{queryPath}
  * 用 provider 预设切换：`newapi`（中转站）/ `ark`（官方）。
  *
- * 请求体沿用 VideoFlow AI 后端 backend/app/providers/newapi.py 里的原生延长语义：
+ * 请求体沿用火山方舟 contents-generation 的原生延长语义：
  *   - 提示词以「向后延长视频1」开头，说明续拍秒数与衔接约束
  *   - content 传入 {"type":"video_url","video_url":{"url":...},"role":"reference_video"}
  *   - seedance 2.5 追加 ratio=adaptive 与 omni_reference_task_type=extend
