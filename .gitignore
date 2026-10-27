@@ -1,0 +1,5 @@
+# 生成物：插件默认把成片落到会话工作目录下的 metaontic-video/，
+# 当工作目录正好是本仓库时，这些文件会弄脏 git 状态。
+*.mp4
+*.concat.txt
+segments/
