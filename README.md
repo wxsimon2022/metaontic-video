@@ -4,7 +4,7 @@
 **15 秒以内的视频一次生成，更长的会自动拆成几段分别生成，再用 ffmpeg 拼成一条完整的视频存到你电脑上。**
 
 - 显示名 **MetaOnticVideo**，npm 包名 `metaontic-video`，profile 条目 id `metaontic-video`
-- 需要 Harness 桌面端；合并成一条视频需要本机有 `ffmpeg`
+- 需要 Harness 桌面端；合并成一条视频需要本机有 `ffmpeg`（见下面「先装好这些（依赖）」）
 - 上游用 New API 中转站（默认）或火山方舟官方接口，任选一个即可
 
 ## 它能做什么
@@ -15,6 +15,33 @@
 | 一段更长的视频（20 秒、25 秒、30 秒…） | 自动拆成 15 秒 + 若干段续拍，再合并成一条完整的视频文件 |
 | 把已有的视频接长 | 用你给的视频当起点，往后续拍（也可以往前补前置剧情） |
 | 知道做好没有 | 按任务 ID 查进度，好了就给你下载链接和本地文件 |
+
+## 先装好这些（依赖）
+
+真正要你自己装的只有一样：**ffmpeg**。
+
+| 要装什么 | 为什么需要 | 怎么装 |
+| --- | --- | --- |
+| Harness 桌面端 | 插件跑在它里面，工具、插件页和配置页都由它提供（自带 Node 20+，不用自己装） | 安装 DeepSeek Harness 即可 |
+| `ffmpeg` + `ffprobe` | 只有「把多段合成一条成片」和「量一下每段多长」用得到 | Mac：`brew install ffmpeg`；Windows：`winget install Gyan.FFmpeg` |
+
+**不用** `npm install`：插件本身没有第三方依赖（`@deepseek-ai/schemastery` 由 App 自带）。
+
+在终端跑这三条，都打印出版本号就说明齐了：
+
+```bash
+node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
+```
+
+- 提示 `command not found: ffmpeg`：还没装；装了但不在 PATH，就在插件配置里把 `ffmpegBinary` / `ffprobeBinary` 填绝对路径（Mac 上一般是 `/opt/homebrew/bin/ffmpeg`）。
+- 完全没装 ffmpeg 也能出片：分段照常生成，只是最后不会自动拼成一条完整视频。
+
+另外还需要两件「账号 + 网络」上的准备：
+
+- **上游账号**：New API 中转站（一般选这个）或火山方舟官方，要有可用的 API Key。
+- **网络能通**：本机能访问上游地址，也能下载上游返回的成片链接（走代理时记得放行）。
+
+可选：再装 `metaontic-video-agent`（视频导演 preset，纯配置、不存密钥），它能让 Harness 先帮你写脚本、分镜和逐镜提示词再出片，出片时复用本插件的 `video_generate` 等工具。
 
 ## 三步就能用起来
 
