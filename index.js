@@ -16,7 +16,8 @@
  * 用 provider 预设切换：`newapi`（中转站）/ `ark`（官方）。
  *
  * 请求体沿用火山方舟 contents-generation 的原生延长语义：
- *   - 提示词以「向后延长视频1」开头，说明续拍秒数与衔接约束
+ *   - 提示词以「向后延长视频1」/「向前延长视频1」开头，用「视频1」指代输入素材，
+ *     并写清延长方向、剧情发展、主体状态、镜头运动、声音延续
  *   - content 传入 {"type":"video_url","video_url":{"url":...},"role":"reference_video"}
  *   - seedance 2.5 追加 ratio=adaptive 与 omni_reference_task_type=extend
  *
@@ -67,7 +68,10 @@ export const Config = z.object({
     .volatile(),
   duration: z.number().step(1).min(4).max(15)
     .default(5)
-    .description('每段延长出来的秒数（不含参考视频本身），4-15；seedance_video 生成长视频时按它分段')
+    .description(
+      '每段延长出来的秒数（不含视频1本身），4-15 的整数，例如 5/8/10/14；'
+      + '建议 ≤14，刚好卡 15 秒容易因封装略超被上游拒绝',
+    )
     .volatile(),
   singleMaxSeconds: z.number().step(1).min(4).max(15)
     .default(15)
@@ -183,8 +187,13 @@ const IMAGE_KEY_TOKENS = ['cover', 'image', 'thumb', 'poster', 'frame', 'snapsho
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif'];
 
 const CONTINUOUS_TRANSITION =
-  '新片第一帧必须紧接参考视频最后一帧，保持同一构图、人物大小、左右位置、'
+  '本段第一帧必须紧接视频1最后一帧，保持同一构图、人物大小、左右位置、'
   + '头部朝向、视线、手部位置和动作阶段。动作保持原有方向和速度，'
+  + '不重复前段动作、不定格等待、不从画面另一侧重新入场；不擅自切镜或重新居中。';
+
+const FORWARD_TRANSITION =
+  '向前延长时，本段最后一帧必须紧接视频1第一帧，保持同一构图、人物大小、左右位置、'
+  + '头部朝向、视线、手部位置和动作阶段。动作朝向视频1的开场动作发展，'
   + '不重复前段动作、不定格等待、不从画面另一侧重新入场；不擅自切镜或重新居中。';
 
 const CLOSEUP_TRANSITION =
@@ -284,20 +293,45 @@ function assertConfigured(config, apiKey) {
   }
 }
 
-function buildExtensionPrompt({ prompt, seconds, startAt, mode }) {
-  const transition = mode === 'closeup' ? CLOSEUP_TRANSITION : CONTINUOUS_TRANSITION;
-  const span = startAt == null
-    ? `生成 ${seconds} 秒续拍画面。`
-    : `生成 ${seconds} 秒续拍画面，对应整片第 ${startAt}–${startAt + seconds} 秒。`;
-  return (
-    `向后延长视频1。${span}参考视频1的结尾动作、人物面貌、体型、服装、`
-    + '场景光线和运镜，延续同一角色的音色、口音、语速和当前情绪。'
-    + '只演后续剧情，不重新开场、不复述已说台词；每句台词完整说完，'
-    + '保持对白、环境声和背景音乐连续，不添加片头片尾。'
-    + '锁定曝光、白平衡、光源方向和背景布局，不渐暗渐亮、不改变景深、不重建背景。'
-    + `${transition}本段明确指定的运镜和切镜优先，衔接建议不得覆盖已确认的镜头安排。`
-    + `\n本段续写内容与人物设定：\n${prompt}`
-  );
+/**
+ * 延长提示词。开头用「向后延长视频1」/「向前延长视频1」这类显式说法，
+ * 并用「视频1」指代输入素材——写成「参考视频1」容易被上游当成「参考生视频」而不是延长。
+ * 正文分五块写清，减少衔接断层：延长方向、剧情发展、主体状态、镜头运动、声音延续。
+ */
+function buildExtensionPrompt({
+  prompt, seconds, startAt, mode, direction = 'backward', wording = 'extend',
+}) {
+  const forward = direction === 'forward';
+  const head = forward
+    ? '向前延长视频1。'
+    : (wording === 'after' ? '生成视频1之后的内容：' : '向后延长视频1。');
+  const span = forward
+    ? (startAt == null
+      ? `生成 ${seconds} 秒前置画面，接在视频1第一帧之前。`
+      : `生成 ${seconds} 秒前置画面，对应整片第 ${Math.max(0, startAt - seconds)}–${startAt} 秒，紧接在视频1之前。`)
+    : (startAt == null
+      ? `生成 ${seconds} 秒续拍画面，接在视频1最后一帧之后。`
+      : `生成 ${seconds} 秒续拍画面，对应整片第 ${startAt}–${startAt + seconds} 秒，接在视频1之后。`);
+  const transition = forward
+    ? FORWARD_TRANSITION
+    : (mode === 'closeup' ? CLOSEUP_TRANSITION : CONTINUOUS_TRANSITION);
+  return [
+    `${head}${span}`,
+    `【延长方向】${forward ? '向前延长（前置剧情，放在视频1之前）' : '向后延长（续拍剧情，接在视频1之后）'}。`,
+    `【剧情发展】${endWithPunctuation(prompt)}${forward
+      ? '只演视频1之前发生的前置剧情，不复述视频1里的情节。'
+      : '只演视频1之后发生的新剧情，不重复视频1里的情节、不重新开场。'}`,
+    '【主体状态】' + (forward
+      ? '本段收尾的人物面貌、体型、服装、姿态、手部位置和动作阶段必须能直接接到视频1第一帧；'
+      : '沿用视频1结尾的人物面貌、体型、服装、姿态、手部位置和动作阶段；')
+      + '同一角色保持音色、口音、语速和当前情绪，不换人、不换装，不改变年龄与外貌特征。',
+    '【镜头运动】保持视频1' + (forward ? '开头的' : '结尾的')
+      + '机位、景别、焦段、运镜方向与速度，锁定曝光、白平衡、光源方向和背景布局，'
+      + '不渐暗渐亮、不改变景深、不重建背景。',
+    '【声音延续】保持对白、环境声与背景音乐连续，每句台词完整说完，不添加片头片尾、不复述已说台词。',
+    transition,
+    '本段明确指定的运镜和切镜优先，上面的衔接建议不得覆盖已确认的镜头安排。',
+  ].join('\n');
 }
 
 /** 中转站要能直接拉取参考视频，本地路径与内网地址没有意义。 */
@@ -312,13 +346,20 @@ function normalizeReferenceUrl(value) {
 
 function buildRequestBody(config, args, referenceVideoUrl) {
   const model = resolveModel(config);
-  const seconds = clampInteger(args.duration, MIN_SECONDS, MAX_SEGMENT_SECONDS, ref(config, 'duration', 5));
+  const seconds = clampInteger(
+    args.duration,
+    MIN_SEGMENT_SECONDS,
+    MAX_SEGMENT_SECONDS,
+    ref(config, 'duration', 5),
+  );
   const mode = args.mode || ref(config, 'mode', 'continuous');
   const prompt = String(args.prompt ?? '').trim();
   const startAt = args.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
+  const direction = args.direction === 'forward' ? 'forward' : 'backward';
+  const wording = args.wording === 'after' ? 'after' : 'extend';
 
   const content = [
-    { type: 'text', text: buildExtensionPrompt({ prompt, seconds, startAt, mode }) },
+    { type: 'text', text: buildExtensionPrompt({ prompt, seconds, startAt, mode, direction, wording }) },
     { type: 'video_url', video_url: { url: referenceVideoUrl }, role: 'reference_video' },
   ];
 
@@ -360,10 +401,10 @@ function resolveSingleMax(config) {
   );
 }
 
-/** 每次延长出来的秒数（不含参考视频本身）。 */
+/** 每次延长出来的秒数（不含视频1本身）：4-15 的整数，实际使用建议 ≤14。 */
 function resolveSegmentSeconds(config, requested) {
   const fallback = ref(config, 'duration', 5);
-  return clampInteger(requested ?? fallback, MIN_SECONDS, MAX_SEGMENT_SECONDS, fallback);
+  return clampInteger(requested ?? fallback, MIN_SEGMENT_SECONDS, MAX_SEGMENT_SECONDS, fallback);
 }
 
 /**
@@ -390,6 +431,13 @@ function buildGenerationPrompt({ prompt, seconds }) {
     + '每句台词完整说完，环境声与背景音乐连续；'
     + '不要片头片尾、不要字幕、不要水印，不从画面外侧重新入场。'
   );
+}
+
+/** 把用户给的剧情描述接成完整句子时补个句号，避免两句粘在一起。 */
+function endWithPunctuation(text) {
+  const value = String(text ?? '').trim();
+  if (!value) return '';
+  return /[。．.!！?？;；~～:：,，]$/.test(value) ? value : `${value}。`;
 }
 
 function normalizeImageUrl(value, label) {
@@ -605,7 +653,14 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
   let copyError = '';
   let audioError = '';
 
-  if (ref(config, 'mergeMode', 'copy') !== 'reencode') {
+  const probed = [];
+  for (const file of files) probed.push(await probeMedia(file, config, signal));
+  const videos = probed.filter((media) => media && media.width && media.height);
+  // 分辨率/尺寸不一致时无损拼接会得到坏文件，直接走重编码。
+  const paramsMatch = videos.length !== probed.length
+    || videos.every((media) => media.width === videos[0].width && media.height === videos[0].height);
+
+  if (ref(config, 'mergeMode', 'copy') !== 'reencode' && paramsMatch) {
     const listPath = `${outPath}.concat.txt`;
     const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join('\n');
     await writeFile(listPath, `${lines}\n`, 'utf8');
@@ -619,10 +674,10 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
     } finally {
       await rm(listPath, { force: true });
     }
+  } else if (!paramsMatch) {
+    copyError = '分段分辨率不一致，跳过无损拼接。';
   }
 
-  const probed = [];
-  for (const file of files) probed.push(await probeMedia(file, config, signal));
   const first = probed.find((media) => media && media.width && media.height) || {};
   const width = evenNumber(first.width, 1280);
   const height = evenNumber(first.height, 720);
@@ -637,21 +692,26 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
 
   async function encode(filter, maps, withAudioTrack) {
     await rm(outPath, { force: true });
-    const cmd = [binary, '-y'];
-    for (const file of files) cmd.push('-i', file);
-    cmd.push('-filter_complex', filter, ...maps, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p');
-    if (withAudioTrack) cmd.push('-c:a', 'aac', '-b:a', '192k');
-    cmd.push('-movflags', '+faststart', outPath);
-    return runProcess(cmd, { signal });
+    const args = ['-y'];
+    for (const file of files) args.push('-i', file);
+    args.push('-filter_complex', filter, ...maps, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p');
+    if (withAudioTrack) args.push('-c:a', 'aac', '-b:a', '192k');
+    args.push('-movflags', '+faststart', outPath);
+    return runProcess(binary, args, { signal });
   }
 
   if (withAudio) {
-    const audioParts = files.map((_, index) => `[${index}:a]aresample=48000[a${index}]`);
-    const audioInputs = files.map((_, index) => `[a${index}]`).join('');
+    // concat 的输入按 (视频, 音频) 成对排列：v0,a0,v1,a1…
+    const audioParts = files.map((_, index) => (
+      `[${index}:a]aresample=48000,`
+      + 'aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo'
+      + `[a${index}]`
+    ));
+    const pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join('');
     const filter = [
       ...videoParts,
       ...audioParts,
-      `${videoInputs}${audioInputs}concat=n=${files.length}:v=1:a=1[v][a]`,
+      `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`,
     ].join(';');
     const { code, stderr } = await encode(filter, ['-map', '[v]', '-map', '[a]'], true);
     if (code === 0 && await exists(outPath)) return { path: outPath, mode: 'reencode' };
@@ -1004,8 +1064,10 @@ function extendTool(config) {
   return {
     name: 'seedance_extend',
     description:
-      '把一段已有的视频向后延长（续拍）：以公网视频 URL 作为参考视频，调用 Seedance 视频模型生成后续片段，'
-      + '保持人物、服装、场景光线和声音连续。可一次连续延长多段，每段都用上一段的结果作为参考视频。'
+      '把一段已有的视频向前或向后延长：以公网视频 URL 作为输入素材（提示词里用「视频1」指代），'
+      + '调用 Seedance 视频模型生成衔接片段，保持人物、服装、场景光线和声音连续。'
+      + '提示词会写清延长方向、剧情发展、主体状态、镜头运动和声音延续，减少接缝。'
+      + '可一次连续延长多段，每段都用上一段的结果继续延长。'
       + '返回每段的任务 ID 和最终视频下载链接（约 24 小时内有效）。生成通常需要几分钟。',
     parameters: {
       type: 'object',
@@ -1027,7 +1089,22 @@ function extendTool(config) {
           type: 'integer',
           minimum: 4,
           maximum: 15,
-          description: '每段新增的秒数，4-15；省略时使用配置默认值。',
+          description:
+            '每段新增的秒数，4-15 的整数（如 5/8/10/14）；建议 ≤14，'
+            + '刚好卡 15 秒容易因封装略超被上游拒绝。省略时使用配置默认值。',
+        },
+        direction: {
+          type: 'string',
+          enum: ['backward', 'forward'],
+          description:
+            'backward=向后延长，续拍视频1之后的内容（默认）；forward=向前延长，生成视频1之前的前置剧情。',
+        },
+        wording: {
+          type: 'string',
+          enum: ['extend', 'after'],
+          description:
+            '提示词开头写法：extend=「向后延长视频1」/「向前延长视频1」（默认）；'
+            + 'after=「生成视频1之后的内容：」（仅向后延长）。',
         },
         segments: {
           type: 'integer',
@@ -1045,7 +1122,8 @@ function extendTool(config) {
           type: 'number',
           minimum: 0,
           description:
-            '参考视频当前已有多少秒；给了就按「整片第 X–Y 秒」描述本段，多段时自动累加。',
+            '视频1已有的秒数；给了就按「整片第 X–Y 秒」描述本段。'
+            + '向后延长时逐段累加，向前延长时逐段前移。',
         },
         resolution: {
           type: 'string',
@@ -1095,6 +1173,7 @@ function extendTool(config) {
       const prompt = String(args?.prompt ?? '').trim();
       if (!prompt) throw new Error('提示词 prompt 不能为空。');
 
+      const direction = args?.direction === 'forward' ? 'forward' : 'backward';
       const requestedSegments = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
       const secondsPerSegment = clampInteger(
         args?.duration ?? ref(config, 'duration', 5),
@@ -1132,6 +1211,7 @@ function extendTool(config) {
           referenceUrl,
         );
         const final = await runTask(config, body, exec?.signal);
+        const taskId = final.taskId;
 
         segments.push({
           index,
@@ -1155,7 +1235,10 @@ function extendTool(config) {
           break;
         }
         referenceUrl = normalizeReferenceUrl(final.videoUrl);
-        if (cursor != null) cursor += seconds;
+        if (cursor != null) {
+          cursor = direction === 'forward' ? cursor - seconds : cursor + seconds;
+          if (cursor < 0) cursor = null;
+        }
       }
 
       return {
@@ -1264,7 +1347,9 @@ function videoTool(config, deps) {
           type: 'integer',
           minimum: 4,
           maximum: 15,
-          description: '超过单段上限时每段延长多少秒，默认用配置里的每段秒数。',
+          description:
+            '超过单段上限时每段延长多少秒，默认用配置里的每段秒数；'
+            + '4-15 的整数（如 5/8/10/14），建议 ≤14 以免刚好卡 15 秒被上游拒绝。',
         },
         mode: {
           type: 'string',
@@ -1366,6 +1451,8 @@ function videoTool(config, deps) {
           ...args,
           prompt,
           duration: step.seconds,
+          // 这条流程是「先直出再向后续拍」，分段的拼接顺序固定为向后延长。
+          direction: 'backward',
           startAt: step.kind === 'extend' ? cursor : undefined,
         };
         const { body, seconds } = step.kind === 'generate'
@@ -1657,7 +1744,7 @@ function configTool(config, settings) {
         submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
         queryPath: { type: 'string', description: '查询任务路径，{task_id} 会被替换。' },
         model: { type: 'string', description: '模型 ID，例如 doubao-seedance-2-0-mini-260615。' },
-        duration: { type: 'integer', minimum: 4, maximum: 15, description: '每段新增秒数（4-15）。' },
+        duration: { type: 'integer', minimum: 4, maximum: 15, description: '每段新增秒数（4-15 的整数，建议 ≤14）。' },
         mode: { type: 'string', enum: ['continuous', 'closeup'], description: '续拍方式。' },
         resolution: { type: 'string', enum: ['480p', '720p', '1080p'], description: '分辨率。' },
         ratio: {
