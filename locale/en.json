@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "MetaOnticVideo",
-    "description": "Extend an existing video with appended footage on Seedance, keeping people, scene and audio continuous."
+    "description": "AI video plugin: generate a clip directly up to 15 seconds; longer videos are extended in segments and merged into a single file with ffmpeg."
   }
 }

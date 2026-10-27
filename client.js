@@ -38,6 +38,14 @@ window.__ModuleLoader__.load({
       queryPath: '查询路径',
       model: '模型',
       duration: '每段秒数',
+      singleMaxSeconds: '直出上限（秒）',
+      mergeMode: '合并方式',
+      mergeModeCopy: '无损拼接',
+      mergeModeReencode: '重编码拼接',
+      outputDir: '输出目录',
+      keepSegments: '保留分段',
+      ffmpegBinary: 'ffmpeg 路径',
+      ffprobeBinary: 'ffprobe 路径',
       mode: '续拍方式',
       modeContinuous: '同机位连续',
       modeCloseup: '切近景',
@@ -75,6 +83,14 @@ window.__ModuleLoader__.load({
       queryPath: 'Query path',
       model: 'Model',
       duration: 'Seconds per segment',
+      singleMaxSeconds: 'Direct generation limit (s)',
+      mergeMode: 'Merge mode',
+      mergeModeCopy: 'Stream copy',
+      mergeModeReencode: 'Re-encode',
+      outputDir: 'Output directory',
+      keepSegments: 'Keep segments',
+      ffmpegBinary: 'ffmpeg path',
+      ffprobeBinary: 'ffprobe path',
       mode: 'Continuation',
       modeContinuous: 'Same camera',
       modeCloseup: 'Cut to close-up',
@@ -103,6 +119,7 @@ window.__ModuleLoader__.load({
       mode: ['continuous', 'closeup'],
       resolution: ['480p', '720p', '1080p'],
       ratio: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
+      mergeMode: ['copy', 'reencode'],
     };
     const FIELDS = [
       { key: 'provider', kind: 'select' },
@@ -110,6 +127,7 @@ window.__ModuleLoader__.load({
       { key: 'baseUrl', kind: 'text' },
       { key: 'model', kind: 'text' },
       { key: 'duration', kind: 'number' },
+      { key: 'singleMaxSeconds', kind: 'number' },
       { key: 'mode', kind: 'select' },
       { key: 'resolution', kind: 'select' },
       { key: 'ratio', kind: 'select' },
@@ -120,6 +138,11 @@ window.__ModuleLoader__.load({
       { key: 'extraParams', kind: 'text' },
       { key: 'pollIntervalMs', kind: 'number' },
       { key: 'maxWaitMs', kind: 'number' },
+      { key: 'mergeMode', kind: 'select' },
+      { key: 'outputDir', kind: 'text' },
+      { key: 'keepSegments', kind: 'switch' },
+      { key: 'ffmpegBinary', kind: 'text' },
+      { key: 'ffprobeBinary', kind: 'text' },
     ];
 
     const TOKENS = {
@@ -149,6 +172,7 @@ window.__ModuleLoader__.load({
     function optionLabel(t, key, option) {
       if (key === 'provider') return option === 'ark' ? t('providerArk') : t('providerNewapi');
       if (key === 'mode') return option === 'closeup' ? t('modeCloseup') : t('modeContinuous');
+      if (key === 'mergeMode') return option === 'reencode' ? t('mergeModeReencode') : t('mergeModeCopy');
       return option;
     }
 

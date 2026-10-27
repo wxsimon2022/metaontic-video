@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "MetaOnticVideo",
-    "description": "AI视频生成插件。"
+    "description": "AI 视频生成插件：15 秒以内的视频直接生成；更长的会自动逐段续拍，再用 ffmpeg 合并成一个成片文件。"
   }
 }

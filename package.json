@@ -1,7 +1,7 @@
 {
   "name": "metaontic-video",
-  "version": "1.0.0",
-  "description": "DeepSeek Harness plugin: extend an existing video by appending new footage with Seedance (New API relay or Volcano Ark), with an in-app configuration page.",
+  "version": "1.1.0",
+  "description": "DeepSeek Harness plugin: generate short videos with Seedance - a single generation up to 15 seconds, or a base clip plus automatically extended segments merged into one file with ffmpeg. Works through a New API relay or Volcano Ark, with an in-app configuration page.",
   "license": "MIT",
   "type": "module",
   "keywords": [
@@ -11,6 +11,8 @@
     "seedance",
     "video",
     "video-extension",
+    "text-to-video",
+    "ffmpeg",
     "new-api"
   ],
   "repository": {

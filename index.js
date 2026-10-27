@@ -1,9 +1,11 @@
 /**
- * MetaOnticVideo —— Seedance 视频延长（向后续拍）Host plugin.
+ * MetaOnticVideo —— Seedance 短视频生成 + 视频延长（向后续拍）Host plugin.
  *
  * 注册的工具：
+ *   - `seedance_video`        生成一段完整视频：总时长不超过单段上限（默认 15 秒）时直接生成；
+ *                             更长时先直出首段，再逐段延长，最后用 ffmpeg 合并成一个本地成片
  *   - `seedance_extend`       以一段公网视频为参考，向后延长指定秒数；可一次连续延长多段
- *   - `seedance_extend_task`  按任务 ID 查询延长任务的状态
+ *   - `seedance_extend_task`  按任务 ID 查询任务的状态
  *   - `seedance_extend_config` 读取/写回本插件自己的配置（走宿主的 settings 服务，
  *                             写进 profile 的 cordis.patch.yml；配置字段都是 .volatile()，
  *                             宿主重载后立即生效，不必手改 YAML）
@@ -21,6 +23,12 @@
  * 响应解析兼容中转站：状态别名（success/completed…）、任务 ID 字段（id/task_id/taskId）、
  * 深层取件（data.content.video_url），并跳过 cover/首尾帧等图片字段。
  */
+import { spawn } from 'node:child_process';
+import { createWriteStream } from 'node:fs';
+import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import z from '@deepseek-ai/schemastery';
 
 export const inject = ['tools'];
@@ -59,7 +67,31 @@ export const Config = z.object({
     .volatile(),
   duration: z.number().step(1).min(4).max(30)
     .default(5)
-    .description('每段延长出来的秒数（不含参考视频本身），4-30')
+    .description('每段延长出来的秒数（不含参考视频本身），4-30；seedance_video 生成长视频时按它分段')
+    .volatile(),
+  singleMaxSeconds: z.number().step(1).min(4).max(15)
+    .default(15)
+    .description('单次直出上限：不超过它就一次生成，超过它就先直出这一段再逐段延长（4-15）')
+    .volatile(),
+  mergeMode: z.union(['copy', 'reencode'])
+    .default('copy')
+    .description('合并方式：copy=先无损拼接（参数不一致时自动回退重编码）；reencode=统一重编码')
+    .volatile(),
+  outputDir: z.string()
+    .default('')
+    .description('成片输出目录；留空用会话工作目录下的 metaontic-video/')
+    .volatile(),
+  keepSegments: z.boolean()
+    .default(false)
+    .description('合并后是否保留分段原片')
+    .volatile(),
+  ffmpegBinary: z.string()
+    .default('ffmpeg')
+    .description('ffmpeg 可执行文件；PATH 里没有时填绝对路径')
+    .volatile(),
+  ffprobeBinary: z.string()
+    .default('ffprobe')
+    .description('ffprobe 可执行文件；PATH 里没有时填绝对路径')
     .volatile(),
   mode: z.union(['continuous', 'closeup'])
     .default('continuous')
@@ -99,6 +131,13 @@ const DEFAULT_MODEL = 'doubao-seedance-2-0-mini-260615';
 const MAX_SEGMENTS = 10;
 const MIN_SECONDS = 4;
 const MAX_SECONDS = 30;
+/** Seedance 单段最长 15 秒：不超过它一次直出，超过它才需要延长。 */
+const MAX_DIRECT_SECONDS = 15;
+/** 输出目录的默认子目录名。 */
+const DEFAULT_OUTPUT_DIR = 'metaontic-video';
+/** 判断「上游返回的是累计成片」的容差：累计时长的 25%，且至少 1.5 秒。 */
+const CUMULATIVE_TOLERANCE_RATIO = 0.25;
+const CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5;
 
 /** provider 预设：字段留空时按这里的顺序回退到环境变量，再回退到预设默认值。 */
 const PROVIDERS = {
@@ -305,6 +344,340 @@ function buildRequestBody(config, args, referenceVideoUrl) {
     body.omni_reference_task_type = 'extend';
   }
   return { body, seconds };
+}
+
+/* ---------------- 时长规划：不超上限就直出，超过就延长 ---------------- */
+
+/** 单次直出上限；Seedance 单段最长 15 秒，所以配置只在 4-15 之间生效。 */
+function resolveSingleMax(config) {
+  return clampInteger(
+    ref(config, 'singleMaxSeconds', MAX_DIRECT_SECONDS),
+    MIN_SECONDS,
+    MAX_DIRECT_SECONDS,
+    MAX_DIRECT_SECONDS,
+  );
+}
+
+/** 每次延长出来的秒数（不含参考视频本身）。 */
+function resolveSegmentSeconds(config, requested) {
+  const fallback = ref(config, 'duration', 5);
+  return clampInteger(requested ?? fallback, MIN_SECONDS, MAX_SECONDS, fallback);
+}
+
+/**
+ * 把目标总时长拆成执行计划：
+ * 不超过单段上限 → 一段直出；超过 → 先直出上限长度，再按每段秒数延长，最多 MAX_SEGMENTS 段。
+ */
+function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
+  if (totalSeconds <= singleMax) return [{ kind: 'generate', seconds: totalSeconds }];
+  const plan = [{ kind: 'generate', seconds: singleMax }];
+  let remaining = totalSeconds - singleMax;
+  while (remaining > 0 && plan.length < MAX_SEGMENTS) {
+    const seconds = Math.min(remaining, segmentSeconds);
+    plan.push({ kind: 'extend', seconds });
+    remaining -= seconds;
+  }
+  return plan;
+}
+
+/** 直出用的提示词：和延长不同，这里不引用任何参考视频。 */
+function buildGenerationPrompt({ prompt, seconds }) {
+  return (
+    `生成 ${seconds} 秒视频。${prompt}`
+    + '保持人物面貌、体型、服装和音色一致，场景光线、色调与镜头运动连贯；'
+    + '每句台词完整说完，环境声与背景音乐连续；'
+    + '不要片头片尾、不要字幕、不要水印，不从画面外侧重新入场。'
+  );
+}
+
+function normalizeImageUrl(value, label) {
+  const url = String(value ?? '').trim();
+  if (!url) throw new Error(`${label} 不能为空。`);
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error(`${label} 必须是 https:// 或 http:// 开头的公网 URL（不能用本地文件路径）。`);
+  }
+  return url;
+}
+
+/** 直出请求体：文本 + 可选首帧/尾帧图，沿用火山 contents-generation 的原生格式。 */
+function buildGenerationBody(config, args, seconds) {
+  const prompt = String(args.prompt ?? '').trim();
+  const content = [{ type: 'text', text: buildGenerationPrompt({ prompt, seconds }) }];
+
+  const firstFrame = String(args.firstFrameUrl ?? '').trim();
+  if (firstFrame) {
+    content.push({
+      type: 'image_url',
+      image_url: { url: normalizeImageUrl(firstFrame, '首帧图 URL') },
+      role: 'first_frame',
+    });
+  }
+  const lastFrame = String(args.lastFrameUrl ?? '').trim();
+  if (lastFrame) {
+    content.push({
+      type: 'image_url',
+      image_url: { url: normalizeImageUrl(lastFrame, '尾帧图 URL') },
+      role: 'last_frame',
+    });
+  }
+
+  const body = { ...parseExtraParams(config) };
+  body.model = resolveModel(config);
+  body.content = content;
+  body.duration = seconds;
+  body.ratio = args.ratio || ref(config, 'ratio', 'adaptive');
+
+  const resolution = args.resolution ?? ref(config, 'resolution', '720p');
+  if (resolution) body.resolution = resolution;
+
+  const generateAudio = args.generateAudio ?? ref(config, 'generateAudio', true);
+  if (typeof generateAudio === 'boolean') body.generate_audio = generateAudio;
+
+  const watermark = args.watermark ?? ref(config, 'watermark', false);
+  if (typeof watermark === 'boolean') body.watermark = watermark;
+
+  if (args.user) body.safety_identifier = String(args.user);
+  if (typeof args.returnLastFrame === 'boolean') body.return_last_frame = args.returnLastFrame;
+  if (args.seed != null && Number.isFinite(Number(args.seed))) body.seed = Number(args.seed);
+
+  return { body, seconds };
+}
+
+/** 创建任务并等到结束；超时、取消、失败都归一化成同一形状。 */
+async function runTask(config, body, signal) {
+  const created = await createTask(config, body);
+  const taskId = extractTaskId(created);
+  if (!taskId) throw new Error('创建任务失败：响应中缺少任务 ID。');
+  try {
+    const final = await waitForCompletion(config, taskId, signal);
+    return { ...final, taskId };
+  } catch (failure) {
+    if (failure?.code === 'ABORTED') throw failure;
+    if (failure?.code && failure.code !== 'provider_failed') {
+      return { taskId, status: 'failed', error: failure.message, errorCode: failure.code };
+    }
+    return { taskId, status: 'failed', error: failure?.message || String(failure) };
+  }
+}
+
+/* ---------------- 分段下载与 ffmpeg 合并 ---------------- */
+
+function resolveBinary(config, key, fallback) {
+  return String(ref(config, key, '')).trim() || fallback;
+}
+
+function formatSeconds(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return String(value ?? '');
+  return Number.isInteger(number) ? String(number) : number.toFixed(1);
+}
+
+function fileStamp(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`
+    + `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
+
+async function exists(file) {
+  try {
+    await stat(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 跑一个子进程并收全输出；找不到可执行文件时归一化成 ffmpeg_missing。 */
+async function runProcess(binary, args, { signal, timeoutMs = 1800000 } = {}) {
+  return new Promise((resolve, reject) => {
+    let child;
+    try {
+      child = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (error) {
+      reject(Object.assign(new Error(`${binary} 无法启动：${error?.message || error}`), {
+        code: 'ffmpeg_missing',
+      }));
+      return;
+    }
+
+    let stdout = '';
+    let stderr = '';
+    let done = false;
+
+    function cleanup() {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    }
+    function settle(error, value) {
+      if (done) return;
+      done = true;
+      cleanup();
+      if (error) reject(error);
+      else resolve(value);
+    }
+    function onAbort() {
+      child.kill('SIGKILL');
+      settle(abortError());
+    }
+
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      settle(Object.assign(new Error(`${binary} 执行超时。`), { code: 'ffmpeg_timeout' }));
+    }, timeoutMs);
+
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+    signal?.addEventListener('abort', onAbort, { once: true });
+    child.on('error', (error) => settle(Object.assign(
+      new Error(`${binary} 无法启动：${error.message}`),
+      { code: error.code === 'ENOENT' ? 'ffmpeg_missing' : 'ffmpeg_failed' },
+    )));
+    child.stdout?.on('data', (chunk) => { stdout += chunk; });
+    child.stderr?.on('data', (chunk) => { stderr += chunk; });
+    child.on('close', (code) => settle(null, { code, stdout, stderr }));
+  });
+}
+
+/** 探测分段的时长/尺寸；ffprobe 缺失或失败都返回 null，不影响主流程。 */
+async function probeMedia(file, config, signal) {
+  try {
+    const { code, stdout } = await runProcess(resolveBinary(config, 'ffprobeBinary', 'ffprobe'), [
+      '-v', 'error',
+      '-show_entries', 'format=duration:stream=codec_type,width,height,r_frame_rate',
+      '-of', 'json',
+      file,
+    ], { signal, timeoutMs: 60000 });
+    if (code !== 0) return null;
+    const parsed = JSON.parse(stdout);
+    const streams = Array.isArray(parsed?.streams) ? parsed.streams : [];
+    const video = streams.find((stream) => stream.codec_type === 'video') || {};
+    const [num, den] = String(video.r_frame_rate || '').split('/').map(Number);
+    const duration = Number(parsed?.format?.duration);
+    return {
+      durationSeconds: Number.isFinite(duration) && duration > 0 ? duration : 0,
+      width: Number(video.width) || 0,
+      height: Number(video.height) || 0,
+      fps: Number.isFinite(num) && Number.isFinite(den) && den > 0 ? num / den : 0,
+      hasAudio: streams.some((stream) => stream.codec_type === 'audio'),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function downloadFile(url, destPath, { signal } = {}) {
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    throw Object.assign(new Error(`下载分段失败（HTTP ${response.status}）：${url}`), {
+      code: 'download_failed',
+    });
+  }
+  if (!response.body) {
+    throw Object.assign(new Error(`下载分段失败：响应没有内容（${url}）。`), {
+      code: 'download_failed',
+    });
+  }
+  await mkdir(path.dirname(destPath), { recursive: true });
+  const partial = `${destPath}.part`;
+  await pipeline(Readable.fromWeb(response.body), createWriteStream(partial));
+  await rename(partial, destPath);
+  return destPath;
+}
+
+function evenNumber(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return fallback;
+  const rounded = Math.round(number);
+  return rounded % 2 === 0 ? rounded : rounded - 1;
+}
+
+/**
+ * 把分段合并成一个文件：先试无损拼接，需要时统一重编码（带音频，失败再退回只并视频）。
+ */
+async function mergeClips(config, files, outPath, { signal } = {}) {
+  const binary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
+  await mkdir(path.dirname(outPath), { recursive: true });
+  await rm(outPath, { force: true });
+  let copyError = '';
+  let audioError = '';
+
+  if (ref(config, 'mergeMode', 'copy') !== 'reencode') {
+    const listPath = `${outPath}.concat.txt`;
+    const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join('\n');
+    await writeFile(listPath, `${lines}\n`, 'utf8');
+    try {
+      const { code, stderr } = await runProcess(binary, [
+        '-y', '-f', 'concat', '-safe', '0', '-i', listPath,
+        '-c', 'copy', '-movflags', '+faststart', outPath,
+      ], { signal });
+      if (code === 0 && await exists(outPath)) return { path: outPath, mode: 'copy' };
+      copyError = stderr.trim().slice(-400);
+    } finally {
+      await rm(listPath, { force: true });
+    }
+  }
+
+  const probed = [];
+  for (const file of files) probed.push(await probeMedia(file, config, signal));
+  const first = probed.find((media) => media && media.width && media.height) || {};
+  const width = evenNumber(first.width, 1280);
+  const height = evenNumber(first.height, 720);
+  const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
+  const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
+
+  const videoParts = files.map((_, index) => (
+    `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,`
+    + `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${index}]`
+  ));
+  const videoInputs = files.map((_, index) => `[v${index}]`).join('');
+
+  async function encode(filter, maps, withAudioTrack) {
+    await rm(outPath, { force: true });
+    const cmd = [binary, '-y'];
+    for (const file of files) cmd.push('-i', file);
+    cmd.push('-filter_complex', filter, ...maps, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p');
+    if (withAudioTrack) cmd.push('-c:a', 'aac', '-b:a', '192k');
+    cmd.push('-movflags', '+faststart', outPath);
+    return runProcess(cmd, { signal });
+  }
+
+  if (withAudio) {
+    const audioParts = files.map((_, index) => `[${index}:a]aresample=48000[a${index}]`);
+    const audioInputs = files.map((_, index) => `[a${index}]`).join('');
+    const filter = [
+      ...videoParts,
+      ...audioParts,
+      `${videoInputs}${audioInputs}concat=n=${files.length}:v=1:a=1[v][a]`,
+    ].join(';');
+    const { code, stderr } = await encode(filter, ['-map', '[v]', '-map', '[a]'], true);
+    if (code === 0 && await exists(outPath)) return { path: outPath, mode: 'reencode' };
+    audioError = stderr.trim().slice(-400);
+  }
+
+  const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(';');
+  const { code, stderr } = await encode(filter, ['-map', '[v]'], false);
+  if (code === 0 && await exists(outPath)) {
+    return { path: outPath, mode: withAudio ? 'reencode-video-only' : 'reencode' };
+  }
+  const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(' | ');
+  throw Object.assign(new Error(`ffmpeg 合并失败：${detail || '未知错误'}`), { code: 'ffmpeg_failed' });
+}
+
+/** 成片目录：配置优先，否则用会话工作目录下的 metaontic-video/。 */
+async function resolveOutputDir(config, exec, deps) {
+  const configured = String(ref(config, 'outputDir', '')).trim();
+  if (configured) return path.resolve(configured);
+  let cwd = '';
+  if (deps?.workdir && exec?.agent) {
+    try {
+      cwd = (await deps.workdir.ensure(exec.agent, exec.signal)) || '';
+    } catch {
+      cwd = '';
+    }
+  }
+  return path.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
 }
 
 /* ---------------- 响应解析：兼容官方与中转站的不同形状 ---------------- */
@@ -756,21 +1129,7 @@ function extendTool(config) {
           { ...args, prompt, duration: secondsPerSegment, startAt: cursor },
           referenceUrl,
         );
-        const created = await createTask(config, body);
-        const taskId = extractTaskId(created);
-        if (!taskId) throw new Error('创建延长任务失败：响应中缺少任务 ID。');
-
-        let final;
-        try {
-          final = await waitForCompletion(config, taskId, exec?.signal);
-        } catch (failure) {
-          if (failure?.code === 'ABORTED') throw failure;
-          if (failure?.code && failure.code !== 'provider_failed') {
-            final = { taskId, status: 'failed', error: failure.message, errorCode: failure.code };
-          } else {
-            final = { taskId, status: 'failed', error: failure?.message || String(failure) };
-          }
-        }
+        const final = await runTask(config, body, exec?.signal);
 
         segments.push({
           index,
@@ -806,6 +1165,328 @@ function extendTool(config) {
         totalSeconds: segments.filter((segment) => segment.status === 'succeeded').length
           * secondsPerSegment,
       };
+    },
+  };
+}
+
+const VIDEO_SEGMENT_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    index: { type: 'integer' },
+    kind: { type: 'string' },
+    seconds: { type: 'integer' },
+    taskId: { type: 'string' },
+    status: { type: 'string' },
+    videoUrl: { type: 'string' },
+    localPath: { type: 'string' },
+    durationSeconds: { type: 'number' },
+    error: { type: 'string' },
+  },
+};
+
+function renderVideoResult(value) {
+  const {
+    status, mode, segments = [], videoUrl, videoPath, merged, mergeMode, note, error,
+  } = value || {};
+  const lines = segments.map((segment) => {
+    const label = segment.kind === 'extend' ? `延长 +${segment.seconds}s` : `直出 ${segment.seconds}s`;
+    const head = `第 ${segment.index} 段：${label}（任务 ${segment.taskId}）`;
+    return segment.status === 'succeeded' && segment.videoUrl
+      ? `${head} → ${segment.videoUrl}`
+      : `${head} → ${segment.status}${segment.error ? `：${segment.error}` : ''}`;
+  });
+
+  const parts = [];
+  if (status === 'succeeded') {
+    parts.push(mode === 'extended'
+      ? `视频生成成功：先直出 ${formatSeconds(segments[0]?.seconds)} 秒，再延长 ${segments.length - 1} 段。`
+      : `视频生成成功：一次直出 ${formatSeconds(segments[0]?.seconds)} 秒，没有超过单段上限，不需要延长。`);
+  } else if (status === 'timeout') {
+    parts.push('任务仍在生成中（已超出单次等待时间）。');
+  } else if (status === 'cancelled') {
+    parts.push('任务已取消。');
+  } else {
+    parts.push(`视频生成失败${error ? `：${error}` : ''}。`);
+  }
+  parts.push(...lines);
+
+  if (status === 'succeeded') {
+    if (videoPath) {
+      const how = mergeMode === 'copy'
+        ? '无损拼接'
+        : (mergeMode === 'single' ? '一段直出，无需拼接' : '重编码拼接');
+      parts.push(`成片（本地文件）：${videoPath}（${how}）`);
+    } else {
+      parts.push('没有生成合并文件，请按上面的上游链接自行下载分段。');
+    }
+  }
+  if (videoUrl) parts.push(`最后一段上游链接（约 24 小时内有效）：${videoUrl}`);
+  if (note) parts.push(note);
+  if (status === 'timeout') {
+    parts.push(`可用 seedance_extend_task 查询任务 ${segments.at(-1)?.taskId || '（未知）'} 的状态。`);
+  }
+  return [{ type: 'text', text: parts.filter(Boolean).join('\n') }];
+}
+
+function videoTool(config, deps) {
+  return {
+    name: 'seedance_video',
+    description:
+      '生成一段完整视频：目标总时长不超过单段上限（默认 15 秒）时直接调用 Seedance 生成；'
+      + '更长时先直出首段，再用视频延长能力逐段续拍（默认每段 5 秒），'
+      + '最后用 ffmpeg 把分段合并成一个本地成片文件。返回每段任务 ID、上游链接和成片路径。'
+      + '生成通常需要几分钟。',
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: '要生成的内容、人物设定与台词；超过单段上限时它同时决定后续每段续拍什么。',
+        },
+        duration: {
+          type: 'integer',
+          minimum: 4,
+          maximum: 285,
+          description:
+            '目标总时长（秒）。不超过单段上限（默认 15）就直接生成；超过就先直出上限长度再逐段延长，最后合并。',
+        },
+        firstFrameUrl: {
+          type: 'string',
+          description: '可选：首帧图公网 URL，作为生成的首帧参考。',
+        },
+        lastFrameUrl: {
+          type: 'string',
+          description: '可选：尾帧图公网 URL，作为生成的尾帧参考。',
+        },
+        segmentSeconds: {
+          type: 'integer',
+          minimum: 4,
+          maximum: 30,
+          description: '超过单段上限时每段延长多少秒，默认用配置里的每段秒数。',
+        },
+        mode: {
+          type: 'string',
+          enum: ['continuous', 'closeup'],
+          description: '延长时的衔接方式：continuous=同机位连续（默认）；closeup=在台词结束处切近景。',
+        },
+        resolution: {
+          type: 'string',
+          enum: ['480p', '720p', '1080p'],
+          description: '分辨率，默认沿用配置。',
+        },
+        ratio: {
+          type: 'string',
+          enum: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
+          description: '画面比例；seedance 2.5 延长时会自动改用 adaptive。',
+        },
+        generateAudio: {
+          type: 'boolean',
+          description: '是否生成音频，默认 true。',
+        },
+        watermark: {
+          type: 'boolean',
+          description: '是否添加水印，默认 false。',
+        },
+        merge: {
+          type: 'boolean',
+          description: '是否下载分段并用 ffmpeg 合并成一个本地成片，默认 true。',
+        },
+        keepSegments: {
+          type: 'boolean',
+          description: '合并后是否保留分段原片，默认 false（合并成功后删除分段）。',
+        },
+      },
+      required: ['prompt'],
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: {
+          status: { type: 'string' },
+          mode: { type: 'string' },
+          plannedSeconds: { type: 'integer' },
+          totalSeconds: { type: 'integer' },
+          videoUrl: { type: 'string' },
+          videoPath: { type: 'string' },
+          merged: { type: 'boolean' },
+          mergeMode: { type: 'string' },
+          segmentsDir: { type: 'string' },
+          note: { type: 'string' },
+          error: { type: 'string' },
+          errorCode: { type: 'string' },
+          segments: { type: 'array', items: VIDEO_SEGMENT_OUTPUT_SCHEMA },
+        },
+      },
+      render(_args, value) {
+        return renderVideoResult(value);
+      },
+    },
+    timeoutMs: 3600000,
+    isConcurrencySafe() {
+      return true;
+    },
+    async execute(args, exec) {
+      const apiKey = resolveApiKey(config);
+      assertConfigured(config, apiKey);
+
+      const prompt = String(args?.prompt ?? '').trim();
+      if (!prompt) throw new Error('提示词 prompt 不能为空。');
+
+      const singleMax = resolveSingleMax(config);
+      const segmentSeconds = resolveSegmentSeconds(config, args?.segmentSeconds);
+      const total = clampInteger(
+        args?.duration ?? singleMax,
+        MIN_SECONDS,
+        singleMax + (MAX_SEGMENTS - 1) * MAX_SECONDS,
+        singleMax,
+      );
+      const plan = planVideoSegments(total, singleMax, segmentSeconds);
+      const plannedTotal = plan.reduce((sum, step) => sum + step.seconds, 0);
+
+      const notes = [];
+      if (plannedTotal < total) {
+        notes.push(
+          `目标 ${total} 秒超过单次最多 ${MAX_SEGMENTS} 段的上限，本次按 ${plannedTotal} 秒执行。`,
+        );
+      }
+
+      const segments = [];
+      let status = 'succeeded';
+      let error;
+      let errorCode;
+      let referenceUrl = '';
+      let cursor = 0;
+
+      for (const [index, step] of plan.entries()) {
+        if (exec?.signal?.aborted) throw abortError();
+
+        const stepArgs = {
+          ...args,
+          prompt,
+          duration: step.seconds,
+          startAt: step.kind === 'extend' ? cursor : undefined,
+        };
+        const { body, seconds } = step.kind === 'generate'
+          ? buildGenerationBody(config, stepArgs, step.seconds)
+          : buildRequestBody(config, stepArgs, referenceUrl);
+
+        const final = await runTask(config, body, exec?.signal);
+        const detail = final.errorCode === 'content_rejected'
+          ? `${CONTENT_REJECTION_HINT}上游详情：${final.error || ''}`
+          : final.error;
+
+        segments.push({
+          index: index + 1,
+          kind: step.kind,
+          seconds,
+          taskId: final.taskId,
+          status: final.status,
+          videoUrl: final.videoUrl,
+          error: detail,
+        });
+
+        if (final.status !== 'succeeded' || !final.videoUrl) {
+          status = final.status;
+          errorCode = final.errorCode;
+          error = detail;
+          break;
+        }
+        referenceUrl = normalizeReferenceUrl(final.videoUrl);
+        cursor += seconds;
+      }
+
+      const completed = segments.filter((segment) => segment.status === 'succeeded' && segment.videoUrl);
+      const result = {
+        status,
+        mode: plan.length > 1 ? 'extended' : 'direct',
+        plannedSeconds: plannedTotal,
+        totalSeconds: completed.reduce((sum, segment) => sum + segment.seconds, 0),
+        segments,
+        videoUrl: completed.at(-1)?.videoUrl,
+        error,
+        errorCode,
+      };
+      if (status !== 'succeeded' || !completed.length) return result;
+
+      if (args?.merge === false) {
+        result.note = [...notes, '按参数要求只返回上游链接，没有下载合并。'].join('\n');
+        return result;
+      }
+
+      const stamp = fileStamp();
+      const outDir = await resolveOutputDir(config, exec, deps);
+      const segmentsDir = path.join(outDir, 'segments', stamp);
+      const files = [];
+
+      try {
+        for (const [index, segment] of completed.entries()) {
+          const dest = path.join(
+            segmentsDir,
+            `${String(segment.index).padStart(2, '0')}-${segment.kind}.mp4`,
+          );
+          await downloadFile(segment.videoUrl, dest, { signal: exec?.signal });
+          segment.localPath = dest;
+
+          const media = await probeMedia(dest, config, exec?.signal);
+          if (media?.durationSeconds) {
+            segment.durationSeconds = Number(media.durationSeconds.toFixed(2));
+            const cumulative = completed.slice(0, index + 1)
+              .reduce((sum, item) => sum + item.seconds, 0);
+            const tolerance = Math.max(
+              CUMULATIVE_TOLERANCE_MIN_SECONDS,
+              cumulative * CUMULATIVE_TOLERANCE_RATIO,
+            );
+            const looksCumulative = files.length > 0
+              && Math.abs(media.durationSeconds - cumulative) <= tolerance
+              && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
+            if (looksCumulative) {
+              files.length = 0;
+              notes.push(
+                `第 ${segment.index} 段实测 ${formatSeconds(media.durationSeconds)} 秒，`
+                + `接近累计时长 ${cumulative} 秒，按「上游返回的是累计成片」处理。`,
+              );
+            }
+          }
+          files.push(dest);
+        }
+      } catch (failure) {
+        if (failure?.code === 'ABORTED') throw failure;
+        result.note = [...notes, `分段已生成，但下载失败：${failure?.message || failure}`].join('\n');
+        return result;
+      }
+
+      if (!files.length) return result;
+
+      const finalPath = path.join(outDir, `${stamp}-${plannedTotal}s.mp4`);
+      try {
+        if (files.length === 1) {
+          await rm(finalPath, { force: true });
+          await rename(files[0], finalPath);
+          result.mergeMode = 'single';
+        } else {
+          const merged = await mergeClips(config, files, finalPath, { signal: exec?.signal });
+          result.mergeMode = merged.mode;
+        }
+        result.merged = true;
+        result.videoPath = finalPath;
+      } catch (failure) {
+        if (failure?.code === 'ABORTED') throw failure;
+        const reason = failure?.code === 'ffmpeg_missing'
+          ? `没有找到 ${resolveBinary(config, 'ffmpegBinary', 'ffmpeg')}，分段已保留但没有合并成一个文件；`
+            + '在插件配置里填 ffmpegBinary，或把 ffmpeg 装进 PATH 后重试。'
+          : `分段已生成，但合并失败：${failure?.message || failure}`;
+        result.segmentsDir = segmentsDir;
+        result.note = [...notes, reason].join('\n');
+        return result;
+      }
+
+      if (args?.keepSegments ?? ref(config, 'keepSegments', false)) {
+        result.segmentsDir = segmentsDir;
+      } else {
+        await rm(segmentsDir, { recursive: true, force: true });
+      }
+      if (notes.length) result.note = notes.join('\n');
+      return result;
     },
   };
 }
@@ -902,8 +1583,9 @@ function taskTool(config) {
 /** 用户可在插件内改的配置字段。 */
 const CONFIG_FIELDS = [
   'provider', 'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
-  'duration', 'mode', 'resolution', 'ratio', 'generateAudio', 'watermark',
+  'duration', 'singleMaxSeconds', 'mode', 'resolution', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
+  'mergeMode', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary',
 ];
 
 function maskSecrets(view) {
@@ -951,8 +1633,9 @@ function configTool(config, settings) {
     name: 'seedance_extend_config',
     description:
       '读取或修改 seedance_extend 插件自己的配置（provider、apiKey、baseUrl、submitPath、'
-      + 'queryPath、model、duration、mode、resolution、ratio、generateAudio、watermark、'
-      + 'extraParams、pollIntervalMs、maxWaitMs）。改动写进 profile 的 cordis.patch.yml，'
+      + 'queryPath、model、duration、singleMaxSeconds、mode、resolution、ratio、generateAudio、'
+      + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、outputDir、keepSegments、'
+      + 'ffmpegBinary、ffprobeBinary）。改动写进 profile 的 cordis.patch.yml，'
       + '宿主重载后生效。用户说「把中转站地址/模型/时长改成 X」时用 action=set。',
     parameters: {
       type: 'object',
@@ -981,6 +1664,21 @@ function configTool(config, settings) {
         extraParams: { type: 'string', description: '额外请求参数（JSON 对象字符串）。' },
         pollIntervalMs: { type: 'integer', minimum: 1000, description: '轮询间隔（毫秒）。' },
         maxWaitMs: { type: 'integer', minimum: 1000, description: '单次调用最长等待（毫秒）。' },
+        singleMaxSeconds: {
+          type: 'integer',
+          minimum: 4,
+          maximum: 15,
+          description: '单次直出上限（秒）：不超过它一次生成，超过它才分段延长。',
+        },
+        mergeMode: {
+          type: 'string',
+          enum: ['copy', 'reencode'],
+          description: '合并方式：copy=先无损拼接（失败自动重编码）；reencode=统一重编码。',
+        },
+        outputDir: { type: 'string', description: '成片输出目录；留空用会话工作目录下的 metaontic-video/。' },
+        keepSegments: { type: 'boolean', description: '合并后是否保留分段原片。' },
+        ffmpegBinary: { type: 'string', description: 'ffmpeg 可执行文件路径。' },
+        ffprobeBinary: { type: 'string', description: 'ffprobe 可执行文件路径。' },
       },
       required: ['action'],
     },
@@ -1050,7 +1748,9 @@ function configTool(config, settings) {
 }
 
 export function apply(ctx, config = {}) {
+  const deps = {};
   const disposers = [
+    ctx.tools.register(videoTool(config, deps)),
     ctx.tools.register(extendTool(config)),
     ctx.tools.register(taskTool(config)),
   ];
@@ -1059,6 +1759,12 @@ export function apply(ctx, config = {}) {
     disposers.push(settingsCtx.tools.register(configTool(config, settingsCtx.settings)));
   });
   if (typeof cleanup === 'function') disposers.push(cleanup);
+  // 会话工作目录也是可选的：宿主不提供时合并结果落在进程 cwd 下。
+  const workdirCleanup = ctx.inject(['workingDirectory'], (workdirCtx) => {
+    deps.workdir = workdirCtx.workingDirectory;
+    return () => { deps.workdir = undefined; };
+  });
+  if (typeof workdirCleanup === 'function') disposers.push(workdirCleanup);
   return () => {
     for (const dispose of disposers) dispose();
   };

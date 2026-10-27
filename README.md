@@ -1,8 +1,9 @@
 # MetaOnticVideo（DeepSeek Harness 插件）
 
-把 Seedance 的「视频延长 / 向后续拍」能力封装成 Harness 插件。
+把 Seedance 的「短视频直出 + 视频延长（向后续拍）」能力封装成 Harness 插件：
+目标时长不超过单段上限（默认 15 秒）时一次生成，更长时先直出首段、再逐段续拍，最后用 ffmpeg 合并成一个成片文件。
 显示名 **MetaOnticVideo**，npm 包名 `metaontic-video`，profile 条目 id `metaontic-video`。
-它不依赖任何特定平台，只复用同一套上游语义：
+它不依赖任何特定平台（合并只用本机 ffmpeg），只复用同一套上游语义：
 
 - 提示词以「向后延长视频1」开头，说明续拍秒数与衔接约束；
 - `content` 里用 `{"type":"video_url","video_url":{"url":...},"role":"reference_video"}` 传参考视频；
@@ -13,9 +14,30 @@
 
 | 工具 | 作用 |
 | --- | --- |
+| `seedance_video` | 生成一段完整视频：不超过单段上限直出；更长时直出首段 + 逐段延长，最后合并成本地 mp4 |
 | `seedance_extend` | 以一段公网视频为参考向后延长，可一次连续延长多段，返回每段任务 ID 与最终视频链接 |
 | `seedance_extend_task` | 按任务 ID 查询延长任务状态（单次调用超时后用它取结果） |
 | `seedance_extend_config` | 读取/修改插件自己的配置（不改 YAML 也能换中转站地址、模型、时长） |
+
+## 生成一段完整视频：≤15 秒直出，更长自动续拍再合并
+
+`seedance_video` 按目标总时长决定走哪条路：
+
+| 目标时长 | 做法 |
+| --- | --- |
+| ≤ `singleMaxSeconds`（默认 15 秒） | 直接调用 Seedance 生成一次，不做延长 |
+| > 15 秒 | 先按上限直出首段，再用视频延长能力按 `duration`（默认 5 秒）逐段续拍，每段引用上一段的成片 |
+
+分段全部生成后下载到本地，再合并成一个文件：
+
+- 默认 `mergeMode: copy` 先用 concat demuxer 无损拼接；参数不一致时自动回退统一重编码（带音频，必要时退回只并视频）。
+- 每段下载后探测真实时长：实测接近累计时长时，判定上游返回的是「累计成片」，改用这一段作为基础，避免重复拼接。
+- 成片落在 `outputDir`（留空用会话工作目录下的 `metaontic-video/`），文件名形如 `20261027-201530-25s.mp4`；
+  分段默认在合并成功后删除，`keepSegments: true` 可保留。
+- 需要本机有 `ffmpeg` / `ffprobe`（PATH 里没有时在配置里填 `ffmpegBinary` / `ffprobeBinary`）。
+  找不到 ffmpeg 不会让任务失败：分段链接照常返回，只是不合并成一个文件。
+
+例：「用这段提示词生成 25 秒视频」→ 15 秒直出 + 5 秒 + 5 秒，再合并成 25 秒成片。
 
 ## 两种上游：New API 中转站 / 火山方舟官方
 
@@ -107,6 +129,8 @@ git push --follow-tags
 除了这两项差异，其余可调项相同：
 
 ```yaml
+    singleMaxSeconds: 15 # ≤ 它一次直出，超过它才分段延长
+    duration: 5          # 超过单段上限时，每段延长多少秒
     mode: continuous     # continuous 同机位续拍 / closeup 切近景续拍
     resolution: 720p
     ratio: adaptive
@@ -115,6 +139,11 @@ git push --follow-tags
     pollIntervalMs: 5000
     maxWaitMs: 600000
     extraParams: '{}'    # JSON 对象字符串，合并进请求体
+    mergeMode: copy      # copy 先无损拼接（失败自动重编码）/ reencode 统一重编码
+    outputDir: ''        # 留空 = 会话工作目录下的 metaontic-video/
+    keepSegments: false  # 合并成功后是否保留分段原片
+    ffmpegBinary: ffmpeg # PATH 里没有 ffmpeg 时填绝对路径
+    ffprobeBinary: ffprobe
 ```
 
 ## 在插件里改配置
@@ -134,8 +163,9 @@ git push --follow-tags
 本插件自带浏览器半侧（`client.js`），在侧栏**插件**页里给本插件加了一张配置卡片：
 
 - 卡片摘要显示「上游 · 模型 · 每段秒数」，没配好的时候提示先去选上游填密钥。
-- 打开卡片就是表单：上游、API Key、基础地址、模型、每段秒数、续拍方式、分辨率、画面比例、
-  音频/水印开关，以及提交路径、查询路径、额外参数、轮询间隔、最长等待。
+- 打开卡片就是表单：上游、API Key、基础地址、模型、每段秒数、直出上限、续拍方式、分辨率、
+  画面比例、音频/水印开关、合并方式、输出目录、保留分段、ffmpeg/ffprobe 路径，
+  以及提交路径、查询路径、额外参数、轮询间隔、最长等待。
 - 改完点**保存**只写你改过的字段（`form.set`），**恢复默认**清除 profile 里的覆盖（`form.unset`）；
   写入带宿主修订号校验，被更高层配置覆盖时不会静默写坏。
 - API Key 只显示「是否已配置」，留空表示保持原值，不会把掩码值写回去。
@@ -155,3 +185,4 @@ git push --follow-tags
 - 参考视频必须是上游能直接拉取的公网 URL；本地文件路径不支持。
 - 含人脸续拍通常需要同一上游账号下的受信原始产物，否则会被内容审核拒绝。
 - 不保证人脸、声线、口型和背景完全连续；上游返回的成品链接一般 24 小时内有效。
+- 超过单段上限的成片由多段拼成，接缝处仍需自己预览；合并只统一容器与编码，不做画面修补。
