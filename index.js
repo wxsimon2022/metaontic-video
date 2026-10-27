@@ -425,17 +425,22 @@ function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
     }
   }
 
+  // 剩余时长按段数尽量均分（25 秒、每段上限 14 秒 → 15+10，而不是 15+5+5）。
+  const slots = MAX_SEGMENTS - 1;
+  const count = Math.min(slots, Math.max(1, Math.ceil(remaining / segmentSeconds)));
+  const sizes = [];
+  let left = remaining;
+  for (let index = count; index > 0 && left > 0; index -= 1) {
+    let size = Math.min(segmentSeconds, Math.ceil(left / index));
+    if (size < MIN_SEGMENT_SECONDS) size = Math.min(segmentSeconds, MIN_SEGMENT_SECONDS);
+    sizes.push(size);
+    left -= size;
+  }
+
   const plan = [{ kind: 'generate', seconds: base }];
-  while (remaining > 0 && plan.length < MAX_SEGMENTS) {
-    let seconds = Math.min(remaining, segmentSeconds);
-    const rest = remaining - seconds;
-    if (rest > 0 && rest < MIN_SEGMENT_SECONDS) {
-      if (seconds + rest <= MAX_SEGMENT_SECONDS) seconds += rest;
-      else seconds -= MIN_SEGMENT_SECONDS - rest;
-    }
-    if (seconds < MIN_SEGMENT_SECONDS) seconds = MIN_SEGMENT_SECONDS;
+  for (const seconds of sizes) {
+    if (plan.length >= MAX_SEGMENTS) break;
     plan.push({ kind: 'extend', seconds });
-    remaining -= seconds;
   }
   return plan;
 }
