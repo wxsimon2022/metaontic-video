@@ -65,9 +65,9 @@ export const Config = z.object({
     .default('')
     .description('支持视频延长的模型 ID（seedance 2.0 / 2.5 系列）；留空按 provider 取默认值')
     .volatile(),
-  duration: z.number().step(1).min(4).max(30)
+  duration: z.number().step(1).min(4).max(15)
     .default(5)
-    .description('每段延长出来的秒数（不含参考视频本身），4-30；seedance_video 生成长视频时按它分段')
+    .description('每段延长出来的秒数（不含参考视频本身），4-15；seedance_video 生成长视频时按它分段')
     .volatile(),
   singleMaxSeconds: z.number().step(1).min(4).max(15)
     .default(15)
@@ -130,7 +130,9 @@ export const Config = z.object({
 const DEFAULT_MODEL = 'doubao-seedance-2-0-mini-260615';
 const MAX_SEGMENTS = 10;
 const MIN_SECONDS = 4;
-const MAX_SECONDS = 30;
+const MIN_SEGMENT_SECONDS = 4;
+/** 单段延长（续拍）的秒数上限：Seedance 原生延长只接受 4-15 秒。 */
+const MAX_SEGMENT_SECONDS = 15;
 /** Seedance 单段最长 15 秒：不超过它一次直出，超过它才需要延长。 */
 const MAX_DIRECT_SECONDS = 15;
 /** 输出目录的默认子目录名。 */
@@ -310,7 +312,7 @@ function normalizeReferenceUrl(value) {
 
 function buildRequestBody(config, args, referenceVideoUrl) {
   const model = resolveModel(config);
-  const seconds = clampInteger(args.duration, MIN_SECONDS, MAX_SECONDS, ref(config, 'duration', 5));
+  const seconds = clampInteger(args.duration, MIN_SECONDS, MAX_SEGMENT_SECONDS, ref(config, 'duration', 5));
   const mode = args.mode || ref(config, 'mode', 'continuous');
   const prompt = String(args.prompt ?? '').trim();
   const startAt = args.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
@@ -361,7 +363,7 @@ function resolveSingleMax(config) {
 /** 每次延长出来的秒数（不含参考视频本身）。 */
 function resolveSegmentSeconds(config, requested) {
   const fallback = ref(config, 'duration', 5);
-  return clampInteger(requested ?? fallback, MIN_SECONDS, MAX_SECONDS, fallback);
+  return clampInteger(requested ?? fallback, MIN_SECONDS, MAX_SEGMENT_SECONDS, fallback);
 }
 
 /**
@@ -1024,8 +1026,8 @@ function extendTool(config) {
         duration: {
           type: 'integer',
           minimum: 4,
-          maximum: 30,
-          description: '每段新增的秒数，4-30；省略时使用配置默认值。',
+          maximum: 15,
+          description: '每段新增的秒数，4-15；省略时使用配置默认值。',
         },
         segments: {
           type: 'integer',
@@ -1097,7 +1099,7 @@ function extendTool(config) {
       const secondsPerSegment = clampInteger(
         args?.duration ?? ref(config, 'duration', 5),
         MIN_SECONDS,
-        MAX_SECONDS,
+        MAX_SEGMENT_SECONDS,
         ref(config, 'duration', 5),
       );
 
@@ -1261,7 +1263,7 @@ function videoTool(config, deps) {
         segmentSeconds: {
           type: 'integer',
           minimum: 4,
-          maximum: 30,
+          maximum: 15,
           description: '超过单段上限时每段延长多少秒，默认用配置里的每段秒数。',
         },
         mode: {
@@ -1337,7 +1339,7 @@ function videoTool(config, deps) {
       const total = clampInteger(
         args?.duration ?? singleMax,
         MIN_SECONDS,
-        singleMax + (MAX_SEGMENTS - 1) * MAX_SECONDS,
+        singleMax + (MAX_SEGMENTS - 1) * MAX_SEGMENT_SECONDS,
         singleMax,
       );
       const plan = planVideoSegments(total, singleMax, segmentSeconds);
@@ -1417,6 +1419,7 @@ function videoTool(config, deps) {
       const outDir = await resolveOutputDir(config, exec, deps);
       const segmentsDir = path.join(outDir, 'segments', stamp);
       const files = [];
+      let probeWarned = false;
 
       try {
         for (const [index, segment] of completed.entries()) {
@@ -1446,6 +1449,9 @@ function videoTool(config, deps) {
                 + `接近累计时长 ${cumulative} 秒，按「上游返回的是累计成片」处理。`,
               );
             }
+          } else if (!probeWarned) {
+            probeWarned = true;
+            notes.push('没有可用的 ffprobe，无法探测分段时长，按「每段都是增量片段」直接拼接。');
           }
           files.push(dest);
         }
@@ -1651,7 +1657,7 @@ function configTool(config, settings) {
         submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
         queryPath: { type: 'string', description: '查询任务路径，{task_id} 会被替换。' },
         model: { type: 'string', description: '模型 ID，例如 doubao-seedance-2-0-mini-260615。' },
-        duration: { type: 'integer', minimum: 4, maximum: 30, description: '每段新增秒数。' },
+        duration: { type: 'integer', minimum: 4, maximum: 15, description: '每段新增秒数（4-15）。' },
         mode: { type: 'string', enum: ['continuous', 'closeup'], description: '续拍方式。' },
         resolution: { type: 'string', enum: ['480p', '720p', '1080p'], description: '分辨率。' },
         ratio: {

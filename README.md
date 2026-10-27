@@ -26,7 +26,7 @@
 | 目标时长 | 做法 |
 | --- | --- |
 | ≤ `singleMaxSeconds`（默认 15 秒） | 直接调用 Seedance 生成一次，不做延长 |
-| > 15 秒 | 先按上限直出首段，再用视频延长能力按 `duration`（默认 5 秒）逐段续拍，每段引用上一段的成片 |
+| > 15 秒 | 先按上限直出首段，再用视频延长能力按 `duration`（默认 5 秒，可设 4-15 秒）逐段续拍，每段引用上一段的成片 |
 
 分段全部生成后下载到本地，再合并成一个文件：
 
@@ -130,7 +130,7 @@ git push --follow-tags
 
 ```yaml
     singleMaxSeconds: 15 # ≤ 它一次直出，超过它才分段延长
-    duration: 5          # 超过单段上限时，每段延长多少秒
+    duration: 5          # 超过单段上限时，每段延长多少秒（4-15）
     mode: continuous     # continuous 同机位续拍 / closeup 切近景续拍
     resolution: 720p
     ratio: adaptive
