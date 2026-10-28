@@ -42,7 +42,7 @@ window.__ModuleLoader__.load({
       registerUser: '用户名（就是这把 API 的名字）',
       registerTitle: '没有 API Key？',
       registerHint: '先填用户名——它就是你领到的 API 名称，填谁的名字后台就显示谁，方便认领；'
-        + '填好点按钮即可，成功后自动写好上游、Key、地址与模型。默认额度 0.01 美元。',
+        + '填好点按钮即可，成功后自动写好上游、Key、地址与模型。默认额度 ¥0.01。',
       registerUserPlaceholder: '你的名字 / 昵称',
       registerNeedUser: '先填用户名，再点注册。',
       registerRestored: '已找回本机密钥：这台设备之前领过的那把帮你填好了，点「保存」即可。',
@@ -101,7 +101,7 @@ window.__ModuleLoader__.load({
       registerUser: 'User name (this becomes the API name)',
       registerTitle: 'No API key yet?',
       registerHint: 'Type your name first — it becomes the API name you receive, so it is easy to claim later; '
-        + 'then use the button. Provider, key, base URL and model are filled in for you. Default quota US$0.01.',
+        + 'then use the button. Provider, key, base URL and model are filled in for you. Default quota ¥0.01.',
       registerUserPlaceholder: 'Your name / nickname',
       registerNeedUser: 'Type a user name before registering.',
       registerRestored: 'Restored the key issued to this device; click Save to apply.',
@@ -578,13 +578,21 @@ window.__ModuleLoader__.load({
             : (registerStatus === 'restored'
               ? t('registerRestored')
               : registerMessage));
-        const usd = (value) => `$${(Number(value) || 0).toFixed(4)}`;
+        // 金额按服务端给的币种符号展示（当前服务端是中转站口径的人民币 ¥）；
+        // 老服务端只回 *_usd 字段时退回 $，两边都能看清是多少钱。
+        const quotaSymbol = quota && quota.currency_symbol
+          ? quota.currency_symbol
+          : (quota && quota.remain_amount !== undefined ? '¥' : '$');
+        const money = (field, legacyField) => {
+          const raw = quota ? (quota[field] ?? quota[legacyField]) : 0;
+          return `${quotaSymbol}${(Number(raw) || 0).toFixed(4)}`;
+        };
         const quotaReady = quotaStatus === 'ok' && quota;
         const quotaText = quotaReady
           ? `${t('quotaSummary', {
-            remain: quota.unlimited_quota ? t('quotaUnlimited') : usd(quota.remain_usd),
-            used: usd(quota.used_usd),
-            total: usd(quota.total_usd),
+            remain: quota.unlimited_quota ? t('quotaUnlimited') : money('remain_amount', 'remain_usd'),
+            used: money('used_amount', 'used_usd'),
+            total: money('total_amount', 'total_usd'),
           })} · ${t('quotaUpdatedAt', { time: quotaAt })}`
           : (keyReady ? t('quotaLoading') : t('quotaNoKey'));
         const quotaBox = h('div', {
