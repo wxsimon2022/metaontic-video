@@ -79,6 +79,9 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 > 默认 `metaontic-video-register-v1`，要与服务端 `REGISTER_CLIENT_TOKEN` 一致），
 > 免得注册入口被随手扫。用户已经领过 Key 之后，设置页只显示「已经领到 Key 了」，
 > 不会再要求填一遍；想换一把时点「重新领一把」。
+>
+> **不支持重复领取**：同一台设备或同一个用户名只能领一把，再领会直接告诉你「不支持重复领取」
+> （服务端不会在中转站多开 token）。密钥丢了或额度用完，找管理员重置后再领。
 
 需要手工指定 Key / 地址的场景（例如临时换成别人给的 Key），可以直接跟 Harness 说
 「把视频插件的 API Key 设成 sk-xxx、地址设成 https://…」，它会用 `video_config` 工具写进配置。

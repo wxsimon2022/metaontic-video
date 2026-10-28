@@ -35,10 +35,6 @@ import z from '@deepseek-ai/schemastery';
 export const inject = ['tools'];
 
 export const Config = z.object({
-  provider: z.union(['newapi', 'ark'])
-    .default('newapi')
-    .description('只支持 newapi（New API 中转站）；火山官方已移除，旧配置里写成 ark 也一律按中转站走')
-    .volatile(),
   entryId: z.string()
     .default('metaontic-video')
     .description('本插件在 profile patch 里的条目 id；配置工具用它把改动写回')
@@ -65,10 +61,6 @@ export const Config = z.object({
   model: z.string()
     .default('')
     .description('支持视频延长的模型 ID（seedance 2.0 / 2.5 系列）；留空读 NEWAPI_VIDEO_MODEL 或内置默认值')
-    .volatile(),
-  registerApiBase: z.string()
-    .default('https://video.mybfs.cn')
-    .description('「注册并填写」按钮调用的注册服务地址；默认 https://video.mybfs.cn，页面不显示也不开放修改')
     .volatile(),
   registerUser: z.string()
     .default('')
@@ -158,16 +150,14 @@ const CUMULATIVE_TOLERANCE_RATIO = 0.25;
 const CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5;
 
 /** provider 预设：字段留空时按这里的顺序回退到环境变量，再回退到预设默认值。 */
-const PROVIDERS = {
-  newapi: {
+const RELAY_PRESET = {
     baseUrl: '',
     submitPath: '/doubao/api/v3/contents/generations/tasks',
     queryPath: '/doubao/api/v3/contents/generations/tasks/{task_id}',
     model: DEFAULT_MODEL,
     keyEnv: ['NEWAPI_API_KEY'],
     baseEnv: ['NEWAPI_VIDEO_BASE_URL', 'NEWAPI_BASE_URL'],
-    modelEnv: ['NEWAPI_VIDEO_MODEL'],
-  },
+  modelEnv: ['NEWAPI_VIDEO_MODEL'],
 };
 
 const SUCCESS_STATES = new Set(['succeeded', 'success', 'completed', 'complete', 'done', 'finished']);
@@ -219,9 +209,9 @@ function ref(config, key, fallback) {
   return value === undefined || value === null || value === '' ? fallback : value;
 }
 
-function providerPreset() {
-  // 火山官方已移除：不论旧配置写的是什么，一律按中转站的预设走。
-  return PROVIDERS.newapi;
+function relayPreset() {
+  // 只走 New API 中转站（火山官方已移除），路径/模型都取这一份预设。
+  return RELAY_PRESET;
 }
 
 function envValue(names) {
@@ -233,26 +223,26 @@ function envValue(names) {
 }
 
 function resolveApiKey(config) {
-  return String(ref(config, 'apiKey', '')).trim() || envValue(providerPreset().keyEnv);
+  return String(ref(config, 'apiKey', '')).trim() || envValue(relayPreset().keyEnv);
 }
 
 function resolveBaseUrl(config) {
-  const preset = providerPreset();
+  const preset = relayPreset();
   return (String(ref(config, 'baseUrl', '')).trim() || envValue(preset.baseEnv) || preset.baseUrl)
     .replace(/\/+$/, '');
 }
 
 function resolveSubmitPath(config) {
-  return String(ref(config, 'submitPath', '')).trim() || providerPreset().submitPath;
+  return String(ref(config, 'submitPath', '')).trim() || relayPreset().submitPath;
 }
 
 function resolveQueryPath(config, taskId) {
-  const path = String(ref(config, 'queryPath', '')).trim() || providerPreset().queryPath;
+  const path = String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath;
   return path.replace('{task_id}', encodeURIComponent(taskId));
 }
 
 function resolveModel(config) {
-  const preset = providerPreset();
+  const preset = relayPreset();
   return String(ref(config, 'model', '')).trim() || envValue(preset.modelEnv) || preset.model;
 }
 
@@ -1855,7 +1845,7 @@ function configView(config) {
     effective: {
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),
-      queryPath: String(ref(config, 'queryPath', '')).trim() || providerPreset().queryPath,
+      queryPath: String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath,
       model: resolveModel(config),
       apiKeySource: ref(config, 'apiKey', '')
         ? 'config'
@@ -1873,7 +1863,7 @@ async function writeProfileConfig(settings, config, patch) {
     throw new Error(
       `profile patch 里没有可编辑的 ${entryId} 条目，无法写回配置。`
       + '请先在 profile 的 cordis.patch.yml 里加一条覆盖项：\n'
-      + `- id: ${entryId}\n  name: 'metaontic-video'\n  config: { provider: newapi, baseUrl: '...', model: '...' }\n`
+      + `- id: ${entryId}\n  name: 'metaontic-video'\n  config: { apiKey: 'sk-...', baseUrl: '...', model: '...' }\n`
       + '（也可以让 Agent 代写这一条。）',
     );
   }
