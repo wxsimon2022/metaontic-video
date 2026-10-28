@@ -408,9 +408,11 @@ function resolveSegmentSeconds(config, requested) {
 
 /**
  * 把目标总时长拆成执行计划：
- * 不超过单段上限 → 一段直出；超过 → 先直出上限长度，再按每段秒数延长，最多 MAX_SEGMENTS 段。
+ * 不超过单段上限 → **只生成一段**（这是硬规则：≤ 单段上限的视频禁止拆分）；超过 → 先直出上限长度，
+ * 再按每段秒数延长，最多 MAX_SEGMENTS 段（那是同一条视频的续拍段，不是多镜拼接）。
  */
 function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
+  // ≤ 单段上限：一次直出，绝不拆段（回归测试见 tests/：15 → '15'）
   if (totalSeconds <= singleMax) return [{ kind: 'generate', seconds: totalSeconds }];
 
   // 尾段不足最小分段秒数（4 秒）时先把首段缩短一点，避免拆出 1-3 秒的非法分段。
@@ -1455,7 +1457,10 @@ function videoTool(config, deps) {
     name: 'video_generate',
     description:
       '生成一段完整视频，duration 是目标总秒数：不超过单段上限（默认 15 秒）时一次直出；'
-      + '更长时先直出首段，再把剩余时长按段均分逐段续拍（每段 4-15 秒，建议 ≤14 秒），'
+      + '**硬规则：总时长 ≤ 单段上限的视频必须一次直出，禁止拆成多段 / 多镜 / 多次调用再拼接**'
+      + '（例如「15 秒」不许拆成 8+7）；多镜只在用户明确要求多镜时才用。'
+      + '更长时先直出首段，再把剩余时长按段均分逐段续拍（每段 4-15 秒，建议 ≤14 秒）——'
+      + '这是同一个镜头的续拍延长，也不是多镜拼接，'
       + '最后用 ffmpeg 合并成一个本地成片文件，默认落在会话工作目录下的 metaontic-video/，'
       + '文件名形如 20261027-201530-25s.mp4。20 秒、25 秒这类目标不用拆成多个任务：'
       + '直接传 duration=20 即可（20 秒 → 15+5，25 秒 → 15+10）。'
@@ -1474,7 +1479,8 @@ function videoTool(config, deps) {
           minimum: 4,
           maximum: 285,
           description:
-            '目标总时长（秒）。不超过单段上限（默认 15）就直接生成；超过就先直出上限长度再逐段延长，最后合并。',
+            '目标总时长（秒）。不超过单段上限（默认 15）时就一次直出（整条视频只生成一次，'
+            + '禁止拆成多段/多镜再拼）；超过就先直出上限长度再逐段延长，最后合并。',
         },
         firstFrameUrl: {
           type: 'string',
@@ -1489,7 +1495,7 @@ function videoTool(config, deps) {
           minimum: 4,
           maximum: 15,
           description:
-            '超过单段上限时每段延长多少秒，默认用配置里的每段秒数；'
+            '仅在超过单段上限时才用：每段延长多少秒，默认用配置里的每段秒数；'
             + '4-15 的整数（如 5/8/10/14），建议 ≤14 以免刚好卡 15 秒被上游拒绝。',
         },
         mode: {
@@ -2006,9 +2012,13 @@ function buildPromptGuidance(config) {
   const segmentSeconds = resolveSegmentSeconds(config);
   return [
     'MetaOnticVideo（Seedance 视频插件）：需要生成视频、给视频加减时长时优先用它。',
-    `· 新视频用 video_generate，duration 传目标总秒数：不超过单段上限（当前 ${singleMax} 秒）时一次直出；`
-      + '更长会自动拆成首段 + 若干延长段，下载后用 ffmpeg 合并成一个本地成片，'
-      + '默认落在会话工作目录下的 metaontic-video/。所以「20 秒视频」直接传 duration=20，不用拆成多个任务。',
+    `· 新视频用 video_generate，duration 传目标总秒数。**硬规则：总时长 ≤ ${singleMax} 秒（单段上限）的整条`
+      + '视频必须一次直出，禁止拆成多镜 / 多段 / 多次 video_generate 再拼接**——'
+      + `例如「15 秒」就是一次 15 秒，不许拆成 8+7；也不要为了「中间切一刀更好看」而分镜，`
+      + '分镜只在用户明确要求多镜时使用。'
+      + '超过上限时（如 20 秒）会自动拆成首段 + 若干延长段并合并——那是同一条视频的续拍延长，不是多镜拼接。'
+      + '所以「20 秒视频」直接传 duration=20，不用拆成多个任务；'
+      + '成片默认落在会话工作目录下的 metaontic-video/。',
     '· 给已有视频接长用 video_extend，输入必须是公网 URL；提示词以「向后延长视频1」或「向前延长视频1」开头，'
       + '全程用「视频1」指代素材，不要写「参考视频1」；写清延长方向、剧情发展、主体状态、镜头运动、声音延续；'
       + '每段 4-15 秒，建议不超过 14 秒。',
