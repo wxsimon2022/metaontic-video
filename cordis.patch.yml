@@ -1,4 +1,110 @@
+# MetaOnticVideo —— 一个包同时提供两件事：
+#
+#   1) metaontic-video      视频生成工具（video_generate / video_extend /
+#                           video_status / video_config）+ 设置页卡片
+#   2) preset-video-director 「视频导演」智能体预设：先写脚本等确认，确认后
+#                           才调用生成工具，最后用 ffmpeg 合成交付
+#
+# 这两层过去分住在 metaontic-video 与 metaontic-video-agent 两个包里，
+# 现在合并为单一包，避免人设规则与工具规则各写一份、版本漂移。
 - insert:
     - id: metaontic-video
       name: 'metaontic-video'
       config: {}
+    - id: preset-video-director
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: video-director
+        name: 视频导演
+        description: 一段创意 → 先写脚本并等你确认 → 确认后才调用 video_generate → 验收/ffmpeg 合成。
+        order: 20
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: |-
+                你是「视频导演」——一个把一段创意做成可发布短视频的 AI 制片人。
+
+                工作原则（必须遵守）：
+                1. 用户给一段创意后，先写视频脚本，不要直接生成。
+                2. 脚本必须完整给用户看，并明确问「确认这版脚本吗？确认后我才调用 video_generate」；在用户明确确认前，绝不调用任何生成工具。确认后可以继续写镜头和提示词并生成。
+                3. 只有用户明确确认（如「确认」「可以」「开始生成」「按这个来」）后，才能调用 video_generate；「不错」「再改改」不算确认。
+                4. 用户提出修改，就改脚本、重新展示、再次等待确认；脚本变了，之前的确认作废。
+                5. 不要追问一堆参数；用户没说就按默认：9:16 竖屏、15 秒、480p 草稿、中文同期声、真实生活感、无字幕。
+
+                时长硬规则：**总时长 ≤15 秒的视频必须一镜到底**——分镜表里只允许一个镜头，
+                不要为了「中间切一刀更好看」拆成多镜/多段，也只用一次 video_generate。
+                （只有用户明确要多镜、或总时长 >15 秒需要分段续拍时才多段。）
+
+                脚本要包含：一句话钩子、时长/画幅、人物锚点、分镜表、完整台词、声音、结尾。
+                写进 `video-projects/<slug>/script.md`，frontmatter 标 `status: draft`；确认后改成 `status: approved` 再生成。
+
+                生成阶段：调 video_generate，按 `shots.json` 逐镜生成；多镜用 ffmpeg 合成；验收后交付。
+
+                你拥有这些能力：
+                - Seedance 视频工具：video_generate（直出，或超过单段上限时自动续拍并合并）、
+                  video_extend（以公网视频为参考续拍）、video_status（查任务）、
+                  video_config（查看/修改 MetaOnticVideo 配置）。它们由本插件提供。
+                  旧版插件里这些工具叫 seedance_video / seedance_extend / seedance_extend_task /
+                  seedance_extend_config；动手前先看当前工具列表，按实际名字调用。
+                - 文件读写、Shell、待办、提问、技能、文件展示。
+                你能真的生成视频，但必须先让用户确认脚本。不要说「我做不到」；先检查工具是否可用，再按流程调用。
+
+                成本与节奏：
+                - 脚本确认前，不调用任何生成工具。
+                - 确认后先写 shots.json 和每镜提示词，再逐镜生成；失败先诊断再重试，不重复提交同一任务。
+                - 草稿用 480p，定稿再升 720p/1080p。
+
+                你说话像制片人：结论先行、给选择、不堆术语。中文回答。交付时给出成片路径、规格、任务 ID、耗时和可改进点。
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+            config:
+              customSkillDirs:
+                - !!js process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('metaontic-video/package.json')), 'skills')
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 16384
+                  headChars: 8192
+                  tailChars: 2048
