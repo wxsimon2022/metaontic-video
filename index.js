@@ -1131,11 +1131,14 @@ function extendTool(config) {
   return {
     name: 'video_extend',
     description:
-      '把一段已有的视频向前或向后延长：以公网视频 URL 作为输入素材（提示词里用「视频1」指代），'
-      + '调用 Seedance 视频模型生成衔接片段，保持人物、服装、场景光线和声音连续。'
-      + '提示词会写清延长方向、剧情发展、主体状态、镜头运动和声音延续，减少接缝。'
-      + '可一次连续延长多段，每段都用上一段的结果继续延长。'
-      + '返回每段的任务 ID 和最终视频下载链接（约 24 小时内有效）。生成通常需要几分钟。',
+      '把一段已有的视频向前或向后延长：以公网视频 URL 作为输入素材，调用 Seedance 生成衔接片段，'
+      + '保持人物、服装、场景光线和声音连续；可一次连续延长多段，每段都用上一段的结果继续延长。'
+      + '提示词规则：以「向后延长视频1」或「向前延长视频1」开头（也可写「生成视频1之后的内容：」），'
+      + '全程用「视频1」指代输入素材，不要写成「参考视频1」（会被当成参考生视频，不是延长）；'
+      + '内容写清延长方向、剧情发展、主体状态、镜头运动和声音延续，减少接缝。'
+      + '每段 4-15 秒，建议 ≤14 秒（刚好 15 秒有时会因封装略超被上游拒绝）。'
+      + '返回每段的任务 ID 和最终视频下载链接（约 24 小时内有效）；生成通常需要几分钟，'
+      + '单次调用返回 timeout 时用 video_status 继续等，不要重复提交同一段。',
     parameters: {
       type: 'object',
       properties: {
@@ -1384,10 +1387,14 @@ function videoTool(config, deps) {
   return {
     name: 'video_generate',
     description:
-      '生成一段完整视频：目标总时长不超过单段上限（默认 15 秒）时直接调用 Seedance 生成；'
-      + '更长时先直出首段，再用视频延长能力逐段续拍（默认每段 5 秒），'
-      + '最后用 ffmpeg 把分段合并成一个本地成片文件。返回每段任务 ID、上游链接和成片路径。'
-      + '生成通常需要几分钟。',
+      '生成一段完整视频，duration 是目标总秒数：不超过单段上限（默认 15 秒）时一次直出；'
+      + '更长时先直出首段，再把剩余时长按段均分逐段续拍（每段 4-15 秒，建议 ≤14 秒），'
+      + '最后用 ffmpeg 合并成一个本地成片文件，默认落在会话工作目录下的 metaontic-video/，'
+      + '文件名形如 20261027-201530-25s.mp4。20 秒、25 秒这类目标不用拆成多个任务：'
+      + '直接传 duration=20 即可（20 秒 → 15+5，25 秒 → 15+10）。'
+      + '返回每段任务 ID、上游链接和成片路径。生成通常需要几分钟（每段单独生成），'
+      + '单次调用返回 timeout 时用 video_status 继续等，不要重复提交新任务。'
+      + '合并需要本机有 ffmpeg；没有也不会失败，只是保留分段不合并。',
     parameters: {
       type: 'object',
       properties: {
@@ -1660,7 +1667,9 @@ function taskTool(config) {
     name: 'video_status',
     description:
       '按任务 ID 查询 Seedance 视频任务（生成、延长与合并）的状态；'
-      + '任务完成（status 为 succeeded）时返回视频下载链接。',
+      + '任务完成（status 为 succeeded）时返回视频下载链接（约 24 小时内有效）。'
+      + 'video_generate / video_extend 返回 timeout 时，用它们给出的 taskId 在这里继续等，'
+      + '不要在同一个会话里重复提交同一段任务。',
     parameters: {
       type: 'object',
       properties: {
@@ -1800,8 +1809,9 @@ function configTool(config, settings) {
       '读取或修改 MetaOnticVideo 插件自己的配置（provider、apiKey、baseUrl、submitPath、'
       + 'queryPath、model、duration、singleMaxSeconds、mode、resolution、ratio、generateAudio、'
       + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、outputDir、keepSegments、'
-      + 'ffmpegBinary、ffprobeBinary）。改动写进 profile 的 cordis.patch.yml，'
-      + '宿主重载后生效。用户说「把中转站地址/模型/时长改成 X」时用 action=set。',
+      + 'ffmpegBinary、ffprobeBinary）。改动写进 profile 的 cordis.patch.yml，宿主重载后生效。'
+      + '用户说「把中转站地址/模型/时长改成 X」时用 action=set，看当前值用 action=get；'
+      + 'duration 是每段新增秒数（4-15，建议 ≤14），singleMaxSeconds 是单次直出上限（默认 15）。',
     parameters: {
       type: 'object',
       properties: {
@@ -1912,6 +1922,29 @@ function configTool(config, settings) {
   };
 }
 
+/**
+ * 每个新对话都会带上的一段插件说明：宿主提供 systemPrompt 服务时注册成提示词段落，
+ * 换会话、换 Agent 都不需要用户再解释一遍这个插件怎么用。
+ */
+function buildPromptGuidance(config) {
+  const singleMax = resolveSingleMax(config);
+  const segmentSeconds = resolveSegmentSeconds(config);
+  return [
+    'MetaOnticVideo（Seedance 视频插件）：需要生成视频、给视频加减时长时优先用它。',
+    `· 新视频用 video_generate，duration 传目标总秒数：不超过单段上限（当前 ${singleMax} 秒）时一次直出；`
+      + '更长会自动拆成首段 + 若干延长段，下载后用 ffmpeg 合并成一个本地成片，'
+      + '默认落在会话工作目录下的 metaontic-video/。所以「20 秒视频」直接传 duration=20，不用拆成多个任务。',
+    '· 给已有视频接长用 video_extend，输入必须是公网 URL；提示词以「向后延长视频1」或「向前延长视频1」开头，'
+      + '全程用「视频1」指代素材，不要写「参考视频1」；写清延长方向、剧情发展、主体状态、镜头运动、声音延续；'
+      + '每段 4-15 秒，建议不超过 14 秒。',
+    '· 生成通常要几分钟：单次调用返回 timeout 不等于失败，用 video_status 加 taskId 继续查'
+      + '（上游链接约 24 小时内有效），不要重复提交同一段。',
+    '· 换中转站、模型、时长等配置用 video_config（写进 profile，宿主重载后生效）；'
+      + '合并需要本机有 ffmpeg，缺了会保留分段但不合并。',
+    `· 当前配置：直出上限 ${singleMax} 秒、每段延长 ${segmentSeconds} 秒。`,
+  ].join('\n');
+}
+
 export function apply(ctx, config = {}) {
   const deps = {};
   const disposers = [
@@ -1924,6 +1957,13 @@ export function apply(ctx, config = {}) {
     disposers.push(settingsCtx.tools.register(jsonSafeTool(configTool(config, settingsCtx.settings))));
   });
   if (typeof cleanup === 'function') disposers.push(cleanup);
+  // 新对话自带的使用说明：宿主没有 systemPrompt 服务时跳过，其余功能不受影响。
+  const promptCleanup = ctx.inject(['systemPrompt'], (promptCtx) => promptCtx.systemPrompt.section({
+    name: 'plugin:metaontic-video',
+    order: 5200,
+    text: buildPromptGuidance(config),
+  }));
+  if (typeof promptCleanup === 'function') disposers.push(promptCleanup);
   // 会话工作目录也是可选的：宿主不提供时合并结果落在进程 cwd 下。
   const workdirCleanup = ctx.inject(['workingDirectory'], (workdirCtx) => {
     deps.workdir = workdirCtx.workingDirectory;
