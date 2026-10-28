@@ -38,7 +38,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 另外还需要两件「账号 + 网络」上的准备：
 
-- **上游账号**：New API 中转站。不用自己准备 Key——第二步点一下「注册并填写」就会领一把；
+- **上游账号**：New API 中转站。不用自己准备 Key——第二步点一下「激活」就会领一把；
   已另有 Key 的话也可以直接设进插件（或设环境变量 `NEWAPI_API_KEY`）。
 - **网络能通**：本机能访问上游地址，也能下载上游返回的成片链接（走代理时记得放行）。
 
@@ -66,7 +66,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 1. 填你的**邮箱**——它就是你的账号，一个邮箱只发一把 Key；
 2. 点 **「获取验证码」**，去邮箱里拿那 6 位数字（5 分钟内有效，60 秒才能重发一次）；
    这 60 秒里邮箱框会置灰，防止「码发到 A、注册却填了 B」；
-3. 把验证码填进右边的框，点 **「注册并填写」**——服务端在中转站生成一个唯一密钥名，并与这个邮箱绑定。
+3. 把验证码填进右边的框，点 **「激活」**——服务端在中转站生成一个唯一密钥名，并与这个邮箱绑定。
 
 插件会向注册服务申请一把新密钥（**默认额度 ¥0.01**，够试跑几条短片），
 并把「上游 / API Key / 基础地址 / 模型」自动写好——这几项现在不在页面上手填了。
@@ -94,7 +94,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 - **剩余**：这把 Key 还能用多少钱；**已用**：已经花掉多少；**总量** = 剩余 + 已用（按中转站的口径换算成**人民币**，币种符号由服务端给）；
 - 打开设置页会自动读一次，也可以点「刷新额度」；生成完之后想知道还剩多少，就点一下刷新；
 - 读额度是拿**这台设备的标识 + 设备密钥**去服务端换的，所以只会显示你自己那把 Key 的用量；
-- 还没领 Key 时这里会提示「还没有密钥」，点上面的「注册并填写」即可。
+- 还没领 Key 时这里会提示「还没有密钥」，点上面的「激活」即可。
 
 需要手工指定 Key / 地址的场景（例如临时换成别人给的 Key），可以直接跟 Harness 说
 「把视频插件的 API Key 设成 sk-xxx、地址设成 https://…」，它会用 `video_config` 工具写进配置。
@@ -185,7 +185,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | `submitPath` | 按上游 | 创建任务路径，中转站按模型分流时用 `/doubao/api/v3/contents/generations/tasks` |
 | `queryPath` | 按上游 | 查询路径，`{task_id}` 会被替换 |
 | `model` | `doubao-seedance-2-0-mini-260615` | 支持生成/延长的模型（seedance 2.0 / 2.5 系列） |
-| `registerApiBase` | `https://video.mybfs.cn` | 「注册并填写」调用的注册服务地址：固定默认值，页面上不显示、也不开放修改 |
+| `registerApiBase` | `https://video.mybfs.cn` | 「激活」调用的注册服务地址：固定默认值，页面上不显示、也不开放修改 |
 | `registerEmail` | 空 | 领 Key 用的邮箱（注册区那个输入框）；中转站里的密钥名由服务端生成唯一串，邮箱与服务端记录绑定 |
 | `registerUser` | 空 | 已废弃：老的「用户名」字段，读取时作为邮箱的兜底 |
 | `registerToken` | `metaontic-video-register-v1` | 注册请求头 `X-Register-Token` 的值，需与服务端 `REGISTER_CLIENT_TOKEN` 一致；页面不显示 |

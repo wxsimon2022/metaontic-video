@@ -280,7 +280,7 @@ function parseExtraParams(config) {
 function assertConfigured(config, apiKey) {
   if (!apiKey) {
     throw new Error(
-      '未配置 API Key：请在插件设置页点「注册并填写」领一把，或在插件 config 里填 apiKey，'
+      '未配置 API Key：请在插件设置页点「激活」领一把，或在插件 config 里填 apiKey，'
       + '或设置环境变量 NEWAPI_API_KEY。',
     );
   }
@@ -2017,7 +2017,7 @@ function buildPromptGuidance(config) {
     '· 换中转站、模型、时长等配置用 video_config（写进 profile，宿主重载后生效）；'
       + '合并需要本机有 ffmpeg，缺了会保留分段但不合并。',
     `· 当前配置：直出上限 ${singleMax} 秒、每段延长 ${segmentSeconds} 秒。`,
-    '· 没有 API Key：让用户在插件设置页点「注册并填写」，会向注册服务申请一个密钥并自动填好；'
+    '· 没有 API Key：让用户在插件设置页点「激活」，会向注册服务申请一个密钥并自动填好；'
       + '注册时填的用户名就是这把 API 的名称，默认额度 0.01 美元。',
   ].join('\n');
 }

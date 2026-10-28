@@ -7,7 +7,7 @@
  *   - `form.getSnapshot()` 读当前值/修订号，`form.subscribe()` 订阅变化；
  *   - `form.set(field, value)` / `form.unset(field)` 排队写入，修订号由宿主校验。
  * 页面注册进插件页的 `plugins.bundle.config` 槽位，key 为本包名 metaontic-video；
- * 卡片底部还有「注册并填写」按钮：向注册服务申请一个中转站密钥（新 API Key），
+ * 卡片底部还有「激活」按钮：向注册服务申请一个中转站密钥（新 API Key），
  * 成功后自动写回 provider/apiKey/baseUrl/model，用户点「保存」即可用。
  *
  * 样式只用宿主主题 token（`--dsw-alias-*`），并都带兜底值；不 import 任何
@@ -25,7 +25,7 @@ window.__ModuleLoader__.load({
     const NS = 'settings.metaonticVideo';
 
     const zh = {
-      summaryEmpty: '未配置：到插件设置页点「注册并填写」领一把密钥。',
+      summaryEmpty: '未配置：到插件设置页点「激活」领一把密钥。',
       summary: '{provider} · {model} · 每段 {duration}s',
       providerNewapi: 'New API 中转站',
       apiKeyConfigured: '已配置，留空表示保持原值',
@@ -41,7 +41,7 @@ window.__ModuleLoader__.load({
       ffprobeBinary: 'ffprobe 路径',
       registerEmail: '邮箱（账号）',
       registerTitle: '没有 API Key？',
-      registerHint: '用邮箱领：填邮箱 → 点「获取验证码」→ 把邮件里的数字填进来 → 点「注册并填写」。'
+      registerHint: '用邮箱领：填邮箱 → 点「获取验证码」→ 把邮件里的数字填进来 → 点「激活」。'
         + '邮箱就是你的账号，一个邮箱只发一把 Key；成功后自动写好上游、Key、地址与模型，默认额度 ¥0.01。',
       registerEmailPlaceholder: '你的邮箱，例如 name@example.com',
       registerCode: '验证码',
@@ -63,7 +63,7 @@ window.__ModuleLoader__.load({
       quotaNotRegistered: '服务端没有这台设备的注册记录（换过设备 / 清过数据）：请联系管理员处理后重新领取。',
       quotaFailed: '读取额度失败：{message}',
       quotaUpdatedAt: '更新于 {time}',
-      register: '注册并填写',
+      register: '激活',
       registerWorking: '注册中…',
       registerOk: '注册成功：上游 / Key / 地址 / 模型都写好了，宿主重载配置后生效。',
       registerPartial: '已拿到密钥，但有字段宿主没接受，请检查后手动保存。',
