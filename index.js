@@ -662,7 +662,7 @@ async function probeMedia(file, config, signal) {
   try {
     const { code, stdout } = await runProcess(resolveBinary(config, 'ffprobeBinary', 'ffprobe'), [
       '-v', 'error',
-      '-show_entries', 'format=duration:stream=codec_type,width,height,r_frame_rate',
+      '-show_entries', 'format=duration:stream=codec_type,width,height,r_frame_rate,duration',
       '-of', 'json',
       file,
     ], { signal, timeoutMs: 60000 });
@@ -670,10 +670,15 @@ async function probeMedia(file, config, signal) {
     const parsed = JSON.parse(stdout);
     const streams = Array.isArray(parsed?.streams) ? parsed.streams : [];
     const video = streams.find((stream) => stream.codec_type === 'video') || {};
+    const audio = streams.find((stream) => stream.codec_type === 'audio') || {};
     const [num, den] = String(video.r_frame_rate || '').split('/').map(Number);
     const duration = Number(parsed?.format?.duration);
+    const videoDuration = Number(video.duration);
+    const audioDuration = Number(audio.duration);
     return {
       durationSeconds: Number.isFinite(duration) && duration > 0 ? duration : 0,
+      videoDurationSeconds: Number.isFinite(videoDuration) && videoDuration > 0 ? videoDuration : 0,
+      audioDurationSeconds: Number.isFinite(audioDuration) && audioDuration > 0 ? audioDuration : 0,
       width: Number(video.width) || 0,
       height: Number(video.height) || 0,
       fps: Number.isFinite(num) && Number.isFinite(den) && den > 0 ? num / den : 0,
@@ -713,6 +718,59 @@ function evenNumber(value, fallback) {
 /**
  * 把分段合并成一个文件：先试无损拼接，需要时统一重编码（带音频，失败再退回只并视频）。
  */
+/** 分段的音频比视频长出这么多帧时，认为封装补白会在接缝处留下空洞。 */
+const AUDIO_PADDING_TOLERANCE_FRAMES = 1;
+
+/**
+ * 上游分段的音频常比视频长几十毫秒（封装补白）：concat 会按容器时长偏移，
+ * 接缝处就留下 1-2 帧没有画面的空洞（看起来「缺了一小段」），重编码路径还会让音画逐段错位。
+ * 这里把「非末段」的音频裁到与视频等长：视频轨保持 -c copy，只重编音频。
+ * @returns 对齐后的文件列表、需要清理的临时文件、被裁齐的分段信息。
+ */
+async function alignSegmentAudio(config, files, probed, outPath, { signal, binary } = {}) {
+  const temps = [];
+  const trimmed = [];
+  const aligned = [];
+  for (const [index, file] of files.entries()) {
+    const media = probed?.[index];
+    const fps = Math.max(1, Math.round(media?.fps || 30));
+    const videoSeconds = Number(media?.videoDurationSeconds) || 0;
+    const audioSeconds = Number(media?.audioDurationSeconds) || 0;
+    const padding = audioSeconds - videoSeconds;
+    const isLast = index === files.length - 1;
+    if (isLast || !media?.hasAudio || videoSeconds <= 0
+      || padding <= AUDIO_PADDING_TOLERANCE_FRAMES / fps) {
+      aligned.push(file);
+      continue;
+    }
+    const temp = `${outPath}.align${index + 1}.mp4`;
+    const { code } = await runProcess(
+      binary || resolveBinary(config, 'ffmpegBinary', 'ffmpeg'),
+      [
+        '-y', '-i', file, '-map', '0:v', '-map', '0:a',
+        '-c:v', 'copy', '-c:a', 'aac',
+        '-af', `atrim=0:${videoSeconds.toFixed(3)}`,
+        '-movflags', '+faststart', temp,
+      ],
+      { signal },
+    );
+    if (code === 0 && await exists(temp)) {
+      temps.push(temp);
+      trimmed.push({ index: index + 1, paddingSeconds: Number(padding.toFixed(3)) });
+      aligned.push(temp);
+    } else {
+      await rm(temp, { force: true });
+      aligned.push(file);
+    }
+  }
+  return { files: aligned, temps, trimmed };
+}
+
+/** 合并结束后清理音频对齐用的临时分段。 */
+async function cleanupSegmentTemps(temps) {
+  for (const temp of temps || []) await rm(temp, { force: true });
+}
+
 async function mergeClips(config, files, outPath, { signal } = {}) {
   const binary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
   await mkdir(path.dirname(outPath), { recursive: true });
@@ -727,71 +785,81 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
   const paramsMatch = videos.length !== probed.length
     || videos.every((media) => media.width === videos[0].width && media.height === videos[0].height);
 
-  if (ref(config, 'mergeMode', 'copy') !== 'reencode' && paramsMatch) {
-    const listPath = `${outPath}.concat.txt`;
-    const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join('\n');
-    await writeFile(listPath, `${lines}\n`, 'utf8');
-    try {
-      const { code, stderr } = await runProcess(binary, [
-        '-y', '-f', 'concat', '-safe', '0', '-i', listPath,
-        '-c', 'copy', '-movflags', '+faststart', outPath,
-      ], { signal });
-      if (code === 0 && await exists(outPath)) return { path: outPath, mode: 'copy' };
-      copyError = stderr.trim().slice(-400);
-    } finally {
-      await rm(listPath, { force: true });
+  // 先裁齐音频，接缝才不会有空洞；后面的拼接统一用对齐后的分段。
+  const { files: aligned, temps, trimmed } = await alignSegmentAudio(
+    config, files, probed, outPath, { signal, binary },
+  );
+  files = aligned;
+  try {
+
+    if (ref(config, 'mergeMode', 'copy') !== 'reencode' && paramsMatch) {
+      const listPath = `${outPath}.concat.txt`;
+      const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join('\n');
+      await writeFile(listPath, `${lines}\n`, 'utf8');
+      try {
+        const { code, stderr } = await runProcess(binary, [
+          '-y', '-f', 'concat', '-safe', '0', '-i', listPath,
+          '-c', 'copy', '-movflags', '+faststart', outPath,
+        ], { signal });
+        if (code === 0 && await exists(outPath)) return { path: outPath, mode: 'copy', trimmed };
+        copyError = stderr.trim().slice(-400);
+      } finally {
+        await rm(listPath, { force: true });
+      }
+    } else if (!paramsMatch) {
+      copyError = '分段分辨率不一致，跳过无损拼接。';
     }
-  } else if (!paramsMatch) {
-    copyError = '分段分辨率不一致，跳过无损拼接。';
-  }
 
-  const first = probed.find((media) => media && media.width && media.height) || {};
-  const width = evenNumber(first.width, 1280);
-  const height = evenNumber(first.height, 720);
-  const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
-  const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
+    const first = probed.find((media) => media && media.width && media.height) || {};
+    const width = evenNumber(first.width, 1280);
+    const height = evenNumber(first.height, 720);
+    const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
+    const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
 
-  const videoParts = files.map((_, index) => (
-    `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,`
-    + `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${index}]`
-  ));
-  const videoInputs = files.map((_, index) => `[v${index}]`).join('');
-
-  async function encode(filter, maps, withAudioTrack) {
-    await rm(outPath, { force: true });
-    const args = ['-y'];
-    for (const file of files) args.push('-i', file);
-    args.push('-filter_complex', filter, ...maps, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p');
-    if (withAudioTrack) args.push('-c:a', 'aac', '-b:a', '192k');
-    args.push('-movflags', '+faststart', outPath);
-    return runProcess(binary, args, { signal });
-  }
-
-  if (withAudio) {
-    // concat 的输入按 (视频, 音频) 成对排列：v0,a0,v1,a1…
-    const audioParts = files.map((_, index) => (
-      `[${index}:a]aresample=48000,`
-      + 'aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo'
-      + `[a${index}]`
+    const videoParts = files.map((_, index) => (
+      `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,`
+      + `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${index}]`
     ));
-    const pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join('');
-    const filter = [
-      ...videoParts,
-      ...audioParts,
-      `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`,
-    ].join(';');
-    const { code, stderr } = await encode(filter, ['-map', '[v]', '-map', '[a]'], true);
-    if (code === 0 && await exists(outPath)) return { path: outPath, mode: 'reencode' };
-    audioError = stderr.trim().slice(-400);
-  }
+    const videoInputs = files.map((_, index) => `[v${index}]`).join('');
 
-  const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(';');
-  const { code, stderr } = await encode(filter, ['-map', '[v]'], false);
-  if (code === 0 && await exists(outPath)) {
-    return { path: outPath, mode: withAudio ? 'reencode-video-only' : 'reencode' };
+    async function encode(filter, maps, withAudioTrack) {
+      await rm(outPath, { force: true });
+      const args = ['-y'];
+      for (const file of files) args.push('-i', file);
+      args.push('-filter_complex', filter, ...maps, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p');
+      if (withAudioTrack) args.push('-c:a', 'aac', '-b:a', '192k');
+      args.push('-movflags', '+faststart', outPath);
+      return runProcess(binary, args, { signal });
+    }
+
+    if (withAudio) {
+      // concat 的输入按 (视频, 音频) 成对排列：v0,a0,v1,a1…
+      const audioParts = files.map((_, index) => (
+        `[${index}:a]aresample=48000,`
+        + 'aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo'
+        + `[a${index}]`
+      ));
+      const pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join('');
+      const filter = [
+        ...videoParts,
+        ...audioParts,
+        `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`,
+      ].join(';');
+      const { code, stderr } = await encode(filter, ['-map', '[v]', '-map', '[a]'], true);
+      if (code === 0 && await exists(outPath)) return { path: outPath, mode: 'reencode', trimmed };
+      audioError = stderr.trim().slice(-400);
+    }
+
+    const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(';');
+    const { code, stderr } = await encode(filter, ['-map', '[v]'], false);
+    if (code === 0 && await exists(outPath)) {
+      return { path: outPath, mode: withAudio ? 'reencode-video-only' : 'reencode', trimmed };
+    }
+    const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(' | ');
+    throw Object.assign(new Error(`ffmpeg 合并失败：${detail || '未知错误'}`), { code: 'ffmpeg_failed' });
+  } finally {
+    await cleanupSegmentTemps(temps);
   }
-  const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(' | ');
-  throw Object.assign(new Error(`ffmpeg 合并失败：${detail || '未知错误'}`), { code: 'ffmpeg_failed' });
 }
 
 /** 成片目录：配置优先，否则用会话工作目录下的 metaontic-video/。 */
@@ -1637,6 +1705,13 @@ function videoTool(config, deps) {
         } else {
           const merged = await mergeClips(config, files, finalPath, { signal: exec?.signal });
           result.mergeMode = merged.mode;
+          if (merged.trimmed?.length) {
+            notes.push(
+              `第 ${merged.trimmed.map((item) => item.index).join('、')} 段的音频比视频长`
+              + `（最长 ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} 秒），`
+              + '已裁齐后再拼接，避免接缝处缺一小段画面。',
+            );
+          }
         }
         result.merged = true;
         result.videoPath = finalPath;
