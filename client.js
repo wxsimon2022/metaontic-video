@@ -54,6 +54,7 @@ window.__ModuleLoader__.load({
       quotaLoading: '读取额度中…',
       quotaRefresh: '刷新额度',
       quotaNoKey: '还没有密钥：注册后这里会显示剩余 / 已用额度。',
+      quotaNotRegistered: '服务端还没有这台设备的注册记录：点「重新领一把」重新登记（会拿到一把新 Key）。',
       quotaFailed: '读取额度失败：{message}',
       quotaUpdatedAt: '更新于 {time}',
       registerCurrent: '当前连接：{value}',
@@ -116,6 +117,7 @@ window.__ModuleLoader__.load({
       quotaLoading: 'Reading quota…',
       quotaRefresh: 'Refresh quota',
       quotaNoKey: 'No key yet — remaining / used quota shows here after registration.',
+      quotaNotRegistered: 'The service has no registration for this device yet — use “Issue a new one” to register again (you get a new key).',
       quotaFailed: 'Failed to read quota: {message}',
       quotaUpdatedAt: 'updated {time}',
       registerCurrent: 'Current: {value}',
@@ -484,7 +486,7 @@ window.__ModuleLoader__.load({
             setQuota(null);
             setQuotaStatus('failed');
             setQuotaMessage(error?.status === 404
-              ? t('quotaNoKey')
+              ? t('quotaNotRegistered')
               : t('quotaFailed', { message: error?.message || String(error) }));
             throw error;
           }
