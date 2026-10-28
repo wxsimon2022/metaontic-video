@@ -47,14 +47,14 @@ window.__ModuleLoader__.load({
       registerNeedUser: '先填用户名，再点注册。',
       registerDone: '已经领到 Key 了，不用再填。',
       registerRestored: '已找回本机密钥：这台设备之前领过的那把帮你填好了，点「保存」即可。',
-      registerAgain: '重新领一把',
+      registerLocked: '一个设备 / 一个用户名只能领一把；要换 Key 请联系管理员。',
       quotaTitle: '额度（当前这把 Key）',
       quotaSummary: '剩余 {remain} · 已用 {used} · 总量 {total}',
       quotaUnlimited: '不限额度',
       quotaLoading: '读取额度中…',
       quotaRefresh: '刷新额度',
       quotaNoKey: '还没有密钥：注册后这里会显示剩余 / 已用额度。',
-      quotaNotRegistered: '服务端还没有这台设备的注册记录：点「重新领一把」重新登记（会拿到一把新 Key）。',
+      quotaNotRegistered: '服务端没有这台设备的注册记录（换过设备 / 清过数据）：请联系管理员处理后重新领取。',
       quotaFailed: '读取额度失败：{message}',
       quotaUpdatedAt: '更新于 {time}',
       registerCurrent: '当前连接：{value}',
@@ -110,14 +110,14 @@ window.__ModuleLoader__.load({
       registerNeedUser: 'Type a user name before registering.',
       registerDone: 'A key is already configured — nothing to fill in.',
       registerRestored: 'Restored the key issued to this device; click Save to apply.',
-      registerAgain: 'Issue a new one',
+      registerLocked: 'One device / one name gets a single key — ask an admin to replace it.',
       quotaTitle: 'Quota (current key)',
       quotaSummary: 'Remaining {remain} · used {used} · total {total}',
       quotaUnlimited: 'Unlimited',
       quotaLoading: 'Reading quota…',
       quotaRefresh: 'Refresh quota',
       quotaNoKey: 'No key yet — remaining / used quota shows here after registration.',
-      quotaNotRegistered: 'The service has no registration for this device yet — use “Issue a new one” to register again (you get a new key).',
+      quotaNotRegistered: 'The service has no registration for this device (new device or cleared data) — ask an admin to reset it.',
       quotaFailed: 'Failed to read quota: {message}',
       quotaUpdatedAt: 'updated {time}',
       registerCurrent: 'Current: {value}',
@@ -234,8 +234,6 @@ window.__ModuleLoader__.load({
         const [registerUser, setRegisterUser] = React.useState(
           () => String((form.getSnapshot().value || {}).registerUser || ''),
         );
-        // 重新领一把：点小字后才会再显示用户名输入框
-        const [reRegister, setReRegister] = React.useState(false);
         // 额度：设置页展示这把 Key 的剩余 / 已用
         const [quota, setQuota] = React.useState(null);
         const [quotaStatus, setQuotaStatus] = React.useState('idle');
@@ -394,7 +392,6 @@ window.__ModuleLoader__.load({
             else ok = false;
           }
           setRegisterStatus(ok ? 'ok' : 'partial');
-          setReRegister(false);
           loadQuota().catch(() => {});
           return ok;
         }
@@ -580,9 +577,9 @@ window.__ModuleLoader__.load({
         const connection = keyReady
           ? `${t('providerNewapi')} · ${value.baseUrl || '-'} · ${value.model || '-'}`
           : t('registerNoKey');
-        // 已经配好 Key 的（注册过的或手填的）就不用再填一遍，只展示当前连接，
-        // 想换一把时点「重新领一把」再把输入框放出来。
-        const alreadyRegistered = keyReady && !reRegister;
+        // 已经配好 Key 的（注册过的或手填的）只展示当前连接：一个设备 / 一个用户名只发一把，
+        // 不提供「再领一把」的入口，要换 Key 只能找管理员。
+        const alreadyRegistered = keyReady;
         const registerSucceeded = registerStatus === 'ok' || registerStatus === 'partial';
         const registerText = registerStatus === 'ok'
           ? t('registerOk')
@@ -676,18 +673,20 @@ window.__ModuleLoader__.load({
               onChange: (event) => setRegisterUser(event.target.value),
               style: { ...inputStyle, flex: '0 1 180px', width: 'auto' },
             }),
-          h('button', {
-            key: 'button',
-            'data-action': 'register',
-            type: 'button',
-            disabled: alreadyRegistered
-              ? false
-              : (registerStatus === 'working' || !registerUser.trim() || snapshot.writable === false),
-            onClick: alreadyRegistered ? () => { setReRegister(true); setRegisterStatus('idle'); setRegisterMessage(''); } : register,
-            style: alreadyRegistered
-              ? { padding: '4px 10px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.muted, cursor: 'pointer', fontSize: 12 }
-              : { padding: '6px 14px', borderRadius: 6, border: 'none', background: TOKENS.primaryFill, color: '#fff', cursor: 'pointer' },
-          }, alreadyRegistered ? t('registerAgain') : (registerStatus === 'working' ? t('registerWorking') : t('register'))),
+          alreadyRegistered
+            ? h('span', {
+              key: 'locked',
+              'data-field': 'registerLocked',
+              style: { ...labelStyle, flex: '0 1 200px', marginBottom: 0 },
+            }, t('registerLocked'))
+            : h('button', {
+              key: 'button',
+              'data-action': 'register',
+              type: 'button',
+              disabled: registerStatus === 'working' || !registerUser.trim() || snapshot.writable === false,
+              onClick: register,
+              style: { padding: '6px 14px', borderRadius: 6, border: 'none', background: TOKENS.primaryFill, color: '#fff', cursor: 'pointer' },
+            }, registerStatus === 'working' ? t('registerWorking') : t('register')),
           registerText
             ? h('span', {
               key: 'message',
