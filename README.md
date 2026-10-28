@@ -165,19 +165,14 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 参考视频统一用 `视频1` 指代；**不要写「参考视频1」**，那样容易被当成「参考生视频」而不是延长。
 
-## 进阶：全部配置项（一般不用改）
+## 进阶：可调配置项
 
 | 字段 | 默认值 | 说明 |
 | --- | --- | --- |
-| `entryId` | `metaontic-video` | 插件在 profile 里的条目 id；把改动写回配置时用它定位，一般不用改 |
-| `apiKey` | 空 | 激活时自动写入；一般不用手填 |
-| `baseUrl` | 空 | 视频服务地址，如 `https://ai.bileego.com`（不带 `/v1`，不重复 `/api/v3`）。激活时自动写入 |
-| `submitPath` | 按上游 | 创建任务路径；服务按模型分流时用 `/doubao/api/v3/contents/generations/tasks` |
-| `queryPath` | 按上游 | 查询路径，`{task_id}` 会被替换 |
+| `apiKey` | 空 | 激活时自动写入；只有临时换成别人给的 Key 才用手填 |
+| `baseUrl` | 空 | 激活时自动写入；手动换服务地址时才用改，如 `https://ai.bileego.com`（不带 `/v1`，不重复 `/api/v3`） |
 | `model` | `doubao-seedance-2-0-mini-260615` | 支持生成/延长的模型（seedance 2.0 / 2.5 系列） |
 | `registerEmail` | 空 | 领 Key 用的邮箱（注册区那个输入框） |
-| `registerUser` | 空 | 已废弃：老的「用户名」字段，读取时作为邮箱的兜底 |
-| `registerToken` | 固定值 | 激活请求的握手令牌；页面不显示，一般不用改 |
 | `singleMaxSeconds` | `15` | 单次直出上限（4–15）；超过它就分段延长 |
 | `duration` | `5` | 每段延长的秒数（4–15 的整数）；**建议 ≤14**，刚好卡 15 秒容易因为封装略超被拒 |
 | `mode` | `continuous` | `continuous`=同机位续拍；`closeup`=台词结束处切近景 |
