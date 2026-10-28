@@ -61,7 +61,8 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 ### 第二步：填一次密钥（只填一次）
 
 最省事的办法：在 **插件 → 已安装插件 → MetaOnticVideo → 查看** 里，
-点一下底部的 **「注册并填写」**——它会向注册服务申请一个新密钥，
+先在注册区填一个**用户名**（会写进密钥名，方便后台认领你这一把），
+再点 **「注册并填写」**——它会向注册服务申请一个新密钥（默认额度 0.01 美元），
 成功后自动把「上游 / API Key / 基础地址 / 模型」填好，你只要再点一次 **保存**。
 （注册服务地址默认 `https://video.mybfs.cn`，换自建服务时改「注册服务地址」那一栏。）
 
@@ -165,6 +166,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | `queryPath` | 按上游 | 查询路径，`{task_id}` 会被替换 |
 | `model` | `doubao-seedance-2-0-mini-260615` | 支持生成/延长的模型（seedance 2.0 / 2.5 系列） |
 | `registerApiBase` | `https://video.mybfs.cn` | 设置页「注册并填写」按钮调用的注册服务地址；换自建服务时改成自己的域名 |
+| `registerUser` | 空 | 注册时用的用户名（注册区那个输入框），会写进中转站里的密钥名 |
 | `singleMaxSeconds` | `15` | 单次直出上限（4–15）；超过它就分段延长 |
 | `duration` | `5` | 每段延长的秒数（4–15 的整数）；**建议 ≤14**，刚好卡 15 秒容易因封装略超被上游拒 |
 | `mode` | `continuous` | `continuous`=同机位续拍；`closeup`=台词结束处切近景 |

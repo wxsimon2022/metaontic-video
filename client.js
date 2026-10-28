@@ -49,8 +49,12 @@ window.__ModuleLoader__.load({
       ffmpegBinary: 'ffmpeg 路径',
       ffprobeBinary: 'ffprobe 路径',
       registerApiBase: '注册服务地址',
+      registerUser: '用户名',
       registerTitle: '没有 API Key？',
-      registerHint: '点右边按钮向注册服务申请一个，成功后会帮你填好上游、Key、地址与模型。',
+      registerHint: '先填用户名（会写进密钥名，方便后台认领），再点按钮申请一个密钥；'
+        + '成功后自动填好上游、Key、地址与模型。默认额度 0.01 美元，用完了找管理员加。',
+      registerUserPlaceholder: '你的名字 / 昵称',
+      registerNeedUser: '先填用户名，再点注册。',
       register: '注册并填写',
       registerWorking: '注册中…',
       registerOk: '注册成功：已填好上游/Key/地址/模型，点「保存」后生效。',
@@ -105,8 +109,12 @@ window.__ModuleLoader__.load({
       ffmpegBinary: 'ffmpeg path',
       ffprobeBinary: 'ffprobe path',
       registerApiBase: 'Register service URL',
+      registerUser: 'User name',
       registerTitle: 'No API key yet?',
-      registerHint: 'Ask the register service for one; the button fills provider, key, base URL and model.',
+      registerHint: 'Type your name first (it goes into the key name), then ask the service for a key; '
+        + 'provider, key, base URL and model are filled in for you. Default quota is US$0.01.',
+      registerUserPlaceholder: 'Your name / nickname',
+      registerNeedUser: 'Type a user name before registering.',
       register: 'Register & fill in',
       registerWorking: 'Registering…',
       registerOk: 'Registered: provider/key/base URL/model filled in. Click Save to apply.',
@@ -223,6 +231,9 @@ window.__ModuleLoader__.load({
         const [status, setStatus] = React.useState('idle');
         const [registerStatus, setRegisterStatus] = React.useState('idle');
         const [registerMessage, setRegisterMessage] = React.useState('');
+        const [registerUser, setRegisterUser] = React.useState(
+          () => String((form.getSnapshot().value || {}).registerUser || ''),
+        );
 
         if (props && props.view === 'summary') {
           const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
@@ -319,6 +330,12 @@ window.__ModuleLoader__.load({
             ? draft.registerApiBase
             : value.registerApiBase;
           const root = String(configured || DEFAULT_REGISTER_API).trim().replace(/\/+$/, '');
+          const username = registerUser.trim();
+          if (!username) {
+            setRegisterStatus('failed');
+            setRegisterMessage(t('registerNeedUser'));
+            return;
+          }
           setRegisterStatus('working');
           setRegisterMessage('');
           try {
@@ -333,9 +350,9 @@ window.__ModuleLoader__.load({
               method: 'POST',
               headers: { 'content-type': 'application/json', accept: 'application/json' },
               body: JSON.stringify({
-                name: device.label,
+                name: username,
                 device_id: device.id || undefined,
-                note: 'Harness 插件设置页注册',
+                note: `Harness 插件设置页注册（${device.label}）`,
               }),
             });
             if (!result.api_key) {
@@ -347,6 +364,7 @@ window.__ModuleLoader__.load({
               ['provider', 'newapi'],
               ['apiKey', result.api_key],
               ['baseUrl', result.base_url || status.base_url || root],
+              ['registerUser', username],
             ];
             const model = result.model || status.model;
             if (model) writes.push(['model', model]);
@@ -470,11 +488,21 @@ window.__ModuleLoader__.load({
             h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } }, t('registerTitle')),
             h('span', { key: 'hint', style: labelStyle }, t('registerHint')),
           ]),
+          h('input', {
+            key: 'user',
+            'data-field': 'registerUser',
+            type: 'text',
+            value: registerUser,
+            placeholder: t('registerUserPlaceholder'),
+            'aria-label': t('registerUser'),
+            onChange: (event) => setRegisterUser(event.target.value),
+            style: { ...inputStyle, flex: '0 1 180px', width: 'auto' },
+          }),
           h('button', {
             key: 'button',
             'data-action': 'register',
             type: 'button',
-            disabled: registerStatus === 'working' || snapshot.writable === false,
+            disabled: registerStatus === 'working' || !registerUser.trim() || snapshot.writable === false,
             onClick: register,
             style: { padding: '6px 14px', borderRadius: 6, border: 'none', background: TOKENS.primaryFill, color: '#fff', cursor: 'pointer' },
           }, registerStatus === 'working' ? t('registerWorking') : t('register')),
