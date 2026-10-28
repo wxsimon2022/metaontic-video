@@ -48,6 +48,14 @@ window.__ModuleLoader__.load({
       registerDone: '已经领到 Key 了，不用再填。',
       registerRestored: '已找回本机密钥：这台设备之前领过的那把帮你填好了，点「保存」即可。',
       registerAgain: '重新领一把',
+      quotaTitle: '额度（当前这把 Key）',
+      quotaSummary: '剩余 {remain} · 已用 {used} · 总量 {total}',
+      quotaUnlimited: '不限额度',
+      quotaLoading: '读取额度中…',
+      quotaRefresh: '刷新额度',
+      quotaNoKey: '还没有密钥：注册后这里会显示剩余 / 已用额度。',
+      quotaFailed: '读取额度失败：{message}',
+      quotaUpdatedAt: '更新于 {time}',
       registerCurrent: '当前连接：{value}',
       registerNoKey: '密钥未配置——点右边按钮领一个',
       register: '注册并填写',
@@ -102,6 +110,14 @@ window.__ModuleLoader__.load({
       registerDone: 'A key is already configured — nothing to fill in.',
       registerRestored: 'Restored the key issued to this device; click Save to apply.',
       registerAgain: 'Issue a new one',
+      quotaTitle: 'Quota (current key)',
+      quotaSummary: 'Remaining {remain} · used {used} · total {total}',
+      quotaUnlimited: 'Unlimited',
+      quotaLoading: 'Reading quota…',
+      quotaRefresh: 'Refresh quota',
+      quotaNoKey: 'No key yet — remaining / used quota shows here after registration.',
+      quotaFailed: 'Failed to read quota: {message}',
+      quotaUpdatedAt: 'updated {time}',
       registerCurrent: 'Current: {value}',
       registerNoKey: 'No key yet — use the button to get one',
       register: 'Register & fill in',
@@ -218,6 +234,11 @@ window.__ModuleLoader__.load({
         );
         // 重新领一把：点小字后才会再显示用户名输入框
         const [reRegister, setReRegister] = React.useState(false);
+        // 额度：设置页展示这把 Key 的剩余 / 已用
+        const [quota, setQuota] = React.useState(null);
+        const [quotaStatus, setQuotaStatus] = React.useState('idle');
+        const [quotaMessage, setQuotaMessage] = React.useState('');
+        const [quotaAt, setQuotaAt] = React.useState('');
 
         // 打开设置页时，若本机还没配 Key，就先问服务端要回自己那把（设备绑定过就能取回）
         const restoreTried = React.useRef(false);
@@ -225,7 +246,10 @@ window.__ModuleLoader__.load({
           if (restoreTried.current) return;
           restoreTried.current = true;
           const snap = form.getSnapshot() || {};
-          if (snap.secrets?.apiKey || (snap.value || {}).apiKey) return;
+          if (snap.secrets?.apiKey || (snap.value || {}).apiKey) {
+            loadQuota().catch(() => {});
+            return;
+          }
           lookupOwnKey().catch(() => {});
         }, []);
 
@@ -369,6 +393,7 @@ window.__ModuleLoader__.load({
           }
           setRegisterStatus(ok ? 'ok' : 'partial');
           setReRegister(false);
+          loadQuota().catch(() => {});
           return ok;
         }
 
@@ -434,6 +459,34 @@ window.__ModuleLoader__.load({
             }
             setRegisterStatus('failed');
             setRegisterMessage(t('registerFailed', { message: error?.message || String(error) }));
+          }
+        }
+
+        /**
+         * 额度：服务端拿管理端凭据去中转站读这把 Key 的用量。
+         * 只有本机（设备标识 + 设备密钥都对上）才拿得到，展示的必然是自己那把。
+         */
+        async function loadQuota() {
+          const device = deviceIdentity();
+          setQuotaStatus('working');
+          setQuotaMessage('');
+          try {
+            const result = await callRegister(`${DEFAULT_REGISTER_API}/api/v1/register/quota`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', accept: 'application/json' },
+              body: JSON.stringify({ device_id: device.id, device_secret: device.secret }),
+            });
+            setQuota(result);
+            setQuotaAt(new Date().toLocaleTimeString());
+            setQuotaStatus('ok');
+            return result;
+          } catch (error) {
+            setQuota(null);
+            setQuotaStatus('failed');
+            setQuotaMessage(error?.status === 404
+              ? t('quotaNoKey')
+              : t('quotaFailed', { message: error?.message || String(error) }));
+            throw error;
           }
         }
 
@@ -536,6 +589,51 @@ window.__ModuleLoader__.load({
             : (registerStatus === 'restored'
               ? t('registerRestored')
               : (alreadyRegistered && !registerSucceeded ? '' : registerMessage)));
+        const usd = (value) => `$${(Number(value) || 0).toFixed(4)}`;
+        const quotaReady = quotaStatus === 'ok' && quota;
+        const quotaText = quotaReady
+          ? `${t('quotaSummary', {
+            remain: quota.unlimited_quota ? t('quotaUnlimited') : usd(quota.remain_usd),
+            used: usd(quota.used_usd),
+            total: usd(quota.total_usd),
+          })} · ${t('quotaUpdatedAt', { time: quotaAt })}`
+          : (keyReady ? t('quotaLoading') : t('quotaNoKey'));
+        const quotaBox = h('div', {
+          key: 'quota',
+          'data-field': 'quota',
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 10,
+            marginTop: 10,
+            padding: '10px 12px',
+            borderRadius: 8,
+            border: `1px solid ${TOKENS.border}`,
+            background: TOKENS.cardFill,
+          },
+        }, [
+          h('div', { key: 'text', style: { display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 220px' } }, [
+            h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } }, t('quotaTitle')),
+            h('span', {
+              key: 'value',
+              'data-field': 'quotaValue',
+              style: { fontSize: 12, color: quotaReady ? TOKENS.success : TOKENS.muted },
+            }, quotaText),
+            quotaMessage ? h('span', { key: 'message', style: labelStyle }, quotaMessage) : null,
+          ]),
+          keyReady
+            ? h('button', {
+              key: 'refresh',
+              'data-action': 'quota-refresh',
+              type: 'button',
+              disabled: quotaStatus === 'working',
+              onClick: () => { loadQuota().catch(() => {}); },
+              style: { padding: '4px 10px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.muted, cursor: 'pointer', fontSize: 12 },
+            }, t('quotaRefresh'))
+            : null,
+        ]);
+
         const registerBox = h('div', {
           key: 'register',
           style: {
@@ -608,6 +706,7 @@ window.__ModuleLoader__.load({
             style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 },
           }, rows),
           notice && !snapshot.value ? null : registerBox,
+          notice && !snapshot.value ? null : quotaBox,
           notice && !snapshot.value ? null : footer,
         ]);
       };
