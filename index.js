@@ -658,6 +658,20 @@ async function runProcess(binary, args, { signal, timeoutMs = 1800000 } = {}) {
   });
 }
 
+/**
+ * 本机能不能调用 ffmpeg：不能就不要去合成，直接返回分段列表。
+ * 只做一次轻量 `-version`，不缓存结果——用户装好 ffmpeg 后重跑应立即生效。
+ */
+async function hasFfmpeg(config, signal) {
+  const binary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
+  try {
+    const { code } = await runProcess(binary, ['-version'], { signal, timeoutMs: 20000 });
+    return code === 0;
+  } catch {
+    return false;
+  }
+}
+
 /** 探测分段的时长/尺寸；ffprobe 缺失或失败都返回 null，不影响主流程。 */
 async function probeMedia(file, config, signal) {
   try {
@@ -1653,6 +1667,10 @@ function videoTool(config, deps) {
         return result;
       }
 
+      // 多段才需要合成；本机没有 ffmpeg 就直接跳过，别白跑一遍合并再报错。
+      const ffmpegReady = completed.length > 1 ? await hasFfmpeg(config, exec?.signal) : true;
+      const ffmpegBinary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
+
       const stamp = fileStamp();
       const outDir = await resolveOutputDir(config, exec, deps);
       const segmentsDir = path.join(outDir, 'segments', stamp);
@@ -1700,6 +1718,18 @@ function videoTool(config, deps) {
       }
 
       if (!files.length) return result;
+
+      if (!ffmpegReady) {
+        result.segmentsDir = segmentsDir;
+        result.merged = false;
+        notes.push(
+          `本机没有可用的 ffmpeg（${ffmpegBinary}），已跳过合成，只返回分段列表。`
+          + `分段文件已下载到 ${segmentsDir}；`
+          + '装好 ffmpeg（或把 ffmpegBinary 指到绝对路径）后重跑一次即可合并成一条。',
+        );
+        result.note = notes.join('\n');
+        return result;
+      }
 
       const finalPath = path.join(outDir, `${stamp}-${plannedTotal}s.mp4`);
       try {

@@ -15,7 +15,7 @@
 - 不能出现：
 - 声音：中文同期声，需要/不需要 BGM
 - 字幕：需要/不需要
-- 交付：480p 草稿 → 720p 定稿
+- 交付：720p（要更精细再 1080p）
 ```
 
 ## `script.md`
@@ -77,7 +77,7 @@ approved_by: user
   "spec": {
     "duration": 15,
     "ratio": "9:16",
-    "resolution": "480p",
+    "resolution": "720p",
     "audio": true,
     "mode": "continuous"
   },
