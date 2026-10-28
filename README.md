@@ -73,15 +73,15 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 **领到 Key 之后，注册区会整块消失**（不再显示「已经领到 Key 了」之类的说明），
 页面上只剩配置项和下面的额度卡片。
 
-> 服务端要能连上中转站管理端：`backend/.env` 里的 `NEWAPI_ADMIN_USERNAME` /
-> `NEWAPI_ADMIN_PASSWORD`（或 `NEWAPI_ADMIN_ACCESS_TOKEN`）得先配好；
+> 服务端要能连上中转站管理端：`backend/.env` 里的 `NEWAPI_ADMIN_ACCESS_TOKEN`
+> （中转站后台生成的长期访问令牌）得先配好；
 > 还要配好发验证码的邮箱 `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD`
 > （腾讯云企业邮箱是 `smtp.exmail.qq.com:465`）。少哪一项，按钮都会直接把缺什么告诉你，不会静默失败。
 >
 > 注册请求会带上握手请求头 `X-Register-Token`（值 = 插件的 `registerToken`，
 > 默认 `metaontic-video-register-v1`，要与服务端 `REGISTER_CLIENT_TOKEN` 一致），
 > 免得注册入口被随手扫。已经领过 Key 之后，注册区直接隐藏，
-> **不再提供「再领一把」的入口**——一个设备 / 一个邮箱只发一把，要换 Key 请联系管理员。
+> **不再提供「再领一把」的入口**——邮箱是唯一标识，一个邮箱只发一把，要换 Key 请联系管理员。
 >
 > **不支持重复领取**：同一台设备或同一个邮箱只能领一把，再领会直接告诉你「不支持重复领取」
 > （服务端不会在中转站多开 token）。密钥丢了或额度用完，找管理员重置后再领。

@@ -650,7 +650,7 @@ window.__ModuleLoader__.load({
         };
         // 上游 / 地址 / Key 现在由注册流程写入，页面上不让手填。
         const keyReady = Boolean(snapshot.secrets?.apiKey || value.apiKey);
-        // 一个设备 / 一个用户名只发一把：已经配好 Key 的（注册过的或手填的）整块注册区直接隐藏，
+        // 邮箱是唯一标识，只发一把：已经配好 Key 的（注册过的或手填的）整块注册区直接隐藏，
         // 连「已经领到 Key 了」这类说明也不显示；要换 Key 只能找管理员。
         const registerText = registerStatus === 'ok'
           ? t('registerOk')
