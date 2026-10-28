@@ -45,9 +45,7 @@ window.__ModuleLoader__.load({
         + '填好点按钮即可，成功后自动写好上游、Key、地址与模型。默认额度 0.01 美元。',
       registerUserPlaceholder: '你的名字 / 昵称',
       registerNeedUser: '先填用户名，再点注册。',
-      registerDone: '已经领到 Key 了，不用再填。',
       registerRestored: '已找回本机密钥：这台设备之前领过的那把帮你填好了，点「保存」即可。',
-      registerLocked: '一个设备 / 一个用户名只能领一把；要换 Key 请联系管理员。',
       quotaTitle: '额度（当前这把 Key）',
       quotaSummary: '剩余 {remain} · 已用 {used} · 总量 {total}',
       quotaUnlimited: '不限额度',
@@ -57,8 +55,6 @@ window.__ModuleLoader__.load({
       quotaNotRegistered: '服务端没有这台设备的注册记录（换过设备 / 清过数据）：请联系管理员处理后重新领取。',
       quotaFailed: '读取额度失败：{message}',
       quotaUpdatedAt: '更新于 {time}',
-      registerCurrent: '当前连接：{value}',
-      registerNoKey: '密钥未配置——点右边按钮领一个',
       register: '注册并填写',
       registerWorking: '注册中…',
       registerOk: '注册成功：上游 / Key / 地址 / 模型都写好了，宿主重载配置后生效。',
@@ -108,9 +104,7 @@ window.__ModuleLoader__.load({
         + 'then use the button. Provider, key, base URL and model are filled in for you. Default quota US$0.01.',
       registerUserPlaceholder: 'Your name / nickname',
       registerNeedUser: 'Type a user name before registering.',
-      registerDone: 'A key is already configured — nothing to fill in.',
       registerRestored: 'Restored the key issued to this device; click Save to apply.',
-      registerLocked: 'One device / one name gets a single key — ask an admin to replace it.',
       quotaTitle: 'Quota (current key)',
       quotaSummary: 'Remaining {remain} · used {used} · total {total}',
       quotaUnlimited: 'Unlimited',
@@ -120,8 +114,6 @@ window.__ModuleLoader__.load({
       quotaNotRegistered: 'The service has no registration for this device (new device or cleared data) — ask an admin to reset it.',
       quotaFailed: 'Failed to read quota: {message}',
       quotaUpdatedAt: 'updated {time}',
-      registerCurrent: 'Current: {value}',
-      registerNoKey: 'No key yet — use the button to get one',
       register: 'Register & fill in',
       registerWorking: 'Registering…',
       registerOk: 'Registered: provider, key, base URL and model written; applies after the config reload.',
@@ -572,22 +564,17 @@ window.__ModuleLoader__.load({
           disabled: TOKENS.error,
           failed: TOKENS.error,
         };
-        // 上游 / 地址 / Key 现在由注册流程写入，这里只展示当前连接，不让手填。
+        // 上游 / 地址 / Key 现在由注册流程写入，页面上不让手填。
         const keyReady = Boolean(snapshot.secrets?.apiKey || value.apiKey);
-        const connection = keyReady
-          ? `${t('providerNewapi')} · ${value.baseUrl || '-'} · ${value.model || '-'}`
-          : t('registerNoKey');
-        // 已经配好 Key 的（注册过的或手填的）只展示当前连接：一个设备 / 一个用户名只发一把，
-        // 不提供「再领一把」的入口，要换 Key 只能找管理员。
-        const alreadyRegistered = keyReady;
-        const registerSucceeded = registerStatus === 'ok' || registerStatus === 'partial';
+        // 一个设备 / 一个用户名只发一把：已经配好 Key 的（注册过的或手填的）整块注册区直接隐藏，
+        // 连「已经领到 Key 了」这类说明也不显示；要换 Key 只能找管理员。
         const registerText = registerStatus === 'ok'
           ? t('registerOk')
           : (registerStatus === 'partial'
             ? t('registerPartial')
             : (registerStatus === 'restored'
               ? t('registerRestored')
-              : (alreadyRegistered && !registerSucceeded ? '' : registerMessage)));
+              : registerMessage));
         const usd = (value) => `$${(Number(value) || 0).toFixed(4)}`;
         const quotaReady = quotaStatus === 'ok' && quota;
         const quotaText = quotaReady
@@ -633,7 +620,8 @@ window.__ModuleLoader__.load({
             : null,
         ]);
 
-        const registerBox = h('div', {
+        // 有 Key 就整块不渲染（连标题、提示文字都没有），页面上只剩配置项 + 额度卡片。
+        const registerBox = keyReady ? null : h('div', {
           key: 'register',
           style: {
             display: 'flex',
@@ -649,44 +637,27 @@ window.__ModuleLoader__.load({
         }, [
           h('div', { key: 'text', style: { display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 220px' } }, [
             h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } },
-              alreadyRegistered ? t('registerDone') : t('registerTitle')),
-            alreadyRegistered
-              ? null
-              : h('span', { key: 'hint', style: labelStyle }, t('registerHint')),
-            h('span', {
-              key: 'current',
-              'data-field': 'registerCurrent',
-              style: { fontSize: 12, color: keyReady ? TOKENS.success : TOKENS.muted },
-            }, t('registerCurrent', {
-              value: keyReady && registerUser ? `${registerUser} · ${connection}` : connection,
-            })),
+              t('registerTitle')),
+            h('span', { key: 'hint', style: labelStyle }, t('registerHint')),
           ]),
-          alreadyRegistered
-            ? null
-            : h('input', {
-              key: 'user',
-              'data-field': 'registerUser',
-              type: 'text',
-              value: registerUser,
-              placeholder: t('registerUserPlaceholder'),
-              'aria-label': t('registerUser'),
-              onChange: (event) => setRegisterUser(event.target.value),
-              style: { ...inputStyle, flex: '0 1 180px', width: 'auto' },
-            }),
-          alreadyRegistered
-            ? h('span', {
-              key: 'locked',
-              'data-field': 'registerLocked',
-              style: { ...labelStyle, flex: '0 1 200px', marginBottom: 0 },
-            }, t('registerLocked'))
-            : h('button', {
-              key: 'button',
-              'data-action': 'register',
-              type: 'button',
-              disabled: registerStatus === 'working' || !registerUser.trim() || snapshot.writable === false,
-              onClick: register,
-              style: { padding: '6px 14px', borderRadius: 6, border: 'none', background: TOKENS.primaryFill, color: '#fff', cursor: 'pointer' },
-            }, registerStatus === 'working' ? t('registerWorking') : t('register')),
+          h('input', {
+            key: 'user',
+            'data-field': 'registerUser',
+            type: 'text',
+            value: registerUser,
+            placeholder: t('registerUserPlaceholder'),
+            'aria-label': t('registerUser'),
+            onChange: (event) => setRegisterUser(event.target.value),
+            style: { ...inputStyle, flex: '0 1 180px', width: 'auto' },
+          }),
+          h('button', {
+            key: 'button',
+            'data-action': 'register',
+            type: 'button',
+            disabled: registerStatus === 'working' || !registerUser.trim() || snapshot.writable === false,
+            onClick: register,
+            style: { padding: '6px 14px', borderRadius: 6, border: 'none', background: TOKENS.primaryFill, color: '#fff', cursor: 'pointer' },
+          }, registerStatus === 'working' ? t('registerWorking') : t('register')),
           registerText
             ? h('span', {
               key: 'message',
