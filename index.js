@@ -64,7 +64,11 @@ export const Config = z.object({
     .volatile(),
   registerUser: z.string()
     .default('')
-    .description('注册时填的用户名：它就是中转站里那把密钥的 API 名称，方便后台认领')
+    .description('（已废弃）历史上注册时填的用户名；现在领 Key 用邮箱验证码，见 registerEmail')
+    .volatile(),
+  registerEmail: z.string()
+    .default('')
+    .description('领 Key 用的邮箱（账号）：中转站里的密钥名由服务端生成唯一串，与这个邮箱绑定')
     .volatile(),
   registerToken: z.string()
     .default('metaontic-video-register-v1')
@@ -1829,7 +1833,8 @@ const CONFIG_FIELDS = [
   'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
   'duration', 'singleMaxSeconds', 'mode', 'resolution', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
-  'mergeMode', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary', 'registerUser',
+  'mergeMode', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary',
+  'registerUser', 'registerEmail',
 ];
 
 function maskSecrets(view) {
@@ -1878,7 +1883,7 @@ function configTool(config, settings) {
       '读取或修改 MetaOnticVideo 插件自己的配置（apiKey、baseUrl、submitPath、'
       + 'queryPath、model、duration、singleMaxSeconds、mode、resolution、ratio、generateAudio、'
       + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、outputDir、keepSegments、'
-      + 'ffmpegBinary、ffprobeBinary、registerUser）。改动写进 profile 的 cordis.patch.yml，'
+      + 'ffmpegBinary、ffprobeBinary、registerEmail）。改动写进 profile 的 cordis.patch.yml，'
       + '宿主重载后生效。'
       + '用户说「把中转站地址/模型/时长改成 X」时用 action=set，看当前值用 action=get；'
       + 'duration 是每段新增秒数（4-15，建议 ≤14），singleMaxSeconds 是单次直出上限（默认 15）。',
@@ -1892,7 +1897,7 @@ function configTool(config, settings) {
         },
         apiKey: { type: 'string', description: 'API Key（配置里留空时按 provider 读环境变量）。' },
         baseUrl: { type: 'string', description: '基础地址，例如 https://ai.bileego.com（中转站）或官方地址。' },
-        registerUser: { type: 'string', description: '注册时用的用户名，它同时是中转站里的 API（密钥）名称。' },
+        registerEmail: { type: 'string', description: '领 Key 用的邮箱（账号）；注册要邮箱验证码，一个邮箱只发一把。' },
         submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
         queryPath: { type: 'string', description: '查询任务路径，{task_id} 会被替换。' },
         model: { type: 'string', description: '模型 ID，例如 doubao-seedance-2-0-mini-260615。' },

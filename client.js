@@ -39,12 +39,19 @@ window.__ModuleLoader__.load({
       keepSegments: '保留分段',
       ffmpegBinary: 'ffmpeg 路径',
       ffprobeBinary: 'ffprobe 路径',
-      registerUser: '用户名（就是这把 API 的名字）',
+      registerEmail: '邮箱（账号）',
       registerTitle: '没有 API Key？',
-      registerHint: '先填用户名——它就是你领到的 API 名称，填谁的名字后台就显示谁，方便认领；'
-        + '填好点按钮即可，成功后自动写好上游、Key、地址与模型。默认额度 ¥0.01。',
-      registerUserPlaceholder: '你的名字 / 昵称',
-      registerNeedUser: '先填用户名，再点注册。',
+      registerHint: '用邮箱领：填邮箱 → 点「获取验证码」→ 把邮件里的数字填进来 → 点「注册并填写」。'
+        + '邮箱就是你的账号，一个邮箱只发一把 Key；成功后自动写好上游、Key、地址与模型，默认额度 ¥0.01。',
+      registerEmailPlaceholder: '你的邮箱，例如 name@example.com',
+      registerCode: '验证码',
+      registerCodePlaceholder: '邮件里的数字',
+      registerCodeSend: '获取验证码',
+      registerCodeSending: '发送中…',
+      registerCodeCooldown: '{seconds} 秒后重发',
+      registerCodeSent: '验证码已发到 {email}：5 分钟内有效，填进来点右边的按钮即可。',
+      registerNeedEmail: '先填邮箱，再点「获取验证码」。',
+      registerNeedCode: '先填邮件里收到的验证码。',
       registerRestored: '已找回本机密钥：这台设备之前领过的那把帮你填好了，点「保存」即可。',
       quotaTitle: '额度（当前这把 Key）',
       quotaSummary: '剩余 {remain} · 已用 {used} · 总量 {total}',
@@ -98,12 +105,20 @@ window.__ModuleLoader__.load({
       keepSegments: 'Keep segments',
       ffmpegBinary: 'ffmpeg path',
       ffprobeBinary: 'ffprobe path',
-      registerUser: 'User name (this becomes the API name)',
+      registerEmail: 'Email (this is your account)',
       registerTitle: 'No API key yet?',
-      registerHint: 'Type your name first — it becomes the API name you receive, so it is easy to claim later; '
-        + 'then use the button. Provider, key, base URL and model are filled in for you. Default quota ¥0.01.',
-      registerUserPlaceholder: 'Your name / nickname',
-      registerNeedUser: 'Type a user name before registering.',
+      registerHint: 'Register with your email: type it, click "Send code", then paste the number from the mail '
+        + 'and click "Register & fill in". One email gets one key. Provider, key, base URL and model are filled '
+        + 'in for you. Default quota ¥0.01.',
+      registerEmailPlaceholder: 'you@example.com',
+      registerCode: 'Verification code',
+      registerCodePlaceholder: 'code from the mail',
+      registerCodeSend: 'Send code',
+      registerCodeSending: 'Sending…',
+      registerCodeCooldown: 'Resend in {seconds}s',
+      registerCodeSent: 'Code sent to {email} — valid for 5 minutes.',
+      registerNeedEmail: 'Type your email before requesting a code.',
+      registerNeedCode: 'Type the code from the email first.',
       registerRestored: 'Restored the key issued to this device; click Save to apply.',
       quotaTitle: 'Quota (current key)',
       quotaSummary: 'Remaining {remain} · used {used} · total {total}',
@@ -223,9 +238,15 @@ window.__ModuleLoader__.load({
         const [status, setStatus] = React.useState('idle');
         const [registerStatus, setRegisterStatus] = React.useState('idle');
         const [registerMessage, setRegisterMessage] = React.useState('');
-        const [registerUser, setRegisterUser] = React.useState(
-          () => String((form.getSnapshot().value || {}).registerUser || ''),
-        );
+        // 注册用「邮箱（账号）+ 邮件验证码」：邮箱一次只发一把 Key
+        const [registerEmail, setRegisterEmail] = React.useState(() => {
+          const saved = form.getSnapshot().value || {};
+          return String(saved.registerEmail || saved.registerUser || '');
+        });
+        const [registerCode, setRegisterCode] = React.useState('');
+        const [codeStatus, setCodeStatus] = React.useState('idle');
+        const [codeMessage, setCodeMessage] = React.useState('');
+        const [codeCooldown, setCodeCooldown] = React.useState(0);
         // 额度：设置页展示这把 Key 的剩余 / 已用
         const [quota, setQuota] = React.useState(null);
         const [quotaStatus, setQuotaStatus] = React.useState('idle');
@@ -375,10 +396,10 @@ window.__ModuleLoader__.load({
             ['apiKey', result.api_key],
             ['baseUrl', result.base_url || fallbackBase || DEFAULT_REGISTER_API],
           ];
-          // 服务端会保证中转站里的密钥名唯一（撞名时带 -2 这类后缀）；
-          // 这里存用户自己填的原名，映射关系由服务端保管。
-          const displayName = result.display_name || result.name;
-          if (displayName) writes.push(['registerUser', displayName]);
+          // 邮箱是账号：存回本地，方便下次认出「这台机器绑的是哪个邮箱」；
+          // 中转站里的密钥名由服务端生成唯一串，与邮箱的绑定关系在服务端。
+          const account = result.email || result.display_name || '';
+          if (account) writes.push(['registerEmail', account]);
           if (result.model) writes.push(['model', result.model]);
           let ok = true;
           for (const [key, next] of writes) {
@@ -405,12 +426,67 @@ window.__ModuleLoader__.load({
           return result;
         }
 
+        /** 倒计时：同一个邮箱 60 秒才能再发一封，按钮上直接显示还剩几秒。 */
+        function startCooldown(seconds) {
+          const total = Math.max(Math.round(Number(seconds) || 0), 0);
+          if (!total) return;
+          setCodeCooldown(total);
+          const tick = (left) => {
+            if (left <= 0) {
+              setCodeCooldown(0);
+              return;
+            }
+            setCodeCooldown(left);
+            window.setTimeout(() => tick(left - 1), 1000);
+          };
+          window.setTimeout(() => tick(total - 1), 1000);
+        }
+
+        /** 获取验证码：邮箱是账号，服务端把验证码发到这个邮箱。 */
+        async function sendEmailCode() {
+          const account = registerEmail.trim();
+          if (!account) {
+            setCodeStatus('failed');
+            setCodeMessage(t('registerNeedEmail'));
+            return;
+          }
+          setCodeStatus('working');
+          setCodeMessage('');
+          try {
+            const status = await callRegister(`${DEFAULT_REGISTER_API}/api/v1/register/status`);
+            if (!status.enabled) {
+              setCodeStatus('failed');
+              setCodeMessage(t('registerDisabled', { message: status.hint || '-' }));
+              return;
+            }
+            const result = await callRegister(`${DEFAULT_REGISTER_API}/api/v1/register/email/code`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', accept: 'application/json' },
+              body: JSON.stringify({ email: account }),
+            });
+            setCodeStatus('sent');
+            setCodeMessage(t('registerCodeSent', { email: result.email || account }));
+            startCooldown(result.retry_after ?? 60);
+            setRegisterStatus('idle');
+            setRegisterMessage('');
+          } catch (error) {
+            setCodeStatus('failed');
+            setCodeMessage(error?.message || String(error));
+          }
+        }
+
         async function register() {
           const root = DEFAULT_REGISTER_API;
-          const username = registerUser.trim();
-          if (!username) {
+          const account = registerEmail.trim();
+          const code = registerCode.trim();
+          if (!account) {
             setRegisterStatus('failed');
-            setRegisterMessage(t('registerNeedUser'));
+            setRegisterMessage(t('registerNeedEmail'));
+            return;
+          }
+          if (!code) {
+            setRegisterStatus('failed');
+            setRegisterMessage(t('registerNeedCode'));
             return;
           }
           setRegisterStatus('working');
@@ -428,7 +504,8 @@ window.__ModuleLoader__.load({
               method: 'POST',
               headers: { 'content-type': 'application/json', accept: 'application/json' },
               body: JSON.stringify({
-                name: username,
+                email: account,
+                code,
                 device_id: device.id,
                 device_secret: device.secret,
                 device_info: fingerprint,
@@ -652,23 +729,58 @@ window.__ModuleLoader__.load({
             h('span', { key: 'hint', style: labelStyle }, t('registerHint')),
           ]),
           h('input', {
-            key: 'user',
-            'data-field': 'registerUser',
+            key: 'email',
+            'data-field': 'registerEmail',
             type: 'text',
-            value: registerUser,
-            placeholder: t('registerUserPlaceholder'),
-            'aria-label': t('registerUser'),
-            onChange: (event) => setRegisterUser(event.target.value),
+            value: registerEmail,
+            placeholder: t('registerEmailPlaceholder'),
+            'aria-label': t('registerEmail'),
+            onChange: (event) => setRegisterEmail(event.target.value),
             style: { ...inputStyle, flex: '0 1 180px', width: 'auto' },
+          }),
+          h('button', {
+            key: 'code',
+            'data-action': 'send-code',
+            type: 'button',
+            disabled: codeStatus === 'working' || codeCooldown > 0 || !registerEmail.trim(),
+            onClick: () => { sendEmailCode().catch(() => {}); },
+            style: { padding: '6px 12px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.text, cursor: 'pointer' },
+          }, codeCooldown > 0
+            ? t('registerCodeCooldown', { seconds: codeCooldown })
+            : (codeStatus === 'working' ? t('registerCodeSending') : t('registerCodeSend'))),
+          h('input', {
+            key: 'code-input',
+            'data-field': 'registerCode',
+            type: 'text',
+            inputMode: 'numeric',
+            value: registerCode,
+            placeholder: t('registerCodePlaceholder'),
+            'aria-label': t('registerCode'),
+            onChange: (event) => setRegisterCode(event.target.value),
+            style: { ...inputStyle, flex: '0 1 110px', width: 'auto' },
           }),
           h('button', {
             key: 'button',
             'data-action': 'register',
             type: 'button',
-            disabled: registerStatus === 'working' || !registerUser.trim() || snapshot.writable === false,
+            disabled: registerStatus === 'working'
+              || !registerEmail.trim()
+              || !registerCode.trim()
+              || snapshot.writable === false,
             onClick: register,
             style: { padding: '6px 14px', borderRadius: 6, border: 'none', background: TOKENS.primaryFill, color: '#fff', cursor: 'pointer' },
           }, registerStatus === 'working' ? t('registerWorking') : t('register')),
+          codeMessage
+            ? h('span', {
+              key: 'code-message',
+              'data-field': 'codeMessage',
+              style: {
+                flex: '1 1 100%',
+                fontSize: 12,
+                color: codeStatus === 'failed' ? TOKENS.error : TOKENS.success,
+              },
+            }, codeMessage)
+            : null,
           registerText
             ? h('span', {
               key: 'message',
