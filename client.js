@@ -375,7 +375,10 @@ window.__ModuleLoader__.load({
             ['apiKey', result.api_key],
             ['baseUrl', result.base_url || fallbackBase || DEFAULT_REGISTER_API],
           ];
-          if (result.name) writes.push(['registerUser', result.name]);
+          // 服务端会保证中转站里的密钥名唯一（撞名时带 -2 这类后缀）；
+          // 这里存用户自己填的原名，映射关系由服务端保管。
+          const displayName = result.display_name || result.name;
+          if (displayName) writes.push(['registerUser', displayName]);
           if (result.model) writes.push(['model', result.model]);
           let ok = true;
           for (const [key, next] of writes) {
