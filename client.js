@@ -46,6 +46,7 @@ window.__ModuleLoader__.load({
       registerUserPlaceholder: '你的名字 / 昵称',
       registerNeedUser: '先填用户名，再点注册。',
       registerDone: '已经领到 Key 了，不用再填。',
+      registerRestored: '已找回本机密钥：这台设备之前领过的那把帮你填好了，点「保存」即可。',
       registerAgain: '重新领一把',
       registerCurrent: '当前连接：{value}',
       registerNoKey: '密钥未配置——点右边按钮领一个',
@@ -99,6 +100,7 @@ window.__ModuleLoader__.load({
       registerUserPlaceholder: 'Your name / nickname',
       registerNeedUser: 'Type a user name before registering.',
       registerDone: 'A key is already configured — nothing to fill in.',
+      registerRestored: 'Restored the key issued to this device; click Save to apply.',
       registerAgain: 'Issue a new one',
       registerCurrent: 'Current: {value}',
       registerNoKey: 'No key yet — use the button to get one',
@@ -217,6 +219,16 @@ window.__ModuleLoader__.load({
         // 重新领一把：点小字后才会再显示用户名输入框
         const [reRegister, setReRegister] = React.useState(false);
 
+        // 打开设置页时，若本机还没配 Key，就先问服务端要回自己那把（设备绑定过就能取回）
+        const restoreTried = React.useRef(false);
+        React.useEffect(() => {
+          if (restoreTried.current) return;
+          restoreTried.current = true;
+          const snap = form.getSnapshot() || {};
+          if (snap.secrets?.apiKey || (snap.value || {}).apiKey) return;
+          lookupOwnKey().catch(() => {});
+        }, []);
+
         if (props && props.view === 'summary') {
           const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
           const text = configured
@@ -254,27 +266,53 @@ window.__ModuleLoader__.load({
           setStatus('saved');
         }
 
-        /** 认识一下这台机器：注册时作为备注，方便在中转站后台认出是哪个插件实例。 */
-        function deviceInfo() {
-          const KEY = 'metaontic-video.device-id';
-          let id = '';
+        /** 本机身份：本地持久化的设备标识 + 设备密钥，注册时一起交给服务端做绑定。 */
+        function deviceIdentity() {
+          const ID_KEY = 'metaontic-video.device-id';
+          const SECRET_KEY = 'metaontic-video.device-secret';
+          const rand = () => Math.random().toString(36).slice(2, 10);
+          let id = `dsh-${rand()}${Date.now().toString(36)}`;
+          let secret = `dsk-${rand()}${rand()}${rand()}`;
           try {
-            id = window.localStorage.getItem(KEY) || '';
-            if (!id) {
-              id = `dsh-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
-              window.localStorage.setItem(KEY, id);
+            const savedId = window.localStorage.getItem(ID_KEY);
+            const savedSecret = window.localStorage.getItem(SECRET_KEY);
+            if (savedId) id = savedId;
+            else window.localStorage.setItem(ID_KEY, id);
+            if (savedSecret) secret = savedSecret;
+            else window.localStorage.setItem(SECRET_KEY, secret);
+          } catch {
+            // 存不住就退化成「本次会话内有效」，至少不会把注册弄崩
+          }
+          return { id, secret };
+        }
+
+        /** 设备指纹：只做登记，让后台看得出这把 Key 是哪台机器领的。 */
+        function deviceFingerprint() {
+          const pick = (read) => {
+            try {
+              const value = read();
+              return value ? String(value).slice(0, 120) : undefined;
+            } catch {
+              return undefined;
             }
-          } catch {
-            id = '';
-          }
-          let label = 'Harness';
-          try {
-            const platform = window.navigator?.userAgentData?.platform || window.navigator?.platform;
-            if (platform) label = `Harness-${platform}`;
-          } catch {
-            label = 'Harness';
-          }
-          return { id, label };
+          };
+          const nav = () => window.navigator || {};
+          const info = {
+            app: 'Harness',
+            plugin: 'metaontic-video',
+            platform: pick(() => nav().userAgentData?.platform || nav().platform),
+            os: pick(() => nav().userAgentData?.platform || nav().platform),
+            language: pick(() => nav().language),
+            timezone: pick(() => window.Intl?.DateTimeFormat().resolvedOptions().timeZone),
+            screen: pick(() => `${window.screen?.width}x${window.screen?.height}`),
+            agent: pick(() => nav().userAgent),
+          };
+          return Object.fromEntries(Object.entries(info).filter(([, v]) => v !== undefined));
+        }
+
+        function deviceLabel(info) {
+          const platform = info?.platform || info?.os;
+          return platform ? `Harness-${platform}` : 'Harness';
         }
 
         /** 取注册服务的 JSON：后端是 {code, data, message} 信封，这里拆开并统一抛错。 */
@@ -306,11 +344,46 @@ window.__ModuleLoader__.load({
           }
           const payload = body && typeof body === 'object' && 'data' in body ? body.data : body;
           if (!response.ok || (body && typeof body === 'object' && body.code)) {
-            throw new Error(
+            const failure = new Error(
               (body && (body.message || body.detail)) || text.slice(0, 200) || `HTTP ${response.status}`,
             );
+            failure.status = response.status;
+            throw failure;
           }
           return payload || {};
+        }
+
+        /** 把服务端给的那把密钥写回配置（注册、取回都走这里）。 */
+        async function applyRegistration(result, fallbackBase) {
+          const writes = [
+            ['apiKey', result.api_key],
+            ['baseUrl', result.base_url || fallbackBase || DEFAULT_REGISTER_API],
+          ];
+          if (result.name) writes.push(['registerUser', result.name]);
+          if (result.model) writes.push(['model', result.model]);
+          let ok = true;
+          for (const [key, next] of writes) {
+            const accepted = await form.set(key, next);
+            if (accepted) clear(key);
+            else ok = false;
+          }
+          setRegisterStatus(ok ? 'ok' : 'partial');
+          setReRegister(false);
+          return ok;
+        }
+
+        /** 本机取回：只有设备标识 + 设备密钥都对上，服务端才把注册信息给你。 */
+        async function lookupOwnKey() {
+          const device = deviceIdentity();
+          const result = await callRegister(`${DEFAULT_REGISTER_API}/api/v1/register/lookup`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', accept: 'application/json' },
+            body: JSON.stringify({ device_id: device.id, device_secret: device.secret }),
+          });
+          if (!result.api_key) throw new Error(t('registerNoKey'));
+          await applyRegistration(result, null);
+          setRegisterStatus('restored');
+          return result;
         }
 
         async function register() {
@@ -323,6 +396,8 @@ window.__ModuleLoader__.load({
           }
           setRegisterStatus('working');
           setRegisterMessage('');
+          const device = deviceIdentity();
+          const fingerprint = deviceFingerprint();
           try {
             const status = await callRegister(`${root}/api/v1/register/status`);
             if (!status.enabled) {
@@ -330,14 +405,15 @@ window.__ModuleLoader__.load({
               setRegisterMessage(t('registerDisabled', { message: status.hint || '-' }));
               return;
             }
-            const device = deviceInfo();
             const result = await callRegister(`${root}/api/v1/register`, {
               method: 'POST',
               headers: { 'content-type': 'application/json', accept: 'application/json' },
               body: JSON.stringify({
                 name: username,
-                device_id: device.id || undefined,
-                note: `Harness 插件设置页注册（${device.label}）`,
+                device_id: device.id,
+                device_secret: device.secret,
+                device_info: fingerprint,
+                note: `Harness 插件设置页注册（${deviceLabel(fingerprint)}）`,
               }),
             });
             if (!result.api_key) {
@@ -345,23 +421,17 @@ window.__ModuleLoader__.load({
               setRegisterMessage(t('registerNoKey'));
               return;
             }
-            const writes = [
-              ['provider', 'newapi'],
-              ['apiKey', result.api_key],
-              ['baseUrl', result.base_url || status.base_url || root],
-              ['registerUser', username],
-            ];
-            const model = result.model || status.model;
-            if (model) writes.push(['model', model]);
-            let ok = true;
-            for (const [key, next] of writes) {
-              const accepted = await form.set(key, next);
-              if (accepted) clear(key);
-              else ok = false;
-            }
-            setRegisterStatus(ok ? 'ok' : 'partial');
-            setReRegister(false);
+            await applyRegistration(result, status.base_url || root);
           } catch (error) {
+            // 本机早就领过了（或本地密钥丢了）：直接把自己那把取回来
+            if (error?.status === 409 || error?.status === 404) {
+              try {
+                await lookupOwnKey();
+                return;
+              } catch {
+                // 取不回来说明不是本机领的，照原样报错
+              }
+            }
             setRegisterStatus('failed');
             setRegisterMessage(t('registerFailed', { message: error?.message || String(error) }));
           }
@@ -445,6 +515,7 @@ window.__ModuleLoader__.load({
 
         const registerMessageColors = {
           ok: TOKENS.success,
+          restored: TOKENS.success,
           partial: TOKENS.success,
           disabled: TOKENS.error,
           failed: TOKENS.error,
@@ -462,7 +533,9 @@ window.__ModuleLoader__.load({
           ? t('registerOk')
           : (registerStatus === 'partial'
             ? t('registerPartial')
-            : (alreadyRegistered && !registerSucceeded ? '' : registerMessage));
+            : (registerStatus === 'restored'
+              ? t('registerRestored')
+              : (alreadyRegistered && !registerSucceeded ? '' : registerMessage)));
         const registerBox = h('div', {
           key: 'register',
           style: {
