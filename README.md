@@ -169,9 +169,6 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 | 字段 | 默认值 | 说明 |
 | --- | --- | --- |
-| `apiKey` | 空 | 激活时自动写入；只有临时换成别人给的 Key 才用手填 |
-| `baseUrl` | 空 | 激活时自动写入；手动换服务地址时才用改，如 `https://ai.bileego.com`（不带 `/v1`，不重复 `/api/v3`） |
-| `model` | `doubao-seedance-2-0-mini-260615` | 支持生成/延长的模型（seedance 2.0 / 2.5 系列） |
 | `registerEmail` | 空 | 领 Key 用的邮箱（注册区那个输入框） |
 | `singleMaxSeconds` | `15` | 单次直出上限（4–15）；超过它就分段延长 |
 | `duration` | `5` | 每段延长的秒数（4–15 的整数）；**建议 ≤14**，刚好卡 15 秒容易因为封装略超被拒 |
@@ -180,26 +177,22 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | `ratio` | `adaptive` | 16:9 / 9:16 / 4:3 / 3:4 / 1:1 / adaptive（2.5 延长时固定 adaptive） |
 | `generateAudio` | `true` | 是否生成音频 |
 | `watermark` | `false` | 是否加水印（部分线路只接受 true） |
-| `extraParams` | 空 | JSON 对象字符串，合并进请求体 |
-| `pollIntervalMs` | `5000` | 轮询间隔（毫秒） |
-| `maxWaitMs` | `600000` | 单次调用最长等待（毫秒） |
 | `mergeMode` | `copy` | `copy`=先无损拼接（参数不一致自动重编码）；`reencode`=统一重编码 |
 | `outputDir` | 空 | 成片输出目录；留空=会话工作目录下的 `metaontic-video/` |
 | `keepSegments` | `false` | 合并成功后是否保留分段原片 |
 | `ffmpegBinary` | `ffmpeg` | ffmpeg 可执行文件；PATH 里没有时填绝对路径 |
 | `ffprobeBinary` | `ffprobe` | ffprobe 可执行文件 |
 
-配置写在 Harness 的 profile 里（桌面端：`~/.dsh/profiles/desktop/cordis.patch.yml`）：
+上面这些写在 Harness 的 profile 里（桌面端：`~/.dsh/profiles/desktop/cordis.patch.yml`）；
+Key、服务地址、模型由「激活」自动写好，正常不用出现在配置里。
 
 ```yaml
 - id: metaontic-video
   name: 'metaontic-video'
   config:
-    apiKey: 'sk-...'
-    baseUrl: 'https://ai.bileego.com'
-    model: 'doubao-seedance-2-0-mini-260615'
     singleMaxSeconds: 15
     duration: 14
+    resolution: 720p
     ratio: 9:16
 ```
 
