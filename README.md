@@ -3,11 +3,10 @@
 一句话：装上它，你就可以直接对 Harness 说「帮我生成一段 20 秒的视频」，它会调用 Seedance 把视频做出来；
 **15 秒以内的视频一次生成，更长的会自动拆成几段分别生成，再用 ffmpeg 拼成一条完整的视频存到你电脑上。**
 
-- 显示名 **MetaOnticVideo**，npm 包名 `metaontic-video`，profile 条目 id `metaontic-video`
+- 插件显示名 **MetaOnticVideo**，在 **插件 → 已安装插件** 里能看到
 - 需要 Harness 桌面端；合并成一条视频需要本机有 `ffmpeg`（见下面「先装好这些（依赖）」）
-- 只走 New API 中转站（火山方舟官方接口已移除）
 - **一个包管到底**：视频工具、设置页、以及内置的「视频导演」智能体预设都在这个包里
-  （原 `metaontic-video-agent` 已合并进来，不用再单独装第二个包）
+  （以前的 `metaontic-video-agent` 已合并进来，不用再单独装第二个包）
 
 ## 它能做什么
 
@@ -27,9 +26,9 @@
 | Harness 桌面端 | 插件跑在它里面，工具、插件页和配置页都由它提供（自带 Node 20+，不用自己装） | 安装 DeepSeek Harness 即可 |
 | `ffmpeg` + `ffprobe` | 只有「把多段合成一条成片」和「量一下每段多长」用得到 | Mac：`brew install ffmpeg`；Windows：`winget install Gyan.FFmpeg` |
 
-**不用** `npm install`：插件本身没有第三方依赖（`@deepseek-ai/schemastery` 由 App 自带）。
+**不用** `npm install`：插件本身没有第三方依赖。
 
-在终端跑这三条，都打印出版本号就说明齐了：
+在终端跑这一条，都打印出版本号就说明齐了：
 
 ```bash
 node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
@@ -38,25 +37,20 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 - 提示 `command not found: ffmpeg`：还没装；装了但不在 PATH，就在插件配置里把 `ffmpegBinary` / `ffprobeBinary` 填绝对路径（Mac 上一般是 `/opt/homebrew/bin/ffmpeg`）。
 - 完全没装 ffmpeg 也能出片：分段照常生成，只是最后不会自动拼成一条完整视频。
 
-另外还需要两件「账号 + 网络」上的准备：
+另外只要满足两条就能用：
 
-- **上游账号**：New API 中转站。不用自己准备 Key——第二步点一下「激活」就会领一把；
-  已另有 Key 的话也可以直接设进插件（或设环境变量 `NEWAPI_API_KEY`）。
-- **网络能通**：本机能访问上游地址，也能下载上游返回的成片链接（走代理时记得放行）。
+- **能联网**：本机能访问视频服务的地址，也能下载生成好的成片链接（走代理时记得放行）。
+- **有一把 Key**：不用自己申请——下面第二步点一下「激活」就会自动领一把，并帮你把配置填好。
 
 不需要再装别的包：「视频导演」预设已经内置在本插件里（见下一节），它会先帮你写脚本、分镜和逐镜提示词再出片，出片时直接用本插件的 `video_generate` 等工具。
 
 ## 自带一个「视频导演」预设
 
-这个包同时注册了一个智能体预设 **视频导演**（新区里选它就能用）：
+这个包同时注册了一个智能体预设 **视频导演**（在新区里选它就能用）：
 先写脚本、等你确认，确认后才调用 `video_generate` 生成，最后用 ffmpeg 合成交付。
 
-- 预设自带技能目录 `skills/video-director/`（工作流、提示词手册、ffmpeg 合成参考），随包安装，不需要另外配路径。
-- 预设和工具在同一个包里发布，所以「≤15 秒不拆段」这类硬规则只有一份，不会再出现两边规则打架。
-- 用不上预设也没关系：不选它，直接用普通对话 + `video_generate` 一样能出片。
-
-> 早期版本里这个预设住在单独的包 `metaontic-video-agent`。那个包已停止维护，
-> 只保留一个空壳做残留安装的兼容；请改用本包（旧包留着也不会重复注册预设）。
+- 预设自带一套工作流、提示词手册和合成参考，随插件一起安装，不需要你另外配置。
+- 用不上预设也没关系：不选它，直接用普通对话 + 说「生成一段 10 秒的视频…」一样能出片。
 
 ## 三步就能用起来
 
@@ -65,13 +59,13 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 侧栏 **插件 → 已安装插件** 里应该有 **MetaOnticVideo**，右边的开关是**打开**的。
 
 - 没看到？点 **添加插件**，粘贴仓库地址 `github:wxsimon2022/metaontic-video`，或选本地文件夹安装。
-- 命令行装法（本地仓库目录）：
+- 命令行装法（插件目录）：
 
   ```bash
   dsh plugin --profile desktop add /你的路径/metaontic-video
   ```
 
-- **改过插件代码或刚装好，要重启一次 Harness** 才会加载新代码。
+- **刚装好或改过插件，要重启一次 Harness** 才会生效。
 - 装好后，在对话框上方的新区就能看到智能体预设 **视频导演**（不用另外装东西）。
 
 ### 第二步：用邮箱领一把 Key（只做一次）
@@ -81,41 +75,29 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 1. 填你的**邮箱**——它就是你的账号，一个邮箱只发一把 Key；
 2. 点 **「获取验证码」**，去邮箱里拿那 6 位数字（5 分钟内有效，60 秒才能重发一次）；
    这 60 秒里邮箱框会置灰，防止「码发到 A、注册却填了 B」；
-3. 把验证码填进右边的框，点 **「激活」**——服务端在中转站生成一个唯一密钥名，并与这个邮箱绑定。
+3. 把验证码填进右边的框，点 **「激活」**——系统会给你分配一把专属 Key，并和这个邮箱绑定。
 
-插件会向注册服务申请一把新密钥（**默认额度 ¥0.01**，够试跑几条短片），
-并把「上游 / API Key / 基础地址 / 模型」自动写好——这几项现在不在页面上手填了。
-**领到 Key 之后，注册区会整块消失**（不再显示「已经领到 Key 了」之类的说明），
-页面上只剩配置项和下面的额度卡片。
+激活成功后，插件会把「上游 / API Key / 基础地址 / 模型」自动写好——这几项不用你手填。
+**领到 Key 之后，注册区会整块消失**，页面上只剩配置项和下面的额度卡片。
 
-> 服务端要能连上中转站管理端：`backend/.env` 里的 `NEWAPI_ADMIN_ACCESS_TOKEN`
-> （中转站后台生成的长期访问令牌）得先配好；
-> 还要配好发验证码的邮箱 `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD`
-> （腾讯云企业邮箱是 `smtp.exmail.qq.com:465`）。少哪一项，按钮都会直接把缺什么告诉你，不会静默失败。
->
-> 注册请求会带上握手请求头 `X-Register-Token`（值 = 插件的 `registerToken`，
-> 默认 `metaontic-video-register-v1`，要与服务端 `REGISTER_CLIENT_TOKEN` 一致），
-> 免得注册入口被随手扫。已经领过 Key 之后，注册区直接隐藏，
-> **不再提供「再领一把」的入口**——邮箱是唯一标识，一个邮箱只发一把，要换 Key 请联系管理员。
->
-> **一个邮箱一把**：同一个邮箱再来注册，服务端会**直接把原来那把 Key 还回来**（不会在中转站多开
-> token）；换台机器用同一个邮箱注册，也能拿回同一把 Key，并且设备绑定会挪到新机器上。
-> 额度用完找管理员充值；只有历史脏数据（记录里没留下 Key）才会回「不支持重复领取」。
+注意事项：
+
+- **一个邮箱一把 Key**：同一个邮箱再来激活，会把**原来那把 Key 还给你**，不会多开一把；
+  换台电脑用同一个邮箱激活，也能拿回同一把 Key。
+- 验证码发不出去、或提示缺少什么，页面会直接告诉你是哪一步不行，不会静默失败。
+- 额度用完找管理员充值；要换 Key 也请联系管理员。
 
 ### 看额度：剩余 / 已用
 
-设置页下面那条就是**额度**（领到 Key 后，这几乎是页面上唯一还在变的信息）：
+设置页下面那条就是**额度**（领到 Key 之后，这几乎是页面上唯一还在变的信息）：
 
-- **剩余**：这把 Key 还能用多少钱；**已用**：已经花掉多少；**总量** = 剩余 + 已用（按中转站的口径换算成**人民币**，币种符号由服务端给）；
+- **剩余**：这把 Key 还能用多少钱；**已用**：已经花掉多少；**总量** = 剩余 + 已用（换算成**人民币**）；
 - 打开设置页会自动读一次，也可以点「刷新额度」；生成完之后想知道还剩多少，就点一下刷新；
-- 读额度是拿**这台设备的标识 + 设备密钥**去服务端换的，所以只会显示你自己那把 Key 的用量；
+- 额度是跟着**你的 Key** 走的，所以这里只看得到你自己的用量；
 - 还没领 Key 时这里会提示「还没有密钥」，点上面的「激活」即可。
 
 需要手工指定 Key / 地址的场景（例如临时换成别人给的 Key），可以直接跟 Harness 说
 「把视频插件的 API Key 设成 sk-xxx、地址设成 https://…」，它会用 `video_config` 工具写进配置。
-
-> 服务端代码在同级目录的 `MetaOnticVideoService`（FastAPI + Vue3 控制台）：
-> `/api/v1/register/status`、`/register`、`/register/lookup`、`/register/quota`。
 
 ### 第三步：直接说要什么
 
@@ -172,9 +154,9 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 | 现象 | 原因 / 怎么办 |
 | --- | --- |
-| 提示「未配置 API Key」 | 第二步还没注册成功（或注册服务没配好），按提示重试 |
-| 提示「额度不足」 | 中转站余额不够，充值后再试 |
-| 提示「鉴权失败」 | Key 不对、过期，或填错了中转站地址 |
+| 提示「未配置 API Key」 | 第二步还没激活成功，回设置页重试一次 |
+| 提示「额度不足」 | Key 的额度用完了，找管理员充值后再试 |
+| 提示「鉴权失败」 | Key 不对或已失效，重新激活一次拿回自己的 Key |
 | 提示「内容审核拒绝」 | 提示词或参考视频里有真人等敏感内容；换素材，或换同一账号下的受信原片 |
 | 提示「没有找到 ffmpeg」 | 电脑没装 ffmpeg；Mac 上执行 `brew install ffmpeg`，装好但不在 PATH 就在配置里填 `ffmpegBinary` 绝对路径 |
 | 一直显示生成中 | 正常，通常几分钟；说「查一下任务 xxx」继续等 |
@@ -191,29 +173,29 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 4. **声音怎么接**：台词说完、环境声和背景音乐不断
 5. **方向**：是往后续拍，还是往前补
 
-参考视频统一用 `视频1` 指代；**不要写「参考视频1」**，那样容易被上游当成「参考生视频」而不是延长。
+参考视频统一用 `视频1` 指代；**不要写「参考视频1」**，那样容易被当成「参考生视频」而不是延长。
 
-## 进阶：全部配置项
+## 进阶：全部配置项（一般不用改）
 
 | 字段 | 默认值 | 说明 |
 | --- | --- | --- |
-| `provider` | `newapi` | 固定 `newapi`（New API 中转站）；火山官方已移除，旧配置里写成 `ark` 也按中转站走 |
-| `apiKey` | 空 | 注册时自动写入；留空时读环境变量（`NEWAPI_API_KEY` / `ARK_API_KEY`） |
-| `baseUrl` | 空 | 中转站站址，如 `https://ai.bileego.com`（不带 `/v1`，不重复 `/api/v3`）。注册时自动写入 |
-| `submitPath` | 按上游 | 创建任务路径，中转站按模型分流时用 `/doubao/api/v3/contents/generations/tasks` |
+| `provider` | `newapi` | 固定走 New API 中转站；火山官方已移除，旧配置里写成 `ark` 也按中转站走 |
+| `apiKey` | 空 | 激活时自动写入；一般不用手填 |
+| `baseUrl` | 空 | 视频服务地址，如 `https://ai.bileego.com`（不带 `/v1`，不重复 `/api/v3`）。激活时自动写入 |
+| `submitPath` | 按上游 | 创建任务路径；服务按模型分流时用 `/doubao/api/v3/contents/generations/tasks` |
 | `queryPath` | 按上游 | 查询路径，`{task_id}` 会被替换 |
 | `model` | `doubao-seedance-2-0-mini-260615` | 支持生成/延长的模型（seedance 2.0 / 2.5 系列） |
-| `registerApiBase` | `https://video.mybfs.cn` | 「激活」调用的注册服务地址：固定默认值，页面上不显示、也不开放修改 |
-| `registerEmail` | 空 | 领 Key 用的邮箱（注册区那个输入框）；中转站里的密钥名由服务端生成唯一串，邮箱与服务端记录绑定 |
+| `registerApiBase` | 固定值 | 「激活」用的服务地址：页面上不显示，也不开放修改 |
+| `registerEmail` | 空 | 领 Key 用的邮箱（注册区那个输入框） |
 | `registerUser` | 空 | 已废弃：老的「用户名」字段，读取时作为邮箱的兜底 |
-| `registerToken` | `metaontic-video-register-v1` | 注册请求头 `X-Register-Token` 的值，需与服务端 `REGISTER_CLIENT_TOKEN` 一致；页面不显示 |
+| `registerToken` | 固定值 | 激活请求的握手令牌；页面不显示，一般不用改 |
 | `singleMaxSeconds` | `15` | 单次直出上限（4–15）；超过它就分段延长 |
-| `duration` | `5` | 每段延长的秒数（4–15 的整数）；**建议 ≤14**，刚好卡 15 秒容易因封装略超被上游拒 |
+| `duration` | `5` | 每段延长的秒数（4–15 的整数）；**建议 ≤14**，刚好卡 15 秒容易因为封装略超被拒 |
 | `mode` | `continuous` | `continuous`=同机位续拍；`closeup`=台词结束处切近景 |
 | `resolution` | `720p` | 480p / 720p / 1080p |
 | `ratio` | `adaptive` | 16:9 / 9:16 / 4:3 / 3:4 / 1:1 / adaptive（2.5 延长时固定 adaptive） |
 | `generateAudio` | `true` | 是否生成音频 |
-| `watermark` | `false` | 是否加水印（部分中转站只接受 true） |
+| `watermark` | `false` | 是否加水印（部分线路只接受 true） |
 | `extraParams` | 空 | JSON 对象字符串，合并进请求体 |
 | `pollIntervalMs` | `5000` | 轮询间隔（毫秒） |
 | `maxWaitMs` | `600000` | 单次调用最长等待（毫秒） |
@@ -223,7 +205,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | `ffmpegBinary` | `ffmpeg` | ffmpeg 可执行文件；PATH 里没有时填绝对路径 |
 | `ffprobeBinary` | `ffprobe` | ffprobe 可执行文件 |
 
-配置写在 profile 的 patch 文件里（桌面端：`~/.dsh/profiles/desktop/cordis.patch.yml`）：
+配置写在 Harness 的 profile 里（桌面端：`~/.dsh/profiles/desktop/cordis.patch.yml`）：
 
 ```yaml
 - id: metaontic-video
@@ -238,7 +220,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
     ratio: 9:16
 ```
 
-## 进阶：提示词与请求语义
+## 进阶：延长提示词怎么写
 
 延长提示词按五块拼好，减少接缝：
 
@@ -250,32 +232,25 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | 镜头运动 | 机位、景别、焦段、运镜、曝光、白平衡、光源与背景布局 |
 | 声音延续 | 台词完整说完，对白、环境声与背景音乐连续 |
 
-- 向后续拍：`direction` 默认 `backward`；`wording: 'after'` 换成「生成视频1之后的内容：」的说法。
-- 向前延长：`direction: 'forward'`，提示词变成「向前延长视频1。生成 N 秒前置画面，接在视频1第一帧之前」，
-  `startAt` 标出这段在整片里的位置（多段向前时逐段前移）。
-- 请求沿用火山 contents-generation 原生格式：`content` 里用
-  `{"type":"video_url","video_url":{"url":...},"role":"reference_video"}` 传输入素材；
-  seedance 2.5 自动改用 `ratio=adaptive` 与 `omni_reference_task_type=extend`。
-- 回复解析兼容中转站：状态别名、任务 ID 字段、深层取件都能识别，并跳过封面/首尾帧等图片字段。
+- 向后续拍：默认就是往后；也可以换成「生成视频1之后的内容：」的说法。
+- 向前延长：提示词写成「向前延长视频1。生成 N 秒前置画面，接在视频1第一帧之前」，
+  插件会自动标出这段在整片里的位置（多段向前时逐段前移）。
+- 你说清方向和剧情就行，参数细节插件会按当前模型自动适配。
 
 ## 进阶：合并细节
 
-- `mergeMode: copy` 用 concat demuxer 做无损拼接；分段分辨率等参数不一致时自动改走统一重编码（保留音频，必要时退回只并视频）。
-- 每段下载后探测真实时长：接近累计时长时判定「上游返回的是累计成片」，改用这一段作为基础，避免重复拼接。
-- 没有 ffprobe 时按「每段都是增量片段」拼接，并在结果里说明。
+- 默认先做**无损拼接**；各段分辨率等参数不一致时自动改走统一重编码（保留音频，必要时退回只并视频）。
+- 每段下载后会探测真实时长，避免把上游返回的整条成片重复拼一遍。
 - 找不到 ffmpeg 不会让任务失败：分段链接照常返回，只是不合并成一个文件。
 
 ## 限制
 
-- 输入素材必须是上游能直接拉取的公网 URL，本地文件路径不支持。
-- 含人脸续拍通常要求同一上游账号下的受信原始产物，否则会被内容审核拒绝。
-- 不保证人脸、声线、口型和背景完全连续；上游返回的链接一般 24 小时内有效。
+- 输入素材必须是能直接访问的公网视频 URL，本地文件路径不支持。
+- 含人脸续拍通常要求同一账号下的受信原始产物，否则会被内容审核拒绝。
+- 不保证人脸、声线、口型和背景完全连续；生成链接一般 24 小时内有效。
 - 超过单段上限的成片由多段拼成，接缝处仍需自己预览；合并只统一容器与编码，不做画面修补。
 
-## 发布（维护者）
+## 反馈
 
-```bash
-npm pack --dry-run          # 先看会打包哪些文件
-npm version minor           # 或 patch / major，写入 git tag
-git push --follow-tags      # 推 tag 后 Actions 会用仓库 secret NPM_TOKEN 自动发布
-```
+装不上、出不了片、或者有问题想问，去仓库提 Issue：
+<https://github.com/wxsimon2022/metaontic-video/issues>
