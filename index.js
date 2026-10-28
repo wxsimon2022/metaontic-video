@@ -68,7 +68,7 @@ export const Config = z.object({
     .volatile(),
   registerApiBase: z.string()
     .default('https://video.mybfs.cn')
-    .description('插件设置页「注册并填写」按钮调用的注册服务地址；换自建服务时改成自己的域名')
+    .description('「注册并填写」按钮调用的注册服务地址；默认 https://video.mybfs.cn，页面不显示也不开放修改')
     .volatile(),
   registerUser: z.string()
     .default('')
@@ -1842,8 +1842,7 @@ const CONFIG_FIELDS = [
   'provider', 'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
   'duration', 'singleMaxSeconds', 'mode', 'resolution', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
-  'mergeMode', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary',
-  'registerApiBase', 'registerUser',
+  'mergeMode', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary', 'registerUser',
 ];
 
 function maskSecrets(view) {
@@ -1893,7 +1892,7 @@ function configTool(config, settings) {
       '读取或修改 MetaOnticVideo 插件自己的配置（provider、apiKey、baseUrl、submitPath、'
       + 'queryPath、model、duration、singleMaxSeconds、mode、resolution、ratio、generateAudio、'
       + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、outputDir、keepSegments、'
-      + 'ffmpegBinary、ffprobeBinary、registerApiBase、registerUser）。改动写进 profile 的 cordis.patch.yml，'
+      + 'ffmpegBinary、ffprobeBinary、registerUser）。改动写进 profile 的 cordis.patch.yml，'
       + '宿主重载后生效。'
       + '用户说「把中转站地址/模型/时长改成 X」时用 action=set，看当前值用 action=get；'
       + 'duration 是每段新增秒数（4-15，建议 ≤14），singleMaxSeconds 是单次直出上限（默认 15）。',
@@ -1908,10 +1907,6 @@ function configTool(config, settings) {
         provider: { type: 'string', enum: ['newapi', 'ark'], description: 'newapi=中转站，ark=火山官方。' },
         apiKey: { type: 'string', description: 'API Key（配置里留空时按 provider 读环境变量）。' },
         baseUrl: { type: 'string', description: '基础地址，例如 https://ai.bileego.com（中转站）或官方地址。' },
-        registerApiBase: {
-          type: 'string',
-          description: '插件设置页「注册并填写」按钮调用的注册服务地址，默认 https://video.mybfs.cn。',
-        },
         registerUser: { type: 'string', description: '注册时用的用户名，会写进中转站里的密钥名。' },
         submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
         queryPath: { type: 'string', description: '查询任务路径，{task_id} 会被替换。' },
@@ -2033,8 +2028,7 @@ function buildPromptGuidance(config) {
       + '合并需要本机有 ffmpeg，缺了会保留分段但不合并。',
     `· 当前配置：直出上限 ${singleMax} 秒、每段延长 ${segmentSeconds} 秒。`,
     '· 没有 API Key：让用户在插件设置页点「注册并填写」，会向注册服务申请一个密钥并自动填好；'
-      + '注册要先填用户名（写进密钥名，默认额度 0.01 美元），'
-      + '注册服务地址由设置里的 registerApiBase 决定。',
+      + '注册要先填用户名（写进密钥名，默认额度 0.01 美元）。',
   ].join('\n');
 }
 

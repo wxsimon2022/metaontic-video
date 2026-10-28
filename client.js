@@ -48,7 +48,6 @@ window.__ModuleLoader__.load({
       keepSegments: '保留分段',
       ffmpegBinary: 'ffmpeg 路径',
       ffprobeBinary: 'ffprobe 路径',
-      registerApiBase: '注册服务地址',
       registerUser: '用户名',
       registerTitle: '没有 API Key？',
       registerHint: '先填用户名（会写进密钥名，方便后台认领），再点按钮申请一个密钥；'
@@ -64,7 +63,6 @@ window.__ModuleLoader__.load({
       registerFailed: '注册失败：{message}',
       registerDisabled: '注册服务不可用：{message}',
       registerNoKey: '注册服务没有返回密钥（后端中转站配置可能有问题）。',
-      registerHintAfter: '默认地址 {base}；自建服务时改成自己的地址。',
       mode: '续拍方式',
       modeContinuous: '同机位连续',
       modeCloseup: '切近景',
@@ -110,7 +108,6 @@ window.__ModuleLoader__.load({
       keepSegments: 'Keep segments',
       ffmpegBinary: 'ffmpeg path',
       ffprobeBinary: 'ffprobe path',
-      registerApiBase: 'Register service URL',
       registerUser: 'User name',
       registerTitle: 'No API key yet?',
       registerHint: 'Type your name first (it goes into the key name), then ask the service for a key; '
@@ -126,7 +123,6 @@ window.__ModuleLoader__.load({
       registerFailed: 'Registration failed: {message}',
       registerDisabled: 'Register service unavailable: {message}',
       registerNoKey: 'The register service returned no key (check the relay configuration).',
-      registerHintAfter: 'Defaults to {base}; change it for a self-hosted service.',
       mode: 'Continuation',
       modeContinuous: 'Same camera',
       modeCloseup: 'Cut to close-up',
@@ -176,10 +172,9 @@ window.__ModuleLoader__.load({
       { key: 'keepSegments', kind: 'switch' },
       { key: 'ffmpegBinary', kind: 'text' },
       { key: 'ffprobeBinary', kind: 'text' },
-      { key: 'registerApiBase', kind: 'text' },
     ];
 
-    /** 插件设置页「注册」按钮调用的服务；留空/未配置时用这个。 */
+    /** 插件设置页「注册」按钮调用的服务地址：固定这个，不显示也不允许改。 */
     const DEFAULT_REGISTER_API = 'https://video.mybfs.cn';
 
     const TOKENS = {
@@ -327,10 +322,7 @@ window.__ModuleLoader__.load({
         }
 
         async function register() {
-          const configured = draft.registerApiBase !== undefined
-            ? draft.registerApiBase
-            : value.registerApiBase;
-          const root = String(configured || DEFAULT_REGISTER_API).trim().replace(/\/+$/, '');
+          const root = DEFAULT_REGISTER_API;
           const username = registerUser.trim();
           if (!username) {
             setRegisterStatus('failed');
@@ -421,9 +413,7 @@ window.__ModuleLoader__.load({
           });
         }
 
-        const hints = {
-          registerApiBase: t('registerHintAfter', { base: DEFAULT_REGISTER_API }),
-        };
+        const hints = {};
 
         const rows = FIELDS.map((field) => h('div', { key: field.key, style: cellStyle }, [
           field.kind === 'switch'

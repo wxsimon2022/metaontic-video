@@ -71,7 +71,6 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 并把「上游 / API Key / 基础地址 / 模型」自动写好——这几项现在不在页面上手填了，
 注册区那行小字会显示当前连的是哪个中转站、Key 有没有配好。
 
-> 想换自建注册服务：改注册区下面的「注册服务地址」那一栏（默认 `https://video.mybfs.cn`）。
 > 服务端要能连上中转站管理端：`backend/.env` 里的 `NEWAPI_ADMIN_USERNAME` /
 > `NEWAPI_ADMIN_PASSWORD`（或 `NEWAPI_ADMIN_ACCESS_TOKEN`）得先配好；
 > 没配的话按钮会直接把缺什么告诉你，不会静默失败。
@@ -162,7 +161,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | `submitPath` | 按上游 | 创建任务路径，中转站按模型分流时用 `/doubao/api/v3/contents/generations/tasks` |
 | `queryPath` | 按上游 | 查询路径，`{task_id}` 会被替换 |
 | `model` | `doubao-seedance-2-0-mini-260615` | 支持生成/延长的模型（seedance 2.0 / 2.5 系列） |
-| `registerApiBase` | `https://video.mybfs.cn` | 设置页「注册并填写」按钮调用的注册服务地址；换自建服务时改成自己的域名 |
+| `registerApiBase` | `https://video.mybfs.cn` | 「注册并填写」调用的注册服务地址：固定默认值，页面上不显示、也不开放修改 |
 | `registerUser` | 空 | 注册时用的用户名（注册区那个输入框），会写进中转站里的密钥名 |
 | `singleMaxSeconds` | `15` | 单次直出上限（4–15）；超过它就分段延长 |
 | `duration` | `5` | 每段延长的秒数（4–15 的整数）；**建议 ≤14**，刚好卡 15 秒容易因封装略超被上游拒 |
