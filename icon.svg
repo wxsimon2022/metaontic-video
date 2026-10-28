@@ -1,14 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MetaOnticVideo">
   <defs>
-    <linearGradient id="se-extend" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0f766e"/>
-      <stop offset="1" stop-color="#38bdf8"/>
+    <linearGradient id="mvTile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f46e5"/>
+      <stop offset="0.55" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#06b6d4"/>
     </linearGradient>
+    <linearGradient id="mvGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="0.58" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="mvShaft" x1="31.8" y1="32" x2="47" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.82"/>
+    </linearGradient>
+    <clipPath id="mvClip"><rect x="2" y="2" width="60" height="60" rx="16"/></clipPath>
   </defs>
-  <rect x="4" y="12" width="40" height="40" rx="9" fill="url(#se-extend)"/>
-  <polygon points="20,22 20,42 36,32" fill="#ffffff"/>
-  <g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M44 24 L54 32 L44 40"/>
-    <path d="M37 32 H53"/>
+  <g clip-path="url(#mvClip)">
+    <rect x="2" y="2" width="60" height="60" fill="url(#mvTile)"/>
+    <rect x="2" y="2" width="60" height="42" fill="url(#mvGloss)"/>
+  </g>
+  <path d="M13.5 23 13.5 41 28 32Z" fill="#ffffff" stroke="#ffffff" stroke-width="3.2" stroke-linejoin="round"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M31.8 32h15" stroke="url(#mvShaft)" stroke-width="4"/>
+    <path d="M44.8 26.6 51.8 32 44.8 37.4" stroke="#ffffff" stroke-width="3.8"/>
   </g>
 </svg>

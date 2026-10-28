@@ -1,3 +1,5 @@
+<img src="./icon.svg" width="76" alt="MetaOnticVideo">
+
 # MetaOnticVideo —— 让 Harness 帮你生成短视频
 
 一句话：装上它，你就可以直接对 Harness 说「帮我生成一段 20 秒的视频」，它会调用 Seedance 把视频做出来；
