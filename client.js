@@ -7,6 +7,8 @@
  *   - `form.getSnapshot()` 读当前值/修订号，`form.subscribe()` 订阅变化；
  *   - `form.set(field, value)` / `form.unset(field)` 排队写入，修订号由宿主校验。
  * 页面注册进插件页的 `plugins.bundle.config` 槽位，key 为本包名 metaontic-video；
+ * 卡片底部还有「注册并填写」按钮：向注册服务申请一个中转站密钥（新 API Key），
+ * 成功后自动写回 provider/apiKey/baseUrl/model，用户点「保存」即可用。
  *
  * 样式只用宿主主题 token（`--dsw-alias-*`），并都带兜底值；不 import 任何
  * Harness 客户端包，控件是本模块自己实现的。
@@ -46,6 +48,17 @@ window.__ModuleLoader__.load({
       keepSegments: '保留分段',
       ffmpegBinary: 'ffmpeg 路径',
       ffprobeBinary: 'ffprobe 路径',
+      registerApiBase: '注册服务地址',
+      registerTitle: '没有 API Key？',
+      registerHint: '点右边按钮向注册服务申请一个，成功后会帮你填好上游、Key、地址与模型。',
+      register: '注册并填写',
+      registerWorking: '注册中…',
+      registerOk: '注册成功：已填好上游/Key/地址/模型，点「保存」后生效。',
+      registerPartial: '已拿到密钥，但有字段宿主没接受，请检查后手动保存。',
+      registerFailed: '注册失败：{message}',
+      registerDisabled: '注册服务不可用：{message}',
+      registerNoKey: '注册服务没有返回密钥（后端中转站配置可能有问题）。',
+      registerHintAfter: '默认地址 {base}；自建服务时改成自己的地址。',
       mode: '续拍方式',
       modeContinuous: '同机位连续',
       modeCloseup: '切近景',
@@ -91,6 +104,17 @@ window.__ModuleLoader__.load({
       keepSegments: 'Keep segments',
       ffmpegBinary: 'ffmpeg path',
       ffprobeBinary: 'ffprobe path',
+      registerApiBase: 'Register service URL',
+      registerTitle: 'No API key yet?',
+      registerHint: 'Ask the register service for one; the button fills provider, key, base URL and model.',
+      register: 'Register & fill in',
+      registerWorking: 'Registering…',
+      registerOk: 'Registered: provider/key/base URL/model filled in. Click Save to apply.',
+      registerPartial: 'Key received, but some fields were rejected; please review and save manually.',
+      registerFailed: 'Registration failed: {message}',
+      registerDisabled: 'Register service unavailable: {message}',
+      registerNoKey: 'The register service returned no key (check the relay configuration).',
+      registerHintAfter: 'Defaults to {base}; change it for a self-hosted service.',
       mode: 'Continuation',
       modeContinuous: 'Same camera',
       modeCloseup: 'Cut to close-up',
@@ -143,7 +167,11 @@ window.__ModuleLoader__.load({
       { key: 'keepSegments', kind: 'switch' },
       { key: 'ffmpegBinary', kind: 'text' },
       { key: 'ffprobeBinary', kind: 'text' },
+      { key: 'registerApiBase', kind: 'text' },
     ];
+
+    /** 插件设置页「注册」按钮调用的服务；留空/未配置时用这个。 */
+    const DEFAULT_REGISTER_API = 'https://video.mybfs.cn';
 
     const TOKENS = {
       text: 'var(--dsw-alias-label-primary, inherit)',
@@ -193,6 +221,8 @@ window.__ModuleLoader__.load({
         const value = snapshot.value || {};
         const [draft, setDraft] = React.useState({});
         const [status, setStatus] = React.useState('idle');
+        const [registerStatus, setRegisterStatus] = React.useState('idle');
+        const [registerMessage, setRegisterMessage] = React.useState('');
 
         if (props && props.view === 'summary') {
           const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
@@ -229,6 +259,108 @@ window.__ModuleLoader__.load({
           for (const key of overridden) await form.unset(key);
           setDraft({});
           setStatus('saved');
+        }
+
+        /** 认识一下这台机器：注册时作为备注，方便在中转站后台认出是哪个插件实例。 */
+        function deviceInfo() {
+          const KEY = 'metaontic-video.device-id';
+          let id = '';
+          try {
+            id = window.localStorage.getItem(KEY) || '';
+            if (!id) {
+              id = `dsh-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+              window.localStorage.setItem(KEY, id);
+            }
+          } catch {
+            id = '';
+          }
+          let label = 'Harness';
+          try {
+            const platform = window.navigator?.userAgentData?.platform || window.navigator?.platform;
+            if (platform) label = `Harness-${platform}`;
+          } catch {
+            label = 'Harness';
+          }
+          return { id, label };
+        }
+
+        /** 取注册服务的 JSON：后端是 {code, data, message} 信封，这里拆开并统一抛错。 */
+        async function callRegister(url, init) {
+          const controller = typeof AbortController === 'function' ? new AbortController() : null;
+          const timer = controller ? window.setTimeout(() => controller.abort(), 90000) : null;
+          let response;
+          try {
+            response = await fetch(url, {
+              headers: { accept: 'application/json' },
+              signal: controller ? controller.signal : undefined,
+              ...init,
+            });
+          } finally {
+            if (timer) window.clearTimeout(timer);
+          }
+          const text = await response.text();
+          let body = null;
+          try {
+            body = text ? JSON.parse(text) : null;
+          } catch {
+            body = null;
+          }
+          const payload = body && typeof body === 'object' && 'data' in body ? body.data : body;
+          if (!response.ok || (body && typeof body === 'object' && body.code)) {
+            throw new Error(
+              (body && (body.message || body.detail)) || text.slice(0, 200) || `HTTP ${response.status}`,
+            );
+          }
+          return payload || {};
+        }
+
+        async function register() {
+          const configured = draft.registerApiBase !== undefined
+            ? draft.registerApiBase
+            : value.registerApiBase;
+          const root = String(configured || DEFAULT_REGISTER_API).trim().replace(/\/+$/, '');
+          setRegisterStatus('working');
+          setRegisterMessage('');
+          try {
+            const status = await callRegister(`${root}/api/v1/register/status`);
+            if (!status.enabled) {
+              setRegisterStatus('disabled');
+              setRegisterMessage(t('registerDisabled', { message: status.hint || '-' }));
+              return;
+            }
+            const device = deviceInfo();
+            const result = await callRegister(`${root}/api/v1/register`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', accept: 'application/json' },
+              body: JSON.stringify({
+                name: device.label,
+                device_id: device.id || undefined,
+                note: 'Harness 插件设置页注册',
+              }),
+            });
+            if (!result.api_key) {
+              setRegisterStatus('failed');
+              setRegisterMessage(t('registerNoKey'));
+              return;
+            }
+            const writes = [
+              ['provider', 'newapi'],
+              ['apiKey', result.api_key],
+              ['baseUrl', result.base_url || status.base_url || root],
+            ];
+            const model = result.model || status.model;
+            if (model) writes.push(['model', model]);
+            let ok = true;
+            for (const [key, next] of writes) {
+              const accepted = await form.set(key, next);
+              if (accepted) clear(key);
+              else ok = false;
+            }
+            setRegisterStatus(ok ? 'ok' : 'partial');
+          } catch (error) {
+            setRegisterStatus('failed');
+            setRegisterMessage(t('registerFailed', { message: error?.message || String(error) }));
+          }
         }
 
         function control(field) {
@@ -273,6 +405,7 @@ window.__ModuleLoader__.load({
         const hints = {
           apiKey: t('apiKeyEnvHint'),
           baseUrl: t('baseUrlHint'),
+          registerApiBase: t('registerHintAfter', { base: DEFAULT_REGISTER_API }),
         };
 
         const rows = FIELDS.map((field) => h('div', { key: field.key, style: cellStyle }, [
@@ -310,6 +443,49 @@ window.__ModuleLoader__.load({
             : (status === 'failed' ? t('saveFailed') : (pending.length ? t('dirty') : t('clean')))),
         ]);
 
+        const registerMessageColors = {
+          ok: TOKENS.success,
+          partial: TOKENS.success,
+          disabled: TOKENS.error,
+          failed: TOKENS.error,
+        };
+        const registerText = registerStatus === 'ok'
+          ? t('registerOk')
+          : (registerStatus === 'partial' ? t('registerPartial') : registerMessage);
+        const registerBox = h('div', {
+          key: 'register',
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 10,
+            marginTop: 12,
+            padding: '10px 12px',
+            borderRadius: 8,
+            border: `1px solid ${TOKENS.border}`,
+            background: TOKENS.cardFill,
+          },
+        }, [
+          h('div', { key: 'text', style: { display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 220px' } }, [
+            h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } }, t('registerTitle')),
+            h('span', { key: 'hint', style: labelStyle }, t('registerHint')),
+          ]),
+          h('button', {
+            key: 'button',
+            'data-action': 'register',
+            type: 'button',
+            disabled: registerStatus === 'working' || snapshot.writable === false,
+            onClick: register,
+            style: { padding: '6px 14px', borderRadius: 6, border: 'none', background: TOKENS.primaryFill, color: '#fff', cursor: 'pointer' },
+          }, registerStatus === 'working' ? t('registerWorking') : t('register')),
+          registerText
+            ? h('span', {
+              key: 'message',
+              style: { flex: '1 1 100%', fontSize: 12, color: registerMessageColors[registerStatus] || TOKENS.muted },
+            }, registerText)
+            : null,
+        ]);
+
         let notice = null;
         if (snapshot.status === 'loading') notice = t('loading');
         else if (snapshot.value === undefined) notice = t('unavailable');
@@ -321,6 +497,7 @@ window.__ModuleLoader__.load({
             key: 'grid',
             style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 },
           }, rows),
+          notice && !snapshot.value ? null : registerBox,
           notice && !snapshot.value ? null : footer,
         ]);
       };

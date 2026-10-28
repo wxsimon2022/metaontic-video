@@ -60,7 +60,12 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 ### 第二步：填一次密钥（只填一次）
 
-在 **插件 → 已安装插件 → MetaOnticVideo → 查看** 里填这几项，然后点保存：
+最省事的办法：在 **插件 → 已安装插件 → MetaOnticVideo → 查看** 里，
+点一下底部的 **「注册并填写」**——它会向注册服务申请一个新密钥，
+成功后自动把「上游 / API Key / 基础地址 / 模型」填好，你只要再点一次 **保存**。
+（注册服务地址默认 `https://video.mybfs.cn`，换自建服务时改「注册服务地址」那一栏。）
+
+也可以自己手填，在同一个页面填这几项，然后点保存：
 
 | 填什么 | 例子 |
 | --- | --- |
@@ -71,6 +76,10 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 不想手填也行，直接跟 Harness 说：「把视频插件的 API Key 设成 sk-xxx，地址设成 https://…」。
 保存后配置会写入 Harness 的配置文件，重载后生效。
+
+> 「注册并填写」需要服务端先在 `backend/.env` 里配好中转站管理端账号
+> （`NEWAPI_ADMIN_USERNAME` / `NEWAPI_ADMIN_PASSWORD`，或 `NEWAPI_ADMIN_ACCESS_TOKEN`）。
+> 没配的话按钮会直接告诉你缺什么，不会静默失败。
 
 ### 第三步：直接说要什么
 
@@ -155,6 +164,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | `submitPath` | 按上游 | 创建任务路径，中转站按模型分流时用 `/doubao/api/v3/contents/generations/tasks` |
 | `queryPath` | 按上游 | 查询路径，`{task_id}` 会被替换 |
 | `model` | `doubao-seedance-2-0-mini-260615` | 支持生成/延长的模型（seedance 2.0 / 2.5 系列） |
+| `registerApiBase` | `https://video.mybfs.cn` | 设置页「注册并填写」按钮调用的注册服务地址；换自建服务时改成自己的域名 |
 | `singleMaxSeconds` | `15` | 单次直出上限（4–15）；超过它就分段延长 |
 | `duration` | `5` | 每段延长的秒数（4–15 的整数）；**建议 ≤14**，刚好卡 15 秒容易因封装略超被上游拒 |
 | `mode` | `continuous` | `continuous`=同机位续拍；`closeup`=台词结束处切近景 |
