@@ -48,10 +48,10 @@ window.__ModuleLoader__.load({
       keepSegments: '保留分段',
       ffmpegBinary: 'ffmpeg 路径',
       ffprobeBinary: 'ffprobe 路径',
-      registerUser: '用户名',
+      registerUser: '用户名（就是这把 API 的名字）',
       registerTitle: '没有 API Key？',
-      registerHint: '先填用户名（会写进密钥名，方便后台认领），再点按钮申请一个密钥；'
-        + '成功后自动填好上游、Key、地址与模型。默认额度 0.01 美元，用完了找管理员加。',
+      registerHint: '先填用户名——它就是你领到的 API 名称，填谁的名字后台就显示谁，方便认领；'
+        + '填好点按钮即可，成功后自动写好上游、Key、地址与模型。默认额度 0.01 美元。',
       registerUserPlaceholder: '你的名字 / 昵称',
       registerNeedUser: '先填用户名，再点注册。',
       registerCurrent: '当前连接：{value}',
@@ -108,10 +108,10 @@ window.__ModuleLoader__.load({
       keepSegments: 'Keep segments',
       ffmpegBinary: 'ffmpeg path',
       ffprobeBinary: 'ffprobe path',
-      registerUser: 'User name',
+      registerUser: 'User name (this becomes the API name)',
       registerTitle: 'No API key yet?',
-      registerHint: 'Type your name first (it goes into the key name), then ask the service for a key; '
-        + 'provider, key, base URL and model are filled in for you. Default quota is US$0.01.',
+      registerHint: 'Type your name first — it becomes the API name you receive, so it is easy to claim later; '
+        + 'then use the button. Provider, key, base URL and model are filled in for you. Default quota US$0.01.',
       registerUserPlaceholder: 'Your name / nickname',
       registerNeedUser: 'Type a user name before registering.',
       registerCurrent: 'Current: {value}',
@@ -248,7 +248,7 @@ window.__ModuleLoader__.load({
         });
 
         async function save() {
-          if (!pending.length) return;
+          // 没改动也允许点：至少给个「已保存」的反馈，不要按钮点了没反应。
           setStatus('saving');
           let ok = true;
           for (const [key, next] of pending) {
@@ -428,7 +428,7 @@ window.__ModuleLoader__.load({
             key: 'save',
             'data-action': 'save',
             type: 'button',
-            disabled: !pending.length || status === 'saving' || snapshot.writable === false,
+            disabled: status === 'saving' || snapshot.writable === false,
             onClick: save,
             style: { padding: '6px 14px', borderRadius: 6, border: 'none', background: TOKENS.primaryFill, color: '#fff', cursor: 'pointer' },
           }, status === 'saving' ? t('saving') : t('save')),

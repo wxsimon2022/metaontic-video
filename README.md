@@ -63,7 +63,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 在 **插件 → 已安装插件 → MetaOnticVideo → 查看** 里，底部的注册区：
 
-1. 填一个**用户名**（比如你的名字/昵称）；它会写进密钥名，方便在中转站后台认出自己那一把；
+1. 填一个**用户名**（比如你的名字/昵称）——**它就是领到的这把 API 的名称**，中转站后台一眼能认出；
 2. 点 **「注册并填写」**；
 3. 看到绿色「注册成功」就完成了。
 
@@ -162,7 +162,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | `queryPath` | 按上游 | 查询路径，`{task_id}` 会被替换 |
 | `model` | `doubao-seedance-2-0-mini-260615` | 支持生成/延长的模型（seedance 2.0 / 2.5 系列） |
 | `registerApiBase` | `https://video.mybfs.cn` | 「注册并填写」调用的注册服务地址：固定默认值，页面上不显示、也不开放修改 |
-| `registerUser` | 空 | 注册时用的用户名（注册区那个输入框），会写进中转站里的密钥名 |
+| `registerUser` | 空 | 注册时用的用户名（注册区那个输入框）；它同时是中转站里的 API（密钥）名称 |
 | `singleMaxSeconds` | `15` | 单次直出上限（4–15）；超过它就分段延长 |
 | `duration` | `5` | 每段延长的秒数（4–15 的整数）；**建议 ≤14**，刚好卡 15 秒容易因封装略超被上游拒 |
 | `mode` | `continuous` | `continuous`=同机位续拍；`closeup`=台词结束处切近景 |

@@ -72,7 +72,7 @@ export const Config = z.object({
     .volatile(),
   registerUser: z.string()
     .default('')
-    .description('注册时填的用户名，会写进中转站里的密钥名，方便后台认领自己那把 Key')
+    .description('注册时填的用户名：它就是中转站里那把密钥的 API 名称，方便后台认领')
     .volatile(),
   duration: z.number().step(1).min(4).max(15)
     .default(5)
@@ -1907,7 +1907,7 @@ function configTool(config, settings) {
         provider: { type: 'string', enum: ['newapi', 'ark'], description: 'newapi=中转站，ark=火山官方。' },
         apiKey: { type: 'string', description: 'API Key（配置里留空时按 provider 读环境变量）。' },
         baseUrl: { type: 'string', description: '基础地址，例如 https://ai.bileego.com（中转站）或官方地址。' },
-        registerUser: { type: 'string', description: '注册时用的用户名，会写进中转站里的密钥名。' },
+        registerUser: { type: 'string', description: '注册时用的用户名，它同时是中转站里的 API（密钥）名称。' },
         submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
         queryPath: { type: 'string', description: '查询任务路径，{task_id} 会被替换。' },
         model: { type: 'string', description: '模型 ID，例如 doubao-seedance-2-0-mini-260615。' },
@@ -2028,7 +2028,7 @@ function buildPromptGuidance(config) {
       + '合并需要本机有 ffmpeg，缺了会保留分段但不合并。',
     `· 当前配置：直出上限 ${singleMax} 秒、每段延长 ${segmentSeconds} 秒。`,
     '· 没有 API Key：让用户在插件设置页点「注册并填写」，会向注册服务申请一个密钥并自动填好；'
-      + '注册要先填用户名（写进密钥名，默认额度 0.01 美元）。',
+      + '注册时填的用户名就是这把 API 的名称，默认额度 0.01 美元。',
   ].join('\n');
 }
 
