@@ -179,13 +179,12 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 | 字段 | 默认值 | 说明 |
 | --- | --- | --- |
-| `provider` | `newapi` | 固定走 New API 中转站；火山官方已移除，旧配置里写成 `ark` 也按中转站走 |
+| `entryId` | `metaontic-video` | 插件在 profile 里的条目 id；把改动写回配置时用它定位，一般不用改 |
 | `apiKey` | 空 | 激活时自动写入；一般不用手填 |
 | `baseUrl` | 空 | 视频服务地址，如 `https://ai.bileego.com`（不带 `/v1`，不重复 `/api/v3`）。激活时自动写入 |
 | `submitPath` | 按上游 | 创建任务路径；服务按模型分流时用 `/doubao/api/v3/contents/generations/tasks` |
 | `queryPath` | 按上游 | 查询路径，`{task_id}` 会被替换 |
 | `model` | `doubao-seedance-2-0-mini-260615` | 支持生成/延长的模型（seedance 2.0 / 2.5 系列） |
-| `registerApiBase` | 固定值 | 「激活」用的服务地址：页面上不显示，也不开放修改 |
 | `registerEmail` | 空 | 领 Key 用的邮箱（注册区那个输入框） |
 | `registerUser` | 空 | 已废弃：老的「用户名」字段，读取时作为邮箱的兜底 |
 | `registerToken` | 固定值 | 激活请求的握手令牌；页面不显示，一般不用改 |
@@ -211,7 +210,6 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 - id: metaontic-video
   name: 'metaontic-video'
   config:
-    provider: newapi
     apiKey: 'sk-...'
     baseUrl: 'https://ai.bileego.com'
     model: 'doubao-seedance-2-0-mini-260615'

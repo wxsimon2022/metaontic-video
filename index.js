@@ -1901,7 +1901,7 @@ function configTool(config, settings) {
           enum: ['get', 'set'],
           description: 'get=查看当前配置；set=修改配置（至少给一个要改的字段）。',
         },
-        apiKey: { type: 'string', description: 'API Key（配置里留空时按 provider 读环境变量）。' },
+        apiKey: { type: 'string', description: 'API Key（配置里留空时自动读环境变量）。' },
         baseUrl: { type: 'string', description: '基础地址，例如 https://ai.bileego.com（中转站）或官方地址。' },
         registerEmail: { type: 'string', description: '领 Key 用的邮箱（账号）；注册要邮箱验证码，一个邮箱只发一把。' },
         submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
@@ -1960,7 +1960,7 @@ function configTool(config, settings) {
           ...Object.entries(stored || {})
             .filter(([, field]) => field !== undefined && field !== '')
             .map(([key, field]) => `  ${key}: ${typeof field === 'object' ? JSON.stringify(field) : field}`),
-          `生效值：provider=${effective?.provider} baseUrl=${effective?.baseUrl} model=${effective?.model}`,
+          `生效值：baseUrl=${effective?.baseUrl} model=${effective?.model}`,
           `  submitPath=${effective?.submitPath}`,
           `  apiKey 来源：${effective?.apiKeySource}`,
           patchPath ? `配置文件：${patchPath}` : '',
