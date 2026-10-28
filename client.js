@@ -28,9 +28,7 @@ window.__ModuleLoader__.load({
       title: 'MetaOnticVideo',
       summaryEmpty: '未配置：到插件设置页点「注册并填写」领一把密钥。',
       summary: '{provider} · {model} · 每段 {duration}s',
-      provider: '上游',
       providerNewapi: 'New API 中转站',
-      providerArk: '火山方舟官方',
       apiKey: 'API Key',
       apiKeyConfigured: '已配置，留空表示保持原值',
       apiKeyEnvHint: '留空时按上游读环境变量（中转站 NEWAPI_API_KEY / 官方 ARK_API_KEY）',
@@ -54,6 +52,8 @@ window.__ModuleLoader__.load({
         + '填好点按钮即可，成功后自动写好上游、Key、地址与模型。默认额度 0.01 美元。',
       registerUserPlaceholder: '你的名字 / 昵称',
       registerNeedUser: '先填用户名，再点注册。',
+      registerDone: '已经领到 Key 了，不用再填。',
+      registerAgain: '重新领一把',
       registerCurrent: '当前连接：{value}',
       registerNoKey: '密钥未配置——点右边按钮领一个',
       register: '注册并填写',
@@ -88,9 +88,7 @@ window.__ModuleLoader__.load({
       title: 'MetaOnticVideo',
       summaryEmpty: 'Not configured: open the plugin settings and click "Register & fill in".',
       summary: '{provider} · {model} · {duration}s per segment',
-      provider: 'Provider',
       providerNewapi: 'New API relay',
-      providerArk: 'Volcano Ark',
       apiKey: 'API Key',
       apiKeyConfigured: 'Configured; leave empty to keep it',
       apiKeyEnvHint: 'Empty falls back to an environment variable (NEWAPI_API_KEY / ARK_API_KEY)',
@@ -114,6 +112,8 @@ window.__ModuleLoader__.load({
         + 'then use the button. Provider, key, base URL and model are filled in for you. Default quota US$0.01.',
       registerUserPlaceholder: 'Your name / nickname',
       registerNeedUser: 'Type a user name before registering.',
+      registerDone: 'A key is already configured — nothing to fill in.',
+      registerAgain: 'Issue a new one',
       registerCurrent: 'Current: {value}',
       registerNoKey: 'No key yet — use the button to get one',
       register: 'Register & fill in',
@@ -147,7 +147,6 @@ window.__ModuleLoader__.load({
 
     /** 可编辑字段；kind 决定控件，标注 secret 的字段宿主只会告知是否已配置。 */
     const SELECTS = {
-      provider: ['newapi', 'ark'],
       mode: ['continuous', 'closeup'],
       resolution: ['480p', '720p', '1080p'],
       ratio: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
@@ -176,6 +175,8 @@ window.__ModuleLoader__.load({
 
     /** 插件设置页「注册」按钮调用的服务地址：固定这个，不显示也不允许改。 */
     const DEFAULT_REGISTER_API = 'https://video.mybfs.cn';
+    /** 注册接口的握手请求头 X-Register-Token：与服务端 REGISTER_CLIENT_TOKEN 一致。 */
+    const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
 
     const TOKENS = {
       text: 'var(--dsw-alias-label-primary, inherit)',
@@ -202,7 +203,6 @@ window.__ModuleLoader__.load({
     const cellStyle = { display: 'flex', flexDirection: 'column', minWidth: 180 };
 
     function optionLabel(t, key, option) {
-      if (key === 'provider') return option === 'ark' ? t('providerArk') : t('providerNewapi');
       if (key === 'mode') return option === 'closeup' ? t('modeCloseup') : t('modeContinuous');
       if (key === 'mergeMode') return option === 'reencode' ? t('mergeModeReencode') : t('mergeModeCopy');
       return option;
@@ -230,11 +230,13 @@ window.__ModuleLoader__.load({
         const [registerUser, setRegisterUser] = React.useState(
           () => String((form.getSnapshot().value || {}).registerUser || ''),
         );
+        // 重新领一把：点小字后才会再显示用户名输入框
+        const [reRegister, setReRegister] = React.useState(false);
 
         if (props && props.view === 'summary') {
           const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
           const text = configured
-            ? t('summary', { provider: value.provider === 'ark' ? t('providerArk') : t('providerNewapi'), model: value.model || '-', duration: value.duration ?? '-' })
+            ? t('summary', { provider: t('providerNewapi'), model: value.model || '-', duration: value.duration ?? '-' })
             : t('summaryEmpty');
           return h('span', { style: { color: TOKENS.muted } }, text);
         }
@@ -295,12 +297,18 @@ window.__ModuleLoader__.load({
         async function callRegister(url, init) {
           const controller = typeof AbortController === 'function' ? new AbortController() : null;
           const timer = controller ? window.setTimeout(() => controller.abort(), 90000) : null;
+          const token = String(value.registerToken || DEFAULT_REGISTER_TOKEN);
+          const options = { ...(init || {}) };
+          options.headers = {
+            accept: 'application/json',
+            'x-register-token': token,
+            ...((init && init.headers) || {}),
+          };
           let response;
           try {
             response = await fetch(url, {
-              headers: { accept: 'application/json' },
               signal: controller ? controller.signal : undefined,
-              ...init,
+              ...options,
             });
           } finally {
             if (timer) window.clearTimeout(timer);
@@ -368,6 +376,7 @@ window.__ModuleLoader__.load({
               else ok = false;
             }
             setRegisterStatus(ok ? 'ok' : 'partial');
+            setReRegister(false);
           } catch (error) {
             setRegisterStatus('failed');
             setRegisterMessage(t('registerFailed', { message: error?.message || String(error) }));
@@ -456,14 +465,20 @@ window.__ModuleLoader__.load({
           disabled: TOKENS.error,
           failed: TOKENS.error,
         };
-        const registerText = registerStatus === 'ok'
-          ? t('registerOk')
-          : (registerStatus === 'partial' ? t('registerPartial') : registerMessage);
         // 上游 / 地址 / Key 现在由注册流程写入，这里只展示当前连接，不让手填。
         const keyReady = Boolean(snapshot.secrets?.apiKey || value.apiKey);
         const connection = keyReady
-          ? `${value.provider === 'ark' ? t('providerArk') : t('providerNewapi')} · ${value.baseUrl || '-'} · ${value.model || '-'}`
+          ? `${t('providerNewapi')} · ${value.baseUrl || '-'} · ${value.model || '-'}`
           : t('registerNoKey');
+        // 已经配好 Key 的（注册过的或手填的）就不用再填一遍，只展示当前连接，
+        // 想换一把时点「重新领一把」再把输入框放出来。
+        const alreadyRegistered = keyReady && !reRegister;
+        const registerSucceeded = registerStatus === 'ok' || registerStatus === 'partial';
+        const registerText = registerStatus === 'ok'
+          ? t('registerOk')
+          : (registerStatus === 'partial'
+            ? t('registerPartial')
+            : (alreadyRegistered && !registerSucceeded ? '' : registerMessage));
         const registerBox = h('div', {
           key: 'register',
           style: {
@@ -479,32 +494,43 @@ window.__ModuleLoader__.load({
           },
         }, [
           h('div', { key: 'text', style: { display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 220px' } }, [
-            h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } }, t('registerTitle')),
-            h('span', { key: 'hint', style: labelStyle }, t('registerHint')),
+            h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } },
+              alreadyRegistered ? t('registerDone') : t('registerTitle')),
+            alreadyRegistered
+              ? null
+              : h('span', { key: 'hint', style: labelStyle }, t('registerHint')),
             h('span', {
               key: 'current',
               'data-field': 'registerCurrent',
               style: { fontSize: 12, color: keyReady ? TOKENS.success : TOKENS.muted },
-            }, t('registerCurrent', { value: connection })),
+            }, t('registerCurrent', {
+              value: keyReady && registerUser ? `${registerUser} · ${connection}` : connection,
+            })),
           ]),
-          h('input', {
-            key: 'user',
-            'data-field': 'registerUser',
-            type: 'text',
-            value: registerUser,
-            placeholder: t('registerUserPlaceholder'),
-            'aria-label': t('registerUser'),
-            onChange: (event) => setRegisterUser(event.target.value),
-            style: { ...inputStyle, flex: '0 1 180px', width: 'auto' },
-          }),
+          alreadyRegistered
+            ? null
+            : h('input', {
+              key: 'user',
+              'data-field': 'registerUser',
+              type: 'text',
+              value: registerUser,
+              placeholder: t('registerUserPlaceholder'),
+              'aria-label': t('registerUser'),
+              onChange: (event) => setRegisterUser(event.target.value),
+              style: { ...inputStyle, flex: '0 1 180px', width: 'auto' },
+            }),
           h('button', {
             key: 'button',
             'data-action': 'register',
             type: 'button',
-            disabled: registerStatus === 'working' || !registerUser.trim() || snapshot.writable === false,
-            onClick: register,
-            style: { padding: '6px 14px', borderRadius: 6, border: 'none', background: TOKENS.primaryFill, color: '#fff', cursor: 'pointer' },
-          }, registerStatus === 'working' ? t('registerWorking') : t('register')),
+            disabled: alreadyRegistered
+              ? false
+              : (registerStatus === 'working' || !registerUser.trim() || snapshot.writable === false),
+            onClick: alreadyRegistered ? () => { setReRegister(true); setRegisterStatus('idle'); setRegisterMessage(''); } : register,
+            style: alreadyRegistered
+              ? { padding: '4px 10px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.muted, cursor: 'pointer', fontSize: 12 }
+              : { padding: '6px 14px', borderRadius: 6, border: 'none', background: TOKENS.primaryFill, color: '#fff', cursor: 'pointer' },
+          }, alreadyRegistered ? t('registerAgain') : (registerStatus === 'working' ? t('registerWorking') : t('register'))),
           registerText
             ? h('span', {
               key: 'message',

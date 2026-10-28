@@ -13,7 +13,7 @@
  * 接口与火山方舟 contents-generation 任务一致，既可直接用官方地址，也可走 New API 中转站：
  *   POST {baseUrl}{submitPath}
  *   GET  {baseUrl}{queryPath}
- * 用 provider 预设切换：`newapi`（中转站）/ `ark`（官方）。
+ * 只走 New API 中转站（火山官方接口已移除）：baseUrl 填中转站站址，路径按中转站的模型分流走。
  *
  * 请求体沿用火山方舟 contents-generation 的原生延长语义：
  *   - 提示词以「向后延长视频1」/「向前延长视频1」开头，用「视频1」指代输入素材，
@@ -37,7 +37,7 @@ export const inject = ['tools'];
 export const Config = z.object({
   provider: z.union(['newapi', 'ark'])
     .default('newapi')
-    .description('newapi=New API 中转站（默认）；ark=火山方舟官方接口')
+    .description('只支持 newapi（New API 中转站）；火山官方已移除，旧配置里写成 ark 也一律按中转站走')
     .volatile(),
   entryId: z.string()
     .default('metaontic-video')
@@ -45,26 +45,26 @@ export const Config = z.object({
     .volatile(),
   apiKey: z.string()
     .default('')
-    .description('API Key；留空时按 provider 读环境变量（newapi 先读 NEWAPI_API_KEY，ark 先读 ARK_API_KEY）')
+    .description('API Key；留空时读环境变量 NEWAPI_API_KEY（也可以直接用设置页的「注册」按钮领一把）')
     .volatile(),
   baseUrl: z.string()
     .default('')
     .description(
-      '基础地址；留空时按 provider 取默认值或读环境变量。'
-      + '中转站示例 https://ai.bileego.com（不要带 /v1，也不要重复 /api/v3）',
+      '基础地址（中转站站址）；留空时读环境变量 NEWAPI_VIDEO_BASE_URL / NEWAPI_BASE_URL。'
+      + '示例 https://ai.bileego.com（不要带 /v1，也不要重复 /api/v3）',
     )
     .volatile(),
   submitPath: z.string()
     .default('')
-    .description('创建任务路径；留空按 provider 取默认值。中转站若按模型分流，示例 /doubao/api/v3/contents/generations/tasks')
+    .description('创建任务路径；留空用中转站默认值 /doubao/api/v3/contents/generations/tasks')
     .volatile(),
   queryPath: z.string()
     .default('')
-    .description('查询任务路径，{task_id} 会被任务 ID 替换；留空按 provider 取默认值')
+    .description('查询任务路径，{task_id} 会被任务 ID 替换；留空用中转站默认值')
     .volatile(),
   model: z.string()
     .default('')
-    .description('支持视频延长的模型 ID（seedance 2.0 / 2.5 系列）；留空按 provider 取默认值')
+    .description('支持视频延长的模型 ID（seedance 2.0 / 2.5 系列）；留空读 NEWAPI_VIDEO_MODEL 或内置默认值')
     .volatile(),
   registerApiBase: z.string()
     .default('https://video.mybfs.cn')
@@ -73,6 +73,10 @@ export const Config = z.object({
   registerUser: z.string()
     .default('')
     .description('注册时填的用户名：它就是中转站里那把密钥的 API 名称，方便后台认领')
+    .volatile(),
+  registerToken: z.string()
+    .default('metaontic-video-register-v1')
+    .description('注册请求头 X-Register-Token 的值，要与服务端 REGISTER_CLIENT_TOKEN 一致；页面不显示')
     .volatile(),
   duration: z.number().step(1).min(4).max(15)
     .default(5)
@@ -160,18 +164,9 @@ const PROVIDERS = {
     submitPath: '/doubao/api/v3/contents/generations/tasks',
     queryPath: '/doubao/api/v3/contents/generations/tasks/{task_id}',
     model: DEFAULT_MODEL,
-    keyEnv: ['NEWAPI_API_KEY', 'ARK_API_KEY'],
+    keyEnv: ['NEWAPI_API_KEY'],
     baseEnv: ['NEWAPI_VIDEO_BASE_URL', 'NEWAPI_BASE_URL'],
     modelEnv: ['NEWAPI_VIDEO_MODEL'],
-  },
-  ark: {
-    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    submitPath: '/contents/generations/tasks',
-    queryPath: '/contents/generations/tasks/{task_id}',
-    model: DEFAULT_MODEL,
-    keyEnv: ['ARK_API_KEY', 'NEWAPI_API_KEY'],
-    baseEnv: ['ARK_BASE_URL', 'NEWAPI_VIDEO_BASE_URL'],
-    modelEnv: ['ARK_VIDEO_MODEL'],
   },
 };
 
@@ -224,8 +219,9 @@ function ref(config, key, fallback) {
   return value === undefined || value === null || value === '' ? fallback : value;
 }
 
-function providerPreset(config) {
-  return PROVIDERS[ref(config, 'provider', 'newapi')] || PROVIDERS.newapi;
+function providerPreset() {
+  // 火山官方已移除：不论旧配置写的是什么，一律按中转站的预设走。
+  return PROVIDERS.newapi;
 }
 
 function envValue(names) {
@@ -237,26 +233,26 @@ function envValue(names) {
 }
 
 function resolveApiKey(config) {
-  return String(ref(config, 'apiKey', '')).trim() || envValue(providerPreset(config).keyEnv);
+  return String(ref(config, 'apiKey', '')).trim() || envValue(providerPreset().keyEnv);
 }
 
 function resolveBaseUrl(config) {
-  const preset = providerPreset(config);
+  const preset = providerPreset();
   return (String(ref(config, 'baseUrl', '')).trim() || envValue(preset.baseEnv) || preset.baseUrl)
     .replace(/\/+$/, '');
 }
 
 function resolveSubmitPath(config) {
-  return String(ref(config, 'submitPath', '')).trim() || providerPreset(config).submitPath;
+  return String(ref(config, 'submitPath', '')).trim() || providerPreset().submitPath;
 }
 
 function resolveQueryPath(config, taskId) {
-  const path = String(ref(config, 'queryPath', '')).trim() || providerPreset(config).queryPath;
+  const path = String(ref(config, 'queryPath', '')).trim() || providerPreset().queryPath;
   return path.replace('{task_id}', encodeURIComponent(taskId));
 }
 
 function resolveModel(config) {
-  const preset = providerPreset(config);
+  const preset = providerPreset();
   return String(ref(config, 'model', '')).trim() || envValue(preset.modelEnv) || preset.model;
 }
 
@@ -290,7 +286,8 @@ function parseExtraParams(config) {
 function assertConfigured(config, apiKey) {
   if (!apiKey) {
     throw new Error(
-      '未配置 API Key：请在插件 config 里填 apiKey，或设置环境变量 NEWAPI_API_KEY（中转站）/ ARK_API_KEY（官方）。',
+      '未配置 API Key：请在插件设置页点「注册并填写」领一把，或在插件 config 里填 apiKey，'
+      + '或设置环境变量 NEWAPI_API_KEY。',
     );
   }
   if (!resolveBaseUrl(config)) {
@@ -1027,7 +1024,7 @@ function isContentRejection(text) {
 
 /* ---------------- 请求与轮询 ---------------- */
 
-async function arkRequest(config, path, { method = 'GET', body } = {}) {
+async function relayRequest(config, path, { method = 'GET', body } = {}) {
   const url = `${resolveBaseUrl(config)}${path}`;
   let response;
   try {
@@ -1087,11 +1084,11 @@ function sleep(ms, signal) {
 }
 
 function createTask(config, body) {
-  return arkRequest(config, resolveSubmitPath(config), { method: 'POST', body });
+  return relayRequest(config, resolveSubmitPath(config), { method: 'POST', body });
 }
 
 function getTask(config, taskId) {
-  return arkRequest(config, resolveQueryPath(config, taskId));
+  return relayRequest(config, resolveQueryPath(config, taskId));
 }
 
 /**
@@ -1839,7 +1836,7 @@ function taskTool(config) {
 
 /** 用户可在插件内改的配置字段。 */
 const CONFIG_FIELDS = [
-  'provider', 'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
+  'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
   'duration', 'singleMaxSeconds', 'mode', 'resolution', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'mergeMode', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary', 'registerUser',
@@ -1856,10 +1853,9 @@ function configView(config) {
   return {
     stored: maskSecrets(stored),
     effective: {
-      provider: ref(config, 'provider', 'newapi'),
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),
-      queryPath: String(ref(config, 'queryPath', '')).trim() || providerPreset(config).queryPath,
+      queryPath: String(ref(config, 'queryPath', '')).trim() || providerPreset().queryPath,
       model: resolveModel(config),
       apiKeySource: ref(config, 'apiKey', '')
         ? 'config'
@@ -1889,7 +1885,7 @@ function configTool(config, settings) {
   return {
     name: 'video_config',
     description:
-      '读取或修改 MetaOnticVideo 插件自己的配置（provider、apiKey、baseUrl、submitPath、'
+      '读取或修改 MetaOnticVideo 插件自己的配置（apiKey、baseUrl、submitPath、'
       + 'queryPath、model、duration、singleMaxSeconds、mode、resolution、ratio、generateAudio、'
       + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、outputDir、keepSegments、'
       + 'ffmpegBinary、ffprobeBinary、registerUser）。改动写进 profile 的 cordis.patch.yml，'
@@ -1904,7 +1900,6 @@ function configTool(config, settings) {
           enum: ['get', 'set'],
           description: 'get=查看当前配置；set=修改配置（至少给一个要改的字段）。',
         },
-        provider: { type: 'string', enum: ['newapi', 'ark'], description: 'newapi=中转站，ark=火山官方。' },
         apiKey: { type: 'string', description: 'API Key（配置里留空时按 provider 读环境变量）。' },
         baseUrl: { type: 'string', description: '基础地址，例如 https://ai.bileego.com（中转站）或官方地址。' },
         registerUser: { type: 'string', description: '注册时用的用户名，它同时是中转站里的 API（密钥）名称。' },

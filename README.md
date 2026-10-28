@@ -5,7 +5,7 @@
 
 - 显示名 **MetaOnticVideo**，npm 包名 `metaontic-video`，profile 条目 id `metaontic-video`
 - 需要 Harness 桌面端；合并成一条视频需要本机有 `ffmpeg`（见下面「先装好这些（依赖）」）
-- 上游用 New API 中转站（默认）或火山方舟官方接口，任选一个即可
+- 只走 New API 中转站（火山方舟官方接口已移除）
 
 ## 它能做什么
 
@@ -38,8 +38,8 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 另外还需要两件「账号 + 网络」上的准备：
 
-- **上游账号**：New API 中转站（默认）或火山方舟官方。用中转站时不用自己准备 Key——
-  第二步点一下「注册并填写」就会领一把；已另有 Key 的话也可以直接设进插件。
+- **上游账号**：New API 中转站。不用自己准备 Key——第二步点一下「注册并填写」就会领一把；
+  已另有 Key 的话也可以直接设进插件（或设环境变量 `NEWAPI_API_KEY`）。
 - **网络能通**：本机能访问上游地址，也能下载上游返回的成片链接（走代理时记得放行）。
 
 可选：再装 `metaontic-video-agent`（视频导演 preset，纯配置、不存密钥），它能让 Harness 先帮你写脚本、分镜和逐镜提示词再出片，出片时复用本插件的 `video_generate` 等工具。
@@ -74,6 +74,11 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 > 服务端要能连上中转站管理端：`backend/.env` 里的 `NEWAPI_ADMIN_USERNAME` /
 > `NEWAPI_ADMIN_PASSWORD`（或 `NEWAPI_ADMIN_ACCESS_TOKEN`）得先配好；
 > 没配的话按钮会直接把缺什么告诉你，不会静默失败。
+>
+> 注册请求会带上握手请求头 `X-Register-Token`（值 = 插件的 `registerToken`，
+> 默认 `metaontic-video-register-v1`，要与服务端 `REGISTER_CLIENT_TOKEN` 一致），
+> 免得注册入口被随手扫。用户已经领过 Key 之后，设置页只显示「已经领到 Key 了」，
+> 不会再要求填一遍；想换一把时点「重新领一把」。
 
 需要手工指定 Key / 地址的场景（例如临时换成别人给的 Key），可以直接跟 Harness 说
 「把视频插件的 API Key 设成 sk-xxx、地址设成 https://…」，它会用 `video_config` 工具写进配置。
@@ -155,7 +160,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 | 字段 | 默认值 | 说明 |
 | --- | --- | --- |
-| `provider` | `newapi` | `newapi`=中转站火山原生路由；`ark`=火山方舟官方。**注册时自动写入，页面上不再手填** |
+| `provider` | `newapi` | 固定 `newapi`（New API 中转站）；火山官方已移除，旧配置里写成 `ark` 也按中转站走 |
 | `apiKey` | 空 | 注册时自动写入；留空时读环境变量（`NEWAPI_API_KEY` / `ARK_API_KEY`） |
 | `baseUrl` | 空 | 中转站站址，如 `https://ai.bileego.com`（不带 `/v1`，不重复 `/api/v3`）。注册时自动写入 |
 | `submitPath` | 按上游 | 创建任务路径，中转站按模型分流时用 `/doubao/api/v3/contents/generations/tasks` |
@@ -163,6 +168,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | `model` | `doubao-seedance-2-0-mini-260615` | 支持生成/延长的模型（seedance 2.0 / 2.5 系列） |
 | `registerApiBase` | `https://video.mybfs.cn` | 「注册并填写」调用的注册服务地址：固定默认值，页面上不显示、也不开放修改 |
 | `registerUser` | 空 | 注册时用的用户名（注册区那个输入框）；它同时是中转站里的 API（密钥）名称 |
+| `registerToken` | `metaontic-video-register-v1` | 注册请求头 `X-Register-Token` 的值，需与服务端 `REGISTER_CLIENT_TOKEN` 一致；页面不显示 |
 | `singleMaxSeconds` | `15` | 单次直出上限（4–15）；超过它就分段延长 |
 | `duration` | `5` | 每段延长的秒数（4–15 的整数）；**建议 ≤14**，刚好卡 15 秒容易因封装略超被上游拒 |
 | `mode` | `continuous` | `continuous`=同机位续拍；`closeup`=台词结束处切近景 |
