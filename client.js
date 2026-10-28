@@ -50,6 +50,7 @@ window.__ModuleLoader__.load({
       registerCodeSending: '发送中…',
       registerCodeCooldown: '{seconds} 秒后重发',
       registerCodeSent: '验证码已发到 {email}：5 分钟内有效，填进来点右边的按钮即可。',
+      registerEmailLocked: '验证码刚发到上面这个邮箱：等倒计时结束才能改。',
       registerNeedEmail: '先填邮箱，再点「获取验证码」。',
       registerNeedCode: '先填邮件里收到的验证码。',
       registerRestored: '已找回本机密钥：这台设备之前领过的那把帮你填好了，点「保存」即可。',
@@ -117,6 +118,7 @@ window.__ModuleLoader__.load({
       registerCodeSending: 'Sending…',
       registerCodeCooldown: 'Resend in {seconds}s',
       registerCodeSent: 'Code sent to {email} — valid for 5 minutes.',
+      registerEmailLocked: 'Code just went to this address — edit it after the countdown.',
       registerNeedEmail: 'Type your email before requesting a code.',
       registerNeedCode: 'Type the code from the email first.',
       registerRestored: 'Restored the key issued to this device; click Save to apply.',
@@ -247,6 +249,8 @@ window.__ModuleLoader__.load({
         const [codeStatus, setCodeStatus] = React.useState('idle');
         const [codeMessage, setCodeMessage] = React.useState('');
         const [codeCooldown, setCodeCooldown] = React.useState(0);
+        // 发过码之后的冷却期里邮箱置灰（倒计时结束就放开，可以改邮箱重发）
+        const emailLocked = codeCooldown > 0;
         // 额度：设置页展示这把 Key 的剩余 / 已用
         const [quota, setQuota] = React.useState(null);
         const [quotaStatus, setQuotaStatus] = React.useState('idle');
@@ -735,8 +739,18 @@ window.__ModuleLoader__.load({
             value: registerEmail,
             placeholder: t('registerEmailPlaceholder'),
             'aria-label': t('registerEmail'),
+            // 验证码已经发出去了：冷却期内不让改邮箱，免得「码发到 A、注册填 B」
+            disabled: emailLocked,
+            'data-locked': emailLocked ? 'true' : 'false',
+            title: emailLocked ? t('registerEmailLocked') : undefined,
             onChange: (event) => setRegisterEmail(event.target.value),
-            style: { ...inputStyle, flex: '0 1 180px', width: 'auto' },
+            style: {
+              ...inputStyle,
+              flex: '0 1 180px',
+              width: 'auto',
+              opacity: emailLocked ? 0.6 : 1,
+              cursor: emailLocked ? 'not-allowed' : 'text',
+            },
           }),
           h('button', {
             key: 'code',
