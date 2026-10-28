@@ -26,7 +26,7 @@ window.__ModuleLoader__.load({
 
     const zh = {
       title: 'MetaOnticVideo',
-      summaryEmpty: '未配置：先在中转站/官方之间选一个上游并填好密钥。',
+      summaryEmpty: '未配置：到插件设置页点「注册并填写」领一把密钥。',
       summary: '{provider} · {model} · 每段 {duration}s',
       provider: '上游',
       providerNewapi: 'New API 中转站',
@@ -55,9 +55,11 @@ window.__ModuleLoader__.load({
         + '成功后自动填好上游、Key、地址与模型。默认额度 0.01 美元，用完了找管理员加。',
       registerUserPlaceholder: '你的名字 / 昵称',
       registerNeedUser: '先填用户名，再点注册。',
+      registerCurrent: '当前连接：{value}',
+      registerNoKey: '密钥未配置——点右边按钮领一个',
       register: '注册并填写',
       registerWorking: '注册中…',
-      registerOk: '注册成功：已填好上游/Key/地址/模型，点「保存」后生效。',
+      registerOk: '注册成功：上游 / Key / 地址 / 模型都写好了，宿主重载配置后生效。',
       registerPartial: '已拿到密钥，但有字段宿主没接受，请检查后手动保存。',
       registerFailed: '注册失败：{message}',
       registerDisabled: '注册服务不可用：{message}',
@@ -86,7 +88,7 @@ window.__ModuleLoader__.load({
     };
     const en = {
       title: 'MetaOnticVideo',
-      summaryEmpty: 'Not configured: pick New API or Volcano Ark and set the key.',
+      summaryEmpty: 'Not configured: open the plugin settings and click "Register & fill in".',
       summary: '{provider} · {model} · {duration}s per segment',
       provider: 'Provider',
       providerNewapi: 'New API relay',
@@ -115,9 +117,11 @@ window.__ModuleLoader__.load({
         + 'provider, key, base URL and model are filled in for you. Default quota is US$0.01.',
       registerUserPlaceholder: 'Your name / nickname',
       registerNeedUser: 'Type a user name before registering.',
+      registerCurrent: 'Current: {value}',
+      registerNoKey: 'No key yet — use the button to get one',
       register: 'Register & fill in',
       registerWorking: 'Registering…',
-      registerOk: 'Registered: provider/key/base URL/model filled in. Click Save to apply.',
+      registerOk: 'Registered: provider, key, base URL and model written; applies after the config reload.',
       registerPartial: 'Key received, but some fields were rejected; please review and save manually.',
       registerFailed: 'Registration failed: {message}',
       registerDisabled: 'Register service unavailable: {message}',
@@ -154,9 +158,6 @@ window.__ModuleLoader__.load({
       mergeMode: ['copy', 'reencode'],
     };
     const FIELDS = [
-      { key: 'provider', kind: 'select' },
-      { key: 'apiKey', kind: 'text', secret: true },
-      { key: 'baseUrl', kind: 'text' },
       { key: 'model', kind: 'text' },
       { key: 'duration', kind: 'number' },
       { key: 'singleMaxSeconds', kind: 'number' },
@@ -421,8 +422,6 @@ window.__ModuleLoader__.load({
         }
 
         const hints = {
-          apiKey: t('apiKeyEnvHint'),
-          baseUrl: t('baseUrlHint'),
           registerApiBase: t('registerHintAfter', { base: DEFAULT_REGISTER_API }),
         };
 
@@ -470,6 +469,11 @@ window.__ModuleLoader__.load({
         const registerText = registerStatus === 'ok'
           ? t('registerOk')
           : (registerStatus === 'partial' ? t('registerPartial') : registerMessage);
+        // 上游 / 地址 / Key 现在由注册流程写入，这里只展示当前连接，不让手填。
+        const keyReady = Boolean(snapshot.secrets?.apiKey || value.apiKey);
+        const connection = keyReady
+          ? `${value.provider === 'ark' ? t('providerArk') : t('providerNewapi')} · ${value.baseUrl || '-'} · ${value.model || '-'}`
+          : t('registerNoKey');
         const registerBox = h('div', {
           key: 'register',
           style: {
@@ -487,6 +491,11 @@ window.__ModuleLoader__.load({
           h('div', { key: 'text', style: { display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 220px' } }, [
             h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } }, t('registerTitle')),
             h('span', { key: 'hint', style: labelStyle }, t('registerHint')),
+            h('span', {
+              key: 'current',
+              'data-field': 'registerCurrent',
+              style: { fontSize: 12, color: keyReady ? TOKENS.success : TOKENS.muted },
+            }, t('registerCurrent', { value: connection })),
           ]),
           h('input', {
             key: 'user',

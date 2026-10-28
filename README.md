@@ -38,7 +38,8 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 另外还需要两件「账号 + 网络」上的准备：
 
-- **上游账号**：New API 中转站（一般选这个）或火山方舟官方，要有可用的 API Key。
+- **上游账号**：New API 中转站（默认）或火山方舟官方。用中转站时不用自己准备 Key——
+  第二步点一下「注册并填写」就会领一把；已另有 Key 的话也可以直接设进插件。
 - **网络能通**：本机能访问上游地址，也能下载上游返回的成片链接（走代理时记得放行）。
 
 可选：再装 `metaontic-video-agent`（视频导演 preset，纯配置、不存密钥），它能让 Harness 先帮你写脚本、分镜和逐镜提示词再出片，出片时复用本插件的 `video_generate` 等工具。
@@ -58,29 +59,25 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 - **改过插件代码或刚装好，要重启一次 Harness** 才会加载新代码。
 
-### 第二步：填一次密钥（只填一次）
+### 第二步：点一下「注册并填写」（只做一次）
 
-最省事的办法：在 **插件 → 已安装插件 → MetaOnticVideo → 查看** 里，
-先在注册区填一个**用户名**（会写进密钥名，方便后台认领你这一把），
-再点 **「注册并填写」**——它会向注册服务申请一个新密钥（默认额度 0.01 美元），
-成功后自动把「上游 / API Key / 基础地址 / 模型」填好，你只要再点一次 **保存**。
-（注册服务地址默认 `https://video.mybfs.cn`，换自建服务时改「注册服务地址」那一栏。）
+在 **插件 → 已安装插件 → MetaOnticVideo → 查看** 里，底部的注册区：
 
-也可以自己手填，在同一个页面填这几项，然后点保存：
+1. 填一个**用户名**（比如你的名字/昵称）；它会写进密钥名，方便在中转站后台认出自己那一把；
+2. 点 **「注册并填写」**；
+3. 看到绿色「注册成功」就完成了。
 
-| 填什么 | 例子 |
-| --- | --- |
-| 上游 | New API 中转站（一般选这个） |
-| API Key | 你的密钥 |
-| 基础地址 | `https://ai.bileego.com`（中转站地址，不要带 `/v1`） |
-| 模型 | `doubao-seedance-2-0-mini-260615` |
+插件会向注册服务申请一把新密钥（**默认额度 0.01 美元**，够试跑几条短片），
+并把「上游 / API Key / 基础地址 / 模型」自动写好——这几项现在不在页面上手填了，
+注册区那行小字会显示当前连的是哪个中转站、Key 有没有配好。
 
-不想手填也行，直接跟 Harness 说：「把视频插件的 API Key 设成 sk-xxx，地址设成 https://…」。
-保存后配置会写入 Harness 的配置文件，重载后生效。
+> 想换自建注册服务：改注册区下面的「注册服务地址」那一栏（默认 `https://video.mybfs.cn`）。
+> 服务端要能连上中转站管理端：`backend/.env` 里的 `NEWAPI_ADMIN_USERNAME` /
+> `NEWAPI_ADMIN_PASSWORD`（或 `NEWAPI_ADMIN_ACCESS_TOKEN`）得先配好；
+> 没配的话按钮会直接把缺什么告诉你，不会静默失败。
 
-> 「注册并填写」需要服务端先在 `backend/.env` 里配好中转站管理端账号
-> （`NEWAPI_ADMIN_USERNAME` / `NEWAPI_ADMIN_PASSWORD`，或 `NEWAPI_ADMIN_ACCESS_TOKEN`）。
-> 没配的话按钮会直接告诉你缺什么，不会静默失败。
+需要手工指定 Key / 地址的场景（例如临时换成别人给的 Key），可以直接跟 Harness 说
+「把视频插件的 API Key 设成 sk-xxx、地址设成 https://…」，它会用 `video_config` 工具写进配置。
 
 ### 第三步：直接说要什么
 
@@ -99,7 +96,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | `video_generate` | 生成一条完整视频（短的一次直出，长的自动拆段再合并） |
 | `video_extend` | 把已有视频往后续拍或往前补一段 |
 | `video_status` | 按任务 ID 查进度、取下载链接 |
-| `video_config` | 查看或修改插件配置（相当于第二步那张表单） |
+| `video_config` | 查看或修改插件配置（相当于第二步那个页面） |
 
 **不用每次解释**：插件会在每个新对话里自动带上一段用法说明（单段上限、分段规则、延长提示词怎么写、超时怎么继续查、成片落在哪），换会话或换助手都直接说要什么就行。
 
@@ -134,7 +131,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 | 现象 | 原因 / 怎么办 |
 | --- | --- |
-| 提示「未配置 API Key」 | 第二步没填或没保存 |
+| 提示「未配置 API Key」 | 第二步还没注册成功（或注册服务没配好），按提示重试 |
 | 提示「额度不足」 | 中转站余额不够，充值后再试 |
 | 提示「鉴权失败」 | Key 不对、过期，或填错了中转站地址 |
 | 提示「内容审核拒绝」 | 提示词或参考视频里有真人等敏感内容；换素材，或换同一账号下的受信原片 |
@@ -159,9 +156,9 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 
 | 字段 | 默认值 | 说明 |
 | --- | --- | --- |
-| `provider` | `newapi` | `newapi`=中转站火山原生路由；`ark`=火山方舟官方 |
-| `apiKey` | 空 | 留空时读环境变量（`NEWAPI_API_KEY` / `ARK_API_KEY`） |
-| `baseUrl` | 空 | 中转站站址，如 `https://ai.bileego.com`（不带 `/v1`，不重复 `/api/v3`） |
+| `provider` | `newapi` | `newapi`=中转站火山原生路由；`ark`=火山方舟官方。**注册时自动写入，页面上不再手填** |
+| `apiKey` | 空 | 注册时自动写入；留空时读环境变量（`NEWAPI_API_KEY` / `ARK_API_KEY`） |
+| `baseUrl` | 空 | 中转站站址，如 `https://ai.bileego.com`（不带 `/v1`，不重复 `/api/v3`）。注册时自动写入 |
 | `submitPath` | 按上游 | 创建任务路径，中转站按模型分流时用 `/doubao/api/v3/contents/generations/tasks` |
 | `queryPath` | 按上游 | 查询路径，`{task_id}` 会被替换 |
 | `model` | `doubao-seedance-2-0-mini-260615` | 支持生成/延长的模型（seedance 2.0 / 2.5 系列） |
