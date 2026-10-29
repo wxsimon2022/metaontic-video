@@ -1515,42 +1515,49 @@ async function preflightGate(ctx, config, exec) {
   const exchange = finiteNumber(data.usd_exchange_rate) ?? DEFAULT_USD_EXCHANGE_RATE;
 
   const needQuota = estimate ? Math.round(estimate.usd * perUnit) : null;
-  const needMoney = estimate ? formatMoney(estimate.usd * exchange, symbol) : '无法预估';
-  const needText = needQuota === null
-    ? '无法预估'
-    : `${needMoney}（约 ${needQuota.toLocaleString('en-US')} 额度）`;
+  const needMoney = estimate ? formatMoney(estimate.usd * exchange, symbol) : null;
 
   const remainQuota = finiteNumber(data.remain_quota);
   const remainAmount = finiteNumber(data.remain_amount);
-  const remainText = remainQuota === null
-    ? `读不到剩余额度（${quota.reason || '服务端没回额度'}）`
-    : `${formatMoney(remainAmount === null ? 0 : remainAmount, symbol)}`
-      + `（${remainQuota.toLocaleString('en-US')} 额度）`;
+
+  // 用户看到的只有钱：额度数字（「约 65.7 万额度」这种）是内部口径，确认框里不显示。
+  const costText = needMoney === null ? '这次调用的费用没法预估' : `预估 ${needMoney}`;
+  const remainMoneyText = `${formatMoney(remainAmount === null ? 0 : remainAmount, symbol)}`;
+  // 用户看的只有钱；额度数字只留在下面那条审计文本里
+  const remainZh = remainQuota === null
+    ? `本机 Key 的额度读不到（${quota.reason || '服务端没回额度'}）`
+    : `本机 Key 剩余 ${remainMoneyText}`;
+  const remainEn = remainQuota === null
+    ? `this key's quota could not be read (${quota.reason || 'the service returned none'})`
+    : `this key has ${remainMoneyText} left`;
 
   // 额度不够就别调用：中转站也会拒，但那样只会白等一轮还看不到原因。
   if (needQuota !== null && remainQuota !== null && remainQuota < needQuota) {
     return {
       kind: 'deny',
-      reason: `额度不足，已停止调用：本次预估需要 ${needText}，这把 Key 只剩 ${remainText}。`
-        + '请充值或找管理员换一把额度够的 Key 后重试。',
+      reason: `额度不足，已停止调用：本次预估需要 ${needMoney ?? '无法预估'}，这把 Key 只剩 `
+        + `${remainMoneyText}。请充值或找管理员换一把额度够的 Key 后重试。`,
     };
   }
 
   const total = estimate
     ? `${estimate.model} · ${estimate.resolution} · ${planSummary(estimate)}`
     : `${resolveModel(config)} · ${String(args.resolution ?? ref(config, 'resolution', '720p'))}`;
-  const tax = estimate
-    ? `预估消耗 ${estimate.tokens.toLocaleString('en-US')} token ≈ ${needText}`
+  // 审计那条（模型看）保留 token / 额度这类内部口径，方便对着中转站日志核对
+  const auditTax = estimate
+    ? `预估消耗 ${estimate.tokens.toLocaleString('en-US')} token ≈ ${needMoney ?? '无法预估'}`
+      + `（${needQuota === null ? '额度未知' : `${needQuota.toLocaleString('en-US')} 额度`}）`
     : '这次调用的费用无法预估';
   return {
     kind: 'ask',
-    reason: `人工确认：调用视频模型（${total}）。${tax}；本机 Key 剩余 ${remainText}。`,
+    reason: `人工确认：调用视频模型（${total}）。${auditTax}；本机 Key 剩余 `
+      + `${remainQuota === null ? '额度读不到' : `${remainMoneyText} / `
+        + `${remainQuota.toLocaleString('en-US')} 额度`}。`,
     displayReason: {
-      zh: `本次会调用视频模型：${total}；${tax}，本机 Key 剩余 ${remainText}。`
-        + '点了「允许」才会真正调用。',
-      en: `This will call the video model: ${total}. Estimated cost ${needMoney}`
-        + ` (about ${needQuota === null ? 'unknown' : needQuota.toLocaleString('en-US')} quota);`
-        + ` this key has ${remainText} left. The call runs only after you allow it.`,
+      zh: `本次会调用视频模型：${total}；${costText}，${remainZh}。点了「允许」才会真正调用。`,
+      en: `This will call the video model: ${total}. Estimated cost `
+        + `${needMoney === null ? 'unknown' : needMoney}; ${remainEn}. `
+        + 'The call runs only after you allow it.',
     },
   };
 }

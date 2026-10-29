@@ -1081,25 +1081,27 @@ async function preflightGate(ctx, config, exec) {
   const perUnit = finiteNumber(data.quota_per_unit) ?? DEFAULT_QUOTA_PER_UNIT;
   const exchange = finiteNumber(data.usd_exchange_rate) ?? DEFAULT_USD_EXCHANGE_RATE;
   const needQuota = estimate ? Math.round(estimate.usd * perUnit) : null;
-  const needMoney = estimate ? formatMoney(estimate.usd * exchange, symbol) : "\u65E0\u6CD5\u9884\u4F30";
-  const needText = needQuota === null ? "\u65E0\u6CD5\u9884\u4F30" : `${needMoney}\uFF08\u7EA6 ${needQuota.toLocaleString("en-US")} \u989D\u5EA6\uFF09`;
+  const needMoney = estimate ? formatMoney(estimate.usd * exchange, symbol) : null;
   const remainQuota = finiteNumber(data.remain_quota);
   const remainAmount = finiteNumber(data.remain_amount);
-  const remainText = remainQuota === null ? `\u8BFB\u4E0D\u5230\u5269\u4F59\u989D\u5EA6\uFF08${quota.reason || "\u670D\u52A1\u7AEF\u6CA1\u56DE\u989D\u5EA6"}\uFF09` : `${formatMoney(remainAmount === null ? 0 : remainAmount, symbol)}\uFF08${remainQuota.toLocaleString("en-US")} \u989D\u5EA6\uFF09`;
+  const costText = needMoney === null ? "\u8FD9\u6B21\u8C03\u7528\u7684\u8D39\u7528\u6CA1\u6CD5\u9884\u4F30" : `\u9884\u4F30 ${needMoney}`;
+  const remainMoneyText = `${formatMoney(remainAmount === null ? 0 : remainAmount, symbol)}`;
+  const remainZh = remainQuota === null ? `\u672C\u673A Key \u7684\u989D\u5EA6\u8BFB\u4E0D\u5230\uFF08${quota.reason || "\u670D\u52A1\u7AEF\u6CA1\u56DE\u989D\u5EA6"}\uFF09` : `\u672C\u673A Key \u5269\u4F59 ${remainMoneyText}`;
+  const remainEn = remainQuota === null ? `this key's quota could not be read (${quota.reason || "the service returned none"})` : `this key has ${remainMoneyText} left`;
   if (needQuota !== null && remainQuota !== null && remainQuota < needQuota) {
     return {
       kind: "deny",
-      reason: `\u989D\u5EA6\u4E0D\u8DB3\uFF0C\u5DF2\u505C\u6B62\u8C03\u7528\uFF1A\u672C\u6B21\u9884\u4F30\u9700\u8981 ${needText}\uFF0C\u8FD9\u628A Key \u53EA\u5269 ${remainText}\u3002\u8BF7\u5145\u503C\u6216\u627E\u7BA1\u7406\u5458\u6362\u4E00\u628A\u989D\u5EA6\u591F\u7684 Key \u540E\u91CD\u8BD5\u3002`
+      reason: `\u989D\u5EA6\u4E0D\u8DB3\uFF0C\u5DF2\u505C\u6B62\u8C03\u7528\uFF1A\u672C\u6B21\u9884\u4F30\u9700\u8981 ${needMoney ?? "\u65E0\u6CD5\u9884\u4F30"}\uFF0C\u8FD9\u628A Key \u53EA\u5269 ${remainMoneyText}\u3002\u8BF7\u5145\u503C\u6216\u627E\u7BA1\u7406\u5458\u6362\u4E00\u628A\u989D\u5EA6\u591F\u7684 Key \u540E\u91CD\u8BD5\u3002`
     };
   }
   const total = estimate ? `${estimate.model} \xB7 ${estimate.resolution} \xB7 ${planSummary(estimate)}` : `${resolveModel(config)} \xB7 ${String(args.resolution ?? ref(config, "resolution", "720p"))}`;
-  const tax = estimate ? `\u9884\u4F30\u6D88\u8017 ${estimate.tokens.toLocaleString("en-US")} token \u2248 ${needText}` : "\u8FD9\u6B21\u8C03\u7528\u7684\u8D39\u7528\u65E0\u6CD5\u9884\u4F30";
+  const auditTax = estimate ? `\u9884\u4F30\u6D88\u8017 ${estimate.tokens.toLocaleString("en-US")} token \u2248 ${needMoney ?? "\u65E0\u6CD5\u9884\u4F30"}\uFF08${needQuota === null ? "\u989D\u5EA6\u672A\u77E5" : `${needQuota.toLocaleString("en-US")} \u989D\u5EA6`}\uFF09` : "\u8FD9\u6B21\u8C03\u7528\u7684\u8D39\u7528\u65E0\u6CD5\u9884\u4F30";
   return {
     kind: "ask",
-    reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u8C03\u7528\u89C6\u9891\u6A21\u578B\uFF08${total}\uFF09\u3002${tax}\uFF1B\u672C\u673A Key \u5269\u4F59 ${remainText}\u3002`,
+    reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u8C03\u7528\u89C6\u9891\u6A21\u578B\uFF08${total}\uFF09\u3002${auditTax}\uFF1B\u672C\u673A Key \u5269\u4F59 ${remainQuota === null ? "\u989D\u5EA6\u8BFB\u4E0D\u5230" : `${remainMoneyText} / ${remainQuota.toLocaleString("en-US")} \u989D\u5EA6`}\u3002`,
     displayReason: {
-      zh: `\u672C\u6B21\u4F1A\u8C03\u7528\u89C6\u9891\u6A21\u578B\uFF1A${total}\uFF1B${tax}\uFF0C\u672C\u673A Key \u5269\u4F59 ${remainText}\u3002\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u771F\u6B63\u8C03\u7528\u3002`,
-      en: `This will call the video model: ${total}. Estimated cost ${needMoney} (about ${needQuota === null ? "unknown" : needQuota.toLocaleString("en-US")} quota); this key has ${remainText} left. The call runs only after you allow it.`
+      zh: `\u672C\u6B21\u4F1A\u8C03\u7528\u89C6\u9891\u6A21\u578B\uFF1A${total}\uFF1B${costText}\uFF0C${remainZh}\u3002\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u771F\u6B63\u8C03\u7528\u3002`,
+      en: `This will call the video model: ${total}. Estimated cost ${needMoney === null ? "unknown" : needMoney}; ${remainEn}. The call runs only after you allow it.`
     }
   };
 }
