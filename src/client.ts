@@ -341,6 +341,7 @@ window.__ModuleLoader__.load({
       .mov-table-row { font-size: 12.5px; border-bottom: 1px solid ${TOKENS.border}; }
       .mov-table-row:last-child { border-bottom: none; }
       .mov-table-row:hover { background: rgba(127, 127, 127, .08); }
+      .mov-table-head > :nth-child(3), .mov-table-row > :nth-child(3) { text-align: right; padding-right: 12px; }
       .mov-num { font-variant-numeric: tabular-nums; }
       .mov-code { flex: 1 1 220px; padding: 5px 9px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; color: ${TOKENS.text}; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
       .mov-tag { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
