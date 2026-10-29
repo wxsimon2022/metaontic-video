@@ -337,7 +337,6 @@ window.__ModuleLoader__.load({
           setStatus('saved');
         }
 
-        /** 本机身份：本地持久化的设备标识 + 设备密钥，注册时一起交给服务端做绑定。 */
         /** 服务地址：配置里有就用配置的（老版本固定写死，这里保留兜底）。 */
         function registerApiRoot() {
           const configured = String(value.registerApi || '').trim();
