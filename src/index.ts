@@ -148,10 +148,6 @@ export const Config = z.object({
     .default('continuous')
     .description('continuous=同机位连续续拍；closeup=在台词结束处切近景续拍')
     .volatile(),
-  resolution: z.union(['480p', '720p', '1080p'])
-    .default('720p')
-    .description('分辨率')
-    .volatile(),
   ratio: z.union(['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'])
     .default('adaptive')
     .description('画面比例；seedance 2.5 延长时固定改用 adaptive')
@@ -186,6 +182,12 @@ const MIN_SEGMENT_SECONDS = 4;
 const MAX_SEGMENT_SECONDS = 15;
 /** Seedance 单段最长 15 秒：不超过它一次直出，超过它才需要延长。 */
 const MAX_DIRECT_SECONDS = 15;
+/**
+ * 分辨率写死 720P：中转站这条线路就按 720P 出货，开放给用户调只会
+ * 选出一个和实际产出对不上的值（预估价、确认框也会跟着偏），所以不加配置项、
+ * 也不接受工具入参——extraParams 里写 resolution 也会被这里覆盖掉。
+ */
+const FIXED_RESOLUTION = '720p';
 /** 输出目录的默认子目录名。 */
 const DEFAULT_OUTPUT_DIR = 'metaontic-video';
 /** 判断「上游返回的是累计成片」的容差：累计时长的 25%，且至少 1.5 秒。 */
@@ -480,8 +482,7 @@ function buildRequestBody(config, args, referenceVideoUrl) {
   body.duration = seconds;
   body.ratio = args.ratio || ref(config, 'ratio', 'adaptive');
 
-  const resolution = args.resolution ?? ref(config, 'resolution', '720p');
-  if (resolution) body.resolution = resolution;
+  body.resolution = FIXED_RESOLUTION;
 
   const generateAudio = args.generateAudio ?? ref(config, 'generateAudio', true);
   if (typeof generateAudio === 'boolean') body.generate_audio = generateAudio;
@@ -617,8 +618,7 @@ function buildGenerationBody(config, args, seconds) {
   body.duration = seconds;
   body.ratio = args.ratio || ref(config, 'ratio', 'adaptive');
 
-  const resolution = args.resolution ?? ref(config, 'resolution', '720p');
-  if (resolution) body.resolution = resolution;
+  body.resolution = FIXED_RESOLUTION;
 
   const generateAudio = args.generateAudio ?? ref(config, 'generateAudio', true);
   if (typeof generateAudio === 'boolean') body.generate_audio = generateAudio;
@@ -1521,8 +1521,8 @@ function estimatePlan(config, toolName, args) {
  */
 function estimateUsage(config, toolName, args) {
   const plan = estimatePlan(config, toolName, args);
-  const resolution = String(args?.resolution ?? ref(config, 'resolution', '720p'));
-  const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS['720p'];
+  const resolution = FIXED_RESOLUTION;
+  const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS[FIXED_RESOLUTION];
   const tokensPerSecond = (pixels[0] * pixels[1] * ESTIMATE_FPS) / ESTIMATE_TOKEN_DIVISOR;
   const hasFrame = Boolean(
     String(args?.firstFrameUrl ?? '').trim() || String(args?.lastFrameUrl ?? '').trim(),
@@ -1776,7 +1776,7 @@ async function preflightGate(ctx, config, exec) {
 
   const total = estimate
     ? `${estimate.model} · ${estimate.resolution} · ${planSummary(estimate)}`
-    : `${resolveModel(config)} · ${String(args.resolution ?? ref(config, 'resolution', '720p'))}`;
+    : `${resolveModel(config)} · ${FIXED_RESOLUTION}`;
   // 审计那条（模型看）保留 token / 额度这类内部口径，方便对着中转站日志核对
   const auditTax = estimate
     ? `预估消耗 ${estimate.tokens.toLocaleString('en-US')} token ≈ ${needMoney ?? '无法预估'}`
@@ -2047,11 +2047,6 @@ function extendTool(config) {
             '视频1已有的秒数；给了就按「整片第 X–Y 秒」描述本段。'
             + '向后延长时逐段累加，向前延长时逐段前移。',
         },
-        resolution: {
-          type: 'string',
-          enum: ['480p', '720p', '1080p'],
-          description: '分辨率，默认沿用配置。',
-        },
         ratio: {
           type: 'string',
           enum: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
@@ -2298,11 +2293,6 @@ function videoTool(config, deps) {
           type: 'string',
           enum: ['continuous', 'closeup'],
           description: '延长时的衔接方式：continuous=同机位连续（默认）；closeup=在台词结束处切近景。',
-        },
-        resolution: {
-          type: 'string',
-          enum: ['480p', '720p', '1080p'],
-          description: '分辨率，默认沿用配置。',
         },
         ratio: {
           type: 'string',
@@ -2855,7 +2845,7 @@ function taskTool(config) {
 /** 用户可在插件内改的配置字段。 */
 const CONFIG_FIELDS = [
   'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
-  'duration', 'singleMaxSeconds', 'mode', 'resolution', 'ratio', 'generateAudio', 'watermark',
+  'duration', 'singleMaxSeconds', 'mode', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'mergeMode', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary',
   'registerUser', 'registerEmail', 'registerApi', 'deviceId', 'estimateGroupRatio',
@@ -2916,7 +2906,7 @@ function configTool(config, settings) {
     name: 'video_config',
     description:
       '读取或修改 MetaOnticVideo 插件自己的配置（baseUrl、submitPath、queryPath、model、'
-      + 'duration、singleMaxSeconds、mode、resolution、ratio、generateAudio、'
+      + 'duration、singleMaxSeconds、mode、ratio、generateAudio、'
       + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、outputDir、keepSegments、'
       + 'ffmpegBinary、ffprobeBinary、registerEmail、registerApi、estimateGroupRatio）。'
       + 'apiKey 只能由设置页「激活」时服务端下发，这里只能看、不能改；'
@@ -2942,7 +2932,6 @@ function configTool(config, settings) {
         model: { type: 'string', description: '模型 ID，例如 doubao-seedance-2-0-mini-260615。' },
         duration: { type: 'integer', minimum: 4, maximum: 15, description: '每段新增秒数上限（4-15 的整数，默认 15、段数最少）。' },
         mode: { type: 'string', enum: ['continuous', 'closeup'], description: '续拍方式。' },
-        resolution: { type: 'string', enum: ['480p', '720p', '1080p'], description: '分辨率。' },
         ratio: {
           type: 'string',
           enum: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
