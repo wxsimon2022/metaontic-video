@@ -26,12 +26,11 @@ window.__ModuleLoader__.load({
 
     const zh = {
       summaryEmpty: '未配置：到插件设置页点「激活」领一把密钥。',
-      summary: '{provider} · {model} · 每段 {duration}s',
+      summary: '{provider} · {model}',
       providerNewapi: 'New API 中转站',
       apiKeyConfigured: '已配置，留空表示保持原值',
       model: '模型',
-      duration: '每段秒数',
-      singleMaxSeconds: '直出上限（秒）',
+      modelHint: 'mini 更省（默认）；fast 同一代的加速版，单价约 1.6 倍。',
       mergeMode: '合并方式',
       mergeModeSeamless: '无缝拼接（对齐接缝）',
       mergeModeCopy: '无损拼接',
@@ -121,19 +120,17 @@ window.__ModuleLoader__.load({
       saved: '已保存，宿主重载配置后生效。',
       saveFailed: '宿主拒绝了这次写入，请检查字段取值。',
       dirty: '有未保存的改动',
-      clean: '没有改动',
       loading: '读取配置中…',
       unavailable: '宿主还没有把本条目当作可编辑设置项提供服务（配置命名空间 metaontic-video 未就绪）。若 profile 的 cordis.patch.yml 里已有该条目，请重启 Harness 让宿主重新加载；重启后仍是这句话，就是宿主版本与插件的设置接口不匹配。',
       readOnly: '当前 profile 不接受表单写入。',
     };
     const en = {
       summaryEmpty: 'Not configured: open the plugin settings and click "Register & fill in".',
-      summary: '{provider} · {model} · {duration}s per segment',
+      summary: '{provider} · {model}',
       providerNewapi: 'New API relay',
       apiKeyConfigured: 'Configured; leave empty to keep it',
       model: 'Model',
-      duration: 'Seconds per segment',
-      singleMaxSeconds: 'Direct generation limit (s)',
+      modelHint: 'mini is the cheaper default; fast is the faster sibling at about 1.6× the price.',
       mergeMode: 'Merge mode',
       mergeModeSeamless: 'Seamless (match junctions)',
       mergeModeCopy: 'Stream copy',
@@ -211,30 +208,41 @@ window.__ModuleLoader__.load({
       saved: 'Saved; the Host applies it after the config reload.',
       saveFailed: 'The Host rejected this write; check the field values.',
       dirty: 'Unsaved changes',
-      clean: 'No changes',
       loading: 'Reading configuration…',
       unavailable: 'This Host does not serve this entry as an editable setting yet (namespace metaontic-video is not ready). If the row already exists in the profile cordis.patch.yml, restart Harness so the Host reloads it; if the message persists, the Host version and the plugin settings interface do not match.',
       readOnly: 'This profile does not accept form writes.',
     };
 
+    /**
+     * 模型下拉的候选：中转站当前上架的 seedance 视频型号。
+     * 两个都在插件的预估价目表里，所以换着选也不会把「预估费用」算歪；
+     * 服务端下发的型号如果比这张表新，会照原样补进下拉，不会被静默换掉。
+     */
+    const MODEL_OPTIONS = [
+      'doubao-seedance-2-0-mini-260615',
+      'doubao-seedance-2-0-fast-260128',
+    ];
     /** 可编辑字段；kind 决定控件，标注 secret 的字段宿主只会告知是否已配置。 */
     const SELECTS = {
+      model: MODEL_OPTIONS,
       mode: ['continuous', 'closeup'],
       resolution: ['480p', '720p', '1080p'],
       ratio: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
       mergeMode: ['seamless', 'copy', 'reencode'],
     };
-    // 字段按用途分组，页面用分节标题隔开——16 个字段铺一格太糊，分了组一眼能扫到自己要改的那项。
+    // 字段按用途分组，页面用分节标题隔开——字段铺一格太糊，分了组一眼能扫到自己要改的那项。
+    // 注：singleMaxSeconds（单次直出上限）与 duration（每段延长秒数）不进设置页：
+    // 前者就是 Seedance 单段 15 秒的能力值，调小只会把一条视频拆得更碎；
+    // 后者默认 15 = 段数最少，调小只会多出接缝。两者都留在配置里（默认 15），
+    // 只有「上游对卡满 15 秒的延长段敏感」这种少数情况才需要改成 14。
     const SECTIONS = [
-      { key: 'sectionGeneration', fields: ['model', 'duration', 'singleMaxSeconds', 'mode', 'resolution', 'ratio', 'generateAudio', 'watermark'] },
+      { key: 'sectionGeneration', fields: ['model', 'mode', 'resolution', 'ratio', 'generateAudio', 'watermark'] },
       { key: 'sectionMerge', fields: ['mergeMode', 'outputDir', 'keepSegments'] },
       { key: 'sectionAdvanced', fields: ['extraParams', 'pollIntervalMs', 'maxWaitMs', 'ffmpegBinary', 'ffprobeBinary'] },
     ];
     const FIELDS = [
-      // 模型 ID 很长（doubao-seedance-2-0-mini-260615），占一整行免得半截被截断
-      { key: 'model', kind: 'text', wide: true, mono: true },
-      { key: 'duration', kind: 'number' },
-      { key: 'singleMaxSeconds', kind: 'number' },
+      // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
+      { key: 'model', kind: 'select', wide: true },
       { key: 'mode', kind: 'select' },
       { key: 'resolution', kind: 'select' },
       { key: 'ratio', kind: 'select' },
@@ -409,6 +417,8 @@ window.__ModuleLoader__.load({
         const value = snapshot.value || {};
         const [draft, setDraft] = React.useState({});
         const [status, setStatus] = React.useState('idle');
+        // 「已保存」这类反馈过几秒自动收起：收起后操作条跟着消失，页面回到「没有改动」的样子
+        const statusTimer = React.useRef(null);
         const [registerStatus, setRegisterStatus] = React.useState('idle');
         const [registerMessage, setRegisterMessage] = React.useState('');
         // 注册用「邮箱（账号）+ 邮件验证码」：邮箱一次只发一把 Key
@@ -454,21 +464,43 @@ window.__ModuleLoader__.load({
         if (props && props.view === 'summary') {
           const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
           const text = configured
-            ? t('summary', { provider: t('providerNewapi'), model: value.model || '-', duration: value.duration ?? '-' })
+            ? t('summary', { provider: t('providerNewapi'), model: value.model || '-' })
             : t('summaryEmpty');
           return h('span', { style: { color: TOKENS.muted } }, text);
         }
 
         const pending = Object.entries(draft).filter(([key, next]) => !same(value[key], next));
-        const edit = (key, next) => setDraft((current) => ({ ...current, [key]: next }));
+        // 一有新的改动就把上一条「已保存」收起来，免得看着像这次的改动也存过了
+        const edit = (key, next) => {
+          clearStatusTimer();
+          setStatus((current) => (current === 'idle' ? current : 'idle'));
+          setDraft((current) => ({ ...current, [key]: next }));
+        };
         const clear = (key) => setDraft((current) => {
           const next = { ...current };
           delete next[key];
           return next;
         });
 
+        /** 收起定时器：改动、重新保存前都要清掉，免得旧定时器把新反馈提前收掉。 */
+        function clearStatusTimer() {
+          if (statusTimer.current) {
+            window.clearTimeout(statusTimer.current);
+            statusTimer.current = null;
+          }
+        }
+
+        /** 成功反馈：显示几秒后自动回到 idle（页面就只剩「没有改动」的样子）。 */
+        function flashStatus(next, holdMs = 2500) {
+          clearStatusTimer();
+          setStatus(next);
+          statusTimer.current = window.setTimeout(() => {
+            statusTimer.current = null;
+            setStatus('idle');
+          }, holdMs);
+        }
+
         async function save() {
-          // 没改动也允许点：至少给个「已保存」的反馈，不要按钮点了没反应。
           setStatus('saving');
           let ok = true;
           for (const [key, next] of pending) {
@@ -476,7 +508,9 @@ window.__ModuleLoader__.load({
             if (accepted) clear(key);
             else ok = false;
           }
-          setStatus(ok ? 'saved' : 'failed');
+          // 失败要留着让人看清原因；成功闪一下就好，操作条随后自动收起
+          if (ok) flashStatus('saved');
+          else setStatus('failed');
         }
 
         async function reset() {
@@ -485,7 +519,7 @@ window.__ModuleLoader__.load({
           setStatus('saving');
           for (const key of overridden) await form.unset(key);
           setDraft({});
-          setStatus('saved');
+          flashStatus('saved');
         }
 
         /** 服务地址：配置里有就用配置的（老版本固定写死，这里保留兜底）。 */
@@ -833,6 +867,9 @@ window.__ModuleLoader__.load({
               h('span', null, t(field.key)));
           }
           if (field.kind === 'select') {
+            const options = SELECTS[field.key] || [];
+            // 当前值不在候选表里（例如服务端刚换的型号）就把它补进去，避免下拉里看不到自己现在的取值
+            const list = current && !options.includes(current) ? [...options, current] : options;
             return h('select', {
               id,
               'data-field': field.key,
@@ -840,7 +877,7 @@ window.__ModuleLoader__.load({
               style: inputStyle,
               value: current ?? '',
               onChange: (event) => edit(field.key, event.target.value),
-            }, (SELECTS[field.key] || []).map((option) => h('option', { key: option, value: option }, optionLabel(t, field.key, option))));
+            }, list.map((option) => h('option', { key: option, value: option }, optionLabel(t, field.key, option))));
           }
           return h('input', {
             id,
@@ -859,7 +896,8 @@ window.__ModuleLoader__.load({
           });
         }
 
-        const hints = {};
+        // 少数需要解释的字段：模型选哪个（mini 便宜 / fast 贵一些）
+        const hints = { model: t('modelHint') };
 
         /** 一个可编辑字段：标签 + 控件（开关自带标签，就不重复画）。 */
         function fieldCell(field) {
@@ -883,33 +921,47 @@ window.__ModuleLoader__.load({
             section.fields.map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)),
         ]));
 
-        const footer = h('div', { key: 'footer', className: 'mov-footer' }, [
-          h('button', {
-            key: 'save',
-            'data-action': 'save',
-            type: 'button',
-            className: 'mov-btn mov-btn-primary',
-            disabled: status === 'saving' || snapshot.writable === false,
-            onClick: save,
-          }, status === 'saving' ? t('saving') : t('save')),
-          h('button', {
-            key: 'reset',
-            'data-action': 'reset',
-            type: 'button',
-            className: 'mov-btn',
-            disabled: !Object.keys(snapshot.user || {}).length,
-            onClick: reset,
-          }, t('reset')),
-          h('span', {
-            key: 'status',
-            style: {
-              fontSize: 12,
-              color: status === 'failed' ? TOKENS.error : (status === 'saved' ? TOKENS.success : TOKENS.muted),
-            },
-          }, status === 'saved'
-            ? t('saved')
-            : (status === 'failed' ? t('saveFailed') : (pending.length ? t('dirty') : t('clean')))),
-        ]);
+        // 操作条只在「有改动 / 有可恢复的默认值 / 正要给反馈」时出现：
+        // 没有改动就没有「保存」按钮，页面干干净净，也不会有空点一下的疑问。
+        const overrides = Object.keys(snapshot.user || {});
+        const footerMessage = status === 'saved'
+          ? t('saved')
+          : (status === 'failed'
+            ? t('saveFailed')
+            : (pending.length ? t('dirty') : ''));
+        const footer = (pending.length || overrides.length || status !== 'idle')
+          ? h('div', { key: 'footer', className: 'mov-footer' }, [
+            pending.length
+              ? h('button', {
+                key: 'save',
+                'data-action': 'save',
+                type: 'button',
+                className: 'mov-btn mov-btn-primary',
+                disabled: status === 'saving' || snapshot.writable === false,
+                onClick: save,
+              }, status === 'saving' ? t('saving') : t('save'))
+              : null,
+            overrides.length
+              ? h('button', {
+                key: 'reset',
+                'data-action': 'reset',
+                type: 'button',
+                className: 'mov-btn',
+                disabled: status === 'saving',
+                onClick: reset,
+              }, t('reset'))
+              : null,
+            footerMessage
+              ? h('span', {
+                key: 'status',
+                style: {
+                  fontSize: 12,
+                  color: status === 'failed' ? TOKENS.error : (status === 'saved' ? TOKENS.success : TOKENS.muted),
+                },
+              }, footerMessage)
+              : null,
+          ])
+          : null;
 
         const registerMessageColors = {
           ok: TOKENS.success,

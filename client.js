@@ -7,12 +7,11 @@ window.__ModuleLoader__.load({
     const NS = "settings.metaonticVideo";
     const zh = {
       summaryEmpty: "\u672A\u914D\u7F6E\uFF1A\u5230\u63D2\u4EF6\u8BBE\u7F6E\u9875\u70B9\u300C\u6FC0\u6D3B\u300D\u9886\u4E00\u628A\u5BC6\u94A5\u3002",
-      summary: "{provider} \xB7 {model} \xB7 \u6BCF\u6BB5 {duration}s",
+      summary: "{provider} \xB7 {model}",
       providerNewapi: "New API \u4E2D\u8F6C\u7AD9",
       apiKeyConfigured: "\u5DF2\u914D\u7F6E\uFF0C\u7559\u7A7A\u8868\u793A\u4FDD\u6301\u539F\u503C",
       model: "\u6A21\u578B",
-      duration: "\u6BCF\u6BB5\u79D2\u6570",
-      singleMaxSeconds: "\u76F4\u51FA\u4E0A\u9650\uFF08\u79D2\uFF09",
+      modelHint: "mini \u66F4\u7701\uFF08\u9ED8\u8BA4\uFF09\uFF1Bfast \u540C\u4E00\u4EE3\u7684\u52A0\u901F\u7248\uFF0C\u5355\u4EF7\u7EA6 1.6 \u500D\u3002",
       mergeMode: "\u5408\u5E76\u65B9\u5F0F",
       mergeModeSeamless: "\u65E0\u7F1D\u62FC\u63A5\uFF08\u5BF9\u9F50\u63A5\u7F1D\uFF09",
       mergeModeCopy: "\u65E0\u635F\u62FC\u63A5",
@@ -96,19 +95,17 @@ window.__ModuleLoader__.load({
       saved: "\u5DF2\u4FDD\u5B58\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u914D\u7F6E\u540E\u751F\u6548\u3002",
       saveFailed: "\u5BBF\u4E3B\u62D2\u7EDD\u4E86\u8FD9\u6B21\u5199\u5165\uFF0C\u8BF7\u68C0\u67E5\u5B57\u6BB5\u53D6\u503C\u3002",
       dirty: "\u6709\u672A\u4FDD\u5B58\u7684\u6539\u52A8",
-      clean: "\u6CA1\u6709\u6539\u52A8",
       loading: "\u8BFB\u53D6\u914D\u7F6E\u4E2D\u2026",
       unavailable: "\u5BBF\u4E3B\u8FD8\u6CA1\u6709\u628A\u672C\u6761\u76EE\u5F53\u4F5C\u53EF\u7F16\u8F91\u8BBE\u7F6E\u9879\u63D0\u4F9B\u670D\u52A1\uFF08\u914D\u7F6E\u547D\u540D\u7A7A\u95F4 metaontic-video \u672A\u5C31\u7EEA\uFF09\u3002\u82E5 profile \u7684 cordis.patch.yml \u91CC\u5DF2\u6709\u8BE5\u6761\u76EE\uFF0C\u8BF7\u91CD\u542F Harness \u8BA9\u5BBF\u4E3B\u91CD\u65B0\u52A0\u8F7D\uFF1B\u91CD\u542F\u540E\u4ECD\u662F\u8FD9\u53E5\u8BDD\uFF0C\u5C31\u662F\u5BBF\u4E3B\u7248\u672C\u4E0E\u63D2\u4EF6\u7684\u8BBE\u7F6E\u63A5\u53E3\u4E0D\u5339\u914D\u3002",
       readOnly: "\u5F53\u524D profile \u4E0D\u63A5\u53D7\u8868\u5355\u5199\u5165\u3002"
     };
     const en = {
       summaryEmpty: 'Not configured: open the plugin settings and click "Register & fill in".',
-      summary: "{provider} \xB7 {model} \xB7 {duration}s per segment",
+      summary: "{provider} \xB7 {model}",
       providerNewapi: "New API relay",
       apiKeyConfigured: "Configured; leave empty to keep it",
       model: "Model",
-      duration: "Seconds per segment",
-      singleMaxSeconds: "Direct generation limit (s)",
+      modelHint: "mini is the cheaper default; fast is the faster sibling at about 1.6\xD7 the price.",
       mergeMode: "Merge mode",
       mergeModeSeamless: "Seamless (match junctions)",
       mergeModeCopy: "Stream copy",
@@ -177,27 +174,29 @@ window.__ModuleLoader__.load({
       saved: "Saved; the Host applies it after the config reload.",
       saveFailed: "The Host rejected this write; check the field values.",
       dirty: "Unsaved changes",
-      clean: "No changes",
       loading: "Reading configuration\u2026",
       unavailable: "This Host does not serve this entry as an editable setting yet (namespace metaontic-video is not ready). If the row already exists in the profile cordis.patch.yml, restart Harness so the Host reloads it; if the message persists, the Host version and the plugin settings interface do not match.",
       readOnly: "This profile does not accept form writes."
     };
+    const MODEL_OPTIONS = [
+      "doubao-seedance-2-0-mini-260615",
+      "doubao-seedance-2-0-fast-260128"
+    ];
     const SELECTS = {
+      model: MODEL_OPTIONS,
       mode: ["continuous", "closeup"],
       resolution: ["480p", "720p", "1080p"],
       ratio: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
       mergeMode: ["seamless", "copy", "reencode"]
     };
     const SECTIONS = [
-      { key: "sectionGeneration", fields: ["model", "duration", "singleMaxSeconds", "mode", "resolution", "ratio", "generateAudio", "watermark"] },
+      { key: "sectionGeneration", fields: ["model", "mode", "resolution", "ratio", "generateAudio", "watermark"] },
       { key: "sectionMerge", fields: ["mergeMode", "outputDir", "keepSegments"] },
       { key: "sectionAdvanced", fields: ["extraParams", "pollIntervalMs", "maxWaitMs", "ffmpegBinary", "ffprobeBinary"] }
     ];
     const FIELDS = [
-      // 模型 ID 很长（doubao-seedance-2-0-mini-260615），占一整行免得半截被截断
-      { key: "model", kind: "text", wide: true, mono: true },
-      { key: "duration", kind: "number" },
-      { key: "singleMaxSeconds", kind: "number" },
+      // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
+      { key: "model", kind: "select", wide: true },
       { key: "mode", kind: "select" },
       { key: "resolution", kind: "select" },
       { key: "ratio", kind: "select" },
@@ -349,6 +348,7 @@ window.__ModuleLoader__.load({
         const value = snapshot.value || {};
         const [draft, setDraft] = React.useState({});
         const [status, setStatus] = React.useState("idle");
+        const statusTimer = React.useRef(null);
         const [registerStatus, setRegisterStatus] = React.useState("idle");
         const [registerMessage, setRegisterMessage] = React.useState("");
         const [registerEmail, setRegisterEmail] = React.useState(() => {
@@ -388,16 +388,34 @@ window.__ModuleLoader__.load({
         }, []);
         if (props && props.view === "summary") {
           const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
-          const text = configured ? t("summary", { provider: t("providerNewapi"), model: value.model || "-", duration: value.duration ?? "-" }) : t("summaryEmpty");
+          const text = configured ? t("summary", { provider: t("providerNewapi"), model: value.model || "-" }) : t("summaryEmpty");
           return h("span", { style: { color: TOKENS.muted } }, text);
         }
         const pending = Object.entries(draft).filter(([key, next]) => !same(value[key], next));
-        const edit = (key, next) => setDraft((current) => ({ ...current, [key]: next }));
+        const edit = (key, next) => {
+          clearStatusTimer();
+          setStatus((current) => current === "idle" ? current : "idle");
+          setDraft((current) => ({ ...current, [key]: next }));
+        };
         const clear = (key) => setDraft((current) => {
           const next = { ...current };
           delete next[key];
           return next;
         });
+        function clearStatusTimer() {
+          if (statusTimer.current) {
+            window.clearTimeout(statusTimer.current);
+            statusTimer.current = null;
+          }
+        }
+        function flashStatus(next, holdMs = 2500) {
+          clearStatusTimer();
+          setStatus(next);
+          statusTimer.current = window.setTimeout(() => {
+            statusTimer.current = null;
+            setStatus("idle");
+          }, holdMs);
+        }
         async function save() {
           setStatus("saving");
           let ok = true;
@@ -406,7 +424,8 @@ window.__ModuleLoader__.load({
             if (accepted) clear(key);
             else ok = false;
           }
-          setStatus(ok ? "saved" : "failed");
+          if (ok) flashStatus("saved");
+          else setStatus("failed");
         }
         async function reset() {
           const overridden = Object.keys(snapshot.user || {});
@@ -414,7 +433,7 @@ window.__ModuleLoader__.load({
           setStatus("saving");
           for (const key of overridden) await form.unset(key);
           setDraft({});
-          setStatus("saved");
+          flashStatus("saved");
         }
         function registerApiRoot() {
           const configured = String(value.registerApi || "").trim();
@@ -716,6 +735,8 @@ window.__ModuleLoader__.load({
             );
           }
           if (field.kind === "select") {
+            const options = SELECTS[field.key] || [];
+            const list = current && !options.includes(current) ? [...options, current] : options;
             return h("select", {
               id,
               "data-field": field.key,
@@ -723,7 +744,7 @@ window.__ModuleLoader__.load({
               style: inputStyle,
               value: current ?? "",
               onChange: (event) => edit(field.key, event.target.value)
-            }, (SELECTS[field.key] || []).map((option) => h("option", { key: option, value: option }, optionLabel(t, field.key, option))));
+            }, list.map((option) => h("option", { key: option, value: option }, optionLabel(t, field.key, option))));
           }
           return h("input", {
             id,
@@ -739,7 +760,7 @@ window.__ModuleLoader__.load({
             )
           });
         }
-        const hints = {};
+        const hints = { model: t("modelHint") };
         function fieldCell(field) {
           const classes = ["mov-field"];
           if (field.kind === "switch") classes.push("mov-field-switch");
@@ -758,31 +779,33 @@ window.__ModuleLoader__.load({
             section.fields.map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
           )
         ]));
-        const footer = h("div", { key: "footer", className: "mov-footer" }, [
-          h("button", {
+        const overrides = Object.keys(snapshot.user || {});
+        const footerMessage = status === "saved" ? t("saved") : status === "failed" ? t("saveFailed") : pending.length ? t("dirty") : "";
+        const footer = pending.length || overrides.length || status !== "idle" ? h("div", { key: "footer", className: "mov-footer" }, [
+          pending.length ? h("button", {
             key: "save",
             "data-action": "save",
             type: "button",
             className: "mov-btn mov-btn-primary",
             disabled: status === "saving" || snapshot.writable === false,
             onClick: save
-          }, status === "saving" ? t("saving") : t("save")),
-          h("button", {
+          }, status === "saving" ? t("saving") : t("save")) : null,
+          overrides.length ? h("button", {
             key: "reset",
             "data-action": "reset",
             type: "button",
             className: "mov-btn",
-            disabled: !Object.keys(snapshot.user || {}).length,
+            disabled: status === "saving",
             onClick: reset
-          }, t("reset")),
-          h("span", {
+          }, t("reset")) : null,
+          footerMessage ? h("span", {
             key: "status",
             style: {
               fontSize: 12,
               color: status === "failed" ? TOKENS.error : status === "saved" ? TOKENS.success : TOKENS.muted
             }
-          }, status === "saved" ? t("saved") : status === "failed" ? t("saveFailed") : pending.length ? t("dirty") : t("clean"))
-        ]);
+          }, footerMessage) : null
+        ]) : null;
         const registerMessageColors = {
           ok: TOKENS.success,
           restored: TOKENS.success,
