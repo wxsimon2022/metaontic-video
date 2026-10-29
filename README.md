@@ -28,7 +28,9 @@
 | Harness 桌面端 | 插件跑在它里面，工具、插件页和配置页都由它提供（自带 Node 20+，不用自己装） | 安装 DeepSeek Harness 即可 |
 | `ffmpeg` + `ffprobe` | 只有「把多段合成一条成片」和「量一下每段多长」用得到 | Mac：`brew install ffmpeg`；Windows：`winget install Gyan.FFmpeg` |
 
-**不用** `npm install`：插件本身没有第三方依赖。
+插件只有一个运行时依赖 `@deepseek-ai/schemastery`（Harness 的配置 schema 库）：
+**用插件市场/命令行安装时，包管理器会自动装好**，你不用管；
+只有从源码目录跑插件（本地软链安装）时才需要在这个目录执行一次 `npm install`。
 
 在终端跑这一条，都打印出版本号就说明齐了：
 
