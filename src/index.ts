@@ -1,9 +1,15 @@
 /**
- * MetaOnticVideo —— Seedance 短视频生成 + 视频延长（向后续拍）Host plugin.
+ * MetaOnticVideo —— Seedance 视频生成 Host plugin（含长视频的分段生成与合并）。
+ *
+ * 本职就是「生成视频」：文生视频、图生视频，目标时长直接给（20 秒、25 秒也行）。
+ * 因为 Seedance 单次最多生成 15 秒，超过单段上限的部分由插件自己衔接：
+ * 先直出首段，再用 Seedance 原生的视频延长能力逐段续拍，最后 ffmpeg 合并成一条；
+ * 给已有视频「接长」也是同一套能力（video_extend）。
  *
  * 注册的工具：
- *   - `video_generate`  生成一段完整视频：总时长不超过单段上限（默认 15 秒）时直接生成；
- *                       更长时先直出首段，再逐段延长，最后用 ffmpeg 合并成一个本地成片
+ *   - `video_generate`  生成一段完整视频：目标总时长不超过单段上限（默认 15 秒）时一次直出；
+ *                       更长时先直出首段，再把剩余时长按 4-15 秒逐段延长续拍，
+ *                       最后用 ffmpeg 合并成一个本地成片
  *                       （本机没有 ffmpeg 就不合成，只返回分段列表，并附上按系统给的安装命令）
  *   - `video_extend`    以一段公网视频为输入素材，向前或向后延长指定秒数；可一次连续延长多段
  *   - `video_status`    按任务 ID 查询任务的状态
@@ -61,7 +67,7 @@ export const Config = z.object({
     .volatile(),
   model: z.string()
     .default('')
-    .description('支持视频延长的模型 ID（seedance 2.0 / 2.5 系列）；留空读 NEWAPI_VIDEO_MODEL 或内置默认值')
+    .description('视频生成用的模型 ID（seedance 2.0 / 2.5 系列）；留空读 NEWAPI_VIDEO_MODEL 或内置默认值')
     .volatile(),
   registerUser: z.string()
     .default('')
@@ -1915,7 +1921,8 @@ function videoTool(config, deps) {
   return {
     name: 'video_generate',
     description:
-      '生成一段完整视频，duration 是目标总秒数：不超过单段上限（默认 15 秒）时一次直出；'
+      '生成一段完整视频（视频生成的首选工具），duration 是目标总秒数：'
+      + '不超过单段上限（默认 15 秒）时一次直出；'
       + '**硬规则：总时长 ≤ 单段上限的视频必须一次直出，禁止拆成多段 / 多镜 / 多次调用再拼接**'
       + '（例如「15 秒」不许拆成 8+7）；多镜只在用户明确要求多镜时才用。'
       + '更长时先直出首段，再把剩余时长按 4-15 秒均分逐段续拍（默认吃满上限、段数最少）——'
@@ -2506,13 +2513,14 @@ function buildPromptGuidance(config) {
   const singleMax = resolveSingleMax(config);
   const segmentSeconds = resolveSegmentSeconds(config);
   return [
-    'MetaOnticVideo（Seedance 视频插件）：需要生成视频、给视频加减时长时优先用它。',
+    'MetaOnticVideo（Seedance 视频生成插件）：需要生成视频、给视频加长时优先用它；'
+      + '用户只要说想要多长（duration），超过单段上限的部分插件自己分段续拍再合并，不用用户自己拆任务。',
     `· 新视频用 video_generate，duration 传目标总秒数。**硬规则：总时长 ≤ ${singleMax} 秒（单段上限）的整条`
       + '视频必须一次直出，禁止拆成多镜 / 多段 / 多次 video_generate 再拼接**——'
       + `例如「15 秒」就是一次 15 秒，不许拆成 8+7；也不要为了「中间切一刀更好看」而分镜，`
       + '分镜只在用户明确要求多镜时使用。'
-      + '超过上限时（如 20 秒）会自动拆成首段 + 若干延长段并合并——那是同一条视频的续拍延长，不是多镜拼接。'
-      + '所以「20 秒视频」直接传 duration=20，不用拆成多个任务；'
+      + '超过上限时（如 20 秒）会自动拆成首段 + 若干续拍段再合并——那是同一条视频往下续拍，不是多镜拼接。'
+      + '所以「20 秒视频」直接传 duration=20，不用拆成多个任务，也不用跟用户解释「模型一次只能出 15 秒」；'
       + '成片默认落在会话工作目录下的 metaontic-video/。',
     '· 给已有视频接长用 video_extend，输入必须是公网 URL；提示词以「向后延长视频1」或「向前延长视频1」开头，'
       + '全程用「视频1」指代素材，不要写「参考视频1」；写清延长方向、剧情发展、主体状态、镜头运动、声音延续；'

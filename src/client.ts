@@ -40,8 +40,8 @@ window.__ModuleLoader__.load({
       ffmpegBinary: 'ffmpeg 路径',
       ffprobeBinary: 'ffprobe 路径',
       ffmpegTitle: '长视频合并需要 ffmpeg',
-      ffmpegBody: '生成超过单段上限的长视频（比如 20 秒、25 秒）时，插件会在本机把多段合并成一条，'
-        + '这一步用的是 ffmpeg。没装也能生成，只是只给分段列表、不合成整条。',
+      ffmpegBody: '视频超过 15 秒时会拆成几段分别生成、再在本机合并成一条——合并这一步用的是 ffmpeg。'
+        + '没装也能生成，只是只给分段列表、不合成整条。',
       ffmpegInstallFor: '按你的系统装一下（点右边按钮复制命令）：',
       ffmpegCopy: '复制',
       ffmpegCopied: '已复制',
@@ -134,9 +134,9 @@ window.__ModuleLoader__.load({
       ffmpegBinary: 'ffmpeg path',
       ffprobeBinary: 'ffprobe path',
       ffmpegTitle: 'Merging long videos needs ffmpeg',
-      ffmpegBody: 'For videos longer than one segment (say 20s or 25s) the plugin merges the pieces '
-        + 'on this machine, which needs ffmpeg. Without it you still get the video — just as separate '
-        + 'segments, not one file.',
+      ffmpegBody: 'Videos longer than 15 seconds are generated as several shots and merged into one file on '
+        + 'this machine — that merge needs ffmpeg. Without it you still get the video, just as separate '
+        + 'segments instead of one file.',
       ffmpegInstallFor: 'Install it for your OS (click the button to copy the command):',
       ffmpegCopy: 'Copy',
       ffmpegCopied: 'Copied',

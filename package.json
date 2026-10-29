@@ -1,7 +1,7 @@
 {
   "name": "metaontic-video",
-  "version": "2.5.0",
-  "description": "DeepSeek Harness plugin: generate short videos with Seedance - a single generation up to 15 seconds, or a base clip plus automatically extended segments merged into one file with ffmpeg. Ships the video_generate / video_extend / video_status tools, an in-app settings page, and the built-in \"video director\" agent preset (script-first workflow with human approval). Works through a New API relay.",
+  "version": "2.5.1",
+  "description": "DeepSeek Harness plugin: generate videos with Seedance (text-to-video / image-to-video), including videos longer than a single generation — the extra length is generated shot by shot and merged into one file with ffmpeg — plus video_extend for adding footage to a clip you already have. Ships the video_generate / video_extend / video_status tools, an in-app settings page, and the built-in \"video director\" agent preset (script-first workflow with human approval). Works through a New API relay.",
   "license": "MIT",
   "type": "module",
   "keywords": [
