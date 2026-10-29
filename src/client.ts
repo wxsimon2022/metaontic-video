@@ -82,6 +82,7 @@ window.__ModuleLoader__.load({
       usageSummary: '{count} 条 · 费用合计 {amount}',
       usageColTime: '时间',
       usageColKind: '类型',
+      usageColModel: '模型',
       usageColCost: '费用',
       usageColStatus: '结果',
       usageEmpty: '还没有记录：生成或续拍过视频后，这里会按时间列出最近几次。',
@@ -336,12 +337,16 @@ window.__ModuleLoader__.load({
       .mov-btn-sm { padding: 4px 10px; border-radius: 7px; font-size: 12px; }
       .mov-trailing { margin-left: auto; }
       .mov-table { display: flex; flex-direction: column; }
-      .mov-table-head, .mov-table-row { display: grid; grid-template-columns: 92px minmax(64px, 1fr) 92px 56px; align-items: center; gap: 8px; padding: 7px 8px; }
+      /* 时间 / 类型 / 模型 / 费用 / 结果：时间与费用按原宽度固定，多出来的宽度给模型列 */
+      .mov-table-head, .mov-table-row { display: grid; grid-template-columns: 92px minmax(52px, .6fr) minmax(72px, 1.4fr) 92px 56px; align-items: center; gap: 8px; padding: 7px 8px; }
       .mov-table-head { font-size: 11px; color: ${TOKENS.muted}; border-bottom: 1px solid ${TOKENS.border}; }
       .mov-table-row { font-size: 12.5px; border-bottom: 1px solid ${TOKENS.border}; }
       .mov-table-row:last-child { border-bottom: none; }
       .mov-table-row:hover { background: rgba(127, 127, 127, .08); }
-      .mov-table-head > :nth-child(3), .mov-table-row > :nth-child(3) { text-align: right; padding-right: 12px; }
+      /* 费用列（第 4 列）右对齐，跟上面的额度数字对齐 */
+      .mov-table-head > :nth-child(4), .mov-table-row > :nth-child(4) { text-align: right; padding-right: 12px; }
+      /* 模型 ID 很长（doubao-seedance-2-0-mini-260615），单行省略，悬停看全名 */
+      .mov-model { min-width: 0; overflow: hidden; color: ${TOKENS.muted}; white-space: nowrap; text-overflow: ellipsis; }
       .mov-num { font-variant-numeric: tabular-nums; }
       .mov-code { flex: 1 1 220px; padding: 5px 9px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; color: ${TOKENS.text}; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
       .mov-tag { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
@@ -1048,6 +1053,7 @@ window.__ModuleLoader__.load({
             }, [
               h('span', { key: 'time' }, t('usageColTime')),
               h('span', { key: 'kind' }, t('usageColKind')),
+              h('span', { key: 'model' }, t('usageColModel')),
               h('span', { key: 'cost' }, t('usageColCost')),
               h('span', { key: 'status' }, t('usageColStatus')),
             ]),
@@ -1059,6 +1065,12 @@ window.__ModuleLoader__.load({
               h('span', { key: 'time', className: 'mov-num', style: { color: TOKENS.muted } },
                 usageTime(row.created_at)),
               h('span', { key: 'kind' }, row.kind_label || ''),
+              // 模型 ID 是这一行最有用的信息之一（换过模型一眼能看出来是哪次用的哪个）
+              h('span', {
+                key: 'model',
+                className: 'mov-model',
+                title: row.model || '',
+              }, row.model || '—'),
               h('span', {
                 key: 'amount',
                 'data-field': 'usage-amount',

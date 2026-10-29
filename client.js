@@ -57,6 +57,7 @@ window.__ModuleLoader__.load({
       usageSummary: "{count} \u6761 \xB7 \u8D39\u7528\u5408\u8BA1 {amount}",
       usageColTime: "\u65F6\u95F4",
       usageColKind: "\u7C7B\u578B",
+      usageColModel: "\u6A21\u578B",
       usageColCost: "\u8D39\u7528",
       usageColStatus: "\u7ED3\u679C",
       usageEmpty: "\u8FD8\u6CA1\u6709\u8BB0\u5F55\uFF1A\u751F\u6210\u6216\u7EED\u62CD\u8FC7\u89C6\u9891\u540E\uFF0C\u8FD9\u91CC\u4F1A\u6309\u65F6\u95F4\u5217\u51FA\u6700\u8FD1\u51E0\u6B21\u3002",
@@ -283,12 +284,16 @@ window.__ModuleLoader__.load({
       .mov-btn-sm { padding: 4px 10px; border-radius: 7px; font-size: 12px; }
       .mov-trailing { margin-left: auto; }
       .mov-table { display: flex; flex-direction: column; }
-      .mov-table-head, .mov-table-row { display: grid; grid-template-columns: 92px minmax(64px, 1fr) 92px 56px; align-items: center; gap: 8px; padding: 7px 8px; }
+      /* \u65F6\u95F4 / \u7C7B\u578B / \u6A21\u578B / \u8D39\u7528 / \u7ED3\u679C\uFF1A\u65F6\u95F4\u4E0E\u8D39\u7528\u6309\u539F\u5BBD\u5EA6\u56FA\u5B9A\uFF0C\u591A\u51FA\u6765\u7684\u5BBD\u5EA6\u7ED9\u6A21\u578B\u5217 */
+      .mov-table-head, .mov-table-row { display: grid; grid-template-columns: 92px minmax(52px, .6fr) minmax(72px, 1.4fr) 92px 56px; align-items: center; gap: 8px; padding: 7px 8px; }
       .mov-table-head { font-size: 11px; color: ${TOKENS.muted}; border-bottom: 1px solid ${TOKENS.border}; }
       .mov-table-row { font-size: 12.5px; border-bottom: 1px solid ${TOKENS.border}; }
       .mov-table-row:last-child { border-bottom: none; }
       .mov-table-row:hover { background: rgba(127, 127, 127, .08); }
-      .mov-table-head > :nth-child(3), .mov-table-row > :nth-child(3) { text-align: right; padding-right: 12px; }
+      /* \u8D39\u7528\u5217\uFF08\u7B2C 4 \u5217\uFF09\u53F3\u5BF9\u9F50\uFF0C\u8DDF\u4E0A\u9762\u7684\u989D\u5EA6\u6570\u5B57\u5BF9\u9F50 */
+      .mov-table-head > :nth-child(4), .mov-table-row > :nth-child(4) { text-align: right; padding-right: 12px; }
+      /* \u6A21\u578B ID \u5F88\u957F\uFF08doubao-seedance-2-0-mini-260615\uFF09\uFF0C\u5355\u884C\u7701\u7565\uFF0C\u60AC\u505C\u770B\u5168\u540D */
+      .mov-model { min-width: 0; overflow: hidden; color: ${TOKENS.muted}; white-space: nowrap; text-overflow: ellipsis; }
       .mov-num { font-variant-numeric: tabular-nums; }
       .mov-code { flex: 1 1 220px; padding: 5px 9px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; color: ${TOKENS.text}; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
       .mov-tag { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
@@ -902,6 +907,7 @@ window.__ModuleLoader__.load({
             }, [
               h("span", { key: "time" }, t("usageColTime")),
               h("span", { key: "kind" }, t("usageColKind")),
+              h("span", { key: "model" }, t("usageColModel")),
               h("span", { key: "cost" }, t("usageColCost")),
               h("span", { key: "status" }, t("usageColStatus"))
             ]),
@@ -916,6 +922,12 @@ window.__ModuleLoader__.load({
                 usageTime(row.created_at)
               ),
               h("span", { key: "kind" }, row.kind_label || ""),
+              // 模型 ID 是这一行最有用的信息之一（换过模型一眼能看出来是哪次用的哪个）
+              h("span", {
+                key: "model",
+                className: "mov-model",
+                title: row.model || ""
+              }, row.model || "\u2014"),
               h("span", {
                 key: "amount",
                 "data-field": "usage-amount",
