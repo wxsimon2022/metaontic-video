@@ -1,4 +1,4 @@
-<img src="./icon.svg" width="76" alt="MetaOnticVideo">
+<img src="./logo.svg" width="300" alt="MetaOnticVideo">
 
 # MetaOnticVideo —— 让 Harness 帮你生成短视频
 
