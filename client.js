@@ -63,6 +63,16 @@ window.__ModuleLoader__.load({
       quotaNotRegistered: '服务端没有这台设备的注册记录（换过设备 / 清过数据）：请联系管理员处理后重新领取。',
       quotaFailed: '读取额度失败：{message}',
       quotaUpdatedAt: '更新于 {time}',
+      usageTitle: '使用记录（最近 {days} 天）',
+      usageSummary: '{count} 条 · 共消耗 {amount}',
+      usageEmpty: '还没有记录：生成或续拍过视频后，这里会按时间列出最近几次。',
+      usageLoading: '读取使用记录中…',
+      usageRefresh: '刷新记录',
+      usageFailed: '读取使用记录失败：{message}',
+      usageMore: '时间窗内还有更早的记录，这里只显示最近的 {count} 条。',
+      usageKeyMissing: '还没有密钥：领到 Key 之后，这里会显示用它出片的记录。',
+      usageStatusOk: '成功',
+      usageStatusFailed: '失败',
       register: '激活',
       registerWorking: '注册中…',
       registerOk: '注册成功：上游 / Key / 地址 / 模型都写好了，宿主重载配置后生效。',
@@ -256,6 +266,10 @@ window.__ModuleLoader__.load({
         const [quotaStatus, setQuotaStatus] = React.useState('idle');
         const [quotaMessage, setQuotaMessage] = React.useState('');
         const [quotaAt, setQuotaAt] = React.useState('');
+        // 使用记录：本机那把 Key 最近几次出片（服务端按设备认人，只给自己的）
+        const [usage, setUsage] = React.useState(null);
+        const [usageStatus, setUsageStatus] = React.useState('idle');
+        const [usageMessage, setUsageMessage] = React.useState('');
 
         // 打开设置页时，若本机还没配 Key，就先问服务端要回自己那把（设备绑定过就能取回）
         const restoreTried = React.useRef(false);
@@ -265,6 +279,7 @@ window.__ModuleLoader__.load({
           const snap = form.getSnapshot() || {};
           if (snap.secrets?.apiKey || (snap.value || {}).apiKey) {
             loadQuota().catch(() => {});
+            loadUsage().catch(() => {});
             return;
           }
           lookupOwnKey().catch(() => {});
@@ -413,6 +428,7 @@ window.__ModuleLoader__.load({
           }
           setRegisterStatus(ok ? 'ok' : 'partial');
           loadQuota().catch(() => {});
+          loadUsage().catch(() => {});
           return ok;
         }
 
@@ -565,6 +581,37 @@ window.__ModuleLoader__.load({
           }
         }
 
+        /**
+         * 使用记录：服务端按「设备标识 + 设备密钥」认出是本机那把 Key，
+         * 再去读它的调用日志（谁什么时候出了片、消耗多少），一次任务只显示一行。
+         */
+        async function loadUsage() {
+          const device = deviceIdentity();
+          setUsageStatus('working');
+          setUsageMessage('');
+          try {
+            const result = await callRegister(`${DEFAULT_REGISTER_API}/api/v1/usage/list`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', accept: 'application/json' },
+              body: JSON.stringify({
+                device_id: device.id,
+                device_secret: device.secret,
+                limit: 10,
+              }),
+            });
+            setUsage(result);
+            setUsageStatus('ok');
+            return result;
+          } catch (error) {
+            setUsage(null);
+            setUsageStatus('failed');
+            setUsageMessage(error?.status === 404
+              ? t('quotaNotRegistered')
+              : t('usageFailed', { message: error?.message || String(error) }));
+            throw error;
+          }
+        }
+
         function control(field) {
           const current = draft[field.key] !== undefined ? draft[field.key] : value[field.key];
           const id = `metaontic-video-${field.key}`;
@@ -712,6 +759,93 @@ window.__ModuleLoader__.load({
             : null,
         ]);
 
+        /** 一条记录里的时间：只到分钟，够看清「什么时候出的片」。 */
+        function usageTime(value) {
+          if (!value) return '-';
+          const at = new Date(value);
+          if (Number.isNaN(at.getTime())) return '-';
+          return at.toLocaleString(undefined, {
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+        }
+
+        // 使用记录：本机那把 Key 最近几次出片（一次任务一行，含消耗多少钱）。
+        const usageRows = usage && Array.isArray(usage.items) ? usage.items : [];
+        const usageSymbol = usage && usage.currency_symbol ? usage.currency_symbol : '¥';
+        const usageSummaryText = usage
+          ? (usageRows.length
+            ? `${t('usageSummary', {
+              count: usage.count,
+              amount: `${usageSymbol}${(Number(usage.amount_sum) || 0).toFixed(4)}`,
+            })}${usage.truncated ? ` · ${t('usageMore', { count: usage.count })}` : ''}`
+            : t('usageEmpty'))
+          : (usageStatus === 'working' ? t('usageLoading') : t('usageKeyMissing'));
+        const usageBox = keyReady ? h('div', {
+          key: 'usage',
+          'data-field': 'usage',
+          style: {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            marginTop: 10,
+            padding: '10px 12px',
+            borderRadius: 8,
+            border: `1px solid ${TOKENS.border}`,
+            background: TOKENS.cardFill,
+          },
+        }, [
+          h('div', { key: 'head', style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' } }, [
+            h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } },
+              t('usageTitle', { days: usage ? usage.window_days : 7 })),
+            h('span', {
+              key: 'summary',
+              'data-field': 'usageSummary',
+              style: { fontSize: 12, color: TOKENS.muted, flex: '1 1 200px' },
+            }, usageSummaryText),
+            h('button', {
+              key: 'refresh',
+              'data-action': 'usage-refresh',
+              type: 'button',
+              disabled: usageStatus === 'working',
+              onClick: () => { loadUsage().catch(() => {}); },
+              style: { padding: '4px 10px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.muted, cursor: 'pointer', fontSize: 12 },
+            }, t('usageRefresh')),
+          ]),
+          ...usageRows.map((row, index) => h('div', {
+            key: `${row.id}-${index}`,
+            'data-field': 'usage-row',
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
+              fontSize: 12,
+              color: TOKENS.text,
+              paddingTop: 6,
+              borderTop: `1px solid ${TOKENS.border}`,
+            },
+          }, [
+            h('span', { key: 'time', style: { color: TOKENS.muted, width: 96 } },
+              usageTime(row.created_at)),
+            h('span', { key: 'kind', style: { width: 76 } }, row.kind_label || ''),
+            h('span', { key: 'resolution', style: { color: TOKENS.muted, width: 56 } },
+              row.resolution || ''),
+            h('span', {
+              key: 'amount',
+              'data-field': 'usage-amount',
+              style: { color: row.status === 'succeeded' ? TOKENS.success : TOKENS.muted, width: 86 },
+            }, `${usageSymbol}${(Number(row.amount) || 0).toFixed(4)}`),
+            h('span', {
+              key: 'status',
+              style: { color: row.status === 'succeeded' ? TOKENS.success : TOKENS.error },
+            }, row.status === 'succeeded' ? t('usageStatusOk') : t('usageStatusFailed')),
+          ])),
+          usageMessage ? h('span', { key: 'message', style: labelStyle }, usageMessage) : null,
+        ]) : null;
+
         // 有 Key 就整块不渲染（连标题、提示文字都没有），页面上只剩配置项 + 额度卡片。
         const registerBox = keyReady ? null : h('div', {
           key: 'register',
@@ -816,6 +950,7 @@ window.__ModuleLoader__.load({
           }, rows),
           notice && !snapshot.value ? null : registerBox,
           notice && !snapshot.value ? null : quotaBox,
+          notice && !snapshot.value ? null : usageBox,
           notice && !snapshot.value ? null : footer,
         ]);
       };
