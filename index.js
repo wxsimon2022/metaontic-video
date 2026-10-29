@@ -2384,10 +2384,32 @@ export function apply(ctx, config = {}) {
   });
   if (typeof workdirCleanup === 'function') disposers.push(workdirCleanup);
   // 每次真正调用视频模型前卡一道：宿主弹人工确认（含预估费用），额度不够直接拒绝。
-  const gateCleanup = ctx.on('tools/pre-execute', async (exec, next) => {
-    if (!GATED_TOOLS.includes(exec.name)) return next();
-    return preflightGate(ctx, config, exec);
-  });
+  // 注册或预检本身出问题都不该把生成堵死：那样退回「没有预估数字」的人工确认。
+  let gateCleanup;
+  try {
+    gateCleanup = ctx.on('tools/pre-execute', async (exec, next) => {
+      if (!GATED_TOOLS.includes(exec.name)) return next();
+      try {
+        return await preflightGate(ctx, config, exec);
+      } catch (error) {
+        const message = error?.message || String(error);
+        return {
+          kind: 'ask',
+          reason: `人工确认：调用视频模型（预估费用没算出来：${message}）。`,
+          displayReason: {
+            zh: `本次会调用视频模型，但预估费用没算出来（${message}）。`
+              + '点了「允许」才会真正调用。',
+            en: 'This will call the video model, but the cost estimate failed. '
+              + 'The call runs only after you allow it.',
+          },
+        };
+      }
+    });
+  } catch (error) {
+    ctx.logger?.warn?.(
+      `metaontic-video: 调用前的人工确认卡口注册失败：${error?.message || error}`,
+    );
+  }
   if (typeof gateCleanup === 'function') disposers.push(gateCleanup);
   return () => {
     for (const dispose of disposers) dispose();
