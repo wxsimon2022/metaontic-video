@@ -1424,14 +1424,17 @@ const VIDEO_SEGMENT_OUTPUT_SCHEMA = {
 
 function renderVideoResult(value) {
   const {
-    status, mode, segments = [], videoUrl, videoPath, merged, mergeMode, note, error,
+    status, mode, segments = [], videoUrl, videoPath, mergeMode, segmentsDir, note, error,
   } = value || {};
   const lines = segments.map((segment) => {
     const label = segment.kind === 'extend' ? `延长 +${segment.seconds}s` : `直出 ${segment.seconds}s`;
     const head = `第 ${segment.index} 段：${label}（任务 ${segment.taskId}）`;
-    return segment.status === 'succeeded' && segment.videoUrl
-      ? `${head} → ${segment.videoUrl}`
-      : `${head} → ${segment.status}${segment.error ? `：${segment.error}` : ''}`;
+    if (segment.status !== 'succeeded' || !segment.videoUrl) {
+      return `${head} → ${segment.status}${segment.error ? `：${segment.error}` : ''}`;
+    }
+    return segment.localPath
+      ? `${head} → ${segment.videoUrl}\n    本地文件：${segment.localPath}`
+      : `${head} → ${segment.videoUrl}`;
   });
 
   const parts = [];
@@ -1454,6 +1457,8 @@ function renderVideoResult(value) {
         ? '无损拼接'
         : (mergeMode === 'single' ? '一段直出，无需拼接' : '重编码拼接');
       parts.push(`成片（本地文件）：${videoPath}（${how}）`);
+    } else if (segmentsDir) {
+      parts.push(`没有合并成一条：分段文件都在 ${segmentsDir}（每段路径见上面的列表）。`);
     } else {
       parts.push('没有生成合并文件，请按上面的上游链接自行下载分段。');
     }
@@ -1480,7 +1485,8 @@ function videoTool(config, deps) {
       + '直接传 duration=20 即可（20 秒 → 15+5，25 秒 → 15+10）。'
       + '返回每段任务 ID、上游链接和成片路径。生成通常需要几分钟（每段单独生成），'
       + '单次调用返回 timeout 时用 video_status 继续等，不要重复提交新任务。'
-      + '合并需要本机有 ffmpeg；没有也不会失败，只是保留分段不合并。',
+      + '合并需要本机有 ffmpeg；本机没有就不去合成，直接返回分段列表（每段的上游链接和'
+      + '本地文件），装好 ffmpeg 后重跑一次即可合并成一条。',
     parameters: {
       type: 'object',
       properties: {
@@ -1537,7 +1543,8 @@ function videoTool(config, deps) {
         },
         merge: {
           type: 'boolean',
-          description: '是否下载分段并用 ffmpeg 合并成一个本地成片，默认 true。',
+          description: '是否下载分段并用 ffmpeg 合并成一个本地成片，默认 true；'
+            + '本机没有 ffmpeg 时会跳过合并，只返回分段列表。',
         },
         keepSegments: {
           type: 'boolean',
@@ -1719,7 +1726,7 @@ function videoTool(config, deps) {
 
       if (!files.length) return result;
 
-      if (!ffmpegReady) {
+      if (!ffmpegReady && files.length > 1) {
         result.segmentsDir = segmentsDir;
         result.merged = false;
         notes.push(
@@ -2055,7 +2062,7 @@ function buildPromptGuidance(config) {
     '· 生成通常要几分钟：单次调用返回 timeout 不等于失败，用 video_status 加 taskId 继续查'
       + '（上游链接约 24 小时内有效），不要重复提交同一段。',
     '· 换中转站、模型、时长等配置用 video_config（写进 profile，宿主重载后生效）；'
-      + '合并需要本机有 ffmpeg，缺了会保留分段但不合并。',
+      + '合并需要本机有 ffmpeg；本机缺了就跳过合成，只返回分段列表（每段链接 + 本地文件）。',
     `· 当前配置：直出上限 ${singleMax} 秒、每段延长 ${segmentSeconds} 秒。`,
     '· 没有 API Key：让用户在插件设置页点「激活」，会向注册服务申请一个密钥并自动填好；'
       + '注册时填的用户名就是这把 API 的名称，默认额度 0.01 美元。',
