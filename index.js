@@ -74,6 +74,22 @@ export const Config = z.object({
     .default('metaontic-video-register-v1')
     .description('注册请求头 X-Register-Token 的值，要与服务端 REGISTER_CLIENT_TOKEN 一致；页面不显示')
     .volatile(),
+  registerApi: z.string()
+    .default('')
+    .description('插件服务地址（领 Key / 查额度 / 使用记录）；留空用内置的视频服务域名')
+    .volatile(),
+  deviceId: z.string()
+    .default('')
+    .description('本机设备标识：设置页点「激活」时写入，用来查这把 Key 的剩余额度')
+    .volatile(),
+  deviceSecret: z.string()
+    .default('')
+    .description('本机设备密钥：与设备标识一起绑定归属；页面不显示')
+    .volatile(),
+  estimateGroupRatio: z.number().min(0).max(10)
+    .default(0.8)
+    .description('预估费用用的分组折扣（中转站 group_ratio：videosvip=0.8、default=1）')
+    .volatile(),
   duration: z.number().step(1).min(4).max(15)
     .default(15)
     .description(
@@ -154,6 +170,33 @@ const DEFAULT_OUTPUT_DIR = 'metaontic-video';
 /** 判断「上游返回的是累计成片」的容差：累计时长的 25%，且至少 1.5 秒。 */
 const CUMULATIVE_TOLERANCE_RATIO = 0.25;
 const CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5;
+
+/** 插件服务地址（领 Key、查额度、使用记录）：配置留空时用这个固定域名。 */
+const DEFAULT_REGISTER_API = 'https://video.mybfs.cn';
+/** 服务端握手头的兜底值（与服务端 REGISTER_CLIENT_TOKEN 对齐）。 */
+const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
+/** 额度/汇率兜底：服务端会回真实值，只有拿不到时才用这两个。 */
+const DEFAULT_QUOTA_PER_UNIT = 500000;
+const DEFAULT_USD_EXCHANGE_RATE = 7.3;
+/** 会真正调用视频模型、因而必须人工确认的工具。 */
+const GATED_TOOLS = ['video_generate', 'video_extend'];
+
+/**
+ * 预估费用的价目表：照抄中转站 /api/pricing 里 seedance 的 billing_expr。
+ *
+ * 中转站按 token 计费：``tokens = 宽 × 高 × 帧率 × 秒数 ÷ 1024``
+ * （720p/24fps 正好 21600 token/秒），再乘「每 100 万 token 的美元价」得到美元。
+ * 实测 15 秒 720p 直出 = 324000 token → 408329 额度，与中转站日志里的预扣费一致，
+ * 所以这套算法够用来做「够不够、大概多少钱」的预检。实际以中转站结算为准。
+ */
+const ESTIMATE_PIXELS = { '480p': [854, 480], '720p': [1280, 720], '1080p': [1920, 1080] };
+const ESTIMATE_FPS = 24;
+const ESTIMATE_TOKEN_DIVISOR = 1024;
+/** 每 100 万 token 的美元价：none = 没有参考素材，video = 带参考图 / 参考视频。 */
+const ESTIMATE_RATES = [
+  ['doubao-seedance-2-0-mini', { none: 3.150684931507, video: 1.917808219178 }],
+  ['doubao-seedance-2-0-fast', { none: 5.068493150685, video: 3.013698630137 }],
+];
 
 /** provider 预设：字段留空时按这里的顺序回退到环境变量，再回退到预设默认值。 */
 const RELAY_PRESET = {
@@ -1036,6 +1079,240 @@ function isContentRejection(text) {
   return CONTENT_HINTS.some((hint) => lowered.includes(hint));
 }
 
+/* ---------------- 调用前预检：预估费用 + 人工确认 + 额度是否够 ---------------- */
+
+/** 金额显示与中转站一致：|x| ≥ 1 保留 2 位小数，否则保留 4 位，末尾多余的 0 去掉。 */
+function formatAmount(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '0';
+  const text = number.toFixed(Math.abs(number) >= 1 ? 2 : 4);
+  return text.includes('.') ? text.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '') : text;
+}
+
+function formatMoney(value, symbol = '¥') {
+  return `${symbol}${formatAmount(value)}`;
+}
+
+function finiteNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+/** 每 100 万 token 的美元价：带参考素材（参考图 / 参考视频）时更便宜。 */
+function estimateRate(model, usesReference) {
+  const id = String(model || '').toLowerCase();
+  const hit = ESTIMATE_RATES.find(([prefix]) => id.startsWith(prefix));
+  const table = hit ? hit[1] : ESTIMATE_RATES[0][1];
+  return usesReference ? table.video : table.none;
+}
+
+/** 这次调用会拆几段：和真正执行用的是同一套规划（直出 + 逐段延长）。 */
+function estimatePlan(config, toolName, args) {
+  if (toolName === 'video_extend') {
+    const count = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
+    const fallback = ref(config, 'duration', 5);
+    const seconds = clampInteger(
+      args?.duration ?? fallback,
+      MIN_SECONDS,
+      MAX_SEGMENT_SECONDS,
+      fallback,
+    );
+    return Array.from({ length: count }, () => ({ kind: 'extend', seconds }));
+  }
+  const singleMax = resolveSingleMax(config);
+  const total = clampInteger(
+    args?.duration ?? singleMax,
+    MIN_SECONDS,
+    singleMax + (MAX_SEGMENTS - 1) * MAX_SEGMENT_SECONDS,
+    singleMax,
+  );
+  return planVideoSegments(total, singleMax, resolveSegmentSeconds(config, args?.segmentSeconds));
+}
+
+/**
+ * 调用模型前的估算：拆几段、多少 token、大概多少美元。
+ * 只按价目表与分辨率算，实际以中转站结算为准（确认框里写的是「预估」）。
+ */
+function estimateUsage(config, toolName, args) {
+  const plan = estimatePlan(config, toolName, args);
+  const resolution = String(args?.resolution ?? ref(config, 'resolution', '720p'));
+  const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS['720p'];
+  const tokensPerSecond = (pixels[0] * pixels[1] * ESTIMATE_FPS) / ESTIMATE_TOKEN_DIVISOR;
+  const hasFrame = Boolean(
+    String(args?.firstFrameUrl ?? '').trim() || String(args?.lastFrameUrl ?? '').trim(),
+  );
+  const model = resolveModel(config);
+  const groupRatio = finiteNumber(ref(config, 'estimateGroupRatio', 0.8)) ?? 1;
+  const segments = plan.map((step, index) => {
+    // 延长段一定带参考视频；直出段只有给了首/尾帧才算「有参考素材」
+    const usesReference = step.kind === 'extend' || hasFrame;
+    const tokens = Math.round(tokensPerSecond * step.seconds);
+    return {
+      index: index + 1,
+      kind: step.kind,
+      seconds: step.seconds,
+      tokens,
+      usesReference,
+      usd: (tokens * estimateRate(model, usesReference)) / 1e6,
+    };
+  });
+  const usd = segments.reduce((sum, item) => sum + item.usd, 0) * groupRatio;
+  return {
+    model,
+    resolution,
+    segments,
+    seconds: segments.reduce((sum, item) => sum + item.seconds, 0),
+    tokens: segments.reduce((sum, item) => sum + item.tokens, 0),
+    usd: Math.round(usd * 1e6) / 1e6,
+  };
+}
+
+/** 插件服务地址：配置优先，留空用固定域名。 */
+function resolveRegisterApi(config) {
+  return (String(ref(config, 'registerApi', '')).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, '');
+}
+
+/**
+ * 问插件服务要「本机这把 Key 还剩多少额度」。
+ * 服务端按设备凭据去中转站读密钥详情，只回剩余 / 已用额度。
+ * 拿不到（没设备凭据、服务不可用）就回 unknown，由调用方决定怎么写进确认框。
+ */
+async function fetchDeviceQuota(config, signal) {
+  const api = resolveRegisterApi(config);
+  const deviceId = String(ref(config, 'deviceId', '')).trim();
+  const deviceSecret = String(ref(config, 'deviceSecret', '')).trim();
+  if (!deviceId || !deviceSecret) {
+    return {
+      status: 'unknown',
+      reason: '插件里没有本机设备凭据（在设置页点一次「激活」会写进来，之后就能自动校验额度）',
+    };
+  }
+  try {
+    const response = await fetch(`${api}/api/v1/register/quota`, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'X-Register-Token': String(ref(config, 'registerToken', '')).trim() || DEFAULT_REGISTER_TOKEN,
+      },
+      body: JSON.stringify({ device_id: deviceId, device_secret: deviceSecret }),
+      ...(signal ? { signal } : {}),
+    });
+    const text = await response.text();
+    let body = {};
+    if (text) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = { message: text.slice(0, 200) };
+      }
+    }
+    if (!response.ok || (body && typeof body === 'object' && body.code)) {
+      return {
+        status: 'unknown',
+        reason: (body && (body.message || body.detail)) || `HTTP ${response.status}`,
+      };
+    }
+    return { status: 'ok', data: (body && body.data) || body || {} };
+  } catch (error) {
+    return { status: 'unknown', reason: error?.message || String(error) };
+  }
+}
+
+/** 宿主当前的审批策略：never 表示「审批提示被关掉」，这时候没法人工确认。 */
+function approvalPolicy(ctx, exec) {
+  try {
+    const approval = ctx.get('approval');
+    if (!approval) return 'missing';
+    const session = exec?.agent?.session;
+    const override = session && typeof approval.overrideOf === 'function'
+      ? approval.overrideOf(session)
+      : undefined;
+    return override || approval.config?.policy || 'ask';
+  } catch {
+    return 'ask';
+  }
+}
+
+/** 把秒数列表写成「15s + 5s」这样的紧凑形式，确认框只有一行文字，不能换行。 */
+function planSummary(estimate) {
+  if (!estimate) return '时长未知';
+  const sizes = estimate.segments.map((item) => `${item.seconds}s`).join(' + ');
+  return `${estimate.segments.length} 段（${sizes}）共 ${estimate.seconds} 秒`;
+}
+
+/**
+ * 真正调用模型前的卡口：先人工确认，再确认额度够不够。
+ *
+ * - 审批提示被关掉（完全访问模式）：拒绝，并说明怎么打开；
+ * - 预估费用超过这把 Key 的剩余额度：直接拒绝，不去调用（避免白扣 / 报错）；
+ * - 读不到剩余额度：照常弹确认框，但把「读不到额度」的原因写清楚；
+ * - 其余情况：返回 ask，宿主弹审批面板给用户看预估费用，点「允许」才会执行。
+ */
+async function preflightGate(ctx, config, exec) {
+  if (approvalPolicy(ctx, exec) === 'never') {
+    return {
+      kind: 'deny',
+      reason: '当前权限模式关闭了审批提示（完全访问），无法做人工确认，已停止调用。'
+        + '把权限切到「工作区写入」或「只读」后再生成视频。',
+    };
+  }
+
+  const args = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : {};
+  let estimate = null;
+  try {
+    estimate = estimateUsage(config, exec.name, args);
+  } catch {
+    estimate = null;
+  }
+
+  const quota = await fetchDeviceQuota(config, exec.signal);
+  const data = quota.status === 'ok' ? quota.data : {};
+  const symbol = String(data.currency_symbol || '¥');
+  const perUnit = finiteNumber(data.quota_per_unit) ?? DEFAULT_QUOTA_PER_UNIT;
+  const exchange = finiteNumber(data.usd_exchange_rate) ?? DEFAULT_USD_EXCHANGE_RATE;
+
+  const needQuota = estimate ? Math.round(estimate.usd * perUnit) : null;
+  const needMoney = estimate ? formatMoney(estimate.usd * exchange, symbol) : '无法预估';
+  const needText = needQuota === null
+    ? '无法预估'
+    : `${needMoney}（约 ${needQuota.toLocaleString('en-US')} 额度）`;
+
+  const remainQuota = finiteNumber(data.remain_quota);
+  const remainAmount = finiteNumber(data.remain_amount);
+  const remainText = remainQuota === null
+    ? `读不到剩余额度（${quota.reason || '服务端没回额度'}）`
+    : `${formatMoney(remainAmount === null ? 0 : remainAmount, symbol)}`
+      + `（${remainQuota.toLocaleString('en-US')} 额度）`;
+
+  // 额度不够就别调用：中转站也会拒，但那样只会白等一轮还看不到原因。
+  if (needQuota !== null && remainQuota !== null && remainQuota < needQuota) {
+    return {
+      kind: 'deny',
+      reason: `额度不足，已停止调用：本次预估需要 ${needText}，这把 Key 只剩 ${remainText}。`
+        + '请充值或找管理员换一把额度够的 Key 后重试。',
+    };
+  }
+
+  const total = estimate
+    ? `${estimate.model} · ${estimate.resolution} · ${planSummary(estimate)}`
+    : `${resolveModel(config)} · ${String(args.resolution ?? ref(config, 'resolution', '720p'))}`;
+  const tax = estimate
+    ? `预估消耗 ${estimate.tokens.toLocaleString('en-US')} token ≈ ${needText}`
+    : '这次调用的费用无法预估';
+  return {
+    kind: 'ask',
+    reason: `人工确认：调用视频模型（${total}）。${tax}；本机 Key 剩余 ${remainText}。`,
+    displayReason: {
+      zh: `本次会调用视频模型：${total}；${tax}，本机 Key 剩余 ${remainText}。`
+        + '点了「允许」才会真正调用。',
+      en: `This will call the video model: ${total}. Estimated cost ${needMoney}`
+        + ` (about ${needQuota === null ? 'unknown' : needQuota.toLocaleString('en-US')} quota);`
+        + ` this key has ${remainText} left. The call runs only after you allow it.`,
+    },
+  };
+}
+
 /* ---------------- 请求与轮询 ---------------- */
 
 async function relayRequest(config, path, { method = 'GET', body } = {}) {
@@ -1881,11 +2158,15 @@ const CONFIG_FIELDS = [
   'duration', 'singleMaxSeconds', 'mode', 'resolution', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'mergeMode', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary',
-  'registerUser', 'registerEmail',
+  'registerUser', 'registerEmail', 'registerApi', 'deviceId', 'estimateGroupRatio',
 ];
 
 function maskSecrets(view) {
-  return { ...view, apiKey: view.apiKey ? '（已配置）' : '' };
+  return {
+    ...view,
+    apiKey: view.apiKey ? '（已配置）' : '',
+    deviceSecret: view.deviceSecret ? '（已配置）' : '',
+  };
 }
 
 /** 当前配置：stored 是写进 profile patch 的值，effective 是实际生效（含预设与环境变量）。 */
@@ -1930,7 +2211,8 @@ function configTool(config, settings) {
       '读取或修改 MetaOnticVideo 插件自己的配置（apiKey、baseUrl、submitPath、'
       + 'queryPath、model、duration、singleMaxSeconds、mode、resolution、ratio、generateAudio、'
       + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、outputDir、keepSegments、'
-      + 'ffmpegBinary、ffprobeBinary、registerEmail）。改动写进 profile 的 cordis.patch.yml，'
+      + 'ffmpegBinary、ffprobeBinary、registerEmail、registerApi、estimateGroupRatio）。'
+      + '改动写进 profile 的 cordis.patch.yml，'
       + '宿主重载后生效。'
       + '用户说「把中转站地址/模型/时长改成 X」时用 action=set，看当前值用 action=get；'
       + 'duration 是每段新增秒数上限（4-15，默认 15、段数最少），singleMaxSeconds 是单次直出上限（默认 15）。',
@@ -1945,6 +2227,8 @@ function configTool(config, settings) {
         apiKey: { type: 'string', description: 'API Key（配置里留空时自动读环境变量）。' },
         baseUrl: { type: 'string', description: '基础地址，例如 https://ai.bileego.com（中转站）或官方地址。' },
         registerEmail: { type: 'string', description: '领 Key 用的邮箱（账号）；注册要邮箱验证码，一个邮箱只发一把。' },
+        registerApi: { type: 'string', description: '插件服务地址（领 Key / 查额度 / 使用记录）；留空用内置域名。' },
+        estimateGroupRatio: { type: 'number', description: '预估费用用的分组折扣（中转站 group_ratio：默认 0.8）。' },
         submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
         queryPath: { type: 'string', description: '查询任务路径，{task_id} 会被替换。' },
         model: { type: 'string', description: '模型 ID，例如 doubao-seedance-2-0-mini-260615。' },
@@ -2099,6 +2383,12 @@ export function apply(ctx, config = {}) {
     return () => { deps.workdir = undefined; };
   });
   if (typeof workdirCleanup === 'function') disposers.push(workdirCleanup);
+  // 每次真正调用视频模型前卡一道：宿主弹人工确认（含预估费用），额度不够直接拒绝。
+  const gateCleanup = ctx.on('tools/pre-execute', async (exec, next) => {
+    if (!GATED_TOOLS.includes(exec.name)) return next();
+    return preflightGate(ctx, config, exec);
+  });
+  if (typeof gateCleanup === 'function') disposers.push(gateCleanup);
   return () => {
     for (const dispose of disposers) dispose();
   };

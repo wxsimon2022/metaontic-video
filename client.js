@@ -206,6 +206,20 @@ window.__ModuleLoader__.load({
     /** 注册接口的握手请求头 X-Register-Token：与服务端 REGISTER_CLIENT_TOKEN 一致。 */
     const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
 
+    /** 服务地址：配置里有就用配置的（老版本固定写死，这里保留兜底）。 */
+    function registerApiRoot() {
+      const configured = String(value.registerApi || '').trim();
+      return (configured || DEFAULT_REGISTER_API).replace(/\/+$/, '');
+    }
+
+    /** 金额显示与中转站一致：|x| ≥ 1 保留 2 位小数，否则保留 4 位，末尾多余的 0 去掉。 */
+    function formatMoney(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return '0';
+      const text = number.toFixed(Math.abs(number) >= 1 ? 2 : 4);
+      return text.includes('.') ? text.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '') : text;
+    }
+
     const TOKENS = {
       text: 'var(--dsw-alias-label-primary, inherit)',
       muted: 'var(--dsw-alias-label-caption, #8886)',
@@ -418,7 +432,7 @@ window.__ModuleLoader__.load({
         async function applyRegistration(result, fallbackBase) {
           const writes = [
             ['apiKey', result.api_key],
-            ['baseUrl', result.base_url || fallbackBase || DEFAULT_REGISTER_API],
+            ['baseUrl', result.base_url || fallbackBase || registerApiRoot()],
           ];
           // 邮箱是账号：存回本地，方便下次认出「这台机器绑的是哪个邮箱」；
           // 中转站里的密钥名由服务端生成唯一串，与邮箱的绑定关系在服务端。
@@ -440,7 +454,7 @@ window.__ModuleLoader__.load({
         /** 本机取回：只有设备标识 + 设备密钥都对上，服务端才把注册信息给你。 */
         async function lookupOwnKey() {
           const device = deviceIdentity();
-          const result = await callRegister(`${DEFAULT_REGISTER_API}/api/v1/register/lookup`, {
+          const result = await callRegister(`${registerApiRoot()}/api/v1/register/lookup`, {
             method: 'POST',
             headers: { 'content-type': 'application/json', accept: 'application/json' },
             body: JSON.stringify({ device_id: device.id, device_secret: device.secret }),
@@ -478,13 +492,13 @@ window.__ModuleLoader__.load({
           setCodeStatus('working');
           setCodeMessage('');
           try {
-            const status = await callRegister(`${DEFAULT_REGISTER_API}/api/v1/register/status`);
+            const status = await callRegister(`${registerApiRoot()}/api/v1/register/status`);
             if (!status.enabled) {
               setCodeStatus('failed');
               setCodeMessage(t('registerDisabled', { message: status.hint || '-' }));
               return;
             }
-            const result = await callRegister(`${DEFAULT_REGISTER_API}/api/v1/register/email/code`, {
+            const result = await callRegister(`${registerApiRoot()}/api/v1/register/email/code`, {
               method: 'POST',
               headers: { 'content-type': 'application/json', accept: 'application/json' },
               body: JSON.stringify({ email: account }),
@@ -501,7 +515,7 @@ window.__ModuleLoader__.load({
         }
 
         async function register() {
-          const root = DEFAULT_REGISTER_API;
+          const root = registerApiRoot();
           const account = registerEmail.trim();
           const code = registerCode.trim();
           if (!account) {
@@ -567,7 +581,7 @@ window.__ModuleLoader__.load({
           setQuotaStatus('working');
           setQuotaMessage('');
           try {
-            const result = await callRegister(`${DEFAULT_REGISTER_API}/api/v1/register/quota`, {
+            const result = await callRegister(`${registerApiRoot()}/api/v1/register/quota`, {
               method: 'POST',
               headers: { 'content-type': 'application/json', accept: 'application/json' },
               body: JSON.stringify({ device_id: device.id, device_secret: device.secret }),
@@ -595,7 +609,7 @@ window.__ModuleLoader__.load({
           setUsageStatus('working');
           setUsageMessage('');
           try {
-            const result = await callRegister(`${DEFAULT_REGISTER_API}/api/v1/usage/list`, {
+            const result = await callRegister(`${registerApiRoot()}/api/v1/usage/list`, {
               method: 'POST',
               headers: { 'content-type': 'application/json', accept: 'application/json' },
               body: JSON.stringify({
