@@ -202,6 +202,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | 字段 | 默认值 | 说明 |
 | --- | --- | --- |
 | `registerEmail` | 空 | 领 Key 用的邮箱（注册区那个输入框） |
+| `estimateGroupRatio` | `0.8` | 预估费用用的分组折扣（跟着充值后台的分组折扣走：`videosvip` = 0.8、`default` = 1） |
 | `singleMaxSeconds` | `15` | 单次直出上限（4–15）；超过它就分段延长 |
 | `duration` | `15` | 每段延长的秒数上限（4–15 的整数）。默认 15 = 按上限拆、段数最少；调小会拆出更多段；上游对卡满 15 秒敏感时设 14 |
 | `mode` | `continuous` | `continuous`=同机位续拍；`closeup`=台词结束处切近景 |
