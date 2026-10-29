@@ -39,6 +39,18 @@ window.__ModuleLoader__.load({
       keepSegments: '保留分段',
       ffmpegBinary: 'ffmpeg 路径',
       ffprobeBinary: 'ffprobe 路径',
+      ffmpegTitle: '长视频合并需要 ffmpeg',
+      ffmpegBody: '生成超过单段上限的长视频（比如 20 秒、25 秒）时，插件会在本机把多段合并成一条，'
+        + '这一步用的是 ffmpeg。没装也能生成，只是只给分段列表、不合成整条。',
+      ffmpegInstallFor: '按你的系统装一下（点右边按钮复制命令）：',
+      ffmpegCopy: '复制',
+      ffmpegCopied: '已复制',
+      ffmpegMore: '其他系统',
+      ffmpegLess: '收起其他系统',
+      ffmpegAfter: '装好后重跑一次就会自动合并（不用重新生成）；ffmpeg 装在非默认位置的话，'
+        + '把绝对路径填到上面的「ffmpeg 路径」也一样管用。安装包自带 ffprobe，分段时长探测会一起解决。',
+      ffmpegManual: '想自己装：macOS 用 Homebrew，Windows 用 winget，Linux 用系统包管理器；'
+        + '装完确认命令行里能跑 ffmpeg -version 就行。',
       registerEmail: '邮箱（账号）',
       registerTitle: '没有 API Key？',
       registerHint: '用邮箱领：填邮箱 → 点「获取验证码」→ 把邮件里的数字填进来 → 点「激活」。'
@@ -121,6 +133,20 @@ window.__ModuleLoader__.load({
       keepSegments: 'Keep segments',
       ffmpegBinary: 'ffmpeg path',
       ffprobeBinary: 'ffprobe path',
+      ffmpegTitle: 'Merging long videos needs ffmpeg',
+      ffmpegBody: 'For videos longer than one segment (say 20s or 25s) the plugin merges the pieces '
+        + 'on this machine, which needs ffmpeg. Without it you still get the video — just as separate '
+        + 'segments, not one file.',
+      ffmpegInstallFor: 'Install it for your OS (click the button to copy the command):',
+      ffmpegCopy: 'Copy',
+      ffmpegCopied: 'Copied',
+      ffmpegMore: 'Other systems',
+      ffmpegLess: 'Hide other systems',
+      ffmpegAfter: 'Re-run the generation once it is installed and the merge happens automatically '
+        + '(no need to regenerate). Installed somewhere unusual? Put the absolute path in the "ffmpeg path" '
+        + 'field above. The package ships ffprobe too, so segment probing is fixed at the same time.',
+      ffmpegManual: 'Installing by hand: Homebrew on macOS, winget on Windows, your distro package '
+        + 'manager on Linux — you are set once `ffmpeg -version` works in a terminal.',
       registerEmail: 'Email (this is your account)',
       registerTitle: 'No API key yet?',
       registerHint: 'Register with your email: type it, click "Send code", then paste the number from the mail '
@@ -206,6 +232,36 @@ window.__ModuleLoader__.load({
     /** 注册接口的握手请求头 X-Register-Token：与服务端 REGISTER_CLIENT_TOKEN 一致。 */
     const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
 
+    /** 这台机器的系统（浏览器半侧只能这么看）：用来挑默认展示的 ffmpeg 安装命令。 */
+    function currentOs() {
+      const nav: any = window.navigator || {};
+      const raw = String(
+        nav.userAgentData?.platform || nav.platform || nav.userAgent || '',
+      ).toLowerCase();
+      if (/mac|darwin|iphone|ipad/.test(raw)) return 'macos';
+      if (/win/.test(raw)) return 'windows';
+      return 'linux';
+    }
+
+    /** 各系统的 ffmpeg 安装命令：主推一条，其余的折叠在「其他系统」里。 */
+    const FFMPEG_INSTALLS = {
+      macos: { label: 'macOS（Homebrew）', command: 'brew install ffmpeg' },
+      windows: { label: 'Windows（winget）', command: 'winget install --id Gyan.FFmpeg -e' },
+      linux: { label: 'Linux（Debian / Ubuntu）', command: 'sudo apt update && sudo apt install -y ffmpeg' },
+    };
+    const FFMPEG_ALL = [
+      { os: 'macos', label: 'macOS（Homebrew）', command: 'brew install ffmpeg' },
+      {
+        os: 'macos',
+        label: 'macOS（还没装 Homebrew）',
+        command: '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+      },
+      { os: 'windows', label: 'Windows（winget）', command: 'winget install --id Gyan.FFmpeg -e' },
+      { os: 'windows', label: 'Windows（Chocolatey）', command: 'choco install ffmpeg' },
+      { os: 'linux', label: 'Linux（Debian / Ubuntu）', command: 'sudo apt update && sudo apt install -y ffmpeg' },
+      { os: 'linux', label: 'Linux（Fedora / RHEL / CentOS）', command: 'sudo dnf install -y ffmpeg' },
+    ];
+
     /** 金额显示与中转站一致：|x| ≥ 1 保留 2 位小数，否则保留 4 位，末尾多余的 0 去掉。 */
     function formatMoney(value) {
       const number = Number(value);
@@ -283,6 +339,9 @@ window.__ModuleLoader__.load({
         const [usage, setUsage] = React.useState(null);
         const [usageStatus, setUsageStatus] = React.useState('idle');
         const [usageMessage, setUsageMessage] = React.useState('');
+        // ffmpeg 安装引导：默认只展示当前系统那条，可展开看其他系统；复制过的命令给个「已复制」反馈
+        const [showAllFfmpeg, setShowAllFfmpeg] = React.useState(false);
+        const [copiedFfmpeg, setCopiedFfmpeg] = React.useState('');
 
         // 打开设置页时，若本机还没配 Key，就先问服务端要回自己那把（设备绑定过就能取回）
         const restoreTried = React.useRef(false);
@@ -770,6 +829,68 @@ window.__ModuleLoader__.load({
             total: money('total_amount'),
           })} · ${t('quotaUpdatedAt', { time: quotaAt })}`
           : (keyReady ? t('quotaLoading') : t('quotaNoKey'));
+        // ffmpeg 引导卡片：合并长视频要用它，缺了就照着命令装一个。
+        const os = currentOs();
+        const primaryInstall = FFMPEG_INSTALLS[os] || FFMPEG_INSTALLS.macos;
+        const installRows = showAllFfmpeg ? FFMPEG_ALL : [primaryInstall];
+        const ffmpegBox = h('div', {
+          key: 'ffmpeg',
+          'data-field': 'ffmpeg',
+          style: {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            marginTop: 10,
+            padding: '10px 12px',
+            borderRadius: 8,
+            border: `1px solid ${TOKENS.border}`,
+            background: TOKENS.cardFill,
+          },
+        }, [
+          h('div', { key: 'head', style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' } }, [
+            h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } }, t('ffmpegTitle')),
+            h('button', {
+              key: 'toggle',
+              'data-action': 'ffmpeg-systems',
+              type: 'button',
+              onClick: () => setShowAllFfmpeg((current) => !current),
+              style: { marginLeft: 'auto', padding: '2px 8px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.muted, cursor: 'pointer', fontSize: 12 },
+            }, showAllFfmpeg ? t('ffmpegLess') : t('ffmpegMore')),
+          ]),
+          h('span', { key: 'body', style: labelStyle }, t('ffmpegBody')),
+          h('span', { key: 'for', style: labelStyle }, t('ffmpegInstallFor')),
+          ...installRows.map((item, index) => h('div', {
+            key: `install-${index}`,
+            'data-field': 'ffmpegInstall',
+            style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+          }, [
+            h('span', { key: 'label', style: { fontSize: 12, color: TOKENS.muted, flex: '0 0 auto' } }, item.label),
+            h('code', {
+              key: 'command',
+              'data-field': 'ffmpegCommand',
+              style: {
+                flex: '1 1 240px',
+                padding: '4px 8px',
+                borderRadius: 6,
+                border: `1px solid ${TOKENS.border}`,
+                background: TOKENS.controlFill,
+                color: TOKENS.text,
+                fontSize: 12,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-all',
+              },
+            }, item.command),
+            h('button', {
+              key: 'copy',
+              'data-action': 'ffmpeg-copy',
+              type: 'button',
+              onClick: () => copyCommand(item.command),
+              style: { padding: '4px 10px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.muted, cursor: 'pointer', fontSize: 12 },
+            }, copiedFfmpeg === item.command ? t('ffmpegCopied') : t('ffmpegCopy')),
+          ])),
+          h('span', { key: 'after', style: labelStyle }, t('ffmpegAfter')),
+        ]);
+
         const quotaBox = h('div', {
           key: 'quota',
           'data-field': 'quota',
@@ -805,6 +926,21 @@ window.__ModuleLoader__.load({
             }, t('quotaRefresh'))
             : null,
         ]);
+
+        /** 复制 ffmpeg 安装命令；剪贴板不可用就什么都不做，用户照样能照着敲。 */
+        function copyCommand(command) {
+          try {
+            const result = window.navigator?.clipboard?.writeText(command);
+            if (result && typeof result.then === 'function') {
+              result.then(() => {
+                setCopiedFfmpeg(command);
+                window.setTimeout(() => setCopiedFfmpeg(''), 2000);
+              }, () => {});
+            }
+          } catch {
+            // 复制失败不影响照着命令自己装
+          }
+        }
 
         /** 一条记录里的时间：只到分钟，够看清「什么时候出的片」。 */
         function usageTime(value) {
@@ -1015,6 +1151,7 @@ window.__ModuleLoader__.load({
             key: 'grid',
             style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 },
           }, rows),
+          notice && !snapshot.value ? null : ffmpegBox,
           notice && !snapshot.value ? null : registerBox,
           notice && !snapshot.value ? null : quotaBox,
           notice && !snapshot.value ? null : usageBox,

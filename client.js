@@ -20,6 +20,15 @@ window.__ModuleLoader__.load({
       keepSegments: "\u4FDD\u7559\u5206\u6BB5",
       ffmpegBinary: "ffmpeg \u8DEF\u5F84",
       ffprobeBinary: "ffprobe \u8DEF\u5F84",
+      ffmpegTitle: "\u957F\u89C6\u9891\u5408\u5E76\u9700\u8981 ffmpeg",
+      ffmpegBody: "\u751F\u6210\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\u7684\u957F\u89C6\u9891\uFF08\u6BD4\u5982 20 \u79D2\u300125 \u79D2\uFF09\u65F6\uFF0C\u63D2\u4EF6\u4F1A\u5728\u672C\u673A\u628A\u591A\u6BB5\u5408\u5E76\u6210\u4E00\u6761\uFF0C\u8FD9\u4E00\u6B65\u7528\u7684\u662F ffmpeg\u3002\u6CA1\u88C5\u4E5F\u80FD\u751F\u6210\uFF0C\u53EA\u662F\u53EA\u7ED9\u5206\u6BB5\u5217\u8868\u3001\u4E0D\u5408\u6210\u6574\u6761\u3002",
+      ffmpegInstallFor: "\u6309\u4F60\u7684\u7CFB\u7EDF\u88C5\u4E00\u4E0B\uFF08\u70B9\u53F3\u8FB9\u6309\u94AE\u590D\u5236\u547D\u4EE4\uFF09\uFF1A",
+      ffmpegCopy: "\u590D\u5236",
+      ffmpegCopied: "\u5DF2\u590D\u5236",
+      ffmpegMore: "\u5176\u4ED6\u7CFB\u7EDF",
+      ffmpegLess: "\u6536\u8D77\u5176\u4ED6\u7CFB\u7EDF",
+      ffmpegAfter: "\u88C5\u597D\u540E\u91CD\u8DD1\u4E00\u6B21\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\uFF08\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\uFF1Bffmpeg \u88C5\u5728\u975E\u9ED8\u8BA4\u4F4D\u7F6E\u7684\u8BDD\uFF0C\u628A\u7EDD\u5BF9\u8DEF\u5F84\u586B\u5230\u4E0A\u9762\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\u4E5F\u4E00\u6837\u7BA1\u7528\u3002\u5B89\u88C5\u5305\u81EA\u5E26 ffprobe\uFF0C\u5206\u6BB5\u65F6\u957F\u63A2\u6D4B\u4F1A\u4E00\u8D77\u89E3\u51B3\u3002",
+      ffmpegManual: "\u60F3\u81EA\u5DF1\u88C5\uFF1AmacOS \u7528 Homebrew\uFF0CWindows \u7528 winget\uFF0CLinux \u7528\u7CFB\u7EDF\u5305\u7BA1\u7406\u5668\uFF1B\u88C5\u5B8C\u786E\u8BA4\u547D\u4EE4\u884C\u91CC\u80FD\u8DD1 ffmpeg -version \u5C31\u884C\u3002",
       registerEmail: "\u90AE\u7BB1\uFF08\u8D26\u53F7\uFF09",
       registerTitle: "\u6CA1\u6709 API Key\uFF1F",
       registerHint: "\u7528\u90AE\u7BB1\u9886\uFF1A\u586B\u90AE\u7BB1 \u2192 \u70B9\u300C\u83B7\u53D6\u9A8C\u8BC1\u7801\u300D\u2192 \u628A\u90AE\u4EF6\u91CC\u7684\u6570\u5B57\u586B\u8FDB\u6765 \u2192 \u70B9\u300C\u6FC0\u6D3B\u300D\u3002\u90AE\u7BB1\u5C31\u662F\u4F60\u7684\u8D26\u53F7\uFF0C\u4E00\u4E2A\u90AE\u7BB1\u53EA\u53D1\u4E00\u628A Key\uFF1B\u6210\u529F\u540E\u81EA\u52A8\u5199\u597D\u4E0A\u6E38\u3001Key\u3001\u5730\u5740\u4E0E\u6A21\u578B\uFF0C\u9ED8\u8BA4\u989D\u5EA6 \xA50.01\u3002",
@@ -101,6 +110,15 @@ window.__ModuleLoader__.load({
       keepSegments: "Keep segments",
       ffmpegBinary: "ffmpeg path",
       ffprobeBinary: "ffprobe path",
+      ffmpegTitle: "Merging long videos needs ffmpeg",
+      ffmpegBody: "For videos longer than one segment (say 20s or 25s) the plugin merges the pieces on this machine, which needs ffmpeg. Without it you still get the video \u2014 just as separate segments, not one file.",
+      ffmpegInstallFor: "Install it for your OS (click the button to copy the command):",
+      ffmpegCopy: "Copy",
+      ffmpegCopied: "Copied",
+      ffmpegMore: "Other systems",
+      ffmpegLess: "Hide other systems",
+      ffmpegAfter: 'Re-run the generation once it is installed and the merge happens automatically (no need to regenerate). Installed somewhere unusual? Put the absolute path in the "ffmpeg path" field above. The package ships ffprobe too, so segment probing is fixed at the same time.',
+      ffmpegManual: "Installing by hand: Homebrew on macOS, winget on Windows, your distro package manager on Linux \u2014 you are set once `ffmpeg -version` works in a terminal.",
       registerEmail: "Email (this is your account)",
       registerTitle: "No API key yet?",
       registerHint: 'Register with your email: type it, click "Send code", then paste the number from the mail and click "Register & fill in". One email gets one key. Provider, key, base URL and model are filled in for you. Default quota \xA50.01.',
@@ -178,6 +196,32 @@ window.__ModuleLoader__.load({
     ];
     const DEFAULT_REGISTER_API = "https://video.mybfs.cn";
     const DEFAULT_REGISTER_TOKEN = "metaontic-video-register-v1";
+    function currentOs() {
+      const nav = window.navigator || {};
+      const raw = String(
+        nav.userAgentData?.platform || nav.platform || nav.userAgent || ""
+      ).toLowerCase();
+      if (/mac|darwin|iphone|ipad/.test(raw)) return "macos";
+      if (/win/.test(raw)) return "windows";
+      return "linux";
+    }
+    const FFMPEG_INSTALLS = {
+      macos: { label: "macOS\uFF08Homebrew\uFF09", command: "brew install ffmpeg" },
+      windows: { label: "Windows\uFF08winget\uFF09", command: "winget install --id Gyan.FFmpeg -e" },
+      linux: { label: "Linux\uFF08Debian / Ubuntu\uFF09", command: "sudo apt update && sudo apt install -y ffmpeg" }
+    };
+    const FFMPEG_ALL = [
+      { os: "macos", label: "macOS\uFF08Homebrew\uFF09", command: "brew install ffmpeg" },
+      {
+        os: "macos",
+        label: "macOS\uFF08\u8FD8\u6CA1\u88C5 Homebrew\uFF09",
+        command: '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+      },
+      { os: "windows", label: "Windows\uFF08winget\uFF09", command: "winget install --id Gyan.FFmpeg -e" },
+      { os: "windows", label: "Windows\uFF08Chocolatey\uFF09", command: "choco install ffmpeg" },
+      { os: "linux", label: "Linux\uFF08Debian / Ubuntu\uFF09", command: "sudo apt update && sudo apt install -y ffmpeg" },
+      { os: "linux", label: "Linux\uFF08Fedora / RHEL / CentOS\uFF09", command: "sudo dnf install -y ffmpeg" }
+    ];
     function formatMoney(value) {
       const number = Number(value);
       if (!Number.isFinite(number)) return "0";
@@ -243,6 +287,8 @@ window.__ModuleLoader__.load({
         const [usage, setUsage] = React.useState(null);
         const [usageStatus, setUsageStatus] = React.useState("idle");
         const [usageMessage, setUsageMessage] = React.useState("");
+        const [showAllFfmpeg, setShowAllFfmpeg] = React.useState(false);
+        const [copiedFfmpeg, setCopiedFfmpeg] = React.useState("");
         const restoreTried = React.useRef(false);
         React.useEffect(() => {
           if (restoreTried.current) return;
@@ -657,6 +703,66 @@ window.__ModuleLoader__.load({
           used: money("used_amount"),
           total: money("total_amount")
         })} \xB7 ${t("quotaUpdatedAt", { time: quotaAt })}` : keyReady ? t("quotaLoading") : t("quotaNoKey");
+        const os = currentOs();
+        const primaryInstall = FFMPEG_INSTALLS[os] || FFMPEG_INSTALLS.macos;
+        const installRows = showAllFfmpeg ? FFMPEG_ALL : [primaryInstall];
+        const ffmpegBox = h("div", {
+          key: "ffmpeg",
+          "data-field": "ffmpeg",
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            marginTop: 10,
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: `1px solid ${TOKENS.border}`,
+            background: TOKENS.cardFill
+          }
+        }, [
+          h("div", { key: "head", style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } }, [
+            h("span", { key: "title", style: { fontSize: 13, color: TOKENS.text } }, t("ffmpegTitle")),
+            h("button", {
+              key: "toggle",
+              "data-action": "ffmpeg-systems",
+              type: "button",
+              onClick: () => setShowAllFfmpeg((current) => !current),
+              style: { marginLeft: "auto", padding: "2px 8px", borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: "transparent", color: TOKENS.muted, cursor: "pointer", fontSize: 12 }
+            }, showAllFfmpeg ? t("ffmpegLess") : t("ffmpegMore"))
+          ]),
+          h("span", { key: "body", style: labelStyle }, t("ffmpegBody")),
+          h("span", { key: "for", style: labelStyle }, t("ffmpegInstallFor")),
+          ...installRows.map((item, index) => h("div", {
+            key: `install-${index}`,
+            "data-field": "ffmpegInstall",
+            style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }
+          }, [
+            h("span", { key: "label", style: { fontSize: 12, color: TOKENS.muted, flex: "0 0 auto" } }, item.label),
+            h("code", {
+              key: "command",
+              "data-field": "ffmpegCommand",
+              style: {
+                flex: "1 1 240px",
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: `1px solid ${TOKENS.border}`,
+                background: TOKENS.controlFill,
+                color: TOKENS.text,
+                fontSize: 12,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-all"
+              }
+            }, item.command),
+            h("button", {
+              key: "copy",
+              "data-action": "ffmpeg-copy",
+              type: "button",
+              onClick: () => copyCommand(item.command),
+              style: { padding: "4px 10px", borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: "transparent", color: TOKENS.muted, cursor: "pointer", fontSize: 12 }
+            }, copiedFfmpeg === item.command ? t("ffmpegCopied") : t("ffmpegCopy"))
+          ])),
+          h("span", { key: "after", style: labelStyle }, t("ffmpegAfter"))
+        ]);
         const quotaBox = h("div", {
           key: "quota",
           "data-field": "quota",
@@ -693,6 +799,19 @@ window.__ModuleLoader__.load({
             style: { padding: "4px 10px", borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: "transparent", color: TOKENS.muted, cursor: "pointer", fontSize: 12 }
           }, t("quotaRefresh")) : null
         ]);
+        function copyCommand(command) {
+          try {
+            const result = window.navigator?.clipboard?.writeText(command);
+            if (result && typeof result.then === "function") {
+              result.then(() => {
+                setCopiedFfmpeg(command);
+                window.setTimeout(() => setCopiedFfmpeg(""), 2e3);
+              }, () => {
+              });
+            }
+          } catch {
+          }
+        }
         function usageTime(value2) {
           if (!value2) return "-";
           const at = new Date(value2);
@@ -900,6 +1019,7 @@ window.__ModuleLoader__.load({
             key: "grid",
             style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }
           }, rows),
+          notice && !snapshot.value ? null : ffmpegBox,
           notice && !snapshot.value ? null : registerBox,
           notice && !snapshot.value ? null : quotaBox,
           notice && !snapshot.value ? null : usageBox,

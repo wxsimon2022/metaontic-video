@@ -4,6 +4,7 @@
  * 注册的工具：
  *   - `video_generate`  生成一段完整视频：总时长不超过单段上限（默认 15 秒）时直接生成；
  *                       更长时先直出首段，再逐段延长，最后用 ffmpeg 合并成一个本地成片
+ *                       （本机没有 ffmpeg 就不合成，只返回分段列表，并附上按系统给的安装命令）
  *   - `video_extend`    以一段公网视频为输入素材，向前或向后延长指定秒数；可一次连续延长多段
  *   - `video_status`    按任务 ID 查询任务的状态
  *   - `video_config`    读取/写回本插件自己的配置（走宿主的 settings 服务，
@@ -746,6 +747,75 @@ async function hasFfmpeg(config, signal) {
   }
 }
 
+/** 本机操作系统名，只用来挑安装命令；取不到就按 Linux 处理。 */
+function currentPlatform(): string {
+  try {
+    return (typeof process !== 'undefined' && process.platform) || 'linux';
+  } catch {
+    return 'linux';
+  }
+}
+
+/**
+ * 按操作系统给出 ffmpeg 的安装方式。
+ * 只给「装一次就完事」的官方渠道：macOS 走 Homebrew，Windows 走 winget（备选 choco），
+ * Linux 同时给 Debian 系与 Fedora 系——用户照着抄一行就行。
+ */
+function ffmpegInstallOptions(platform = currentPlatform()) {
+  if (platform === 'darwin') {
+    return {
+      os: 'macOS',
+      installs: [
+        { label: 'macOS（Homebrew）', command: 'brew install ffmpeg' },
+        {
+          label: 'macOS（还没装 Homebrew 就先装它）',
+          command: '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+        },
+      ],
+    };
+  }
+  if (platform === 'win32') {
+    return {
+      os: 'Windows',
+      installs: [
+        { label: 'Windows（winget）', command: 'winget install --id Gyan.FFmpeg -e' },
+        { label: 'Windows（Chocolatey）', command: 'choco install ffmpeg' },
+      ],
+    };
+  }
+  return {
+    os: 'Linux',
+    installs: [
+      {
+        label: 'Linux（Debian / Ubuntu）',
+        command: 'sudo apt update && sudo apt install -y ffmpeg',
+      },
+      { label: 'Linux（Fedora / RHEL / CentOS）', command: 'sudo dnf install -y ffmpeg' },
+    ],
+  };
+}
+
+/**
+ * ffmpeg 缺失时给用户看的引导：为什么需要它、现在该怎么装、装完怎么让合并生效。
+ * 结果里的 installHint 会原样带进工具返回值，让模型照着念给用户听，
+ * 不是只说一句「已跳过合并」——这一步的目的就是把人引到安装上。
+ */
+function ffmpegInstallHint(config) {
+  const binary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
+  const { os, installs } = ffmpegInstallOptions();
+  const lines = [
+    `本机没有找到可用的 ffmpeg（${binary}），所以「把多段合并成一条」这步暂时没做，`
+      + '分段文件都在，一条都不少。',
+    `装一下 ffmpeg 就能合并（你当前是 ${os}）：`,
+    ...installs.map((item) => `  · ${item.label}：${item.command}`),
+    '装好后重跑这次生成，分段会自动合并成一条，不用重新生成；'
+      + '如果 ffmpeg 已经装了但不在默认位置，把它的绝对路径填到插件设置里的「ffmpeg 路径」也一样管用。',
+    'ffmpeg 的安装包里自带 ffprobe，装完分段探测也一起好了。',
+    '需要我帮你执行安装命令的话说一声，我来跑（执行前会让你确认）。',
+  ];
+  return { binary, os, installs, hint: lines.join('\n') };
+}
+
 /** 探测分段的时长/尺寸；ffprobe 缺失或失败都返回 null，不影响主流程。 */
 async function probeMedia(file, config, signal) {
   try {
@@ -1275,6 +1345,52 @@ function planSummary(estimate) {
 }
 
 /**
+ * 要合并的长视频遇上「本机没有 ffmpeg」：不往下走，把这次调用退回去，
+ * 让模型在对话框里和用户确认「要不要现在装 ffmpeg」——同意就装（宿主会弹审批），
+ * 不想装就带 merge:false 重发，只拿分段列表。
+ *
+ * 返回 null 表示不用拦（不需要合并、或本机已经能跑 ffmpeg）。
+ */
+async function ffmpegConsentGate(config, exec, args) {
+  if (exec.name !== 'video_generate') return null;
+  // 用户已经明确说要「只返回分段」，就别再拦了。
+  if (args?.merge === false) return null;
+
+  let plan = null;
+  try {
+    plan = estimatePlan(config, exec.name, args);
+  } catch {
+    plan = null;
+  }
+  if (!plan || plan.length < 2) return null;
+  if (await hasFfmpeg(config, exec.signal)) return null;
+
+  const { os, installs } = ffmpegInstallOptions();
+  const command = installs[0].command;
+  const sizes = plan.map((step) => `${step.seconds}s`).join(' + ');
+  const binary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
+  const lines = [
+    `本机没有 ${binary}，这次要生成 ${plan.reduce((sum, step) => sum + step.seconds, 0)} 秒`
+      + `（会拆成 ${plan.length} 段：${sizes}），没有 ffmpeg 就没法合并成一条，所以先停下来了，`
+      + '还没有调用模型、没有产生费用。',
+    '请在对话框里先和用户确认，不要自己绕过这一步：',
+    `1) 问用户要不要现在装 ffmpeg —— 说清他的系统（${os}）和命令：${command}`,
+    '   （装好后重跑这次生成就会自动合并成一条，分段不用重新生成）。',
+    '2) 用户同意安装：用 shell/终端工具执行上面的命令（宿主会让他确认一次），'
+      + '装完跑 `ffmpeg -version` 确认成功，再重新调用 video_generate（duration 不变）继续生成。',
+    '3) 用户不想装、或者装不了：带 `merge:false` 重新调用 video_generate，'
+      + '插件就只生成并返回分段列表（每段链接 + 本地文件），这次不会再拦。',
+    '已经装过但不在默认位置的话，把绝对路径填进插件设置里的「ffmpeg 路径」也一样管用；'
+      + '安装包自带 ffprobe，分段时长探测会一起解决。',
+  ];
+  return {
+    kind: 'deny',
+    reason: lines.join('\n'),
+    info: { ffmpegMissing: true, os, command, segments: plan.length },
+  };
+}
+
+/**
  * 真正调用模型前的卡口：先人工确认，再确认额度够不够。
  *
  * - 审批提示被关掉（完全访问模式）：拒绝，并说明怎么打开；
@@ -1292,6 +1408,11 @@ async function preflightGate(ctx, config, exec) {
   }
 
   const args = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : {};
+
+  // 长视频要在本机合并，缺 ffmpeg 就先停下来：把这次调用退回去，
+  // 让模型在对话框里问用户「要不要授权我装 ffmpeg」，而不是闷头生成再丢一堆分段。
+  const consent = await ffmpegConsentGate(config, exec, args);
+  if (consent) return consent;
   let estimate = null;
   try {
     estimate = estimateUsage(config, exec.name, args);
@@ -1804,8 +1925,12 @@ function videoTool(config, deps) {
       + '直接传 duration=20 即可（20 秒 → 15+5，25 秒 → 15+10）。'
       + '返回每段任务 ID、上游链接和成片路径。生成通常需要几分钟（每段单独生成），'
       + '单次调用返回 timeout 时用 video_status 继续等，不要重复提交新任务。'
-      + '合并需要本机有 ffmpeg；本机没有就不去合成，直接返回分段列表（每段的上游链接和'
-      + '本地文件），装好 ffmpeg 后重跑一次即可合并成一条。',
+      + '合并需要本机有 ffmpeg。本机没装 ffmpeg 时，插件会**先把这次调用拦回来（不会调用模型、'
+      + '不产生费用）**，返回的说明里带着按系统给的安装命令 ——这时要在对话框里和用户确认：'
+      + '问他要不要现在装 ffmpeg（给出他系统的命令，说明装好重跑就会自动合并、分段不用重新生成），'
+      + '同意就用终端工具装上（宿主会让他确认）并 `ffmpeg -version` 验证，然后按同样的 duration 重发；'
+      + '用户不想装就带 merge:false 重发，插件只返回分段列表（每段上游链接 + 本地文件）。'
+      + '拿到 ffmpegMissing=true 的结果时也要照 installHint 引导安装，别只丢一句「已跳过合并」。',
     parameters: {
       type: 'object',
       properties: {
@@ -1863,7 +1988,8 @@ function videoTool(config, deps) {
         merge: {
           type: 'boolean',
           description: '是否下载分段并用 ffmpeg 合并成一个本地成片，默认 true；'
-            + '本机没有 ffmpeg 时会跳过合并，只返回分段列表。',
+            + '本机没有 ffmpeg 时，长视频会被先拦回来让用户决定要不要装（见 description）；'
+            + '显式传 false 表示只返回分段列表，不再拦。',
         },
         keepSegments: {
           type: 'boolean',
@@ -1885,6 +2011,8 @@ function videoTool(config, deps) {
           merged: { type: 'boolean' },
           mergeMode: { type: 'string' },
           segmentsDir: { type: 'string' },
+          ffmpegMissing: { type: 'boolean' },
+          installHint: { type: 'string' },
           note: { type: 'string' },
           error: { type: 'string' },
           errorCode: { type: 'string' },
@@ -1996,7 +2124,6 @@ function videoTool(config, deps) {
 
       // 多段才需要合成；本机没有 ffmpeg 就直接跳过，别白跑一遍合并再报错。
       const ffmpegReady = completed.length > 1 ? await hasFfmpeg(config, exec?.signal) : true;
-      const ffmpegBinary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
 
       const stamp = fileStamp();
       const outDir = await resolveOutputDir(config, exec, deps);
@@ -2047,13 +2174,14 @@ function videoTool(config, deps) {
       if (!files.length) return result;
 
       if (!ffmpegReady && files.length > 1) {
+        // 缺 ffmpeg 不是失败：分段照样交付，但必须把「怎么装」== 引导 ==交出去。
+        const guide = ffmpegInstallHint(config);
         result.segmentsDir = segmentsDir;
         result.merged = false;
-        notes.push(
-          `本机没有可用的 ffmpeg（${ffmpegBinary}），已跳过合成，只返回分段列表。`
-          + `分段文件已下载到 ${segmentsDir}；`
-          + '装好 ffmpeg（或把 ffmpegBinary 指到绝对路径）后重跑一次即可合并成一条。',
-        );
+        result.ffmpegMissing = true;
+        result.installHint = guide.hint;
+        notes.push(`分段文件都已下载到 ${segmentsDir}。`);
+        notes.push(guide.hint);
         result.note = notes.join('\n');
         return result;
       }
@@ -2079,10 +2207,13 @@ function videoTool(config, deps) {
         result.videoPath = finalPath;
       } catch (failure) {
         if (failure?.code === 'ABORTED') throw failure;
-        const reason = failure?.code === 'ffmpeg_missing'
-          ? `没有找到 ${resolveBinary(config, 'ffmpegBinary', 'ffmpeg')}，分段已保留但没有合并成一个文件；`
-            + '在插件配置里填 ffmpegBinary，或把 ffmpeg 装进 PATH 后重试。'
-          : `分段已生成，但合并失败：${failure?.message || failure}`;
+        let reason = `分段已生成，但合并失败：${failure?.message || failure}`;
+        if (failure?.code === 'ffmpeg_missing') {
+          const guide = ffmpegInstallHint(config);
+          result.ffmpegMissing = true;
+          result.installHint = guide.hint;
+          reason = guide.hint;
+        }
         result.segmentsDir = segmentsDir;
         result.note = [...notes, reason].join('\n');
         return result;
@@ -2389,7 +2520,11 @@ function buildPromptGuidance(config) {
     '· 生成通常要几分钟：单次调用返回 timeout 不等于失败，用 video_status 加 taskId 继续查'
       + '（上游链接约 24 小时内有效），不要重复提交同一段。',
     '· 换中转站、模型、时长等配置用 video_config（写进 profile，宿主重载后生效）；'
-      + '合并需要本机有 ffmpeg；本机缺了就跳过合成，只返回分段列表（每段链接 + 本地文件）。',
+      + '长视频要在本机合并，需要 ffmpeg：本机没装时，插件会先把这次生成拦回来（不产生费用），'
+      + '这时要在对话框里问用户「要不要授权我装 ffmpeg」——按返回的说明说清他的系统与命令，'
+      + '用户同意就用终端工具装（宿主会让他确认）、装完 `ffmpeg -version` 验证，再按原 duration 重发；'
+      + '用户不想装就带 merge:false 重发，插件只返回分段列表（每段链接 + 本地文件），'
+      + '结果里会带 ffmpegMissing=true 与 installHint，照它引导安装即可。',
     `· 当前配置：直出上限 ${singleMax} 秒、每段延长 ${segmentSeconds} 秒。`,
     '· 没有 API Key：让用户在插件设置页点「激活」，用邮箱收验证码领一把（一个邮箱只发一把，'
       + '默认额度 ¥0.01），成功后上游 / Key / 地址 / 模型会自动填好；'

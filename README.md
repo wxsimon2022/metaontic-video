@@ -36,7 +36,39 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 ```
 
 - 提示 `command not found: ffmpeg`：还没装；装了但不在 PATH，就在插件配置里把 `ffmpegBinary` / `ffprobeBinary` 填绝对路径（Mac 上一般是 `/opt/homebrew/bin/ffmpeg`）。
-- 完全没装 ffmpeg 也能出片：分段照常生成并逐段下载好，只是不会去拼接（跳过合成，不报错）。
+
+没装 ffmpeg 的时候该怎么装（挑你系统那一行，复制到终端回车）：
+
+| 系统 | 命令 |
+| --- | --- |
+| macOS（Homebrew） | `brew install ffmpeg` |
+| macOS（还没装 Homebrew） | `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"` |
+| Windows（winget） | `winget install --id Gyan.FFmpeg -e` |
+| Windows（Chocolatey） | `choco install ffmpeg` |
+| Linux（Debian / Ubuntu） | `sudo apt update && sudo apt install -y ffmpeg` |
+| Linux（Fedora / RHEL / CentOS） | `sudo dnf install -y ffmpeg` |
+
+装完重开一个终端，跑 `ffmpeg -version` 有版本号就算好了。
+
+- **没装 ffmpeg 时，长视频会先停下来问你**：15 秒以内的短视频用不到 ffmpeg，照常生成；
+  超过 15 秒的（需要合并成一条）只要你没说「只给分段」，插件会先把这次调用挡下来——
+  还没调用模型、也不花钱——然后在对话框里问你**要不要授权安装 ffmpeg**（附上你系统的命令）。
+  你同意就让它装（Harness 会再让你确认一次），装好会自动接着生成并合并成一条；不想装就说一声，
+  它会改成只生成分段。详见下面「没装 ffmpeg 会怎样」。
+- 插件设置页里也有一张「长视频合并需要 ffmpeg」的卡片：默认显示你这台机器的安装命令，
+  点「复制」就能拿去终端用，点「其他系统」能看全部命令。装在别处的话，把绝对路径填进「ffmpeg 路径」也一样管用。
+
+### 没装 ffmpeg 会怎样
+
+1. 你说「生成一段 20 秒的视频」；
+2. 插件发现本机没有 ffmpeg，而 20 秒要拆成两段再合并——于是**先不调用模型**，
+   直接告诉你：需要 ffmpeg 才能合并成一条，并给出你这台电脑的安装命令（比如 Mac 上就是 `brew install ffmpeg`）；
+3. 问你要不要装。你同意 → Harness 里跑一次安装（会再让你确认一下），装好自动继续生成；
+   你不想装 → 它就只生成并给出分段（每段都有链接和本地文件），不影响出片，只是没有合成的一条。
+4. 之后如果你自己装好了 ffmpeg，**重跑一次**就会自动合并成一条，分段不用重新生成。
+
+已经装了但不在 PATH 里（比如 Mac 手动解压的版本）也不影响：把 `ffmpeg` 的绝对路径填进插件配置的
+「ffmpeg 路径」即可。
 
 另外只要满足两条就能用：
 
@@ -180,7 +212,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | 提示「额度不足」 | Key 的额度用完了，找管理员充值后再试 |
 | 提示「鉴权失败」 | Key 不对或已失效，重新激活一次拿回自己的 Key |
 | 提示「内容审核拒绝」 | 提示词或参考视频里有真人等敏感内容；换素材，或换同一账号下的受信原片 |
-| 提示「没有找到 ffmpeg」 | 电脑没装 ffmpeg；Mac 上执行 `brew install ffmpeg`，装好但不在 PATH 就在配置里填 `ffmpegBinary` 绝对路径 |
+| 生成前问「要不要装 ffmpeg」 | 本机没装 ffmpeg 而这次视频超过 15 秒、需要合并成一条。同意就让它装（附了你能直接复制的命令），不想装就说「只要分段」，它会跳过合并 |
 | 一直显示生成中 | 正常，通常几分钟；说「查一下任务 xxx」继续等 |
 | 成片和想要的不太一样 | 延长/续拍不保证人脸、口型、背景完全一致，多试几次或换提示词 |
 | 时长差一点 | 插件会写清每段实际秒数，必要时调整目标时长或分段秒数 |
@@ -250,8 +282,9 @@ Key、服务地址、模型由「激活」自动写好，正常不用出现在�
 
 - 默认先做**无损拼接**；各段分辨率等参数不一致时自动改走统一重编码（保留音频，必要时退回只并视频）。
 - 每段下载后会探测真实时长，避免把上游返回的整条成片重复拼一遍。
-- 本机没有 ffmpeg 时不会去合成：直接跳过拼接，返回分段的列表（每段的上游链接 + 本地文件），
-  装好 ffmpeg 后重跑一次即可合并成一条。
+- 本机没有 ffmpeg 时：先把这次调用挡下来问你要不要装（不花钱），装好接着生成并合并；
+  你说「只要分段」的话它就不合成，只返回分段列表（每段的上游链接 + 本地文件），
+  同时附上**该装哪个命令**（按你的系统给）——装好后重跑一次就会自动合并成一条。
 
 ## 限制
 
