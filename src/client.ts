@@ -47,7 +47,8 @@ window.__ModuleLoader__.load({
       ffmpegCopied: '已复制',
       ffmpegMore: '其他系统',
       ffmpegLess: '收起其他系统',
-      ffmpegAfter: '装好后重跑一次就会自动合并（不用重新生成）；ffmpeg 装在非默认位置的话，'
+      ffmpegAfter: '不想自己敲命令的话，直接在对话里说「帮我装 ffmpeg」——插件会执行安装（命令会先让你确认）；'
+        + '装好后重跑一次就会自动合并（不用重新生成）。ffmpeg 装在非默认位置的话，'
         + '把绝对路径填到上面的「ffmpeg 路径」也一样管用。安装包自带 ffprobe，分段时长探测会一起解决。',
       ffmpegManual: '想自己装：macOS 用 Homebrew，Windows 用 winget，Linux 用系统包管理器；'
         + '装完确认命令行里能跑 ffmpeg -version 就行。',
@@ -142,9 +143,11 @@ window.__ModuleLoader__.load({
       ffmpegCopied: 'Copied',
       ffmpegMore: 'Other systems',
       ffmpegLess: 'Hide other systems',
-      ffmpegAfter: 'Re-run the generation once it is installed and the merge happens automatically '
-        + '(no need to regenerate). Installed somewhere unusual? Put the absolute path in the "ffmpeg path" '
-        + 'field above. The package ships ffprobe too, so segment probing is fixed at the same time.',
+      ffmpegAfter: 'Rather not touch a terminal? Just say "帮我装 ffmpeg" in the chat and the plugin '
+        + 'runs the install for you (it asks you to confirm the command first). Re-run the generation '
+        + 'afterwards and the merge happens automatically — no need to regenerate. Installed somewhere '
+        + 'unusual? Put the absolute path in the "ffmpeg path" field above. The package ships ffprobe '
+        + 'too, so segment probing is fixed at the same time.',
       ffmpegManual: 'Installing by hand: Homebrew on macOS, winget on Windows, your distro package '
         + 'manager on Linux — you are set once `ffmpeg -version` works in a terminal.',
       registerEmail: 'Email (this is your account)',

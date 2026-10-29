@@ -186,7 +186,7 @@ const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
 const DEFAULT_QUOTA_PER_UNIT = 500000;
 const DEFAULT_USD_EXCHANGE_RATE = 7.3;
 /** 会真正调用视频模型、因而必须人工确认的工具。 */
-const GATED_TOOLS = ['video_generate', 'video_extend'];
+const GATED_TOOLS = ['video_generate', 'video_extend', 'video_setup'];
 
 /**
  * 预估费用的价目表：照抄中转站 /api/pricing 里 seedance 的 billing_expr。
@@ -393,6 +393,8 @@ interface RunOptions {
   signal?: AbortSignal;
   timeoutMs?: number;
   binary?: string;
+  /** 走 shell 执行（安装命令要在 shell 里展开 PATH、参数与管道）。 */
+  shell?: boolean;
 }
 
 /** 一次任务跑完的结果（上游是动态 JSON，这里只声明我们会读的字段）。 */
@@ -616,6 +618,12 @@ function resolveBinary(config, key, fallback) {
   return String(ref(config, key, '')).trim() || fallback;
 }
 
+/** 命令输出的末尾若干字符：安装日志很长，只留最后一截给用户看。 */
+function tail(text, limit = 600) {
+  const clean = String(text || '').trim();
+  return clean.length > limit ? `…${clean.slice(-limit)}` : clean;
+}
+
 function formatSeconds(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return String(value ?? '');
@@ -686,12 +694,12 @@ async function exists(file) {
 async function runProcess(
   binary: string,
   args: string[],
-  { signal, timeoutMs = 1800000 }: RunOptions = {},
+  { signal, timeoutMs = 1800000, shell = false }: RunOptions = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     let child;
     try {
-      child = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      child = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'], ...(shell ? { shell: true } : {}) });
     } catch (error) {
       reject(Object.assign(new Error(`${binary} 无法启动：${error?.message || error}`), {
         code: 'ffmpeg_missing',
@@ -762,6 +770,10 @@ function currentPlatform(): string {
   }
 }
 
+/** macOS 上连 Homebrew 都没有时的第一步。 */
+const HOMEBREW_BOOTSTRAP = '/bin/bash -c "$(curl -fsSL '
+  + 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"';
+
 /**
  * 按操作系统给出 ffmpeg 的安装方式。
  * 只给「装一次就完事」的官方渠道：macOS 走 Homebrew，Windows 走 winget（备选 choco），
@@ -775,9 +787,11 @@ function ffmpegInstallOptions(platform = currentPlatform()) {
         { label: 'macOS（Homebrew）', command: 'brew install ffmpeg' },
         {
           label: 'macOS（还没装 Homebrew 就先装它）',
-          command: '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+          command: HOMEBREW_BOOTSTRAP,
         },
       ],
+      // 连包管理器都没有时的前置步骤（macOS 才有）
+      bootstrap: { label: 'macOS（先装 Homebrew）', command: HOMEBREW_BOOTSTRAP },
     };
   }
   if (platform === 'win32') {
@@ -787,6 +801,7 @@ function ffmpegInstallOptions(platform = currentPlatform()) {
         { label: 'Windows（winget）', command: 'winget install --id Gyan.FFmpeg -e' },
         { label: 'Windows（Chocolatey）', command: 'choco install ffmpeg' },
       ],
+      bootstrap: null,
     };
   }
   return {
@@ -798,7 +813,35 @@ function ffmpegInstallOptions(platform = currentPlatform()) {
       },
       { label: 'Linux（Fedora / RHEL / CentOS）', command: 'sudo dnf install -y ffmpeg' },
     ],
+    bootstrap: null,
   };
+}
+
+/** ffmpeg 装完常常不立刻进 PATH；这几个常见位置也找一遍，好让用户直接填进 ffmpegBinary。 */
+function commonFfmpegPaths(platform = currentPlatform()) {
+  if (platform === 'darwin') return ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg'];
+  if (platform === 'win32') return [];
+  return ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/snap/bin/ffmpeg'];
+}
+
+/** 探一次可执行文件版本，返回首行（拿不到返回 null）。 */
+async function probeBinaryVersion(binary, signal) {
+  try {
+    const { code, stdout, stderr } = await runProcess(binary, ['-version'], { signal, timeoutMs: 20000 });
+    if (code !== 0) return null;
+    const line = String(stdout || stderr).split('\n').map((item) => item.trim()).filter(Boolean)[0];
+    return line || 'ok';
+  } catch {
+    return null;
+  }
+}
+
+/** 装完之后在常见位置里找一次 ffmpeg：找到就把绝对路径交出去。 */
+async function findInstalledFfmpeg(signal) {
+  for (const candidate of commonFfmpegPaths()) {
+    if (await probeBinaryVersion(candidate, signal)) return candidate;
+  }
+  return null;
 }
 
 /**
@@ -817,7 +860,7 @@ function ffmpegInstallHint(config) {
     '装好后重跑这次生成，分段会自动合并成一条，不用重新生成；'
       + '如果 ffmpeg 已经装了但不在默认位置，把它的绝对路径填到插件设置里的「ffmpeg 路径」也一样管用。',
     'ffmpeg 的安装包里自带 ffprobe，装完分段探测也一起好了。',
-    '需要我帮你执行安装命令的话说一声，我来跑（执行前会让你确认）。',
+    '想让我来装就说一声 —— 我会用 video_setup 执行安装（执行前宿主会先让你确认命令）。',
   ];
   return { binary, os, installs, hint: lines.join('\n') };
 }
@@ -1351,6 +1394,40 @@ function planSummary(estimate) {
 }
 
 /**
+ * 装 ffmpeg 前的确认：安装命令要在本机跑，必须让用户先看清楚是什么、再决定装不装。
+ * （只检查不安装的调用直接放行，不用打扰用户。）
+ */
+function setupGate(ctx, exec) {
+  const args = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : {};
+  if (args?.install !== true) return { kind: 'allow' };
+
+  const { os, installs, bootstrap } = ffmpegInstallOptions();
+  const command = String(args?.target || 'ffmpeg') === 'package-manager' && bootstrap
+    ? bootstrap.command
+    : installs[0].command;
+
+  if (approvalPolicy(ctx, exec) === 'never') {
+    return {
+      kind: 'deny',
+      reason: '当前权限模式关闭了审批提示（完全访问），装环境这种会在本机跑命令的操作没法确认，已停止。'
+        + '把权限切到「工作区写入」或「只读」后再让我装；也可以照着这条命令自己在终端执行：'
+        + `${command}（${os}）。`,
+    };
+  }
+
+  return {
+    kind: 'ask',
+    reason: `人工确认：在 ${os} 上执行安装命令「${command}」。`,
+    displayReason: {
+      zh: `准备在这台电脑上装 ffmpeg：${command}（${os}）。`
+        + '点了「允许」才会执行，装完会自动接着把视频生成出来。',
+      en: `About to install ffmpeg on this machine: ${command} (${os}). `
+        + 'It runs only after you allow it; the video generation continues right after.',
+    },
+  };
+}
+
+/**
  * 要合并的长视频遇上「本机没有 ffmpeg」：不往下走，把这次调用退回去，
  * 让模型在对话框里和用户确认「要不要现在装 ffmpeg」——同意就装（宿主会弹审批），
  * 不想装就带 merge:false 重发，只拿分段列表。
@@ -1382,8 +1459,10 @@ async function ffmpegConsentGate(config, exec, args) {
     '请在对话框里先和用户确认，不要自己绕过这一步：',
     `1) 问用户要不要现在装 ffmpeg —— 说清他的系统（${os}）和命令：${command}`,
     '   （装好后重跑这次生成就会自动合并成一条，分段不用重新生成）。',
-    '2) 用户同意安装：用 shell/终端工具执行上面的命令（宿主会让他确认一次），'
-      + '装完跑 `ffmpeg -version` 确认成功，再重新调用 video_generate（duration 不变）继续生成。',
+    '2) 用户同意安装：调用 video_setup（install:true）——插件会执行上面的命令，'
+      + '宿主会先把这条命令拿给用户确认；装完它会自己验证，成功后你按原 duration 重新调用 '
+      + 'video_generate 继续生成即可（一般是先装包管理器：本机连 brew 都没有时，'
+      + 'video_setup 会返回 nextStep，用 target:"package-manager" 再装一次）。',
     '3) 用户不想装、或者装不了：带 `merge:false` 重新调用 video_generate，'
       + '插件就只生成并返回分段列表（每段链接 + 本地文件），这次不会再拦。',
     '已经装过但不在默认位置的话，把绝对路径填进插件设置里的「ffmpeg 路径」也一样管用；'
@@ -1405,6 +1484,9 @@ async function ffmpegConsentGate(config, exec, args) {
  * - 其余情况：返回 ask，宿主弹审批面板给用户看预估费用，点「允许」才会执行。
  */
 async function preflightGate(ctx, config, exec) {
+  // 装环境：只有真要装的时候才拦（让用户先看到命令）；纯检查放行。
+  if (exec.name === 'video_setup') return setupGate(ctx, exec);
+
   if (approvalPolicy(ctx, exec) === 'never') {
     return {
       kind: 'deny',
@@ -2237,6 +2319,192 @@ function videoTool(config, deps) {
   };
 }
 
+/**
+ * `video_setup` —— 检查本机跑不跑得动 ffmpeg，缺了就由插件来装。
+ *
+ * 存在的意义：长视频合并要 ffmpeg，而「在对话框里问一句要不要装」光靠模型没法落地
+ * （模型不一定有终端工具、也不一定敢自己跑安装命令）。所以给一个工具：
+ * 用户同意后由插件执行安装（install=true 会走审批卡口，让用户先看到完整命令），
+ * 装完自己再验证一次，并告诉模型「现在重跑生成就会自动合并」。
+ */
+function setupTool(config) {
+  return {
+    name: 'video_setup',
+    description:
+      '检查本机有没有 ffmpeg（生成超过 15 秒的视频时，合并成一条要用它），缺了就装。'
+      + 'install=true 表示「用户已经同意安装」，插件会执行安装命令并验证——'
+      + '命令会先拿给用户确认，用户点了允许才执行。'
+      + '装不上（例如本机连包管理器都没有）会返回手动安装步骤和一个 nextStep。'
+      + '用户说「帮我装 ffmpeg」「检查一下环境」时用它；只有确实要装才传 install=true。',
+    parameters: {
+      type: 'object',
+      properties: {
+        install: {
+          type: 'boolean',
+          description: '是否执行安装，默认 false（只检查、只汇报，不动本机）。',
+        },
+        target: {
+          type: 'string',
+          enum: ['ffmpeg', 'package-manager'],
+          description: 'install=true 时装什么：ffmpeg（默认）或先装包管理器（macOS 的 Homebrew）。',
+        },
+      },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: {
+          status: { type: 'string' },
+          os: { type: 'string' },
+          ffmpegVersion: { type: 'string' },
+          ffmpegPath: { type: 'string' },
+          ffprobeVersion: { type: 'string' },
+          installCommand: { type: 'string' },
+          manualSteps: { type: 'array', items: { type: 'string' } },
+          output: { type: 'string' },
+          note: { type: 'string' },
+        },
+      },
+      render(_args, value) {
+        const {
+          status, os, ffmpegVersion, ffmpegPath, ffprobeVersion, installCommand, output, note,
+        } = value || {};
+        const lines = [];
+        if (status === 'ready') {
+          lines.push('本机环境没问题：ffmpeg 已经能用了，长视频可以直接合并成一条。');
+        } else if (status === 'installed') {
+          lines.push('ffmpeg 装好了，长视频现在可以合并成一条。');
+        } else if (status === 'missing') {
+          lines.push('本机还没有 ffmpeg：生成超过 15 秒的视频时只能给分段，没法合并成一条。');
+          lines.push(`装一下就好（${os || '当前系统'}）：${installCommand || ''}`);
+          lines.push('用户同意的话，我可以用 video_setup（install=true）直接帮他装。');
+        } else if (status === 'failed') {
+          lines.push('ffmpeg 没装成功，得手动装一下。');
+          lines.push(`手动步骤：${note || installCommand || ''}`);
+        } else {
+          lines.push(`环境检查结果：${status || '未知'}。`);
+        }
+        if (ffmpegVersion) lines.push(`ffmpeg：${ffmpegVersion}`);
+        if (ffmpegPath) lines.push(`ffmpeg 路径：${ffmpegPath}（可以填进插件设置里的「ffmpeg 路径」）`);
+        if (ffprobeVersion) lines.push(`ffprobe：${ffprobeVersion}`);
+        if (status !== 'ready' && status !== 'installed' && installCommand && status === 'failed') {
+          lines.push(`命令：${installCommand}`);
+        }
+        if (output) lines.push(`安装输出（末尾）：${output}`);
+        if (note) lines.push(note);
+        return [{ type: 'text', text: lines.filter(Boolean).join('\n') }];
+      },
+    },
+    // 装 ffmpeg 可能要下载几十 MB，给足时间；装完还要再验证一次。
+    timeoutMs: 20 * 60 * 1000,
+    isConcurrencySafe() {
+      return false;
+    },
+    async execute(args, exec) {
+      const signal = exec?.signal;
+      const binary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
+      const probeBinary = resolveBinary(config, 'ffprobeBinary', 'ffprobe');
+      const { os, installs, bootstrap } = ffmpegInstallOptions();
+      const wantsInstall = args?.install === true;
+      const target = String(args?.target || 'ffmpeg');
+      const manualSteps = installs.map((item) => `${item.label}：${item.command}`);
+      const installCommand = target === 'package-manager' && bootstrap
+        ? bootstrap.command
+        : installs[0].command;
+
+      const ffmpegVersion = await probeBinaryVersion(binary, signal);
+      const ffprobeVersion = await probeBinaryVersion(probeBinary, signal);
+      const base = { os, installCommand, manualSteps, ffmpegVersion, ffprobeVersion };
+
+      // 已经能用了：只汇报，顺便提醒 ffprobe 的情况（分段时长探测用它）
+      if (ffmpegVersion) {
+        const note = ffprobeVersion
+          ? 'ffmpeg 与 ffprobe 都可用，长视频会正常合并成一条。'
+          : 'ffmpeg 可用；没有 ffprobe，分段时长探测会被跳过（不影响合并）。';
+        return { status: 'ready', ...base, ffmpegPath: binary, note };
+      }
+
+      // 只检查：把安装方式交出去，等用户点头
+      if (!wantsInstall) {
+        return {
+          status: 'missing',
+          ...base,
+          note: `本机 ${binary} 跑不起来。用户同意后可以 install=true 让我来装；`
+            + '也有可能是路径不对：已经装过就把绝对路径填进插件设置里的「ffmpeg 路径」。',
+        };
+      }
+
+      // 用户已经同意：真的执行安装命令，跑完再验证一次
+      let output = '';
+      try {
+        const shellCommand = target === 'package-manager' && bootstrap
+          ? bootstrap.command
+          : (target === 'package-manager' && !bootstrap
+            ? null
+            : installs[0].command);
+        if (!shellCommand) {
+          return {
+            status: 'failed',
+            ...base,
+            note: `${os} 不需要另外装包管理器，直接用系统自带的包管理器装 ffmpeg 就行。`,
+          };
+        }
+        const result = await runProcess(shellCommand, [], {
+          signal,
+          shell: true,
+          timeoutMs: 18 * 60 * 1000,
+        });
+        output = tail(String(result.stdout || '') + String(result.stderr || ''), 800);
+      } catch (error) {
+        output = tail(error?.message || String(error), 800);
+      }
+
+      const afterVersion = await probeBinaryVersion(binary, signal);
+      if (afterVersion) {
+        return {
+          status: 'installed',
+          ...base,
+          ffmpegVersion: afterVersion,
+          ffmpegPath: binary,
+          output,
+          note: '装好了：直接重跑刚才那次生成就会自动合并成一条（分段不用重新生成）。',
+        };
+      }
+
+      // PATH 还没刷新时，ffmpeg 往往已经落在常见位置里，找出来让用户填配置
+      const found = await findInstalledFfmpeg(signal);
+      if (found) {
+        return {
+          status: 'installed',
+          ...base,
+          ffmpegVersion: await probeBinaryVersion(found, signal),
+          ffmpegPath: found,
+          output,
+          note: `装好了，但没进 PATH：把 ${found} 填进插件设置里的「ffmpeg 路径」`
+            + '（或者重开一个终端再重跑一次生成）。',
+        };
+      }
+
+      const needsBootstrap = Boolean(bootstrap) && !ffmpegVersion
+        && /command not found|not found|不是内部或外部命令|未找到/i.test(output);
+      return {
+        status: 'failed',
+        ...base,
+        installCommand: needsBootstrap ? bootstrap.command : installs[0].command,
+        manualSteps: needsBootstrap
+          ? [`先装包管理器：${bootstrap.command}`, ...manualSteps]
+          : manualSteps,
+        output,
+        note: needsBootstrap
+          ? `本机没有 ${os} 的包管理器，得先装它：${bootstrap.command}；装好之后再装 ffmpeg。`
+            + '这两步都可以让我来做 —— 说一声就行。'
+          : '安装命令没成功（可能是没权限、没联网或被安全策略拦下）。'
+            + '上面是手动步骤，照着在终端里跑一遍即可。',
+      };
+    },
+  };
+}
+
 function taskTool(config) {
   return {
     name: 'video_status',
@@ -2527,10 +2795,14 @@ function buildPromptGuidance(config) {
       + '每段 4-15 秒，默认按上限拆、段数最少。',
     '· 生成通常要几分钟：单次调用返回 timeout 不等于失败，用 video_status 加 taskId 继续查'
       + '（上游链接约 24 小时内有效），不要重复提交同一段。',
+    '· 环境有问题（缺 ffmpeg 装不上、想确认能不能合并）用 video_setup：默认只检查，'
+      + 'install:true 才会真装；装命令会先给用户确认，装完自动验证。'
+      + '用户说「帮我装 ffmpeg」时就用它，别自己拼命令行。',
     '· 换中转站、模型、时长等配置用 video_config（写进 profile，宿主重载后生效）；'
       + '长视频要在本机合并，需要 ffmpeg：本机没装时，插件会先把这次生成拦回来（不产生费用），'
       + '这时要在对话框里问用户「要不要授权我装 ffmpeg」——按返回的说明说清他的系统与命令，'
-      + '用户同意就用终端工具装（宿主会让他确认）、装完 `ffmpeg -version` 验证，再按原 duration 重发；'
+      + '用户同意就调用 video_setup（install:true）由插件来装（宿主会先让他确认那条命令），'
+      + '装完它会自己验证，再按原 duration 重发；'
       + '用户不想装就带 merge:false 重发，插件只返回分段列表（每段链接 + 本地文件），'
       + '结果里会带 ffmpegMissing=true 与 installHint，照它引导安装即可。',
     `· 当前配置：直出上限 ${singleMax} 秒、每段延长 ${segmentSeconds} 秒。`,
@@ -2555,6 +2827,7 @@ export function apply(ctx: DshContext, config: any = {}) {
     ctx.tools.register(jsonSafeTool(videoTool(config, deps))),
     ctx.tools.register(jsonSafeTool(extendTool(config))),
     ctx.tools.register(jsonSafeTool(taskTool(config))),
+    ctx.tools.register(jsonSafeTool(setupTool(config))),
   ];
   // 配置工具依赖宿主的 settings 服务；没有该服务时插件其余功能照常可用。
   const cleanup = ctx.inject(['settings'], (settingsCtx) => {
@@ -2584,6 +2857,17 @@ export function apply(ctx: DshContext, config: any = {}) {
         return await preflightGate(ctx, config, exec);
       } catch (error) {
         const message = error?.message || String(error);
+        if (exec.name === 'video_setup') {
+          const command = ffmpegInstallOptions().installs[0].command;
+          return {
+            kind: 'ask',
+            reason: `人工确认：准备执行安装命令「${command}」（预检本身出错：${message}）。`,
+            displayReason: {
+              zh: `准备在这台电脑上装 ffmpeg：${command}。点了「允许」才会执行。`,
+              en: `About to install ffmpeg on this machine: ${command}. It runs only after you allow it.`,
+            },
+          };
+        }
         return {
           kind: 'ask',
           reason: `人工确认：调用视频模型（预估费用没算出来：${message}）。`,
