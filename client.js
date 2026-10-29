@@ -206,12 +206,6 @@ window.__ModuleLoader__.load({
     /** 注册接口的握手请求头 X-Register-Token：与服务端 REGISTER_CLIENT_TOKEN 一致。 */
     const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
 
-    /** 服务地址：配置里有就用配置的（老版本固定写死，这里保留兜底）。 */
-    function registerApiRoot() {
-      const configured = String(value.registerApi || '').trim();
-      return (configured || DEFAULT_REGISTER_API).replace(/\/+$/, '');
-    }
-
     /** 金额显示与中转站一致：|x| ≥ 1 保留 2 位小数，否则保留 4 位，末尾多余的 0 去掉。 */
     function formatMoney(value) {
       const number = Number(value);
@@ -295,6 +289,8 @@ window.__ModuleLoader__.load({
         React.useEffect(() => {
           if (restoreTried.current) return;
           restoreTried.current = true;
+          // 设备凭据同步进配置：主进程要在调用模型前拿它查余额
+          syncDeviceIdentity().catch(() => {});
           const snap = form.getSnapshot() || {};
           if (snap.secrets?.apiKey || (snap.value || {}).apiKey) {
             loadQuota().catch(() => {});
@@ -339,6 +335,13 @@ window.__ModuleLoader__.load({
           for (const key of overridden) await form.unset(key);
           setDraft({});
           setStatus('saved');
+        }
+
+        /** 本机身份：本地持久化的设备标识 + 设备密钥，注册时一起交给服务端做绑定。 */
+        /** 服务地址：配置里有就用配置的（老版本固定写死，这里保留兜底）。 */
+        function registerApiRoot() {
+          const configured = String(value.registerApi || '').trim();
+          return (configured || DEFAULT_REGISTER_API).replace(/\/+$/, '');
         }
 
         /** 本机身份：本地持久化的设备标识 + 设备密钥，注册时一起交给服务端做绑定。 */
@@ -390,6 +393,36 @@ window.__ModuleLoader__.load({
           return platform ? `Harness-${platform}` : 'Harness';
         }
 
+        /**
+         * 设备凭据（设备标识 + 设备密钥）要同步进插件配置。
+         *
+         * 生成视频前，主进程那侧的工具会拿它去服务端查这把 Key 的剩余额度
+         * （额度不够就禁止调用），而设备凭据平时只存在浏览器 localStorage 里，
+         * 主进程读不到，所以这里写一份到配置里。值与配置一致时不重复写。
+         */
+        function deviceWrites(device) {
+          const identity = device || deviceIdentity();
+          const current = form.getSnapshot().value || {};
+          const writes = [];
+          if (!same(current.deviceId, identity.id)) writes.push(['deviceId', identity.id]);
+          if (!same(current.deviceSecret, identity.secret)) {
+            writes.push(['deviceSecret', identity.secret]);
+          }
+          return writes;
+        }
+
+        /** 进设置页时补一次设备凭据（老版本没存过，注册过的人不用重新领 Key）。 */
+        async function syncDeviceIdentity() {
+          try {
+            for (const [key, next] of deviceWrites()) {
+              const accepted = await form.set(key, next);
+              if (accepted) clear(key);
+            }
+          } catch {
+            // 写不进配置不影响注册与查额度，只是调用前没法自动校验余额
+          }
+        }
+
         /** 取注册服务的 JSON：后端是 {code, data, message} 信封，这里拆开并统一抛错。 */
         async function callRegister(url, init) {
           const controller = typeof AbortController === 'function' ? new AbortController() : null;
@@ -429,10 +462,11 @@ window.__ModuleLoader__.load({
         }
 
         /** 把服务端给的那把密钥写回配置（注册、取回都走这里）。 */
-        async function applyRegistration(result, fallbackBase) {
+        async function applyRegistration(result, fallbackBase, device) {
           const writes = [
             ['apiKey', result.api_key],
             ['baseUrl', result.base_url || fallbackBase || registerApiRoot()],
+            ...await deviceWrites(device),
           ];
           // 邮箱是账号：存回本地，方便下次认出「这台机器绑的是哪个邮箱」；
           // 中转站里的密钥名由服务端生成唯一串，与邮箱的绑定关系在服务端。
@@ -460,7 +494,7 @@ window.__ModuleLoader__.load({
             body: JSON.stringify({ device_id: device.id, device_secret: device.secret }),
           });
           if (!result.api_key) throw new Error(t('registerNoKey'));
-          await applyRegistration(result, null);
+          await applyRegistration(result, null, device);
           setRegisterStatus('restored');
           return result;
         }
@@ -556,7 +590,7 @@ window.__ModuleLoader__.load({
               setRegisterMessage(t('registerNoKey'));
               return;
             }
-            await applyRegistration(result, status.base_url || root);
+            await applyRegistration(result, status.base_url || root, device);
           } catch (error) {
             // 本机早就领过了（或本地密钥丢了）：直接把自己那把取回来
             if (error?.status === 409 || error?.status === 404) {
@@ -725,21 +759,16 @@ window.__ModuleLoader__.load({
             : (registerStatus === 'restored'
               ? t('registerRestored')
               : registerMessage));
-        // 金额按服务端给的币种符号展示（当前服务端是中转站口径的人民币 ¥）；
-        // 老服务端只回 *_usd 字段时退回 $，两边都能看清是多少钱。
-        const quotaSymbol = quota && quota.currency_symbol
-          ? quota.currency_symbol
-          : (quota && quota.remain_amount !== undefined ? '¥' : '$');
-        const money = (field, legacyField) => {
-          const raw = quota ? (quota[field] ?? quota[legacyField]) : 0;
-          return `${quotaSymbol}${(Number(raw) || 0).toFixed(4)}`;
-        };
+        // 额度一律显示人民币：服务端已经按中转站的口径换算好（额度 / 500000 × 7.3），
+        // 这里只负责拼符号与位数（与中转站一致：够 1 元保留 2 位，不到保留 4 位）。
+        const quotaSymbol = quota && quota.currency_symbol ? quota.currency_symbol : '¥';
+        const money = (field) => `${quotaSymbol}${formatMoney(quota ? quota[field] : 0)}`;
         const quotaReady = quotaStatus === 'ok' && quota;
         const quotaText = quotaReady
           ? `${t('quotaSummary', {
-            remain: quota.unlimited_quota ? t('quotaUnlimited') : money('remain_amount', 'remain_usd'),
-            used: money('used_amount', 'used_usd'),
-            total: money('total_amount', 'total_usd'),
+            remain: quota.unlimited_quota ? t('quotaUnlimited') : money('remain_amount'),
+            used: money('used_amount'),
+            total: money('total_amount'),
           })} · ${t('quotaUpdatedAt', { time: quotaAt })}`
           : (keyReady ? t('quotaLoading') : t('quotaNoKey'));
         const quotaBox = h('div', {
@@ -798,7 +827,7 @@ window.__ModuleLoader__.load({
           ? (usageRows.length
             ? `${t('usageSummary', {
               count: usage.count,
-              amount: `${usageSymbol}${(Number(usage.amount_sum) || 0).toFixed(4)}`,
+              amount: `${usageSymbol}${formatMoney(usage.amount_sum)}`,
             })}${usage.truncated ? ` · ${t('usageMore', { count: usage.count })}` : ''}`
             : t('usageEmpty'))
           : (usageStatus === 'working' ? t('usageLoading') : t('usageKeyMissing'));
@@ -876,7 +905,7 @@ window.__ModuleLoader__.load({
               key: 'amount',
               'data-field': 'usage-amount',
               style: { color: row.status === 'succeeded' ? TOKENS.success : TOKENS.muted, width: 86 },
-            }, `${usageSymbol}${(Number(row.amount) || 0).toFixed(4)}`),
+            }, `${usageSymbol}${formatMoney(row.amount)}`),
             h('span', {
               key: 'status',
               style: { color: row.status === 'succeeded' ? TOKENS.success : TOKENS.error },
