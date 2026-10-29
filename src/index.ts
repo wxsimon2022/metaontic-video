@@ -48,7 +48,14 @@ export const Config = z.object({
     .volatile(),
   apiKey: z.string()
     .default('')
-    .description('API Key；留空时读环境变量 NEWAPI_API_KEY（也可以直接用设置页的「注册」按钮领一把）')
+    .description(
+      'API Key：只在设置页点「激活」时由服务端下发并直接写进配置，不支持手填、'
+      + '也不读环境变量；手改这里的值会被拒绝调用',
+    )
+    .volatile(),
+  keyOrigin: z.string()
+    .default('')
+    .description("密钥来源标记：设置页「激活」成功后写入 'register'，插件只认服务端下发的 Key")
     .volatile(),
   baseUrl: z.string()
     .default('')
@@ -182,6 +189,8 @@ const CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5;
 const DEFAULT_REGISTER_API = 'https://video.mybfs.cn';
 /** 服务端握手头的兜底值（与服务端 REGISTER_CLIENT_TOKEN 对齐）。 */
 const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
+/** 密钥来源标记：设置页「激活」成功后写进配置，表示这把 Key 是服务端下发的。 */
+const KEY_ORIGIN_REGISTER = 'register';
 /** 额度/汇率兜底：服务端会回真实值，只有拿不到时才用这两个。 */
 const DEFAULT_QUOTA_PER_UNIT = 500000;
 const DEFAULT_USD_EXCHANGE_RATE = 7.3;
@@ -211,7 +220,6 @@ const RELAY_PRESET = {
     submitPath: '/doubao/api/v3/contents/generations/tasks',
     queryPath: '/doubao/api/v3/contents/generations/tasks/{task_id}',
     model: DEFAULT_MODEL,
-    keyEnv: ['NEWAPI_API_KEY'],
     baseEnv: ['NEWAPI_VIDEO_BASE_URL', 'NEWAPI_BASE_URL'],
   modelEnv: ['NEWAPI_VIDEO_MODEL'],
 };
@@ -279,7 +287,22 @@ function envValue(names) {
 }
 
 function resolveApiKey(config) {
-  return String(ref(config, 'apiKey', '')).trim() || envValue(relayPreset().keyEnv);
+  // 只认配置里那一把——它只能由设置页「激活」时服务端下发写入，
+  // 不读环境变量、也不认手填，避免用到没绑设备 / 没额度的野 Key。
+  return String(ref(config, 'apiKey', '')).trim();
+}
+
+/**
+ * 这把 Key 是不是服务端下发的。
+ *
+ * 激活成功后设置页会写 keyOrigin=register；更早的版本没写这个标记，
+ * 用「设备凭据 + 邮箱」兜底认出来（这两项也只有激活流程会写）。
+ */
+function isServerIssuedKey(config) {
+  if (String(ref(config, 'keyOrigin', '')).trim() === KEY_ORIGIN_REGISTER) return true;
+  return Boolean(String(ref(config, 'deviceId', '')).trim())
+    && Boolean(String(ref(config, 'deviceSecret', '')).trim())
+    && Boolean(String(ref(config, 'registerEmail', '')).trim());
 }
 
 function resolveBaseUrl(config) {
@@ -332,14 +355,20 @@ function parseExtraParams(config) {
 function assertConfigured(config, apiKey) {
   if (!apiKey) {
     throw new Error(
-      '未配置 API Key：请在插件设置页点「激活」领一把，或在插件 config 里填 apiKey，'
-      + '或设置环境变量 NEWAPI_API_KEY。',
+      '未配置 API Key：打开「插件 → 已安装插件 → MetaOnticVideo → 查看」，点「激活」领一把——'
+      + '服务端会把 Key、上游地址和模型直接写进配置，不用手填。',
+    );
+  }
+  if (!isServerIssuedKey(config)) {
+    throw new Error(
+      '当前 apiKey 不是服务端下发的，插件拒绝调用：密钥只能在插件详情页点「激活」由服务端下发。'
+      + '同一个邮箱再激活一次会把原来那把还给你，不会多开一把。',
     );
   }
   if (!resolveBaseUrl(config)) {
     throw new Error(
-      '未配置 baseUrl：用中转站时填中转站地址（如 https://ai.bileego.com），'
-      + '或设置环境变量 NEWAPI_VIDEO_BASE_URL / NEWAPI_BASE_URL。',
+      '未配置 baseUrl：正常由「激活」时服务端下发中转站地址；'
+      + '缺失时请重新激活，或检查设置页里的上游地址。',
     );
   }
 }
@@ -2613,6 +2642,12 @@ const CONFIG_FIELDS = [
   'registerUser', 'registerEmail', 'registerApi', 'deviceId', 'estimateGroupRatio',
 ];
 
+/**
+ * 只读字段：密钥一律由服务端在「激活」时下发写入，页面和工具都不许改，
+ * 免得手填一把没绑设备、查不到额度的 Key 出去瞎调。
+ */
+const READ_ONLY_CONFIG_FIELDS = new Set(['apiKey', 'keyOrigin', 'deviceId', 'deviceSecret']);
+
 function maskSecrets(view) {
   return {
     ...view,
@@ -2632,9 +2667,10 @@ function configView(config) {
       submitPath: resolveSubmitPath(config),
       queryPath: String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath,
       model: resolveModel(config),
+      // 密钥只有一种合法来源：设置页「激活」时服务端下发
       apiKeySource: ref(config, 'apiKey', '')
-        ? 'config'
-        : (resolveApiKey(config) ? 'env' : 'missing'),
+        ? (isServerIssuedKey(config) ? 'register' : 'unverified')
+        : 'missing',
     },
   };
 }
@@ -2660,10 +2696,12 @@ function configTool(config, settings) {
   return {
     name: 'video_config',
     description:
-      '读取或修改 MetaOnticVideo 插件自己的配置（apiKey、baseUrl、submitPath、'
-      + 'queryPath、model、duration、singleMaxSeconds、mode、resolution、ratio、generateAudio、'
+      '读取或修改 MetaOnticVideo 插件自己的配置（baseUrl、submitPath、queryPath、model、'
+      + 'duration、singleMaxSeconds、mode、resolution、ratio、generateAudio、'
       + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、outputDir、keepSegments、'
       + 'ffmpegBinary、ffprobeBinary、registerEmail、registerApi、estimateGroupRatio）。'
+      + 'apiKey 只能由设置页「激活」时服务端下发，这里只能看、不能改；'
+      + '用户要换 Key 就让他去插件详情页点「激活」。'
       + '改动写进 profile 的 cordis.patch.yml，'
       + '宿主重载后生效。'
       + '用户说「把中转站地址/模型/时长改成 X」时用 action=set，看当前值用 action=get；'
@@ -2676,7 +2714,6 @@ function configTool(config, settings) {
           enum: ['get', 'set'],
           description: 'get=查看当前配置；set=修改配置（至少给一个要改的字段）。',
         },
-        apiKey: { type: 'string', description: 'API Key（配置里留空时自动读环境变量）。' },
         baseUrl: { type: 'string', description: '基础地址，例如 https://ai.bileego.com（中转站）或官方地址。' },
         registerEmail: { type: 'string', description: '领 Key 用的邮箱（账号）；注册要邮箱验证码，一个邮箱只发一把。' },
         registerApi: { type: 'string', description: '插件服务地址（领 Key / 查额度 / 使用记录）；留空用内置域名。' },
@@ -2739,7 +2776,11 @@ function configTool(config, settings) {
             .map(([key, field]) => `  ${key}: ${typeof field === 'object' ? JSON.stringify(field) : field}`),
           `生效值：baseUrl=${effective?.baseUrl} model=${effective?.model}`,
           `  submitPath=${effective?.submitPath}`,
-          `  apiKey 来源：${effective?.apiKeySource}`,
+          `  apiKey 来源：${{
+            register: '服务端下发（激活写入）',
+            unverified: '非服务端下发——调用会被拒绝，请到设置页点「激活」',
+            missing: '未配置——请到设置页点「激活」',
+          }[effective?.apiKeySource] || effective?.apiKeySource}`,
           patchPath ? `配置文件：${patchPath}` : '',
           patch && Object.keys(patch).length ? '改动会在宿主重载配置后生效。' : '',
         ].filter(Boolean);
@@ -2761,9 +2802,16 @@ function configTool(config, settings) {
       if (action !== 'set') {
         throw new Error('action 只能是 get 或 set。');
       }
+      const readonly = Object.keys(args || {}).filter((key) => READ_ONLY_CONFIG_FIELDS.has(key));
+      if (readonly.length) {
+        throw new Error(
+          `${readonly.join('、')} 由服务端在「激活」时下发，不能手动改；`
+          + '要换 Key 请在「插件 → 已安装插件 → MetaOnticVideo → 查看」点「激活」重新领取。',
+        );
+      }
       const patch = {};
       for (const key of CONFIG_FIELDS) {
-        if (args?.[key] !== undefined) patch[key] = args[key];
+        if (args?.[key] !== undefined && !READ_ONLY_CONFIG_FIELDS.has(key)) patch[key] = args[key];
       }
       if (!Object.keys(patch).length) {
         throw new Error('set 需要至少一个要修改的字段（如 baseUrl、model、duration）。');
@@ -2805,7 +2853,9 @@ function buildPromptGuidance(config) {
     '· 环境有问题（缺 ffmpeg 装不上、想确认能不能合并）用 video_setup：默认只检查，'
       + 'install:true 才会真装；装命令会先给用户确认，装完自动验证。'
       + '用户说「帮我装 ffmpeg」时就用它，别自己拼命令行。',
-    '· 换中转站、模型、时长等配置用 video_config（写进 profile，宿主重载后生效）；'
+    '· 换模型、时长等配置用 video_config（写进 profile，宿主重载后生效）；'
+      + '但 apiKey 例外：它只能由服务端在「激活」时下发，不要手填、也不要让用户手填，'
+      + '缺 Key 或提示「不是服务端下发的」时，就引导用户去插件详情页点「激活」。'
       + '长视频要在本机合并，需要 ffmpeg：本机没装时，插件会先把这次生成拦回来（不产生费用），'
       + '这时要在对话框里问用户「要不要授权我装 ffmpeg」——按返回的说明说清他的系统与命令，'
       + '用户同意就调用 video_setup（install:true）由插件来装（宿主会先让他确认那条命令），'

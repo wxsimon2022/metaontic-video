@@ -190,7 +190,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 | `video_extend` | 把已有视频往后续拍或往前补一段 |
 | `video_setup` | 检查本机有没有 ffmpeg；你说「帮我装 ffmpeg」时由它执行安装（命令会先给你确认） |
 | `video_status` | 按任务 ID 查进度、取下载链接 |
-| `video_config` | 查看或修改插件配置（相当于第二步那个页面） |
+| `video_config` | 查看或修改插件配置（相当于第二步那个页面；`apiKey` 由服务端下发，只读） |
 
 ## 生成要等一会儿
 

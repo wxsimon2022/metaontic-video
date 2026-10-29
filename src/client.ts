@@ -55,7 +55,8 @@ window.__ModuleLoader__.load({
       registerEmail: '邮箱（账号）',
       registerTitle: '没有 API Key？',
       registerHint: '用邮箱领：填邮箱 → 点「获取验证码」→ 把邮件里的数字填进来 → 点「激活」。'
-        + '邮箱就是你的账号，一个邮箱只发一把 Key；成功后自动写好上游、Key、地址与模型，默认额度 ¥0.01。',
+        + '邮箱就是你的账号，一个邮箱只发一把 Key；成功后服务端把 Key、上游地址与模型直接写进配置，'
+        + '不用手填，默认额度 ¥0.01。',
       registerEmailPlaceholder: '你的邮箱，例如 name@example.com',
       registerCode: '验证码',
       registerCodePlaceholder: '邮件里的数字',
@@ -524,8 +525,11 @@ window.__ModuleLoader__.load({
 
         /** 把服务端给的那把密钥写回配置（注册、取回都走这里）。 */
         async function applyRegistration(result, fallbackBase, device) {
+          // keyOrigin 是给宿主那侧看的标记：只有带这个标记（或早期版本的设备凭据 + 邮箱）
+          // 的 Key 才被当成「服务端下发的」，手填的一律拒绝调用。
           const writes = [
             ['apiKey', result.api_key],
+            ['keyOrigin', 'register'],
             ['baseUrl', result.base_url || fallbackBase || registerApiRoot()],
             ...await deviceWrites(device),
           ];
@@ -810,7 +814,11 @@ window.__ModuleLoader__.load({
           failed: TOKENS.error,
         };
         // 上游 / 地址 / Key 现在由注册流程写入，页面上不让手填。
-        const keyReady = Boolean(snapshot.secrets?.apiKey || value.apiKey);
+        // 只有「服务端下发的」才算配好：手改到配置里的 Key 拿不到额度、调用也会被拒，
+        // 这种情况要把注册区露出来，让用户点「激活」换回自己那把。
+        const serverIssuedKey = value.keyOrigin === 'register'
+          || Boolean(value.deviceId && value.deviceSecret && value.registerEmail);
+        const keyReady = Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;
         // 邮箱是唯一标识，只发一把：已经配好 Key 的（注册过的或手填的）整块注册区直接隐藏，
         // 连「已经领到 Key 了」这类说明也不显示；要换 Key 只能找管理员。
         const registerText = registerStatus === 'ok'

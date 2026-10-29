@@ -31,7 +31,7 @@ window.__ModuleLoader__.load({
       ffmpegManual: "\u60F3\u81EA\u5DF1\u88C5\uFF1AmacOS \u7528 Homebrew\uFF0CWindows \u7528 winget\uFF0CLinux \u7528\u7CFB\u7EDF\u5305\u7BA1\u7406\u5668\uFF1B\u88C5\u5B8C\u786E\u8BA4\u547D\u4EE4\u884C\u91CC\u80FD\u8DD1 ffmpeg -version \u5C31\u884C\u3002",
       registerEmail: "\u90AE\u7BB1\uFF08\u8D26\u53F7\uFF09",
       registerTitle: "\u6CA1\u6709 API Key\uFF1F",
-      registerHint: "\u7528\u90AE\u7BB1\u9886\uFF1A\u586B\u90AE\u7BB1 \u2192 \u70B9\u300C\u83B7\u53D6\u9A8C\u8BC1\u7801\u300D\u2192 \u628A\u90AE\u4EF6\u91CC\u7684\u6570\u5B57\u586B\u8FDB\u6765 \u2192 \u70B9\u300C\u6FC0\u6D3B\u300D\u3002\u90AE\u7BB1\u5C31\u662F\u4F60\u7684\u8D26\u53F7\uFF0C\u4E00\u4E2A\u90AE\u7BB1\u53EA\u53D1\u4E00\u628A Key\uFF1B\u6210\u529F\u540E\u81EA\u52A8\u5199\u597D\u4E0A\u6E38\u3001Key\u3001\u5730\u5740\u4E0E\u6A21\u578B\uFF0C\u9ED8\u8BA4\u989D\u5EA6 \xA50.01\u3002",
+      registerHint: "\u7528\u90AE\u7BB1\u9886\uFF1A\u586B\u90AE\u7BB1 \u2192 \u70B9\u300C\u83B7\u53D6\u9A8C\u8BC1\u7801\u300D\u2192 \u628A\u90AE\u4EF6\u91CC\u7684\u6570\u5B57\u586B\u8FDB\u6765 \u2192 \u70B9\u300C\u6FC0\u6D3B\u300D\u3002\u90AE\u7BB1\u5C31\u662F\u4F60\u7684\u8D26\u53F7\uFF0C\u4E00\u4E2A\u90AE\u7BB1\u53EA\u53D1\u4E00\u628A Key\uFF1B\u6210\u529F\u540E\u670D\u52A1\u7AEF\u628A Key\u3001\u4E0A\u6E38\u5730\u5740\u4E0E\u6A21\u578B\u76F4\u63A5\u5199\u8FDB\u914D\u7F6E\uFF0C\u4E0D\u7528\u624B\u586B\uFF0C\u9ED8\u8BA4\u989D\u5EA6 \xA50.01\u3002",
       registerEmailPlaceholder: "\u4F60\u7684\u90AE\u7BB1\uFF0C\u4F8B\u5982 name@example.com",
       registerCode: "\u9A8C\u8BC1\u7801",
       registerCodePlaceholder: "\u90AE\u4EF6\u91CC\u7684\u6570\u5B57",
@@ -441,6 +441,7 @@ window.__ModuleLoader__.load({
         async function applyRegistration(result, fallbackBase, device) {
           const writes = [
             ["apiKey", result.api_key],
+            ["keyOrigin", "register"],
             ["baseUrl", result.base_url || fallbackBase || registerApiRoot()],
             ...await deviceWrites(device)
           ];
@@ -693,7 +694,8 @@ window.__ModuleLoader__.load({
           disabled: TOKENS.error,
           failed: TOKENS.error
         };
-        const keyReady = Boolean(snapshot.secrets?.apiKey || value.apiKey);
+        const serverIssuedKey = value.keyOrigin === "register" || Boolean(value.deviceId && value.deviceSecret && value.registerEmail);
+        const keyReady = Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;
         const registerText = registerStatus === "ok" ? t("registerOk") : registerStatus === "partial" ? t("registerPartial") : registerStatus === "restored" ? t("registerRestored") : registerMessage;
         const quotaSymbol = quota && quota.currency_symbol ? quota.currency_symbol : "\xA5";
         const money = (field) => `${quotaSymbol}${formatMoney(quota ? quota[field] : 0)}`;
