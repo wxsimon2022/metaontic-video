@@ -70,7 +70,9 @@ window.__ModuleLoader__.load({
       registerNeedCode: '先填邮件里收到的验证码。',
       registerRestored: '已找回本机密钥：这台设备之前领过的那把帮你填好了，点「保存」即可。',
       quotaTitle: '额度（当前这把 Key）',
-      quotaSummary: '剩余 {remain} · 已用 {used} · 总量 {total}',
+      quotaRemain: '剩余',
+      quotaUsed: '已用',
+      quotaTotal: '总额度',
       quotaUnlimited: '不限额度',
       quotaLoading: '读取额度中…',
       quotaRefresh: '刷新额度',
@@ -173,7 +175,9 @@ window.__ModuleLoader__.load({
       registerNeedCode: 'Type the code from the email first.',
       registerRestored: 'Restored the key issued to this device; click Save to apply.',
       quotaTitle: 'Quota (current key)',
-      quotaSummary: 'Remaining {remain} · used {used} · total {total}',
+      quotaRemain: 'Remaining',
+      quotaUsed: 'Used',
+      quotaTotal: 'Total',
       quotaUnlimited: 'Unlimited',
       quotaLoading: 'Reading quota…',
       quotaRefresh: 'Refresh quota',
@@ -227,7 +231,8 @@ window.__ModuleLoader__.load({
       { key: 'sectionAdvanced', fields: ['extraParams', 'pollIntervalMs', 'maxWaitMs', 'ffmpegBinary', 'ffprobeBinary'] },
     ];
     const FIELDS = [
-      { key: 'model', kind: 'text' },
+      // 模型 ID 很长（doubao-seedance-2-0-mini-260615），占一整行免得半截被截断
+      { key: 'model', kind: 'text', wide: true, mono: true },
       { key: 'duration', kind: 'number' },
       { key: 'singleMaxSeconds', kind: 'number' },
       { key: 'mode', kind: 'select' },
@@ -241,8 +246,8 @@ window.__ModuleLoader__.load({
       { key: 'extraParams', kind: 'text' },
       { key: 'pollIntervalMs', kind: 'number' },
       { key: 'maxWaitMs', kind: 'number' },
-      { key: 'ffmpegBinary', kind: 'text' },
-      { key: 'ffprobeBinary', kind: 'text' },
+      { key: 'ffmpegBinary', kind: 'text', mono: true },
+      { key: 'ffprobeBinary', kind: 'text', mono: true },
     ];
     const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((field) => [field.key, field]));
 
@@ -300,56 +305,82 @@ window.__ModuleLoader__.load({
       success: 'var(--dsw-alias-state-success-primary, #2e9e5b)',
     };
 
-    const inputStyle = {
-      width: '100%',
-      boxSizing: 'border-box',
-      padding: '7px 9px',
-      borderRadius: 8,
-      border: `1px solid ${TOKENS.border}`,
-      background: TOKENS.controlFill,
-      color: TOKENS.text,
-      font: 'inherit',
-    };
-    const labelStyle = { display: 'block', fontSize: 12, color: TOKENS.muted, marginBottom: 4 };
+    // 控件的外观（边框 / 圆角 / 高度 / 聚焦圈）统一放进 PAGE_CSS 的 .mov-input，
+    // 内联样式只留布局（宽度），免得改一处样式要在两处同步。
+    const inputStyle = { width: '100%', boxSizing: 'border-box' };
 
     /**
      * 页面静态样式：能 hover / focus 的效果（按钮、表格行、输入聚焦圈）内联样式表达不了，
      * 所以集中在这张表里；class 统一 mov- 前缀，避免和宿主其他插件串味。
      */
     const PAGE_CSS = `
-      .mov-page { display: flex; flex-direction: column; gap: 14px; padding: 4px 0; color: ${TOKENS.text}; }
-      .mov-section { display: flex; flex-direction: column; gap: 10px; }
-      .mov-section-title { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 600; color: ${TOKENS.muted}; letter-spacing: .04em; }
+      /* 整页纵向排布：块与块之间统一 16px，比一整片表单好扫 */
+      .mov-page { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; color: ${TOKENS.text}; }
+      /* 分组卡片：16 个字段摊在一格里太糊，按用途各装一张卡 */
+      .mov-section { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
+      .mov-section-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
+      /* 标题左边一道主色竖条，代替纯文字分组标题 */
+      .mov-section-title::before { content: ""; flex: 0 0 auto; width: 3px; height: 13px; border-radius: 2px; background: ${TOKENS.primaryFill}; }
       .mov-section-title::after { content: ""; flex: 1 1 auto; height: 1px; background: ${TOKENS.border}; }
-      .mov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 14px; }
+      /* 两列自适应：单列至少 240px，窄面板自动落成一列 */
+      .mov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 18px; }
       .mov-field { display: flex; flex-direction: column; min-width: 0; }
-      .mov-input:focus, .mov-input:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(36, 123, 191, .22); }
-      .mov-switch { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; color: ${TOKENS.text}; cursor: pointer; }
-      .mov-switch input { width: 16px; height: 16px; accent-color: ${TOKENS.primaryFill}; cursor: pointer; }
-      .mov-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 10px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
+      /* 开关没有标签行，靠底对齐才能跟旁边输入框的控制线齐平 */
+      .mov-field-switch { justify-content: flex-end; }
+      .mov-field-wide { grid-column: 1 / -1; }
+      .mov-label { display: block; font-size: 12px; color: ${TOKENS.muted}; margin-bottom: 6px; }
+      .mov-input { padding: 8px 10px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; color: ${TOKENS.text}; font: inherit; font-size: 13px; height: 36px; }
+      .mov-input:focus, .mov-input:focus-visible { outline: none; border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 3px rgba(36, 123, 191, .18); }
+      /* 模型 ID 与可执行文件路径很长：等宽字体 + 省略，不把整行撑变形 */
+      .mov-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
+      /* 开关做成跟输入框同高的小方块，和周围控件一条线 */
+      .mov-switch { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 36px; box-sizing: border-box; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.controlFill}; font-size: 13px; color: ${TOKENS.text}; cursor: pointer; }
+      .mov-switch:hover { border-color: ${TOKENS.primaryFill}; }
+      .mov-switch input { width: 15px; height: 15px; accent-color: ${TOKENS.primaryFill}; cursor: pointer; }
+      .mov-card { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
       .mov-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
       .mov-card-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
-      .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12.5px; line-height: 1.2; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
+      .mov-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.5; }
+      .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 7px 13px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12.5px; line-height: 1.2; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
       .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
       .mov-btn:disabled { opacity: .5; cursor: default; }
       .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
       .mov-btn-primary:hover:not(:disabled) { color: #fff; opacity: .88; }
-      .mov-btn-sm { padding: 4px 10px; border-radius: 7px; font-size: 12px; }
+      .mov-btn-sm { min-height: 30px; padding: 5px 10px; border-radius: 7px; font-size: 12px; }
       .mov-trailing { margin-left: auto; }
-      .mov-table { display: flex; flex-direction: column; }
-      /* 时间 / 类型 / 模型 / 费用 / 结果：时间与费用按原宽度固定，多出来的宽度给模型列 */
-      .mov-table-head, .mov-table-row { display: grid; grid-template-columns: 92px minmax(52px, .6fr) minmax(72px, 1.4fr) 92px 56px; align-items: center; gap: 8px; padding: 7px 8px; }
-      .mov-table-head { font-size: 11px; color: ${TOKENS.muted}; border-bottom: 1px solid ${TOKENS.border}; }
-      .mov-table-row { font-size: 12.5px; border-bottom: 1px solid ${TOKENS.border}; }
-      .mov-table-row:last-child { border-bottom: none; }
-      .mov-table-row:hover { background: rgba(127, 127, 127, .08); }
-      /* 费用列（第 4 列）右对齐，跟上面的额度数字对齐 */
-      .mov-table-head > :nth-child(4), .mov-table-row > :nth-child(4) { text-align: right; padding-right: 12px; }
-      /* 模型 ID 很长（doubao-seedance-2-0-mini-260615），单行省略，悬停看全名 */
-      .mov-model { min-width: 0; overflow: hidden; color: ${TOKENS.muted}; white-space: nowrap; text-overflow: ellipsis; }
+      /* 额度：三个数字块，一眼分清剩余 / 已用 / 总额度 */
+      .mov-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+      .mov-stat { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; border: 1px solid ${TOKENS.border}; }
+      .mov-stat-label { font-size: 11.5px; color: ${TOKENS.muted}; }
+      .mov-stat-value { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+      .mov-foot-note { font-size: 11.5px; color: ${TOKENS.muted}; }
+      /* ffmpeg 安装命令：一行等宽、可复制，不用撑满整行 */
+      .mov-cmd-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .mov-tag { flex: 0 0 auto; min-width: 132px; font-size: 12px; color: ${TOKENS.muted}; }
+      .mov-code { flex: 0 0 auto; max-width: 100%; padding: 6px 10px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+      /* 使用记录：斑马纹 + 细表头，模型列吃掉剩余宽度 */
+      /* 面板很窄时表格横向滚动，也不把「时间」挤成两行 */
+      .mov-table { display: flex; flex-direction: column; margin: 0 -6px; overflow-x: auto; }
+      .mov-table-head, .mov-table-row { display: grid; grid-template-columns: 106px 78px minmax(72px, 1fr) 84px 60px; align-items: center; gap: 10px; padding: 8px 10px; }
+      .mov-table-head > :nth-child(1), .mov-table-row > :nth-child(1) { white-space: nowrap; }
+      .mov-table-head { font-size: 11px; letter-spacing: .03em; color: ${TOKENS.muted}; border-bottom: 1px solid ${TOKENS.border}; }
+      .mov-table-row { font-size: 12.5px; border-radius: 8px; }
+      .mov-table-row:nth-child(even) { background: rgba(127, 127, 127, .05); }
+      .mov-table-row:hover { background: rgba(127, 127, 127, .1); }
+      /* 费用与结果两列右对齐，数字竖着对得齐 */
+      .mov-table-head > :nth-child(4), .mov-table-row > :nth-child(4),
+      .mov-table-head > :nth-child(5), .mov-table-row > :nth-child(5) { text-align: right; }
+      .mov-model { min-width: 0; overflow: hidden; color: ${TOKENS.muted}; white-space: nowrap; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
       .mov-num { font-variant-numeric: tabular-nums; }
-      .mov-code { flex: 1 1 220px; padding: 5px 9px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; color: ${TOKENS.text}; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
-      .mov-tag { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
+      /* 结果用胶囊标签，比裸文字更容易一眼扫到 */
+      .mov-chip { display: inline-flex; align-items: center; justify-content: center; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; line-height: 1.7; }
+      .mov-chip-ok { color: ${TOKENS.success}; background: rgba(46, 158, 91, .12); }
+      .mov-chip-bad { color: ${TOKENS.error}; background: rgba(217, 83, 79, .12); }
+      /* 注册表单：输入框吃掉多余宽度，两个按钮不换行 */
+      .mov-register-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      /* 底部操作条：上边线把「保存」和配置内容分开 */
+      .mov-footer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 2px 2px; border-top: 1px solid ${TOKENS.border}; }
+      .mov-notice { margin: 0; font-size: 12px; color: ${TOKENS.muted}; line-height: 1.5; }
     `;
 
     function optionLabel(t, key, option) {
@@ -805,7 +836,7 @@ window.__ModuleLoader__.load({
             return h('select', {
               id,
               'data-field': field.key,
-              className: 'mov-input',
+              className: `mov-input${field.mono ? ' mov-mono' : ''}`,
               style: inputStyle,
               value: current ?? '',
               onChange: (event) => edit(field.key, event.target.value),
@@ -814,7 +845,7 @@ window.__ModuleLoader__.load({
           return h('input', {
             id,
             'data-field': field.key,
-            className: 'mov-input',
+            className: `mov-input${field.mono ? ' mov-mono' : ''}`,
             style: inputStyle,
             type: field.kind === 'number' ? 'number' : (field.secret ? 'password' : 'text'),
             value: current ?? '',
@@ -832,12 +863,16 @@ window.__ModuleLoader__.load({
 
         /** 一个可编辑字段：标签 + 控件（开关自带标签，就不重复画）。 */
         function fieldCell(field) {
-          return h('div', { key: field.key, className: 'mov-field' }, [
+          const classes = ['mov-field'];
+          // 开关没有标签行，靠底对齐才能跟旁边输入框/下拉框的控制线齐平
+          if (field.kind === 'switch') classes.push('mov-field-switch');
+          if (field.wide) classes.push('mov-field-wide');
+          return h('div', { key: field.key, className: classes.join(' ') }, [
             field.kind === 'switch'
               ? null
-              : h('label', { key: 'label', style: labelStyle, htmlFor: `metaontic-video-${field.key}` }, t(field.key)),
+              : h('label', { key: 'label', className: 'mov-label', htmlFor: `metaontic-video-${field.key}` }, t(field.key)),
             control(field),
-            hints[field.key] ? h('span', { key: 'hint', style: { ...labelStyle, marginTop: 4 } }, hints[field.key]) : null,
+            hints[field.key] ? h('span', { key: 'hint', className: 'mov-hint', style: { marginTop: 4 } }, hints[field.key]) : null,
           ]);
         }
 
@@ -848,7 +883,7 @@ window.__ModuleLoader__.load({
             section.fields.map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)),
         ]));
 
-        const footer = h('div', { key: 'footer', className: 'mov-card-head', style: { gap: 12, marginTop: 2 } }, [
+        const footer = h('div', { key: 'footer', className: 'mov-footer' }, [
           h('button', {
             key: 'save',
             'data-action': 'save',
@@ -903,13 +938,20 @@ window.__ModuleLoader__.load({
         const quotaSymbol = quota && quota.currency_symbol ? quota.currency_symbol : '¥';
         const money = (field) => `${quotaSymbol}${formatMoney(quota ? quota[field] : 0)}`;
         const quotaReady = quotaStatus === 'ok' && quota;
-        const quotaText = quotaReady
-          ? `${t('quotaSummary', {
-            remain: quota.unlimited_quota ? t('quotaUnlimited') : money('remain_amount'),
-            used: money('used_amount'),
-            total: money('total_amount'),
-          })} · ${t('quotaUpdatedAt', { time: quotaAt })}`
-          : (keyReady ? t('quotaLoading') : t('quotaNoKey'));
+        // 没读到额度时还是给一句话（读取中 / 还没领 Key），读到了就摊成三个数字块。
+        const quotaFallback = keyReady ? t('quotaLoading') : t('quotaNoKey');
+        const quotaStats = quotaReady
+          ? [
+            {
+              key: 'remain',
+              label: t('quotaRemain'),
+              value: quota.unlimited_quota ? t('quotaUnlimited') : money('remain_amount'),
+              color: TOKENS.success,
+            },
+            { key: 'used', label: t('quotaUsed'), value: money('used_amount'), color: TOKENS.text },
+            { key: 'total', label: t('quotaTotal'), value: money('total_amount'), color: TOKENS.muted },
+          ]
+          : null;
         // ffmpeg 引导卡片：合并长视频要用它，缺了就照着命令装一个。
         const os = currentOs();
         const primaryInstall = FFMPEG_INSTALLS[os] || FFMPEG_INSTALLS.macos;
@@ -929,12 +971,12 @@ window.__ModuleLoader__.load({
               onClick: () => setShowAllFfmpeg((current) => !current),
             }, showAllFfmpeg ? t('ffmpegLess') : t('ffmpegMore')),
           ]),
-          h('span', { key: 'body', style: labelStyle }, t('ffmpegBody')),
-          h('span', { key: 'for', style: labelStyle }, t('ffmpegInstallFor')),
+          h('span', { key: 'body', className: 'mov-hint' }, t('ffmpegBody')),
+          h('span', { key: 'for', className: 'mov-hint' }, t('ffmpegInstallFor')),
           ...installRows.map((item, index) => h('div', {
             key: `install-${index}`,
             'data-field': 'ffmpegInstall',
-            style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+            className: 'mov-cmd-row',
           }, [
             h('span', { key: 'label', className: 'mov-tag' }, item.label),
             h('code', {
@@ -950,7 +992,7 @@ window.__ModuleLoader__.load({
               onClick: () => copyCommand(item.command),
             }, copiedFfmpeg === item.command ? t('ffmpegCopied') : t('ffmpegCopy')),
           ])),
-          h('span', { key: 'after', style: labelStyle }, t('ffmpegAfter')),
+          h('span', { key: 'after', className: 'mov-hint' }, t('ffmpegAfter')),
         ]);
 
         const quotaBox = h('div', {
@@ -971,14 +1013,25 @@ window.__ModuleLoader__.load({
               }, t('quotaRefresh'))
               : null,
           ]),
-          h('div', { key: 'text', style: { display: 'flex', flexDirection: 'column', gap: 2 } }, [
-            h('span', {
-              key: 'value',
+          quotaStats
+            ? h('div', { key: 'text', 'data-field': 'quotaValue', className: 'mov-stats' },
+              quotaStats.map((item) => h('div', { key: item.key, className: 'mov-stat' }, [
+                h('span', { key: 'label', className: 'mov-stat-label' }, item.label),
+                h('span', {
+                  key: 'value',
+                  className: 'mov-stat-value',
+                  style: { color: item.color },
+                }, item.value),
+              ])))
+            : h('span', {
+              key: 'text',
               'data-field': 'quotaValue',
-              style: { fontSize: 12, color: quotaReady ? TOKENS.success : TOKENS.muted },
-            }, quotaText),
-            quotaMessage ? h('span', { key: 'message', style: labelStyle }, quotaMessage) : null,
-          ]),
+              className: 'mov-hint',
+            }, quotaFallback),
+          quotaReady
+            ? h('span', { key: 'at', className: 'mov-foot-note' }, t('quotaUpdatedAt', { time: quotaAt }))
+            : null,
+          quotaMessage ? h('span', { key: 'message', className: 'mov-hint' }, quotaMessage) : null,
         ]);
 
         /** 复制 ffmpeg 安装命令；剪贴板不可用就什么都不做，用户照样能照着敲。 */
@@ -1031,7 +1084,8 @@ window.__ModuleLoader__.load({
             h('span', {
               key: 'summary',
               'data-field': 'usageSummary',
-              style: { fontSize: 12, color: TOKENS.muted, flex: '1 1 200px' },
+              className: 'mov-hint',
+              style: { flex: '1 1 160px' },
             }, usageSummaryText),
             h('button', {
               key: 'refresh',
@@ -1077,13 +1131,14 @@ window.__ModuleLoader__.load({
                 className: 'mov-num',
                 style: { color: row.status === 'succeeded' ? TOKENS.success : TOKENS.muted },
               }, `${usageSymbol}${formatMoney(row.amount)}`),
-              h('span', {
-                key: 'status',
-                style: { color: row.status === 'succeeded' ? TOKENS.success : TOKENS.error },
-              }, row.status === 'succeeded' ? t('usageStatusOk') : t('usageStatusFailed')),
+              h('span', { key: 'status' },
+                h('span', {
+                  key: 'chip',
+                  className: `mov-chip ${row.status === 'succeeded' ? 'mov-chip-ok' : 'mov-chip-bad'}`,
+                }, row.status === 'succeeded' ? t('usageStatusOk') : t('usageStatusFailed'))),
             ])),
           ]) : null,
-          usageMessage ? h('span', { key: 'message', style: labelStyle }, usageMessage) : null,
+          usageMessage ? h('span', { key: 'message', className: 'mov-hint' }, usageMessage) : null,
         ]) : null;
 
         // 有 Key 就整块不渲染（连标题、提示文字都没有），页面上只剩配置项 + 额度卡片。
@@ -1092,12 +1147,12 @@ window.__ModuleLoader__.load({
           className: 'mov-card',
           style: { gap: 10 },
         }, [
-          h('div', { key: 'text', style: { display: 'flex', flexDirection: 'column', gap: 2 } }, [
+          h('div', { key: 'text', style: { display: 'flex', flexDirection: 'column', gap: 4 } }, [
             h('span', { key: 'title', className: 'mov-card-title' },
               t('registerTitle')),
-            h('span', { key: 'hint', style: labelStyle }, t('registerHint')),
+            h('span', { key: 'hint', className: 'mov-hint' }, t('registerHint')),
           ]),
-          h('div', { key: 'form', style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } }, [
+          h('div', { key: 'form', className: 'mov-register-form' }, [
           h('input', {
             key: 'email',
             'data-field': 'registerEmail',
@@ -1113,7 +1168,7 @@ window.__ModuleLoader__.load({
             onChange: (event) => setRegisterEmail(event.target.value),
             style: {
               ...inputStyle,
-              flex: '0 1 180px',
+              flex: '1 1 220px',
               width: 'auto',
               opacity: emailLocked ? 0.6 : 1,
               cursor: emailLocked ? 'not-allowed' : 'text',
@@ -1139,7 +1194,7 @@ window.__ModuleLoader__.load({
             placeholder: t('registerCodePlaceholder'),
             'aria-label': t('registerCode'),
             onChange: (event) => setRegisterCode(event.target.value),
-            style: { ...inputStyle, flex: '0 1 110px', width: 'auto' },
+            style: { ...inputStyle, flex: '0 1 130px', width: 'auto' },
           }),
           h('button', {
             key: 'button',
@@ -1185,7 +1240,7 @@ window.__ModuleLoader__.load({
         return h('div', { className: 'mov-page' }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
           h('style', { key: 'styles' }, PAGE_CSS),
-          notice ? h('p', { key: 'notice', style: { margin: 0, fontSize: 12, color: TOKENS.muted } }, notice) : null,
+          notice ? h('p', { key: 'notice', className: 'mov-notice' }, notice) : null,
           ...(notice && !snapshot.value ? [] : rows),
           ...blobs,
         ]);

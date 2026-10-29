@@ -45,7 +45,9 @@ window.__ModuleLoader__.load({
       registerNeedCode: "\u5148\u586B\u90AE\u4EF6\u91CC\u6536\u5230\u7684\u9A8C\u8BC1\u7801\u3002",
       registerRestored: "\u5DF2\u627E\u56DE\u672C\u673A\u5BC6\u94A5\uFF1A\u8FD9\u53F0\u8BBE\u5907\u4E4B\u524D\u9886\u8FC7\u7684\u90A3\u628A\u5E2E\u4F60\u586B\u597D\u4E86\uFF0C\u70B9\u300C\u4FDD\u5B58\u300D\u5373\u53EF\u3002",
       quotaTitle: "\u989D\u5EA6\uFF08\u5F53\u524D\u8FD9\u628A Key\uFF09",
-      quotaSummary: "\u5269\u4F59 {remain} \xB7 \u5DF2\u7528 {used} \xB7 \u603B\u91CF {total}",
+      quotaRemain: "\u5269\u4F59",
+      quotaUsed: "\u5DF2\u7528",
+      quotaTotal: "\u603B\u989D\u5EA6",
       quotaUnlimited: "\u4E0D\u9650\u989D\u5EA6",
       quotaLoading: "\u8BFB\u53D6\u989D\u5EA6\u4E2D\u2026",
       quotaRefresh: "\u5237\u65B0\u989D\u5EA6",
@@ -139,7 +141,9 @@ window.__ModuleLoader__.load({
       registerNeedCode: "Type the code from the email first.",
       registerRestored: "Restored the key issued to this device; click Save to apply.",
       quotaTitle: "Quota (current key)",
-      quotaSummary: "Remaining {remain} \xB7 used {used} \xB7 total {total}",
+      quotaRemain: "Remaining",
+      quotaUsed: "Used",
+      quotaTotal: "Total",
       quotaUnlimited: "Unlimited",
       quotaLoading: "Reading quota\u2026",
       quotaRefresh: "Refresh quota",
@@ -190,7 +194,8 @@ window.__ModuleLoader__.load({
       { key: "sectionAdvanced", fields: ["extraParams", "pollIntervalMs", "maxWaitMs", "ffmpegBinary", "ffprobeBinary"] }
     ];
     const FIELDS = [
-      { key: "model", kind: "text" },
+      // 模型 ID 很长（doubao-seedance-2-0-mini-260615），占一整行免得半截被截断
+      { key: "model", kind: "text", wide: true, mono: true },
       { key: "duration", kind: "number" },
       { key: "singleMaxSeconds", kind: "number" },
       { key: "mode", kind: "select" },
@@ -204,8 +209,8 @@ window.__ModuleLoader__.load({
       { key: "extraParams", kind: "text" },
       { key: "pollIntervalMs", kind: "number" },
       { key: "maxWaitMs", kind: "number" },
-      { key: "ffmpegBinary", kind: "text" },
-      { key: "ffprobeBinary", kind: "text" }
+      { key: "ffmpegBinary", kind: "text", mono: true },
+      { key: "ffprobeBinary", kind: "text", mono: true }
     ];
     const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((field) => [field.key, field]));
     const DEFAULT_REGISTER_API = "https://video.mybfs.cn";
@@ -252,51 +257,75 @@ window.__ModuleLoader__.load({
       error: "var(--dsw-alias-state-error-primary, #d9534f)",
       success: "var(--dsw-alias-state-success-primary, #2e9e5b)"
     };
-    const inputStyle = {
-      width: "100%",
-      boxSizing: "border-box",
-      padding: "7px 9px",
-      borderRadius: 8,
-      border: `1px solid ${TOKENS.border}`,
-      background: TOKENS.controlFill,
-      color: TOKENS.text,
-      font: "inherit"
-    };
-    const labelStyle = { display: "block", fontSize: 12, color: TOKENS.muted, marginBottom: 4 };
+    const inputStyle = { width: "100%", boxSizing: "border-box" };
     const PAGE_CSS = `
-      .mov-page { display: flex; flex-direction: column; gap: 14px; padding: 4px 0; color: ${TOKENS.text}; }
-      .mov-section { display: flex; flex-direction: column; gap: 10px; }
-      .mov-section-title { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 600; color: ${TOKENS.muted}; letter-spacing: .04em; }
+      /* \u6574\u9875\u7EB5\u5411\u6392\u5E03\uFF1A\u5757\u4E0E\u5757\u4E4B\u95F4\u7EDF\u4E00 16px\uFF0C\u6BD4\u4E00\u6574\u7247\u8868\u5355\u597D\u626B */
+      .mov-page { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; color: ${TOKENS.text}; }
+      /* \u5206\u7EC4\u5361\u7247\uFF1A16 \u4E2A\u5B57\u6BB5\u644A\u5728\u4E00\u683C\u91CC\u592A\u7CCA\uFF0C\u6309\u7528\u9014\u5404\u88C5\u4E00\u5F20\u5361 */
+      .mov-section { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
+      .mov-section-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
+      /* \u6807\u9898\u5DE6\u8FB9\u4E00\u9053\u4E3B\u8272\u7AD6\u6761\uFF0C\u4EE3\u66FF\u7EAF\u6587\u5B57\u5206\u7EC4\u6807\u9898 */
+      .mov-section-title::before { content: ""; flex: 0 0 auto; width: 3px; height: 13px; border-radius: 2px; background: ${TOKENS.primaryFill}; }
       .mov-section-title::after { content: ""; flex: 1 1 auto; height: 1px; background: ${TOKENS.border}; }
-      .mov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 14px; }
+      /* \u4E24\u5217\u81EA\u9002\u5E94\uFF1A\u5355\u5217\u81F3\u5C11 240px\uFF0C\u7A84\u9762\u677F\u81EA\u52A8\u843D\u6210\u4E00\u5217 */
+      .mov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 18px; }
       .mov-field { display: flex; flex-direction: column; min-width: 0; }
-      .mov-input:focus, .mov-input:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(36, 123, 191, .22); }
-      .mov-switch { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; color: ${TOKENS.text}; cursor: pointer; }
-      .mov-switch input { width: 16px; height: 16px; accent-color: ${TOKENS.primaryFill}; cursor: pointer; }
-      .mov-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 10px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
+      /* \u5F00\u5173\u6CA1\u6709\u6807\u7B7E\u884C\uFF0C\u9760\u5E95\u5BF9\u9F50\u624D\u80FD\u8DDF\u65C1\u8FB9\u8F93\u5165\u6846\u7684\u63A7\u5236\u7EBF\u9F50\u5E73 */
+      .mov-field-switch { justify-content: flex-end; }
+      .mov-field-wide { grid-column: 1 / -1; }
+      .mov-label { display: block; font-size: 12px; color: ${TOKENS.muted}; margin-bottom: 6px; }
+      .mov-input { padding: 8px 10px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; color: ${TOKENS.text}; font: inherit; font-size: 13px; height: 36px; }
+      .mov-input:focus, .mov-input:focus-visible { outline: none; border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 3px rgba(36, 123, 191, .18); }
+      /* \u6A21\u578B ID \u4E0E\u53EF\u6267\u884C\u6587\u4EF6\u8DEF\u5F84\u5F88\u957F\uFF1A\u7B49\u5BBD\u5B57\u4F53 + \u7701\u7565\uFF0C\u4E0D\u628A\u6574\u884C\u6491\u53D8\u5F62 */
+      .mov-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
+      /* \u5F00\u5173\u505A\u6210\u8DDF\u8F93\u5165\u6846\u540C\u9AD8\u7684\u5C0F\u65B9\u5757\uFF0C\u548C\u5468\u56F4\u63A7\u4EF6\u4E00\u6761\u7EBF */
+      .mov-switch { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 36px; box-sizing: border-box; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.controlFill}; font-size: 13px; color: ${TOKENS.text}; cursor: pointer; }
+      .mov-switch:hover { border-color: ${TOKENS.primaryFill}; }
+      .mov-switch input { width: 15px; height: 15px; accent-color: ${TOKENS.primaryFill}; cursor: pointer; }
+      .mov-card { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
       .mov-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
       .mov-card-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
-      .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12.5px; line-height: 1.2; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
+      .mov-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.5; }
+      .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 7px 13px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12.5px; line-height: 1.2; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
       .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
       .mov-btn:disabled { opacity: .5; cursor: default; }
       .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
       .mov-btn-primary:hover:not(:disabled) { color: #fff; opacity: .88; }
-      .mov-btn-sm { padding: 4px 10px; border-radius: 7px; font-size: 12px; }
+      .mov-btn-sm { min-height: 30px; padding: 5px 10px; border-radius: 7px; font-size: 12px; }
       .mov-trailing { margin-left: auto; }
-      .mov-table { display: flex; flex-direction: column; }
-      /* \u65F6\u95F4 / \u7C7B\u578B / \u6A21\u578B / \u8D39\u7528 / \u7ED3\u679C\uFF1A\u65F6\u95F4\u4E0E\u8D39\u7528\u6309\u539F\u5BBD\u5EA6\u56FA\u5B9A\uFF0C\u591A\u51FA\u6765\u7684\u5BBD\u5EA6\u7ED9\u6A21\u578B\u5217 */
-      .mov-table-head, .mov-table-row { display: grid; grid-template-columns: 92px minmax(52px, .6fr) minmax(72px, 1.4fr) 92px 56px; align-items: center; gap: 8px; padding: 7px 8px; }
-      .mov-table-head { font-size: 11px; color: ${TOKENS.muted}; border-bottom: 1px solid ${TOKENS.border}; }
-      .mov-table-row { font-size: 12.5px; border-bottom: 1px solid ${TOKENS.border}; }
-      .mov-table-row:last-child { border-bottom: none; }
-      .mov-table-row:hover { background: rgba(127, 127, 127, .08); }
-      /* \u8D39\u7528\u5217\uFF08\u7B2C 4 \u5217\uFF09\u53F3\u5BF9\u9F50\uFF0C\u8DDF\u4E0A\u9762\u7684\u989D\u5EA6\u6570\u5B57\u5BF9\u9F50 */
-      .mov-table-head > :nth-child(4), .mov-table-row > :nth-child(4) { text-align: right; padding-right: 12px; }
-      /* \u6A21\u578B ID \u5F88\u957F\uFF08doubao-seedance-2-0-mini-260615\uFF09\uFF0C\u5355\u884C\u7701\u7565\uFF0C\u60AC\u505C\u770B\u5168\u540D */
-      .mov-model { min-width: 0; overflow: hidden; color: ${TOKENS.muted}; white-space: nowrap; text-overflow: ellipsis; }
+      /* \u989D\u5EA6\uFF1A\u4E09\u4E2A\u6570\u5B57\u5757\uFF0C\u4E00\u773C\u5206\u6E05\u5269\u4F59 / \u5DF2\u7528 / \u603B\u989D\u5EA6 */
+      .mov-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+      .mov-stat { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; border: 1px solid ${TOKENS.border}; }
+      .mov-stat-label { font-size: 11.5px; color: ${TOKENS.muted}; }
+      .mov-stat-value { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+      .mov-foot-note { font-size: 11.5px; color: ${TOKENS.muted}; }
+      /* ffmpeg \u5B89\u88C5\u547D\u4EE4\uFF1A\u4E00\u884C\u7B49\u5BBD\u3001\u53EF\u590D\u5236\uFF0C\u4E0D\u7528\u6491\u6EE1\u6574\u884C */
+      .mov-cmd-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .mov-tag { flex: 0 0 auto; min-width: 132px; font-size: 12px; color: ${TOKENS.muted}; }
+      .mov-code { flex: 0 0 auto; max-width: 100%; padding: 6px 10px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+      /* \u4F7F\u7528\u8BB0\u5F55\uFF1A\u6591\u9A6C\u7EB9 + \u7EC6\u8868\u5934\uFF0C\u6A21\u578B\u5217\u5403\u6389\u5269\u4F59\u5BBD\u5EA6 */
+      /* \u9762\u677F\u5F88\u7A84\u65F6\u8868\u683C\u6A2A\u5411\u6EDA\u52A8\uFF0C\u4E5F\u4E0D\u628A\u300C\u65F6\u95F4\u300D\u6324\u6210\u4E24\u884C */
+      .mov-table { display: flex; flex-direction: column; margin: 0 -6px; overflow-x: auto; }
+      .mov-table-head, .mov-table-row { display: grid; grid-template-columns: 106px 78px minmax(72px, 1fr) 84px 60px; align-items: center; gap: 10px; padding: 8px 10px; }
+      .mov-table-head > :nth-child(1), .mov-table-row > :nth-child(1) { white-space: nowrap; }
+      .mov-table-head { font-size: 11px; letter-spacing: .03em; color: ${TOKENS.muted}; border-bottom: 1px solid ${TOKENS.border}; }
+      .mov-table-row { font-size: 12.5px; border-radius: 8px; }
+      .mov-table-row:nth-child(even) { background: rgba(127, 127, 127, .05); }
+      .mov-table-row:hover { background: rgba(127, 127, 127, .1); }
+      /* \u8D39\u7528\u4E0E\u7ED3\u679C\u4E24\u5217\u53F3\u5BF9\u9F50\uFF0C\u6570\u5B57\u7AD6\u7740\u5BF9\u5F97\u9F50 */
+      .mov-table-head > :nth-child(4), .mov-table-row > :nth-child(4),
+      .mov-table-head > :nth-child(5), .mov-table-row > :nth-child(5) { text-align: right; }
+      .mov-model { min-width: 0; overflow: hidden; color: ${TOKENS.muted}; white-space: nowrap; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
       .mov-num { font-variant-numeric: tabular-nums; }
-      .mov-code { flex: 1 1 220px; padding: 5px 9px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; color: ${TOKENS.text}; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
-      .mov-tag { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
+      /* \u7ED3\u679C\u7528\u80F6\u56CA\u6807\u7B7E\uFF0C\u6BD4\u88F8\u6587\u5B57\u66F4\u5BB9\u6613\u4E00\u773C\u626B\u5230 */
+      .mov-chip { display: inline-flex; align-items: center; justify-content: center; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; line-height: 1.7; }
+      .mov-chip-ok { color: ${TOKENS.success}; background: rgba(46, 158, 91, .12); }
+      .mov-chip-bad { color: ${TOKENS.error}; background: rgba(217, 83, 79, .12); }
+      /* \u6CE8\u518C\u8868\u5355\uFF1A\u8F93\u5165\u6846\u5403\u6389\u591A\u4F59\u5BBD\u5EA6\uFF0C\u4E24\u4E2A\u6309\u94AE\u4E0D\u6362\u884C */
+      .mov-register-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      /* \u5E95\u90E8\u64CD\u4F5C\u6761\uFF1A\u4E0A\u8FB9\u7EBF\u628A\u300C\u4FDD\u5B58\u300D\u548C\u914D\u7F6E\u5185\u5BB9\u5206\u5F00 */
+      .mov-footer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 2px 2px; border-top: 1px solid ${TOKENS.border}; }
+      .mov-notice { margin: 0; font-size: 12px; color: ${TOKENS.muted}; line-height: 1.5; }
     `;
     function optionLabel(t, key, option) {
       if (key === "mode") return option === "closeup" ? t("modeCloseup") : t("modeContinuous");
@@ -690,7 +719,7 @@ window.__ModuleLoader__.load({
             return h("select", {
               id,
               "data-field": field.key,
-              className: "mov-input",
+              className: `mov-input${field.mono ? " mov-mono" : ""}`,
               style: inputStyle,
               value: current ?? "",
               onChange: (event) => edit(field.key, event.target.value)
@@ -699,7 +728,7 @@ window.__ModuleLoader__.load({
           return h("input", {
             id,
             "data-field": field.key,
-            className: "mov-input",
+            className: `mov-input${field.mono ? " mov-mono" : ""}`,
             style: inputStyle,
             type: field.kind === "number" ? "number" : field.secret ? "password" : "text",
             value: current ?? "",
@@ -712,10 +741,13 @@ window.__ModuleLoader__.load({
         }
         const hints = {};
         function fieldCell(field) {
-          return h("div", { key: field.key, className: "mov-field" }, [
-            field.kind === "switch" ? null : h("label", { key: "label", style: labelStyle, htmlFor: `metaontic-video-${field.key}` }, t(field.key)),
+          const classes = ["mov-field"];
+          if (field.kind === "switch") classes.push("mov-field-switch");
+          if (field.wide) classes.push("mov-field-wide");
+          return h("div", { key: field.key, className: classes.join(" ") }, [
+            field.kind === "switch" ? null : h("label", { key: "label", className: "mov-label", htmlFor: `metaontic-video-${field.key}` }, t(field.key)),
             control(field),
-            hints[field.key] ? h("span", { key: "hint", style: { ...labelStyle, marginTop: 4 } }, hints[field.key]) : null
+            hints[field.key] ? h("span", { key: "hint", className: "mov-hint", style: { marginTop: 4 } }, hints[field.key]) : null
           ]);
         }
         const rows = SECTIONS.map((section) => h("div", { key: section.key, className: "mov-section" }, [
@@ -726,7 +758,7 @@ window.__ModuleLoader__.load({
             section.fields.map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
           )
         ]));
-        const footer = h("div", { key: "footer", className: "mov-card-head", style: { gap: 12, marginTop: 2 } }, [
+        const footer = h("div", { key: "footer", className: "mov-footer" }, [
           h("button", {
             key: "save",
             "data-action": "save",
@@ -764,11 +796,17 @@ window.__ModuleLoader__.load({
         const quotaSymbol = quota && quota.currency_symbol ? quota.currency_symbol : "\xA5";
         const money = (field) => `${quotaSymbol}${formatMoney(quota ? quota[field] : 0)}`;
         const quotaReady = quotaStatus === "ok" && quota;
-        const quotaText = quotaReady ? `${t("quotaSummary", {
-          remain: quota.unlimited_quota ? t("quotaUnlimited") : money("remain_amount"),
-          used: money("used_amount"),
-          total: money("total_amount")
-        })} \xB7 ${t("quotaUpdatedAt", { time: quotaAt })}` : keyReady ? t("quotaLoading") : t("quotaNoKey");
+        const quotaFallback = keyReady ? t("quotaLoading") : t("quotaNoKey");
+        const quotaStats = quotaReady ? [
+          {
+            key: "remain",
+            label: t("quotaRemain"),
+            value: quota.unlimited_quota ? t("quotaUnlimited") : money("remain_amount"),
+            color: TOKENS.success
+          },
+          { key: "used", label: t("quotaUsed"), value: money("used_amount"), color: TOKENS.text },
+          { key: "total", label: t("quotaTotal"), value: money("total_amount"), color: TOKENS.muted }
+        ] : null;
         const os = currentOs();
         const primaryInstall = FFMPEG_INSTALLS[os] || FFMPEG_INSTALLS.macos;
         const installRows = showAllFfmpeg ? FFMPEG_ALL : [primaryInstall];
@@ -787,12 +825,12 @@ window.__ModuleLoader__.load({
               onClick: () => setShowAllFfmpeg((current) => !current)
             }, showAllFfmpeg ? t("ffmpegLess") : t("ffmpegMore"))
           ]),
-          h("span", { key: "body", style: labelStyle }, t("ffmpegBody")),
-          h("span", { key: "for", style: labelStyle }, t("ffmpegInstallFor")),
+          h("span", { key: "body", className: "mov-hint" }, t("ffmpegBody")),
+          h("span", { key: "for", className: "mov-hint" }, t("ffmpegInstallFor")),
           ...installRows.map((item, index) => h("div", {
             key: `install-${index}`,
             "data-field": "ffmpegInstall",
-            style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }
+            className: "mov-cmd-row"
           }, [
             h("span", { key: "label", className: "mov-tag" }, item.label),
             h("code", {
@@ -808,7 +846,7 @@ window.__ModuleLoader__.load({
               onClick: () => copyCommand(item.command)
             }, copiedFfmpeg === item.command ? t("ffmpegCopied") : t("ffmpegCopy"))
           ])),
-          h("span", { key: "after", style: labelStyle }, t("ffmpegAfter"))
+          h("span", { key: "after", className: "mov-hint" }, t("ffmpegAfter"))
         ]);
         const quotaBox = h("div", {
           key: "quota",
@@ -829,14 +867,24 @@ window.__ModuleLoader__.load({
               }
             }, t("quotaRefresh")) : null
           ]),
-          h("div", { key: "text", style: { display: "flex", flexDirection: "column", gap: 2 } }, [
-            h("span", {
-              key: "value",
-              "data-field": "quotaValue",
-              style: { fontSize: 12, color: quotaReady ? TOKENS.success : TOKENS.muted }
-            }, quotaText),
-            quotaMessage ? h("span", { key: "message", style: labelStyle }, quotaMessage) : null
-          ])
+          quotaStats ? h(
+            "div",
+            { key: "text", "data-field": "quotaValue", className: "mov-stats" },
+            quotaStats.map((item) => h("div", { key: item.key, className: "mov-stat" }, [
+              h("span", { key: "label", className: "mov-stat-label" }, item.label),
+              h("span", {
+                key: "value",
+                className: "mov-stat-value",
+                style: { color: item.color }
+              }, item.value)
+            ]))
+          ) : h("span", {
+            key: "text",
+            "data-field": "quotaValue",
+            className: "mov-hint"
+          }, quotaFallback),
+          quotaReady ? h("span", { key: "at", className: "mov-foot-note" }, t("quotaUpdatedAt", { time: quotaAt })) : null,
+          quotaMessage ? h("span", { key: "message", className: "mov-hint" }, quotaMessage) : null
         ]);
         function copyCommand(command) {
           try {
@@ -882,7 +930,8 @@ window.__ModuleLoader__.load({
             h("span", {
               key: "summary",
               "data-field": "usageSummary",
-              style: { fontSize: 12, color: TOKENS.muted, flex: "1 1 200px" }
+              className: "mov-hint",
+              style: { flex: "1 1 160px" }
             }, usageSummaryText),
             h("button", {
               key: "refresh",
@@ -934,28 +983,32 @@ window.__ModuleLoader__.load({
                 className: "mov-num",
                 style: { color: row.status === "succeeded" ? TOKENS.success : TOKENS.muted }
               }, `${usageSymbol}${formatMoney(row.amount)}`),
-              h("span", {
-                key: "status",
-                style: { color: row.status === "succeeded" ? TOKENS.success : TOKENS.error }
-              }, row.status === "succeeded" ? t("usageStatusOk") : t("usageStatusFailed"))
+              h(
+                "span",
+                { key: "status" },
+                h("span", {
+                  key: "chip",
+                  className: `mov-chip ${row.status === "succeeded" ? "mov-chip-ok" : "mov-chip-bad"}`
+                }, row.status === "succeeded" ? t("usageStatusOk") : t("usageStatusFailed"))
+              )
             ]))
           ]) : null,
-          usageMessage ? h("span", { key: "message", style: labelStyle }, usageMessage) : null
+          usageMessage ? h("span", { key: "message", className: "mov-hint" }, usageMessage) : null
         ]) : null;
         const registerBox = keyReady ? null : h("div", {
           key: "register",
           className: "mov-card",
           style: { gap: 10 }
         }, [
-          h("div", { key: "text", style: { display: "flex", flexDirection: "column", gap: 2 } }, [
+          h("div", { key: "text", style: { display: "flex", flexDirection: "column", gap: 4 } }, [
             h(
               "span",
               { key: "title", className: "mov-card-title" },
               t("registerTitle")
             ),
-            h("span", { key: "hint", style: labelStyle }, t("registerHint"))
+            h("span", { key: "hint", className: "mov-hint" }, t("registerHint"))
           ]),
-          h("div", { key: "form", style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } }, [
+          h("div", { key: "form", className: "mov-register-form" }, [
             h("input", {
               key: "email",
               "data-field": "registerEmail",
@@ -971,7 +1024,7 @@ window.__ModuleLoader__.load({
               onChange: (event) => setRegisterEmail(event.target.value),
               style: {
                 ...inputStyle,
-                flex: "0 1 180px",
+                flex: "1 1 220px",
                 width: "auto",
                 opacity: emailLocked ? 0.6 : 1,
                 cursor: emailLocked ? "not-allowed" : "text"
@@ -998,7 +1051,7 @@ window.__ModuleLoader__.load({
               placeholder: t("registerCodePlaceholder"),
               "aria-label": t("registerCode"),
               onChange: (event) => setRegisterCode(event.target.value),
-              style: { ...inputStyle, flex: "0 1 110px", width: "auto" }
+              style: { ...inputStyle, flex: "0 1 130px", width: "auto" }
             }),
             h("button", {
               key: "button",
@@ -1031,7 +1084,7 @@ window.__ModuleLoader__.load({
         return h("div", { className: "mov-page" }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
           h("style", { key: "styles" }, PAGE_CSS),
-          notice ? h("p", { key: "notice", style: { margin: 0, fontSize: 12, color: TOKENS.muted } }, notice) : null,
+          notice ? h("p", { key: "notice", className: "mov-notice" }, notice) : null,
           ...notice && !snapshot.value ? [] : rows,
           ...blobs
         ]);
