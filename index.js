@@ -29,7 +29,9 @@ const Config = z.object({
     "\u6BCF\u6BB5\u5EF6\u957F\u51FA\u6765\u7684\u79D2\u6570\u4E0A\u9650\uFF08\u4E0D\u542B\u89C6\u98911\u672C\u8EAB\uFF09\uFF0C4-15 \u7684\u6574\u6570\uFF0C\u9ED8\u8BA4 15\uFF1A\u6309\u4E0A\u9650\u62C6\uFF0C\u6BB5\u6570\u6700\u5C11\uFF0830 \u79D2 \u2192 15+15\uFF0C\u800C\u4E0D\u662F 15+5+5+5\uFF09\uFF1B\u8C03\u5C0F\u5B83\u4F1A\u62C6\u51FA\u66F4\u591A\u6BB5\uFF0825 \u79D2\u3001\u4E0A\u9650 10 \u2192 15+10\uFF0C\u4E0A\u9650 5 \u2192 15+5+5\uFF09\uFF1B\u5982\u679C\u4E0A\u6E38\u5BF9\u5361\u6EE1 15 \u79D2\u7684\u5EF6\u957F\u6BB5\u654F\u611F\uFF0C\u53EF\u4EE5\u8BBE\u6210 14"
   ).volatile(),
   singleMaxSeconds: z.number().step(1).min(4).max(15).default(15).description("\u5355\u6B21\u76F4\u51FA\u4E0A\u9650\uFF1A\u4E0D\u8D85\u8FC7\u5B83\u5C31\u4E00\u6B21\u751F\u6210\uFF0C\u8D85\u8FC7\u5B83\u5C31\u5148\u76F4\u51FA\u8FD9\u4E00\u6BB5\u518D\u9010\u6BB5\u5EF6\u957F\uFF084-15\uFF09").volatile(),
-  mergeMode: z.union(["copy", "reencode"]).default("copy").description("\u5408\u5E76\u65B9\u5F0F\uFF1Acopy=\u5148\u65E0\u635F\u62FC\u63A5\uFF08\u53C2\u6570\u4E0D\u4E00\u81F4\u65F6\u81EA\u52A8\u56DE\u9000\u91CD\u7F16\u7801\uFF09\uFF1Breencode=\u7EDF\u4E00\u91CD\u7F16\u7801").volatile(),
+  mergeMode: z.union(["seamless", "copy", "reencode"]).default("seamless").description(
+    "\u5408\u5E76\u65B9\u5F0F\uFF1Aseamless=\u628A\u540E\u6BB5\u5BF9\u5230\u524D\u6BB5\u7ED3\u5C3E\u7684\u4EAE\u5EA6/\u97F3\u91CF\uFF0C\u518D\u7528\u77ED\u4EA4\u53C9\u6DE1\u5316\u63A5\u4E0A\uFF08\u9ED8\u8BA4\uFF0C\u63A5\u7F1D\u770B\u4E0D\u51FA\u6362\u6BB5\uFF09\uFF1Bcopy=\u65E0\u635F\u62FC\u63A5\uFF08\u5FEB\uFF0C\u4F46\u63A5\u7F1D\u662F\u786C\u5207\uFF0C\u4E24\u6B21\u751F\u6210\u7684\u8272\u8C03\u4F1A\u5DEE 2-3 \u7EA7\uFF09\uFF1Breencode=\u7EDF\u4E00\u91CD\u7F16\u7801"
+  ).volatile(),
   outputDir: z.string().default("").description("\u6210\u7247\u8F93\u51FA\u76EE\u5F55\uFF1B\u7559\u7A7A\u7528\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/").volatile(),
   keepSegments: z.boolean().default(false).description("\u5408\u5E76\u540E\u662F\u5426\u4FDD\u7559\u5206\u6BB5\u539F\u7247").volatile(),
   ffmpegBinary: z.string().default("ffmpeg").description("ffmpeg \u53EF\u6267\u884C\u6587\u4EF6\uFF1BPATH \u91CC\u6CA1\u6709\u65F6\u586B\u7EDD\u5BF9\u8DEF\u5F84").volatile(),
@@ -201,7 +203,7 @@ function buildExtensionPrompt({
     `\u3010\u5EF6\u957F\u65B9\u5411\u3011${forward ? "\u5411\u524D\u5EF6\u957F\uFF08\u524D\u7F6E\u5267\u60C5\uFF0C\u653E\u5728\u89C6\u98911\u4E4B\u524D\uFF09" : "\u5411\u540E\u5EF6\u957F\uFF08\u7EED\u62CD\u5267\u60C5\uFF0C\u63A5\u5728\u89C6\u98911\u4E4B\u540E\uFF09"}\u3002`,
     `\u3010\u5267\u60C5\u53D1\u5C55\u3011${endWithPunctuation(prompt)}${forward ? "\u53EA\u6F14\u89C6\u98911\u4E4B\u524D\u53D1\u751F\u7684\u524D\u7F6E\u5267\u60C5\uFF0C\u4E0D\u590D\u8FF0\u89C6\u98911\u91CC\u7684\u60C5\u8282\u3002" : "\u53EA\u6F14\u89C6\u98911\u4E4B\u540E\u53D1\u751F\u7684\u65B0\u5267\u60C5\uFF0C\u4E0D\u91CD\u590D\u89C6\u98911\u91CC\u7684\u60C5\u8282\u3001\u4E0D\u91CD\u65B0\u5F00\u573A\u3002"}`,
     "\u3010\u4E3B\u4F53\u72B6\u6001\u3011" + (forward ? "\u672C\u6BB5\u6536\u5C3E\u7684\u4EBA\u7269\u9762\u8C8C\u3001\u4F53\u578B\u3001\u670D\u88C5\u3001\u59FF\u6001\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\u5FC5\u987B\u80FD\u76F4\u63A5\u63A5\u5230\u89C6\u98911\u7B2C\u4E00\u5E27\uFF1B" : "\u6CBF\u7528\u89C6\u98911\u7ED3\u5C3E\u7684\u4EBA\u7269\u9762\u8C8C\u3001\u4F53\u578B\u3001\u670D\u88C5\u3001\u59FF\u6001\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\uFF1B") + "\u540C\u4E00\u89D2\u8272\u4FDD\u6301\u97F3\u8272\u3001\u53E3\u97F3\u3001\u8BED\u901F\u548C\u5F53\u524D\u60C5\u7EEA\uFF0C\u4E0D\u6362\u4EBA\u3001\u4E0D\u6362\u88C5\uFF0C\u4E0D\u6539\u53D8\u5E74\u9F84\u4E0E\u5916\u8C8C\u7279\u5F81\u3002",
-    "\u3010\u955C\u5934\u8FD0\u52A8\u3011\u4FDD\u6301\u89C6\u98911" + (forward ? "\u5F00\u5934\u7684" : "\u7ED3\u5C3E\u7684") + "\u673A\u4F4D\u3001\u666F\u522B\u3001\u7126\u6BB5\u3001\u8FD0\u955C\u65B9\u5411\u4E0E\u901F\u5EA6\uFF0C\u9501\u5B9A\u66DD\u5149\u3001\u767D\u5E73\u8861\u3001\u5149\u6E90\u65B9\u5411\u548C\u80CC\u666F\u5E03\u5C40\uFF0C\u4E0D\u6E10\u6697\u6E10\u4EAE\u3001\u4E0D\u6539\u53D8\u666F\u6DF1\u3001\u4E0D\u91CD\u5EFA\u80CC\u666F\u3002",
+    "\u3010\u955C\u5934\u8FD0\u52A8\u3011\u4FDD\u6301\u89C6\u98911" + (forward ? "\u5F00\u5934\u7684" : "\u7ED3\u5C3E\u7684") + "\u673A\u4F4D\u3001\u666F\u522B\u3001\u7126\u6BB5\u3001\u8FD0\u955C\u65B9\u5411\u4E0E\u901F\u5EA6\uFF0C\u9501\u5B9A\u66DD\u5149\u3001\u767D\u5E73\u8861\u3001\u5149\u6E90\u65B9\u5411\u548C\u80CC\u666F\u5E03\u5C40\uFF0C\u4E0D\u6E10\u6697\u6E10\u4EAE\u3001\u4E0D\u6539\u53D8\u666F\u6DF1\u3001\u4E0D\u91CD\u5EFA\u80CC\u666F\uFF1B\u6574\u6BB5\u4EAE\u5EA6\u4E0E\u8272\u8C03\u5FC5\u987B\u4E0E\u89C6\u98911" + (forward ? "\u5F00\u5934" : "\u7ED3\u5C3E") + "\u4E00\u81F4\uFF0C\u4E0D\u8981\u6574\u4F53\u538B\u6697\u6216\u504F\u8272\u3002",
     "\u3010\u58F0\u97F3\u5EF6\u7EED\u3011\u4FDD\u6301\u5BF9\u767D\u3001\u73AF\u5883\u58F0\u4E0E\u80CC\u666F\u97F3\u4E50\u8FDE\u7EED\uFF0C\u6BCF\u53E5\u53F0\u8BCD\u5B8C\u6574\u8BF4\u5B8C\uFF0C\u4E0D\u6DFB\u52A0\u7247\u5934\u7247\u5C3E\u3001\u4E0D\u590D\u8FF0\u5DF2\u8BF4\u53F0\u8BCD\u3002",
     transition,
     "\u672C\u6BB5\u660E\u786E\u6307\u5B9A\u7684\u8FD0\u955C\u548C\u5207\u955C\u4F18\u5148\uFF0C\u4E0A\u9762\u7684\u8854\u63A5\u5EFA\u8BAE\u4E0D\u5F97\u8986\u76D6\u5DF2\u786E\u8BA4\u7684\u955C\u5934\u5B89\u6392\u3002"
@@ -618,6 +620,165 @@ function evenNumber(value, fallback) {
   return rounded % 2 === 0 ? rounded : rounded - 1;
 }
 const AUDIO_PADDING_TOLERANCE_FRAMES = 1;
+const SEAM_FADE_SECONDS = 0.25;
+const SEAM_WINDOW_SECONDS = 0.5;
+const SEAM_MAX_LUMA_SHIFT = 12;
+const SEAM_MAX_AUDIO_GAIN_DB = 4;
+async function measureAverageLuma(file, atSeconds, windowSeconds, config, signal) {
+  try {
+    const { code, stderr } = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
+      "-hide_banner",
+      "-nostats",
+      "-ss",
+      Math.max(0, atSeconds).toFixed(3),
+      "-t",
+      Math.max(0.05, windowSeconds).toFixed(3),
+      "-i",
+      file,
+      "-vf",
+      "signalstats,metadata=print:key=lavfi.signalstats.YAVG",
+      "-f",
+      "null",
+      "-"
+    ], { signal, timeoutMs: 12e4 });
+    if (code !== 0) return null;
+    const values = [...String(stderr).matchAll(/lavfi\.signalstats\.YAVG=(-?[\d.]+)/g)].map((match) => Number(match[1])).filter((value) => Number.isFinite(value));
+    if (!values.length) return null;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  } catch {
+    return null;
+  }
+}
+async function measureLoudness(file, atSeconds, windowSeconds, config, signal) {
+  try {
+    const { code, stderr } = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
+      "-hide_banner",
+      "-nostats",
+      "-ss",
+      Math.max(0, atSeconds).toFixed(3),
+      "-t",
+      Math.max(0.05, windowSeconds).toFixed(3),
+      "-i",
+      file,
+      "-af",
+      "volumedetect",
+      "-f",
+      "null",
+      "-"
+    ], { signal, timeoutMs: 12e4 });
+    if (code !== 0) return null;
+    const match = String(stderr).match(/mean_volume:\s*(-?[\d.]+)\s*dB/);
+    if (!match) return null;
+    const value = Number(match[1]);
+    return Number.isFinite(value) && value > -99 ? value : null;
+  } catch {
+    return null;
+  }
+}
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+async function measureSeams(config, files, durations, { signal, binary }) {
+  const window = SEAM_WINDOW_SECONDS;
+  const seams = [];
+  for (let index = 1; index < files.length; index += 1) {
+    const prevLength = durations[index - 1];
+    const seam = { index: index + 1, lumaDelta: 0, audioGainDb: 0 };
+    const prevAt = Math.max(0, prevLength - window);
+    const prevLuma = await measureAverageLuma(files[index - 1], prevAt, window, config, signal);
+    const nextLuma = await measureAverageLuma(files[index], 0, window, config, signal);
+    if (prevLuma != null && nextLuma != null) {
+      seam.lumaDelta = Number(
+        clampNumber(prevLuma - nextLuma, -SEAM_MAX_LUMA_SHIFT, SEAM_MAX_LUMA_SHIFT).toFixed(2)
+      );
+    }
+    const prevLoud = await measureLoudness(files[index - 1], prevAt, window, config, signal);
+    const nextLoud = await measureLoudness(files[index], 0, window, config, signal);
+    if (prevLoud != null && nextLoud != null) {
+      seam.audioGainDb = Number(
+        clampNumber(prevLoud - nextLoud, -SEAM_MAX_AUDIO_GAIN_DB, SEAM_MAX_AUDIO_GAIN_DB).toFixed(2)
+      );
+    }
+    seams.push(seam);
+  }
+  return seams;
+}
+async function mergeClipsSeamless(config, files, probed, outPath, { signal, binary }) {
+  const durations = files.map((_, index) => {
+    const media = probed[index] || {};
+    return Number(media.videoDurationSeconds) || Number(media.durationSeconds) || 0;
+  });
+  if (durations.some((value) => !(value > 0))) return null;
+  const shortest = Math.min(...durations);
+  const fade = Number(Math.min(SEAM_FADE_SECONDS, shortest / 4).toFixed(3));
+  if (!(fade >= 0.05)) return null;
+  const seams = await measureSeams(config, files, durations, { signal, binary });
+  const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
+  const first = probed.find((media) => media && media.width && media.height) || {};
+  const width = evenNumber(first.width, 1280);
+  const height = evenNumber(first.height, 720);
+  const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
+  const videoParts = [];
+  const audioParts = [];
+  for (const [index, file] of files.entries()) {
+    const seam = seams.find((item) => item.index === index + 1);
+    const shift = seam && Math.abs(seam.lumaDelta) >= 0.5 ? `lut=y='clip(val${seam.lumaDelta > 0 ? "+" : ""}${seam.lumaDelta},0,255)',` : "";
+    videoParts.push(
+      `[${index}:v]${shift}scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},format=yuv420p[v${index}]`
+    );
+    const gain = seam && Math.abs(seam.audioGainDb) >= 0.2 ? `volume=${seam.audioGainDb}dB,` : "";
+    audioParts.push(
+      `[${index}:a]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,${gain}asetpts=PTS-STARTPTS[a${index}]`
+    );
+  }
+  const videoChain = [];
+  const audioChain = [];
+  let offset = durations[0] - fade;
+  let lastVideo = "[v0]";
+  let lastAudio = "[a0]";
+  for (let index = 1; index < files.length; index += 1) {
+    const outVideo = `[x${index}]`;
+    videoChain.push(
+      `${lastVideo}[v${index}]xfade=transition=fade:duration=${fade}:offset=${offset.toFixed(3)}${outVideo}`
+    );
+    lastVideo = outVideo;
+    if (withAudio) {
+      const outAudio = `[y${index}]`;
+      audioChain.push(`${lastAudio}[a${index}]acrossfade=d=${fade}:c1=tri:c2=tri${outAudio}`);
+      lastAudio = outAudio;
+    }
+    offset += durations[index] - fade;
+  }
+  const filter = [
+    ...videoParts,
+    ...withAudio ? audioParts : [],
+    ...videoChain,
+    ...audioChain
+  ].join(";");
+  await rm(outPath, { force: true });
+  const args = ["-y"];
+  for (const file of files) args.push("-i", file);
+  args.push("-filter_complex", filter, "-map", lastVideo);
+  if (withAudio) args.push("-map", lastAudio);
+  args.push(
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-pix_fmt",
+    "yuv420p",
+    ...withAudio ? ["-c:a", "aac", "-b:a", "192k"] : [],
+    "-movflags",
+    "+faststart",
+    outPath
+  );
+  const { code, stderr } = await runProcess(binary, args, { signal });
+  if (code !== 0 || !await exists(outPath)) {
+    await rm(outPath, { force: true });
+    return { path: null, mode: "seamless", seams, error: String(stderr).trim().slice(-400) };
+  }
+  return { path: outPath, mode: "seamless", seams, fade };
+}
 async function alignSegmentAudio(config, files, probed, outPath, { signal, binary } = {}) {
   const temps = [];
   const trimmed = [];
@@ -689,7 +850,15 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
   );
   files = aligned;
   try {
-    if (ref(config, "mergeMode", "copy") !== "reencode" && paramsMatch) {
+    const mergeMode = ref(config, "mergeMode", "seamless");
+    if (mergeMode === "seamless" && files.length > 1) {
+      const seamless = await mergeClipsSeamless(config, files, probed, outPath, { signal, binary });
+      if (seamless?.path) {
+        return { path: seamless.path, mode: "seamless", trimmed, seams: seamless.seams, fade: seamless.fade };
+      }
+      if (seamless?.error) copyError = seamless.error;
+    }
+    if (mergeMode !== "reencode" && paramsMatch) {
       const listPath = `${outPath}.concat.txt`;
       const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
       await writeFile(listPath, `${lines}
@@ -1478,7 +1647,7 @@ function renderVideoResult(value) {
   parts.push(...lines);
   if (status === "succeeded") {
     if (videoPath) {
-      const how = mergeMode === "copy" ? "\u65E0\u635F\u62FC\u63A5" : mergeMode === "single" ? "\u4E00\u6BB5\u76F4\u51FA\uFF0C\u65E0\u9700\u62FC\u63A5" : "\u91CD\u7F16\u7801\u62FC\u63A5";
+      const how = mergeMode === "copy" ? "\u65E0\u635F\u62FC\u63A5" : mergeMode === "single" ? "\u4E00\u6BB5\u76F4\u51FA\uFF0C\u65E0\u9700\u62FC\u63A5" : mergeMode === "seamless" ? "\u65E0\u7F1D\u62FC\u63A5\uFF08\u5BF9\u9F50\u63A5\u7F1D + \u4EA4\u53C9\u6DE1\u5316\uFF09" : "\u91CD\u7F16\u7801\u62FC\u63A5";
       parts.push(`\u6210\u7247\uFF08\u672C\u5730\u6587\u4EF6\uFF09\uFF1A${videoPath}\uFF08${how}\uFF09`);
     } else if (segmentsDir) {
       parts.push(`\u6CA1\u6709\u5408\u5E76\u6210\u4E00\u6761\uFF1A\u5206\u6BB5\u6587\u4EF6\u90FD\u5728 ${segmentsDir}\uFF08\u6BCF\u6BB5\u8DEF\u5F84\u89C1\u4E0A\u9762\u7684\u5217\u8868\uFF09\u3002`);
@@ -1729,6 +1898,12 @@ function videoTool(config, deps) {
           if (merged.trimmed?.length) {
             notes.push(
               `\u7B2C ${merged.trimmed.map((item) => item.index).join("\u3001")} \u6BB5\u7684\u97F3\u9891\u6BD4\u89C6\u9891\u957F\uFF08\u6700\u957F ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} \u79D2\uFF09\uFF0C\u5DF2\u88C1\u9F50\u540E\u518D\u62FC\u63A5\uFF0C\u907F\u514D\u63A5\u7F1D\u5904\u7F3A\u4E00\u5C0F\u6BB5\u753B\u9762\u3002`
+            );
+          }
+          if (merged.mode === "seamless") {
+            const fixed = (merged.seams || []).filter((seam) => Math.abs(seam.lumaDelta) >= 0.5 || Math.abs(seam.audioGainDb) >= 0.2).map((seam) => `\u7B2C ${seam.index} \u6BB5\u63A5\u7F1D\uFF1A\u753B\u9762 ${seam.lumaDelta >= 0 ? "+" : ""}${seam.lumaDelta.toFixed(1)} \u7EA7\u3001\u97F3\u91CF ${seam.audioGainDb >= 0 ? "+" : ""}${seam.audioGainDb.toFixed(1)} dB`);
+            notes.push(
+              `\u5408\u5E76\u65B9\u5F0F\uFF1A\u65E0\u7F1D\u62FC\u63A5\uFF08\u63A5\u7F1D ${merged.fade} \u79D2\u4EA4\u53C9\u6DE1\u5316${fixed.length ? `\uFF0C\u5E76\u5DF2\u5BF9\u9F50${fixed.join("\uFF1B")}` : ""}\uFF09\u3002`
             );
           }
         }
@@ -2096,8 +2271,8 @@ function configTool(config, settings) {
         },
         mergeMode: {
           type: "string",
-          enum: ["copy", "reencode"],
-          description: "\u5408\u5E76\u65B9\u5F0F\uFF1Acopy=\u5148\u65E0\u635F\u62FC\u63A5\uFF08\u5931\u8D25\u81EA\u52A8\u91CD\u7F16\u7801\uFF09\uFF1Breencode=\u7EDF\u4E00\u91CD\u7F16\u7801\u3002"
+          enum: ["seamless", "copy", "reencode"],
+          description: "\u5408\u5E76\u65B9\u5F0F\uFF1Aseamless=\u6309\u63A5\u7F1D\u5B9E\u6D4B\u628A\u540E\u6BB5\u7684\u4EAE\u5EA6/\u97F3\u91CF\u5BF9\u9F50\uFF0C\u518D\u7528 0.25 \u79D2\u4EA4\u53C9\u6DE1\u5316\u63A5\u4E0A\uFF08\u9ED8\u8BA4\uFF0C\u63A5\u7F1D\u770B\u4E0D\u51FA\u6362\u6BB5\uFF09\uFF1Bcopy=\u65E0\u635F\u62FC\u63A5\uFF08\u5FEB\uFF0C\u4F46\u63A5\u7F1D\u662F\u786C\u5207\uFF09\uFF1Breencode=\u7EDF\u4E00\u91CD\u7F16\u7801\u3002"
         },
         outputDir: { type: "string", description: "\u6210\u7247\u8F93\u51FA\u76EE\u5F55\uFF1B\u7559\u7A7A\u7528\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\u3002" },
         keepSegments: { type: "boolean", description: "\u5408\u5E76\u540E\u662F\u5426\u4FDD\u7559\u5206\u6BB5\u539F\u7247\u3002" },

@@ -33,6 +33,7 @@ window.__ModuleLoader__.load({
       duration: '每段秒数',
       singleMaxSeconds: '直出上限（秒）',
       mergeMode: '合并方式',
+      mergeModeSeamless: '无缝拼接（对齐接缝）',
       mergeModeCopy: '无损拼接',
       mergeModeReencode: '重编码拼接',
       outputDir: '输出目录',
@@ -81,7 +82,6 @@ window.__ModuleLoader__.load({
       usageSummary: '{count} 条 · 费用合计 {amount}',
       usageColTime: '时间',
       usageColKind: '类型',
-      usageColResolution: '分辨率',
       usageColCost: '费用',
       usageColStatus: '结果',
       usageEmpty: '还没有记录：生成或续拍过视频后，这里会按时间列出最近几次。',
@@ -92,6 +92,9 @@ window.__ModuleLoader__.load({
       usageKeyMissing: '还没有密钥：领到 Key 之后，这里会显示用它出片的记录。',
       usageStatusOk: '成功',
       usageStatusFailed: '失败',
+      sectionGeneration: '生成参数',
+      sectionMerge: '合并与输出',
+      sectionAdvanced: '高级',
       register: '激活',
       registerWorking: '注册中…',
       registerOk: '注册成功：上游 / Key / 地址 / 模型都写好了，宿主重载配置后生效。',
@@ -129,6 +132,7 @@ window.__ModuleLoader__.load({
       duration: 'Seconds per segment',
       singleMaxSeconds: 'Direct generation limit (s)',
       mergeMode: 'Merge mode',
+      mergeModeSeamless: 'Seamless (match junctions)',
       mergeModeCopy: 'Stream copy',
       mergeModeReencode: 'Re-encode',
       outputDir: 'Output directory',
@@ -183,6 +187,9 @@ window.__ModuleLoader__.load({
       registerFailed: 'Registration failed: {message}',
       registerDisabled: 'Register service unavailable: {message}',
       registerNoKey: 'The register service returned no key (check the relay configuration).',
+      sectionGeneration: 'Generation',
+      sectionMerge: 'Merge & output',
+      sectionAdvanced: 'Advanced',
       mode: 'Continuation',
       modeContinuous: 'Same camera',
       modeCloseup: 'Cut to close-up',
@@ -210,8 +217,14 @@ window.__ModuleLoader__.load({
       mode: ['continuous', 'closeup'],
       resolution: ['480p', '720p', '1080p'],
       ratio: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
-      mergeMode: ['copy', 'reencode'],
+      mergeMode: ['seamless', 'copy', 'reencode'],
     };
+    // 字段按用途分组，页面用分节标题隔开——16 个字段铺一格太糊，分了组一眼能扫到自己要改的那项。
+    const SECTIONS = [
+      { key: 'sectionGeneration', fields: ['model', 'duration', 'singleMaxSeconds', 'mode', 'resolution', 'ratio', 'generateAudio', 'watermark'] },
+      { key: 'sectionMerge', fields: ['mergeMode', 'outputDir', 'keepSegments'] },
+      { key: 'sectionAdvanced', fields: ['extraParams', 'pollIntervalMs', 'maxWaitMs', 'ffmpegBinary', 'ffprobeBinary'] },
+    ];
     const FIELDS = [
       { key: 'model', kind: 'text' },
       { key: 'duration', kind: 'number' },
@@ -221,15 +234,16 @@ window.__ModuleLoader__.load({
       { key: 'ratio', kind: 'select' },
       { key: 'generateAudio', kind: 'switch' },
       { key: 'watermark', kind: 'switch' },
-      { key: 'extraParams', kind: 'text' },
-      { key: 'pollIntervalMs', kind: 'number' },
-      { key: 'maxWaitMs', kind: 'number' },
       { key: 'mergeMode', kind: 'select' },
       { key: 'outputDir', kind: 'text' },
       { key: 'keepSegments', kind: 'switch' },
+      { key: 'extraParams', kind: 'text' },
+      { key: 'pollIntervalMs', kind: 'number' },
+      { key: 'maxWaitMs', kind: 'number' },
       { key: 'ffmpegBinary', kind: 'text' },
       { key: 'ffprobeBinary', kind: 'text' },
     ];
+    const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((field) => [field.key, field]));
 
     /** 插件设置页「注册」按钮调用的服务地址：固定这个，不显示也不允许改。 */
     const DEFAULT_REGISTER_API = 'https://video.mybfs.cn';
@@ -288,19 +302,56 @@ window.__ModuleLoader__.load({
     const inputStyle = {
       width: '100%',
       boxSizing: 'border-box',
-      padding: '6px 8px',
-      borderRadius: 6,
+      padding: '7px 9px',
+      borderRadius: 8,
       border: `1px solid ${TOKENS.border}`,
       background: TOKENS.controlFill,
       color: TOKENS.text,
       font: 'inherit',
     };
     const labelStyle = { display: 'block', fontSize: 12, color: TOKENS.muted, marginBottom: 4 };
-    const cellStyle = { display: 'flex', flexDirection: 'column', minWidth: 180 };
+
+    /**
+     * 页面静态样式：能 hover / focus 的效果（按钮、表格行、输入聚焦圈）内联样式表达不了，
+     * 所以集中在这张表里；class 统一 mov- 前缀，避免和宿主其他插件串味。
+     */
+    const PAGE_CSS = `
+      .mov-page { display: flex; flex-direction: column; gap: 14px; padding: 4px 0; color: ${TOKENS.text}; }
+      .mov-section { display: flex; flex-direction: column; gap: 10px; }
+      .mov-section-title { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 600; color: ${TOKENS.muted}; letter-spacing: .04em; }
+      .mov-section-title::after { content: ""; flex: 1 1 auto; height: 1px; background: ${TOKENS.border}; }
+      .mov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 14px; }
+      .mov-field { display: flex; flex-direction: column; min-width: 0; }
+      .mov-input:focus, .mov-input:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(36, 123, 191, .22); }
+      .mov-switch { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; color: ${TOKENS.text}; cursor: pointer; }
+      .mov-switch input { width: 16px; height: 16px; accent-color: ${TOKENS.primaryFill}; cursor: pointer; }
+      .mov-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 10px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
+      .mov-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .mov-card-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
+      .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12.5px; line-height: 1.2; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
+      .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+      .mov-btn:disabled { opacity: .5; cursor: default; }
+      .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
+      .mov-btn-primary:hover:not(:disabled) { color: #fff; opacity: .88; }
+      .mov-btn-sm { padding: 4px 10px; border-radius: 7px; font-size: 12px; }
+      .mov-trailing { margin-left: auto; }
+      .mov-table { display: flex; flex-direction: column; }
+      .mov-table-head, .mov-table-row { display: grid; grid-template-columns: 92px minmax(64px, 1fr) 92px 56px; align-items: center; gap: 8px; padding: 7px 8px; }
+      .mov-table-head { font-size: 11px; color: ${TOKENS.muted}; border-bottom: 1px solid ${TOKENS.border}; }
+      .mov-table-row { font-size: 12.5px; border-bottom: 1px solid ${TOKENS.border}; }
+      .mov-table-row:last-child { border-bottom: none; }
+      .mov-table-row:hover { background: rgba(127, 127, 127, .08); }
+      .mov-num { font-variant-numeric: tabular-nums; }
+      .mov-code { flex: 1 1 220px; padding: 5px 9px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; color: ${TOKENS.text}; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+      .mov-tag { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
+    `;
 
     function optionLabel(t, key, option) {
       if (key === 'mode') return option === 'closeup' ? t('modeCloseup') : t('modeContinuous');
-      if (key === 'mergeMode') return option === 'reencode' ? t('mergeModeReencode') : t('mergeModeCopy');
+      if (key === 'mergeMode') {
+        if (option === 'reencode') return t('mergeModeReencode');
+        return option === 'copy' ? t('mergeModeCopy') : t('mergeModeSeamless');
+      }
       return option;
     }
 
@@ -734,7 +785,7 @@ window.__ModuleLoader__.load({
           const current = draft[field.key] !== undefined ? draft[field.key] : value[field.key];
           const id = `metaontic-video-${field.key}`;
           if (field.kind === 'switch') {
-            return h('label', { htmlFor: id, style: { display: 'flex', alignItems: 'center', gap: 6, color: TOKENS.text } },
+            return h('label', { htmlFor: id, className: 'mov-switch' },
               h('input', {
                 id,
                 'data-field': field.key,
@@ -748,6 +799,7 @@ window.__ModuleLoader__.load({
             return h('select', {
               id,
               'data-field': field.key,
+              className: 'mov-input',
               style: inputStyle,
               value: current ?? '',
               onChange: (event) => edit(field.key, event.target.value),
@@ -756,6 +808,7 @@ window.__ModuleLoader__.load({
           return h('input', {
             id,
             'data-field': field.key,
+            className: 'mov-input',
             style: inputStyle,
             type: field.kind === 'number' ? 'number' : (field.secret ? 'password' : 'text'),
             value: current ?? '',
@@ -771,34 +824,45 @@ window.__ModuleLoader__.load({
 
         const hints = {};
 
-        const rows = FIELDS.map((field) => h('div', { key: field.key, style: cellStyle }, [
-          field.kind === 'switch'
-            ? null
-            : h('label', { key: 'label', style: labelStyle, htmlFor: `metaontic-video-${field.key}` }, t(field.key)),
-          control(field),
-          hints[field.key] ? h('span', { key: 'hint', style: { ...labelStyle, marginTop: 4 } }, hints[field.key]) : null,
+        /** 一个可编辑字段：标签 + 控件（开关自带标签，就不重复画）。 */
+        function fieldCell(field) {
+          return h('div', { key: field.key, className: 'mov-field' }, [
+            field.kind === 'switch'
+              ? null
+              : h('label', { key: 'label', style: labelStyle, htmlFor: `metaontic-video-${field.key}` }, t(field.key)),
+            control(field),
+            hints[field.key] ? h('span', { key: 'hint', style: { ...labelStyle, marginTop: 4 } }, hints[field.key]) : null,
+          ]);
+        }
+
+        // 配置区分成几节，每节一个标题 + 一个自适应网格。
+        const rows = SECTIONS.map((section) => h('div', { key: section.key, className: 'mov-section' }, [
+          h('div', { key: 'title', className: 'mov-section-title' }, t(section.key)),
+          h('div', { key: 'grid', className: 'mov-grid' },
+            section.fields.map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)),
         ]));
 
-        const footer = h('div', { key: 'footer', style: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 } }, [
+        const footer = h('div', { key: 'footer', className: 'mov-card-head', style: { gap: 12, marginTop: 2 } }, [
           h('button', {
             key: 'save',
             'data-action': 'save',
             type: 'button',
+            className: 'mov-btn mov-btn-primary',
             disabled: status === 'saving' || snapshot.writable === false,
             onClick: save,
-            style: { padding: '6px 14px', borderRadius: 6, border: 'none', background: TOKENS.primaryFill, color: '#fff', cursor: 'pointer' },
           }, status === 'saving' ? t('saving') : t('save')),
           h('button', {
             key: 'reset',
             'data-action': 'reset',
             type: 'button',
+            className: 'mov-btn',
             disabled: !Object.keys(snapshot.user || {}).length,
             onClick: reset,
-            style: { padding: '6px 12px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.text, cursor: 'pointer' },
           }, t('reset')),
           h('span', {
             key: 'status',
             style: {
+              fontSize: 12,
               color: status === 'failed' ? TOKENS.error : (status === 'saved' ? TOKENS.success : TOKENS.muted),
             },
           }, status === 'saved'
@@ -847,25 +911,16 @@ window.__ModuleLoader__.load({
         const ffmpegBox = h('div', {
           key: 'ffmpeg',
           'data-field': 'ffmpeg',
-          style: {
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
-            marginTop: 10,
-            padding: '10px 12px',
-            borderRadius: 8,
-            border: `1px solid ${TOKENS.border}`,
-            background: TOKENS.cardFill,
-          },
+          className: 'mov-card',
         }, [
-          h('div', { key: 'head', style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' } }, [
-            h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } }, t('ffmpegTitle')),
+          h('div', { key: 'head', className: 'mov-card-head' }, [
+            h('span', { key: 'title', className: 'mov-card-title' }, t('ffmpegTitle')),
             h('button', {
               key: 'toggle',
               'data-action': 'ffmpeg-systems',
               type: 'button',
+              className: 'mov-btn mov-btn-sm mov-trailing',
               onClick: () => setShowAllFfmpeg((current) => !current),
-              style: { marginLeft: 'auto', padding: '2px 8px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.muted, cursor: 'pointer', fontSize: 12 },
             }, showAllFfmpeg ? t('ffmpegLess') : t('ffmpegMore')),
           ]),
           h('span', { key: 'body', style: labelStyle }, t('ffmpegBody')),
@@ -875,28 +930,18 @@ window.__ModuleLoader__.load({
             'data-field': 'ffmpegInstall',
             style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
           }, [
-            h('span', { key: 'label', style: { fontSize: 12, color: TOKENS.muted, flex: '0 0 auto' } }, item.label),
+            h('span', { key: 'label', className: 'mov-tag' }, item.label),
             h('code', {
               key: 'command',
               'data-field': 'ffmpegCommand',
-              style: {
-                flex: '1 1 240px',
-                padding: '4px 8px',
-                borderRadius: 6,
-                border: `1px solid ${TOKENS.border}`,
-                background: TOKENS.controlFill,
-                color: TOKENS.text,
-                fontSize: 12,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-all',
-              },
+              className: 'mov-code',
             }, item.command),
             h('button', {
               key: 'copy',
               'data-action': 'ffmpeg-copy',
               type: 'button',
+              className: 'mov-btn mov-btn-sm',
               onClick: () => copyCommand(item.command),
-              style: { padding: '4px 10px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.muted, cursor: 'pointer', fontSize: 12 },
             }, copiedFfmpeg === item.command ? t('ffmpegCopied') : t('ffmpegCopy')),
           ])),
           h('span', { key: 'after', style: labelStyle }, t('ffmpegAfter')),
@@ -905,20 +950,22 @@ window.__ModuleLoader__.load({
         const quotaBox = h('div', {
           key: 'quota',
           'data-field': 'quota',
-          style: {
-            display: 'flex',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 10,
-            marginTop: 10,
-            padding: '10px 12px',
-            borderRadius: 8,
-            border: `1px solid ${TOKENS.border}`,
-            background: TOKENS.cardFill,
-          },
+          className: 'mov-card',
         }, [
-          h('div', { key: 'text', style: { display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 220px' } }, [
-            h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } }, t('quotaTitle')),
+          h('div', { key: 'head', className: 'mov-card-head' }, [
+            h('span', { key: 'title', className: 'mov-card-title' }, t('quotaTitle')),
+            keyReady
+              ? h('button', {
+                key: 'refresh',
+                'data-action': 'quota-refresh',
+                type: 'button',
+                className: 'mov-btn mov-btn-sm mov-trailing',
+                disabled: quotaStatus === 'working',
+                onClick: () => { loadQuota().catch(() => {}); },
+              }, t('quotaRefresh'))
+              : null,
+          ]),
+          h('div', { key: 'text', style: { display: 'flex', flexDirection: 'column', gap: 2 } }, [
             h('span', {
               key: 'value',
               'data-field': 'quotaValue',
@@ -926,16 +973,6 @@ window.__ModuleLoader__.load({
             }, quotaText),
             quotaMessage ? h('span', { key: 'message', style: labelStyle }, quotaMessage) : null,
           ]),
-          keyReady
-            ? h('button', {
-              key: 'refresh',
-              'data-action': 'quota-refresh',
-              type: 'button',
-              disabled: quotaStatus === 'working',
-              onClick: () => { loadQuota().catch(() => {}); },
-              style: { padding: '4px 10px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.muted, cursor: 'pointer', fontSize: 12 },
-            }, t('quotaRefresh'))
-            : null,
         ]);
 
         /** 复制 ffmpeg 安装命令；剪贴板不可用就什么都不做，用户照样能照着敲。 */
@@ -980,19 +1017,10 @@ window.__ModuleLoader__.load({
         const usageBox = keyReady ? h('div', {
           key: 'usage',
           'data-field': 'usage',
-          style: {
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
-            marginTop: 10,
-            padding: '10px 12px',
-            borderRadius: 8,
-            border: `1px solid ${TOKENS.border}`,
-            background: TOKENS.cardFill,
-          },
+          className: 'mov-card',
         }, [
-          h('div', { key: 'head', style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' } }, [
-            h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } },
+          h('div', { key: 'head', className: 'mov-card-head' }, [
+            h('span', { key: 'title', className: 'mov-card-title' },
               t('usageTitle', { days: usage ? usage.window_days : 7 })),
             h('span', {
               key: 'summary',
@@ -1003,87 +1031,65 @@ window.__ModuleLoader__.load({
               key: 'refresh',
               'data-action': 'usage-refresh',
               type: 'button',
+              className: 'mov-btn mov-btn-sm',
               disabled: usageStatus === 'working',
               onClick: () => { loadUsage().catch(() => {}); },
-              style: { padding: '4px 10px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.muted, cursor: 'pointer', fontSize: 12 },
             }, t('usageRefresh')),
           ]),
           usageRows.length ? h('div', {
-            key: 'head-row',
+            key: 'table',
+            className: 'mov-table',
+          }, [
+            h('div', {
+              key: 'head-row',
             'data-field': 'usage-head',
-            style: {
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              flexWrap: 'wrap',
-              fontSize: 11,
-              color: TOKENS.muted,
-              paddingTop: 6,
-              borderTop: `1px solid ${TOKENS.border}`,
-            },
-          }, [
-            h('span', { key: 'time', style: { width: 96 } }, t('usageColTime')),
-            h('span', { key: 'kind', style: { width: 76 } }, t('usageColKind')),
-            h('span', { key: 'resolution', style: { width: 56 } }, t('usageColResolution')),
-            h('span', { key: 'cost', style: { width: 86 } }, t('usageColCost')),
-            h('span', { key: 'status' }, t('usageColStatus')),
+              className: 'mov-table-head',
+            }, [
+              h('span', { key: 'time' }, t('usageColTime')),
+              h('span', { key: 'kind' }, t('usageColKind')),
+              h('span', { key: 'cost' }, t('usageColCost')),
+              h('span', { key: 'status' }, t('usageColStatus')),
+            ]),
+            ...usageRows.map((row, index) => h('div', {
+              key: `${row.id}-${index}`,
+              'data-field': 'usage-row',
+              className: 'mov-table-row',
+            }, [
+              h('span', { key: 'time', className: 'mov-num', style: { color: TOKENS.muted } },
+                usageTime(row.created_at)),
+              h('span', { key: 'kind' }, row.kind_label || ''),
+              h('span', {
+                key: 'amount',
+                'data-field': 'usage-amount',
+                className: 'mov-num',
+                style: { color: row.status === 'succeeded' ? TOKENS.success : TOKENS.muted },
+              }, `${usageSymbol}${formatMoney(row.amount)}`),
+              h('span', {
+                key: 'status',
+                style: { color: row.status === 'succeeded' ? TOKENS.success : TOKENS.error },
+              }, row.status === 'succeeded' ? t('usageStatusOk') : t('usageStatusFailed')),
+            ])),
           ]) : null,
-          ...usageRows.map((row, index) => h('div', {
-            key: `${row.id}-${index}`,
-            'data-field': 'usage-row',
-            style: {
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              flexWrap: 'wrap',
-              fontSize: 12,
-              color: TOKENS.text,
-              paddingTop: 6,
-              borderTop: `1px solid ${TOKENS.border}`,
-            },
-          }, [
-            h('span', { key: 'time', style: { color: TOKENS.muted, width: 96 } },
-              usageTime(row.created_at)),
-            h('span', { key: 'kind', style: { width: 76 } }, row.kind_label || ''),
-            h('span', { key: 'resolution', style: { color: TOKENS.muted, width: 56 } },
-              row.resolution || ''),
-            h('span', {
-              key: 'amount',
-              'data-field': 'usage-amount',
-              style: { color: row.status === 'succeeded' ? TOKENS.success : TOKENS.muted, width: 86 },
-            }, `${usageSymbol}${formatMoney(row.amount)}`),
-            h('span', {
-              key: 'status',
-              style: { color: row.status === 'succeeded' ? TOKENS.success : TOKENS.error },
-            }, row.status === 'succeeded' ? t('usageStatusOk') : t('usageStatusFailed')),
-          ])),
           usageMessage ? h('span', { key: 'message', style: labelStyle }, usageMessage) : null,
         ]) : null;
 
         // 有 Key 就整块不渲染（连标题、提示文字都没有），页面上只剩配置项 + 额度卡片。
         const registerBox = keyReady ? null : h('div', {
           key: 'register',
-          style: {
-            display: 'flex',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 10,
-            marginTop: 12,
-            padding: '10px 12px',
-            borderRadius: 8,
-            border: `1px solid ${TOKENS.border}`,
-            background: TOKENS.cardFill,
-          },
+          className: 'mov-card',
+          style: { gap: 10 },
         }, [
-          h('div', { key: 'text', style: { display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 220px' } }, [
-            h('span', { key: 'title', style: { fontSize: 13, color: TOKENS.text } },
+          h('div', { key: 'text', style: { display: 'flex', flexDirection: 'column', gap: 2 } }, [
+            h('span', { key: 'title', className: 'mov-card-title' },
               t('registerTitle')),
             h('span', { key: 'hint', style: labelStyle }, t('registerHint')),
           ]),
+          h('div', { key: 'form', style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } }, [
           h('input', {
             key: 'email',
             'data-field': 'registerEmail',
             type: 'text',
+            className: 'mov-input',
             value: registerEmail,
             placeholder: t('registerEmailPlaceholder'),
             'aria-label': t('registerEmail'),
@@ -1104,9 +1110,9 @@ window.__ModuleLoader__.load({
             key: 'code',
             'data-action': 'send-code',
             type: 'button',
+            className: 'mov-btn',
             disabled: codeStatus === 'working' || codeCooldown > 0 || !registerEmail.trim(),
             onClick: () => { sendEmailCode().catch(() => {}); },
-            style: { padding: '6px 12px', borderRadius: 6, border: `1px solid ${TOKENS.border}`, background: 'transparent', color: TOKENS.text, cursor: 'pointer' },
           }, codeCooldown > 0
             ? t('registerCodeCooldown', { seconds: codeCooldown })
             : (codeStatus === 'working' ? t('registerCodeSending') : t('registerCodeSend'))),
@@ -1115,6 +1121,7 @@ window.__ModuleLoader__.load({
             'data-field': 'registerCode',
             type: 'text',
             inputMode: 'numeric',
+            className: 'mov-input',
             value: registerCode,
             placeholder: t('registerCodePlaceholder'),
             'aria-label': t('registerCode'),
@@ -1125,13 +1132,14 @@ window.__ModuleLoader__.load({
             key: 'button',
             'data-action': 'register',
             type: 'button',
+            className: 'mov-btn mov-btn-primary',
             disabled: registerStatus === 'working'
               || !registerEmail.trim()
               || !registerCode.trim()
               || snapshot.writable === false,
             onClick: register,
-            style: { padding: '6px 14px', borderRadius: 6, border: 'none', background: TOKENS.primaryFill, color: '#fff', cursor: 'pointer' },
           }, registerStatus === 'working' ? t('registerWorking') : t('register')),
+          ]),
           codeMessage
             ? h('span', {
               key: 'code-message',
@@ -1156,17 +1164,17 @@ window.__ModuleLoader__.load({
         else if (snapshot.value === undefined) notice = t('unavailable');
         else if (snapshot.writable === false) notice = t('readOnly');
 
-        return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0', color: TOKENS.text } }, [
-          notice ? h('p', { key: 'notice', style: { margin: 0, color: TOKENS.muted } }, notice) : null,
-          notice && !snapshot.value ? null : h('div', {
-            key: 'grid',
-            style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 },
-          }, rows),
-          notice && !snapshot.value ? null : ffmpegBox,
-          notice && !snapshot.value ? null : registerBox,
-          notice && !snapshot.value ? null : quotaBox,
-          notice && !snapshot.value ? null : usageBox,
-          notice && !snapshot.value ? null : footer,
+        // 配置读不出来（没有表单 / 不可写）时只显示提示，配置项与卡片一律不渲染。
+        const blobs = notice && !snapshot.value
+          ? []
+          : [ffmpegBox, registerBox, quotaBox, usageBox, footer];
+
+        return h('div', { className: 'mov-page' }, [
+          // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
+          h('style', { key: 'styles' }, PAGE_CSS),
+          notice ? h('p', { key: 'notice', style: { margin: 0, fontSize: 12, color: TOKENS.muted } }, notice) : null,
+          ...(notice && !snapshot.value ? [] : rows),
+          ...blobs,
         ]);
       };
     }

@@ -117,9 +117,12 @@ export const Config = z.object({
     .default(15)
     .description('单次直出上限：不超过它就一次生成，超过它就先直出这一段再逐段延长（4-15）')
     .volatile(),
-  mergeMode: z.union(['copy', 'reencode'])
-    .default('copy')
-    .description('合并方式：copy=先无损拼接（参数不一致时自动回退重编码）；reencode=统一重编码')
+  mergeMode: z.union(['seamless', 'copy', 'reencode'])
+    .default('seamless')
+    .description(
+      '合并方式：seamless=把后段对到前段结尾的亮度/音量，再用短交叉淡化接上（默认，接缝看不出换段）；'
+      + 'copy=无损拼接（快，但接缝是硬切，两次生成的色调会差 2-3 级）；reencode=统一重编码',
+    )
     .volatile(),
   outputDir: z.string()
     .default('')
@@ -407,7 +410,9 @@ function buildExtensionPrompt({
       + '同一角色保持音色、口音、语速和当前情绪，不换人、不换装，不改变年龄与外貌特征。',
     '【镜头运动】保持视频1' + (forward ? '开头的' : '结尾的')
       + '机位、景别、焦段、运镜方向与速度，锁定曝光、白平衡、光源方向和背景布局，'
-      + '不渐暗渐亮、不改变景深、不重建背景。',
+      + '不渐暗渐亮、不改变景深、不重建背景；'
+      // 两次生成是各自曝光的：不写死这条，接缝处常整体偏暗 2-3 级，看起来像换了一段
+      + '整段亮度与色调必须与视频1' + (forward ? '开头' : '结尾') + '一致，不要整体压暗或偏色。',
     '【声音延续】保持对白、环境声与背景音乐连续，每句台词完整说完，不添加片头片尾、不复述已说台词。',
     transition,
     '本段明确指定的运镜和切镜优先，上面的衔接建议不得覆盖已确认的镜头安排。',
@@ -959,6 +964,190 @@ function evenNumber(value, fallback) {
 const AUDIO_PADDING_TOLERANCE_FRAMES = 1;
 
 /**
+ * 接缝交叉淡化的时长（秒）：够盖住两次生成之间的微小差异，又不至于看起来像“转场”。
+ */
+const SEAM_FADE_SECONDS = 0.25;
+/** 量接缝两侧水平的取样窗口（秒）：太短会被单帧噪声带偏，太长会把整段色调带进来。 */
+const SEAM_WINDOW_SECONDS = 0.5;
+/** 接缝补正的上下限：数据异常时兜底，避免把画面整体提亮/削暗、音量抬爆。 */
+const SEAM_MAX_LUMA_SHIFT = 12;
+const SEAM_MAX_AUDIO_GAIN_DB = 4;
+
+/**
+ * 量一个时间窗的平均亮度（YAVG，限程 Y 0-255）。
+ * signalstats 的结果走 ffmpeg 的日志（stderr），所以这里不能用 `-v error`。
+ * @returns 平均亮度；取不到（没 ffmpeg / 探测失败）返回 null。
+ */
+async function measureAverageLuma(file, atSeconds, windowSeconds, config, signal) {
+  try {
+    const { code, stderr } = await runProcess(resolveBinary(config, 'ffmpegBinary', 'ffmpeg'), [
+      '-hide_banner', '-nostats',
+      '-ss', Math.max(0, atSeconds).toFixed(3),
+      '-t', Math.max(0.05, windowSeconds).toFixed(3),
+      '-i', file,
+      '-vf', 'signalstats,metadata=print:key=lavfi.signalstats.YAVG',
+      '-f', 'null', '-',
+    ], { signal, timeoutMs: 120000 });
+    if (code !== 0) return null;
+    const values = [...String(stderr).matchAll(/lavfi\.signalstats\.YAVG=(-?[\d.]+)/g)]
+      .map((match) => Number(match[1]))
+      .filter((value) => Number.isFinite(value));
+    if (!values.length) return null;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  } catch {
+    return null;
+  }
+}
+
+/** 量一个时间窗的平均响度（mean_volume，dBFS）；没有音轨或取不到时返回 null。 */
+async function measureLoudness(file, atSeconds, windowSeconds, config, signal) {
+  try {
+    const { code, stderr } = await runProcess(resolveBinary(config, 'ffmpegBinary', 'ffmpeg'), [
+      '-hide_banner', '-nostats',
+      '-ss', Math.max(0, atSeconds).toFixed(3),
+      '-t', Math.max(0.05, windowSeconds).toFixed(3),
+      '-i', file,
+      '-af', 'volumedetect',
+      '-f', 'null', '-',
+    ], { signal, timeoutMs: 120000 });
+    if (code !== 0) return null;
+    const match = String(stderr).match(/mean_volume:\s*(-?[\d.]+)\s*dB/);
+    if (!match) return null;
+    const value = Number(match[1]);
+    return Number.isFinite(value) && value > -99 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * 量每个接缝两侧的水平：前段结尾的亮度/响度 vs 后段开头的亮度/响度。
+ * 后段整段按差值修正——两次生成各自曝光不同，接缝的台阶就出在这里。
+ */
+async function measureSeams(config, files, durations, { signal, binary }) {
+  const window = SEAM_WINDOW_SECONDS;
+  const seams = [];
+  for (let index = 1; index < files.length; index += 1) {
+    const prevLength = durations[index - 1];
+    const seam = { index: index + 1, lumaDelta: 0, audioGainDb: 0 };
+    const prevAt = Math.max(0, prevLength - window);
+    const prevLuma = await measureAverageLuma(files[index - 1], prevAt, window, config, signal);
+    const nextLuma = await measureAverageLuma(files[index], 0, window, config, signal);
+    if (prevLuma != null && nextLuma != null) {
+      seam.lumaDelta = Number(
+        clampNumber(prevLuma - nextLuma, -SEAM_MAX_LUMA_SHIFT, SEAM_MAX_LUMA_SHIFT).toFixed(2),
+      );
+    }
+    const prevLoud = await measureLoudness(files[index - 1], prevAt, window, config, signal);
+    const nextLoud = await measureLoudness(files[index], 0, window, config, signal);
+    if (prevLoud != null && nextLoud != null) {
+      seam.audioGainDb = Number(
+        clampNumber(prevLoud - nextLoud, -SEAM_MAX_AUDIO_GAIN_DB, SEAM_MAX_AUDIO_GAIN_DB).toFixed(2),
+      );
+    }
+    seams.push(seam);
+  }
+  return seams;
+}
+
+/**
+ * 无缝合并：分段是两次独立生成，实测接缝处画面会暗 2-3 级、音量小 1 dB 左右，
+ * 直接 concat 就是一次硬切，看起来像「另拍一段贴上去」，而不是接着往下演。
+ *
+ * 这里做两件事：按接缝实测值把后段整段对齐（亮度用 `lut=y=val+Δ`，实测 `eq` 在小偏移上会取整出错），
+ * 再用 xfade + acrossfade 做 0.25 秒交叉淡化盖住切口。
+ * @returns 合并结果；任何一步不适合做无缝（分段太短、量不到数据）就返回 null 交给调用方回退。
+ */
+async function mergeClipsSeamless(config, files, probed, outPath, { signal, binary }) {
+  const durations = files.map((_, index) => {
+    const media = probed[index] || {};
+    return Number(media.videoDurationSeconds) || Number(media.durationSeconds) || 0;
+  });
+  if (durations.some((value) => !(value > 0))) return null;
+  const shortest = Math.min(...durations);
+  // xfade 的偏移必须为正：整体时长比淡化时长短时根本放不下过渡。
+  const fade = Number(Math.min(SEAM_FADE_SECONDS, shortest / 4).toFixed(3));
+  if (!(fade >= 0.05)) return null;
+
+  const seams = await measureSeams(config, files, durations, { signal, binary });
+  const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
+
+  const first = probed.find((media) => media && media.width && media.height) || {};
+  const width = evenNumber(first.width, 1280);
+  const height = evenNumber(first.height, 720);
+  const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
+
+  const videoParts = [];
+  const audioParts = [];
+  for (const [index, file] of files.entries()) {
+    const seam = seams.find((item) => item.index === index + 1);
+    const shift = seam && Math.abs(seam.lumaDelta) >= 0.5
+      ? `lut=y='clip(val${seam.lumaDelta > 0 ? '+' : ''}${seam.lumaDelta},0,255)',`
+      : '';
+    videoParts.push(
+      `[${index}:v]${shift}scale=${width}:${height}:force_original_aspect_ratio=decrease,`
+      + `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},`
+      // 这里不要再加 settb / setpts：xfade 要求输入是恒定帧率，被它们改过之后会报
+      // 「inputs needs to be a constant frame rate; current rate of 1/0」直接失败。
+      + `format=yuv420p[v${index}]`,
+    );
+    const gain = seam && Math.abs(seam.audioGainDb) >= 0.2 ? `volume=${seam.audioGainDb}dB,` : '';
+    audioParts.push(
+      `[${index}:a]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,`
+      + `${gain}asetpts=PTS-STARTPTS[a${index}]`,
+    );
+  }
+
+  // xfade / acrossfade 只能两两相接，所以按顺序链式串起来；偏移要把前面累计的淡化时长扣掉。
+  const videoChain = [];
+  const audioChain = [];
+  let offset = durations[0] - fade;
+  let lastVideo = '[v0]';
+  let lastAudio = '[a0]';
+  for (let index = 1; index < files.length; index += 1) {
+    const outVideo = `[x${index}]`;
+    videoChain.push(
+      `${lastVideo}[v${index}]xfade=transition=fade:duration=${fade}:offset=${offset.toFixed(3)}${outVideo}`,
+    );
+    lastVideo = outVideo;
+    if (withAudio) {
+      const outAudio = `[y${index}]`;
+      audioChain.push(`${lastAudio}[a${index}]acrossfade=d=${fade}:c1=tri:c2=tri${outAudio}`);
+      lastAudio = outAudio;
+    }
+    offset += durations[index] - fade;
+  }
+
+  const filter = [
+    ...videoParts,
+    ...(withAudio ? audioParts : []),
+    ...videoChain,
+    ...audioChain,
+  ].join(';');
+
+  await rm(outPath, { force: true });
+  const args = ['-y'];
+  for (const file of files) args.push('-i', file);
+  args.push('-filter_complex', filter, '-map', lastVideo);
+  if (withAudio) args.push('-map', lastAudio);
+  args.push(
+    '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
+    ...(withAudio ? ['-c:a', 'aac', '-b:a', '192k'] : []),
+    '-movflags', '+faststart', outPath,
+  );
+  const { code, stderr } = await runProcess(binary, args, { signal });
+  if (code !== 0 || !(await exists(outPath))) {
+    await rm(outPath, { force: true });
+    return { path: null, mode: 'seamless', seams, error: String(stderr).trim().slice(-400) };
+  }
+  return { path: outPath, mode: 'seamless', seams, fade };
+}
+
+/**
  * 上游分段的音频常比视频长几十毫秒（封装补白）：concat 会按容器时长偏移，
  * 接缝处就留下 1-2 帧没有画面的空洞（看起来「缺了一小段」），重编码路径还会让音画逐段错位。
  * 这里把「非末段」的音频裁到与视频等长：视频轨保持 -c copy，只重编音频。
@@ -1035,7 +1224,19 @@ async function mergeClips(config, files: string[], outPath: string, { signal }: 
   files = aligned;
   try {
 
-    if (ref(config, 'mergeMode', 'copy') !== 'reencode' && paramsMatch) {
+    const mergeMode = ref(config, 'mergeMode', 'seamless');
+
+    // 默认走无缝：分段是两次独立生成，色调/响度本来就有台阶，硬切一眼能看出是两段。
+    // 任何一步不满足条件（分段太短、量不到数据、编码失败）都退回到后面的常规拼接。
+    if (mergeMode === 'seamless' && files.length > 1) {
+      const seamless = await mergeClipsSeamless(config, files, probed, outPath, { signal, binary });
+      if (seamless?.path) {
+        return { path: seamless.path, mode: 'seamless', trimmed, seams: seamless.seams, fade: seamless.fade };
+      }
+      if (seamless?.error) copyError = seamless.error;
+    }
+
+    if (mergeMode !== 'reencode' && paramsMatch) {
       const listPath = `${outPath}.concat.txt`;
       const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join('\n');
       await writeFile(listPath, `${lines}\n`, 'utf8');
@@ -2019,7 +2220,9 @@ function renderVideoResult(value) {
     if (videoPath) {
       const how = mergeMode === 'copy'
         ? '无损拼接'
-        : (mergeMode === 'single' ? '一段直出，无需拼接' : '重编码拼接');
+        : (mergeMode === 'single'
+          ? '一段直出，无需拼接'
+          : (mergeMode === 'seamless' ? '无缝拼接（对齐接缝 + 交叉淡化）' : '重编码拼接'));
       parts.push(`成片（本地文件）：${videoPath}（${how}）`);
     } else if (segmentsDir) {
       parts.push(`没有合并成一条：分段文件都在 ${segmentsDir}（每段路径见上面的列表）。`);
@@ -2325,6 +2528,18 @@ function videoTool(config, deps) {
               `第 ${merged.trimmed.map((item) => item.index).join('、')} 段的音频比视频长`
               + `（最长 ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} 秒），`
               + '已裁齐后再拼接，避免接缝处缺一小段画面。',
+            );
+          }
+          if (merged.mode === 'seamless') {
+            // 把接缝补正的实测值写在结果里，用户/模型能看出「不是硬切上去的」
+            const fixed = (merged.seams || [])
+              .filter((seam) => Math.abs(seam.lumaDelta) >= 0.5 || Math.abs(seam.audioGainDb) >= 0.2)
+              .map((seam) => `第 ${seam.index} 段接缝：画面 ${seam.lumaDelta >= 0 ? '+' : ''}`
+                + `${seam.lumaDelta.toFixed(1)} 级、音量 ${seam.audioGainDb >= 0 ? '+' : ''}`
+                + `${seam.audioGainDb.toFixed(1)} dB`);
+            notes.push(
+              `合并方式：无缝拼接（接缝 ${merged.fade} 秒交叉淡化`
+              + `${fixed.length ? `，并已对齐${fixed.join('；')}` : ''}）。`,
             );
           }
         }
@@ -2742,8 +2957,9 @@ function configTool(config, settings) {
         },
         mergeMode: {
           type: 'string',
-          enum: ['copy', 'reencode'],
-          description: '合并方式：copy=先无损拼接（失败自动重编码）；reencode=统一重编码。',
+          enum: ['seamless', 'copy', 'reencode'],
+          description: '合并方式：seamless=按接缝实测把后段的亮度/音量对齐，再用 0.25 秒交叉淡化接上'
+            + '（默认，接缝看不出换段）；copy=无损拼接（快，但接缝是硬切）；reencode=统一重编码。',
         },
         outputDir: { type: 'string', description: '成片输出目录；留空用会话工作目录下的 metaontic-video/。' },
         keepSegments: { type: 'boolean', description: '合并后是否保留分段原片。' },
