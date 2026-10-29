@@ -3,3 +3,5 @@
 *.mp4
 *.concat.txt
 segments/
+node_modules/
+dist/

@@ -264,3 +264,20 @@ Key、服务地址、模型由「激活」自动写好，正常不用出现在�
 
 装不上、出不了片，去仓库提 Issue：
 <https://github.com/wxsimon2022/metaontic-video/issues>
+
+## 改代码（开发者）
+
+源码是 TypeScript，放在 `src/`；仓库根目录的 `index.js` / `client.js` 是**构建产物**
+（宿主与 App 客户端都是直接加载这两个文件，运行时没有 TS 转译），所以改完必须重新构建并一起提交。
+
+```bash
+npm install        # 只装开发依赖：typescript + esbuild + @types/node
+npm run typecheck  # tsc 类型检查（types/dsh.d.ts 里声明了宿主用到的接口）
+npm run build      # 检查 + 构建出根目录的 index.js / client.js
+```
+
+- `src/index.ts`：宿主半侧（`video_generate` / `video_extend` / `video_status` / `video_config`）。
+- `src/client.ts`：浏览器半侧（插件页那张卡片），必须保持单文件、无 import。
+- `types/dsh.d.ts`：本插件用到的宿主接口（工具定义、`tools/pre-execute` 卡口、审批、settings 等）。
+- 冒烟脚本在 `/private/tmp/dsh-plugin/`（不进仓库）：`video-smoke.mjs` 跑合并与卡口，
+  `client-smoke-register.mjs` 跑设置页渲染。

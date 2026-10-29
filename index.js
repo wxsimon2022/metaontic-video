@@ -1,466 +1,259 @@
-/**
- * MetaOnticVideo —— Seedance 短视频生成 + 视频延长（向后续拍）Host plugin.
- *
- * 注册的工具：
- *   - `video_generate`  生成一段完整视频：总时长不超过单段上限（默认 15 秒）时直接生成；
- *                       更长时先直出首段，再逐段延长，最后用 ffmpeg 合并成一个本地成片
- *   - `video_extend`    以一段公网视频为输入素材，向前或向后延长指定秒数；可一次连续延长多段
- *   - `video_status`    按任务 ID 查询任务的状态
- *   - `video_config`    读取/写回本插件自己的配置（走宿主的 settings 服务，
- *                             写进 profile 的 cordis.patch.yml；配置字段都是 .volatile()，
- *                             宿主重载后立即生效，不必手改 YAML）
- *
- * 接口与火山方舟 contents-generation 任务一致，既可直接用官方地址，也可走 New API 中转站：
- *   POST {baseUrl}{submitPath}
- *   GET  {baseUrl}{queryPath}
- * 只走 New API 中转站（火山官方接口已移除）：baseUrl 填中转站站址，路径按中转站的模型分流走。
- *
- * 请求体沿用火山方舟 contents-generation 的原生延长语义：
- *   - 提示词以「向后延长视频1」/「向前延长视频1」开头，用「视频1」指代输入素材，
- *     并写清延长方向、剧情发展、主体状态、镜头运动、声音延续
- *   - content 传入 {"type":"video_url","video_url":{"url":...},"role":"reference_video"}
- *   - seedance 2.5 追加 ratio=adaptive 与 omni_reference_task_type=extend
- *
- * 响应解析兼容中转站：状态别名（success/completed…）、任务 ID 字段（id/task_id/taskId）、
- * 深层取件（data.content.video_url），并跳过 cover/首尾帧等图片字段。
- */
-import { spawn } from 'node:child_process';
-import { createWriteStream } from 'node:fs';
-import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
-import z from '@deepseek-ai/schemastery';
-
-export const inject = ['tools'];
-
-export const Config = z.object({
-  entryId: z.string()
-    .default('metaontic-video')
-    .description('本插件在 profile patch 里的条目 id；配置工具用它把改动写回')
-    .volatile(),
-  apiKey: z.string()
-    .default('')
-    .description('API Key；留空时读环境变量 NEWAPI_API_KEY（也可以直接用设置页的「注册」按钮领一把）')
-    .volatile(),
-  baseUrl: z.string()
-    .default('')
-    .description(
-      '基础地址（中转站站址）；留空时读环境变量 NEWAPI_VIDEO_BASE_URL / NEWAPI_BASE_URL。'
-      + '示例 https://ai.bileego.com（不要带 /v1，也不要重复 /api/v3）',
-    )
-    .volatile(),
-  submitPath: z.string()
-    .default('')
-    .description('创建任务路径；留空用中转站默认值 /doubao/api/v3/contents/generations/tasks')
-    .volatile(),
-  queryPath: z.string()
-    .default('')
-    .description('查询任务路径，{task_id} 会被任务 ID 替换；留空用中转站默认值')
-    .volatile(),
-  model: z.string()
-    .default('')
-    .description('支持视频延长的模型 ID（seedance 2.0 / 2.5 系列）；留空读 NEWAPI_VIDEO_MODEL 或内置默认值')
-    .volatile(),
-  registerUser: z.string()
-    .default('')
-    .description('（已废弃）历史上注册时填的用户名；现在领 Key 用邮箱验证码，见 registerEmail')
-    .volatile(),
-  registerEmail: z.string()
-    .default('')
-    .description('领 Key 用的邮箱（账号）：中转站里的密钥名由服务端生成唯一串，与这个邮箱绑定')
-    .volatile(),
-  registerToken: z.string()
-    .default('metaontic-video-register-v1')
-    .description('注册请求头 X-Register-Token 的值，要与服务端 REGISTER_CLIENT_TOKEN 一致；页面不显示')
-    .volatile(),
-  registerApi: z.string()
-    .default('')
-    .description('插件服务地址（领 Key / 查额度 / 使用记录）；留空用内置的视频服务域名')
-    .volatile(),
-  deviceId: z.string()
-    .default('')
-    .description('本机设备标识：设置页点「激活」时写入，用来查这把 Key 的剩余额度')
-    .volatile(),
-  deviceSecret: z.string()
-    .default('')
-    .description('本机设备密钥：与设备标识一起绑定归属；页面不显示')
-    .volatile(),
-  estimateGroupRatio: z.number().min(0).max(10)
-    .default(0.8)
-    .description('预估费用用的分组折扣（中转站 group_ratio：videosvip=0.8、default=1）')
-    .volatile(),
-  duration: z.number().step(1).min(4).max(15)
-    .default(15)
-    .description(
-      '每段延长出来的秒数上限（不含视频1本身），4-15 的整数，默认 15：'
-      + '按上限拆，段数最少（30 秒 → 15+15，而不是 15+5+5+5）；'
-      + '调小它会拆出更多段（25 秒、上限 10 → 15+10，上限 5 → 15+5+5）；'
-      + '如果上游对卡满 15 秒的延长段敏感，可以设成 14',
-    )
-    .volatile(),
-  singleMaxSeconds: z.number().step(1).min(4).max(15)
-    .default(15)
-    .description('单次直出上限：不超过它就一次生成，超过它就先直出这一段再逐段延长（4-15）')
-    .volatile(),
-  mergeMode: z.union(['copy', 'reencode'])
-    .default('copy')
-    .description('合并方式：copy=先无损拼接（参数不一致时自动回退重编码）；reencode=统一重编码')
-    .volatile(),
-  outputDir: z.string()
-    .default('')
-    .description('成片输出目录；留空用会话工作目录下的 metaontic-video/')
-    .volatile(),
-  keepSegments: z.boolean()
-    .default(false)
-    .description('合并后是否保留分段原片')
-    .volatile(),
-  ffmpegBinary: z.string()
-    .default('ffmpeg')
-    .description('ffmpeg 可执行文件；PATH 里没有时填绝对路径')
-    .volatile(),
-  ffprobeBinary: z.string()
-    .default('ffprobe')
-    .description('ffprobe 可执行文件；PATH 里没有时填绝对路径')
-    .volatile(),
-  mode: z.union(['continuous', 'closeup'])
-    .default('continuous')
-    .description('continuous=同机位连续续拍；closeup=在台词结束处切近景续拍')
-    .volatile(),
-  resolution: z.union(['480p', '720p', '1080p'])
-    .default('720p')
-    .description('分辨率')
-    .volatile(),
-  ratio: z.union(['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'])
-    .default('adaptive')
-    .description('画面比例；seedance 2.5 延长时固定改用 adaptive')
-    .volatile(),
-  generateAudio: z.boolean()
-    .default(true)
-    .description('是否生成音频')
-    .volatile(),
-  watermark: z.boolean()
-    .default(false)
-    .description('是否添加水印；部分中转站只接受 true')
-    .volatile(),
-  extraParams: z.string()
-    .default('')
-    .description('JSON 对象字符串，合并进请求体，用于中转站的特有字段')
-    .volatile(),
-  pollIntervalMs: z.natural().min(1000)
-    .default(5000)
-    .description('轮询任务状态的间隔（毫秒）')
-    .volatile(),
-  maxWaitMs: z.natural().min(1000)
-    .default(600000)
-    .description('单次调用最长等待时间（毫秒）')
-    .volatile(),
+import { spawn } from "node:child_process";
+import { createWriteStream } from "node:fs";
+import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import z from "@deepseek-ai/schemastery";
+const inject = ["tools"];
+const Config = z.object({
+  entryId: z.string().default("metaontic-video").description("\u672C\u63D2\u4EF6\u5728 profile patch \u91CC\u7684\u6761\u76EE id\uFF1B\u914D\u7F6E\u5DE5\u5177\u7528\u5B83\u628A\u6539\u52A8\u5199\u56DE").volatile(),
+  apiKey: z.string().default("").description("API Key\uFF1B\u7559\u7A7A\u65F6\u8BFB\u73AF\u5883\u53D8\u91CF NEWAPI_API_KEY\uFF08\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7528\u8BBE\u7F6E\u9875\u7684\u300C\u6CE8\u518C\u300D\u6309\u94AE\u9886\u4E00\u628A\uFF09").volatile(),
+  baseUrl: z.string().default("").description(
+    "\u57FA\u7840\u5730\u5740\uFF08\u4E2D\u8F6C\u7AD9\u7AD9\u5740\uFF09\uFF1B\u7559\u7A7A\u65F6\u8BFB\u73AF\u5883\u53D8\u91CF NEWAPI_VIDEO_BASE_URL / NEWAPI_BASE_URL\u3002\u793A\u4F8B https://ai.bileego.com\uFF08\u4E0D\u8981\u5E26 /v1\uFF0C\u4E5F\u4E0D\u8981\u91CD\u590D /api/v3\uFF09"
+  ).volatile(),
+  submitPath: z.string().default("").description("\u521B\u5EFA\u4EFB\u52A1\u8DEF\u5F84\uFF1B\u7559\u7A7A\u7528\u4E2D\u8F6C\u7AD9\u9ED8\u8BA4\u503C /doubao/api/v3/contents/generations/tasks").volatile(),
+  queryPath: z.string().default("").description("\u67E5\u8BE2\u4EFB\u52A1\u8DEF\u5F84\uFF0C{task_id} \u4F1A\u88AB\u4EFB\u52A1 ID \u66FF\u6362\uFF1B\u7559\u7A7A\u7528\u4E2D\u8F6C\u7AD9\u9ED8\u8BA4\u503C").volatile(),
+  model: z.string().default("").description("\u652F\u6301\u89C6\u9891\u5EF6\u957F\u7684\u6A21\u578B ID\uFF08seedance 2.0 / 2.5 \u7CFB\u5217\uFF09\uFF1B\u7559\u7A7A\u8BFB NEWAPI_VIDEO_MODEL \u6216\u5185\u7F6E\u9ED8\u8BA4\u503C").volatile(),
+  registerUser: z.string().default("").description("\uFF08\u5DF2\u5E9F\u5F03\uFF09\u5386\u53F2\u4E0A\u6CE8\u518C\u65F6\u586B\u7684\u7528\u6237\u540D\uFF1B\u73B0\u5728\u9886 Key \u7528\u90AE\u7BB1\u9A8C\u8BC1\u7801\uFF0C\u89C1 registerEmail").volatile(),
+  registerEmail: z.string().default("").description("\u9886 Key \u7528\u7684\u90AE\u7BB1\uFF08\u8D26\u53F7\uFF09\uFF1A\u4E2D\u8F6C\u7AD9\u91CC\u7684\u5BC6\u94A5\u540D\u7531\u670D\u52A1\u7AEF\u751F\u6210\u552F\u4E00\u4E32\uFF0C\u4E0E\u8FD9\u4E2A\u90AE\u7BB1\u7ED1\u5B9A").volatile(),
+  registerToken: z.string().default("metaontic-video-register-v1").description("\u6CE8\u518C\u8BF7\u6C42\u5934 X-Register-Token \u7684\u503C\uFF0C\u8981\u4E0E\u670D\u52A1\u7AEF REGISTER_CLIENT_TOKEN \u4E00\u81F4\uFF1B\u9875\u9762\u4E0D\u663E\u793A").volatile(),
+  registerApi: z.string().default("").description("\u63D2\u4EF6\u670D\u52A1\u5730\u5740\uFF08\u9886 Key / \u67E5\u989D\u5EA6 / \u4F7F\u7528\u8BB0\u5F55\uFF09\uFF1B\u7559\u7A7A\u7528\u5185\u7F6E\u7684\u89C6\u9891\u670D\u52A1\u57DF\u540D").volatile(),
+  deviceId: z.string().default("").description("\u672C\u673A\u8BBE\u5907\u6807\u8BC6\uFF1A\u8BBE\u7F6E\u9875\u70B9\u300C\u6FC0\u6D3B\u300D\u65F6\u5199\u5165\uFF0C\u7528\u6765\u67E5\u8FD9\u628A Key \u7684\u5269\u4F59\u989D\u5EA6").volatile(),
+  deviceSecret: z.string().default("").description("\u672C\u673A\u8BBE\u5907\u5BC6\u94A5\uFF1A\u4E0E\u8BBE\u5907\u6807\u8BC6\u4E00\u8D77\u7ED1\u5B9A\u5F52\u5C5E\uFF1B\u9875\u9762\u4E0D\u663E\u793A").volatile(),
+  estimateGroupRatio: z.number().min(0).max(10).default(0.8).description("\u9884\u4F30\u8D39\u7528\u7528\u7684\u5206\u7EC4\u6298\u6263\uFF08\u4E2D\u8F6C\u7AD9 group_ratio\uFF1Avideosvip=0.8\u3001default=1\uFF09").volatile(),
+  duration: z.number().step(1).min(4).max(15).default(15).description(
+    "\u6BCF\u6BB5\u5EF6\u957F\u51FA\u6765\u7684\u79D2\u6570\u4E0A\u9650\uFF08\u4E0D\u542B\u89C6\u98911\u672C\u8EAB\uFF09\uFF0C4-15 \u7684\u6574\u6570\uFF0C\u9ED8\u8BA4 15\uFF1A\u6309\u4E0A\u9650\u62C6\uFF0C\u6BB5\u6570\u6700\u5C11\uFF0830 \u79D2 \u2192 15+15\uFF0C\u800C\u4E0D\u662F 15+5+5+5\uFF09\uFF1B\u8C03\u5C0F\u5B83\u4F1A\u62C6\u51FA\u66F4\u591A\u6BB5\uFF0825 \u79D2\u3001\u4E0A\u9650 10 \u2192 15+10\uFF0C\u4E0A\u9650 5 \u2192 15+5+5\uFF09\uFF1B\u5982\u679C\u4E0A\u6E38\u5BF9\u5361\u6EE1 15 \u79D2\u7684\u5EF6\u957F\u6BB5\u654F\u611F\uFF0C\u53EF\u4EE5\u8BBE\u6210 14"
+  ).volatile(),
+  singleMaxSeconds: z.number().step(1).min(4).max(15).default(15).description("\u5355\u6B21\u76F4\u51FA\u4E0A\u9650\uFF1A\u4E0D\u8D85\u8FC7\u5B83\u5C31\u4E00\u6B21\u751F\u6210\uFF0C\u8D85\u8FC7\u5B83\u5C31\u5148\u76F4\u51FA\u8FD9\u4E00\u6BB5\u518D\u9010\u6BB5\u5EF6\u957F\uFF084-15\uFF09").volatile(),
+  mergeMode: z.union(["copy", "reencode"]).default("copy").description("\u5408\u5E76\u65B9\u5F0F\uFF1Acopy=\u5148\u65E0\u635F\u62FC\u63A5\uFF08\u53C2\u6570\u4E0D\u4E00\u81F4\u65F6\u81EA\u52A8\u56DE\u9000\u91CD\u7F16\u7801\uFF09\uFF1Breencode=\u7EDF\u4E00\u91CD\u7F16\u7801").volatile(),
+  outputDir: z.string().default("").description("\u6210\u7247\u8F93\u51FA\u76EE\u5F55\uFF1B\u7559\u7A7A\u7528\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/").volatile(),
+  keepSegments: z.boolean().default(false).description("\u5408\u5E76\u540E\u662F\u5426\u4FDD\u7559\u5206\u6BB5\u539F\u7247").volatile(),
+  ffmpegBinary: z.string().default("ffmpeg").description("ffmpeg \u53EF\u6267\u884C\u6587\u4EF6\uFF1BPATH \u91CC\u6CA1\u6709\u65F6\u586B\u7EDD\u5BF9\u8DEF\u5F84").volatile(),
+  ffprobeBinary: z.string().default("ffprobe").description("ffprobe \u53EF\u6267\u884C\u6587\u4EF6\uFF1BPATH \u91CC\u6CA1\u6709\u65F6\u586B\u7EDD\u5BF9\u8DEF\u5F84").volatile(),
+  mode: z.union(["continuous", "closeup"]).default("continuous").description("continuous=\u540C\u673A\u4F4D\u8FDE\u7EED\u7EED\u62CD\uFF1Bcloseup=\u5728\u53F0\u8BCD\u7ED3\u675F\u5904\u5207\u8FD1\u666F\u7EED\u62CD").volatile(),
+  resolution: z.union(["480p", "720p", "1080p"]).default("720p").description("\u5206\u8FA8\u7387").volatile(),
+  ratio: z.union(["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"]).default("adaptive").description("\u753B\u9762\u6BD4\u4F8B\uFF1Bseedance 2.5 \u5EF6\u957F\u65F6\u56FA\u5B9A\u6539\u7528 adaptive").volatile(),
+  generateAudio: z.boolean().default(true).description("\u662F\u5426\u751F\u6210\u97F3\u9891").volatile(),
+  watermark: z.boolean().default(false).description("\u662F\u5426\u6DFB\u52A0\u6C34\u5370\uFF1B\u90E8\u5206\u4E2D\u8F6C\u7AD9\u53EA\u63A5\u53D7 true").volatile(),
+  extraParams: z.string().default("").description("JSON \u5BF9\u8C61\u5B57\u7B26\u4E32\uFF0C\u5408\u5E76\u8FDB\u8BF7\u6C42\u4F53\uFF0C\u7528\u4E8E\u4E2D\u8F6C\u7AD9\u7684\u7279\u6709\u5B57\u6BB5").volatile(),
+  pollIntervalMs: z.natural().min(1e3).default(5e3).description("\u8F6E\u8BE2\u4EFB\u52A1\u72B6\u6001\u7684\u95F4\u9694\uFF08\u6BEB\u79D2\uFF09").volatile(),
+  maxWaitMs: z.natural().min(1e3).default(6e5).description("\u5355\u6B21\u8C03\u7528\u6700\u957F\u7B49\u5F85\u65F6\u95F4\uFF08\u6BEB\u79D2\uFF09").volatile()
 });
-
-const DEFAULT_MODEL = 'doubao-seedance-2-0-mini-260615';
+const DEFAULT_MODEL = "doubao-seedance-2-0-mini-260615";
 const MAX_SEGMENTS = 10;
 const MIN_SECONDS = 4;
 const MIN_SEGMENT_SECONDS = 4;
-/** 单段延长（续拍）的秒数上限：Seedance 原生延长只接受 4-15 秒。 */
 const MAX_SEGMENT_SECONDS = 15;
-/** Seedance 单段最长 15 秒：不超过它一次直出，超过它才需要延长。 */
 const MAX_DIRECT_SECONDS = 15;
-/** 输出目录的默认子目录名。 */
-const DEFAULT_OUTPUT_DIR = 'metaontic-video';
-/** 判断「上游返回的是累计成片」的容差：累计时长的 25%，且至少 1.5 秒。 */
+const DEFAULT_OUTPUT_DIR = "metaontic-video";
 const CUMULATIVE_TOLERANCE_RATIO = 0.25;
 const CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5;
-
-/** 插件服务地址（领 Key、查额度、使用记录）：配置留空时用这个固定域名。 */
-const DEFAULT_REGISTER_API = 'https://video.mybfs.cn';
-/** 服务端握手头的兜底值（与服务端 REGISTER_CLIENT_TOKEN 对齐）。 */
-const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
-/** 额度/汇率兜底：服务端会回真实值，只有拿不到时才用这两个。 */
-const DEFAULT_QUOTA_PER_UNIT = 500000;
+const DEFAULT_REGISTER_API = "https://video.mybfs.cn";
+const DEFAULT_REGISTER_TOKEN = "metaontic-video-register-v1";
+const DEFAULT_QUOTA_PER_UNIT = 5e5;
 const DEFAULT_USD_EXCHANGE_RATE = 7.3;
-/** 会真正调用视频模型、因而必须人工确认的工具。 */
-const GATED_TOOLS = ['video_generate', 'video_extend'];
-
-/**
- * 预估费用的价目表：照抄中转站 /api/pricing 里 seedance 的 billing_expr。
- *
- * 中转站按 token 计费：``tokens = 宽 × 高 × 帧率 × 秒数 ÷ 1024``
- * （720p/24fps 正好 21600 token/秒），再乘「每 100 万 token 的美元价」得到美元。
- * 实测 15 秒 720p 直出 = 324000 token → 408329 额度，与中转站日志里的预扣费一致，
- * 所以这套算法够用来做「够不够、大概多少钱」的预检。实际以中转站结算为准。
- */
-const ESTIMATE_PIXELS = { '480p': [854, 480], '720p': [1280, 720], '1080p': [1920, 1080] };
+const GATED_TOOLS = ["video_generate", "video_extend"];
+const ESTIMATE_PIXELS = { "480p": [854, 480], "720p": [1280, 720], "1080p": [1920, 1080] };
 const ESTIMATE_FPS = 24;
 const ESTIMATE_TOKEN_DIVISOR = 1024;
-/** 每 100 万 token 的美元价：none = 没有参考素材，video = 带参考图 / 参考视频。 */
 const ESTIMATE_RATES = [
-  ['doubao-seedance-2-0-mini', { none: 3.150684931507, video: 1.917808219178 }],
-  ['doubao-seedance-2-0-fast', { none: 5.068493150685, video: 3.013698630137 }],
+  ["doubao-seedance-2-0-mini", { none: 3.150684931507, video: 1.917808219178 }],
+  ["doubao-seedance-2-0-fast", { none: 5.068493150685, video: 3.013698630137 }]
 ];
-
-/** provider 预设：字段留空时按这里的顺序回退到环境变量，再回退到预设默认值。 */
 const RELAY_PRESET = {
-    baseUrl: '',
-    submitPath: '/doubao/api/v3/contents/generations/tasks',
-    queryPath: '/doubao/api/v3/contents/generations/tasks/{task_id}',
-    model: DEFAULT_MODEL,
-    keyEnv: ['NEWAPI_API_KEY'],
-    baseEnv: ['NEWAPI_VIDEO_BASE_URL', 'NEWAPI_BASE_URL'],
-  modelEnv: ['NEWAPI_VIDEO_MODEL'],
+  baseUrl: "",
+  submitPath: "/doubao/api/v3/contents/generations/tasks",
+  queryPath: "/doubao/api/v3/contents/generations/tasks/{task_id}",
+  model: DEFAULT_MODEL,
+  keyEnv: ["NEWAPI_API_KEY"],
+  baseEnv: ["NEWAPI_VIDEO_BASE_URL", "NEWAPI_BASE_URL"],
+  modelEnv: ["NEWAPI_VIDEO_MODEL"]
 };
-
-const SUCCESS_STATES = new Set(['succeeded', 'success', 'completed', 'complete', 'done', 'finished']);
-const FAILED_STATES = new Set(['failed', 'failure', 'error', 'cancelled', 'canceled']);
-const CANCEL_STATES = new Set(['cancelled', 'canceled']);
-
-const QUOTA_HINTS = ['quota', 'insufficient', 'balance', '预扣费', '剩余额度'];
-const PRICE_HINTS = ['model_price_error', '阶梯计价', 'u("input_images")'];
+const SUCCESS_STATES = /* @__PURE__ */ new Set(["succeeded", "success", "completed", "complete", "done", "finished"]);
+const FAILED_STATES = /* @__PURE__ */ new Set(["failed", "failure", "error", "cancelled", "canceled"]);
+const CANCEL_STATES = /* @__PURE__ */ new Set(["cancelled", "canceled"]);
+const QUOTA_HINTS = ["quota", "insufficient", "balance", "\u9884\u6263\u8D39", "\u5269\u4F59\u989D\u5EA6"];
+const PRICE_HINTS = ["model_price_error", "\u9636\u68AF\u8BA1\u4EF7", 'u("input_images")'];
 const CONTENT_HINTS = [
-  'real person', 'privacyinformation', 'privacy information', 'content policy',
-  'content_policy', 'contentpolicy', 'content safety', 'safety policy',
-  'sensitive', '违规', '敏感', '涉政',
+  "real person",
+  "privacyinformation",
+  "privacy information",
+  "content policy",
+  "content_policy",
+  "contentpolicy",
+  "content safety",
+  "safety policy",
+  "sensitive",
+  "\u8FDD\u89C4",
+  "\u654F\u611F",
+  "\u6D89\u653F"
 ];
-
 const VIDEO_URL_KEYS = [
-  'video_url', 'videourl', 'download_url', 'play_url', 'result_url', 'output_url',
+  "video_url",
+  "videourl",
+  "download_url",
+  "play_url",
+  "result_url",
+  "output_url"
 ];
-const GENERIC_URL_KEYS = new Set(['url', 'output', 'video', 'file']);
-const IMAGE_KEY_TOKENS = ['cover', 'image', 'thumb', 'poster', 'frame', 'snapshot', 'preview'];
-const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif'];
-
-const CONTINUOUS_TRANSITION =
-  '本段第一帧必须紧接视频1最后一帧，保持同一构图、人物大小、左右位置、'
-  + '头部朝向、视线、手部位置和动作阶段。动作保持原有方向和速度，'
-  + '不重复前段动作、不定格等待、不从画面另一侧重新入场；不擅自切镜或重新居中。';
-
-const FORWARD_TRANSITION =
-  '向前延长时，本段最后一帧必须紧接视频1第一帧，保持同一构图、人物大小、左右位置、'
-  + '头部朝向、视线、手部位置和动作阶段。动作朝向视频1的开场动作发展，'
-  + '不重复前段动作、不定格等待、不从画面另一侧重新入场；不擅自切镜或重新居中。';
-
-const CLOSEUP_TRANSITION =
-  '镜头衔接建议（仅在本段未明确指定运镜或切镜安排时采用）：在完整台词结束处自然切到'
-  + '下一位说话人的近景或听话人的反应近景，再继续本段剧情。保持轴线、视线方向、'
-  + '左右人物关系、服装和音色，不交换角色；只改变景别，不新增场景。';
-
-const CONTENT_REJECTION_HINT =
-  '参考视频被上游内容审核拒绝，延长已停止。Seedance 含人脸续拍需使用同一上游账号的'
-  + '受信原始视频或授权素材；请确认中转站透传了原始 video_url 与 reference_video，'
-  + '且前后请求使用同一上游账号。不会自动去掉参考视频生成，以免人物不一致。';
-
-/**
- * 读取一个配置字段。`.volatile()` 声明的字段由宿主包装成引用（`.get()` 取快照，
- * 改动后无需重启即可生效），未声明的普通配置是普通值；两种形态都能读。
- */
+const GENERIC_URL_KEYS = /* @__PURE__ */ new Set(["url", "output", "video", "file"]);
+const IMAGE_KEY_TOKENS = ["cover", "image", "thumb", "poster", "frame", "snapshot", "preview"];
+const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"];
+const CONTINUOUS_TRANSITION = "\u672C\u6BB5\u7B2C\u4E00\u5E27\u5FC5\u987B\u7D27\u63A5\u89C6\u98911\u6700\u540E\u4E00\u5E27\uFF0C\u4FDD\u6301\u540C\u4E00\u6784\u56FE\u3001\u4EBA\u7269\u5927\u5C0F\u3001\u5DE6\u53F3\u4F4D\u7F6E\u3001\u5934\u90E8\u671D\u5411\u3001\u89C6\u7EBF\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\u3002\u52A8\u4F5C\u4FDD\u6301\u539F\u6709\u65B9\u5411\u548C\u901F\u5EA6\uFF0C\u4E0D\u91CD\u590D\u524D\u6BB5\u52A8\u4F5C\u3001\u4E0D\u5B9A\u683C\u7B49\u5F85\u3001\u4E0D\u4ECE\u753B\u9762\u53E6\u4E00\u4FA7\u91CD\u65B0\u5165\u573A\uFF1B\u4E0D\u64C5\u81EA\u5207\u955C\u6216\u91CD\u65B0\u5C45\u4E2D\u3002";
+const FORWARD_TRANSITION = "\u5411\u524D\u5EF6\u957F\u65F6\uFF0C\u672C\u6BB5\u6700\u540E\u4E00\u5E27\u5FC5\u987B\u7D27\u63A5\u89C6\u98911\u7B2C\u4E00\u5E27\uFF0C\u4FDD\u6301\u540C\u4E00\u6784\u56FE\u3001\u4EBA\u7269\u5927\u5C0F\u3001\u5DE6\u53F3\u4F4D\u7F6E\u3001\u5934\u90E8\u671D\u5411\u3001\u89C6\u7EBF\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\u3002\u52A8\u4F5C\u671D\u5411\u89C6\u98911\u7684\u5F00\u573A\u52A8\u4F5C\u53D1\u5C55\uFF0C\u4E0D\u91CD\u590D\u524D\u6BB5\u52A8\u4F5C\u3001\u4E0D\u5B9A\u683C\u7B49\u5F85\u3001\u4E0D\u4ECE\u753B\u9762\u53E6\u4E00\u4FA7\u91CD\u65B0\u5165\u573A\uFF1B\u4E0D\u64C5\u81EA\u5207\u955C\u6216\u91CD\u65B0\u5C45\u4E2D\u3002";
+const CLOSEUP_TRANSITION = "\u955C\u5934\u8854\u63A5\u5EFA\u8BAE\uFF08\u4EC5\u5728\u672C\u6BB5\u672A\u660E\u786E\u6307\u5B9A\u8FD0\u955C\u6216\u5207\u955C\u5B89\u6392\u65F6\u91C7\u7528\uFF09\uFF1A\u5728\u5B8C\u6574\u53F0\u8BCD\u7ED3\u675F\u5904\u81EA\u7136\u5207\u5230\u4E0B\u4E00\u4F4D\u8BF4\u8BDD\u4EBA\u7684\u8FD1\u666F\u6216\u542C\u8BDD\u4EBA\u7684\u53CD\u5E94\u8FD1\u666F\uFF0C\u518D\u7EE7\u7EED\u672C\u6BB5\u5267\u60C5\u3002\u4FDD\u6301\u8F74\u7EBF\u3001\u89C6\u7EBF\u65B9\u5411\u3001\u5DE6\u53F3\u4EBA\u7269\u5173\u7CFB\u3001\u670D\u88C5\u548C\u97F3\u8272\uFF0C\u4E0D\u4EA4\u6362\u89D2\u8272\uFF1B\u53EA\u6539\u53D8\u666F\u522B\uFF0C\u4E0D\u65B0\u589E\u573A\u666F\u3002";
+const CONTENT_REJECTION_HINT = "\u53C2\u8003\u89C6\u9891\u88AB\u4E0A\u6E38\u5185\u5BB9\u5BA1\u6838\u62D2\u7EDD\uFF0C\u5EF6\u957F\u5DF2\u505C\u6B62\u3002Seedance \u542B\u4EBA\u8138\u7EED\u62CD\u9700\u4F7F\u7528\u540C\u4E00\u4E0A\u6E38\u8D26\u53F7\u7684\u53D7\u4FE1\u539F\u59CB\u89C6\u9891\u6216\u6388\u6743\u7D20\u6750\uFF1B\u8BF7\u786E\u8BA4\u4E2D\u8F6C\u7AD9\u900F\u4F20\u4E86\u539F\u59CB video_url \u4E0E reference_video\uFF0C\u4E14\u524D\u540E\u8BF7\u6C42\u4F7F\u7528\u540C\u4E00\u4E0A\u6E38\u8D26\u53F7\u3002\u4E0D\u4F1A\u81EA\u52A8\u53BB\u6389\u53C2\u8003\u89C6\u9891\u751F\u6210\uFF0C\u4EE5\u514D\u4EBA\u7269\u4E0D\u4E00\u81F4\u3002";
 function ref(config, key, fallback) {
   const raw = config?.[key];
-  const value = raw && typeof raw.get === 'function' ? raw.get() : raw;
-  return value === undefined || value === null || value === '' ? fallback : value;
+  const value = raw && typeof raw.get === "function" ? raw.get() : raw;
+  return value === void 0 || value === null || value === "" ? fallback : value;
 }
-
 function relayPreset() {
-  // 只走 New API 中转站（火山官方已移除），路径/模型都取这一份预设。
   return RELAY_PRESET;
 }
-
 function envValue(names) {
   for (const name of names) {
     const value = process.env[name];
-    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === "string" && value.trim()) return value.trim();
   }
-  return '';
+  return "";
 }
-
 function resolveApiKey(config) {
-  return String(ref(config, 'apiKey', '')).trim() || envValue(relayPreset().keyEnv);
+  return String(ref(config, "apiKey", "")).trim() || envValue(relayPreset().keyEnv);
 }
-
 function resolveBaseUrl(config) {
   const preset = relayPreset();
-  return (String(ref(config, 'baseUrl', '')).trim() || envValue(preset.baseEnv) || preset.baseUrl)
-    .replace(/\/+$/, '');
+  return (String(ref(config, "baseUrl", "")).trim() || envValue(preset.baseEnv) || preset.baseUrl).replace(/\/+$/, "");
 }
-
 function resolveSubmitPath(config) {
-  return String(ref(config, 'submitPath', '')).trim() || relayPreset().submitPath;
+  return String(ref(config, "submitPath", "")).trim() || relayPreset().submitPath;
 }
-
 function resolveQueryPath(config, taskId) {
-  const path = String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath;
-  return path.replace('{task_id}', encodeURIComponent(taskId));
+  const path2 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
+  return path2.replace("{task_id}", encodeURIComponent(taskId));
 }
-
 function resolveModel(config) {
   const preset = relayPreset();
-  return String(ref(config, 'model', '')).trim() || envValue(preset.modelEnv) || preset.model;
+  return String(ref(config, "model", "")).trim() || envValue(preset.modelEnv) || preset.model;
 }
-
 function clampInteger(value, min, max, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.min(max, Math.max(min, Math.round(number)));
 }
-
-/** seedance 2.5 的延长走 omni 参考模式，需要固定 ratio 与任务类型。 */
 function isOmniExtendModel(model) {
   const lowered = String(model).toLowerCase();
-  return lowered.includes('seedance-2-5') || lowered.includes('seedance-2.5');
+  return lowered.includes("seedance-2-5") || lowered.includes("seedance-2.5");
 }
-
 function parseExtraParams(config) {
-  const raw = String(ref(config, 'extraParams', '')).trim();
+  const raw = String(ref(config, "extraParams", "")).trim();
   if (!raw) return {};
   let value;
   try {
     value = JSON.parse(raw);
   } catch {
-    throw new Error('配置 extraParams 不是合法 JSON 对象字符串。');
+    throw new Error("\u914D\u7F6E extraParams \u4E0D\u662F\u5408\u6CD5 JSON \u5BF9\u8C61\u5B57\u7B26\u4E32\u3002");
   }
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('配置 extraParams 必须是 JSON 对象。');
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("\u914D\u7F6E extraParams \u5FC5\u987B\u662F JSON \u5BF9\u8C61\u3002");
   }
   return value;
 }
-
 function assertConfigured(config, apiKey) {
   if (!apiKey) {
     throw new Error(
-      '未配置 API Key：请在插件设置页点「激活」领一把，或在插件 config 里填 apiKey，'
-      + '或设置环境变量 NEWAPI_API_KEY。',
+      "\u672A\u914D\u7F6E API Key\uFF1A\u8BF7\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u70B9\u300C\u6FC0\u6D3B\u300D\u9886\u4E00\u628A\uFF0C\u6216\u5728\u63D2\u4EF6 config \u91CC\u586B apiKey\uFF0C\u6216\u8BBE\u7F6E\u73AF\u5883\u53D8\u91CF NEWAPI_API_KEY\u3002"
     );
   }
   if (!resolveBaseUrl(config)) {
     throw new Error(
-      '未配置 baseUrl：用中转站时填中转站地址（如 https://ai.bileego.com），'
-      + '或设置环境变量 NEWAPI_VIDEO_BASE_URL / NEWAPI_BASE_URL。',
+      "\u672A\u914D\u7F6E baseUrl\uFF1A\u7528\u4E2D\u8F6C\u7AD9\u65F6\u586B\u4E2D\u8F6C\u7AD9\u5730\u5740\uFF08\u5982 https://ai.bileego.com\uFF09\uFF0C\u6216\u8BBE\u7F6E\u73AF\u5883\u53D8\u91CF NEWAPI_VIDEO_BASE_URL / NEWAPI_BASE_URL\u3002"
     );
   }
 }
-
-/**
- * 延长提示词。开头用「向后延长视频1」/「向前延长视频1」这类显式说法，
- * 并用「视频1」指代输入素材——写成「参考视频1」容易被上游当成「参考生视频」而不是延长。
- * 正文分五块写清，减少衔接断层：延长方向、剧情发展、主体状态、镜头运动、声音延续。
- */
 function buildExtensionPrompt({
-  prompt, seconds, startAt, mode, direction = 'backward', wording = 'extend',
+  prompt,
+  seconds,
+  startAt,
+  mode,
+  direction = "backward",
+  wording = "extend"
 }) {
-  const forward = direction === 'forward';
-  const head = forward
-    ? '向前延长视频1。'
-    : (wording === 'after' ? '生成视频1之后的内容：' : '向后延长视频1。');
-  const span = forward
-    ? (startAt == null
-      ? `生成 ${seconds} 秒前置画面，接在视频1第一帧之前。`
-      : `生成 ${seconds} 秒前置画面，对应整片第 ${Math.max(0, startAt - seconds)}–${startAt} 秒，紧接在视频1之前。`)
-    : (startAt == null
-      ? `生成 ${seconds} 秒续拍画面，接在视频1最后一帧之后。`
-      : `生成 ${seconds} 秒续拍画面，对应整片第 ${startAt}–${startAt + seconds} 秒，接在视频1之后。`);
-  const transition = forward
-    ? FORWARD_TRANSITION
-    : (mode === 'closeup' ? CLOSEUP_TRANSITION : CONTINUOUS_TRANSITION);
+  const forward = direction === "forward";
+  const head = forward ? "\u5411\u524D\u5EF6\u957F\u89C6\u98911\u3002" : wording === "after" ? "\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A" : "\u5411\u540E\u5EF6\u957F\u89C6\u98911\u3002";
+  const span = forward ? startAt == null ? `\u751F\u6210 ${seconds} \u79D2\u524D\u7F6E\u753B\u9762\uFF0C\u63A5\u5728\u89C6\u98911\u7B2C\u4E00\u5E27\u4E4B\u524D\u3002` : `\u751F\u6210 ${seconds} \u79D2\u524D\u7F6E\u753B\u9762\uFF0C\u5BF9\u5E94\u6574\u7247\u7B2C ${Math.max(0, startAt - seconds)}\u2013${startAt} \u79D2\uFF0C\u7D27\u63A5\u5728\u89C6\u98911\u4E4B\u524D\u3002` : startAt == null ? `\u751F\u6210 ${seconds} \u79D2\u7EED\u62CD\u753B\u9762\uFF0C\u63A5\u5728\u89C6\u98911\u6700\u540E\u4E00\u5E27\u4E4B\u540E\u3002` : `\u751F\u6210 ${seconds} \u79D2\u7EED\u62CD\u753B\u9762\uFF0C\u5BF9\u5E94\u6574\u7247\u7B2C ${startAt}\u2013${startAt + seconds} \u79D2\uFF0C\u63A5\u5728\u89C6\u98911\u4E4B\u540E\u3002`;
+  const transition = forward ? FORWARD_TRANSITION : mode === "closeup" ? CLOSEUP_TRANSITION : CONTINUOUS_TRANSITION;
   return [
     `${head}${span}`,
-    `【延长方向】${forward ? '向前延长（前置剧情，放在视频1之前）' : '向后延长（续拍剧情，接在视频1之后）'}。`,
-    `【剧情发展】${endWithPunctuation(prompt)}${forward
-      ? '只演视频1之前发生的前置剧情，不复述视频1里的情节。'
-      : '只演视频1之后发生的新剧情，不重复视频1里的情节、不重新开场。'}`,
-    '【主体状态】' + (forward
-      ? '本段收尾的人物面貌、体型、服装、姿态、手部位置和动作阶段必须能直接接到视频1第一帧；'
-      : '沿用视频1结尾的人物面貌、体型、服装、姿态、手部位置和动作阶段；')
-      + '同一角色保持音色、口音、语速和当前情绪，不换人、不换装，不改变年龄与外貌特征。',
-    '【镜头运动】保持视频1' + (forward ? '开头的' : '结尾的')
-      + '机位、景别、焦段、运镜方向与速度，锁定曝光、白平衡、光源方向和背景布局，'
-      + '不渐暗渐亮、不改变景深、不重建背景。',
-    '【声音延续】保持对白、环境声与背景音乐连续，每句台词完整说完，不添加片头片尾、不复述已说台词。',
+    `\u3010\u5EF6\u957F\u65B9\u5411\u3011${forward ? "\u5411\u524D\u5EF6\u957F\uFF08\u524D\u7F6E\u5267\u60C5\uFF0C\u653E\u5728\u89C6\u98911\u4E4B\u524D\uFF09" : "\u5411\u540E\u5EF6\u957F\uFF08\u7EED\u62CD\u5267\u60C5\uFF0C\u63A5\u5728\u89C6\u98911\u4E4B\u540E\uFF09"}\u3002`,
+    `\u3010\u5267\u60C5\u53D1\u5C55\u3011${endWithPunctuation(prompt)}${forward ? "\u53EA\u6F14\u89C6\u98911\u4E4B\u524D\u53D1\u751F\u7684\u524D\u7F6E\u5267\u60C5\uFF0C\u4E0D\u590D\u8FF0\u89C6\u98911\u91CC\u7684\u60C5\u8282\u3002" : "\u53EA\u6F14\u89C6\u98911\u4E4B\u540E\u53D1\u751F\u7684\u65B0\u5267\u60C5\uFF0C\u4E0D\u91CD\u590D\u89C6\u98911\u91CC\u7684\u60C5\u8282\u3001\u4E0D\u91CD\u65B0\u5F00\u573A\u3002"}`,
+    "\u3010\u4E3B\u4F53\u72B6\u6001\u3011" + (forward ? "\u672C\u6BB5\u6536\u5C3E\u7684\u4EBA\u7269\u9762\u8C8C\u3001\u4F53\u578B\u3001\u670D\u88C5\u3001\u59FF\u6001\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\u5FC5\u987B\u80FD\u76F4\u63A5\u63A5\u5230\u89C6\u98911\u7B2C\u4E00\u5E27\uFF1B" : "\u6CBF\u7528\u89C6\u98911\u7ED3\u5C3E\u7684\u4EBA\u7269\u9762\u8C8C\u3001\u4F53\u578B\u3001\u670D\u88C5\u3001\u59FF\u6001\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\uFF1B") + "\u540C\u4E00\u89D2\u8272\u4FDD\u6301\u97F3\u8272\u3001\u53E3\u97F3\u3001\u8BED\u901F\u548C\u5F53\u524D\u60C5\u7EEA\uFF0C\u4E0D\u6362\u4EBA\u3001\u4E0D\u6362\u88C5\uFF0C\u4E0D\u6539\u53D8\u5E74\u9F84\u4E0E\u5916\u8C8C\u7279\u5F81\u3002",
+    "\u3010\u955C\u5934\u8FD0\u52A8\u3011\u4FDD\u6301\u89C6\u98911" + (forward ? "\u5F00\u5934\u7684" : "\u7ED3\u5C3E\u7684") + "\u673A\u4F4D\u3001\u666F\u522B\u3001\u7126\u6BB5\u3001\u8FD0\u955C\u65B9\u5411\u4E0E\u901F\u5EA6\uFF0C\u9501\u5B9A\u66DD\u5149\u3001\u767D\u5E73\u8861\u3001\u5149\u6E90\u65B9\u5411\u548C\u80CC\u666F\u5E03\u5C40\uFF0C\u4E0D\u6E10\u6697\u6E10\u4EAE\u3001\u4E0D\u6539\u53D8\u666F\u6DF1\u3001\u4E0D\u91CD\u5EFA\u80CC\u666F\u3002",
+    "\u3010\u58F0\u97F3\u5EF6\u7EED\u3011\u4FDD\u6301\u5BF9\u767D\u3001\u73AF\u5883\u58F0\u4E0E\u80CC\u666F\u97F3\u4E50\u8FDE\u7EED\uFF0C\u6BCF\u53E5\u53F0\u8BCD\u5B8C\u6574\u8BF4\u5B8C\uFF0C\u4E0D\u6DFB\u52A0\u7247\u5934\u7247\u5C3E\u3001\u4E0D\u590D\u8FF0\u5DF2\u8BF4\u53F0\u8BCD\u3002",
     transition,
-    '本段明确指定的运镜和切镜优先，上面的衔接建议不得覆盖已确认的镜头安排。',
-  ].join('\n');
+    "\u672C\u6BB5\u660E\u786E\u6307\u5B9A\u7684\u8FD0\u955C\u548C\u5207\u955C\u4F18\u5148\uFF0C\u4E0A\u9762\u7684\u8854\u63A5\u5EFA\u8BAE\u4E0D\u5F97\u8986\u76D6\u5DF2\u786E\u8BA4\u7684\u955C\u5934\u5B89\u6392\u3002"
+  ].join("\n");
 }
-
-/** 中转站要能直接拉取参考视频，本地路径与内网地址没有意义。 */
 function normalizeReferenceUrl(value) {
-  const url = String(value ?? '').trim();
-  if (!url) throw new Error('参考视频 URL 不能为空。');
+  const url = String(value ?? "").trim();
+  if (!url) throw new Error("\u53C2\u8003\u89C6\u9891 URL \u4E0D\u80FD\u4E3A\u7A7A\u3002");
   if (!/^https?:\/\//i.test(url)) {
-    throw new Error('参考视频必须是 https:// 或 http:// 开头的公网 URL（不能用本地文件路径）。');
+    throw new Error("\u53C2\u8003\u89C6\u9891\u5FC5\u987B\u662F https:// \u6216 http:// \u5F00\u5934\u7684\u516C\u7F51 URL\uFF08\u4E0D\u80FD\u7528\u672C\u5730\u6587\u4EF6\u8DEF\u5F84\uFF09\u3002");
   }
   return url;
 }
-
 function buildRequestBody(config, args, referenceVideoUrl) {
   const model = resolveModel(config);
   const seconds = clampInteger(
     args.duration,
     MIN_SEGMENT_SECONDS,
     MAX_SEGMENT_SECONDS,
-    ref(config, 'duration', 5),
+    ref(config, "duration", 5)
   );
-  const mode = args.mode || ref(config, 'mode', 'continuous');
-  const prompt = String(args.prompt ?? '').trim();
+  const mode = args.mode || ref(config, "mode", "continuous");
+  const prompt = String(args.prompt ?? "").trim();
   const startAt = args.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
-  const direction = args.direction === 'forward' ? 'forward' : 'backward';
-  const wording = args.wording === 'after' ? 'after' : 'extend';
-
+  const direction = args.direction === "forward" ? "forward" : "backward";
+  const wording = args.wording === "after" ? "after" : "extend";
   const content = [
-    { type: 'text', text: buildExtensionPrompt({ prompt, seconds, startAt, mode, direction, wording }) },
-    { type: 'video_url', video_url: { url: referenceVideoUrl }, role: 'reference_video' },
+    { type: "text", text: buildExtensionPrompt({ prompt, seconds, startAt, mode, direction, wording }) },
+    { type: "video_url", video_url: { url: referenceVideoUrl }, role: "reference_video" }
   ];
-
   const body = { ...parseExtraParams(config) };
   body.model = model;
   body.content = content;
   body.duration = seconds;
-  body.ratio = args.ratio || ref(config, 'ratio', 'adaptive');
-
-  const resolution = args.resolution ?? ref(config, 'resolution', '720p');
+  body.ratio = args.ratio || ref(config, "ratio", "adaptive");
+  const resolution = args.resolution ?? ref(config, "resolution", "720p");
   if (resolution) body.resolution = resolution;
-
-  const generateAudio = args.generateAudio ?? ref(config, 'generateAudio', true);
-  if (typeof generateAudio === 'boolean') body.generate_audio = generateAudio;
-
-  const watermark = args.watermark ?? ref(config, 'watermark', false);
-  if (typeof watermark === 'boolean') body.watermark = watermark;
-
+  const generateAudio = args.generateAudio ?? ref(config, "generateAudio", true);
+  if (typeof generateAudio === "boolean") body.generate_audio = generateAudio;
+  const watermark = args.watermark ?? ref(config, "watermark", false);
+  if (typeof watermark === "boolean") body.watermark = watermark;
   if (args.user) body.safety_identifier = String(args.user);
-  if (typeof args.returnLastFrame === 'boolean') body.return_last_frame = args.returnLastFrame;
+  if (typeof args.returnLastFrame === "boolean") body.return_last_frame = args.returnLastFrame;
   if (args.seed != null && Number.isFinite(Number(args.seed))) body.seed = Number(args.seed);
-
   if (isOmniExtendModel(model)) {
-    body.ratio = 'adaptive';
-    body.omni_reference_task_type = 'extend';
+    body.ratio = "adaptive";
+    body.omni_reference_task_type = "extend";
   }
   return { body, seconds };
 }
-
-/* ---------------- 时长规划：不超上限就直出，超过就延长 ---------------- */
-
-/** 单次直出上限；Seedance 单段最长 15 秒，所以配置只在 4-15 之间生效。 */
 function resolveSingleMax(config) {
   return clampInteger(
-    ref(config, 'singleMaxSeconds', MAX_DIRECT_SECONDS),
+    ref(config, "singleMaxSeconds", MAX_DIRECT_SECONDS),
     MIN_SECONDS,
     MAX_DIRECT_SECONDS,
-    MAX_DIRECT_SECONDS,
+    MAX_DIRECT_SECONDS
   );
 }
-
-/** 每段延长出来的秒数上限（不含视频1本身）：4-15 的整数，默认吃满 15 秒，段数最少。 */
-function resolveSegmentSeconds(config, requested) {
-  const fallback = ref(config, 'duration', 5);
+function resolveSegmentSeconds(config, requested = void 0) {
+  const fallback = ref(config, "duration", 5);
   return clampInteger(requested ?? fallback, MIN_SEGMENT_SECONDS, MAX_SEGMENT_SECONDS, fallback);
 }
-
-/**
- * 把目标总时长拆成执行计划：
- * 不超过单段上限 → **只生成一段**（这是硬规则：≤ 单段上限的视频禁止拆分）；超过 → 先直出上限长度，
- * 再按每段秒数延长，最多 MAX_SEGMENTS 段（那是同一条视频的续拍段，不是多镜拼接）。
- */
 function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
-  // ≤ 单段上限：一次直出，绝不拆段（回归测试见 tests/：15 → '15'）
-  if (totalSeconds <= singleMax) return [{ kind: 'generate', seconds: totalSeconds }];
-
-  // 尾段不足最小分段秒数（4 秒）时先把首段缩短一点，避免拆出 1-3 秒的非法分段。
+  if (totalSeconds <= singleMax) return [{ kind: "generate", seconds: totalSeconds }];
   let base = singleMax;
   let remaining = totalSeconds - base;
   if (remaining < MIN_SEGMENT_SECONDS) {
@@ -470,10 +263,6 @@ function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
       remaining = totalSeconds - base;
     }
   }
-
-  // 段数取「每段装满上限」所需的最少段数：25 秒 → 15+10，30 秒 → 15+15，
-  // 而不是按固定 5 秒切成一堆小段（15+5+5+5）。然后在这几段之间均分，
-  // 既保证段数最少，也不会切出 1-3 秒的碎段。
   const slots = MAX_SEGMENTS - 1;
   const count = Math.min(slots, Math.max(1, Math.ceil(remaining / segmentSeconds)));
   const sizes = [];
@@ -484,137 +273,105 @@ function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
     sizes.push(size);
     left -= size;
   }
-
-  const plan = [{ kind: 'generate', seconds: base }];
+  const plan = [{ kind: "generate", seconds: base }];
   for (const seconds of sizes) {
     if (plan.length >= MAX_SEGMENTS) break;
-    plan.push({ kind: 'extend', seconds });
+    plan.push({ kind: "extend", seconds });
   }
   return plan;
 }
-
-/** 直出用的提示词：和延长不同，这里不引用任何参考视频。 */
 function buildGenerationPrompt({ prompt, seconds }) {
-  return (
-    `生成 ${seconds} 秒视频。${prompt}`
-    + '保持人物面貌、体型、服装和音色一致，场景光线、色调与镜头运动连贯；'
-    + '每句台词完整说完，环境声与背景音乐连续；'
-    + '不要片头片尾、不要字幕、不要水印，不从画面外侧重新入场。'
-  );
+  return `\u751F\u6210 ${seconds} \u79D2\u89C6\u9891\u3002${prompt}\u4FDD\u6301\u4EBA\u7269\u9762\u8C8C\u3001\u4F53\u578B\u3001\u670D\u88C5\u548C\u97F3\u8272\u4E00\u81F4\uFF0C\u573A\u666F\u5149\u7EBF\u3001\u8272\u8C03\u4E0E\u955C\u5934\u8FD0\u52A8\u8FDE\u8D2F\uFF1B\u6BCF\u53E5\u53F0\u8BCD\u5B8C\u6574\u8BF4\u5B8C\uFF0C\u73AF\u5883\u58F0\u4E0E\u80CC\u666F\u97F3\u4E50\u8FDE\u7EED\uFF1B\u4E0D\u8981\u7247\u5934\u7247\u5C3E\u3001\u4E0D\u8981\u5B57\u5E55\u3001\u4E0D\u8981\u6C34\u5370\uFF0C\u4E0D\u4ECE\u753B\u9762\u5916\u4FA7\u91CD\u65B0\u5165\u573A\u3002`;
 }
-
-/** 把用户给的剧情描述接成完整句子时补个句号，避免两句粘在一起。 */
 function endWithPunctuation(text) {
-  const value = String(text ?? '').trim();
-  if (!value) return '';
-  return /[。．.!！?？;；~～:：,，]$/.test(value) ? value : `${value}。`;
+  const value = String(text ?? "").trim();
+  if (!value) return "";
+  return /[。．.!！?？;；~～:：,，]$/.test(value) ? value : `${value}\u3002`;
 }
-
 function normalizeImageUrl(value, label) {
-  const url = String(value ?? '').trim();
-  if (!url) throw new Error(`${label} 不能为空。`);
+  const url = String(value ?? "").trim();
+  if (!url) throw new Error(`${label} \u4E0D\u80FD\u4E3A\u7A7A\u3002`);
   if (!/^https?:\/\//i.test(url)) {
-    throw new Error(`${label} 必须是 https:// 或 http:// 开头的公网 URL（不能用本地文件路径）。`);
+    throw new Error(`${label} \u5FC5\u987B\u662F https:// \u6216 http:// \u5F00\u5934\u7684\u516C\u7F51 URL\uFF08\u4E0D\u80FD\u7528\u672C\u5730\u6587\u4EF6\u8DEF\u5F84\uFF09\u3002`);
   }
   return url;
 }
-
-/** 直出请求体：文本 + 可选首帧/尾帧图，沿用火山 contents-generation 的原生格式。 */
 function buildGenerationBody(config, args, seconds) {
-  const prompt = String(args.prompt ?? '').trim();
-  const content = [{ type: 'text', text: buildGenerationPrompt({ prompt, seconds }) }];
-
-  const firstFrame = String(args.firstFrameUrl ?? '').trim();
+  const prompt = String(args.prompt ?? "").trim();
+  const content = [
+    { type: "text", text: buildGenerationPrompt({ prompt, seconds }) }
+  ];
+  const firstFrame = String(args.firstFrameUrl ?? "").trim();
   if (firstFrame) {
     content.push({
-      type: 'image_url',
-      image_url: { url: normalizeImageUrl(firstFrame, '首帧图 URL') },
-      role: 'first_frame',
+      type: "image_url",
+      image_url: { url: normalizeImageUrl(firstFrame, "\u9996\u5E27\u56FE URL") },
+      role: "first_frame"
     });
   }
-  const lastFrame = String(args.lastFrameUrl ?? '').trim();
+  const lastFrame = String(args.lastFrameUrl ?? "").trim();
   if (lastFrame) {
     content.push({
-      type: 'image_url',
-      image_url: { url: normalizeImageUrl(lastFrame, '尾帧图 URL') },
-      role: 'last_frame',
+      type: "image_url",
+      image_url: { url: normalizeImageUrl(lastFrame, "\u5C3E\u5E27\u56FE URL") },
+      role: "last_frame"
     });
   }
-
   const body = { ...parseExtraParams(config) };
   body.model = resolveModel(config);
   body.content = content;
   body.duration = seconds;
-  body.ratio = args.ratio || ref(config, 'ratio', 'adaptive');
-
-  const resolution = args.resolution ?? ref(config, 'resolution', '720p');
+  body.ratio = args.ratio || ref(config, "ratio", "adaptive");
+  const resolution = args.resolution ?? ref(config, "resolution", "720p");
   if (resolution) body.resolution = resolution;
-
-  const generateAudio = args.generateAudio ?? ref(config, 'generateAudio', true);
-  if (typeof generateAudio === 'boolean') body.generate_audio = generateAudio;
-
-  const watermark = args.watermark ?? ref(config, 'watermark', false);
-  if (typeof watermark === 'boolean') body.watermark = watermark;
-
+  const generateAudio = args.generateAudio ?? ref(config, "generateAudio", true);
+  if (typeof generateAudio === "boolean") body.generate_audio = generateAudio;
+  const watermark = args.watermark ?? ref(config, "watermark", false);
+  if (typeof watermark === "boolean") body.watermark = watermark;
   if (args.user) body.safety_identifier = String(args.user);
-  if (typeof args.returnLastFrame === 'boolean') body.return_last_frame = args.returnLastFrame;
+  if (typeof args.returnLastFrame === "boolean") body.return_last_frame = args.returnLastFrame;
   if (args.seed != null && Number.isFinite(Number(args.seed))) body.seed = Number(args.seed);
-
   return { body, seconds };
 }
-
-/** 创建任务并等到结束；超时、取消、失败都归一化成同一形状。 */
 async function runTask(config, body, signal) {
   const created = await createTask(config, body);
   const taskId = extractTaskId(created);
-  if (!taskId) throw new Error('创建任务失败：响应中缺少任务 ID。');
+  if (!taskId) throw new Error("\u521B\u5EFA\u4EFB\u52A1\u5931\u8D25\uFF1A\u54CD\u5E94\u4E2D\u7F3A\u5C11\u4EFB\u52A1 ID\u3002");
   try {
     const final = await waitForCompletion(config, taskId, signal);
     return { ...final, taskId };
   } catch (failure) {
-    if (failure?.code === 'ABORTED') throw failure;
-    if (failure?.code && failure.code !== 'provider_failed') {
-      return { taskId, status: 'failed', error: failure.message, errorCode: failure.code };
+    if (failure?.code === "ABORTED") throw failure;
+    if (failure?.code && failure.code !== "provider_failed") {
+      return { taskId, status: "failed", error: failure.message, errorCode: failure.code };
     }
-    return { taskId, status: 'failed', error: failure?.message || String(failure) };
+    return { taskId, status: "failed", error: failure?.message || String(failure) };
   }
 }
-
-/* ---------------- 分段下载与 ffmpeg 合并 ---------------- */
-
 function resolveBinary(config, key, fallback) {
-  return String(ref(config, key, '')).trim() || fallback;
+  return String(ref(config, key, "")).trim() || fallback;
 }
-
 function formatSeconds(value) {
   const number = Number(value);
-  if (!Number.isFinite(number)) return String(value ?? '');
+  if (!Number.isFinite(number)) return String(value ?? "");
   return Number.isInteger(number) ? String(number) : number.toFixed(1);
 }
-
-function fileStamp(date = new Date()) {
-  const pad = (value) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`
-    + `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+function fileStamp(date = /* @__PURE__ */ new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
 }
-
-/**
- * 宿主要求工具返回值是「无损 JSON」：只要出现 undefined、NaN/Infinity/-0、
- * 非纯对象（Error/Date 实例等）或循环引用，整条结果就会被丢弃并报
- * 「value is not lossless JSON」。这里统一清洗成严格 JSON。
- */
-function toJsonSafe(value, seen = new Set()) {
+function toJsonSafe(value, seen = /* @__PURE__ */ new Set()) {
   if (value === null) return null;
   const type = typeof value;
-  if (type === 'string' || type === 'boolean') return value;
-  if (type === 'number') {
+  if (type === "string" || type === "boolean") return value;
+  if (type === "number") {
     return Number.isFinite(value) && !Object.is(value, -0) ? value : String(value);
   }
-  if (type === 'bigint') return value.toString();
-  if (type === 'undefined' || type === 'function' || type === 'symbol') return undefined;
+  if (type === "bigint") return value.toString();
+  if (type === "undefined" || type === "function" || type === "symbol") return void 0;
   if (value instanceof Date) return value.toISOString();
   if (value instanceof Error) return value.message ? `${value.name}: ${value.message}` : value.name;
-  if (seen.has(value)) return '[circular]';
+  if (seen.has(value)) return "[circular]";
   seen.add(value);
   try {
     if (Array.isArray(value)) {
@@ -625,24 +382,21 @@ function toJsonSafe(value, seen = new Set()) {
     const plain = {};
     for (const [key, item] of Object.entries(value)) {
       const safe = toJsonSafe(item, seen);
-      if (safe !== undefined) plain[key] = safe;
+      if (safe !== void 0) plain[key] = safe;
     }
     return plain;
   } finally {
     seen.delete(value);
   }
 }
-
-/** 把工具 execute 的返回值清洗成宿主接受的无损 JSON，避免整条结果被丢弃。 */
 function jsonSafeTool(tool) {
   return {
     ...tool,
     async execute(...args) {
       return toJsonSafe(await tool.execute(...args));
-    },
+    }
   };
 }
-
 async function exists(file) {
   try {
     await stat(file);
@@ -651,29 +405,25 @@ async function exists(file) {
     return false;
   }
 }
-
-/** 跑一个子进程并收全输出；找不到可执行文件时归一化成 ffmpeg_missing。 */
-async function runProcess(binary, args, { signal, timeoutMs = 1800000 } = {}) {
+async function runProcess(binary, args, { signal, timeoutMs = 18e5 } = {}) {
   return new Promise((resolve, reject) => {
     let child;
     try {
-      child = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      child = spawn(binary, args, { stdio: ["ignore", "pipe", "pipe"] });
     } catch (error) {
-      reject(Object.assign(new Error(`${binary} 无法启动：${error?.message || error}`), {
-        code: 'ffmpeg_missing',
+      reject(Object.assign(new Error(`${binary} \u65E0\u6CD5\u542F\u52A8\uFF1A${error?.message || error}`), {
+        code: "ffmpeg_missing"
       }));
       return;
     }
-
-    let stdout = '';
-    let stderr = '';
+    let stdout = "";
+    let stderr = "";
     let done = false;
-
     function cleanup() {
       clearTimeout(timer);
-      signal?.removeEventListener('abort', onAbort);
+      signal?.removeEventListener("abort", onAbort);
     }
-    function settle(error, value) {
+    function settle(error = null, value = void 0) {
       if (done) return;
       done = true;
       cleanup();
@@ -681,59 +431,57 @@ async function runProcess(binary, args, { signal, timeoutMs = 1800000 } = {}) {
       else resolve(value);
     }
     function onAbort() {
-      child.kill('SIGKILL');
+      child.kill("SIGKILL");
       settle(abortError());
     }
-
     const timer = setTimeout(() => {
-      child.kill('SIGKILL');
-      settle(Object.assign(new Error(`${binary} 执行超时。`), { code: 'ffmpeg_timeout' }));
+      child.kill("SIGKILL");
+      settle(Object.assign(new Error(`${binary} \u6267\u884C\u8D85\u65F6\u3002`), { code: "ffmpeg_timeout" }));
     }, timeoutMs);
-
     if (signal?.aborted) {
       onAbort();
       return;
     }
-    signal?.addEventListener('abort', onAbort, { once: true });
-    child.on('error', (error) => settle(Object.assign(
-      new Error(`${binary} 无法启动：${error.message}`),
-      { code: error.code === 'ENOENT' ? 'ffmpeg_missing' : 'ffmpeg_failed' },
+    signal?.addEventListener("abort", onAbort, { once: true });
+    child.on("error", (error) => settle(Object.assign(
+      new Error(`${binary} \u65E0\u6CD5\u542F\u52A8\uFF1A${error.message}`),
+      { code: error.code === "ENOENT" ? "ffmpeg_missing" : "ffmpeg_failed" }
     )));
-    child.stdout?.on('data', (chunk) => { stdout += chunk; });
-    child.stderr?.on('data', (chunk) => { stderr += chunk; });
-    child.on('close', (code) => settle(null, { code, stdout, stderr }));
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("close", (code) => settle(null, { code, stdout, stderr }));
   });
 }
-
-/**
- * 本机能不能调用 ffmpeg：不能就不要去合成，直接返回分段列表。
- * 只做一次轻量 `-version`，不缓存结果——用户装好 ffmpeg 后重跑应立即生效。
- */
 async function hasFfmpeg(config, signal) {
-  const binary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
+  const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
   try {
-    const { code } = await runProcess(binary, ['-version'], { signal, timeoutMs: 20000 });
+    const { code } = await runProcess(binary, ["-version"], { signal, timeoutMs: 2e4 });
     return code === 0;
   } catch {
     return false;
   }
 }
-
-/** 探测分段的时长/尺寸；ffprobe 缺失或失败都返回 null，不影响主流程。 */
 async function probeMedia(file, config, signal) {
   try {
-    const { code, stdout } = await runProcess(resolveBinary(config, 'ffprobeBinary', 'ffprobe'), [
-      '-v', 'error',
-      '-show_entries', 'format=duration:stream=codec_type,width,height,r_frame_rate,duration',
-      '-of', 'json',
-      file,
-    ], { signal, timeoutMs: 60000 });
+    const { code, stdout } = await runProcess(resolveBinary(config, "ffprobeBinary", "ffprobe"), [
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration:stream=codec_type,width,height,r_frame_rate,duration",
+      "-of",
+      "json",
+      file
+    ], { signal, timeoutMs: 6e4 });
     if (code !== 0) return null;
     const parsed = JSON.parse(stdout);
     const streams = Array.isArray(parsed?.streams) ? parsed.streams : [];
-    const video = streams.find((stream) => stream.codec_type === 'video') || {};
-    const audio = streams.find((stream) => stream.codec_type === 'audio') || {};
-    const [num, den] = String(video.r_frame_rate || '').split('/').map(Number);
+    const video = streams.find((stream) => stream.codec_type === "video") || {};
+    const audio = streams.find((stream) => stream.codec_type === "audio") || {};
+    const [num, den] = String(video.r_frame_rate || "").split("/").map(Number);
     const duration = Number(parsed?.format?.duration);
     const videoDuration = Number(video.duration);
     const audioDuration = Number(audio.duration);
@@ -744,23 +492,22 @@ async function probeMedia(file, config, signal) {
       width: Number(video.width) || 0,
       height: Number(video.height) || 0,
       fps: Number.isFinite(num) && Number.isFinite(den) && den > 0 ? num / den : 0,
-      hasAudio: streams.some((stream) => stream.codec_type === 'audio'),
+      hasAudio: streams.some((stream) => stream.codec_type === "audio")
     };
   } catch {
     return null;
   }
 }
-
 async function downloadFile(url, destPath, { signal } = {}) {
   const response = await fetch(url, { signal });
   if (!response.ok) {
-    throw Object.assign(new Error(`下载分段失败（HTTP ${response.status}）：${url}`), {
-      code: 'download_failed',
+    throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF08HTTP ${response.status}\uFF09\uFF1A${url}`), {
+      code: "download_failed"
     });
   }
   if (!response.body) {
-    throw Object.assign(new Error(`下载分段失败：响应没有内容（${url}）。`), {
-      code: 'download_failed',
+    throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF1A\u54CD\u5E94\u6CA1\u6709\u5185\u5BB9\uFF08${url}\uFF09\u3002`), {
+      code: "download_failed"
     });
   }
   await mkdir(path.dirname(destPath), { recursive: true });
@@ -769,26 +516,13 @@ async function downloadFile(url, destPath, { signal } = {}) {
   await rename(partial, destPath);
   return destPath;
 }
-
 function evenNumber(value, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number) || number <= 0) return fallback;
   const rounded = Math.round(number);
   return rounded % 2 === 0 ? rounded : rounded - 1;
 }
-
-/**
- * 把分段合并成一个文件：先试无损拼接，需要时统一重编码（带音频，失败再退回只并视频）。
- */
-/** 分段的音频比视频长出这么多帧时，认为封装补白会在接缝处留下空洞。 */
 const AUDIO_PADDING_TOLERANCE_FRAMES = 1;
-
-/**
- * 上游分段的音频常比视频长几十毫秒（封装补白）：concat 会按容器时长偏移，
- * 接缝处就留下 1-2 帧没有画面的空洞（看起来「缺了一小段」），重编码路径还会让音画逐段错位。
- * 这里把「非末段」的音频裁到与视频等长：视频轨保持 -c copy，只重编音频。
- * @returns 对齐后的文件列表、需要清理的临时文件、被裁齐的分段信息。
- */
 async function alignSegmentAudio(config, files, probed, outPath, { signal, binary } = {}) {
   const temps = [];
   const trimmed = [];
@@ -800,21 +534,32 @@ async function alignSegmentAudio(config, files, probed, outPath, { signal, binar
     const audioSeconds = Number(media?.audioDurationSeconds) || 0;
     const padding = audioSeconds - videoSeconds;
     const isLast = index === files.length - 1;
-    if (isLast || !media?.hasAudio || videoSeconds <= 0
-      || padding <= AUDIO_PADDING_TOLERANCE_FRAMES / fps) {
+    if (isLast || !media?.hasAudio || videoSeconds <= 0 || padding <= AUDIO_PADDING_TOLERANCE_FRAMES / fps) {
       aligned.push(file);
       continue;
     }
     const temp = `${outPath}.align${index + 1}.mp4`;
     const { code } = await runProcess(
-      binary || resolveBinary(config, 'ffmpegBinary', 'ffmpeg'),
+      binary || resolveBinary(config, "ffmpegBinary", "ffmpeg"),
       [
-        '-y', '-i', file, '-map', '0:v', '-map', '0:a',
-        '-c:v', 'copy', '-c:a', 'aac',
-        '-af', `atrim=0:${videoSeconds.toFixed(3)}`,
-        '-movflags', '+faststart', temp,
+        "-y",
+        "-i",
+        file,
+        "-map",
+        "0:v",
+        "-map",
+        "0:a",
+        "-c:v",
+        "copy",
+        "-c:a",
+        "aac",
+        "-af",
+        `atrim=0:${videoSeconds.toFixed(3)}`,
+        "-movflags",
+        "+faststart",
+        temp
       ],
-      { signal },
+      { signal }
     );
     if (code === 0 && await exists(temp)) {
       temps.push(temp);
@@ -827,325 +572,279 @@ async function alignSegmentAudio(config, files, probed, outPath, { signal, binar
   }
   return { files: aligned, temps, trimmed };
 }
-
-/** 合并结束后清理音频对齐用的临时分段。 */
 async function cleanupSegmentTemps(temps) {
   for (const temp of temps || []) await rm(temp, { force: true });
 }
-
 async function mergeClips(config, files, outPath, { signal } = {}) {
-  const binary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
+  const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
   await mkdir(path.dirname(outPath), { recursive: true });
   await rm(outPath, { force: true });
-  let copyError = '';
-  let audioError = '';
-
+  let copyError = "";
+  let audioError = "";
   const probed = [];
   for (const file of files) probed.push(await probeMedia(file, config, signal));
   const videos = probed.filter((media) => media && media.width && media.height);
-  // 分辨率/尺寸不一致时无损拼接会得到坏文件，直接走重编码。
-  const paramsMatch = videos.length !== probed.length
-    || videos.every((media) => media.width === videos[0].width && media.height === videos[0].height);
-
-  // 先裁齐音频，接缝才不会有空洞；后面的拼接统一用对齐后的分段。
+  const paramsMatch = videos.length !== probed.length || videos.every((media) => media.width === videos[0].width && media.height === videos[0].height);
   const { files: aligned, temps, trimmed } = await alignSegmentAudio(
-    config, files, probed, outPath, { signal, binary },
+    config,
+    files,
+    probed,
+    outPath,
+    { signal, binary }
   );
   files = aligned;
   try {
-
-    if (ref(config, 'mergeMode', 'copy') !== 'reencode' && paramsMatch) {
+    if (ref(config, "mergeMode", "copy") !== "reencode" && paramsMatch) {
       const listPath = `${outPath}.concat.txt`;
-      const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join('\n');
-      await writeFile(listPath, `${lines}\n`, 'utf8');
+      const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
+      await writeFile(listPath, `${lines}
+`, "utf8");
       try {
-        const { code, stderr } = await runProcess(binary, [
-          '-y', '-f', 'concat', '-safe', '0', '-i', listPath,
-          '-c', 'copy', '-movflags', '+faststart', outPath,
+        const { code: code2, stderr: stderr2 } = await runProcess(binary, [
+          "-y",
+          "-f",
+          "concat",
+          "-safe",
+          "0",
+          "-i",
+          listPath,
+          "-c",
+          "copy",
+          "-movflags",
+          "+faststart",
+          outPath
         ], { signal });
-        if (code === 0 && await exists(outPath)) return { path: outPath, mode: 'copy', trimmed };
-        copyError = stderr.trim().slice(-400);
+        if (code2 === 0 && await exists(outPath)) return { path: outPath, mode: "copy", trimmed };
+        copyError = stderr2.trim().slice(-400);
       } finally {
         await rm(listPath, { force: true });
       }
     } else if (!paramsMatch) {
-      copyError = '分段分辨率不一致，跳过无损拼接。';
+      copyError = "\u5206\u6BB5\u5206\u8FA8\u7387\u4E0D\u4E00\u81F4\uFF0C\u8DF3\u8FC7\u65E0\u635F\u62FC\u63A5\u3002";
     }
-
     const first = probed.find((media) => media && media.width && media.height) || {};
     const width = evenNumber(first.width, 1280);
     const height = evenNumber(first.height, 720);
     const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
     const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
-
-    const videoParts = files.map((_, index) => (
-      `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,`
-      + `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${index}]`
-    ));
-    const videoInputs = files.map((_, index) => `[v${index}]`).join('');
-
-    async function encode(filter, maps, withAudioTrack) {
+    const videoParts = files.map((_, index) => `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${index}]`);
+    const videoInputs = files.map((_, index) => `[v${index}]`).join("");
+    async function encode(filter2, maps, withAudioTrack) {
       await rm(outPath, { force: true });
-      const args = ['-y'];
-      for (const file of files) args.push('-i', file);
-      args.push('-filter_complex', filter, ...maps, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p');
-      if (withAudioTrack) args.push('-c:a', 'aac', '-b:a', '192k');
-      args.push('-movflags', '+faststart', outPath);
+      const args = ["-y"];
+      for (const file of files) args.push("-i", file);
+      args.push("-filter_complex", filter2, ...maps, "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p");
+      if (withAudioTrack) args.push("-c:a", "aac", "-b:a", "192k");
+      args.push("-movflags", "+faststart", outPath);
       return runProcess(binary, args, { signal });
     }
-
     if (withAudio) {
-      // concat 的输入按 (视频, 音频) 成对排列：v0,a0,v1,a1…
-      const audioParts = files.map((_, index) => (
-        `[${index}:a]aresample=48000,`
-        + 'aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo'
-        + `[a${index}]`
-      ));
-      const pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join('');
-      const filter = [
+      const audioParts = files.map((_, index) => `[${index}:a]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a${index}]`);
+      const pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join("");
+      const filter2 = [
         ...videoParts,
         ...audioParts,
-        `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`,
-      ].join(';');
-      const { code, stderr } = await encode(filter, ['-map', '[v]', '-map', '[a]'], true);
-      if (code === 0 && await exists(outPath)) return { path: outPath, mode: 'reencode', trimmed };
-      audioError = stderr.trim().slice(-400);
+        `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`
+      ].join(";");
+      const { code: code2, stderr: stderr2 } = await encode(filter2, ["-map", "[v]", "-map", "[a]"], true);
+      if (code2 === 0 && await exists(outPath)) return { path: outPath, mode: "reencode", trimmed };
+      audioError = stderr2.trim().slice(-400);
     }
-
-    const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(';');
-    const { code, stderr } = await encode(filter, ['-map', '[v]'], false);
+    const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(";");
+    const { code, stderr } = await encode(filter, ["-map", "[v]"], false);
     if (code === 0 && await exists(outPath)) {
-      return { path: outPath, mode: withAudio ? 'reencode-video-only' : 'reencode', trimmed };
+      return { path: outPath, mode: withAudio ? "reencode-video-only" : "reencode", trimmed };
     }
-    const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(' | ');
-    throw Object.assign(new Error(`ffmpeg 合并失败：${detail || '未知错误'}`), { code: 'ffmpeg_failed' });
+    const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
+    throw Object.assign(new Error(`ffmpeg \u5408\u5E76\u5931\u8D25\uFF1A${detail || "\u672A\u77E5\u9519\u8BEF"}`), { code: "ffmpeg_failed" });
   } finally {
     await cleanupSegmentTemps(temps);
   }
 }
-
-/** 成片目录：配置优先，否则用会话工作目录下的 metaontic-video/。 */
 async function resolveOutputDir(config, exec, deps) {
-  const configured = String(ref(config, 'outputDir', '')).trim();
+  const configured = String(ref(config, "outputDir", "")).trim();
   if (configured) return path.resolve(configured);
-  let cwd = '';
+  let cwd = "";
   if (deps?.workdir && exec?.agent) {
     try {
-      cwd = (await deps.workdir.ensure(exec.agent, exec.signal)) || '';
+      cwd = await deps.workdir.ensure(exec.agent, exec.signal) || "";
     } catch {
-      cwd = '';
+      cwd = "";
     }
   }
   return path.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
 }
-
-/* ---------------- 响应解析：兼容官方与中转站的不同形状 ---------------- */
-
 function findKey(payload, keys) {
-  if (payload && typeof payload === 'object') {
+  if (payload && typeof payload === "object") {
     if (!Array.isArray(payload)) {
       for (const key of keys) {
         const value = payload[key];
-        if (value !== undefined && value !== null && value !== '') return value;
+        if (value !== void 0 && value !== null && value !== "") return value;
       }
     }
     for (const value of Array.isArray(payload) ? payload : Object.values(payload)) {
       const found = findKey(value, keys);
-      if (found !== undefined && found !== null && found !== '') return found;
+      if (found !== void 0 && found !== null && found !== "") return found;
     }
   }
-  return undefined;
+  return void 0;
 }
-
-function collectUrls(payload, path = [], found = []) {
-  if (typeof payload === 'string') {
-    if (/^https?:\/\//i.test(payload)) found.push([path, payload]);
+function collectUrls(payload, path2 = [], found = []) {
+  if (typeof payload === "string") {
+    if (/^https?:\/\//i.test(payload)) found.push([path2, payload]);
   } else if (Array.isArray(payload)) {
-    for (const item of payload) collectUrls(item, path, found);
-  } else if (payload && typeof payload === 'object') {
+    for (const item of payload) collectUrls(item, path2, found);
+  } else if (payload && typeof payload === "object") {
     for (const [key, value] of Object.entries(payload)) {
-      collectUrls(value, [...path, key], found);
+      collectUrls(value, [...path2, key], found);
     }
   }
   return found;
 }
-
 function isImageKey(key) {
-  const lowered = String(key || '').toLowerCase();
+  const lowered = String(key || "").toLowerCase();
   return IMAGE_KEY_TOKENS.some((token) => lowered.includes(token));
 }
-
 function looksLikeImageUrl(url) {
-  return IMAGE_EXTENSIONS.some((ext) => url.split('?')[0].toLowerCase().endsWith(ext));
+  return IMAGE_EXTENSIONS.some((ext) => url.split("?")[0].toLowerCase().endsWith(ext));
 }
-
 function extractTaskId(payload) {
-  const value = findKey(payload, ['id', 'task_id', 'taskId', 'request_id']);
-  return typeof value === 'string' && value ? value : undefined;
+  const value = findKey(payload, ["id", "task_id", "taskId", "request_id"]);
+  return typeof value === "string" && value ? value : void 0;
 }
-
 function extractVideoUrl(payload) {
   const candidates = collectUrls(payload).filter(
-    ([path, url]) => !looksLikeImageUrl(url) && !path.some(isImageKey),
+    ([path2, url]) => !looksLikeImageUrl(url) && !path2.some(isImageKey)
   );
-  if (!candidates.length) return undefined;
+  if (!candidates.length) return void 0;
   for (const wanted of VIDEO_URL_KEYS) {
-    for (const [path, url] of candidates) {
-      if (path.length && String(path.at(-1)).toLowerCase() === wanted) return url;
+    for (const [path2, url] of candidates) {
+      if (path2.length && String(path2.at(-1)).toLowerCase() === wanted) return url;
     }
   }
-  for (const [path, url] of candidates) {
-    if (path.length && GENERIC_URL_KEYS.has(String(path.at(-1)).toLowerCase())) return url;
+  for (const [path2, url] of candidates) {
+    if (path2.length && GENERIC_URL_KEYS.has(String(path2.at(-1)).toLowerCase())) return url;
   }
   return candidates[0][1];
 }
-
 function extractImageUrl(payload) {
   const found = collectUrls(payload).find(
-    ([path, url]) => looksLikeImageUrl(url) || path.some(isImageKey),
+    ([path2, url]) => looksLikeImageUrl(url) || path2.some(isImageKey)
   );
   return found?.[1];
 }
-
 function extractStatus(payload) {
-  const value = findKey(payload, ['status', 'state', 'task_status']);
-  return typeof value === 'string' ? value.toLowerCase() : undefined;
+  const value = findKey(payload, ["status", "state", "task_status"]);
+  return typeof value === "string" ? value.toLowerCase() : void 0;
 }
-
 function upstreamMessage(data) {
-  if (data && typeof data === 'object') {
+  if (data && typeof data === "object") {
     const error = data.error;
-    if (error && typeof error === 'object') {
-      const message = String(error.message || '').trim();
-      const code = String(error.code || '').trim();
-      if (message) return code ? `${message}（${code}）` : message;
-    } else if (typeof error === 'string' && error.trim()) {
+    if (error && typeof error === "object") {
+      const message = String(error.message || "").trim();
+      const code = String(error.code || "").trim();
+      if (message) return code ? `${message}\uFF08${code}\uFF09` : message;
+    } else if (typeof error === "string" && error.trim()) {
       return error.trim();
     }
-    for (const key of ['message', 'detail', 'msg', 'fail_reason']) {
+    for (const key of ["message", "detail", "msg", "fail_reason"]) {
       const value = data[key];
-      if (typeof value === 'string' && value.trim()) return value.trim();
+      if (typeof value === "string" && value.trim()) return value.trim();
     }
   }
-  const text = typeof data === 'string' ? data : JSON.stringify(data ?? {});
-  return text || '上游未返回错误详情';
+  const text = typeof data === "string" ? data : JSON.stringify(data ?? {});
+  return text || "\u4E0A\u6E38\u672A\u8FD4\u56DE\u9519\u8BEF\u8BE6\u60C5";
 }
-
 function quotaDetail(text) {
   const parts = [];
   const remain = /(?:remain(?:ing)? quota|剩余额度)\D{0,6}([¥$]?\d[\d.,]*)/i.exec(text);
   const need = /(?:need quota|需要预扣费额度|需要额度)\D{0,6}([¥$]?\d[\d.,]*)/i.exec(text);
-  if (remain) parts.push(`剩余 ${remain[1]}`);
-  if (need) parts.push(`需要 ${need[1]}`);
-  return parts.length ? `（${parts.join('，')}）` : '';
+  if (remain) parts.push(`\u5269\u4F59 ${remain[1]}`);
+  if (need) parts.push(`\u9700\u8981 ${need[1]}`);
+  return parts.length ? `\uFF08${parts.join("\uFF0C")}\uFF09` : "";
 }
-
-/** 把上游报错（HTTP 错误或任务失败详情）归类成可读的 code + message。 */
 function classifyError(statusCode, data) {
   const raw = upstreamMessage(data);
   const lowered = raw.toLowerCase();
-  if (
-    statusCode === 402
-    || QUOTA_HINTS.some((hint) => lowered.includes(hint))
-    || lowered.includes('quota_exceeded')
-  ) {
+  if (statusCode === 402 || QUOTA_HINTS.some((hint) => lowered.includes(hint)) || lowered.includes("quota_exceeded")) {
     return {
-      code: 'provider_quota_exceeded',
-      message: `中转站额度不足${quotaDetail(raw)}，请充值后再试：${raw}`,
+      code: "provider_quota_exceeded",
+      message: `\u4E2D\u8F6C\u7AD9\u989D\u5EA6\u4E0D\u8DB3${quotaDetail(raw)}\uFF0C\u8BF7\u5145\u503C\u540E\u518D\u8BD5\uFF1A${raw}`
     };
   }
   if (statusCode === 401 || statusCode === 403) {
-    return { code: 'provider_auth', message: `中转站鉴权失败（${statusCode}）：${raw}` };
+    return { code: "provider_auth", message: `\u4E2D\u8F6C\u7AD9\u9274\u6743\u5931\u8D25\uFF08${statusCode}\uFF09\uFF1A${raw}` };
   }
   if (statusCode === 429) {
-    return { code: 'provider_rate_limited', message: `中转站限流（429）：${raw}` };
+    return { code: "provider_rate_limited", message: `\u4E2D\u8F6C\u7AD9\u9650\u6D41\uFF08429\uFF09\uFF1A${raw}` };
   }
   if (CONTENT_HINTS.some((hint) => lowered.includes(hint))) {
-    return { code: 'content_rejected', message: raw };
+    return { code: "content_rejected", message: raw };
   }
   if (PRICE_HINTS.some((hint) => lowered.includes(hint))) {
     return {
-      code: 'provider_price_config_error',
-      message:
-        `中转站该模型的计价配置异常，与本次请求参数无关，重试也不会成功：${raw}。`
-        + '请在插件 config 里换用其它可用模型。',
+      code: "provider_price_config_error",
+      message: `\u4E2D\u8F6C\u7AD9\u8BE5\u6A21\u578B\u7684\u8BA1\u4EF7\u914D\u7F6E\u5F02\u5E38\uFF0C\u4E0E\u672C\u6B21\u8BF7\u6C42\u53C2\u6570\u65E0\u5173\uFF0C\u91CD\u8BD5\u4E5F\u4E0D\u4F1A\u6210\u529F\uFF1A${raw}\u3002\u8BF7\u5728\u63D2\u4EF6 config \u91CC\u6362\u7528\u5176\u5B83\u53EF\u7528\u6A21\u578B\u3002`
     };
   }
-  return { code: 'provider_failed', message: raw };
+  return { code: "provider_failed", message: raw };
 }
-
 function isContentRejection(text) {
-  const lowered = String(text || '').toLowerCase();
+  const lowered = String(text || "").toLowerCase();
   return CONTENT_HINTS.some((hint) => lowered.includes(hint));
 }
-
-/* ---------------- 调用前预检：预估费用 + 人工确认 + 额度是否够 ---------------- */
-
-/** 金额显示与中转站一致：|x| ≥ 1 保留 2 位小数，否则保留 4 位，末尾多余的 0 去掉。 */
 function formatAmount(value) {
   const number = Number(value);
-  if (!Number.isFinite(number)) return '0';
+  if (!Number.isFinite(number)) return "0";
   const text = number.toFixed(Math.abs(number) >= 1 ? 2 : 4);
-  return text.includes('.') ? text.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '') : text;
+  return text.includes(".") ? text.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "") : text;
 }
-
-function formatMoney(value, symbol = '¥') {
+function formatMoney(value, symbol = "\xA5") {
   return `${symbol}${formatAmount(value)}`;
 }
-
 function finiteNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
-
-/** 每 100 万 token 的美元价：带参考素材（参考图 / 参考视频）时更便宜。 */
 function estimateRate(model, usesReference) {
-  const id = String(model || '').toLowerCase();
+  const id = String(model || "").toLowerCase();
   const hit = ESTIMATE_RATES.find(([prefix]) => id.startsWith(prefix));
   const table = hit ? hit[1] : ESTIMATE_RATES[0][1];
   return usesReference ? table.video : table.none;
 }
-
-/** 这次调用会拆几段：和真正执行用的是同一套规划（直出 + 逐段延长）。 */
 function estimatePlan(config, toolName, args) {
-  if (toolName === 'video_extend') {
+  if (toolName === "video_extend") {
     const count = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
-    const fallback = ref(config, 'duration', 5);
+    const fallback = ref(config, "duration", 5);
     const seconds = clampInteger(
       args?.duration ?? fallback,
       MIN_SECONDS,
       MAX_SEGMENT_SECONDS,
-      fallback,
+      fallback
     );
-    return Array.from({ length: count }, () => ({ kind: 'extend', seconds }));
+    return Array.from({ length: count }, () => ({ kind: "extend", seconds }));
   }
   const singleMax = resolveSingleMax(config);
   const total = clampInteger(
     args?.duration ?? singleMax,
     MIN_SECONDS,
     singleMax + (MAX_SEGMENTS - 1) * MAX_SEGMENT_SECONDS,
-    singleMax,
+    singleMax
   );
   return planVideoSegments(total, singleMax, resolveSegmentSeconds(config, args?.segmentSeconds));
 }
-
-/**
- * 调用模型前的估算：拆几段、多少 token、大概多少美元。
- * 只按价目表与分辨率算，实际以中转站结算为准（确认框里写的是「预估」）。
- */
 function estimateUsage(config, toolName, args) {
   const plan = estimatePlan(config, toolName, args);
-  const resolution = String(args?.resolution ?? ref(config, 'resolution', '720p'));
-  const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS['720p'];
-  const tokensPerSecond = (pixels[0] * pixels[1] * ESTIMATE_FPS) / ESTIMATE_TOKEN_DIVISOR;
+  const resolution = String(args?.resolution ?? ref(config, "resolution", "720p"));
+  const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS["720p"];
+  const tokensPerSecond = pixels[0] * pixels[1] * ESTIMATE_FPS / ESTIMATE_TOKEN_DIVISOR;
   const hasFrame = Boolean(
-    String(args?.firstFrameUrl ?? '').trim() || String(args?.lastFrameUrl ?? '').trim(),
+    String(args?.firstFrameUrl ?? "").trim() || String(args?.lastFrameUrl ?? "").trim()
   );
   const model = resolveModel(config);
-  const groupRatio = finiteNumber(ref(config, 'estimateGroupRatio', 0.8)) ?? 1;
+  const groupRatio = finiteNumber(ref(config, "estimateGroupRatio", 0.8)) ?? 1;
   const segments = plan.map((step, index) => {
-    // 延长段一定带参考视频；直出段只有给了首/尾帧才算「有参考素材」
-    const usesReference = step.kind === 'extend' || hasFrame;
+    const usesReference = step.kind === "extend" || hasFrame;
     const tokens = Math.round(tokensPerSecond * step.seconds);
     return {
       index: index + 1,
@@ -1153,7 +852,7 @@ function estimateUsage(config, toolName, args) {
       seconds: step.seconds,
       tokens,
       usesReference,
-      usd: (tokens * estimateRate(model, usesReference)) / 1e6,
+      usd: tokens * estimateRate(model, usesReference) / 1e6
     };
   });
   const usd = segments.reduce((sum, item) => sum + item.usd, 0) * groupRatio;
@@ -1163,40 +862,32 @@ function estimateUsage(config, toolName, args) {
     segments,
     seconds: segments.reduce((sum, item) => sum + item.seconds, 0),
     tokens: segments.reduce((sum, item) => sum + item.tokens, 0),
-    usd: Math.round(usd * 1e6) / 1e6,
+    usd: Math.round(usd * 1e6) / 1e6
   };
 }
-
-/** 插件服务地址：配置优先，留空用固定域名。 */
 function resolveRegisterApi(config) {
-  return (String(ref(config, 'registerApi', '')).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, '');
+  return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-
-/**
- * 问插件服务要「本机这把 Key 还剩多少额度」。
- * 服务端按设备凭据去中转站读密钥详情，只回剩余 / 已用额度。
- * 拿不到（没设备凭据、服务不可用）就回 unknown，由调用方决定怎么写进确认框。
- */
 async function fetchDeviceQuota(config, signal) {
   const api = resolveRegisterApi(config);
-  const deviceId = String(ref(config, 'deviceId', '')).trim();
-  const deviceSecret = String(ref(config, 'deviceSecret', '')).trim();
+  const deviceId = String(ref(config, "deviceId", "")).trim();
+  const deviceSecret = String(ref(config, "deviceSecret", "")).trim();
   if (!deviceId || !deviceSecret) {
     return {
-      status: 'unknown',
-      reason: '插件里没有本机设备凭据（在设置页点一次「激活」会写进来，之后就能自动校验额度）',
+      status: "unknown",
+      reason: "\u63D2\u4EF6\u91CC\u6CA1\u6709\u672C\u673A\u8BBE\u5907\u51ED\u636E\uFF08\u5728\u8BBE\u7F6E\u9875\u70B9\u4E00\u6B21\u300C\u6FC0\u6D3B\u300D\u4F1A\u5199\u8FDB\u6765\uFF0C\u4E4B\u540E\u5C31\u80FD\u81EA\u52A8\u6821\u9A8C\u989D\u5EA6\uFF09"
     };
   }
   try {
     const response = await fetch(`${api}/api/v1/register/quota`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        accept: 'application/json',
-        'content-type': 'application/json',
-        'X-Register-Token': String(ref(config, 'registerToken', '')).trim() || DEFAULT_REGISTER_TOKEN,
+        accept: "application/json",
+        "content-type": "application/json",
+        "X-Register-Token": String(ref(config, "registerToken", "")).trim() || DEFAULT_REGISTER_TOKEN
       },
       body: JSON.stringify({ device_id: deviceId, device_secret: deviceSecret }),
-      ...(signal ? { signal } : {}),
+      ...signal ? { signal } : {}
     });
     const text = await response.text();
     let body = {};
@@ -1207,132 +898,92 @@ async function fetchDeviceQuota(config, signal) {
         body = { message: text.slice(0, 200) };
       }
     }
-    if (!response.ok || (body && typeof body === 'object' && body.code)) {
+    if (!response.ok || body && typeof body === "object" && body.code) {
       return {
-        status: 'unknown',
-        reason: (body && (body.message || body.detail)) || `HTTP ${response.status}`,
+        status: "unknown",
+        reason: body && (body.message || body.detail) || `HTTP ${response.status}`
       };
     }
-    return { status: 'ok', data: (body && body.data) || body || {} };
+    return { status: "ok", data: body && body.data || body || {} };
   } catch (error) {
-    return { status: 'unknown', reason: error?.message || String(error) };
+    return { status: "unknown", reason: error?.message || String(error) };
   }
 }
-
-/** 宿主当前的审批策略：never 表示「审批提示被关掉」，这时候没法人工确认。 */
 function approvalPolicy(ctx, exec) {
   try {
-    const approval = ctx.get('approval');
-    if (!approval) return 'missing';
+    const approval = ctx.get("approval");
+    if (!approval) return "missing";
     const session = exec?.agent?.session;
-    const override = session && typeof approval.overrideOf === 'function'
-      ? approval.overrideOf(session)
-      : undefined;
-    return override || approval.config?.policy || 'ask';
+    const override = session && typeof approval.overrideOf === "function" ? approval.overrideOf(session) : void 0;
+    return override || approval.config?.policy || "ask";
   } catch {
-    return 'ask';
+    return "ask";
   }
 }
-
-/** 把秒数列表写成「15s + 5s」这样的紧凑形式，确认框只有一行文字，不能换行。 */
 function planSummary(estimate) {
-  if (!estimate) return '时长未知';
-  const sizes = estimate.segments.map((item) => `${item.seconds}s`).join(' + ');
-  return `${estimate.segments.length} 段（${sizes}）共 ${estimate.seconds} 秒`;
+  if (!estimate) return "\u65F6\u957F\u672A\u77E5";
+  const sizes = estimate.segments.map((item) => `${item.seconds}s`).join(" + ");
+  return `${estimate.segments.length} \u6BB5\uFF08${sizes}\uFF09\u5171 ${estimate.seconds} \u79D2`;
 }
-
-/**
- * 真正调用模型前的卡口：先人工确认，再确认额度够不够。
- *
- * - 审批提示被关掉（完全访问模式）：拒绝，并说明怎么打开；
- * - 预估费用超过这把 Key 的剩余额度：直接拒绝，不去调用（避免白扣 / 报错）；
- * - 读不到剩余额度：照常弹确认框，但把「读不到额度」的原因写清楚；
- * - 其余情况：返回 ask，宿主弹审批面板给用户看预估费用，点「允许」才会执行。
- */
 async function preflightGate(ctx, config, exec) {
-  if (approvalPolicy(ctx, exec) === 'never') {
+  if (approvalPolicy(ctx, exec) === "never") {
     return {
-      kind: 'deny',
-      reason: '当前权限模式关闭了审批提示（完全访问），无法做人工确认，已停止调用。'
-        + '把权限切到「工作区写入」或「只读」后再生成视频。',
+      kind: "deny",
+      reason: "\u5F53\u524D\u6743\u9650\u6A21\u5F0F\u5173\u95ED\u4E86\u5BA1\u6279\u63D0\u793A\uFF08\u5B8C\u5168\u8BBF\u95EE\uFF09\uFF0C\u65E0\u6CD5\u505A\u4EBA\u5DE5\u786E\u8BA4\uFF0C\u5DF2\u505C\u6B62\u8C03\u7528\u3002\u628A\u6743\u9650\u5207\u5230\u300C\u5DE5\u4F5C\u533A\u5199\u5165\u300D\u6216\u300C\u53EA\u8BFB\u300D\u540E\u518D\u751F\u6210\u89C6\u9891\u3002"
     };
   }
-
-  const args = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : {};
+  const args = exec.arguments && typeof exec.arguments === "object" ? exec.arguments : {};
   let estimate = null;
   try {
     estimate = estimateUsage(config, exec.name, args);
   } catch {
     estimate = null;
   }
-
   const quota = await fetchDeviceQuota(config, exec.signal);
-  const data = quota.status === 'ok' ? quota.data : {};
-  const symbol = String(data.currency_symbol || '¥');
+  const data = quota.status === "ok" ? quota.data : {};
+  const symbol = String(data.currency_symbol || "\xA5");
   const perUnit = finiteNumber(data.quota_per_unit) ?? DEFAULT_QUOTA_PER_UNIT;
   const exchange = finiteNumber(data.usd_exchange_rate) ?? DEFAULT_USD_EXCHANGE_RATE;
-
   const needQuota = estimate ? Math.round(estimate.usd * perUnit) : null;
-  const needMoney = estimate ? formatMoney(estimate.usd * exchange, symbol) : '无法预估';
-  const needText = needQuota === null
-    ? '无法预估'
-    : `${needMoney}（约 ${needQuota.toLocaleString('en-US')} 额度）`;
-
+  const needMoney = estimate ? formatMoney(estimate.usd * exchange, symbol) : "\u65E0\u6CD5\u9884\u4F30";
+  const needText = needQuota === null ? "\u65E0\u6CD5\u9884\u4F30" : `${needMoney}\uFF08\u7EA6 ${needQuota.toLocaleString("en-US")} \u989D\u5EA6\uFF09`;
   const remainQuota = finiteNumber(data.remain_quota);
   const remainAmount = finiteNumber(data.remain_amount);
-  const remainText = remainQuota === null
-    ? `读不到剩余额度（${quota.reason || '服务端没回额度'}）`
-    : `${formatMoney(remainAmount === null ? 0 : remainAmount, symbol)}`
-      + `（${remainQuota.toLocaleString('en-US')} 额度）`;
-
-  // 额度不够就别调用：中转站也会拒，但那样只会白等一轮还看不到原因。
+  const remainText = remainQuota === null ? `\u8BFB\u4E0D\u5230\u5269\u4F59\u989D\u5EA6\uFF08${quota.reason || "\u670D\u52A1\u7AEF\u6CA1\u56DE\u989D\u5EA6"}\uFF09` : `${formatMoney(remainAmount === null ? 0 : remainAmount, symbol)}\uFF08${remainQuota.toLocaleString("en-US")} \u989D\u5EA6\uFF09`;
   if (needQuota !== null && remainQuota !== null && remainQuota < needQuota) {
     return {
-      kind: 'deny',
-      reason: `额度不足，已停止调用：本次预估需要 ${needText}，这把 Key 只剩 ${remainText}。`
-        + '请充值或找管理员换一把额度够的 Key 后重试。',
+      kind: "deny",
+      reason: `\u989D\u5EA6\u4E0D\u8DB3\uFF0C\u5DF2\u505C\u6B62\u8C03\u7528\uFF1A\u672C\u6B21\u9884\u4F30\u9700\u8981 ${needText}\uFF0C\u8FD9\u628A Key \u53EA\u5269 ${remainText}\u3002\u8BF7\u5145\u503C\u6216\u627E\u7BA1\u7406\u5458\u6362\u4E00\u628A\u989D\u5EA6\u591F\u7684 Key \u540E\u91CD\u8BD5\u3002`
     };
   }
-
-  const total = estimate
-    ? `${estimate.model} · ${estimate.resolution} · ${planSummary(estimate)}`
-    : `${resolveModel(config)} · ${String(args.resolution ?? ref(config, 'resolution', '720p'))}`;
-  const tax = estimate
-    ? `预估消耗 ${estimate.tokens.toLocaleString('en-US')} token ≈ ${needText}`
-    : '这次调用的费用无法预估';
+  const total = estimate ? `${estimate.model} \xB7 ${estimate.resolution} \xB7 ${planSummary(estimate)}` : `${resolveModel(config)} \xB7 ${String(args.resolution ?? ref(config, "resolution", "720p"))}`;
+  const tax = estimate ? `\u9884\u4F30\u6D88\u8017 ${estimate.tokens.toLocaleString("en-US")} token \u2248 ${needText}` : "\u8FD9\u6B21\u8C03\u7528\u7684\u8D39\u7528\u65E0\u6CD5\u9884\u4F30";
   return {
-    kind: 'ask',
-    reason: `人工确认：调用视频模型（${total}）。${tax}；本机 Key 剩余 ${remainText}。`,
+    kind: "ask",
+    reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u8C03\u7528\u89C6\u9891\u6A21\u578B\uFF08${total}\uFF09\u3002${tax}\uFF1B\u672C\u673A Key \u5269\u4F59 ${remainText}\u3002`,
     displayReason: {
-      zh: `本次会调用视频模型：${total}；${tax}，本机 Key 剩余 ${remainText}。`
-        + '点了「允许」才会真正调用。',
-      en: `This will call the video model: ${total}. Estimated cost ${needMoney}`
-        + ` (about ${needQuota === null ? 'unknown' : needQuota.toLocaleString('en-US')} quota);`
-        + ` this key has ${remainText} left. The call runs only after you allow it.`,
-    },
+      zh: `\u672C\u6B21\u4F1A\u8C03\u7528\u89C6\u9891\u6A21\u578B\uFF1A${total}\uFF1B${tax}\uFF0C\u672C\u673A Key \u5269\u4F59 ${remainText}\u3002\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u771F\u6B63\u8C03\u7528\u3002`,
+      en: `This will call the video model: ${total}. Estimated cost ${needMoney} (about ${needQuota === null ? "unknown" : needQuota.toLocaleString("en-US")} quota); this key has ${remainText} left. The call runs only after you allow it.`
+    }
   };
 }
-
-/* ---------------- 请求与轮询 ---------------- */
-
-async function relayRequest(config, path, { method = 'GET', body } = {}) {
-  const url = `${resolveBaseUrl(config)}${path}`;
+async function relayRequest(config, path2, { method = "GET", body } = {}) {
+  const url = `${resolveBaseUrl(config)}${path2}`;
   let response;
   try {
     response = await fetch(url, {
       method,
       headers: {
         Authorization: `Bearer ${resolveApiKey(config)}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json"
       },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      ...body !== void 0 ? { body: JSON.stringify(body) } : {}
     });
   } catch (error) {
-    throw Object.assign(new Error(`中转站请求失败：${error?.message || error}`), {
-      code: 'provider_network_error',
+    throw Object.assign(new Error(`\u4E2D\u8F6C\u7AD9\u8BF7\u6C42\u5931\u8D25\uFF1A${error?.message || error}`), {
+      code: "provider_network_error"
     });
   }
-
   const text = await response.text();
   let data = {};
   if (text) {
@@ -1342,581 +993,492 @@ async function relayRequest(config, path, { method = 'GET', body } = {}) {
       data = { raw: text };
     }
   }
-
-  const upstreamError = data && typeof data === 'object' && data.error;
+  const upstreamError = data && typeof data === "object" && data.error;
   if (!response.ok || upstreamError) {
     const classified = classifyError(
       response.status >= 400 ? response.status : 400,
-      data,
+      data
     );
     throw Object.assign(new Error(classified.message), { code: classified.code });
   }
   return data;
 }
-
 function abortError() {
-  const error = new Error('已取消');
-  error.code = 'ABORTED';
+  const error = new Error("\u5DF2\u53D6\u6D88");
+  error.code = "ABORTED";
   return error;
 }
-
 function sleep(ms, signal) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      signal?.removeEventListener('abort', onAbort);
+      signal?.removeEventListener("abort", onAbort);
       resolve();
     }, ms);
     function onAbort() {
       clearTimeout(timer);
       reject(abortError());
     }
-    signal?.addEventListener('abort', onAbort, { once: true });
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
-
 function createTask(config, body) {
-  return relayRequest(config, resolveSubmitPath(config), { method: 'POST', body });
+  return relayRequest(config, resolveSubmitPath(config), { method: "POST", body });
 }
-
 function getTask(config, taskId) {
   return relayRequest(config, resolveQueryPath(config, taskId));
 }
-
-/**
- * 轮询直到任务成功、失败、取消，或等待预算耗尽。
- * 中转站的状态字段可能是 success/completed 等别名，这里统一归一化。
- */
 async function waitForCompletion(config, taskId, signal) {
-  const deadline = Date.now() + ref(config, 'maxWaitMs', 600000);
-
-  for (;;) {
+  const deadline = Date.now() + ref(config, "maxWaitMs", 6e5);
+  for (; ; ) {
     if (signal?.aborted) throw abortError();
-
     const task = await getTask(config, taskId);
-    const status = extractStatus(task) || 'unknown';
-    const model = findKey(task, ['model']) || resolveModel(config);
-
+    const status = extractStatus(task) || "unknown";
+    const model = findKey(task, ["model"]) || resolveModel(config);
     if (SUCCESS_STATES.has(status)) {
       const videoUrl = extractVideoUrl(task);
-      if (videoUrl) return { taskId, status: 'succeeded', model, videoUrl };
+      if (videoUrl) return { taskId, status: "succeeded", model, videoUrl };
       const imageUrl = extractImageUrl(task);
       return {
         taskId,
-        status: 'failed',
+        status: "failed",
         model,
-        errorCode: 'provider_bad_response',
-        error: imageUrl
-          ? `上游返回的是图片而不是视频（${imageUrl.split('?')[0].slice(-60)}），`
-            + '可能是中转站把视频请求路由到了图片渠道。'
-          : '上游报告成功但没有返回视频地址。',
+        errorCode: "provider_bad_response",
+        error: imageUrl ? `\u4E0A\u6E38\u8FD4\u56DE\u7684\u662F\u56FE\u7247\u800C\u4E0D\u662F\u89C6\u9891\uFF08${imageUrl.split("?")[0].slice(-60)}\uFF09\uFF0C\u53EF\u80FD\u662F\u4E2D\u8F6C\u7AD9\u628A\u89C6\u9891\u8BF7\u6C42\u8DEF\u7531\u5230\u4E86\u56FE\u7247\u6E20\u9053\u3002` : "\u4E0A\u6E38\u62A5\u544A\u6210\u529F\u4F46\u6CA1\u6709\u8FD4\u56DE\u89C6\u9891\u5730\u5740\u3002"
       };
     }
     if (FAILED_STATES.has(status)) {
-      const data = findKey(task, ['error', 'fail_reason', 'message', 'detail']);
-      const classified = classifyError(400, typeof data === 'string' ? { message: data } : (data || task));
+      const data = findKey(task, ["error", "fail_reason", "message", "detail"]);
+      const classified = classifyError(400, typeof data === "string" ? { message: data } : data || task);
       return {
         taskId,
-        status: CANCEL_STATES.has(status) ? 'cancelled' : 'failed',
+        status: CANCEL_STATES.has(status) ? "cancelled" : "failed",
         model,
         errorCode: classified.code,
-        error: classified.message,
+        error: classified.message
       };
     }
     if (Date.now() > deadline) {
-      return { taskId, status: 'timeout' };
+      return { taskId, status: "timeout" };
     }
-    await sleep(ref(config, 'pollIntervalMs', 5000), signal);
+    await sleep(ref(config, "pollIntervalMs", 5e3), signal);
   }
 }
-
 function renderResult(value) {
   const { status, segments = [], videoUrl, error } = value || {};
   const lines = segments.map((segment) => {
-    const head = `第 ${segment.index} 段：+${segment.seconds}s（任务 ${segment.taskId}）`;
-    return segment.status === 'succeeded' && segment.videoUrl
-      ? `${head} → ${segment.videoUrl}`
-      : `${head} → ${segment.status}${segment.error ? `：${segment.error}` : ''}`;
+    const head = `\u7B2C ${segment.index} \u6BB5\uFF1A+${segment.seconds}s\uFF08\u4EFB\u52A1 ${segment.taskId}\uFF09`;
+    return segment.status === "succeeded" && segment.videoUrl ? `${head} \u2192 ${segment.videoUrl}` : `${head} \u2192 ${segment.status}${segment.error ? `\uFF1A${segment.error}` : ""}`;
   });
-
-  if (status === 'succeeded') {
+  if (status === "succeeded") {
     return [
       {
-        type: 'text',
+        type: "text",
         text: [
-          '视频延长成功。',
+          "\u89C6\u9891\u5EF6\u957F\u6210\u529F\u3002",
           ...lines,
-          `最终视频链接（约 24 小时内有效）：${videoUrl || '（无）'}`,
-        ].join('\n'),
-      },
+          `\u6700\u7EC8\u89C6\u9891\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF1A${videoUrl || "\uFF08\u65E0\uFF09"}`
+        ].join("\n")
+      }
     ];
   }
-  if (status === 'timeout') {
+  if (status === "timeout") {
     return [
       {
-        type: 'text',
+        type: "text",
         text: [
-          '延长任务仍在生成中（已超出单次等待时间）。',
+          "\u5EF6\u957F\u4EFB\u52A1\u4ECD\u5728\u751F\u6210\u4E2D\uFF08\u5DF2\u8D85\u51FA\u5355\u6B21\u7B49\u5F85\u65F6\u95F4\uFF09\u3002",
           ...lines,
-          `可用 video_status 查询任务 ${
-            segments.at(-1)?.taskId || '（未知）'
-          } 的状态与视频链接。`,
-        ].join('\n'),
-      },
+          `\u53EF\u7528 video_status \u67E5\u8BE2\u4EFB\u52A1 ${segments.at(-1)?.taskId || "\uFF08\u672A\u77E5\uFF09"} \u7684\u72B6\u6001\u4E0E\u89C6\u9891\u94FE\u63A5\u3002`
+        ].join("\n")
+      }
     ];
   }
-  if (status === 'cancelled') {
-    return [{ type: 'text', text: `延长任务已取消。\n${lines.join('\n')}` }];
+  if (status === "cancelled") {
+    return [{ type: "text", text: `\u5EF6\u957F\u4EFB\u52A1\u5DF2\u53D6\u6D88\u3002
+${lines.join("\n")}` }];
   }
   return [
     {
-      type: 'text',
+      type: "text",
       text: [
-        `视频延长失败${error ? `：${error}` : ''}。`,
+        `\u89C6\u9891\u5EF6\u957F\u5931\u8D25${error ? `\uFF1A${error}` : ""}\u3002`,
         ...lines,
-        videoUrl ? `已完成部分的视频链接：${videoUrl}` : '',
-      ].filter(Boolean).join('\n'),
-    },
+        videoUrl ? `\u5DF2\u5B8C\u6210\u90E8\u5206\u7684\u89C6\u9891\u94FE\u63A5\uFF1A${videoUrl}` : ""
+      ].filter(Boolean).join("\n")
+    }
   ];
 }
-
 const SEGMENT_OUTPUT_SCHEMA = {
-  type: 'object',
+  type: "object",
   properties: {
-    index: { type: 'integer' },
-    seconds: { type: 'integer' },
-    taskId: { type: 'string' },
-    status: { type: 'string' },
-    videoUrl: { type: 'string' },
-    error: { type: 'string' },
-  },
+    index: { type: "integer" },
+    seconds: { type: "integer" },
+    taskId: { type: "string" },
+    status: { type: "string" },
+    videoUrl: { type: "string" },
+    error: { type: "string" }
+  }
 };
-
 function extendTool(config) {
   return {
-    name: 'video_extend',
-    description:
-      '把一段已有的视频向前或向后延长：以公网视频 URL 作为输入素材，调用 Seedance 生成衔接片段，'
-      + '保持人物、服装、场景光线和声音连续；可一次连续延长多段，每段都用上一段的结果继续延长。'
-      + '提示词规则：以「向后延长视频1」或「向前延长视频1」开头（也可写「生成视频1之后的内容：」），'
-      + '全程用「视频1」指代输入素材，不要写成「参考视频1」（会被当成参考生视频，不是延长）；'
-      + '内容写清延长方向、剧情发展、主体状态、镜头运动和声音延续，减少接缝。'
-      + '每段 4-15 秒，默认按 15 秒上限拆、段数最少；上游对卡满 15 秒敏感时再调小。'
-      + '返回每段的任务 ID 和最终视频下载链接（约 24 小时内有效）；生成通常需要几分钟，'
-      + '单次调用返回 timeout 时用 video_status 继续等，不要重复提交同一段。',
+    name: "video_extend",
+    description: "\u628A\u4E00\u6BB5\u5DF2\u6709\u7684\u89C6\u9891\u5411\u524D\u6216\u5411\u540E\u5EF6\u957F\uFF1A\u4EE5\u516C\u7F51\u89C6\u9891 URL \u4F5C\u4E3A\u8F93\u5165\u7D20\u6750\uFF0C\u8C03\u7528 Seedance \u751F\u6210\u8854\u63A5\u7247\u6BB5\uFF0C\u4FDD\u6301\u4EBA\u7269\u3001\u670D\u88C5\u3001\u573A\u666F\u5149\u7EBF\u548C\u58F0\u97F3\u8FDE\u7EED\uFF1B\u53EF\u4E00\u6B21\u8FDE\u7EED\u5EF6\u957F\u591A\u6BB5\uFF0C\u6BCF\u6BB5\u90FD\u7528\u4E0A\u4E00\u6BB5\u7684\u7ED3\u679C\u7EE7\u7EED\u5EF6\u957F\u3002\u63D0\u793A\u8BCD\u89C4\u5219\uFF1A\u4EE5\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D\u6216\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\u5F00\u5934\uFF08\u4E5F\u53EF\u5199\u300C\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A\u300D\uFF09\uFF0C\u5168\u7A0B\u7528\u300C\u89C6\u98911\u300D\u6307\u4EE3\u8F93\u5165\u7D20\u6750\uFF0C\u4E0D\u8981\u5199\u6210\u300C\u53C2\u8003\u89C6\u98911\u300D\uFF08\u4F1A\u88AB\u5F53\u6210\u53C2\u8003\u751F\u89C6\u9891\uFF0C\u4E0D\u662F\u5EF6\u957F\uFF09\uFF1B\u5185\u5BB9\u5199\u6E05\u5EF6\u957F\u65B9\u5411\u3001\u5267\u60C5\u53D1\u5C55\u3001\u4E3B\u4F53\u72B6\u6001\u3001\u955C\u5934\u8FD0\u52A8\u548C\u58F0\u97F3\u5EF6\u7EED\uFF0C\u51CF\u5C11\u63A5\u7F1D\u3002\u6BCF\u6BB5 4-15 \u79D2\uFF0C\u9ED8\u8BA4\u6309 15 \u79D2\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\uFF1B\u4E0A\u6E38\u5BF9\u5361\u6EE1 15 \u79D2\u654F\u611F\u65F6\u518D\u8C03\u5C0F\u3002\u8FD4\u56DE\u6BCF\u6BB5\u7684\u4EFB\u52A1 ID \u548C\u6700\u7EC8\u89C6\u9891\u4E0B\u8F7D\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF1B\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout \u65F6\u7528 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u540C\u4E00\u6BB5\u3002",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         prompt: {
-          type: 'string',
-          description: '本段要续拍的剧情内容与人物设定；不要在提示词里重复已发生的情节。',
+          type: "string",
+          description: "\u672C\u6BB5\u8981\u7EED\u62CD\u7684\u5267\u60C5\u5185\u5BB9\u4E0E\u4EBA\u7269\u8BBE\u5B9A\uFF1B\u4E0D\u8981\u5728\u63D0\u793A\u8BCD\u91CC\u91CD\u590D\u5DF2\u53D1\u751F\u7684\u60C5\u8282\u3002"
         },
         videoUrl: {
-          type: 'string',
-          description: '参考视频的公网 URL（https:// 或 http://）。与 taskId 二选一。',
+          type: "string",
+          description: "\u53C2\u8003\u89C6\u9891\u7684\u516C\u7F51 URL\uFF08https:// \u6216 http://\uFF09\u3002\u4E0E taskId \u4E8C\u9009\u4E00\u3002"
         },
         taskId: {
-          type: 'string',
-          description:
-            '已有的 video_generate / video_extend 任务 ID，用它的成片作为输入素材。与 videoUrl 二选一。',
+          type: "string",
+          description: "\u5DF2\u6709\u7684 video_generate / video_extend \u4EFB\u52A1 ID\uFF0C\u7528\u5B83\u7684\u6210\u7247\u4F5C\u4E3A\u8F93\u5165\u7D20\u6750\u3002\u4E0E videoUrl \u4E8C\u9009\u4E00\u3002"
         },
         duration: {
-          type: 'integer',
+          type: "integer",
           minimum: 4,
           maximum: 15,
-          description:
-            '每段新增的秒数上限，4-15 的整数（如 5/8/10/14，默认 15）；'
-            + '刚好卡 15 秒容易因封装略超被上游拒绝。省略时使用配置默认值。',
+          description: "\u6BCF\u6BB5\u65B0\u589E\u7684\u79D2\u6570\u4E0A\u9650\uFF0C4-15 \u7684\u6574\u6570\uFF08\u5982 5/8/10/14\uFF0C\u9ED8\u8BA4 15\uFF09\uFF1B\u521A\u597D\u5361 15 \u79D2\u5BB9\u6613\u56E0\u5C01\u88C5\u7565\u8D85\u88AB\u4E0A\u6E38\u62D2\u7EDD\u3002\u7701\u7565\u65F6\u4F7F\u7528\u914D\u7F6E\u9ED8\u8BA4\u503C\u3002"
         },
         direction: {
-          type: 'string',
-          enum: ['backward', 'forward'],
-          description:
-            'backward=向后延长，续拍视频1之后的内容（默认）；forward=向前延长，生成视频1之前的前置剧情。',
+          type: "string",
+          enum: ["backward", "forward"],
+          description: "backward=\u5411\u540E\u5EF6\u957F\uFF0C\u7EED\u62CD\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF08\u9ED8\u8BA4\uFF09\uFF1Bforward=\u5411\u524D\u5EF6\u957F\uFF0C\u751F\u6210\u89C6\u98911\u4E4B\u524D\u7684\u524D\u7F6E\u5267\u60C5\u3002"
         },
         wording: {
-          type: 'string',
-          enum: ['extend', 'after'],
-          description:
-            '提示词开头写法：extend=「向后延长视频1」/「向前延长视频1」（默认）；'
-            + 'after=「生成视频1之后的内容：」（仅向后延长）。',
+          type: "string",
+          enum: ["extend", "after"],
+          description: "\u63D0\u793A\u8BCD\u5F00\u5934\u5199\u6CD5\uFF1Aextend=\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D/\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\uFF08\u9ED8\u8BA4\uFF09\uFF1Bafter=\u300C\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A\u300D\uFF08\u4EC5\u5411\u540E\u5EF6\u957F\uFF09\u3002"
         },
         segments: {
-          type: 'integer',
+          type: "integer",
           minimum: 1,
           maximum: 10,
-          description: '连续延长几段，默认 1；每段都引用上一段的结果，适合做出更长的成片。',
+          description: "\u8FDE\u7EED\u5EF6\u957F\u51E0\u6BB5\uFF0C\u9ED8\u8BA4 1\uFF1B\u6BCF\u6BB5\u90FD\u5F15\u7528\u4E0A\u4E00\u6BB5\u7684\u7ED3\u679C\uFF0C\u9002\u5408\u505A\u51FA\u66F4\u957F\u7684\u6210\u7247\u3002"
         },
         mode: {
-          type: 'string',
-          enum: ['continuous', 'closeup'],
-          description:
-            'continuous=同机位连续续拍（默认）；closeup=在完整台词结束处自然切到近景或反应镜头。',
+          type: "string",
+          enum: ["continuous", "closeup"],
+          description: "continuous=\u540C\u673A\u4F4D\u8FDE\u7EED\u7EED\u62CD\uFF08\u9ED8\u8BA4\uFF09\uFF1Bcloseup=\u5728\u5B8C\u6574\u53F0\u8BCD\u7ED3\u675F\u5904\u81EA\u7136\u5207\u5230\u8FD1\u666F\u6216\u53CD\u5E94\u955C\u5934\u3002"
         },
         startAt: {
-          type: 'number',
+          type: "number",
           minimum: 0,
-          description:
-            '视频1已有的秒数；给了就按「整片第 X–Y 秒」描述本段。'
-            + '向后延长时逐段累加，向前延长时逐段前移。',
+          description: "\u89C6\u98911\u5DF2\u6709\u7684\u79D2\u6570\uFF1B\u7ED9\u4E86\u5C31\u6309\u300C\u6574\u7247\u7B2C X\u2013Y \u79D2\u300D\u63CF\u8FF0\u672C\u6BB5\u3002\u5411\u540E\u5EF6\u957F\u65F6\u9010\u6BB5\u7D2F\u52A0\uFF0C\u5411\u524D\u5EF6\u957F\u65F6\u9010\u6BB5\u524D\u79FB\u3002"
         },
         resolution: {
-          type: 'string',
-          enum: ['480p', '720p', '1080p'],
-          description: '分辨率，默认沿用配置。',
+          type: "string",
+          enum: ["480p", "720p", "1080p"],
+          description: "\u5206\u8FA8\u7387\uFF0C\u9ED8\u8BA4\u6CBF\u7528\u914D\u7F6E\u3002"
         },
         ratio: {
-          type: 'string',
-          enum: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
-          description: '画面比例；seedance 2.5 延长时会自动改用 adaptive。',
+          type: "string",
+          enum: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
+          description: "\u753B\u9762\u6BD4\u4F8B\uFF1Bseedance 2.5 \u5EF6\u957F\u65F6\u4F1A\u81EA\u52A8\u6539\u7528 adaptive\u3002"
         },
         generateAudio: {
-          type: 'boolean',
-          description: '是否生成音频，默认 true。',
+          type: "boolean",
+          description: "\u662F\u5426\u751F\u6210\u97F3\u9891\uFF0C\u9ED8\u8BA4 true\u3002"
         },
         watermark: {
-          type: 'boolean',
-          description: '是否添加水印，默认 false。',
-        },
+          type: "boolean",
+          description: "\u662F\u5426\u6DFB\u52A0\u6C34\u5370\uFF0C\u9ED8\u8BA4 false\u3002"
+        }
       },
-      required: ['prompt'],
+      required: ["prompt"]
     },
     output: {
       schema: {
-        type: 'object',
+        type: "object",
         properties: {
-          status: { type: 'string' },
-          videoUrl: { type: 'string' },
-          totalSeconds: { type: 'integer' },
-          error: { type: 'string' },
-          errorCode: { type: 'string' },
-          segments: { type: 'array', items: SEGMENT_OUTPUT_SCHEMA },
-        },
+          status: { type: "string" },
+          videoUrl: { type: "string" },
+          totalSeconds: { type: "integer" },
+          error: { type: "string" },
+          errorCode: { type: "string" },
+          segments: { type: "array", items: SEGMENT_OUTPUT_SCHEMA }
+        }
       },
       render(_args, value) {
         return renderResult(value);
-      },
+      }
     },
-    timeoutMs: 1800000,
+    timeoutMs: 18e5,
     isConcurrencySafe() {
       return true;
     },
     async execute(args, exec) {
       const apiKey = resolveApiKey(config);
       assertConfigured(config, apiKey);
-
-      const prompt = String(args?.prompt ?? '').trim();
-      if (!prompt) throw new Error('提示词 prompt 不能为空。');
-
-      const direction = args?.direction === 'forward' ? 'forward' : 'backward';
+      const prompt = String(args?.prompt ?? "").trim();
+      if (!prompt) throw new Error("\u63D0\u793A\u8BCD prompt \u4E0D\u80FD\u4E3A\u7A7A\u3002");
+      const direction = args?.direction === "forward" ? "forward" : "backward";
       const requestedSegments = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
       const secondsPerSegment = clampInteger(
-        args?.duration ?? ref(config, 'duration', 5),
+        args?.duration ?? ref(config, "duration", 5),
         MIN_SECONDS,
         MAX_SEGMENT_SECONDS,
-        ref(config, 'duration', 5),
+        ref(config, "duration", 5)
       );
-
-      let referenceUrl = String(args?.videoUrl ?? '').trim();
+      let referenceUrl = String(args?.videoUrl ?? "").trim();
       if (!referenceUrl && args?.taskId) {
         const source = await getTask(config, String(args.taskId).trim());
-        referenceUrl = extractVideoUrl(source) || '';
+        referenceUrl = extractVideoUrl(source) || "";
         if (!referenceUrl) {
           throw new Error(
-            `任务 ${args.taskId} 没有可用的视频链接（状态：${
-              extractStatus(source) || '未知'
-            }）。`,
+            `\u4EFB\u52A1 ${args.taskId} \u6CA1\u6709\u53EF\u7528\u7684\u89C6\u9891\u94FE\u63A5\uFF08\u72B6\u6001\uFF1A${extractStatus(source) || "\u672A\u77E5"}\uFF09\u3002`
           );
         }
       }
       referenceUrl = normalizeReferenceUrl(referenceUrl);
-
       let cursor = args?.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
       const segments = [];
-      let status = 'succeeded';
+      let status = "succeeded";
       let error;
       let errorCode;
-
       for (let index = 1; index <= requestedSegments; index += 1) {
         if (exec?.signal?.aborted) throw abortError();
-
         const { body, seconds } = buildRequestBody(
           config,
           { ...args, prompt, duration: secondsPerSegment, startAt: cursor },
-          referenceUrl,
+          referenceUrl
         );
         const final = await runTask(config, body, exec?.signal);
         const taskId = final.taskId;
-
         segments.push({
           index,
           seconds,
           taskId,
           status: final.status,
           videoUrl: final.videoUrl,
-          error:
-            final.errorCode === 'content_rejected'
-              ? `${CONTENT_REJECTION_HINT}上游详情：${final.error || ''}`
-              : final.error,
+          error: final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error
         });
-
-        if (final.status !== 'succeeded' || !final.videoUrl) {
+        if (final.status !== "succeeded" || !final.videoUrl) {
           status = final.status;
           errorCode = final.errorCode;
-          error =
-            final.errorCode === 'content_rejected'
-              ? `${CONTENT_REJECTION_HINT}上游详情：${final.error || ''}`
-              : final.error;
+          error = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error;
           break;
         }
         referenceUrl = normalizeReferenceUrl(final.videoUrl);
         if (cursor != null) {
-          cursor = direction === 'forward' ? cursor - seconds : cursor + seconds;
+          cursor = direction === "forward" ? cursor - seconds : cursor + seconds;
           if (cursor < 0) cursor = null;
         }
       }
-
       return {
         status,
         error,
         errorCode,
         segments,
         videoUrl: segments.filter((segment) => segment.videoUrl).at(-1)?.videoUrl,
-        totalSeconds: segments.filter((segment) => segment.status === 'succeeded').length
-          * secondsPerSegment,
+        totalSeconds: segments.filter((segment) => segment.status === "succeeded").length * secondsPerSegment
       };
-    },
+    }
   };
 }
-
 const VIDEO_SEGMENT_OUTPUT_SCHEMA = {
-  type: 'object',
+  type: "object",
   properties: {
-    index: { type: 'integer' },
-    kind: { type: 'string' },
-    seconds: { type: 'integer' },
-    taskId: { type: 'string' },
-    status: { type: 'string' },
-    videoUrl: { type: 'string' },
-    localPath: { type: 'string' },
-    durationSeconds: { type: 'number' },
-    error: { type: 'string' },
-  },
+    index: { type: "integer" },
+    kind: { type: "string" },
+    seconds: { type: "integer" },
+    taskId: { type: "string" },
+    status: { type: "string" },
+    videoUrl: { type: "string" },
+    localPath: { type: "string" },
+    durationSeconds: { type: "number" },
+    error: { type: "string" }
+  }
 };
-
 function renderVideoResult(value) {
   const {
-    status, mode, segments = [], videoUrl, videoPath, mergeMode, segmentsDir, note, error,
+    status,
+    mode,
+    segments = [],
+    videoUrl,
+    videoPath,
+    mergeMode,
+    segmentsDir,
+    note,
+    error
   } = value || {};
   const lines = segments.map((segment) => {
-    const label = segment.kind === 'extend' ? `延长 +${segment.seconds}s` : `直出 ${segment.seconds}s`;
-    const head = `第 ${segment.index} 段：${label}（任务 ${segment.taskId}）`;
-    if (segment.status !== 'succeeded' || !segment.videoUrl) {
-      return `${head} → ${segment.status}${segment.error ? `：${segment.error}` : ''}`;
+    const label = segment.kind === "extend" ? `\u5EF6\u957F +${segment.seconds}s` : `\u76F4\u51FA ${segment.seconds}s`;
+    const head = `\u7B2C ${segment.index} \u6BB5\uFF1A${label}\uFF08\u4EFB\u52A1 ${segment.taskId}\uFF09`;
+    if (segment.status !== "succeeded" || !segment.videoUrl) {
+      return `${head} \u2192 ${segment.status}${segment.error ? `\uFF1A${segment.error}` : ""}`;
     }
-    return segment.localPath
-      ? `${head} → ${segment.videoUrl}\n    本地文件：${segment.localPath}`
-      : `${head} → ${segment.videoUrl}`;
+    return segment.localPath ? `${head} \u2192 ${segment.videoUrl}
+    \u672C\u5730\u6587\u4EF6\uFF1A${segment.localPath}` : `${head} \u2192 ${segment.videoUrl}`;
   });
-
   const parts = [];
-  if (status === 'succeeded') {
-    parts.push(mode === 'extended'
-      ? `视频生成成功：先直出 ${formatSeconds(segments[0]?.seconds)} 秒，再延长 ${segments.length - 1} 段。`
-      : `视频生成成功：一次直出 ${formatSeconds(segments[0]?.seconds)} 秒，没有超过单段上限，不需要延长。`);
-  } else if (status === 'timeout') {
-    parts.push('任务仍在生成中（已超出单次等待时间）。');
-  } else if (status === 'cancelled') {
-    parts.push('任务已取消。');
+  if (status === "succeeded") {
+    parts.push(mode === "extended" ? `\u89C6\u9891\u751F\u6210\u6210\u529F\uFF1A\u5148\u76F4\u51FA ${formatSeconds(segments[0]?.seconds)} \u79D2\uFF0C\u518D\u5EF6\u957F ${segments.length - 1} \u6BB5\u3002` : `\u89C6\u9891\u751F\u6210\u6210\u529F\uFF1A\u4E00\u6B21\u76F4\u51FA ${formatSeconds(segments[0]?.seconds)} \u79D2\uFF0C\u6CA1\u6709\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\uFF0C\u4E0D\u9700\u8981\u5EF6\u957F\u3002`);
+  } else if (status === "timeout") {
+    parts.push("\u4EFB\u52A1\u4ECD\u5728\u751F\u6210\u4E2D\uFF08\u5DF2\u8D85\u51FA\u5355\u6B21\u7B49\u5F85\u65F6\u95F4\uFF09\u3002");
+  } else if (status === "cancelled") {
+    parts.push("\u4EFB\u52A1\u5DF2\u53D6\u6D88\u3002");
   } else {
-    parts.push(`视频生成失败${error ? `：${error}` : ''}。`);
+    parts.push(`\u89C6\u9891\u751F\u6210\u5931\u8D25${error ? `\uFF1A${error}` : ""}\u3002`);
   }
   parts.push(...lines);
-
-  if (status === 'succeeded') {
+  if (status === "succeeded") {
     if (videoPath) {
-      const how = mergeMode === 'copy'
-        ? '无损拼接'
-        : (mergeMode === 'single' ? '一段直出，无需拼接' : '重编码拼接');
-      parts.push(`成片（本地文件）：${videoPath}（${how}）`);
+      const how = mergeMode === "copy" ? "\u65E0\u635F\u62FC\u63A5" : mergeMode === "single" ? "\u4E00\u6BB5\u76F4\u51FA\uFF0C\u65E0\u9700\u62FC\u63A5" : "\u91CD\u7F16\u7801\u62FC\u63A5";
+      parts.push(`\u6210\u7247\uFF08\u672C\u5730\u6587\u4EF6\uFF09\uFF1A${videoPath}\uFF08${how}\uFF09`);
     } else if (segmentsDir) {
-      parts.push(`没有合并成一条：分段文件都在 ${segmentsDir}（每段路径见上面的列表）。`);
+      parts.push(`\u6CA1\u6709\u5408\u5E76\u6210\u4E00\u6761\uFF1A\u5206\u6BB5\u6587\u4EF6\u90FD\u5728 ${segmentsDir}\uFF08\u6BCF\u6BB5\u8DEF\u5F84\u89C1\u4E0A\u9762\u7684\u5217\u8868\uFF09\u3002`);
     } else {
-      parts.push('没有生成合并文件，请按上面的上游链接自行下载分段。');
+      parts.push("\u6CA1\u6709\u751F\u6210\u5408\u5E76\u6587\u4EF6\uFF0C\u8BF7\u6309\u4E0A\u9762\u7684\u4E0A\u6E38\u94FE\u63A5\u81EA\u884C\u4E0B\u8F7D\u5206\u6BB5\u3002");
     }
   }
-  if (videoUrl) parts.push(`最后一段上游链接（约 24 小时内有效）：${videoUrl}`);
+  if (videoUrl) parts.push(`\u6700\u540E\u4E00\u6BB5\u4E0A\u6E38\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF1A${videoUrl}`);
   if (note) parts.push(note);
-  if (status === 'timeout') {
-    parts.push(`可用 video_status 查询任务 ${segments.at(-1)?.taskId || '（未知）'} 的状态。`);
+  if (status === "timeout") {
+    parts.push(`\u53EF\u7528 video_status \u67E5\u8BE2\u4EFB\u52A1 ${segments.at(-1)?.taskId || "\uFF08\u672A\u77E5\uFF09"} \u7684\u72B6\u6001\u3002`);
   }
-  return [{ type: 'text', text: parts.filter(Boolean).join('\n') }];
+  return [{ type: "text", text: parts.filter(Boolean).join("\n") }];
 }
-
 function videoTool(config, deps) {
   return {
-    name: 'video_generate',
-    description:
-      '生成一段完整视频，duration 是目标总秒数：不超过单段上限（默认 15 秒）时一次直出；'
-      + '**硬规则：总时长 ≤ 单段上限的视频必须一次直出，禁止拆成多段 / 多镜 / 多次调用再拼接**'
-      + '（例如「15 秒」不许拆成 8+7）；多镜只在用户明确要求多镜时才用。'
-      + '更长时先直出首段，再把剩余时长按 4-15 秒均分逐段续拍（默认吃满上限、段数最少）——'
-      + '这是同一个镜头的续拍延长，也不是多镜拼接，'
-      + '最后用 ffmpeg 合并成一个本地成片文件，默认落在会话工作目录下的 metaontic-video/，'
-      + '文件名形如 20261027-201530-25s.mp4。20 秒、25 秒这类目标不用拆成多个任务：'
-      + '直接传 duration=20 即可（20 秒 → 15+5，25 秒 → 15+10）。'
-      + '返回每段任务 ID、上游链接和成片路径。生成通常需要几分钟（每段单独生成），'
-      + '单次调用返回 timeout 时用 video_status 继续等，不要重复提交新任务。'
-      + '合并需要本机有 ffmpeg；本机没有就不去合成，直接返回分段列表（每段的上游链接和'
-      + '本地文件），装好 ffmpeg 后重跑一次即可合并成一条。',
+    name: "video_generate",
+    description: "\u751F\u6210\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\uFF0Cduration \u662F\u76EE\u6807\u603B\u79D2\u6570\uFF1A\u4E0D\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\uFF08\u9ED8\u8BA4 15 \u79D2\uFF09\u65F6\u4E00\u6B21\u76F4\u51FA\uFF1B**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 \u5355\u6BB5\u4E0A\u9650\u7684\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u62C6\u6210\u591A\u6BB5 / \u591A\u955C / \u591A\u6B21\u8C03\u7528\u518D\u62FC\u63A5**\uFF08\u4F8B\u5982\u300C15 \u79D2\u300D\u4E0D\u8BB8\u62C6\u6210 8+7\uFF09\uFF1B\u591A\u955C\u53EA\u5728\u7528\u6237\u660E\u786E\u8981\u6C42\u591A\u955C\u65F6\u624D\u7528\u3002\u66F4\u957F\u65F6\u5148\u76F4\u51FA\u9996\u6BB5\uFF0C\u518D\u628A\u5269\u4F59\u65F6\u957F\u6309 4-15 \u79D2\u5747\u5206\u9010\u6BB5\u7EED\u62CD\uFF08\u9ED8\u8BA4\u5403\u6EE1\u4E0A\u9650\u3001\u6BB5\u6570\u6700\u5C11\uFF09\u2014\u2014\u8FD9\u662F\u540C\u4E00\u4E2A\u955C\u5934\u7684\u7EED\u62CD\u5EF6\u957F\uFF0C\u4E5F\u4E0D\u662F\u591A\u955C\u62FC\u63A5\uFF0C\u6700\u540E\u7528 ffmpeg \u5408\u5E76\u6210\u4E00\u4E2A\u672C\u5730\u6210\u7247\u6587\u4EF6\uFF0C\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\uFF0C\u6587\u4EF6\u540D\u5F62\u5982 20261027-201530-25s.mp4\u300220 \u79D2\u300125 \u79D2\u8FD9\u7C7B\u76EE\u6807\u4E0D\u7528\u62C6\u6210\u591A\u4E2A\u4EFB\u52A1\uFF1A\u76F4\u63A5\u4F20 duration=20 \u5373\u53EF\uFF0820 \u79D2 \u2192 15+5\uFF0C25 \u79D2 \u2192 15+10\uFF09\u3002\u8FD4\u56DE\u6BCF\u6BB5\u4EFB\u52A1 ID\u3001\u4E0A\u6E38\u94FE\u63A5\u548C\u6210\u7247\u8DEF\u5F84\u3002\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF08\u6BCF\u6BB5\u5355\u72EC\u751F\u6210\uFF09\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout \u65F6\u7528 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u65B0\u4EFB\u52A1\u3002\u5408\u5E76\u9700\u8981\u672C\u673A\u6709 ffmpeg\uFF1B\u672C\u673A\u6CA1\u6709\u5C31\u4E0D\u53BB\u5408\u6210\uFF0C\u76F4\u63A5\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u7684\u4E0A\u6E38\u94FE\u63A5\u548C\u672C\u5730\u6587\u4EF6\uFF09\uFF0C\u88C5\u597D ffmpeg \u540E\u91CD\u8DD1\u4E00\u6B21\u5373\u53EF\u5408\u5E76\u6210\u4E00\u6761\u3002",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         prompt: {
-          type: 'string',
-          description: '要生成的内容、人物设定与台词；超过单段上限时它同时决定后续每段续拍什么。',
+          type: "string",
+          description: "\u8981\u751F\u6210\u7684\u5185\u5BB9\u3001\u4EBA\u7269\u8BBE\u5B9A\u4E0E\u53F0\u8BCD\uFF1B\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\u65F6\u5B83\u540C\u65F6\u51B3\u5B9A\u540E\u7EED\u6BCF\u6BB5\u7EED\u62CD\u4EC0\u4E48\u3002"
         },
         duration: {
-          type: 'integer',
+          type: "integer",
           minimum: 4,
           maximum: 285,
-          description:
-            '目标总时长（秒）。不超过单段上限（默认 15）时就一次直出（整条视频只生成一次，'
-            + '禁止拆成多段/多镜再拼）；超过就先直出上限长度再逐段延长，最后合并。',
+          description: "\u76EE\u6807\u603B\u65F6\u957F\uFF08\u79D2\uFF09\u3002\u4E0D\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\uFF08\u9ED8\u8BA4 15\uFF09\u65F6\u5C31\u4E00\u6B21\u76F4\u51FA\uFF08\u6574\u6761\u89C6\u9891\u53EA\u751F\u6210\u4E00\u6B21\uFF0C\u7981\u6B62\u62C6\u6210\u591A\u6BB5/\u591A\u955C\u518D\u62FC\uFF09\uFF1B\u8D85\u8FC7\u5C31\u5148\u76F4\u51FA\u4E0A\u9650\u957F\u5EA6\u518D\u9010\u6BB5\u5EF6\u957F\uFF0C\u6700\u540E\u5408\u5E76\u3002"
         },
         firstFrameUrl: {
-          type: 'string',
-          description: '可选：首帧图公网 URL，作为生成的首帧参考。',
+          type: "string",
+          description: "\u53EF\u9009\uFF1A\u9996\u5E27\u56FE\u516C\u7F51 URL\uFF0C\u4F5C\u4E3A\u751F\u6210\u7684\u9996\u5E27\u53C2\u8003\u3002"
         },
         lastFrameUrl: {
-          type: 'string',
-          description: '可选：尾帧图公网 URL，作为生成的尾帧参考。',
+          type: "string",
+          description: "\u53EF\u9009\uFF1A\u5C3E\u5E27\u56FE\u516C\u7F51 URL\uFF0C\u4F5C\u4E3A\u751F\u6210\u7684\u5C3E\u5E27\u53C2\u8003\u3002"
         },
         segmentSeconds: {
-          type: 'integer',
+          type: "integer",
           minimum: 4,
           maximum: 15,
-          description:
-            '仅在超过单段上限时才用：每段延长多少秒，默认用配置里的每段秒数；'
-            + '4-15 的整数（如 5/8/10/14），默认 15：按上限拆、段数最少。',
+          description: "\u4EC5\u5728\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\u65F6\u624D\u7528\uFF1A\u6BCF\u6BB5\u5EF6\u957F\u591A\u5C11\u79D2\uFF0C\u9ED8\u8BA4\u7528\u914D\u7F6E\u91CC\u7684\u6BCF\u6BB5\u79D2\u6570\uFF1B4-15 \u7684\u6574\u6570\uFF08\u5982 5/8/10/14\uFF09\uFF0C\u9ED8\u8BA4 15\uFF1A\u6309\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\u3002"
         },
         mode: {
-          type: 'string',
-          enum: ['continuous', 'closeup'],
-          description: '延长时的衔接方式：continuous=同机位连续（默认）；closeup=在台词结束处切近景。',
+          type: "string",
+          enum: ["continuous", "closeup"],
+          description: "\u5EF6\u957F\u65F6\u7684\u8854\u63A5\u65B9\u5F0F\uFF1Acontinuous=\u540C\u673A\u4F4D\u8FDE\u7EED\uFF08\u9ED8\u8BA4\uFF09\uFF1Bcloseup=\u5728\u53F0\u8BCD\u7ED3\u675F\u5904\u5207\u8FD1\u666F\u3002"
         },
         resolution: {
-          type: 'string',
-          enum: ['480p', '720p', '1080p'],
-          description: '分辨率，默认沿用配置。',
+          type: "string",
+          enum: ["480p", "720p", "1080p"],
+          description: "\u5206\u8FA8\u7387\uFF0C\u9ED8\u8BA4\u6CBF\u7528\u914D\u7F6E\u3002"
         },
         ratio: {
-          type: 'string',
-          enum: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
-          description: '画面比例；seedance 2.5 延长时会自动改用 adaptive。',
+          type: "string",
+          enum: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
+          description: "\u753B\u9762\u6BD4\u4F8B\uFF1Bseedance 2.5 \u5EF6\u957F\u65F6\u4F1A\u81EA\u52A8\u6539\u7528 adaptive\u3002"
         },
         generateAudio: {
-          type: 'boolean',
-          description: '是否生成音频，默认 true。',
+          type: "boolean",
+          description: "\u662F\u5426\u751F\u6210\u97F3\u9891\uFF0C\u9ED8\u8BA4 true\u3002"
         },
         watermark: {
-          type: 'boolean',
-          description: '是否添加水印，默认 false。',
+          type: "boolean",
+          description: "\u662F\u5426\u6DFB\u52A0\u6C34\u5370\uFF0C\u9ED8\u8BA4 false\u3002"
         },
         merge: {
-          type: 'boolean',
-          description: '是否下载分段并用 ffmpeg 合并成一个本地成片，默认 true；'
-            + '本机没有 ffmpeg 时会跳过合并，只返回分段列表。',
+          type: "boolean",
+          description: "\u662F\u5426\u4E0B\u8F7D\u5206\u6BB5\u5E76\u7528 ffmpeg \u5408\u5E76\u6210\u4E00\u4E2A\u672C\u5730\u6210\u7247\uFF0C\u9ED8\u8BA4 true\uFF1B\u672C\u673A\u6CA1\u6709 ffmpeg \u65F6\u4F1A\u8DF3\u8FC7\u5408\u5E76\uFF0C\u53EA\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\u3002"
         },
         keepSegments: {
-          type: 'boolean',
-          description: '合并后是否保留分段原片，默认 false（合并成功后删除分段）。',
-        },
+          type: "boolean",
+          description: "\u5408\u5E76\u540E\u662F\u5426\u4FDD\u7559\u5206\u6BB5\u539F\u7247\uFF0C\u9ED8\u8BA4 false\uFF08\u5408\u5E76\u6210\u529F\u540E\u5220\u9664\u5206\u6BB5\uFF09\u3002"
+        }
       },
-      required: ['prompt'],
+      required: ["prompt"]
     },
     output: {
       schema: {
-        type: 'object',
+        type: "object",
         properties: {
-          status: { type: 'string' },
-          mode: { type: 'string' },
-          plannedSeconds: { type: 'integer' },
-          totalSeconds: { type: 'integer' },
-          videoUrl: { type: 'string' },
-          videoPath: { type: 'string' },
-          merged: { type: 'boolean' },
-          mergeMode: { type: 'string' },
-          segmentsDir: { type: 'string' },
-          note: { type: 'string' },
-          error: { type: 'string' },
-          errorCode: { type: 'string' },
-          segments: { type: 'array', items: VIDEO_SEGMENT_OUTPUT_SCHEMA },
-        },
+          status: { type: "string" },
+          mode: { type: "string" },
+          plannedSeconds: { type: "integer" },
+          totalSeconds: { type: "integer" },
+          videoUrl: { type: "string" },
+          videoPath: { type: "string" },
+          merged: { type: "boolean" },
+          mergeMode: { type: "string" },
+          segmentsDir: { type: "string" },
+          note: { type: "string" },
+          error: { type: "string" },
+          errorCode: { type: "string" },
+          segments: { type: "array", items: VIDEO_SEGMENT_OUTPUT_SCHEMA }
+        }
       },
       render(_args, value) {
         return renderVideoResult(value);
-      },
+      }
     },
-    timeoutMs: 3600000,
+    timeoutMs: 36e5,
     isConcurrencySafe() {
       return true;
     },
     async execute(args, exec) {
       const apiKey = resolveApiKey(config);
       assertConfigured(config, apiKey);
-
-      const prompt = String(args?.prompt ?? '').trim();
-      if (!prompt) throw new Error('提示词 prompt 不能为空。');
-
+      const prompt = String(args?.prompt ?? "").trim();
+      if (!prompt) throw new Error("\u63D0\u793A\u8BCD prompt \u4E0D\u80FD\u4E3A\u7A7A\u3002");
       const singleMax = resolveSingleMax(config);
       const segmentSeconds = resolveSegmentSeconds(config, args?.segmentSeconds);
       const total = clampInteger(
         args?.duration ?? singleMax,
         MIN_SECONDS,
         singleMax + (MAX_SEGMENTS - 1) * MAX_SEGMENT_SECONDS,
-        singleMax,
+        singleMax
       );
       const plan = planVideoSegments(total, singleMax, segmentSeconds);
       const plannedTotal = plan.reduce((sum, step) => sum + step.seconds, 0);
-
       const notes = [];
       if (plannedTotal < total) {
         notes.push(
-          `目标 ${total} 秒超过单次最多 ${MAX_SEGMENTS} 段的上限，本次按 ${plannedTotal} 秒执行。`,
+          `\u76EE\u6807 ${total} \u79D2\u8D85\u8FC7\u5355\u6B21\u6700\u591A ${MAX_SEGMENTS} \u6BB5\u7684\u4E0A\u9650\uFF0C\u672C\u6B21\u6309 ${plannedTotal} \u79D2\u6267\u884C\u3002`
         );
       } else if (plannedTotal > total) {
         notes.push(
-          `目标 ${total} 秒拆不出完全等长的分段（每段 4-15 秒），本次按 ${plannedTotal} 秒执行。`,
+          `\u76EE\u6807 ${total} \u79D2\u62C6\u4E0D\u51FA\u5B8C\u5168\u7B49\u957F\u7684\u5206\u6BB5\uFF08\u6BCF\u6BB5 4-15 \u79D2\uFF09\uFF0C\u672C\u6B21\u6309 ${plannedTotal} \u79D2\u6267\u884C\u3002`
         );
       }
-
       const segments = [];
-      let status = 'succeeded';
+      let status = "succeeded";
       let error;
       let errorCode;
-      let referenceUrl = '';
+      let referenceUrl = "";
       let cursor = 0;
-
       for (const [index, step] of plan.entries()) {
         if (exec?.signal?.aborted) throw abortError();
-
         const stepArgs = {
           ...args,
           prompt,
           duration: step.seconds,
           // 这条流程是「先直出再向后续拍」，分段的拼接顺序固定为向后延长。
-          direction: 'backward',
-          startAt: step.kind === 'extend' ? cursor : undefined,
+          direction: "backward",
+          startAt: step.kind === "extend" ? cursor : void 0
         };
-        const { body, seconds } = step.kind === 'generate'
-          ? buildGenerationBody(config, stepArgs, step.seconds)
-          : buildRequestBody(config, stepArgs, referenceUrl);
-
+        const { body, seconds } = step.kind === "generate" ? buildGenerationBody(config, stepArgs, step.seconds) : buildRequestBody(config, stepArgs, referenceUrl);
         const final = await runTask(config, body, exec?.signal);
-        const detail = final.errorCode === 'content_rejected'
-          ? `${CONTENT_REJECTION_HINT}上游详情：${final.error || ''}`
-          : final.error;
-
+        const detail = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error;
         segments.push({
           index: index + 1,
           kind: step.kind,
@@ -1924,10 +1486,9 @@ function videoTool(config, deps) {
           taskId: final.taskId,
           status: final.status,
           videoUrl: final.videoUrl,
-          error: detail,
+          error: detail
         });
-
-        if (final.status !== 'succeeded' || !final.videoUrl) {
+        if (final.status !== "succeeded" || !final.videoUrl) {
           status = final.status;
           errorCode = final.errorCode;
           error = detail;
@@ -1936,365 +1497,334 @@ function videoTool(config, deps) {
         referenceUrl = normalizeReferenceUrl(final.videoUrl);
         cursor += seconds;
       }
-
-      const completed = segments.filter((segment) => segment.status === 'succeeded' && segment.videoUrl);
+      const completed = segments.filter((segment) => segment.status === "succeeded" && segment.videoUrl);
       const result = {
         status,
-        mode: plan.length > 1 ? 'extended' : 'direct',
+        mode: plan.length > 1 ? "extended" : "direct",
         plannedSeconds: plannedTotal,
         totalSeconds: completed.reduce((sum, segment) => sum + segment.seconds, 0),
         segments,
         videoUrl: completed.at(-1)?.videoUrl,
         error,
-        errorCode,
+        errorCode
       };
-      if (status !== 'succeeded' || !completed.length) return result;
-
+      if (status !== "succeeded" || !completed.length) return result;
       if (args?.merge === false) {
-        result.note = [...notes, '按参数要求只返回上游链接，没有下载合并。'].join('\n');
+        result.note = [...notes, "\u6309\u53C2\u6570\u8981\u6C42\u53EA\u8FD4\u56DE\u4E0A\u6E38\u94FE\u63A5\uFF0C\u6CA1\u6709\u4E0B\u8F7D\u5408\u5E76\u3002"].join("\n");
         return result;
       }
-
-      // 多段才需要合成；本机没有 ffmpeg 就直接跳过，别白跑一遍合并再报错。
       const ffmpegReady = completed.length > 1 ? await hasFfmpeg(config, exec?.signal) : true;
-      const ffmpegBinary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
-
+      const ffmpegBinary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
       const stamp = fileStamp();
       const outDir = await resolveOutputDir(config, exec, deps);
-      const segmentsDir = path.join(outDir, 'segments', stamp);
+      const segmentsDir = path.join(outDir, "segments", stamp);
       const files = [];
       let probeWarned = false;
-
       try {
         for (const [index, segment] of completed.entries()) {
           const dest = path.join(
             segmentsDir,
-            `${String(segment.index).padStart(2, '0')}-${segment.kind}.mp4`,
+            `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`
           );
           await downloadFile(segment.videoUrl, dest, { signal: exec?.signal });
           segment.localPath = dest;
-
           const media = await probeMedia(dest, config, exec?.signal);
           if (media?.durationSeconds) {
             segment.durationSeconds = Number(media.durationSeconds.toFixed(2));
-            const cumulative = completed.slice(0, index + 1)
-              .reduce((sum, item) => sum + item.seconds, 0);
+            const cumulative = completed.slice(0, index + 1).reduce((sum, item) => sum + item.seconds, 0);
             const tolerance = Math.max(
               CUMULATIVE_TOLERANCE_MIN_SECONDS,
-              cumulative * CUMULATIVE_TOLERANCE_RATIO,
+              cumulative * CUMULATIVE_TOLERANCE_RATIO
             );
-            const looksCumulative = files.length > 0
-              && Math.abs(media.durationSeconds - cumulative) <= tolerance
-              && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
+            const looksCumulative = files.length > 0 && Math.abs(media.durationSeconds - cumulative) <= tolerance && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
             if (looksCumulative) {
               files.length = 0;
               notes.push(
-                `第 ${segment.index} 段实测 ${formatSeconds(media.durationSeconds)} 秒，`
-                + `接近累计时长 ${cumulative} 秒，按「上游返回的是累计成片」处理。`,
+                `\u7B2C ${segment.index} \u6BB5\u5B9E\u6D4B ${formatSeconds(media.durationSeconds)} \u79D2\uFF0C\u63A5\u8FD1\u7D2F\u8BA1\u65F6\u957F ${cumulative} \u79D2\uFF0C\u6309\u300C\u4E0A\u6E38\u8FD4\u56DE\u7684\u662F\u7D2F\u8BA1\u6210\u7247\u300D\u5904\u7406\u3002`
               );
             }
           } else if (!probeWarned) {
             probeWarned = true;
-            notes.push('没有可用的 ffprobe，无法探测分段时长，按「每段都是增量片段」直接拼接。');
+            notes.push("\u6CA1\u6709\u53EF\u7528\u7684 ffprobe\uFF0C\u65E0\u6CD5\u63A2\u6D4B\u5206\u6BB5\u65F6\u957F\uFF0C\u6309\u300C\u6BCF\u6BB5\u90FD\u662F\u589E\u91CF\u7247\u6BB5\u300D\u76F4\u63A5\u62FC\u63A5\u3002");
           }
           files.push(dest);
         }
       } catch (failure) {
-        if (failure?.code === 'ABORTED') throw failure;
-        result.note = [...notes, `分段已生成，但下载失败：${failure?.message || failure}`].join('\n');
+        if (failure?.code === "ABORTED") throw failure;
+        result.note = [...notes, `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u4E0B\u8F7D\u5931\u8D25\uFF1A${failure?.message || failure}`].join("\n");
         return result;
       }
-
       if (!files.length) return result;
-
       if (!ffmpegReady && files.length > 1) {
         result.segmentsDir = segmentsDir;
         result.merged = false;
         notes.push(
-          `本机没有可用的 ffmpeg（${ffmpegBinary}），已跳过合成，只返回分段列表。`
-          + `分段文件已下载到 ${segmentsDir}；`
-          + '装好 ffmpeg（或把 ffmpegBinary 指到绝对路径）后重跑一次即可合并成一条。',
+          `\u672C\u673A\u6CA1\u6709\u53EF\u7528\u7684 ffmpeg\uFF08${ffmpegBinary}\uFF09\uFF0C\u5DF2\u8DF3\u8FC7\u5408\u6210\uFF0C\u53EA\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\u3002\u5206\u6BB5\u6587\u4EF6\u5DF2\u4E0B\u8F7D\u5230 ${segmentsDir}\uFF1B\u88C5\u597D ffmpeg\uFF08\u6216\u628A ffmpegBinary \u6307\u5230\u7EDD\u5BF9\u8DEF\u5F84\uFF09\u540E\u91CD\u8DD1\u4E00\u6B21\u5373\u53EF\u5408\u5E76\u6210\u4E00\u6761\u3002`
         );
-        result.note = notes.join('\n');
+        result.note = notes.join("\n");
         return result;
       }
-
       const finalPath = path.join(outDir, `${stamp}-${plannedTotal}s.mp4`);
       try {
         if (files.length === 1) {
           await rm(finalPath, { force: true });
           await rename(files[0], finalPath);
-          result.mergeMode = 'single';
+          result.mergeMode = "single";
         } else {
           const merged = await mergeClips(config, files, finalPath, { signal: exec?.signal });
           result.mergeMode = merged.mode;
           if (merged.trimmed?.length) {
             notes.push(
-              `第 ${merged.trimmed.map((item) => item.index).join('、')} 段的音频比视频长`
-              + `（最长 ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} 秒），`
-              + '已裁齐后再拼接，避免接缝处缺一小段画面。',
+              `\u7B2C ${merged.trimmed.map((item) => item.index).join("\u3001")} \u6BB5\u7684\u97F3\u9891\u6BD4\u89C6\u9891\u957F\uFF08\u6700\u957F ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} \u79D2\uFF09\uFF0C\u5DF2\u88C1\u9F50\u540E\u518D\u62FC\u63A5\uFF0C\u907F\u514D\u63A5\u7F1D\u5904\u7F3A\u4E00\u5C0F\u6BB5\u753B\u9762\u3002`
             );
           }
         }
         result.merged = true;
         result.videoPath = finalPath;
       } catch (failure) {
-        if (failure?.code === 'ABORTED') throw failure;
-        const reason = failure?.code === 'ffmpeg_missing'
-          ? `没有找到 ${resolveBinary(config, 'ffmpegBinary', 'ffmpeg')}，分段已保留但没有合并成一个文件；`
-            + '在插件配置里填 ffmpegBinary，或把 ffmpeg 装进 PATH 后重试。'
-          : `分段已生成，但合并失败：${failure?.message || failure}`;
+        if (failure?.code === "ABORTED") throw failure;
+        const reason = failure?.code === "ffmpeg_missing" ? `\u6CA1\u6709\u627E\u5230 ${resolveBinary(config, "ffmpegBinary", "ffmpeg")}\uFF0C\u5206\u6BB5\u5DF2\u4FDD\u7559\u4F46\u6CA1\u6709\u5408\u5E76\u6210\u4E00\u4E2A\u6587\u4EF6\uFF1B\u5728\u63D2\u4EF6\u914D\u7F6E\u91CC\u586B ffmpegBinary\uFF0C\u6216\u628A ffmpeg \u88C5\u8FDB PATH \u540E\u91CD\u8BD5\u3002` : `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u5408\u5E76\u5931\u8D25\uFF1A${failure?.message || failure}`;
         result.segmentsDir = segmentsDir;
-        result.note = [...notes, reason].join('\n');
+        result.note = [...notes, reason].join("\n");
         return result;
       }
-
-      if (args?.keepSegments ?? ref(config, 'keepSegments', false)) {
+      if (args?.keepSegments ?? ref(config, "keepSegments", false)) {
         result.segmentsDir = segmentsDir;
       } else {
         await rm(segmentsDir, { recursive: true, force: true });
       }
-      if (notes.length) result.note = notes.join('\n');
+      if (notes.length) result.note = notes.join("\n");
       return result;
-    },
+    }
   };
 }
-
 function taskTool(config) {
   return {
-    name: 'video_status',
-    description:
-      '按任务 ID 查询 Seedance 视频任务（生成、延长与合并）的状态；'
-      + '任务完成（status 为 succeeded）时返回视频下载链接（约 24 小时内有效）。'
-      + 'video_generate / video_extend 返回 timeout 时，用它们给出的 taskId 在这里继续等，'
-      + '不要在同一个会话里重复提交同一段任务。',
+    name: "video_status",
+    description: "\u6309\u4EFB\u52A1 ID \u67E5\u8BE2 Seedance \u89C6\u9891\u4EFB\u52A1\uFF08\u751F\u6210\u3001\u5EF6\u957F\u4E0E\u5408\u5E76\uFF09\u7684\u72B6\u6001\uFF1B\u4EFB\u52A1\u5B8C\u6210\uFF08status \u4E3A succeeded\uFF09\u65F6\u8FD4\u56DE\u89C6\u9891\u4E0B\u8F7D\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\u3002video_generate / video_extend \u8FD4\u56DE timeout \u65F6\uFF0C\u7528\u5B83\u4EEC\u7ED9\u51FA\u7684 taskId \u5728\u8FD9\u91CC\u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u5728\u540C\u4E00\u4E2A\u4F1A\u8BDD\u91CC\u91CD\u590D\u63D0\u4EA4\u540C\u4E00\u6BB5\u4EFB\u52A1\u3002",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         taskId: {
-          type: 'string',
-          description: '由 video_generate / video_extend 返回的任务 ID。',
-        },
+          type: "string",
+          description: "\u7531 video_generate / video_extend \u8FD4\u56DE\u7684\u4EFB\u52A1 ID\u3002"
+        }
       },
-      required: ['taskId'],
+      required: ["taskId"]
     },
     output: {
       schema: {
-        type: 'object',
+        type: "object",
         properties: {
-          taskId: { type: 'string' },
-          status: { type: 'string' },
-          model: { type: 'string' },
-          videoUrl: { type: 'string' },
-          error: { type: 'string' },
-          errorCode: { type: 'string' },
-        },
+          taskId: { type: "string" },
+          status: { type: "string" },
+          model: { type: "string" },
+          videoUrl: { type: "string" },
+          error: { type: "string" },
+          errorCode: { type: "string" }
+        }
       },
       render(_args, value) {
         const { taskId, status, videoUrl, error, model } = value || {};
-        if (status === 'succeeded') {
+        if (status === "succeeded") {
           return [
             {
-              type: 'text',
+              type: "text",
               text: [
-                '延长任务已完成。',
-                `任务 ID：${taskId}`,
-                `模型：${model || '-'}`,
-                `视频链接（约 24 小时内有效）：${videoUrl || '（无）'}`,
-              ].join('\n'),
-            },
+                "\u5EF6\u957F\u4EFB\u52A1\u5DF2\u5B8C\u6210\u3002",
+                `\u4EFB\u52A1 ID\uFF1A${taskId}`,
+                `\u6A21\u578B\uFF1A${model || "-"}`,
+                `\u89C6\u9891\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF1A${videoUrl || "\uFF08\u65E0\uFF09"}`
+              ].join("\n")
+            }
           ];
         }
-        if (status === 'failed') {
-          return [{ type: 'text', text: `延长任务失败（任务 ${taskId}）：${error || '未知错误'}` }];
+        if (status === "failed") {
+          return [{ type: "text", text: `\u5EF6\u957F\u4EFB\u52A1\u5931\u8D25\uFF08\u4EFB\u52A1 ${taskId}\uFF09\uFF1A${error || "\u672A\u77E5\u9519\u8BEF"}` }];
         }
-        return [{ type: 'text', text: `任务 ${taskId} 当前状态：${status || '未知'}。` }];
-      },
+        return [{ type: "text", text: `\u4EFB\u52A1 ${taskId} \u5F53\u524D\u72B6\u6001\uFF1A${status || "\u672A\u77E5"}\u3002` }];
+      }
     },
-    timeoutMs: 60000,
+    timeoutMs: 6e4,
     isConcurrencySafe() {
       return true;
     },
     async execute(args, exec) {
       const apiKey = resolveApiKey(config);
       assertConfigured(config, apiKey);
-
-      const taskId = String(args?.taskId ?? '').trim();
-      if (!taskId) throw new Error('taskId 不能为空。');
-
+      const taskId = String(args?.taskId ?? "").trim();
+      if (!taskId) throw new Error("taskId \u4E0D\u80FD\u4E3A\u7A7A\u3002");
       const task = await getTask(config, taskId);
-      const status = extractStatus(task) || 'unknown';
-      const model = findKey(task, ['model']) || resolveModel(config);
+      const status = extractStatus(task) || "unknown";
+      const model = findKey(task, ["model"]) || resolveModel(config);
       const videoUrl = extractVideoUrl(task);
-
       if (SUCCESS_STATES.has(status) && videoUrl) {
-        return { taskId, status: 'succeeded', model, videoUrl };
+        return { taskId, status: "succeeded", model, videoUrl };
       }
       if (FAILED_STATES.has(status)) {
-        const detail = findKey(task, ['error', 'fail_reason', 'message', 'detail']);
+        const detail = findKey(task, ["error", "fail_reason", "message", "detail"]);
         const classified = classifyError(
           400,
-          typeof detail === 'string' ? { message: detail } : (detail || task),
+          typeof detail === "string" ? { message: detail } : detail || task
         );
-        const raw = status === 'cancelled' || status === 'canceled' ? 'cancelled' : 'failed';
+        const raw = status === "cancelled" || status === "canceled" ? "cancelled" : "failed";
         return {
           taskId,
           status: raw,
           model,
           errorCode: classified.code,
-          error: isContentRejection(classified.message)
-            ? `${CONTENT_REJECTION_HINT}上游详情：${classified.message}`
-            : classified.message,
+          error: isContentRejection(classified.message) ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${classified.message}` : classified.message
         };
       }
       return { taskId, status, model, videoUrl };
-    },
+    }
   };
 }
-
-/** 用户可在插件内改的配置字段。 */
 const CONFIG_FIELDS = [
-  'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
-  'duration', 'singleMaxSeconds', 'mode', 'resolution', 'ratio', 'generateAudio', 'watermark',
-  'extraParams', 'pollIntervalMs', 'maxWaitMs',
-  'mergeMode', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary',
-  'registerUser', 'registerEmail', 'registerApi', 'deviceId', 'estimateGroupRatio',
+  "apiKey",
+  "baseUrl",
+  "submitPath",
+  "queryPath",
+  "model",
+  "duration",
+  "singleMaxSeconds",
+  "mode",
+  "resolution",
+  "ratio",
+  "generateAudio",
+  "watermark",
+  "extraParams",
+  "pollIntervalMs",
+  "maxWaitMs",
+  "mergeMode",
+  "outputDir",
+  "keepSegments",
+  "ffmpegBinary",
+  "ffprobeBinary",
+  "registerUser",
+  "registerEmail",
+  "registerApi",
+  "deviceId",
+  "estimateGroupRatio"
 ];
-
 function maskSecrets(view) {
   return {
     ...view,
-    apiKey: view.apiKey ? '（已配置）' : '',
-    deviceSecret: view.deviceSecret ? '（已配置）' : '',
+    apiKey: view.apiKey ? "\uFF08\u5DF2\u914D\u7F6E\uFF09" : "",
+    deviceSecret: view.deviceSecret ? "\uFF08\u5DF2\u914D\u7F6E\uFF09" : ""
   };
 }
-
-/** 当前配置：stored 是写进 profile patch 的值，effective 是实际生效（含预设与环境变量）。 */
 function configView(config) {
   const stored = {};
-  for (const key of CONFIG_FIELDS) stored[key] = ref(config, key, undefined);
+  for (const key of CONFIG_FIELDS) stored[key] = ref(config, key, void 0);
   return {
     stored: maskSecrets(stored),
     effective: {
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),
-      queryPath: String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath,
+      queryPath: String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath,
       model: resolveModel(config),
-      apiKeySource: ref(config, 'apiKey', '')
-        ? 'config'
-        : (resolveApiKey(config) ? 'env' : 'missing'),
-    },
+      apiKeySource: ref(config, "apiKey", "") ? "config" : resolveApiKey(config) ? "env" : "missing"
+    }
   };
 }
-
-/** 把字段改动合并进本插件在 profile patch 里的那条条目。 */
 async function writeProfileConfig(settings, config, patch) {
-  const entryId = String(ref(config, 'entryId', 'metaontic-video')).trim();
+  const entryId = String(ref(config, "entryId", "metaontic-video")).trim();
   const descriptors = settings.describe({ redactSecrets: true });
   const entry = descriptors.find((item) => item.ns === entryId);
   if (!entry) {
     throw new Error(
-      `profile patch 里没有可编辑的 ${entryId} 条目，无法写回配置。`
-      + '请先在 profile 的 cordis.patch.yml 里加一条覆盖项：\n'
-      + `- id: ${entryId}\n  name: 'metaontic-video'\n  config: { apiKey: 'sk-...', baseUrl: '...', model: '...' }\n`
-      + '（也可以让 Agent 代写这一条。）',
+      `profile patch \u91CC\u6CA1\u6709\u53EF\u7F16\u8F91\u7684 ${entryId} \u6761\u76EE\uFF0C\u65E0\u6CD5\u5199\u56DE\u914D\u7F6E\u3002\u8BF7\u5148\u5728 profile \u7684 cordis.patch.yml \u91CC\u52A0\u4E00\u6761\u8986\u76D6\u9879\uFF1A
+- id: ${entryId}
+  name: 'metaontic-video'
+  config: { apiKey: 'sk-...', baseUrl: '...', model: '...' }
+\uFF08\u4E5F\u53EF\u4EE5\u8BA9 Agent \u4EE3\u5199\u8FD9\u4E00\u6761\u3002\uFF09`
     );
   }
   await settings.update(entryId, patch, entry.revision);
   return entryId;
 }
-
 function configTool(config, settings) {
   return {
-    name: 'video_config',
-    description:
-      '读取或修改 MetaOnticVideo 插件自己的配置（apiKey、baseUrl、submitPath、'
-      + 'queryPath、model、duration、singleMaxSeconds、mode、resolution、ratio、generateAudio、'
-      + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、outputDir、keepSegments、'
-      + 'ffmpegBinary、ffprobeBinary、registerEmail、registerApi、estimateGroupRatio）。'
-      + '改动写进 profile 的 cordis.patch.yml，'
-      + '宿主重载后生效。'
-      + '用户说「把中转站地址/模型/时长改成 X」时用 action=set，看当前值用 action=get；'
-      + 'duration 是每段新增秒数上限（4-15，默认 15、段数最少），singleMaxSeconds 是单次直出上限（默认 15）。',
+    name: "video_config",
+    description: "\u8BFB\u53D6\u6216\u4FEE\u6539 MetaOnticVideo \u63D2\u4EF6\u81EA\u5DF1\u7684\u914D\u7F6E\uFF08apiKey\u3001baseUrl\u3001submitPath\u3001queryPath\u3001model\u3001duration\u3001singleMaxSeconds\u3001mode\u3001resolution\u3001ratio\u3001generateAudio\u3001watermark\u3001extraParams\u3001pollIntervalMs\u3001maxWaitMs\u3001mergeMode\u3001outputDir\u3001keepSegments\u3001ffmpegBinary\u3001ffprobeBinary\u3001registerEmail\u3001registerApi\u3001estimateGroupRatio\uFF09\u3002\u6539\u52A8\u5199\u8FDB profile \u7684 cordis.patch.yml\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u540E\u751F\u6548\u3002\u7528\u6237\u8BF4\u300C\u628A\u4E2D\u8F6C\u7AD9\u5730\u5740/\u6A21\u578B/\u65F6\u957F\u6539\u6210 X\u300D\u65F6\u7528 action=set\uFF0C\u770B\u5F53\u524D\u503C\u7528 action=get\uFF1Bduration \u662F\u6BCF\u6BB5\u65B0\u589E\u79D2\u6570\u4E0A\u9650\uFF084-15\uFF0C\u9ED8\u8BA4 15\u3001\u6BB5\u6570\u6700\u5C11\uFF09\uFF0CsingleMaxSeconds \u662F\u5355\u6B21\u76F4\u51FA\u4E0A\u9650\uFF08\u9ED8\u8BA4 15\uFF09\u3002",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         action: {
-          type: 'string',
-          enum: ['get', 'set'],
-          description: 'get=查看当前配置；set=修改配置（至少给一个要改的字段）。',
+          type: "string",
+          enum: ["get", "set"],
+          description: "get=\u67E5\u770B\u5F53\u524D\u914D\u7F6E\uFF1Bset=\u4FEE\u6539\u914D\u7F6E\uFF08\u81F3\u5C11\u7ED9\u4E00\u4E2A\u8981\u6539\u7684\u5B57\u6BB5\uFF09\u3002"
         },
-        apiKey: { type: 'string', description: 'API Key（配置里留空时自动读环境变量）。' },
-        baseUrl: { type: 'string', description: '基础地址，例如 https://ai.bileego.com（中转站）或官方地址。' },
-        registerEmail: { type: 'string', description: '领 Key 用的邮箱（账号）；注册要邮箱验证码，一个邮箱只发一把。' },
-        registerApi: { type: 'string', description: '插件服务地址（领 Key / 查额度 / 使用记录）；留空用内置域名。' },
-        estimateGroupRatio: { type: 'number', description: '预估费用用的分组折扣（中转站 group_ratio：默认 0.8）。' },
-        submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
-        queryPath: { type: 'string', description: '查询任务路径，{task_id} 会被替换。' },
-        model: { type: 'string', description: '模型 ID，例如 doubao-seedance-2-0-mini-260615。' },
-        duration: { type: 'integer', minimum: 4, maximum: 15, description: '每段新增秒数上限（4-15 的整数，默认 15、段数最少）。' },
-        mode: { type: 'string', enum: ['continuous', 'closeup'], description: '续拍方式。' },
-        resolution: { type: 'string', enum: ['480p', '720p', '1080p'], description: '分辨率。' },
+        apiKey: { type: "string", description: "API Key\uFF08\u914D\u7F6E\u91CC\u7559\u7A7A\u65F6\u81EA\u52A8\u8BFB\u73AF\u5883\u53D8\u91CF\uFF09\u3002" },
+        baseUrl: { type: "string", description: "\u57FA\u7840\u5730\u5740\uFF0C\u4F8B\u5982 https://ai.bileego.com\uFF08\u4E2D\u8F6C\u7AD9\uFF09\u6216\u5B98\u65B9\u5730\u5740\u3002" },
+        registerEmail: { type: "string", description: "\u9886 Key \u7528\u7684\u90AE\u7BB1\uFF08\u8D26\u53F7\uFF09\uFF1B\u6CE8\u518C\u8981\u90AE\u7BB1\u9A8C\u8BC1\u7801\uFF0C\u4E00\u4E2A\u90AE\u7BB1\u53EA\u53D1\u4E00\u628A\u3002" },
+        registerApi: { type: "string", description: "\u63D2\u4EF6\u670D\u52A1\u5730\u5740\uFF08\u9886 Key / \u67E5\u989D\u5EA6 / \u4F7F\u7528\u8BB0\u5F55\uFF09\uFF1B\u7559\u7A7A\u7528\u5185\u7F6E\u57DF\u540D\u3002" },
+        estimateGroupRatio: { type: "number", description: "\u9884\u4F30\u8D39\u7528\u7528\u7684\u5206\u7EC4\u6298\u6263\uFF08\u4E2D\u8F6C\u7AD9 group_ratio\uFF1A\u9ED8\u8BA4 0.8\uFF09\u3002" },
+        submitPath: { type: "string", description: "\u521B\u5EFA\u4EFB\u52A1\u8DEF\u5F84\uFF0C\u4F8B\u5982 /doubao/api/v3/contents/generations/tasks\u3002" },
+        queryPath: { type: "string", description: "\u67E5\u8BE2\u4EFB\u52A1\u8DEF\u5F84\uFF0C{task_id} \u4F1A\u88AB\u66FF\u6362\u3002" },
+        model: { type: "string", description: "\u6A21\u578B ID\uFF0C\u4F8B\u5982 doubao-seedance-2-0-mini-260615\u3002" },
+        duration: { type: "integer", minimum: 4, maximum: 15, description: "\u6BCF\u6BB5\u65B0\u589E\u79D2\u6570\u4E0A\u9650\uFF084-15 \u7684\u6574\u6570\uFF0C\u9ED8\u8BA4 15\u3001\u6BB5\u6570\u6700\u5C11\uFF09\u3002" },
+        mode: { type: "string", enum: ["continuous", "closeup"], description: "\u7EED\u62CD\u65B9\u5F0F\u3002" },
+        resolution: { type: "string", enum: ["480p", "720p", "1080p"], description: "\u5206\u8FA8\u7387\u3002" },
         ratio: {
-          type: 'string',
-          enum: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
-          description: '画面比例。',
+          type: "string",
+          enum: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
+          description: "\u753B\u9762\u6BD4\u4F8B\u3002"
         },
-        generateAudio: { type: 'boolean', description: '是否生成音频。' },
-        watermark: { type: 'boolean', description: '是否加水印。' },
-        extraParams: { type: 'string', description: '额外请求参数（JSON 对象字符串）。' },
-        pollIntervalMs: { type: 'integer', minimum: 1000, description: '轮询间隔（毫秒）。' },
-        maxWaitMs: { type: 'integer', minimum: 1000, description: '单次调用最长等待（毫秒）。' },
+        generateAudio: { type: "boolean", description: "\u662F\u5426\u751F\u6210\u97F3\u9891\u3002" },
+        watermark: { type: "boolean", description: "\u662F\u5426\u52A0\u6C34\u5370\u3002" },
+        extraParams: { type: "string", description: "\u989D\u5916\u8BF7\u6C42\u53C2\u6570\uFF08JSON \u5BF9\u8C61\u5B57\u7B26\u4E32\uFF09\u3002" },
+        pollIntervalMs: { type: "integer", minimum: 1e3, description: "\u8F6E\u8BE2\u95F4\u9694\uFF08\u6BEB\u79D2\uFF09\u3002" },
+        maxWaitMs: { type: "integer", minimum: 1e3, description: "\u5355\u6B21\u8C03\u7528\u6700\u957F\u7B49\u5F85\uFF08\u6BEB\u79D2\uFF09\u3002" },
         singleMaxSeconds: {
-          type: 'integer',
+          type: "integer",
           minimum: 4,
           maximum: 15,
-          description: '单次直出上限（秒）：不超过它一次生成，超过它才分段延长。',
+          description: "\u5355\u6B21\u76F4\u51FA\u4E0A\u9650\uFF08\u79D2\uFF09\uFF1A\u4E0D\u8D85\u8FC7\u5B83\u4E00\u6B21\u751F\u6210\uFF0C\u8D85\u8FC7\u5B83\u624D\u5206\u6BB5\u5EF6\u957F\u3002"
         },
         mergeMode: {
-          type: 'string',
-          enum: ['copy', 'reencode'],
-          description: '合并方式：copy=先无损拼接（失败自动重编码）；reencode=统一重编码。',
+          type: "string",
+          enum: ["copy", "reencode"],
+          description: "\u5408\u5E76\u65B9\u5F0F\uFF1Acopy=\u5148\u65E0\u635F\u62FC\u63A5\uFF08\u5931\u8D25\u81EA\u52A8\u91CD\u7F16\u7801\uFF09\uFF1Breencode=\u7EDF\u4E00\u91CD\u7F16\u7801\u3002"
         },
-        outputDir: { type: 'string', description: '成片输出目录；留空用会话工作目录下的 metaontic-video/。' },
-        keepSegments: { type: 'boolean', description: '合并后是否保留分段原片。' },
-        ffmpegBinary: { type: 'string', description: 'ffmpeg 可执行文件路径。' },
-        ffprobeBinary: { type: 'string', description: 'ffprobe 可执行文件路径。' },
+        outputDir: { type: "string", description: "\u6210\u7247\u8F93\u51FA\u76EE\u5F55\uFF1B\u7559\u7A7A\u7528\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\u3002" },
+        keepSegments: { type: "boolean", description: "\u5408\u5E76\u540E\u662F\u5426\u4FDD\u7559\u5206\u6BB5\u539F\u7247\u3002" },
+        ffmpegBinary: { type: "string", description: "ffmpeg \u53EF\u6267\u884C\u6587\u4EF6\u8DEF\u5F84\u3002" },
+        ffprobeBinary: { type: "string", description: "ffprobe \u53EF\u6267\u884C\u6587\u4EF6\u8DEF\u5F84\u3002" }
       },
-      required: ['action'],
+      required: ["action"]
     },
     output: {
       schema: {
-        type: 'object',
+        type: "object",
         properties: {
-          action: { type: 'string' },
-          entryId: { type: 'string' },
-          editable: { type: 'boolean' },
-          patchPath: { type: 'string' },
-          stored: { type: 'object' },
-          effective: { type: 'object' },
-          patch: { type: 'object' },
-          error: { type: 'string' },
-        },
+          action: { type: "string" },
+          entryId: { type: "string" },
+          editable: { type: "boolean" },
+          patchPath: { type: "string" },
+          stored: { type: "object" },
+          effective: { type: "object" },
+          patch: { type: "object" },
+          error: { type: "string" }
+        }
       },
       render(_args, value) {
         const { action, stored, effective, entryId, patchPath, patch, error } = value || {};
-        if (error) return [{ type: 'text', text: error }];
+        if (error) return [{ type: "text", text: error }];
         const lines = [
-          action === 'set' ? `已写入 profile patch（条目 ${entryId}）` : '当前配置：',
-          ...Object.entries(stored || {})
-            .filter(([, field]) => field !== undefined && field !== '')
-            .map(([key, field]) => `  ${key}: ${typeof field === 'object' ? JSON.stringify(field) : field}`),
-          `生效值：baseUrl=${effective?.baseUrl} model=${effective?.model}`,
+          action === "set" ? `\u5DF2\u5199\u5165 profile patch\uFF08\u6761\u76EE ${entryId}\uFF09` : "\u5F53\u524D\u914D\u7F6E\uFF1A",
+          ...Object.entries(stored || {}).filter(([, field]) => field !== void 0 && field !== "").map(([key, field]) => `  ${key}: ${typeof field === "object" ? JSON.stringify(field) : field}`),
+          `\u751F\u6548\u503C\uFF1AbaseUrl=${effective?.baseUrl} model=${effective?.model}`,
           `  submitPath=${effective?.submitPath}`,
-          `  apiKey 来源：${effective?.apiKeySource}`,
-          patchPath ? `配置文件：${patchPath}` : '',
-          patch && Object.keys(patch).length ? '改动会在宿主重载配置后生效。' : '',
+          `  apiKey \u6765\u6E90\uFF1A${effective?.apiKeySource}`,
+          patchPath ? `\u914D\u7F6E\u6587\u4EF6\uFF1A${patchPath}` : "",
+          patch && Object.keys(patch).length ? "\u6539\u52A8\u4F1A\u5728\u5BBF\u4E3B\u91CD\u8F7D\u914D\u7F6E\u540E\u751F\u6548\u3002" : ""
         ].filter(Boolean);
-        return [{ type: 'text', text: lines.join('\n') }];
-      },
+        return [{ type: "text", text: lines.join("\n") }];
+      }
     },
-    timeoutMs: 30000,
+    timeoutMs: 3e4,
     isConcurrencySafe() {
       return false;
     },
@@ -2302,116 +1832,99 @@ function configTool(config, settings) {
       const action = args?.action;
       const view = configView(config);
       const patchPath = settings?.documentPath;
-
-      if (action === 'get') {
+      if (action === "get") {
         return { action, ...view, editable: Boolean(settings), patchPath };
       }
-      if (action !== 'set') {
-        throw new Error('action 只能是 get 或 set。');
+      if (action !== "set") {
+        throw new Error("action \u53EA\u80FD\u662F get \u6216 set\u3002");
       }
       const patch = {};
       for (const key of CONFIG_FIELDS) {
-        if (args?.[key] !== undefined) patch[key] = args[key];
+        if (args?.[key] !== void 0) patch[key] = args[key];
       }
       if (!Object.keys(patch).length) {
-        throw new Error('set 需要至少一个要修改的字段（如 baseUrl、model、duration）。');
+        throw new Error("set \u9700\u8981\u81F3\u5C11\u4E00\u4E2A\u8981\u4FEE\u6539\u7684\u5B57\u6BB5\uFF08\u5982 baseUrl\u3001model\u3001duration\uFF09\u3002");
       }
       if (!settings) {
         throw new Error(
-          '宿主没有提供 settings 服务，无法写回配置。请手动编辑 profile 的 cordis.patch.yml 里 '
-          + "metaontic-video 那一条的 config（见插件 README）。",
+          "\u5BBF\u4E3B\u6CA1\u6709\u63D0\u4F9B settings \u670D\u52A1\uFF0C\u65E0\u6CD5\u5199\u56DE\u914D\u7F6E\u3002\u8BF7\u624B\u52A8\u7F16\u8F91 profile \u7684 cordis.patch.yml \u91CC metaontic-video \u90A3\u4E00\u6761\u7684 config\uFF08\u89C1\u63D2\u4EF6 README\uFF09\u3002"
         );
       }
       const entryId = await writeProfileConfig(settings, config, patch);
       return { action, entryId, patchPath, patch, ...view };
-    },
+    }
   };
 }
-
-/**
- * 每个新对话都会带上的一段插件说明：宿主提供 systemPrompt 服务时注册成提示词段落，
- * 换会话、换 Agent 都不需要用户再解释一遍这个插件怎么用。
- */
 function buildPromptGuidance(config) {
   const singleMax = resolveSingleMax(config);
   const segmentSeconds = resolveSegmentSeconds(config);
   return [
-    'MetaOnticVideo（Seedance 视频插件）：需要生成视频、给视频加减时长时优先用它。',
-    `· 新视频用 video_generate，duration 传目标总秒数。**硬规则：总时长 ≤ ${singleMax} 秒（单段上限）的整条`
-      + '视频必须一次直出，禁止拆成多镜 / 多段 / 多次 video_generate 再拼接**——'
-      + `例如「15 秒」就是一次 15 秒，不许拆成 8+7；也不要为了「中间切一刀更好看」而分镜，`
-      + '分镜只在用户明确要求多镜时使用。'
-      + '超过上限时（如 20 秒）会自动拆成首段 + 若干延长段并合并——那是同一条视频的续拍延长，不是多镜拼接。'
-      + '所以「20 秒视频」直接传 duration=20，不用拆成多个任务；'
-      + '成片默认落在会话工作目录下的 metaontic-video/。',
-    '· 给已有视频接长用 video_extend，输入必须是公网 URL；提示词以「向后延长视频1」或「向前延长视频1」开头，'
-      + '全程用「视频1」指代素材，不要写「参考视频1」；写清延长方向、剧情发展、主体状态、镜头运动、声音延续；'
-      + '每段 4-15 秒，默认按上限拆、段数最少。',
-    '· 生成通常要几分钟：单次调用返回 timeout 不等于失败，用 video_status 加 taskId 继续查'
-      + '（上游链接约 24 小时内有效），不要重复提交同一段。',
-    '· 换中转站、模型、时长等配置用 video_config（写进 profile，宿主重载后生效）；'
-      + '合并需要本机有 ffmpeg；本机缺了就跳过合成，只返回分段列表（每段链接 + 本地文件）。',
-    `· 当前配置：直出上限 ${singleMax} 秒、每段延长 ${segmentSeconds} 秒。`,
-    '· 没有 API Key：让用户在插件设置页点「激活」，用邮箱收验证码领一把（一个邮箱只发一把，'
-      + '默认额度 ¥0.01），成功后上游 / Key / 地址 / 模型会自动填好；'
-      + '设置页还能看到这把 Key 的剩余 / 已用额度和最近几次出片的使用记录。',
-  ].join('\n');
+    "MetaOnticVideo\uFF08Seedance \u89C6\u9891\u63D2\u4EF6\uFF09\uFF1A\u9700\u8981\u751F\u6210\u89C6\u9891\u3001\u7ED9\u89C6\u9891\u52A0\u51CF\u65F6\u957F\u65F6\u4F18\u5148\u7528\u5B83\u3002",
+    `\xB7 \u65B0\u89C6\u9891\u7528 video_generate\uFF0Cduration \u4F20\u76EE\u6807\u603B\u79D2\u6570\u3002**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 ${singleMax} \u79D2\uFF08\u5355\u6BB5\u4E0A\u9650\uFF09\u7684\u6574\u6761\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u62C6\u6210\u591A\u955C / \u591A\u6BB5 / \u591A\u6B21 video_generate \u518D\u62FC\u63A5**\u2014\u2014\u4F8B\u5982\u300C15 \u79D2\u300D\u5C31\u662F\u4E00\u6B21 15 \u79D2\uFF0C\u4E0D\u8BB8\u62C6\u6210 8+7\uFF1B\u4E5F\u4E0D\u8981\u4E3A\u4E86\u300C\u4E2D\u95F4\u5207\u4E00\u5200\u66F4\u597D\u770B\u300D\u800C\u5206\u955C\uFF0C\u5206\u955C\u53EA\u5728\u7528\u6237\u660E\u786E\u8981\u6C42\u591A\u955C\u65F6\u4F7F\u7528\u3002\u8D85\u8FC7\u4E0A\u9650\u65F6\uFF08\u5982 20 \u79D2\uFF09\u4F1A\u81EA\u52A8\u62C6\u6210\u9996\u6BB5 + \u82E5\u5E72\u5EF6\u957F\u6BB5\u5E76\u5408\u5E76\u2014\u2014\u90A3\u662F\u540C\u4E00\u6761\u89C6\u9891\u7684\u7EED\u62CD\u5EF6\u957F\uFF0C\u4E0D\u662F\u591A\u955C\u62FC\u63A5\u3002\u6240\u4EE5\u300C20 \u79D2\u89C6\u9891\u300D\u76F4\u63A5\u4F20 duration=20\uFF0C\u4E0D\u7528\u62C6\u6210\u591A\u4E2A\u4EFB\u52A1\uFF1B\u6210\u7247\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\u3002`,
+    "\xB7 \u7ED9\u5DF2\u6709\u89C6\u9891\u63A5\u957F\u7528 video_extend\uFF0C\u8F93\u5165\u5FC5\u987B\u662F\u516C\u7F51 URL\uFF1B\u63D0\u793A\u8BCD\u4EE5\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D\u6216\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\u5F00\u5934\uFF0C\u5168\u7A0B\u7528\u300C\u89C6\u98911\u300D\u6307\u4EE3\u7D20\u6750\uFF0C\u4E0D\u8981\u5199\u300C\u53C2\u8003\u89C6\u98911\u300D\uFF1B\u5199\u6E05\u5EF6\u957F\u65B9\u5411\u3001\u5267\u60C5\u53D1\u5C55\u3001\u4E3B\u4F53\u72B6\u6001\u3001\u955C\u5934\u8FD0\u52A8\u3001\u58F0\u97F3\u5EF6\u7EED\uFF1B\u6BCF\u6BB5 4-15 \u79D2\uFF0C\u9ED8\u8BA4\u6309\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\u3002",
+    "\xB7 \u751F\u6210\u901A\u5E38\u8981\u51E0\u5206\u949F\uFF1A\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout \u4E0D\u7B49\u4E8E\u5931\u8D25\uFF0C\u7528 video_status \u52A0 taskId \u7EE7\u7EED\u67E5\uFF08\u4E0A\u6E38\u94FE\u63A5\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u540C\u4E00\u6BB5\u3002",
+    "\xB7 \u6362\u4E2D\u8F6C\u7AD9\u3001\u6A21\u578B\u3001\u65F6\u957F\u7B49\u914D\u7F6E\u7528 video_config\uFF08\u5199\u8FDB profile\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u540E\u751F\u6548\uFF09\uFF1B\u5408\u5E76\u9700\u8981\u672C\u673A\u6709 ffmpeg\uFF1B\u672C\u673A\u7F3A\u4E86\u5C31\u8DF3\u8FC7\u5408\u6210\uFF0C\u53EA\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u94FE\u63A5 + \u672C\u5730\u6587\u4EF6\uFF09\u3002",
+    `\xB7 \u5F53\u524D\u914D\u7F6E\uFF1A\u76F4\u51FA\u4E0A\u9650 ${singleMax} \u79D2\u3001\u6BCF\u6BB5\u5EF6\u957F ${segmentSeconds} \u79D2\u3002`,
+    "\xB7 \u6CA1\u6709 API Key\uFF1A\u8BA9\u7528\u6237\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u70B9\u300C\u6FC0\u6D3B\u300D\uFF0C\u7528\u90AE\u7BB1\u6536\u9A8C\u8BC1\u7801\u9886\u4E00\u628A\uFF08\u4E00\u4E2A\u90AE\u7BB1\u53EA\u53D1\u4E00\u628A\uFF0C\u9ED8\u8BA4\u989D\u5EA6 \xA50.01\uFF09\uFF0C\u6210\u529F\u540E\u4E0A\u6E38 / Key / \u5730\u5740 / \u6A21\u578B\u4F1A\u81EA\u52A8\u586B\u597D\uFF1B\u8BBE\u7F6E\u9875\u8FD8\u80FD\u770B\u5230\u8FD9\u628A Key \u7684\u5269\u4F59 / \u5DF2\u7528\u989D\u5EA6\u548C\u6700\u8FD1\u51E0\u6B21\u51FA\u7247\u7684\u4F7F\u7528\u8BB0\u5F55\u3002"
+  ].join("\n");
 }
-
-export function apply(ctx, config = {}) {
+function asDisposer(value) {
+  return typeof value === "function" ? value : void 0;
+}
+function apply(ctx, config = {}) {
   const deps = {};
   const disposers = [
     ctx.tools.register(jsonSafeTool(videoTool(config, deps))),
     ctx.tools.register(jsonSafeTool(extendTool(config))),
-    ctx.tools.register(jsonSafeTool(taskTool(config))),
+    ctx.tools.register(jsonSafeTool(taskTool(config)))
   ];
-  // 配置工具依赖宿主的 settings 服务；没有该服务时插件其余功能照常可用。
-  const cleanup = ctx.inject(['settings'], (settingsCtx) => {
+  const cleanup = ctx.inject(["settings"], (settingsCtx) => {
     disposers.push(settingsCtx.tools.register(jsonSafeTool(configTool(config, settingsCtx.settings))));
   });
-  if (typeof cleanup === 'function') disposers.push(cleanup);
-  // 新对话自带的使用说明：宿主没有 systemPrompt 服务时跳过，其余功能不受影响。
-  const promptCleanup = ctx.inject(['systemPrompt'], (promptCtx) => promptCtx.systemPrompt.section({
-    name: 'plugin:metaontic-video',
+  for (const dispose of [asDisposer(cleanup)]) if (dispose) disposers.push(dispose);
+  const promptCleanup = ctx.inject(["systemPrompt"], (promptCtx) => promptCtx.systemPrompt.section({
+    name: "plugin:metaontic-video",
     order: 5200,
-    text: buildPromptGuidance(config),
+    text: buildPromptGuidance(config)
   }));
-  if (typeof promptCleanup === 'function') disposers.push(promptCleanup);
-  // 会话工作目录也是可选的：宿主不提供时合并结果落在进程 cwd 下。
-  const workdirCleanup = ctx.inject(['workingDirectory'], (workdirCtx) => {
+  for (const dispose of [asDisposer(promptCleanup)]) if (dispose) disposers.push(dispose);
+  const workdirCleanup = ctx.inject(["workingDirectory"], (workdirCtx) => {
     deps.workdir = workdirCtx.workingDirectory;
-    return () => { deps.workdir = undefined; };
+    return () => {
+      deps.workdir = void 0;
+    };
   });
-  if (typeof workdirCleanup === 'function') disposers.push(workdirCleanup);
-  // 每次真正调用视频模型前卡一道：宿主弹人工确认（含预估费用），额度不够直接拒绝。
-  // 注册或预检本身出问题都不该把生成堵死：那样退回「没有预估数字」的人工确认。
+  for (const dispose of [asDisposer(workdirCleanup)]) if (dispose) disposers.push(dispose);
   let gateCleanup;
   try {
-    gateCleanup = ctx.on('tools/pre-execute', async (exec, next) => {
+    gateCleanup = ctx.on("tools/pre-execute", async (exec, next) => {
       if (!GATED_TOOLS.includes(exec.name)) return next();
       try {
         return await preflightGate(ctx, config, exec);
       } catch (error) {
         const message = error?.message || String(error);
         return {
-          kind: 'ask',
-          reason: `人工确认：调用视频模型（预估费用没算出来：${message}）。`,
+          kind: "ask",
+          reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u8C03\u7528\u89C6\u9891\u6A21\u578B\uFF08\u9884\u4F30\u8D39\u7528\u6CA1\u7B97\u51FA\u6765\uFF1A${message}\uFF09\u3002`,
           displayReason: {
-            zh: `本次会调用视频模型，但预估费用没算出来（${message}）。`
-              + '点了「允许」才会真正调用。',
-            en: 'This will call the video model, but the cost estimate failed. '
-              + 'The call runs only after you allow it.',
-          },
+            zh: `\u672C\u6B21\u4F1A\u8C03\u7528\u89C6\u9891\u6A21\u578B\uFF0C\u4F46\u9884\u4F30\u8D39\u7528\u6CA1\u7B97\u51FA\u6765\uFF08${message}\uFF09\u3002\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u771F\u6B63\u8C03\u7528\u3002`,
+            en: "This will call the video model, but the cost estimate failed. The call runs only after you allow it."
+          }
         };
       }
     });
   } catch (error) {
     ctx.logger?.warn?.(
-      `metaontic-video: 调用前的人工确认卡口注册失败：${error?.message || error}`,
+      `metaontic-video: \u8C03\u7528\u524D\u7684\u4EBA\u5DE5\u786E\u8BA4\u5361\u53E3\u6CE8\u518C\u5931\u8D25\uFF1A${error?.message || error}`
     );
   }
-  if (typeof gateCleanup === 'function') disposers.push(gateCleanup);
+  if (typeof gateCleanup === "function") disposers.push(gateCleanup);
   return () => {
     for (const dispose of disposers) dispose();
   };
 }
+export {
+  Config,
+  apply,
+  inject
+};
