@@ -95,6 +95,7 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 侧栏 **插件 → 已安装插件** 里应该有 **MetaOnticVideo**，右边的开关是**打开**的。
 
 - 没看到？点 **添加插件**，粘贴仓库地址 `github:wxsimon2022/metaontic-video`，或选本地文件夹安装。
+- 国内网络拉不动 GitHub 时，用 Gitee 镜像仓库（内容同步发布）：`git@gitee.com:hackloop/metaontic-video.git`。
 - 命令行装法（插件目录）：
 
   ```bash
@@ -305,7 +306,9 @@ Key、服务地址、模型由「激活」自动写好，正常不用出现在�
 ## 反馈
 
 装不上、出不了片，去仓库提 Issue：
-<https://github.com/wxsimon2022/metaontic-video/issues>
+
+- GitHub：<https://github.com/wxsimon2022/metaontic-video/issues>
+- Gitee 镜像：<https://gitee.com/hackloop/metaontic-video>（每次发布都会同步到这边）
 
 ## 改代码（开发者）
 
