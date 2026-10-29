@@ -95,13 +95,22 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 侧栏 **插件 → 已安装插件** 里应该有 **MetaOnticVideo**，右边的开关是**打开**的。
 
 - 没看到？点 **添加插件**，粘贴仓库地址 `github:wxsimon2022/metaontic-video`，或选本地文件夹安装。
-- 国内网络拉不动 GitHub 时，用 Gitee 镜像仓库（内容同步发布），同样是复制进「添加插件」：
-  `https://gitee.com/hackloop/metaontic-video.git`（SSH 写法：`git@gitee.com:hackloop/metaontic-video.git`）。
-- 命令行装法（插件目录）：
+- 国内网络拉不动 GitHub 时，用 Gitee（码云）镜像仓库，内容与 GitHub 同步发布：
+  **`git+https://gitee.com/hackloop/metaontic-video.git`**，同样是复制进「添加插件」。
+- 命令行装法：
 
   ```bash
+  # 本地目录（自己改代码时用这个）
   dsh plugin --profile desktop add /你的路径/metaontic-video
+
+  # 从 Gitee 装（配了 SSH 密钥的话，也可以用 git+ssh://git@gitee.com/hackloop/metaontic-video.git）
+  dsh plugin --profile desktop add "git+https://gitee.com/hackloop/metaontic-video.git"
   ```
+
+  ⚠️ **地址必须带 `git+` 前缀**：npm/pnpm 对 GitHub 有内置简写（`github:owner/repo`），
+  但对 Gitee 没有——写成 `git@gitee.com:hackloop/metaontic-video.git` 或 `gitee.com:...`
+  会被当成「未知协议」直接报错：
+  `ERR_PNPM_UNSUPPORTED_PROTOCOL Unsupported protocol "gitee.com:"`。
 
 - **刚装好或改过插件，要重启一次 Harness** 才会生效。
 - 装好后，在对话框上方的新区就能看到智能体预设 **视频导演**。
@@ -310,6 +319,7 @@ Key、服务地址、模型由「激活」自动写好，正常不用出现在�
 
 - GitHub：<https://github.com/wxsimon2022/metaontic-video/issues>
 - Gitee 镜像：<https://gitee.com/hackloop/metaontic-video>（每次发布都会同步到这边）
+  装法：`dsh plugin --profile desktop add "git+https://gitee.com/hackloop/metaontic-video.git"`
 
 ## 改代码（开发者）
 
