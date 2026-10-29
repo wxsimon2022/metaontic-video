@@ -75,10 +75,12 @@ export const Config = z.object({
     .description('注册请求头 X-Register-Token 的值，要与服务端 REGISTER_CLIENT_TOKEN 一致；页面不显示')
     .volatile(),
   duration: z.number().step(1).min(4).max(15)
-    .default(5)
+    .default(15)
     .description(
-      '每段延长出来的秒数（不含视频1本身），4-15 的整数，例如 5/8/10/14；'
-      + '建议 ≤14，刚好卡 15 秒容易因封装略超被上游拒绝',
+      '每段延长出来的秒数上限（不含视频1本身），4-15 的整数，默认 15：'
+      + '按上限拆，段数最少（30 秒 → 15+15，而不是 15+5+5+5）；'
+      + '调小它会拆出更多段（25 秒、上限 10 → 15+10，上限 5 → 15+5+5）；'
+      + '如果上游对卡满 15 秒的延长段敏感，可以设成 14',
     )
     .volatile(),
   singleMaxSeconds: z.number().step(1).min(4).max(15)
@@ -400,7 +402,7 @@ function resolveSingleMax(config) {
   );
 }
 
-/** 每次延长出来的秒数（不含视频1本身）：4-15 的整数，实际使用建议 ≤14。 */
+/** 每段延长出来的秒数上限（不含视频1本身）：4-15 的整数，默认吃满 15 秒，段数最少。 */
 function resolveSegmentSeconds(config, requested) {
   const fallback = ref(config, 'duration', 5);
   return clampInteger(requested ?? fallback, MIN_SEGMENT_SECONDS, MAX_SEGMENT_SECONDS, fallback);
@@ -426,7 +428,9 @@ function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
     }
   }
 
-  // 剩余时长按段数尽量均分（25 秒、每段上限 14 秒 → 15+10，而不是 15+5+5）。
+  // 段数取「每段装满上限」所需的最少段数：25 秒 → 15+10，30 秒 → 15+15，
+  // 而不是按固定 5 秒切成一堆小段（15+5+5+5）。然后在这几段之间均分，
+  // 既保证段数最少，也不会切出 1-3 秒的碎段。
   const slots = MAX_SEGMENTS - 1;
   const count = Math.min(slots, Math.max(1, Math.ceil(remaining / segmentSeconds)));
   const sizes = [];
@@ -1219,7 +1223,7 @@ function extendTool(config) {
       + '提示词规则：以「向后延长视频1」或「向前延长视频1」开头（也可写「生成视频1之后的内容：」），'
       + '全程用「视频1」指代输入素材，不要写成「参考视频1」（会被当成参考生视频，不是延长）；'
       + '内容写清延长方向、剧情发展、主体状态、镜头运动和声音延续，减少接缝。'
-      + '每段 4-15 秒，建议 ≤14 秒（刚好 15 秒有时会因封装略超被上游拒绝）。'
+      + '每段 4-15 秒，默认按 15 秒上限拆、段数最少；上游对卡满 15 秒敏感时再调小。'
       + '返回每段的任务 ID 和最终视频下载链接（约 24 小时内有效）；生成通常需要几分钟，'
       + '单次调用返回 timeout 时用 video_status 继续等，不要重复提交同一段。',
     parameters: {
@@ -1243,7 +1247,7 @@ function extendTool(config) {
           minimum: 4,
           maximum: 15,
           description:
-            '每段新增的秒数，4-15 的整数（如 5/8/10/14）；建议 ≤14，'
+            '每段新增的秒数上限，4-15 的整数（如 5/8/10/14，默认 15）；'
             + '刚好卡 15 秒容易因封装略超被上游拒绝。省略时使用配置默认值。',
         },
         direction: {
@@ -1478,7 +1482,7 @@ function videoTool(config, deps) {
       '生成一段完整视频，duration 是目标总秒数：不超过单段上限（默认 15 秒）时一次直出；'
       + '**硬规则：总时长 ≤ 单段上限的视频必须一次直出，禁止拆成多段 / 多镜 / 多次调用再拼接**'
       + '（例如「15 秒」不许拆成 8+7）；多镜只在用户明确要求多镜时才用。'
-      + '更长时先直出首段，再把剩余时长按段均分逐段续拍（每段 4-15 秒，建议 ≤14 秒）——'
+      + '更长时先直出首段，再把剩余时长按 4-15 秒均分逐段续拍（默认吃满上限、段数最少）——'
       + '这是同一个镜头的续拍延长，也不是多镜拼接，'
       + '最后用 ffmpeg 合并成一个本地成片文件，默认落在会话工作目录下的 metaontic-video/，'
       + '文件名形如 20261027-201530-25s.mp4。20 秒、25 秒这类目标不用拆成多个任务：'
@@ -1516,7 +1520,7 @@ function videoTool(config, deps) {
           maximum: 15,
           description:
             '仅在超过单段上限时才用：每段延长多少秒，默认用配置里的每段秒数；'
-            + '4-15 的整数（如 5/8/10/14），建议 ≤14 以免刚好卡 15 秒被上游拒绝。',
+            + '4-15 的整数（如 5/8/10/14），默认 15：按上限拆、段数最少。',
         },
         mode: {
           type: 'string',
@@ -1929,7 +1933,7 @@ function configTool(config, settings) {
       + 'ffmpegBinary、ffprobeBinary、registerEmail）。改动写进 profile 的 cordis.patch.yml，'
       + '宿主重载后生效。'
       + '用户说「把中转站地址/模型/时长改成 X」时用 action=set，看当前值用 action=get；'
-      + 'duration 是每段新增秒数（4-15，建议 ≤14），singleMaxSeconds 是单次直出上限（默认 15）。',
+      + 'duration 是每段新增秒数上限（4-15，默认 15、段数最少），singleMaxSeconds 是单次直出上限（默认 15）。',
     parameters: {
       type: 'object',
       properties: {
@@ -1944,7 +1948,7 @@ function configTool(config, settings) {
         submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
         queryPath: { type: 'string', description: '查询任务路径，{task_id} 会被替换。' },
         model: { type: 'string', description: '模型 ID，例如 doubao-seedance-2-0-mini-260615。' },
-        duration: { type: 'integer', minimum: 4, maximum: 15, description: '每段新增秒数（4-15 的整数，建议 ≤14）。' },
+        duration: { type: 'integer', minimum: 4, maximum: 15, description: '每段新增秒数上限（4-15 的整数，默认 15、段数最少）。' },
         mode: { type: 'string', enum: ['continuous', 'closeup'], description: '续拍方式。' },
         resolution: { type: 'string', enum: ['480p', '720p', '1080p'], description: '分辨率。' },
         ratio: {
@@ -2058,7 +2062,7 @@ function buildPromptGuidance(config) {
       + '成片默认落在会话工作目录下的 metaontic-video/。',
     '· 给已有视频接长用 video_extend，输入必须是公网 URL；提示词以「向后延长视频1」或「向前延长视频1」开头，'
       + '全程用「视频1」指代素材，不要写「参考视频1」；写清延长方向、剧情发展、主体状态、镜头运动、声音延续；'
-      + '每段 4-15 秒，建议不超过 14 秒。',
+      + '每段 4-15 秒，默认按上限拆、段数最少。',
     '· 生成通常要几分钟：单次调用返回 timeout 不等于失败，用 video_status 加 taskId 继续查'
       + '（上游链接约 24 小时内有效），不要重复提交同一段。',
     '· 换中转站、模型、时长等配置用 video_config（写进 profile，宿主重载后生效）；'
