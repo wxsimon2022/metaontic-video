@@ -99,8 +99,16 @@ window.__ModuleLoader__.load({
       versionLatest: '已是最新版本',
       versionNew: '有新版本 v{version}',
       versionFailed: '检查更新失败：{message}',
-      versionHint: '更新方式：插件 → 已安装 → MetaOnticVideo → 卸载，再点「添加插件」粘贴仓库地址；'
-        + '或者在终端跑下面这条命令。更新完重启 Harness 才生效。',
+      versionUpdate: '立即更新',
+      versionUpdateConfirm: '确认更新到 v{version}',
+      versionUpdateConfirmHint: '会先卸载再从 Gitee 装一遍插件本体（配置和密钥都保留），这张设置页会短暂消失一下。',
+      versionUpdating: '更新中…',
+      versionUpdateDone: '已更新到 v{version}，正在重新加载…',
+      versionUpdateRestart: '新版本 v{version} 已装好：重启 Harness 后生效。',
+      versionUpdateCancelled: '更新已取消。',
+      versionUpdateFailed: '在线更新失败：{message}',
+      versionUpdateUnavailable: '宿主没有开放插件管理接口，请用下面的命令，或者到「插件」页手动更新。',
+      versionHint: '点「立即更新」直接在线更新；也可以复制下面这条命令在终端里跑（终端更新完要重启 Harness 才生效）。',
       versionCopy: '复制命令',
       versionCopied: '已复制',
       versionCheckedAt: '检查于 {time}',
@@ -196,8 +204,16 @@ window.__ModuleLoader__.load({
       versionLatest: 'Up to date',
       versionNew: 'v{version} is available',
       versionFailed: 'Update check failed: {message}',
-      versionHint: 'To update: Plugins → Installed → MetaOnticVideo → Uninstall, then "Add plugin" and paste the '
-        + 'repository URL; or run the command below. Restart Harness afterwards for it to take effect.',
+      versionUpdate: 'Update now',
+      versionUpdateConfirm: 'Confirm update to v{version}',
+      versionUpdateConfirmHint: 'Reinstalls the plugin itself from Gitee (settings and key are kept); this settings page disappears for a moment.',
+      versionUpdating: 'Updating…',
+      versionUpdateDone: 'Updated to v{version}, reloading…',
+      versionUpdateRestart: 'v{version} installed; restart Harness to apply it.',
+      versionUpdateCancelled: 'Update cancelled.',
+      versionUpdateFailed: 'Online update failed: {message}',
+      versionUpdateUnavailable: 'This Host exposes no plugin-management API; use the command below or the Plugins page.',
+      versionHint: 'Click "Update now" to update in place, or copy the command below into a terminal (a terminal update applies after restarting Harness).',
       versionCopy: 'Copy command',
       versionCopied: 'Copied',
       versionCheckedAt: 'checked {time}',
@@ -289,9 +305,12 @@ window.__ModuleLoader__.load({
     /** 「检查更新」的数据源：Gitee 镜像仓库（Gitee 的 API 带 CORS 头，浏览器半侧能直接读）。 */
     const UPDATE_PROJECT = 'hackloop/metaontic-video';
     const UPDATE_FILE_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json`;
-    /** 升级命令：给用户复制用，走 Gitee（国内比 GitHub 稳）。 */
-    const UPDATE_COMMAND = 'dsh plugin --profile desktop remove metaontic-video '
-      + '&& dsh plugin --profile desktop add "git+https://gitee.com/hackloop/metaontic-video.git"';
+    /** 本包在 profile 里的包名，以及能重装自己的那条依赖 spec——在线更新直接复用这两样。 */
+    const PLUGIN_PACKAGE = 'metaontic-video';
+    const UPDATE_SPEC = 'git+https://gitee.com/hackloop/metaontic-video.git';
+    /** 升级命令：在线更新走不通时给用户复制用，走 Gitee（国内比 GitHub 稳）。 */
+    const UPDATE_COMMAND = `dsh plugin --profile desktop remove ${PLUGIN_PACKAGE} `
+      + `&& dsh plugin --profile desktop add "${UPDATE_SPEC}"`;
     /** 版本检查结果的本地缓存与节流：6 小时内不重复联网，打开设置页先用缓存显示。 */
     const UPDATE_CACHE_KEY = 'metaontic-video.update-check';
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -496,7 +515,7 @@ window.__ModuleLoader__.load({
       return a === b || (a === undefined && b === '') || (a === '' && b === undefined);
     }
 
-    function makePage({ form, t }) {
+    function makePage({ form, t, manager }) {
       return function ConfigPage(props) {
         const snapshot = useSnapshot(form);
         const value = snapshot.value || {};
@@ -535,6 +554,8 @@ window.__ModuleLoader__.load({
         const [updateLatest, setUpdateLatest] = React.useState('');
         const [updateAt, setUpdateAt] = React.useState('');
         const [copiedUpdate, setCopiedUpdate] = React.useState('');
+        // 一键在线更新：第一下把按钮转成「确认更新」，第二下才真的重装本插件
+        const [updateConfirm, setUpdateConfirm] = React.useState(false);
 
         // 打开设置页时，若本机还没配 Key，就先问服务端要回自己那把（设备绑定过就能取回）；
         // 但刚点过「重置插件」的不算——那时要保持未登录，等用户自己再点「登录」。
@@ -1042,6 +1063,15 @@ window.__ModuleLoader__.load({
           }
         }
 
+        /** 更新成功后清掉缓存：新版本这次启动就该重新比对一次，不然还挂着「有新版本」。 */
+        function forgetUpdateCheck() {
+          try {
+            window.localStorage.removeItem(UPDATE_CACHE_KEY);
+          } catch {
+            // 清不掉只是下次打开可能还显示旧结果，不影响更新本身
+          }
+        }
+
         /**
          * 检查更新：比 Gitee 上默认分支的版本号与本包版本。
          * silent 用于打开设置页时的自动检查——失败不打扰用户，页面上还是上次的结果。
@@ -1326,6 +1356,67 @@ window.__ModuleLoader__.load({
           copyText(UPDATE_COMMAND, setCopiedUpdate);
         }
 
+        /**
+         * 一键在线更新：让宿主的插件管理服务把本插件重装一遍。
+         *
+         * 宿主对「同一个 spec 重复安装」是直接拒绝的（already-installed），所以先卸载再装——
+         * 这也是宿主「插件」页那个「更新」按钮的做法。配置与密钥都存在 profile 的
+         * cordis.patch.yml 里，卸载重装不受影响。
+         *
+         * 期间本插件的客户端模块会被宿主换掉，这张设置页会短暂消失：属正常现象，
+         * 更新完（或重启 Harness 后）再回来就是新版本。所以引用要提前取好。
+         */
+        async function runOnlineUpdate() {
+          const pluginManager = manager && manager();
+          setUpdateConfirm(false);
+          if (!pluginManager || typeof pluginManager.installBundle !== 'function') {
+            setUpdateStatus('failed');
+            setUpdateMessage(t('versionUpdateUnavailable'));
+            return;
+          }
+          setUpdateStatus('installing');
+          setUpdateMessage('');
+          try {
+            // 卸载失败也继续装：没有 HMR 的宿主会报 stop-profile，安装会直接盖过去
+            if (typeof pluginManager.removeBundle === 'function') {
+              await pluginManager.removeBundle(PLUGIN_PACKAGE).catch(() => {});
+            }
+            const result = await pluginManager.installBundle(UPDATE_SPEC, {
+              enabled: true,
+              requestId: `${PLUGIN_PACKAGE}-update-${Date.now()}`,
+            });
+            if (!result || result.ok !== true) {
+              setUpdateStatus('failed');
+              setUpdateMessage(t('versionUpdateFailed', { message: result?.error?.message || 'unknown' }));
+              return;
+            }
+            const outcome = result.value || {};
+            if (outcome.application === 'failed') {
+              setUpdateStatus('failed');
+              setUpdateMessage(t('versionUpdateFailed', {
+                message: outcome.error?.diagnostic || outcome.error?.code || 'failed',
+              }));
+              return;
+            }
+            if (outcome.application === 'cancelled') {
+              setUpdateStatus('ok');
+              setUpdateMessage(t('versionUpdateCancelled'));
+              return;
+            }
+            // 装好了：缓存作废，卡片不再是「有新版本」，只报更新结果
+            forgetUpdateCheck();
+            const version = outcome.version || updateLatest;
+            setUpdateLatest('');
+            setUpdateStatus('restart');
+            setUpdateMessage(outcome.application === 'restart-required'
+              ? t('versionUpdateRestart', { version })
+              : t('versionUpdateDone', { version }));
+          } catch (error) {
+            setUpdateStatus('failed');
+            setUpdateMessage(t('versionUpdateFailed', { message: error?.message || String(error) }));
+          }
+        }
+
         /** 一条记录里的时间：只到分钟，够看清「什么时候出的片」。 */
         function usageTime(value) {
           if (!value) return '-';
@@ -1426,9 +1517,17 @@ window.__ModuleLoader__.load({
           ? t('versionChecking')
           : (updateStatus === 'failed'
             ? updateMessage
-            : (updateStatus === 'ok'
-              ? (updateAvailable ? t('versionNew', { version: updateLatest }) : t('versionLatest'))
-              : ''));
+            : (updateStatus === 'installing'
+              ? t('versionUpdating')
+              : (updateStatus === 'restart'
+                ? updateMessage
+                : (updateStatus === 'ok'
+                  ? (updateAvailable ? t('versionNew', { version: updateLatest }) : t('versionLatest'))
+                  : ''))));
+        // 失败红、成功绿（更新完/有新版本），其余用灰度文字
+        const updateTone = updateStatus === 'failed'
+          ? TOKENS.error
+          : (updateStatus === 'restart' || updateAvailable ? TOKENS.success : TOKENS.muted);
         const versionBox = h('div', {
           key: 'version',
           'data-field': 'version',
@@ -1447,7 +1546,7 @@ window.__ModuleLoader__.load({
               'data-action': 'update-check',
               type: 'button',
               className: 'mov-btn mov-btn-sm mov-trailing',
-              disabled: updateStatus === 'working',
+              disabled: updateStatus === 'working' || updateStatus === 'installing',
               onClick: () => { checkForUpdate(false).catch(() => {}); },
             }, updateStatus === 'working' ? t('versionChecking') : t('versionCheck')),
           ]),
@@ -1456,15 +1555,27 @@ window.__ModuleLoader__.load({
               key: 'state',
               'data-field': 'versionState',
               className: 'mov-hint',
-              style: {
-                color: updateStatus === 'failed'
-                  ? TOKENS.error
-                  : (updateAvailable ? TOKENS.success : TOKENS.muted),
-              },
+              style: { color: updateTone },
             }, updateText)
             : null,
           updateAvailable
             ? h('div', { key: 'command', className: 'mov-cmd-row' }, [
+              // 主按钮：点一下转成「确认更新」，再点一下让宿主重装本插件
+              h('button', {
+                key: 'online',
+                'data-action': 'update-online',
+                type: 'button',
+                className: 'mov-btn mov-btn-sm mov-btn-primary',
+                disabled: updateStatus === 'installing',
+                onClick: () => {
+                  if (updateConfirm) runOnlineUpdate().catch(() => {});
+                  else setUpdateConfirm(true);
+                },
+              }, updateStatus === 'installing'
+                ? t('versionUpdating')
+                : (updateConfirm
+                  ? t('versionUpdateConfirm', { version: updateLatest })
+                  : t('versionUpdate'))),
               h('code', {
                 key: 'code',
                 'data-field': 'updateCommand',
@@ -1478,6 +1589,13 @@ window.__ModuleLoader__.load({
                 onClick: copyUpdateCommand,
               }, copiedUpdate ? t('versionCopied') : t('versionCopy')),
             ])
+            : null,
+          updateAvailable && updateConfirm
+            ? h('span', {
+              key: 'confirm-hint',
+              'data-field': 'updateConfirmHint',
+              className: 'mov-hint',
+            }, t('versionUpdateConfirmHint'))
             : null,
           updateAvailable ? h('span', { key: 'hint', className: 'mov-hint' }, t('versionHint')) : null,
           (updateStatus === 'ok' && updateAt)
@@ -1597,7 +1715,13 @@ window.__ModuleLoader__.load({
         const t = ctx.locale.bind(NS);
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'metaontic-video: dictionaries');
         const form = ctx.configForms.get(NAMESPACE);
-        const Page = makePage({ form, t });
+        // 在线更新用的宿主服务（`ctx.remote.pluginManager`）：宿主没有它时页面只留「复制命令」。
+        // 包一层 getter，点击时再取；重装过程里本插件马上会被卸掉，服务引用要赶在卸载前拿到。
+        const pluginManager = () => {
+          const remote = typeof ctx.get === 'function' ? ctx.get('remote') : undefined;
+          return remote && remote.pluginManager ? remote.pluginManager : null;
+        };
+        const Page = makePage({ form, t, manager: pluginManager });
         // 第三方 bundle 的配置页注册到 plugins.bundle.config，以 npm 包名为 key；
         // 打开「已安装插件」里的 metaontic-video 详情页时显示在描述与组件行之间。
         ctx.effect(() => ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register({

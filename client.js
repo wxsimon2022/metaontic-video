@@ -76,7 +76,16 @@ window.__ModuleLoader__.load({
       versionLatest: "\u5DF2\u662F\u6700\u65B0\u7248\u672C",
       versionNew: "\u6709\u65B0\u7248\u672C v{version}",
       versionFailed: "\u68C0\u67E5\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
-      versionHint: "\u66F4\u65B0\u65B9\u5F0F\uFF1A\u63D2\u4EF6 \u2192 \u5DF2\u5B89\u88C5 \u2192 MetaOnticVideo \u2192 \u5378\u8F7D\uFF0C\u518D\u70B9\u300C\u6DFB\u52A0\u63D2\u4EF6\u300D\u7C98\u8D34\u4ED3\u5E93\u5730\u5740\uFF1B\u6216\u8005\u5728\u7EC8\u7AEF\u8DD1\u4E0B\u9762\u8FD9\u6761\u547D\u4EE4\u3002\u66F4\u65B0\u5B8C\u91CD\u542F Harness \u624D\u751F\u6548\u3002",
+      versionUpdate: "\u7ACB\u5373\u66F4\u65B0",
+      versionUpdateConfirm: "\u786E\u8BA4\u66F4\u65B0\u5230 v{version}",
+      versionUpdateConfirmHint: "\u4F1A\u5148\u5378\u8F7D\u518D\u4ECE Gitee \u88C5\u4E00\u904D\u63D2\u4EF6\u672C\u4F53\uFF08\u914D\u7F6E\u548C\u5BC6\u94A5\u90FD\u4FDD\u7559\uFF09\uFF0C\u8FD9\u5F20\u8BBE\u7F6E\u9875\u4F1A\u77ED\u6682\u6D88\u5931\u4E00\u4E0B\u3002",
+      versionUpdating: "\u66F4\u65B0\u4E2D\u2026",
+      versionUpdateDone: "\u5DF2\u66F4\u65B0\u5230 v{version}\uFF0C\u6B63\u5728\u91CD\u65B0\u52A0\u8F7D\u2026",
+      versionUpdateRestart: "\u65B0\u7248\u672C v{version} \u5DF2\u88C5\u597D\uFF1A\u91CD\u542F Harness \u540E\u751F\u6548\u3002",
+      versionUpdateCancelled: "\u66F4\u65B0\u5DF2\u53D6\u6D88\u3002",
+      versionUpdateFailed: "\u5728\u7EBF\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
+      versionUpdateUnavailable: "\u5BBF\u4E3B\u6CA1\u6709\u5F00\u653E\u63D2\u4EF6\u7BA1\u7406\u63A5\u53E3\uFF0C\u8BF7\u7528\u4E0B\u9762\u7684\u547D\u4EE4\uFF0C\u6216\u8005\u5230\u300C\u63D2\u4EF6\u300D\u9875\u624B\u52A8\u66F4\u65B0\u3002",
+      versionHint: "\u70B9\u300C\u7ACB\u5373\u66F4\u65B0\u300D\u76F4\u63A5\u5728\u7EBF\u66F4\u65B0\uFF1B\u4E5F\u53EF\u4EE5\u590D\u5236\u4E0B\u9762\u8FD9\u6761\u547D\u4EE4\u5728\u7EC8\u7AEF\u91CC\u8DD1\uFF08\u7EC8\u7AEF\u66F4\u65B0\u5B8C\u8981\u91CD\u542F Harness \u624D\u751F\u6548\uFF09\u3002",
       versionCopy: "\u590D\u5236\u547D\u4EE4",
       versionCopied: "\u5DF2\u590D\u5236",
       versionCheckedAt: "\u68C0\u67E5\u4E8E {time}",
@@ -165,7 +174,16 @@ window.__ModuleLoader__.load({
       versionLatest: "Up to date",
       versionNew: "v{version} is available",
       versionFailed: "Update check failed: {message}",
-      versionHint: 'To update: Plugins \u2192 Installed \u2192 MetaOnticVideo \u2192 Uninstall, then "Add plugin" and paste the repository URL; or run the command below. Restart Harness afterwards for it to take effect.',
+      versionUpdate: "Update now",
+      versionUpdateConfirm: "Confirm update to v{version}",
+      versionUpdateConfirmHint: "Reinstalls the plugin itself from Gitee (settings and key are kept); this settings page disappears for a moment.",
+      versionUpdating: "Updating\u2026",
+      versionUpdateDone: "Updated to v{version}, reloading\u2026",
+      versionUpdateRestart: "v{version} installed; restart Harness to apply it.",
+      versionUpdateCancelled: "Update cancelled.",
+      versionUpdateFailed: "Online update failed: {message}",
+      versionUpdateUnavailable: "This Host exposes no plugin-management API; use the command below or the Plugins page.",
+      versionHint: 'Click "Update now" to update in place, or copy the command below into a terminal (a terminal update applies after restarting Harness).',
       versionCopy: "Copy command",
       versionCopied: "Copied",
       versionCheckedAt: "checked {time}",
@@ -244,10 +262,12 @@ window.__ModuleLoader__.load({
     const DEFAULT_REGISTER_TOKEN = "metaontic-video-register-v1";
     const UPDATE_PROJECT = "hackloop/metaontic-video";
     const UPDATE_FILE_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json`;
-    const UPDATE_COMMAND = 'dsh plugin --profile desktop remove metaontic-video && dsh plugin --profile desktop add "git+https://gitee.com/hackloop/metaontic-video.git"';
+    const PLUGIN_PACKAGE = "metaontic-video";
+    const UPDATE_SPEC = "git+https://gitee.com/hackloop/metaontic-video.git";
+    const UPDATE_COMMAND = `dsh plugin --profile desktop remove ${PLUGIN_PACKAGE} && dsh plugin --profile desktop add "${UPDATE_SPEC}"`;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "2.7.2".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "2.8.0".trim().replace(/^v/i, "") : "";
     function currentOs() {
       const nav = window.navigator || {};
       const raw = String(
@@ -416,7 +436,7 @@ window.__ModuleLoader__.load({
     function same(a, b) {
       return a === b || a === void 0 && b === "" || a === "" && b === void 0;
     }
-    function makePage({ form, t }) {
+    function makePage({ form, t, manager }) {
       return function ConfigPage(props) {
         const snapshot = useSnapshot(form);
         const value = snapshot.value || {};
@@ -448,6 +468,7 @@ window.__ModuleLoader__.load({
         const [updateLatest, setUpdateLatest] = React.useState("");
         const [updateAt, setUpdateAt] = React.useState("");
         const [copiedUpdate, setCopiedUpdate] = React.useState("");
+        const [updateConfirm, setUpdateConfirm] = React.useState(false);
         const restoreTried = React.useRef(false);
         React.useEffect(() => {
           if (restoreTried.current) return;
@@ -869,6 +890,12 @@ window.__ModuleLoader__.load({
           } catch {
           }
         }
+        function forgetUpdateCheck() {
+          try {
+            window.localStorage.removeItem(UPDATE_CACHE_KEY);
+          } catch {
+          }
+        }
         async function checkForUpdate(silent = false) {
           if (!silent) {
             setUpdateStatus("working");
@@ -1099,6 +1126,53 @@ window.__ModuleLoader__.load({
         function copyUpdateCommand() {
           copyText(UPDATE_COMMAND, setCopiedUpdate);
         }
+        async function runOnlineUpdate() {
+          const pluginManager = manager && manager();
+          setUpdateConfirm(false);
+          if (!pluginManager || typeof pluginManager.installBundle !== "function") {
+            setUpdateStatus("failed");
+            setUpdateMessage(t("versionUpdateUnavailable"));
+            return;
+          }
+          setUpdateStatus("installing");
+          setUpdateMessage("");
+          try {
+            if (typeof pluginManager.removeBundle === "function") {
+              await pluginManager.removeBundle(PLUGIN_PACKAGE).catch(() => {
+              });
+            }
+            const result = await pluginManager.installBundle(UPDATE_SPEC, {
+              enabled: true,
+              requestId: `${PLUGIN_PACKAGE}-update-${Date.now()}`
+            });
+            if (!result || result.ok !== true) {
+              setUpdateStatus("failed");
+              setUpdateMessage(t("versionUpdateFailed", { message: result?.error?.message || "unknown" }));
+              return;
+            }
+            const outcome = result.value || {};
+            if (outcome.application === "failed") {
+              setUpdateStatus("failed");
+              setUpdateMessage(t("versionUpdateFailed", {
+                message: outcome.error?.diagnostic || outcome.error?.code || "failed"
+              }));
+              return;
+            }
+            if (outcome.application === "cancelled") {
+              setUpdateStatus("ok");
+              setUpdateMessage(t("versionUpdateCancelled"));
+              return;
+            }
+            forgetUpdateCheck();
+            const version = outcome.version || updateLatest;
+            setUpdateLatest("");
+            setUpdateStatus("restart");
+            setUpdateMessage(outcome.application === "restart-required" ? t("versionUpdateRestart", { version }) : t("versionUpdateDone", { version }));
+          } catch (error) {
+            setUpdateStatus("failed");
+            setUpdateMessage(t("versionUpdateFailed", { message: error?.message || String(error) }));
+          }
+        }
         function usageTime(value2) {
           if (!value2) return "-";
           const at = new Date(value2);
@@ -1196,7 +1270,8 @@ window.__ModuleLoader__.load({
           usageMessage ? h("span", { key: "message", className: "mov-hint" }, usageMessage) : null
         ]) : null;
         const updateAvailable = Boolean(updateLatest) && Boolean(PLUGIN_VERSION) && isNewerVersion(updateLatest, PLUGIN_VERSION);
-        const updateText = updateStatus === "working" ? t("versionChecking") : updateStatus === "failed" ? updateMessage : updateStatus === "ok" ? updateAvailable ? t("versionNew", { version: updateLatest }) : t("versionLatest") : "";
+        const updateText = updateStatus === "working" ? t("versionChecking") : updateStatus === "failed" ? updateMessage : updateStatus === "installing" ? t("versionUpdating") : updateStatus === "restart" ? updateMessage : updateStatus === "ok" ? updateAvailable ? t("versionNew", { version: updateLatest }) : t("versionLatest") : "";
+        const updateTone = updateStatus === "failed" ? TOKENS.error : updateStatus === "restart" || updateAvailable ? TOKENS.success : TOKENS.muted;
         const versionBox = h("div", {
           key: "version",
           "data-field": "version",
@@ -1215,7 +1290,7 @@ window.__ModuleLoader__.load({
               "data-action": "update-check",
               type: "button",
               className: "mov-btn mov-btn-sm mov-trailing",
-              disabled: updateStatus === "working",
+              disabled: updateStatus === "working" || updateStatus === "installing",
               onClick: () => {
                 checkForUpdate(false).catch(() => {
                 });
@@ -1226,11 +1301,22 @@ window.__ModuleLoader__.load({
             key: "state",
             "data-field": "versionState",
             className: "mov-hint",
-            style: {
-              color: updateStatus === "failed" ? TOKENS.error : updateAvailable ? TOKENS.success : TOKENS.muted
-            }
+            style: { color: updateTone }
           }, updateText) : null,
           updateAvailable ? h("div", { key: "command", className: "mov-cmd-row" }, [
+            // 主按钮：点一下转成「确认更新」，再点一下让宿主重装本插件
+            h("button", {
+              key: "online",
+              "data-action": "update-online",
+              type: "button",
+              className: "mov-btn mov-btn-sm mov-btn-primary",
+              disabled: updateStatus === "installing",
+              onClick: () => {
+                if (updateConfirm) runOnlineUpdate().catch(() => {
+                });
+                else setUpdateConfirm(true);
+              }
+            }, updateStatus === "installing" ? t("versionUpdating") : updateConfirm ? t("versionUpdateConfirm", { version: updateLatest }) : t("versionUpdate")),
             h("code", {
               key: "code",
               "data-field": "updateCommand",
@@ -1244,6 +1330,11 @@ window.__ModuleLoader__.load({
               onClick: copyUpdateCommand
             }, copiedUpdate ? t("versionCopied") : t("versionCopy"))
           ]) : null,
+          updateAvailable && updateConfirm ? h("span", {
+            key: "confirm-hint",
+            "data-field": "updateConfirmHint",
+            className: "mov-hint"
+          }, t("versionUpdateConfirmHint")) : null,
           updateAvailable ? h("span", { key: "hint", className: "mov-hint" }, t("versionHint")) : null,
           updateStatus === "ok" && updateAt ? h("span", { key: "at", className: "mov-foot-note" }, t("versionCheckedAt", { time: updateAt })) : null
         ]);
@@ -1348,7 +1439,11 @@ window.__ModuleLoader__.load({
         const t = ctx.locale.bind(NS);
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), "metaontic-video: dictionaries");
         const form = ctx.configForms.get(NAMESPACE);
-        const Page = makePage({ form, t });
+        const pluginManager = () => {
+          const remote = typeof ctx.get === "function" ? ctx.get("remote") : void 0;
+          return remote && remote.pluginManager ? remote.pluginManager : null;
+        };
+        const Page = makePage({ form, t, manager: pluginManager });
         ctx.effect(() => ctx.slots.inject("plugins.bundle.config", () => ctx.slots.register({
           name: "plugins.bundle.config",
           key: NAMESPACE,

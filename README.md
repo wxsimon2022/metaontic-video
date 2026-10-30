@@ -323,24 +323,28 @@ Key、服务地址、模型由「登录」自动写好，正常不用出现在�
 
 - 左边写着你装的版本（例：`当前版本 v2.6.0`）——打开设置页时会自动去仓库看一眼有没有新版本，
   6 小时内不重复查；也可以用缓存里的结果离线看；
-- 有新版本就变成 `有新版本 v2.7.0`，并给出升级命令（带「复制命令」按钮）；
-- 想手动确认就点右边的**「检查更新」**。
+- 有新版本就变成 `有新版本 v2.7.0`，右边多一个 **「立即更新」** 按钮，下面还留着那条升级命令（带「复制命令」）；
+- 想手动确认版本就点右边的**「检查更新」**。
 
 查的是 **Gitee 镜像仓库**默认分支上的 `package.json`（国内网络比 GitHub 稳），只读一个版本号，
 不发你的 Key、也不上传任何本机信息。查不到（断网 / 限流）只会提示「检查更新失败」，不影响出片。
 
 更新怎么做：
 
-1. **界面**：**插件 → 已安装 → MetaOnticVideo → 卸载**，再点 **添加插件** 粘上仓库地址
-   `git+https://gitee.com/hackloop/metaontic-video.git`；
-2. **或者命令行**（就是卡片里给的那条）：
+1. **一键在线更新**：点 **「立即更新」**（再确认一下）。插件会让宿主把本插件从 Gitee 重装一遍，
+   不用你去「插件」页卸载重加、也不用开终端；这张设置页会短暂消失再回来，属正常。
+   装完若提示「重启 Harness 后生效」，重启一次即可。
+2. **手动（一键失败时的退路）**：**插件 → 已安装 → MetaOnticVideo → 卸载**，再点 **添加插件**
+   粘上仓库地址 `git+https://gitee.com/hackloop/metaontic-video.git`；或者复制卡片里那条命令：
 
    ```bash
    dsh plugin --profile desktop remove metaontic-video
    dsh plugin --profile desktop add "git+https://gitee.com/hackloop/metaontic-video.git"
    ```
 
-3. **重启一次 Harness** 才生效。你现有的配置（Key、模型、输出目录等）都留着，不用重新登录。
+   命令行更新完要**重启一次 Harness** 才生效。
+
+你现有的配置（Key、模型、输出目录等）都存在 profile 里，卸载重装不受影响，不用重新登录。
 
 ## 限制
 
@@ -376,6 +380,10 @@ npm run build      # 检查 + 构建：locale/*.json（从 src/locale/*.ts）+ i
 - 客户端构建用 `--define:__PLUGIN_VERSION__` 把 `package.json` 的版本号烧进 `client.js`
   （就是版本卡片上的「当前版本」）——所以**改了版本号要重新 `npm run build`**。
 - `types/dsh.d.ts`：本插件用到的宿主接口（工具定义、`tools/pre-execute` 卡口、审批、settings 等）。
+- 在线更新走宿主的插件管理服务（浏览器半侧的 `ctx.remote.pluginManager`）：宿主对「同一个 spec」
+  重复安装会直接拒（`already-installed`），所以是**先 `removeBundle` 再 `installBundle`**——
+  跟宿主「插件」页那个「更新」按钮同一套路；服务不存在时卡片自动退回「复制命令」。
 - 冒烟脚本在 `/private/tmp/dsh-plugin/`（不进仓库）：`video-smoke.mjs` 跑合并与卡口，
   `client-smoke-register.mjs` 跑设置页渲染，`client-smoke-update.mjs` / `client-smoke-update-auto.mjs`
-  跑「检查更新」的手动与自动两条路径。
+  跑「检查更新」的手动与自动两条路径，`client-smoke-update-online.mjs` 跑「立即更新」的
+  确认 → 卸载 → 重装 → 提示四条分支（宿主服务用一个假实现顶着）。
