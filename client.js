@@ -2,7 +2,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "2.15.2",
+    version: "2.15.3",
     description: "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
     license: "MIT",
     type: "module",
@@ -78,12 +78,11 @@
       "@deepseek-ai/schemastery": "~3.18.5"
     },
     releaseNotes: {
-      version: "2.15.2",
+      version: "2.15.3",
       items: [
-        "\u4FEE\u590D\u63D2\u4EF6\u542F\u52A8\u5931\u8D25\uFF1A\u5BA2\u6237\u7AEF\u6253\u5305\u4E3A\u72EC\u7ACB\u666E\u901A\u811A\u672C\uFF0C\u6D88\u9664\u9876\u5C42 import\u3002",
-        "\u4F18\u5316\u7248\u672C\u68C0\u6D4B\uFF1A\u591A\u6E90\u5E76\u53D1\u53D6\u6700\u9AD8\u7248\u672C\uFF0C\u63D0\u4EA4\u53F7\u67E5\u8BE2\u4E0D\u518D\u963B\u585E\u7ED3\u679C\uFF0C\u5237\u65B0\u65E7\u7F13\u5B58\u3002",
-        "\u5728\u7EBF\u66F4\u65B0\u4F18\u5148\u4F7F\u7528\u7248\u672C\u6807\u7B7E\uFF0C\u51CF\u5C11\u5BF9 Gitee \u63D0\u4EA4\u63A5\u53E3\u7684\u4F9D\u8D56\u3002",
-        "\u91CD\u7F6E\u63D2\u4EF6\u589E\u52A0\u4E8C\u6B21\u786E\u8BA4\uFF0C\u660E\u786E\u6E05\u9664\u914D\u7F6E\u3001Key \u548C\u767B\u5F55\u72B6\u6001\uFF0C\u4FDD\u7559\u5DF2\u751F\u6210\u89C6\u9891\u3002"
+        "\u65B0\u589E\u672C\u5730\u8131\u654F\u8BF7\u6C42\u65E5\u5FD7\uFF0C\u6309\u65E5\u4FDD\u5B58\u521B\u5EFA\u4EFB\u52A1\u4E0E\u67E5\u8BE2\u4EFB\u52A1\u7684\u8BF7\u6C42\u8BB0\u5F55\u3002",
+        "\u8BB0\u5F55\u72EC\u7ACB\u8BF7\u6C42ID\u3001\u8017\u65F6\u3001HTTP\u72B6\u6001\u3001\u6A21\u578B\u3001\u4EFB\u52A1ID\u548C\u4E0A\u6E38\u8BF7\u6C42ID\uFF0C\u4FBF\u4E8E\u6392\u67E5\u91CD\u590D\u63D0\u4EA4\u3002",
+        "\u4E0D\u8BB0\u5F55API Key\u3001\u5B8C\u6574\u63D0\u793A\u8BCD\u3001\u8BF7\u6C42\u4F53\u548C\u7B7E\u540D\u89C6\u9891\u94FE\u63A5\uFF1B\u65E5\u5FD7\u5199\u5165\u5931\u8D25\u4E0D\u5F71\u54CD\u751F\u6210\u3002"
       ]
     }
   };
@@ -408,7 +407,7 @@
       const UPDATE_ATTEMPTS = 3;
       const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
       const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-      const PLUGIN_VERSION = true ? "2.15.2".trim().replace(/^v/i, "") : "";
+      const PLUGIN_VERSION = true ? "2.15.3".trim().replace(/^v/i, "") : "";
       function currentOs() {
         const nav = window.navigator || {};
         const raw = String(

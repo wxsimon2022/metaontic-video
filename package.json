@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "2.15.2",
+  "version": "2.15.3",
   "description": "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
   "license": "MIT",
   "type": "module",
@@ -76,12 +76,11 @@
     "@deepseek-ai/schemastery": "~3.18.5"
   },
   "releaseNotes": {
-    "version": "2.15.2",
+    "version": "2.15.3",
     "items": [
-      "修复插件启动失败：客户端打包为独立普通脚本，消除顶层 import。",
-      "优化版本检测：多源并发取最高版本，提交号查询不再阻塞结果，刷新旧缓存。",
-      "在线更新优先使用版本标签，减少对 Gitee 提交接口的依赖。",
-      "重置插件增加二次确认，明确清除配置、Key 和登录状态，保留已生成视频。"
+      "新增本地脱敏请求日志，按日保存创建任务与查询任务的请求记录。",
+      "记录独立请求ID、耗时、HTTP状态、模型、任务ID和上游请求ID，便于排查重复提交。",
+      "不记录API Key、完整提示词、请求体和签名视频链接；日志写入失败不影响生成。"
     ]
   }
 }

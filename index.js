@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
-import { mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -1944,7 +1944,7 @@ async function confirmNextSegment(ctx, config, exec, {
 function resolveRegisterApi(config) {
   return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-const PLUGIN_VERSION = true ? "2.15.2".trim().replace(/^v/i, "") : "";
+const PLUGIN_VERSION = true ? "2.15.3".trim().replace(/^v/i, "") : "";
 async function fetchDeviceQuota(config, signal) {
   if (isVolcengine(config)) return { status: "unknown", reason: "\u706B\u5C71\u76F4\u8FDE\u8D39\u7528\u548C\u4F59\u989D\u8BF7\u5728\u706B\u5C71\u63A7\u5236\u53F0\u67E5\u770B" };
   const api = resolveRegisterApi(config);
@@ -2137,7 +2137,63 @@ async function preflightGate(ctx, config, exec) {
   };
 }
 const RELAY_TIMEOUT_MS = 12e4;
-async function relayRequest(config, path2, { method = "GET", body, signal } = {}) {
+function requestLogPath() {
+  return path.join(dshHome(), "logs", "metaontic-video", `${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.jsonl`);
+}
+async function appendRequestLog(record) {
+  try {
+    const file = requestLogPath();
+    await mkdir(path.dirname(file), { recursive: true, mode: 448 });
+    await appendFile(file, JSON.stringify({ time: (/* @__PURE__ */ new Date()).toISOString(), ...record }) + "\n", { mode: 384 });
+  } catch {
+  }
+}
+async function relayRequest(config, requestPath, options = {}) {
+  const method = options.method || "GET";
+  const requestId = uniqueSuffix("request");
+  const started = Date.now();
+  const trace = {};
+  const body = options.body;
+  const operation = method === "POST" ? "create_task" : "query_task";
+  const info = {
+    requestId,
+    operation,
+    method,
+    provider: isVolcengine(config) ? "volcengine" : "service",
+    model: body?.model || resolveModel(config),
+    ...method === "POST" ? {
+      duration: body?.duration,
+      resolution: body?.resolution,
+      imageCount: Array.isArray(body?.content) ? body.content.filter((item) => item.type === "image_url").length : 0,
+      videoCount: Array.isArray(body?.content) ? body.content.filter((item) => item.type === "video_url").length : 0
+    } : { taskId: String(requestPath).split("?")[0].split("/").at(-1) }
+  };
+  await appendRequestLog({ ...info, event: "request_started" });
+  try {
+    const data = await relayRequestCore(config, requestPath, options, trace);
+    await appendRequestLog({
+      ...info,
+      ...trace,
+      event: "request_completed",
+      elapsedMs: Date.now() - started,
+      taskId: extractTaskId(data) || info.taskId,
+      taskStatus: extractStatus(data),
+      completionTokens: finiteNumber(data?.usage?.completion_tokens)
+    });
+    return data;
+  } catch (error) {
+    await appendRequestLog({
+      ...info,
+      ...trace,
+      event: "request_failed",
+      elapsedMs: Date.now() - started,
+      errorCode: String(error?.code || "request_error"),
+      cancelled: Boolean(options.signal?.aborted)
+    });
+    throw error;
+  }
+}
+async function relayRequestCore(config, path2, { method = "GET", body, signal } = {}, trace = {}) {
   const url = `${resolveBaseUrl(config)}${path2}`;
   const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -2157,6 +2213,8 @@ async function relayRequest(config, path2, { method = "GET", body, signal } = {}
       ...serialized !== void 0 ? { body: serialized } : {},
       signal: requestSignal
     });
+    trace.httpStatus = response.status;
+    trace.upstreamRequestId = response.headers.get("x-request-id") || response.headers.get("x-tt-logid") || void 0;
     text = await response.text();
   } catch (error) {
     if (signal?.aborted) throw abortError();

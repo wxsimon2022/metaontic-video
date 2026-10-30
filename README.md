@@ -275,3 +275,12 @@ git show --no-patch "v<版本>"
 - [Gitee 镜像](https://gitee.com/hackloop/metaontic-video)
 
 模型一致性、口型和接缝效果以实际预览为准；具体API能力与插件已开放的设置可能不同。
+
+
+## 请求日志
+
+创建与查询视频任务会写入 `~/.dsh/logs/metaontic-video/YYYY-MM-DD.jsonl`（日期为UTC；设置 `DSH_HOME` 时跟随该目录）。
+每次请求都有独立 `requestId`，记录开始、完成或失败事件，以及接入方式、模型、时长、素材数量、HTTP状态、耗时、任务ID和上游请求ID（接口提供时）。
+统计 `operation=create_task` 且 `event=request_started` 可核对插件尝试提交的次数；`query_task` 只表示查询，不能算新增生成。
+开始后没有结束日志可能是进程退出；网络错误也不能证明上游未受理，先复查任务与上游记录。
+日志不记录API Key、请求体、完整提示词、Base64或签名视频链接。日志按日保留，未自动清理。

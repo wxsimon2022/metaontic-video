@@ -33,7 +33,7 @@
  */
 import { spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
-import { mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
@@ -2904,10 +2904,59 @@ async function preflightGate(ctx, config, exec) {
 /** 中转站单次请求的超时（毫秒）：卡住的连接不要拖到宿主工具超时才结束。 */
 const RELAY_TIMEOUT_MS = 120000;
 
-async function relayRequest(
+/** 日志仅包含白名单字段；每日一个JSONL文件，不写请求体、鉴权头或输出URL。 */
+function requestLogPath() {
+  return path.join(dshHome(), 'logs', 'metaontic-video', `${new Date().toISOString().slice(0, 10)}.jsonl`);
+}
+
+async function appendRequestLog(record) {
+  try {
+    const file = requestLogPath();
+    await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
+    await appendFile(file, JSON.stringify({ time: new Date().toISOString(), ...record }) + '\n', { mode: 0o600 });
+  } catch {
+    // 日志不可写不能改变生成结果，也不能因此重提付费请求。
+  }
+}
+
+async function relayRequest(config, requestPath, options: { method?: string; body?: any; signal?: AbortSignal } = {}) {
+  const method = options.method || 'GET';
+  const requestId = uniqueSuffix('request');
+  const started = Date.now();
+  const trace: Record<string, any> = {};
+  const body = options.body;
+  const operation = method === 'POST' ? 'create_task' : 'query_task';
+  const info: Record<string, any> = {
+    requestId, operation, method,
+    provider: isVolcengine(config) ? 'volcengine' : 'service',
+    model: body?.model || resolveModel(config),
+    ...(method === 'POST' ? {
+      duration: body?.duration, resolution: body?.resolution,
+      imageCount: Array.isArray(body?.content) ? body.content.filter((item) => item.type === 'image_url').length : 0,
+      videoCount: Array.isArray(body?.content) ? body.content.filter((item) => item.type === 'video_url').length : 0,
+    } : { taskId: String(requestPath).split('?')[0].split('/').at(-1) }),
+  };
+  await appendRequestLog({ ...info, event: 'request_started' });
+  try {
+    const data = await relayRequestCore(config, requestPath, options, trace);
+    await appendRequestLog({ ...info, ...trace, event: 'request_completed', elapsedMs: Date.now() - started,
+      taskId: extractTaskId(data) || info.taskId, taskStatus: extractStatus(data),
+      completionTokens: finiteNumber(data?.usage?.completion_tokens),
+    });
+    return data;
+  } catch (error) {
+    await appendRequestLog({ ...info, ...trace, event: 'request_failed', elapsedMs: Date.now() - started,
+      errorCode: String(error?.code || 'request_error'), cancelled: Boolean(options.signal?.aborted),
+    });
+    throw error;
+  }
+}
+
+async function relayRequestCore(
   config,
   path,
   { method = 'GET', body, signal }: { method?: string; body?: unknown; signal?: AbortSignal } = {},
+  trace: Record<string, any> = {},
 ): Promise<any> {
   const url = `${resolveBaseUrl(config)}${path}`;
   const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
@@ -2928,6 +2977,8 @@ async function relayRequest(
       ...(serialized !== undefined ? { body: serialized } : {}),
       signal: requestSignal,
     });
+    trace.httpStatus = response.status;
+    trace.upstreamRequestId = response.headers.get('x-request-id') || response.headers.get('x-tt-logid') || undefined;
     text = await response.text();
   } catch (error) {
     if (signal?.aborted) throw abortError();
