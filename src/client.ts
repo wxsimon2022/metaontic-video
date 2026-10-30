@@ -313,10 +313,14 @@ window.__ModuleLoader__.load({
     const PLUGIN_PACKAGE = 'metaontic-video';
     const UPDATE_SPEC = 'git+https://gitee.com/hackloop/metaontic-video.git';
     /**
-     * Gitee 的 API 会被 WAF 限流（403 Rate Limit Exceeded），「检查更新」不应该因此变瞎。
-     * 这几条是同一个仓库在 GitHub 上的镜像，走 jsDelivr 的 CDN 读（带 CORS），
-     * 只在 Gitee API 读不到时兜底取版本号；cdn.jsdelivr.net 在国内常被墙，所以列的是它的备用域名。
+     * Gitee 的 API 会被 WAF 限流（403 Rate Limit Exceeded），「检查更新」不该因此变瞎。
+     * 兜底分两级：
+     *   1) jsDelivr 的**数据接口**（不是文件 CDN）：给的是这个仓库的 tag 列表，不经过 CDN 缓存，
+     *      拿到的就是最新版号——而且 tag 正好是更新 spec 要用的后缀；
+     *   2) 文件镜像：同一仓库的 GitHub 副本，走 jsDelivr 的备用域名（`cdn.jsdelivr.net` 在国内常被墙，
+     *      所以用 `fastly` / `gcore`）。分支内容是 CDN 缓存的，可能比最新版滞后十几小时，只当最后一路兜底。
      */
+    const UPDATE_TAGS_API = 'https://data.jsdelivr.com/v1/packages/gh/wxsimon2022/metaontic-video';
     const UPDATE_MIRROR_FILES = [
       'https://fastly.jsdelivr.net/gh/wxsimon2022/metaontic-video@master/package.json',
       'https://gcore.jsdelivr.net/gh/wxsimon2022/metaontic-video@master/package.json',
@@ -420,11 +424,24 @@ window.__ModuleLoader__.load({
       return version;
     }
 
+    /** 从 jsDelivr 的 tag 列表里挑版本最高的那个（非 semver 的 tag 直接跳过）。 */
+    function versionFromTags(body) {
+      const versions = Array.isArray(body?.versions) ? body.versions : [];
+      let best = '';
+      for (const entry of versions) {
+        const version = String((entry && entry.version) || '').trim().replace(/^v/i, '');
+        if (!/^\d+\.\d+\.\d+$/.test(version)) continue;
+        if (!best || isNewerVersion(version, best)) best = version;
+      }
+      if (!best) throw new Error('no tags');
+      return best;
+    }
+
     /**
      * 读默认分支的 package.json，只用里面的 version 判断有没有新版本。
      * 不走 npm 源也不用管理端凭据：谁都能查，查不到就只报「检查失败」，不影响生成。
      *
-     * 顺序：Gitee API（权威、带 CORS）→ jsDelivr 上的 GitHub 镜像（Gitee 被限流时用）。
+     * 顺序：Gitee API（权威、带 CORS）→ jsDelivr 的 tag 列表（不走 CDN 缓存，最新）→ 文件镜像。
      * 之所以要兜底：Gitee 的 API 会 WAF 限流，一限就是一段时间，而「检查更新」是打开设置页就会跑的。
      */
     async function fetchLatestVersion() {
@@ -436,6 +453,11 @@ window.__ModuleLoader__.load({
         return versionFromFile(JSON.parse(text));
       } catch (error) {
         problems.push(`gitee api: ${error?.message || error}`);
+      }
+      try {
+        return versionFromTags(await (await fetchUpdateSource(UPDATE_TAGS_API)).json());
+      } catch (error) {
+        problems.push(`jsdelivr tags: ${error?.message || error}`);
       }
       for (const url of UPDATE_MIRROR_FILES) {
         try {

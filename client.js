@@ -268,6 +268,7 @@ window.__ModuleLoader__.load({
     const UPDATE_FILE_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json`;
     const PLUGIN_PACKAGE = "metaontic-video";
     const UPDATE_SPEC = "git+https://gitee.com/hackloop/metaontic-video.git";
+    const UPDATE_TAGS_API = "https://data.jsdelivr.com/v1/packages/gh/wxsimon2022/metaontic-video";
     const UPDATE_MIRROR_FILES = [
       "https://fastly.jsdelivr.net/gh/wxsimon2022/metaontic-video@master/package.json",
       "https://gcore.jsdelivr.net/gh/wxsimon2022/metaontic-video@master/package.json"
@@ -349,6 +350,17 @@ window.__ModuleLoader__.load({
       if (!version) throw new Error("no version");
       return version;
     }
+    function versionFromTags(body) {
+      const versions = Array.isArray(body?.versions) ? body.versions : [];
+      let best = "";
+      for (const entry of versions) {
+        const version = String(entry && entry.version || "").trim().replace(/^v/i, "");
+        if (!/^\d+\.\d+\.\d+$/.test(version)) continue;
+        if (!best || isNewerVersion(version, best)) best = version;
+      }
+      if (!best) throw new Error("no tags");
+      return best;
+    }
     async function fetchLatestVersion() {
       const problems = [];
       try {
@@ -358,6 +370,11 @@ window.__ModuleLoader__.load({
         return versionFromFile(JSON.parse(text));
       } catch (error) {
         problems.push(`gitee api: ${error?.message || error}`);
+      }
+      try {
+        return versionFromTags(await (await fetchUpdateSource(UPDATE_TAGS_API)).json());
+      } catch (error) {
+        problems.push(`jsdelivr tags: ${error?.message || error}`);
       }
       for (const url of UPDATE_MIRROR_FILES) {
         try {
