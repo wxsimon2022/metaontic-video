@@ -16,6 +16,8 @@ window.__ModuleLoader__.load({
       mergeModeSeamless: "\u65E0\u7F1D\u62FC\u63A5\uFF08\u5BF9\u9F50\u63A5\u7F1D\uFF09",
       mergeModeCopy: "\u65E0\u635F\u62FC\u63A5",
       mergeModeReencode: "\u91CD\u7F16\u7801\u62FC\u63A5",
+      bgmFadeSeconds: "\u97F3\u4E50\u63A5\u7F1D\u6DE1\u5316\uFF08\u79D2\uFF09",
+      bgmFadeSecondsHint: "\u7EED\u62CD\u6BB5\u7684\u80CC\u666F\u97F3\u4E50\u4F1A\u4ECE\u5934\u518D\u6765\uFF0C\u8FD9\u91CC\u628A\u63A5\u7F1D\u4E24\u4FA7\u7684\u97F3\u9891\u5355\u72EC\u6DE1\u5316\u8FD9\u4E48\u4E45\uFF08\u9ED8\u8BA4 0.8\uFF0C\u8BBE 0 \u5173\u95ED\uFF09\uFF1B\u753B\u9762\u6DE1\u5316\u4ECD\u662F 0.25 \u79D2\uFF0C\u4E0D\u4F1A\u770B\u51FA\u8F6C\u573A\u3002",
       outputDir: "\u8F93\u51FA\u76EE\u5F55",
       keepSegments: "\u4FDD\u7559\u5206\u6BB5",
       ffmpegBinary: "ffmpeg \u8DEF\u5F84",
@@ -131,6 +133,8 @@ window.__ModuleLoader__.load({
       mergeModeSeamless: "Seamless (match junctions)",
       mergeModeCopy: "Stream copy",
       mergeModeReencode: "Re-encode",
+      bgmFadeSeconds: "Music seam cross-fade (s)",
+      bgmFadeSecondsHint: "Each segment gets its own soundtrack, so the music restarts at the junction. Audio is cross-faded for this long (default 0.8; 0 disables). The picture fade stays at 0.25s, so it never looks like a transition.",
       outputDir: "Output directory",
       keepSegments: "Keep segments",
       ffmpegBinary: "ffmpeg path",
@@ -232,7 +236,7 @@ window.__ModuleLoader__.load({
     };
     const SECTIONS = [
       { key: "sectionGeneration", fields: ["model", "mode", "ratio", "generateAudio", "watermark"] },
-      { key: "sectionMerge", fields: ["mergeMode", "outputDir", "keepSegments"] },
+      { key: "sectionMerge", fields: ["mergeMode", "bgmFadeSeconds", "outputDir", "keepSegments"] },
       { key: "sectionAdvanced", fields: ["extraParams", "pollIntervalMs", "maxWaitMs", "ffmpegBinary", "ffprobeBinary"] }
     ];
     const FIELDS = [
@@ -243,6 +247,7 @@ window.__ModuleLoader__.load({
       { key: "generateAudio", kind: "switch" },
       { key: "watermark", kind: "switch" },
       { key: "mergeMode", kind: "select" },
+      { key: "bgmFadeSeconds", kind: "number" },
       { key: "outputDir", kind: "text" },
       { key: "keepSegments", kind: "switch" },
       { key: "extraParams", kind: "text" },
@@ -278,7 +283,7 @@ window.__ModuleLoader__.load({
     const UPDATE_ATTEMPTS = 3;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "2.11.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "2.12.0".trim().replace(/^v/i, "") : "";
     function currentOs() {
       const nav = window.navigator || {};
       const raw = String(
@@ -1020,7 +1025,10 @@ window.__ModuleLoader__.load({
             )
           });
         }
-        const hints = { model: t("modelHint") };
+        const hints = {
+          model: t("modelHint"),
+          bgmFadeSeconds: t("bgmFadeSecondsHint")
+        };
         function fieldCell(field) {
           const classes = ["mov-field"];
           if (field.kind === "switch") classes.push("mov-field-switch");

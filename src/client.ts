@@ -35,6 +35,9 @@ window.__ModuleLoader__.load({
       mergeModeSeamless: '无缝拼接（对齐接缝）',
       mergeModeCopy: '无损拼接',
       mergeModeReencode: '重编码拼接',
+      bgmFadeSeconds: '音乐接缝淡化（秒）',
+      bgmFadeSecondsHint: '续拍段的背景音乐会从头再来，这里把接缝两侧的音频单独淡化这么久（默认 0.8，'
+        + '设 0 关闭）；画面淡化仍是 0.25 秒，不会看出转场。',
       outputDir: '输出目录',
       keepSegments: '保留分段',
       ffmpegBinary: 'ffmpeg 路径',
@@ -154,6 +157,9 @@ window.__ModuleLoader__.load({
       mergeModeSeamless: 'Seamless (match junctions)',
       mergeModeCopy: 'Stream copy',
       mergeModeReencode: 'Re-encode',
+      bgmFadeSeconds: 'Music seam cross-fade (s)',
+      bgmFadeSecondsHint: 'Each segment gets its own soundtrack, so the music restarts at the junction. '
+        + 'Audio is cross-faded for this long (default 0.8; 0 disables). The picture fade stays at 0.25s, so it never looks like a transition.',
       outputDir: 'Output directory',
       keepSegments: 'Keep segments',
       ffmpegBinary: 'ffmpeg path',
@@ -274,7 +280,7 @@ window.__ModuleLoader__.load({
     // 只有「上游对卡满 15 秒的延长段敏感」这种少数情况才需要改成 14。
     const SECTIONS = [
       { key: 'sectionGeneration', fields: ['model', 'mode', 'ratio', 'generateAudio', 'watermark'] },
-      { key: 'sectionMerge', fields: ['mergeMode', 'outputDir', 'keepSegments'] },
+      { key: 'sectionMerge', fields: ['mergeMode', 'bgmFadeSeconds', 'outputDir', 'keepSegments'] },
       { key: 'sectionAdvanced', fields: ['extraParams', 'pollIntervalMs', 'maxWaitMs', 'ffmpegBinary', 'ffprobeBinary'] },
     ];
     const FIELDS = [
@@ -285,6 +291,7 @@ window.__ModuleLoader__.load({
       { key: 'generateAudio', kind: 'switch' },
       { key: 'watermark', kind: 'switch' },
       { key: 'mergeMode', kind: 'select' },
+      { key: 'bgmFadeSeconds', kind: 'number' },
       { key: 'outputDir', kind: 'text' },
       { key: 'keepSegments', kind: 'switch' },
       { key: 'extraParams', kind: 'text' },
@@ -1235,7 +1242,10 @@ window.__ModuleLoader__.load({
         }
 
         // 少数需要解释的字段：模型选哪个（mini 便宜 / fast 贵一些）
-        const hints = { model: t('modelHint') };
+        const hints = {
+          model: t('modelHint'),
+          bgmFadeSeconds: t('bgmFadeSecondsHint'),
+        };
 
         /** 一个可编辑字段：标签 + 控件（开关自带标签，就不重复画）。 */
         function fieldCell(field) {

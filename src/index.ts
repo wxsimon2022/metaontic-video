@@ -33,7 +33,7 @@
  */
 import { spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
-import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
@@ -123,6 +123,14 @@ export const Config = z.object({
     .description(
       '合并方式：seamless=把后段对到前段结尾的亮度/音量，再用短交叉淡化接上（默认，接缝看不出换段）；'
       + 'copy=无损拼接（快，但接缝是硬切，两次生成的色调会差 2-3 级）；reencode=统一重编码',
+    )
+    .volatile(),
+  bgmFadeSeconds: z.number().min(0).max(3)
+    .default(0.8)
+    .description(
+      '合并时音频接缝的交叉淡化秒数（0-3，默认 0.8，0=关）：'
+      + '上游每段是各自生成的，续拍段的背景音乐会从头再来，0.25 秒的画面淡化盖不住；'
+      + '音频单独拉长淡化盖住音乐重启，画面淡化仍是 0.25 秒（不至于看起来像转场）。',
     )
     .volatile(),
   outputDir: z.string()
@@ -430,7 +438,10 @@ function buildExtensionPrompt({
       + '不渐暗渐亮、不改变景深、不重建背景；'
       // 两次生成是各自曝光的：不写死这条，接缝处常整体偏暗 2-3 级，看起来像换了一段
       + '整段亮度与色调必须与视频1' + (forward ? '开头' : '结尾') + '一致，不要整体压暗或偏色。',
-    '【声音延续】保持对白、环境声与背景音乐连续，每句台词完整说完，不添加片头片尾、不复述已说台词。',
+    '【声音延续】对白、环境声与背景音乐都接着视频1' + (forward ? '开头' : '结尾') + '往下走：'
+      + '背景音乐沿用视频1里的同一首曲子、同一段落、同一进度继续播放，'
+      + '禁止从头播放、禁止换曲、禁止重新起奏、禁止加淡入或片头；'
+      + '环境声保持同一环境、同一底噪；每句台词完整说完，不添加片头片尾、不复述已说台词。',
     transition,
     '本段明确指定的运镜和切镜优先，上面的衔接建议不得覆盖已确认的镜头安排。',
   ].join('\n');
@@ -689,6 +700,66 @@ async function fitImageToCanvas(absPath, size, config, signal) {
   return absPath;
 }
 
+/** 用户说「我刚上传的那张图」时的简写：latest / latest:2（第 2 新的）等。 */
+const UPLOAD_ALIAS_PATTERN = /^(?:latest|newest|recent|最近上传(?:的图片)?|最新上传(?:的图片)?|刚上传(?:的图片)?|最新图片|刚拖进来的图片)$/i;
+/** 「最近上传」只看这个时间窗内的附件：窗口太长容易挑到无关的旧图。 */
+const UPLOAD_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+/** DSH 主目录（`DSH_HOME`，默认 `~/.dsh`）。 */
+function dshHome() {
+  const fromEnv = String((typeof process !== 'undefined' && process.env?.DSH_HOME) || '').trim();
+  return fromEnv || path.join(os.homedir(), '.dsh');
+}
+
+/** Harness 的对话附件库：内容寻址存的是原始图片字节（无扩展名）。 */
+function attachmentObjectsDir() {
+  return path.join(dshHome(), 'attachments', 'v1', 'objects');
+}
+
+/** 只读文件头认图片，附件库里的对象没有扩展名，只能靠文件头。 */
+async function sniffFileImage(file) {
+  let handle;
+  try {
+    handle = await open(file, 'r');
+    const head = Buffer.alloc(32);
+    const { bytesRead } = await handle.read(head, 0, head.length, 0);
+    return sniffImageMime(head.subarray(0, bytesRead));
+  } catch {
+    return null;
+  } finally {
+    await handle?.close().catch(() => {});
+  }
+}
+
+/**
+ * 找出用户在对话里最近上传的图片，按上传时间从新到旧排。
+ *
+ * 用户把图片拖进对话框时，Harness 会先把原始字节收进附件库
+ * （`$DSH_HOME/attachments/v1/objects/<xx>/<sha256>`）——**即使当前模型不支持图片、
+ * 消息被 `MODEL_DOES_NOT_SUPPORT_IMAGES` 拦下来，文件也已经落盘了**。
+ * 所以插件可以直接按时间从这里面取图，用户不必再自己找路径：模型看不看得见图都不影响出片。
+ */
+async function findRecentUploadedImages(windowMs = UPLOAD_WINDOW_MS) {
+  const root = attachmentObjectsDir();
+  const shards = await readdir(root, { withFileTypes: true }).catch(() => []);
+  const cutoff = Date.now() - windowMs;
+  const found = [];
+  for (const shard of shards) {
+    if (!shard.isDirectory()) continue;
+    const dir = path.join(root, shard.name);
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      const abs = path.join(dir, entry.name);
+      const info = await stat(abs).catch(() => null);
+      if (!info || info.mtimeMs < cutoff) continue;
+      const mime = await sniffFileImage(abs);
+      if (mime) found.push({ abs, mime, bytes: info.size, mtimeMs: info.mtimeMs });
+    }
+  }
+  return found.sort((a, b) => b.mtimeMs - a.mtimeMs);
+}
+
 /**
  * 报错里回显用户输入时截断：base64 动辄几十万字符，原样带进错误信息会把结果撑爆。
  */
@@ -743,26 +814,60 @@ async function resolveImageInput(value, label, fit = null) {
   const inlined = inlineBase64Image(raw, label);
   if (inlined) return inlined;
 
-  const abs = path.resolve(raw.startsWith('~/') || raw === '~' ? path.join(os.homedir(), raw.slice(1)) : raw);
-  const ext = path.extname(abs).toLowerCase();
-  if (!IMAGE_EXT_TO_MIME[ext]) {
-    throw new Error(
-      `${label} 既不是 http(s) 链接、base64，也不是支持的图片文件：${brief(raw)}。`
-      + `本机图片请用 ${Object.keys(IMAGE_EXT_TO_MIME).join(' / ')} 之一。`,
-    );
+  let abs;
+  let info;
+  let upload = null;
+  // 「我刚上传的那张图」：latest / latest:2（第 2 新的）/ 最近上传 等简写
+  const aliasParts = /^([^\s:]+)(?::(\d+))?$/.exec(raw);
+  const aliasName = aliasParts ? aliasParts[1] : '';
+  const uploadIndex = aliasParts && aliasParts[2] ? Math.max(1, Number(aliasParts[2])) : 1;
+  if (UPLOAD_ALIAS_PATTERN.test(aliasName)) {
+    const index = uploadIndex;
+    const uploads = await findRecentUploadedImages();
+    const picked = uploads[index - 1];
+    if (!picked) {
+      throw new Error(
+        `${label} 写的是「最近上传的图片」${index > 1 ? `（第 ${index} 新）` : ''}，但 Harness 附件库里`
+        + `最近 ${UPLOAD_WINDOW_MS / 3600000} 小时只有 ${uploads.length} 张图片，取不到。`
+        + '请直接把图片路径或公网 URL 发过来。',
+      );
+    }
+    abs = picked.abs;
+    info = { size: picked.bytes };
+    upload = {
+      uploadedAt: new Date(picked.mtimeMs).toISOString(),
+      recentUploads: uploads.length,
+      uploadIndex: index,
+    };
+  } else {
+    abs = path.resolve(raw.startsWith('~/') || raw === '~' ? path.join(os.homedir(), raw.slice(1)) : raw);
+    const ext = path.extname(abs).toLowerCase();
+    if (!IMAGE_EXT_TO_MIME[ext]) {
+      throw new Error(
+        `${label} 既不是 http(s) 链接、base64，也不是支持的图片文件：${brief(raw)}。`
+        + `本机图片请用 ${Object.keys(IMAGE_EXT_TO_MIME).join(' / ')} 之一，`
+        + '用户刚在对话里上传的图直接写 latest。',
+      );
+    }
+    info = await stat(abs).catch(() => null);
+    if (!info?.isFile()) {
+      throw new Error(`${label} 找不到文件：${abs}（用户刚在对话里上传的图可以直接写 latest）`);
+    }
   }
-  const info = await stat(abs).catch(() => null);
-  if (!info?.isFile()) throw new Error(`${label} 找不到文件：${abs}`);
 
   // 先适配画幅，再按「真正要发出去的那张图」做大小与格式校验
   const submitPath = fit?.size
     ? await fitImageToCanvas(abs, fit.size, fit.config, fit.signal)
     : abs;
-  const submitInfo = submitPath === abs ? info : await stat(submitPath).catch(() => null);
-  if (!submitInfo?.isFile()) throw new Error(`${label} 读不出来：${abs}`);
-  if (submitInfo.size > MAX_IMAGE_BYTES) {
+  let size = info.size;
+  if (submitPath !== abs) {
+    const fittedInfo = await stat(submitPath).catch(() => null);
+    if (!fittedInfo?.isFile()) throw new Error(`${label} 读不出来：${abs}`);
+    size = fittedInfo.size;
+  }
+  if (size > MAX_IMAGE_BYTES) {
     throw new Error(
-      `${label} 太大（${(submitInfo.size / 1048576).toFixed(1)} MB），请压到 `
+      `${label} 太大（${(size / 1048576).toFixed(1)} MB），请压到 `
       + `${MAX_IMAGE_BYTES / 1048576} MB 以内再传：${abs}`,
     );
   }
@@ -771,9 +876,10 @@ async function resolveImageInput(value, label, fit = null) {
   if (!mime) throw new Error(`${label} 不是有效的图片文件（读到的内容不是 jpg/png/webp/bmp/gif/tiff）：${abs}`);
   const resolved: Record<string, unknown> = {
     url: `data:${mime};base64,${buffer.toString('base64')}`,
-    source: 'file',
+    source: upload ? 'upload' : 'file',
     localPath: submitPath,
     bytes: buffer.length,
+    ...(upload || {}),
   };
   if (submitPath !== abs) {
     resolved.originalPath = abs;
@@ -1238,6 +1344,11 @@ const AUDIO_PADDING_TOLERANCE_FRAMES = 1;
  * 接缝交叉淡化的时长（秒）：够盖住两次生成之间的微小差异，又不至于看起来像“转场”。
  */
 const SEAM_FADE_SECONDS = 0.25;
+/**
+ * 音频接缝的默认淡化时长（秒）：画面 0.25 秒够用，但续拍段的背景音乐是重新起奏的，
+ * 0.25 秒盖不住「音乐从头开始」；音频单独拉长到 0.8 秒（配置项 `bgmFadeSeconds`）。
+ */
+const BGM_FADE_SECONDS = 0.8;
 /** 量接缝两侧水平的取样窗口（秒）：太短会被单帧噪声带偏，太长会把整段色调带进来。 */
 const SEAM_WINDOW_SECONDS = 0.5;
 /** 接缝补正的上下限：数据异常时兜底，避免把画面整体提亮/削暗、音量抬爆。 */
@@ -1329,8 +1440,9 @@ async function measureSeams(config, files, durations, { signal, binary }) {
  * 无缝合并：分段是两次独立生成，实测接缝处画面会暗 2-3 级、音量小 1 dB 左右，
  * 直接 concat 就是一次硬切，看起来像「另拍一段贴上去」，而不是接着往下演。
  *
- * 这里做两件事：按接缝实测值把后段整段对齐（亮度用 `lut=y=val+Δ`，实测 `eq` 在小偏移上会取整出错），
- * 再用 xfade + acrossfade 做 0.25 秒交叉淡化盖住切口。
+ * 这里做三件事：按接缝实测值把后段整段对齐（亮度用 `lut=y=val+Δ`，实测 `eq` 在小偏移上会取整出错），
+ * 画面用 xfade 做 0.25 秒交叉淡化盖住切口，音频再用 acrossfade 做更长的淡化——
+ * 续拍段的背景音乐是重新起奏的（见 `bgmFadeSeconds`），画面淡化盖不住音乐重启。
  * @returns 合并结果；任何一步不适合做无缝（分段太短、量不到数据）就返回 null 交给调用方回退。
  */
 async function mergeClipsSeamless(config, files, probed, outPath, { signal, binary }) {
@@ -1343,6 +1455,16 @@ async function mergeClipsSeamless(config, files, probed, outPath, { signal, bina
   // xfade 的偏移必须为正：整体时长比淡化时长短时根本放不下过渡。
   const fade = Number(Math.min(SEAM_FADE_SECONDS, shortest / 4).toFixed(3));
   if (!(fade >= 0.05)) return null;
+  // 上游每段各自配乐：续拍段的背景音乐常从头再来，0.25 秒的音频淡化盖不住音乐重启，
+  // 所以音频单独用更长的淡化（默认 0.8 秒），画面仍用 fade，避免看起来像转场。
+  const bgmFade = clampNumber(Number(ref(config, 'bgmFadeSeconds', BGM_FADE_SECONDS)) || 0, 0, 3);
+  const audioFade = bgmFade > 0
+    ? Number(Math.min(Math.max(bgmFade, fade), shortest / 3).toFixed(3))
+    : fade;
+  // 音频和视频的淡化时长不同会长短不一：按视频的总时长把音频补齐/裁齐，避免尾部对不上。
+  const videoTotal = Number(
+    (durations.reduce((sum, value) => sum + value, 0) - (files.length - 1) * fade).toFixed(3),
+  );
 
   const seams = await measureSeams(config, files, durations, { signal, binary });
   const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
@@ -1387,10 +1509,19 @@ async function mergeClipsSeamless(config, files, probed, outPath, { signal, bina
     lastVideo = outVideo;
     if (withAudio) {
       const outAudio = `[y${index}]`;
-      audioChain.push(`${lastAudio}[a${index}]acrossfade=d=${fade}:c1=tri:c2=tri${outAudio}`);
+      audioChain.push(`${lastAudio}[a${index}]acrossfade=d=${audioFade}:c1=tri:c2=tri${outAudio}`);
       lastAudio = outAudio;
     }
     offset += durations[index] - fade;
+  }
+  if (withAudio) {
+    // acrossfade 会把两端叠在一起，音频总长比视频短 (段数-1) × (audioFade - fade)；
+    // 尾部补静音再裁到视频总长，两条轨就等长，不会在片尾留下画面缺失或静音尾巴。
+    const outAudio = '[afinal]';
+    audioChain.push(
+      `${lastAudio}apad=whole_dur=${videoTotal},atrim=0:${videoTotal},asetpts=PTS-STARTPTS${outAudio}`,
+    );
+    lastAudio = outAudio;
   }
 
   const filter = [
@@ -1415,7 +1546,7 @@ async function mergeClipsSeamless(config, files, probed, outPath, { signal, bina
     await rm(outPath, { force: true });
     return { path: null, mode: 'seamless', seams, error: String(stderr).trim().slice(-400) };
   }
-  return { path: outPath, mode: 'seamless', seams, fade };
+  return { path: outPath, mode: 'seamless', seams, fade, audioFade };
 }
 
 /**
@@ -1502,7 +1633,10 @@ async function mergeClips(config, files: string[], outPath: string, { signal }: 
     if (mergeMode === 'seamless' && files.length > 1) {
       const seamless = await mergeClipsSeamless(config, files, probed, outPath, { signal, binary });
       if (seamless?.path) {
-        return { path: seamless.path, mode: 'seamless', trimmed, seams: seamless.seams, fade: seamless.fade };
+        return {
+          path: seamless.path, mode: 'seamless', trimmed,
+          seams: seamless.seams, fade: seamless.fade, audioFade: seamless.audioFade,
+        };
       }
       if (seamless?.error) copyError = seamless.error;
     }
@@ -2368,7 +2502,8 @@ function extendTool(config) {
       + '保持人物、服装、场景光线和声音连续；可一次连续延长多段，每段都用上一段的结果继续延长。'
       + '提示词规则：以「向后延长视频1」或「向前延长视频1」开头（也可写「生成视频1之后的内容：」），'
       + '全程用「视频1」指代输入素材，不要写成「参考视频1」（会被当成参考生视频，不是延长）；'
-      + '内容写清延长方向、剧情发展、主体状态、镜头运动和声音延续，减少接缝。'
+      + '内容写清延长方向、剧情发展、主体状态、镜头运动和声音延续'
+      + '（背景音乐要接着视频1结尾往下走，禁止从头播放/换曲），减少接缝。'
       + '每段 4-15 秒，默认按 15 秒上限拆、段数最少；上游对卡满 15 秒敏感时再调小。'
       + '返回每段的任务 ID 和最终视频下载链接（约 24 小时内有效）；生成通常需要几分钟，'
       + '单次调用返回 timeout、或某段返回 unknown（查询失败、任务其实已提交）时，'
@@ -2620,7 +2755,9 @@ function renderVideoResult(value) {
         ? '无损拼接'
         : (mergeMode === 'single'
           ? '一段直出，无需拼接'
-          : (mergeMode === 'seamless' ? '无缝拼接（对齐接缝 + 交叉淡化）' : '重编码拼接'));
+          : (mergeMode === 'seamless'
+            ? '无缝拼接（对齐接缝 + 画面/音频交叉淡化，音乐接缝已淡化）'
+            : '重编码拼接'));
       parts.push(`成片（本地文件）：${videoPath}（${how}）`);
     } else if (segmentsDir) {
       parts.push(`没有合并成一条：分段文件都在 ${segmentsDir}（每段路径见上面的列表）。`);
@@ -2662,11 +2799,14 @@ function videoTool(config, deps) {
       + '同意就用终端工具装上（宿主会让他确认）并 `ffmpeg -version` 验证，然后按同样的 duration 重发；'
       + '用户不想装就带 merge:false 重发，插件只返回分段列表（每段上游链接 + 本地文件）。'
       + '拿到 ffmpegMissing=true 的结果时也要照 installHint 引导安装，别只丢一句「已跳过合并」。'
-      + '**人物形象 / 参考图**：公网图片 URL、base64（data URI 或纯 base64）、或用户上传的本地图片'
-      + '（对话里拖进来的文件、@ 引用的路径）都支持——'
-      + '要固定人物长相、服装、场景时传 referenceImages（一次只认第一张）；首帧 / 尾帧用 '
-      + 'firstFrameUrl / lastFrameUrl 传。公网 URL 直接交给中转站取图；本地图片由插件读进来'
-      + '（按 ratio 先适配画幅）内联成 image_url 发给中转站，用户不需要自己找图床。',
+      + '**人物形象 / 参考图**：公网图片 URL、base64（data URI 或纯 base64）、本机图片路径，'
+      + '或简写 `latest` 都支持——要固定人物长相、服装、场景时传 referenceImages（一次只认第一张）；'
+      + '首帧 / 尾帧用 firstFrameUrl / lastFrameUrl 传。公网 URL 直接交给中转站取图；本地图片由插件读进来'
+      + '（按 ratio 先适配画幅）内联成 image_url 发给中转站，用户不需要自己找图床。'
+      + '**用户说「就用我刚上传/刚拖进来的那张图」时直接传 `latest`**（`latest:2` 取第 2 新的）：'
+      + '插件会去 Harness 附件库里找最近 2 小时上传的图片——哪怕当前聊天模型不支持图片、'
+      + '附件被 `MODEL_DOES_NOT_SUPPORT_IMAGES` 拦下，图片本身也已经落盘，照样能用。'
+      + '别在这时说「我看不到图片」，也别让用户自己去找路径。',
     parameters: {
       type: 'object',
       properties: {
@@ -2697,8 +2837,8 @@ function videoTool(config, deps) {
           type: 'array',
           items: { type: 'string' },
           description:
-            '可选：人物形象 / 主体参考图（每项是公网 URL、base64（data URI 或纯 base64）或本机图片路径，'
-            + '对话里 @ 引用的上传文件也可以）。'
+            '可选：人物形象 / 主体参考图（每项是公网 URL、base64（data URI 或纯 base64）、本机图片路径，'
+            + '或 `latest` / `latest:2` 这种「用户最近上传的图片」简写）。'
             + '想把某个人的长相、发型、服装固定下来时用它，图片以 role=reference_image 传给上游。'
             + '上游一次只认一张，多给的会被忽略（要固定多个人物请先把他们合成到一张图里）。'
             + '本地图片单张不超过 8 MB，支持 jpg/jpeg/png/webp/bmp/gif/tiff。',
@@ -2881,6 +3021,8 @@ function videoTool(config, deps) {
           bytes: item.bytes,
           originalPath: item.originalPath,
           fittedTo: item.fittedTo,
+          uploadedAt: item.uploadedAt,
+          recentUploads: item.recentUploads,
         }));
       }
 
@@ -3356,7 +3498,7 @@ const CONFIG_FIELDS = [
   'duration', 'singleMaxSeconds', 'mode', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'pollErrorRetries',
-  'mergeMode', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary',
+  'mergeMode', 'bgmFadeSeconds', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary',
   'registerEmail', 'registerApi', 'deviceId', 'estimateGroupRatio',
 ];
 
@@ -3416,7 +3558,8 @@ function configTool(config, settings) {
     description:
       '读取或修改 MetaOnticVideo 插件自己的配置（baseUrl、submitPath、queryPath、model、'
       + 'duration、singleMaxSeconds、mode、ratio、generateAudio、'
-      + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、outputDir、keepSegments、'
+      + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、bgmFadeSeconds、'
+      + 'outputDir、keepSegments、'
       + 'ffmpegBinary、ffprobeBinary、registerEmail、registerApi、estimateGroupRatio）。'
       + 'apiKey 只能由设置页「登录」时服务端下发，这里只能看、不能改；'
       + '用户要换 Key 就让他去插件详情页点「登录」。'
@@ -3579,7 +3722,8 @@ function buildPromptGuidance(config) {
       + `${MAX_TOTAL_SECONDS} 秒生成并说明这是插件当前的上限，不要反复加大 duration；`
       + '成片默认落在会话工作目录下的 metaontic-video/。',
     '· 给已有视频接长用 video_extend，输入必须是公网 URL；提示词以「向后延长视频1」或「向前延长视频1」开头，'
-      + '全程用「视频1」指代素材，不要写「参考视频1」；写清延长方向、剧情发展、主体状态、镜头运动、声音延续；'
+      + '全程用「视频1」指代素材，不要写「参考视频1」；写清延长方向、剧情发展、主体状态、镜头运动、'
+      + '声音延续（背景音乐接在视频1结尾处、不要从头播放，环境声和对白也要连续）；'
       + '每段 4-15 秒，默认按上限拆、段数最少。',
     '· 生成通常要几分钟：单次调用返回 timeout 不等于失败，用 video_status 加 taskId 继续查'
       + '（上游链接约 24 小时内有效），不要重复提交同一段。',
