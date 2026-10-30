@@ -283,7 +283,7 @@ window.__ModuleLoader__.load({
     const UPDATE_ATTEMPTS = 3;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "2.14.1".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "2.14.2".trim().replace(/^v/i, "") : "";
     function currentOs() {
       const nav = window.navigator || {};
       const raw = String(

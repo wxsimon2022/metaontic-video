@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "2.14.1",
+  "version": "2.14.2",
   "description": "DeepSeek Harness video generation plugin: say what you want and get a finished clip — up to 15 seconds in one shot, longer videos are generated shot by shot and merged seamlessly into a single file with ffmpeg, right on your machine. Extend a clip you already have (forwards or backwards), check/install the ffmpeg it needs, and watch progress by task id. Ships the video_generate / video_extend / video_status / video_setup / video_config tools, an in-app settings page with email login and live quota/usage, and a built-in \"video director\" agent preset (script first, human approval before spending). Works through a New API relay.",
   "license": "MIT",
   "type": "module",

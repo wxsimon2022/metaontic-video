@@ -441,15 +441,16 @@ function buildExtensionPrompt({
       ? '本段收尾的人物面貌、体型、服装、姿态、手部位置和动作阶段必须能直接接到视频1第一帧；'
       : '沿用视频1结尾的人物面貌、体型、服装、姿态、手部位置和动作阶段；')
       + '同一角色保持音色、口音、语速和当前情绪，不换人、不换装，不改变年龄与外貌特征。',
-    '【镜头运动】保持视频1' + (forward ? '开头的' : '结尾的')
-      + '机位、景别、焦段、运镜方向与速度，锁定曝光、白平衡、光源方向和背景布局，'
-      + '不渐暗渐亮、不改变景深、不重建背景；'
+    '【镜头运动】在接缝处匹配视频1' + (forward ? '开头的' : '结尾的')
+      + '机位、景别、焦段、运镜方向与速度；接缝之外按本段脚本自然运镜或切镜。保持曝光、白平衡、光源方向和场景布局连贯，'
+      + '避免无剧情依据的亮度跳变或背景重建；'
       // 两次生成是各自曝光的：不写死这条，接缝处常整体偏暗 2-3 级，看起来像换了一段
       + '整段亮度与色调必须与视频1' + (forward ? '开头' : '结尾') + '一致，不要整体压暗或偏色。',
-    '【声音延续】对白、环境声与背景音乐都接着视频1' + (forward ? '开头' : '结尾') + '往下走：'
-      + '背景音乐沿用视频1里的同一首曲子、同一段落、同一进度继续播放，'
-      + '禁止从头播放、禁止换曲、禁止重新起奏、禁止加淡入或片头；'
-      + '环境声保持同一环境、同一底噪；每句台词完整说完，不添加片头片尾、不复述已说台词。',
+    '【声音延续】' + (forward
+      ? '本段声音在结尾自然衔接视频1开头，台词只讲前置剧情。'
+      : '本段声音接续视频1结尾，台词只讲后续剧情。')
+      + '保持角色音色与环境底噪一致，每句台词完整说完，不复述原台词。'
+      + '原视频有配乐时保持曲目与节奏连贯；原视频无配乐时不新增配乐。',
     transition,
     '本段明确指定的运镜和切镜优先，上面的衔接建议不得覆盖已确认的镜头安排。',
   ].join('\n');
@@ -605,7 +606,7 @@ function buildGenerationPrompt({ prompt, seconds }) {
     `生成 ${seconds} 秒视频。${prompt}`
     + '保持人物面貌、体型、服装和音色一致，场景光线、色调与镜头运动连贯；'
     + '每句台词完整说完，环境声与背景音乐连续；'
-    + '不要片头片尾、不要字幕、不要水印，不从画面外侧重新入场。'
+    + '未明确要求时不添加片头片尾、字幕、水印或背景音乐；动作与出入画按脚本执行。'
   );
 }
 
@@ -2538,6 +2539,8 @@ async function fetchDeviceQuota(config, signal) {
       reason: '插件里没有本机设备凭据（在设置页点一次「登录」会写进来，之后就能自动校验额度）',
     };
   }
+  const timeout = AbortSignal.timeout(15000);
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   try {
     const response = await fetch(`${api}/api/v1/register/quota`, {
       method: 'POST',
@@ -2548,7 +2551,7 @@ async function fetchDeviceQuota(config, signal) {
         ...(PLUGIN_VERSION ? { 'X-Plugin-Version': PLUGIN_VERSION } : {}),
       },
       body: JSON.stringify({ device_id: deviceId, device_secret: deviceSecret }),
-      ...(signal ? { signal } : {}),
+      signal: requestSignal,
     });
     const text = await response.text();
     let body: any = {};
@@ -2809,6 +2812,7 @@ async function relayRequest(
   const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   let response;
+  let text: string;
   try {
     response = await fetch(url, {
       method,
@@ -2819,6 +2823,7 @@ async function relayRequest(
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       signal: requestSignal,
     });
+    text = await response.text();
   } catch (error) {
     if (signal?.aborted) throw abortError();
     throw Object.assign(new Error(`中转站请求失败：${error?.message || error}`), {
@@ -2826,7 +2831,6 @@ async function relayRequest(
     });
   }
 
-  const text = await response.text();
   let data: any = {};
   if (text) {
     try {
@@ -2926,7 +2930,7 @@ async function waitForCompletion(config, taskId, signal): Promise<TaskResult> {
       if (!isRetryablePollError(failure)) {
         return {
           taskId,
-          status: 'failed',
+          status: 'unknown',
           errorCode: failure?.code || 'provider_poll_error',
           error: `任务已提交（${taskId}），查询返回失败：${failure?.message || failure}。`
             + '可用 video_status 按这个 ID 复查确认。',
@@ -4614,9 +4618,9 @@ function buildPromptGuidance(config) {
       + '脚本一改，两道确认全部作废，要重新走。用户说「直接生成」也要先走这两步，不要跳过。'
       + '给已有视频接长（video_extend）不需要脚本，但同样要先确认再调用。',
     `· 新视频用 video_generate，duration 传目标总秒数。**硬规则：总时长 ≤ ${singleMax} 秒（单段上限）的整条`
-      + '视频必须一次直出，禁止拆成多镜 / 多段 / 多次 video_generate 再拼接**——'
+      + '视频必须一次直出，默认一镜到底，禁止拆成多次 video_generate 再拼接**——'
       + `例如「15 秒」就是一次 15 秒，不许拆成 8+7；也不要为了「中间切一刀更好看」而分镜，`
-      + '分镜只在用户明确要求多镜时使用。'
+      + '用户明确要求切镜时，在同一次生成的提示词中安排镜头切换。'
       + '超过上限时（如 20 秒）会自动拆成首段 + 若干续拍段再合并——那是同一条视频往下续拍，不是多镜拼接。'
       + '所以「20 秒视频」直接传 duration=20，不用拆成多个任务，也不用跟用户解释「模型一次只能出 15 秒」；'
       + '**超过单段上限的成片是「循环迭代」的：每段生成完都会弹一次确认框问用户要不要继续，'
