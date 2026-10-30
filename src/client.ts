@@ -1025,7 +1025,7 @@ window.__ModuleLoader__.load({
         };
         // 上游 / 地址 / Key 现在由注册流程写入，页面上不让手填。
         // 只有「服务端下发的」才算配好：手改到配置里的 Key 拿不到额度、调用也会被拒，
-        // 这种情况要把注册区露出来，让用户点「激活」换回自己那把。
+        // 这种情况要把注册区露出来，让用户点「登录」换回自己那把。
         const serverIssuedKey = value.keyOrigin === 'register'
           || Boolean(value.deviceId && value.deviceSecret && value.registerEmail);
         const keyReady = Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;

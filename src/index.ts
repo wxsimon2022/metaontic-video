@@ -49,13 +49,13 @@ export const Config = z.object({
   apiKey: z.string()
     .default('')
     .description(
-      'API Key：只在设置页点「激活」时由服务端下发并直接写进配置，不支持手填、'
+      'API Key：只在设置页点「登录」时由服务端下发并直接写进配置，不支持手填、'
       + '也不读环境变量；手改这里的值会被拒绝调用',
     )
     .volatile(),
   keyOrigin: z.string()
     .default('')
-    .description("密钥来源标记：设置页「激活」成功后写入 'register'，插件只认服务端下发的 Key")
+    .description("密钥来源标记：设置页「登录」成功后写入 'register'，插件只认服务端下发的 Key")
     .volatile(),
   baseUrl: z.string()
     .default('')
@@ -94,7 +94,7 @@ export const Config = z.object({
     .volatile(),
   deviceId: z.string()
     .default('')
-    .description('本机设备标识：设置页点「激活」时写入，用来查这把 Key 的剩余额度')
+    .description('本机设备标识：设置页点「登录」时写入，用来查这把 Key 的剩余额度')
     .volatile(),
   deviceSecret: z.string()
     .default('')
@@ -198,7 +198,7 @@ const CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5;
 const DEFAULT_REGISTER_API = 'https://video.mybfs.cn';
 /** 服务端握手头的兜底值（与服务端 REGISTER_CLIENT_TOKEN 对齐）。 */
 const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
-/** 密钥来源标记：设置页「激活」成功后写进配置，表示这把 Key 是服务端下发的。 */
+/** 密钥来源标记：设置页「登录」成功后写进配置，表示这把 Key 是服务端下发的。 */
 const KEY_ORIGIN_REGISTER = 'register';
 /** 额度/汇率兜底：服务端会回真实值，只有拿不到时才用这两个。 */
 const DEFAULT_QUOTA_PER_UNIT = 500000;
@@ -296,7 +296,7 @@ function envValue(names) {
 }
 
 function resolveApiKey(config) {
-  // 只认配置里那一把——它只能由设置页「激活」时服务端下发写入，
+  // 只认配置里那一把——它只能由设置页「登录」时服务端下发写入，
   // 不读环境变量、也不认手填，避免用到没绑设备 / 没额度的野 Key。
   return String(ref(config, 'apiKey', '')).trim();
 }
@@ -304,8 +304,8 @@ function resolveApiKey(config) {
 /**
  * 这把 Key 是不是服务端下发的。
  *
- * 激活成功后设置页会写 keyOrigin=register；更早的版本没写这个标记，
- * 用「设备凭据 + 邮箱」兜底认出来（这两项也只有激活流程会写）。
+ * 登录成功后设置页会写 keyOrigin=register；更早的版本没写这个标记，
+ * 用「设备凭据 + 邮箱」兜底认出来（这两项也只有登录流程会写）。
  */
 function isServerIssuedKey(config) {
   if (String(ref(config, 'keyOrigin', '')).trim() === KEY_ORIGIN_REGISTER) return true;
@@ -364,20 +364,20 @@ function parseExtraParams(config) {
 function assertConfigured(config, apiKey) {
   if (!apiKey) {
     throw new Error(
-      '未配置 API Key：打开「插件 → 已安装插件 → MetaOnticVideo → 查看」，点「激活」领一把——'
+      '未配置 API Key：打开「插件 → 已安装插件 → MetaOnticVideo → 查看」，点「登录」领一把——'
       + '服务端会把 Key、上游地址和模型直接写进配置，不用手填。',
     );
   }
   if (!isServerIssuedKey(config)) {
     throw new Error(
-      '当前 apiKey 不是服务端下发的，插件拒绝调用：密钥只能在插件详情页点「激活」由服务端下发。'
-      + '同一个邮箱再激活一次会把原来那把还给你，不会多开一把。',
+      '当前 apiKey 不是服务端下发的，插件拒绝调用：密钥只能在插件详情页点「登录」由服务端下发。'
+      + '同一个邮箱再登录一次会把原来那把还给你，不会多开一把。',
     );
   }
   if (!resolveBaseUrl(config)) {
     throw new Error(
-      '未配置 baseUrl：正常由「激活」时服务端下发中转站地址；'
-      + '缺失时请重新激活，或检查设置页里的上游地址。',
+      '未配置 baseUrl：正常由「登录」时服务端下发中转站地址；'
+      + '缺失时请重新登录，或检查设置页里的上游地址。',
     );
   }
 }
@@ -1570,7 +1570,7 @@ async function fetchDeviceQuota(config, signal) {
   if (!deviceId || !deviceSecret) {
     return {
       status: 'unknown',
-      reason: '插件里没有本机设备凭据（在设置页点一次「激活」会写进来，之后就能自动校验额度）',
+      reason: '插件里没有本机设备凭据（在设置页点一次「登录」会写进来，之后就能自动校验额度）',
     };
   }
   try {
@@ -2852,7 +2852,7 @@ const CONFIG_FIELDS = [
 ];
 
 /**
- * 只读字段：密钥一律由服务端在「激活」时下发写入，页面和工具都不许改，
+ * 只读字段：密钥一律由服务端在「登录」时下发写入，页面和工具都不许改，
  * 免得手填一把没绑设备、查不到额度的 Key 出去瞎调。
  */
 const READ_ONLY_CONFIG_FIELDS = new Set(['apiKey', 'keyOrigin', 'deviceId', 'deviceSecret']);
@@ -2876,7 +2876,7 @@ function configView(config) {
       submitPath: resolveSubmitPath(config),
       queryPath: String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath,
       model: resolveModel(config),
-      // 密钥只有一种合法来源：设置页「激活」时服务端下发
+      // 密钥只有一种合法来源：设置页「登录」时服务端下发
       apiKeySource: ref(config, 'apiKey', '')
         ? (isServerIssuedKey(config) ? 'register' : 'unverified')
         : 'missing',
@@ -2909,8 +2909,8 @@ function configTool(config, settings) {
       + 'duration、singleMaxSeconds、mode、ratio、generateAudio、'
       + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、outputDir、keepSegments、'
       + 'ffmpegBinary、ffprobeBinary、registerEmail、registerApi、estimateGroupRatio）。'
-      + 'apiKey 只能由设置页「激活」时服务端下发，这里只能看、不能改；'
-      + '用户要换 Key 就让他去插件详情页点「激活」。'
+      + 'apiKey 只能由设置页「登录」时服务端下发，这里只能看、不能改；'
+      + '用户要换 Key 就让他去插件详情页点「登录」。'
       + '改动写进 profile 的 cordis.patch.yml，'
       + '宿主重载后生效。'
       + '用户说「把中转站地址/模型/时长改成 X」时用 action=set，看当前值用 action=get；'
@@ -2986,9 +2986,9 @@ function configTool(config, settings) {
           `生效值：baseUrl=${effective?.baseUrl} model=${effective?.model}`,
           `  submitPath=${effective?.submitPath}`,
           `  apiKey 来源：${{
-            register: '服务端下发（激活写入）',
-            unverified: '非服务端下发——调用会被拒绝，请到设置页点「激活」',
-            missing: '未配置——请到设置页点「激活」',
+            register: '服务端下发（登录写入）',
+            unverified: '非服务端下发——调用会被拒绝，请到设置页点「登录」',
+            missing: '未配置——请到设置页点「登录」',
           }[effective?.apiKeySource] || effective?.apiKeySource}`,
           patchPath ? `配置文件：${patchPath}` : '',
           patch && Object.keys(patch).length ? '改动会在宿主重载配置后生效。' : '',
@@ -3014,8 +3014,8 @@ function configTool(config, settings) {
       const readonly = Object.keys(args || {}).filter((key) => READ_ONLY_CONFIG_FIELDS.has(key));
       if (readonly.length) {
         throw new Error(
-          `${readonly.join('、')} 由服务端在「激活」时下发，不能手动改；`
-          + '要换 Key 请在「插件 → 已安装插件 → MetaOnticVideo → 查看」点「激活」重新领取。',
+          `${readonly.join('、')} 由服务端在「登录」时下发，不能手动改；`
+          + '要换 Key 请在「插件 → 已安装插件 → MetaOnticVideo → 查看」点「登录」重新领取。',
         );
       }
       const patch = {};
@@ -3063,8 +3063,8 @@ function buildPromptGuidance(config) {
       + 'install:true 才会真装；装命令会先给用户确认，装完自动验证。'
       + '用户说「帮我装 ffmpeg」时就用它，别自己拼命令行。',
     '· 换模型、时长等配置用 video_config（写进 profile，宿主重载后生效）；'
-      + '但 apiKey 例外：它只能由服务端在「激活」时下发，不要手填、也不要让用户手填，'
-      + '缺 Key 或提示「不是服务端下发的」时，就引导用户去插件详情页点「激活」。'
+      + '但 apiKey 例外：它只能由服务端在「登录」时下发，不要手填、也不要让用户手填，'
+      + '缺 Key 或提示「不是服务端下发的」时，就引导用户去插件详情页点「登录」。'
       + '长视频要在本机合并，需要 ffmpeg：本机没装时，插件会先把这次生成拦回来（不产生费用），'
       + '这时要在对话框里问用户「要不要授权我装 ffmpeg」——按返回的说明说清他的系统与命令，'
       + '用户同意就调用 video_setup（install:true）由插件来装（宿主会先让他确认那条命令），'
@@ -3072,7 +3072,7 @@ function buildPromptGuidance(config) {
       + '用户不想装就带 merge:false 重发，插件只返回分段列表（每段链接 + 本地文件），'
       + '结果里会带 ffmpegMissing=true 与 installHint，照它引导安装即可。',
     `· 当前配置：直出上限 ${singleMax} 秒、每段延长 ${segmentSeconds} 秒。`,
-    '· 没有 API Key：让用户在插件设置页点「激活」，用邮箱收验证码领一把（一个邮箱只发一把，'
+    '· 没有 API Key：让用户在插件设置页点「登录」，用邮箱收验证码领一把（一个邮箱只发一把，'
       + '默认额度 ¥0.01），成功后上游 / Key / 地址 / 模型会自动填好；'
       + '设置页还能看到这把 Key 的剩余 / 已用额度和最近几次出片的使用记录。',
   ].join('\n');
