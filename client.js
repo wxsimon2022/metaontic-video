@@ -1743,7 +1743,7 @@
       function estimatedVideoProgress(elapsed, succeeded) {
         if (succeeded) return 100;
         const seconds = Math.max(0, Number(elapsed) || 0);
-        return Math.min(99, Math.max(1, Math.floor(100 * (1 - Math.exp(-seconds / 75)))));
+        return Math.min(99, Math.max(1, Math.floor(seconds / 180 * 99)));
       }
       function VideoTaskProgress({ block = {}, toolName = "video_generate", callId }) {
         const done = "kind" in block;
@@ -1796,7 +1796,7 @@
             { key: "progress", className: `mov-task-track${!done ? " mov-task-active" : ""}`, role: "progressbar", "aria-label": "\u4F30\u7B97\u8FDB\u5EA6", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": progress },
             h("div", { className: "mov-task-fill", style: { width: `${progress}%`, background: failed ? TOKENS.error : void 0 } })
           ),
-          h("div", { key: "percent", className: "mov-task-note" }, `${progress}%${succeeded ? " \xB7 \u672C\u6B21\u751F\u6210\u5B8C\u6210" : " \xB7 \u4F30\u7B97\u8FDB\u5EA6\uFF0C\u672A\u6210\u529F\u6700\u591A99%"}${failed ? " \xB7 \u6267\u884C\u5931\u8D25\u6216\u5DF2\u505C\u6B62" : ""}`),
+          h("div", { key: "percent", className: "mov-task-note" }, `${progress}%${succeeded ? " \xB7 \u672C\u6B21\u751F\u6210\u5B8C\u6210" : " \xB7 \u4F30\u7B97\u8FDB\u5EA6"}${failed ? " \xB7 \u6267\u884C\u5931\u8D25\u6216\u5DF2\u505C\u6B62" : ""}`),
           !done ? h(
             "div",
             { key: "note", className: "mov-task-note" },

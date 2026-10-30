@@ -1973,7 +1973,8 @@ window.__ModuleLoader__.load({
     function estimatedVideoProgress(elapsed, succeeded) {
       if (succeeded) return 100;
       const seconds = Math.max(0, Number(elapsed) || 0);
-      return Math.min(99, Math.max(1, Math.floor(100 * (1 - Math.exp(-seconds / 75)))));
+      // 按三分钟匀速推进；实际结果返回前始终停在 99%。
+      return Math.min(99, Math.max(1, Math.floor(seconds / 180 * 99)));
     }
 
     /** 宿主工具卡片：仅消费实际运行状态，等待动画不代表百分比进度。 */
@@ -2024,7 +2025,7 @@ window.__ModuleLoader__.load({
         ]),
         h('div', { key: 'progress', className: `mov-task-track${!done ? ' mov-task-active' : ''}`, role: 'progressbar', 'aria-label': '估算进度', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': progress },
           h('div', { className: 'mov-task-fill', style: { width: `${progress}%`, background: failed ? TOKENS.error : undefined } })),
-        h('div', { key: 'percent', className: 'mov-task-note' }, `${progress}%${succeeded ? ' · 本次生成完成' : ' · 估算进度，未成功最多99%'}${failed ? ' · 执行失败或已停止' : ''}`),
+        h('div', { key: 'percent', className: 'mov-task-note' }, `${progress}%${succeeded ? ' · 本次生成完成' : ' · 估算进度'}${failed ? ' · 执行失败或已停止' : ''}`),
         !done ? h('div', { key: 'note', className: 'mov-task-note' },
           [
             h('span', { key: 'live', className: 'mov-task-live', 'aria-hidden': true }),
