@@ -179,6 +179,11 @@ const MAX_SEGMENT_SECONDS = 15;
 /** Seedance 单段最长 15 秒：不超过它一次直出，超过它才需要延长。 */
 const MAX_DIRECT_SECONDS = 15;
 /**
+ * 单条成片的目标时长上限：段数上限内排得出来的最长时长，先按 120 秒卡住。
+ * 段数越少接缝越少，但一条片子拖太长可用的质检/重跑余地也小，所以这里封顶 120 秒。
+ */
+const MAX_TOTAL_SECONDS = 120;
+/**
  * 分辨率写死 720P：中转站这条线路就按 720P 出货，开放给用户调只会
  * 选出一个和实际产出对不上的值（预估价、确认框也会跟着偏），所以不加配置项、
  * 也不接受工具入参——extraParams 里写 resolution 也会被这里覆盖掉。
@@ -513,6 +518,14 @@ function resolveSingleMax(config) {
 function resolveSegmentSeconds(config, requested = undefined) {
   const fallback = ref(config, 'duration', 5);
   return clampInteger(requested ?? fallback, MIN_SEGMENT_SECONDS, MAX_SEGMENT_SECONDS, fallback);
+}
+
+/**
+ * 本次配置能排出的最长时长：120 秒与「首段上限 + 每段上限 ×（最大段数-1）」取小。
+ * 注意用的是**本次每段秒数**：每段上限调小时，能排出的总长也跟着变短。
+ */
+function maxTargetSeconds(singleMax, segmentSeconds) {
+  return Math.min(MAX_TOTAL_SECONDS, singleMax + (MAX_SEGMENTS - 1) * segmentSeconds);
 }
 
 /**
@@ -1501,14 +1514,33 @@ function estimatePlan(config, toolName, args) {
     );
     return Array.from({ length: count }, () => ({ kind: 'extend', seconds }));
   }
+  return resolveTargetPlan(config, args).plan;
+}
+
+/**
+ * 本次调用的时长规划（估算与真正生成共用，保证确认框里的段数与实际执行一致）：
+ * 目标秒数先夹到「单条成片上限」内，再按单段上限 / 每段上限拆段。
+ * 上限之外的请求不会被静默砍掉——调用方把 `asked - total` 写进备注里告诉用户。
+ */
+function resolveTargetPlan(config, args) {
   const singleMax = resolveSingleMax(config);
-  const total = clampInteger(
+  const segmentSeconds = resolveSegmentSeconds(config, args?.segmentSeconds);
+  const cap = maxTargetSeconds(singleMax, segmentSeconds);
+  const asked = clampInteger(
     args?.duration ?? singleMax,
     MIN_SECONDS,
-    singleMax + (MAX_SEGMENTS - 1) * MAX_SEGMENT_SECONDS,
+    Number.MAX_SAFE_INTEGER,
     singleMax,
   );
-  return planVideoSegments(total, singleMax, resolveSegmentSeconds(config, args?.segmentSeconds));
+  const total = Math.min(asked, cap);
+  return {
+    plan: planVideoSegments(total, singleMax, segmentSeconds),
+    singleMax,
+    segmentSeconds,
+    cap,
+    asked,
+    total,
+  };
 }
 
 /**
@@ -2247,7 +2279,8 @@ function videoTool(config, deps) {
       + '不超过单段上限（默认 15 秒）时一次直出；'
       + '**硬规则：总时长 ≤ 单段上限的视频必须一次直出，禁止拆成多段 / 多镜 / 多次调用再拼接**'
       + '（例如「15 秒」不许拆成 8+7）；多镜只在用户明确要求多镜时才用。'
-      + '更长时先直出首段，再把剩余时长按 4-15 秒均分逐段续拍（默认吃满上限、段数最少）——'
+      + `更长时先直出首段，再把剩余时长按 4-15 秒均分逐段续拍（默认吃满上限、段数最少，最长 `
+      + `${MAX_TOTAL_SECONDS} 秒）——`
       + '这是同一个镜头的续拍延长，也不是多镜拼接，'
       + '最后用 ffmpeg 合并成一个本地成片文件，默认落在会话工作目录下的 metaontic-video/，'
       + '文件名形如 20261027-201530-25s.mp4。20 秒、25 秒这类目标不用拆成多个任务：'
@@ -2270,10 +2303,12 @@ function videoTool(config, deps) {
         duration: {
           type: 'integer',
           minimum: 4,
-          maximum: 285,
+          maximum: 120,
           description:
             '目标总时长（秒）。不超过单段上限（默认 15）时就一次直出（整条视频只生成一次，'
-            + '禁止拆成多段/多镜再拼）；超过就先直出上限长度再逐段延长，最后合并。',
+            + '禁止拆成多段/多镜再拼）；超过就先直出上限长度再逐段延长，最后合并。'
+            + `单条成片最长 ${MAX_TOTAL_SECONDS} 秒（最多 ${MAX_SEGMENTS} 段），更长的目标按 `
+            + `${MAX_TOTAL_SECONDS} 秒执行并在 note 里说明，不要反复重试更大的时长。`,
         },
         firstFrameUrl: {
           type: 'string',
@@ -2358,21 +2393,20 @@ function videoTool(config, deps) {
       const prompt = String(args?.prompt ?? '').trim();
       if (!prompt) throw new Error('提示词 prompt 不能为空。');
 
-      const singleMax = resolveSingleMax(config);
-      const segmentSeconds = resolveSegmentSeconds(config, args?.segmentSeconds);
-      const total = clampInteger(
-        args?.duration ?? singleMax,
-        MIN_SECONDS,
-        singleMax + (MAX_SEGMENTS - 1) * MAX_SEGMENT_SECONDS,
-        singleMax,
-      );
-      const plan = planVideoSegments(total, singleMax, segmentSeconds);
+      const { plan, singleMax, segmentSeconds, cap, asked, total } = resolveTargetPlan(config, args);
       const plannedTotal = plan.reduce((sum, step) => sum + step.seconds, 0);
 
       const notes = [];
+      if (asked > total) {
+        notes.push(
+          `目标 ${asked} 秒超过单条成片上限 ${cap} 秒（首段最长 ${singleMax} 秒 + 每段最多 `
+          + `${segmentSeconds} 秒 × ${MAX_SEGMENTS - 1}），本次按 ${total} 秒执行。`,
+        );
+      }
       if (plannedTotal < total) {
         notes.push(
-          `目标 ${total} 秒超过单次最多 ${MAX_SEGMENTS} 段的上限，本次按 ${plannedTotal} 秒执行。`,
+          `目标 ${total} 秒排不满（每段上限 ${segmentSeconds} 秒 × ${MAX_SEGMENTS} 段），`
+          + `本次按 ${plannedTotal} 秒执行。`,
         );
       } else if (plannedTotal > total) {
         notes.push(
@@ -2439,7 +2473,19 @@ function videoTool(config, deps) {
         error,
         errorCode,
       };
-      if (status !== 'succeeded' || !completed.length) return result;
+      // 只要有成功的分段就继续：中段 timeout、被审核挡掉这类失败，不该把前面已经花过钱、
+      // 已经生成好的分段一起扔掉——能下载就下载、能合成就合成，status 照旧如实报失败，
+      // 由 note 与 partial 标记说明「这是残片」。
+      if (!completed.length) return result;
+
+      const deliveredSeconds = completed.reduce((sum, segment) => sum + segment.seconds, 0);
+      if (status !== 'succeeded') {
+        notes.push(
+          `第 ${segments.length} 段没有成功（${status}），已把成功的 ${completed.length} 段`
+          + `（${deliveredSeconds} 秒）下载并合并交付，可作为残片使用。`,
+        );
+        result.partial = true;
+      }
 
       if (args?.merge === false) {
         result.note = [...notes, '按参数要求只返回上游链接，没有下载合并。'].join('\n');
@@ -2510,7 +2556,7 @@ function videoTool(config, deps) {
         return result;
       }
 
-      const finalPath = path.join(outDir, `${stamp}-${plannedTotal}s.mp4`);
+      const finalPath = path.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
       try {
         if (files.length === 1) {
           await rm(finalPath, { force: true });
@@ -3055,6 +3101,8 @@ function buildPromptGuidance(config) {
       + '分镜只在用户明确要求多镜时使用。'
       + '超过上限时（如 20 秒）会自动拆成首段 + 若干续拍段再合并——那是同一条视频往下续拍，不是多镜拼接。'
       + '所以「20 秒视频」直接传 duration=20，不用拆成多个任务，也不用跟用户解释「模型一次只能出 15 秒」；'
+      + `单条成片最长 ${MAX_TOTAL_SECONDS} 秒（最多 ${MAX_SEGMENTS} 段），用户要更长的就按 `
+      + `${MAX_TOTAL_SECONDS} 秒生成并说明这是插件当前的上限，不要反复加大 duration；`
       + '成片默认落在会话工作目录下的 metaontic-video/。',
     '· 给已有视频接长用 video_extend，输入必须是公网 URL；提示词以「向后延长视频1」或「向前延长视频1」开头，'
       + '全程用「视频1」指代素材，不要写「参考视频1」；写清延长方向、剧情发展、主体状态、镜头运动、声音延续；'
