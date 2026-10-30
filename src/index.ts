@@ -1939,14 +1939,39 @@ function resolveTargetPlan(config, args) {
 }
 
 /**
+ * 每段的预估用量（token / 美元）。全量估算和「还要生成几段」的确认框共用这一套价目，
+ * 两边算出来的数字才不会打架。
+ * @param steps - 每段要有 seconds / kind，以及 usesReference（是否带参考素材）。
+ */
+function estimateSteps(config, steps) {
+  const resolution = FIXED_RESOLUTION;
+  const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS[FIXED_RESOLUTION];
+  const tokensPerSecond = (pixels[0] * pixels[1] * ESTIMATE_FPS) / ESTIMATE_TOKEN_DIVISOR;
+  const model = resolveModel(config);
+  return {
+    model,
+    resolution,
+    segments: steps.map((step, index) => {
+      const usesReference = step.usesReference === true;
+      const tokens = Math.round(tokensPerSecond * step.seconds);
+      return {
+        index: index + 1,
+        kind: step.kind,
+        seconds: step.seconds,
+        tokens,
+        usesReference,
+        usd: (tokens * estimateRate(model, usesReference)) / 1e6,
+      };
+    }),
+  };
+}
+
+/**
  * 调用模型前的估算：拆几段、多少 token、大概多少美元。
  * 只按价目表与分辨率算，实际以中转站结算为准（确认框里写的是「预估」）。
  */
 function estimateUsage(config, toolName, args) {
   const plan = estimatePlan(config, toolName, args);
-  const resolution = FIXED_RESOLUTION;
-  const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS[FIXED_RESOLUTION];
-  const tokensPerSecond = (pixels[0] * pixels[1] * ESTIMATE_FPS) / ESTIMATE_TOKEN_DIVISOR;
   // 有首/尾帧或参考图，就算「带参考素材」，价目表里视频一档更便宜。
   const referenceImages = Array.isArray(args?.referenceImages)
     ? args.referenceImages
@@ -1956,21 +1981,12 @@ function estimateUsage(config, toolName, args) {
     || String(args?.lastFrameUrl ?? '').trim()
     || referenceImages.length,
   );
-  const model = resolveModel(config);
   const groupRatio = finiteNumber(ref(config, 'estimateGroupRatio', 0.8)) ?? 1;
-  const segments = plan.map((step, index) => {
-    // 延长段一定带参考视频；直出段只有给了首/尾帧才算「有参考素材」
-    const usesReference = step.kind === 'extend' || hasFrame;
-    const tokens = Math.round(tokensPerSecond * step.seconds);
-    return {
-      index: index + 1,
-      kind: step.kind,
-      seconds: step.seconds,
-      tokens,
-      usesReference,
-      usd: (tokens * estimateRate(model, usesReference)) / 1e6,
-    };
-  });
+  // 延长段一定带参考视频；直出段只有给了首/尾帧才算「有参考素材」
+  const { model, resolution, segments } = estimateSteps(
+    config,
+    plan.map((step) => ({ ...step, usesReference: step.kind === 'extend' || hasFrame })),
+  );
   const usd = segments.reduce((sum, item) => sum + item.usd, 0) * groupRatio;
   return {
     model,
@@ -1980,6 +1996,184 @@ function estimateUsage(config, toolName, args) {
     tokens: segments.reduce((sum, item) => sum + item.tokens, 0),
     usd: Math.round(usd * 1e6) / 1e6,
   };
+}
+
+/* ---------------- 长视频的循环迭代：分段之间的人工确认 + 暂停后接着做 ---------------- */
+
+/**
+ * 暂停记录文件名。长视频是「先直出、再逐段延长」，每段生成完都先问用户要不要继续；
+ * 用户点了「先不继续」就把「已经生成到哪一步」写进这个文件，随时能用 resume 接着做。
+ */
+const PAUSE_FILE = 'paused-plan.json';
+
+/** resume 参数：目录路径字符串，或上次结果里那个 resumeDir 对象。 */
+function resumeDirOf(value) {
+  const raw = typeof value === 'string'
+    ? value
+    : (value?.dir ?? value?.path ?? value?.resumeDir ?? value?.token ?? '');
+  const dir = String(raw ?? '').trim();
+  return dir ? path.resolve(dir) : '';
+}
+
+async function readPauseFile(dir) {
+  const file = path.join(dir, PAUSE_FILE);
+  let text;
+  try {
+    text = await readFile(file, 'utf8');
+  } catch {
+    throw new Error(
+      `没有找到暂停记录：${file}。resume 要传上一次结果里的 resumeDir`
+      + '（用户选择先不继续时，结果里给的那个分段目录），不要自己拼路径。',
+    );
+  }
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`暂停记录不是合法 JSON：${file}。`);
+  }
+  if (data?.plugin !== 'metaontic-video' || !Array.isArray(data.plan) || !data.plan.length) {
+    throw new Error(`暂停记录内容不对（不是本插件写的）：${file}。`);
+  }
+  return data;
+}
+
+async function writePauseFile(dir, data) {
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, PAUSE_FILE), `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+}
+
+function sumStepSeconds(steps) {
+  return (steps || []).reduce((sum, step) => sum + (Number(step?.seconds) || 0), 0);
+}
+
+/**
+ * 接着跑：默认沿用原计划剩下的段；这次传了更大的 duration 就按每段上限往后补延伸段。
+ * @returns fullPlan 整条视频从头到尾的计划（暂停时写回记录用）、plan 这次要跑的部分、
+ *   cursor 已经生成好的秒数、total 整条的总秒数。
+ */
+function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
+  const done = Number(data.done) || 0;
+  const cursor = Number(data.cursor) || 0;
+  const fullPlan = (data.plan || []).map((step) => ({ ...step }));
+  const remaining = fullPlan.slice(done).map((step) => ({ ...step }));
+  const wanted = Number.isFinite(askedTotal) ? askedTotal : 0;
+  const cap = segmentSeconds > 0 ? segmentSeconds : MAX_SEGMENT_SECONDS;
+  let total = cursor + sumStepSeconds(remaining);
+  while (wanted > total && fullPlan.length < MAX_SEGMENTS && total + MIN_SECONDS <= wanted) {
+    const seconds = Math.max(MIN_SECONDS, Math.min(cap, wanted - total));
+    fullPlan.push({ kind: 'extend', seconds });
+    remaining.push({ kind: 'extend', seconds });
+    total += seconds;
+  }
+  return { fullPlan, plan: remaining, cursor, total };
+}
+
+/** 续做时要沿用的参数：调用方只传 resume 时，靠这份记录还原上次的口径。 */
+function pickResumeOptions(args) {
+  const keys = ['mode', 'ratio', 'generateAudio', 'watermark'];
+  const options = {};
+  for (const key of keys) {
+    if (args?.[key] !== undefined) options[key] = args[key];
+  }
+  return options;
+}
+
+/** 暂停时写进分段目录的记录：接着做时照它恢复计划、进度和最后一段的链接。 */
+function pauseRecordAt({ stamp, prompt, fullPlan, done, cursor, lastVideoUrl, options, segments }) {
+  return {
+    plugin: 'metaontic-video',
+    kind: 'paused-plan',
+    version: 1,
+    createdAt: new Date().toISOString(),
+    stamp,
+    prompt,
+    plan: fullPlan,
+    done,
+    cursor,
+    lastVideoUrl,
+    options,
+    steps: segments.map((segment) => ({
+      index: segment.index,
+      kind: segment.kind,
+      seconds: segment.seconds,
+      taskId: segment.taskId,
+      videoUrl: segment.videoUrl,
+    })),
+  };
+}
+
+/** 暂停后怎么接着做：这段说明会交到模型手里，正是「循环迭代」的续做入口。 */
+function resumeHint(dir, remainingSeconds) {
+  return `要接着做就把 resume="${dir}" 再调一次 video_generate（prompt 可以省略，其余参数照旧）：`
+    + `插件会接着已经生成的分段继续，剩下的 ${remainingSeconds} 秒不用重头生成、不会重复扣费。`;
+}
+
+/** 剩下这几段的预估费用文案（确认框里给用户看钱）。 */
+async function remainingCostText(config, exec, remainingSteps) {
+  try {
+    const estimated = estimateSteps(
+      config,
+      remainingSteps.map((step) => ({ ...step, usesReference: true })),
+    );
+    const groupRatio = finiteNumber(ref(config, 'estimateGroupRatio', 0.8)) ?? 1;
+    const usd = estimated.segments.reduce((sum, item) => sum + item.usd, 0) * groupRatio;
+    const quota = await fetchDeviceQuota(config, exec?.signal);
+    const data = quota.status === 'ok' ? quota.data : {};
+    const symbol = String(data.currency_symbol || '¥');
+    const exchange = finiteNumber(data.usd_exchange_rate) ?? DEFAULT_USD_EXCHANGE_RATE;
+    const remainAmount = finiteNumber(data.remain_amount);
+    return {
+      cost: `预估 ${formatMoney(usd * exchange, symbol)}`,
+      remain: remainAmount === null ? '' : `本机 Key 剩余 ${formatMoney(remainAmount, symbol)}`,
+    };
+  } catch (error) {
+    return { cost: `预估费用没算出来（${error?.message || error}）`, remain: '' };
+  }
+}
+
+/**
+ * 分段之间的人工确认：拿到第 N 段的结果后，先问用户要不要继续生成第 N+1 段。
+ * 结果口径：
+ *   allowed-once —— 用户同意，继续生成；
+ *   rejected / cancelled —— 用户先不继续：停下来，把已经生成的部分交付，之后可以 resume；
+ *   unavailable —— 没有可用的确认通道（没有审批服务 / 没有会话 / 提问失败）：
+ *     这次调用在动手前已经确认过费用，就不把生成堵在这里，按继续处理并在 note 里说明。
+ */
+async function confirmNextSegment(ctx, config, exec, { done, finished, nextSeconds, remainingSteps }) {
+  const approval = ctx?.get?.('approval');
+  const agent = exec?.agent;
+  if (!approval || typeof approval.request !== 'function' || !agent) {
+    return { outcome: 'unavailable', reason: '没有可用的审批服务' };
+  }
+  if (approvalPolicy(ctx, exec) === 'never') {
+    return { outcome: 'unavailable', reason: '当前权限模式关闭了审批提示' };
+  }
+  const rest = sumStepSeconds(remainingSteps);
+  const { cost, remain } = await remainingCostText(config, exec, remainingSteps);
+  const lastSeconds = finished?.[done - 1]?.seconds ?? 0;
+  const alreadyDone = `第 ${done} 段（${lastSeconds} 秒）已经生成好`;
+  try {
+    const outcome = await approval.request({
+      agent,
+      toolName: 'video_generate',
+      ...(exec?.callId ? { callId: exec.callId } : {}),
+      ...(exec?.signal ? { signal: exec.signal } : {}),
+      reason: `人工确认：继续生成第 ${done + 1} 段视频（${nextSeconds} 秒）。`
+        + `${alreadyDone}，整条还差 ${rest} 秒（${cost}${remain ? `；${remain}` : ''}）。`,
+      displayReason: {
+        zh: `${alreadyDone}。接下来生成第 ${done + 1} 段（${nextSeconds} 秒），整条还差 ${rest} 秒，`
+          + `${cost}${remain ? `，${remain}` : ''}。`
+          + '点「允许」继续往下生成；点「拒绝」就先把已经生成的部分交付给你，之后随时可以接着做（不用重头再来）。',
+        en: `Segment ${done} (${lastSeconds}s) is ready. Next up: segment ${done + 1} `
+          + `(${nextSeconds}s); ${rest}s left in total, ${cost}${remain ? `, ${remain}` : ''}. `
+          + 'Allow to keep generating; reject to receive what is already done and continue later.',
+      },
+    });
+    return { outcome: String(outcome) };
+  } catch (error) {
+    return { outcome: 'unavailable', reason: error?.message || String(error) };
+  }
 }
 
 /** 插件服务地址：配置优先，留空用固定域名。 */
@@ -2109,21 +2303,30 @@ async function ffmpegConsentGate(config, exec, args) {
   if (args?.merge === false) return null;
 
   let plan = null;
+  // 续做时：合并的文件数 = 已经生成好的段 + 这次要跑的段，所以两边都要算进来。
+  let doneSteps = [];
   try {
-    plan = estimatePlan(config, exec.name, args);
+    const gateArgs = await estimateArgsFor(config, exec.name, args);
+    plan = estimatePlan(config, exec.name, gateArgs);
+    const dir = resumeDirOf(args?.resume);
+    if (dir) {
+      const data = await readPauseFile(dir);
+      doneSteps = (data.steps || []).map((step) => ({ kind: step.kind, seconds: step.seconds }));
+    }
   } catch {
     plan = null;
   }
-  if (!plan || plan.length < 2) return null;
+  const allSteps = [...doneSteps, ...(plan || [])];
+  if (!plan || allSteps.length < 2) return null;
   if (await hasFfmpeg(config, exec.signal)) return null;
 
   const { os, installs } = ffmpegInstallOptions();
   const command = installs[0].command;
-  const sizes = plan.map((step) => `${step.seconds}s`).join(' + ');
+  const sizes = allSteps.map((step) => `${step.seconds}s`).join(' + ');
   const binary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
   const lines = [
-    `本机没有 ${binary}，这次要生成 ${plan.reduce((sum, step) => sum + step.seconds, 0)} 秒`
-      + `（会拆成 ${plan.length} 段：${sizes}），没有 ffmpeg 就没法合并成一条，所以先停下来了，`
+    `本机没有 ${binary}，这条成片是 ${allSteps.reduce((sum, step) => sum + step.seconds, 0)} 秒`
+      + `（会拆成 ${allSteps.length} 段：${sizes}），没有 ffmpeg 就没法合并成一条，所以先停下来了，`
       + '还没有调用模型、没有产生费用。',
     '请在对话框里先和用户确认，不要自己绕过这一步：',
     `1) 问用户要不要现在装 ffmpeg —— 说清他的系统（${os}）和命令：${command}`,
@@ -2140,7 +2343,7 @@ async function ffmpegConsentGate(config, exec, args) {
   return {
     kind: 'deny',
     reason: lines.join('\n'),
-    info: { ffmpegMissing: true, os, command, segments: plan.length },
+    info: { ffmpegMissing: true, os, command, segments: allSteps.length },
   };
 }
 
@@ -2152,6 +2355,30 @@ async function ffmpegConsentGate(config, exec, args) {
  * - 读不到剩余额度：照常弹确认框，但把「读不到额度」的原因写清楚；
  * - 其余情况：返回 ask，宿主弹审批面板给用户看预估费用，点「允许」才会执行。
  */
+/**
+ * 确认框要估的是「这次真会花的钱」。接着上一次暂停继续时只生成剩下的几段，
+ * 所以按暂停记录里剩下的计划估算，而不是按 args.duration（续做时可能压根没传）。
+ */
+async function estimateArgsFor(config, toolName, args) {
+  if (toolName !== 'video_generate') return args;
+  const dir = resumeDirOf(args?.resume);
+  if (!dir) return args;
+  try {
+    const data = await readPauseFile(dir);
+    const restarted = resumePlanFrom(data, {
+      askedTotal: args?.duration == null
+        ? null
+        : clampInteger(args.duration, MIN_SECONDS, Number.MAX_SAFE_INTEGER, 0),
+      segmentSeconds: resolveSegmentSeconds(config, args?.segmentSeconds),
+    });
+    const seconds = sumStepSeconds(restarted.plan);
+    if (!(seconds > 0)) return args;
+    return { ...args, duration: seconds, referenceImages: [] };
+  } catch {
+    return args;
+  }
+}
+
 async function preflightGate(ctx, config, exec) {
   // 装环境：只有真要装的时候才拦（让用户先看到命令）；纯检查放行。
   if (exec.name === 'video_setup') return setupGate(ctx, exec);
@@ -2172,7 +2399,7 @@ async function preflightGate(ctx, config, exec) {
   if (consent) return consent;
   let estimate = null;
   try {
-    estimate = estimateUsage(config, exec.name, args);
+    estimate = estimateUsage(config, exec.name, await estimateArgsFor(config, exec.name, args));
   } catch {
     estimate = null;
   }
@@ -2717,7 +2944,7 @@ const VIDEO_SEGMENT_OUTPUT_SCHEMA = {
 function renderVideoResult(value) {
   const {
     status, mode, segments = [], videoUrl, videoPath, mergeMode, segmentsDir, note, error,
-    pendingTaskId,
+    pendingTaskId, paused, resumeDir, remainingSeconds,
   } = value || {};
   const lines = segments.map((segment) => {
     const label = segment.kind === 'extend' ? `延长 +${segment.seconds}s` : `直出 ${segment.seconds}s`;
@@ -2732,9 +2959,17 @@ function renderVideoResult(value) {
 
   const parts = [];
   if (status === 'succeeded') {
-    parts.push(mode === 'extended'
-      ? `视频生成成功：先直出 ${formatSeconds(segments[0]?.seconds)} 秒，再延长 ${segments.length - 1} 段。`
-      : `视频生成成功：一次直出 ${formatSeconds(segments[0]?.seconds)} 秒，没有超过单段上限，不需要延长。`);
+    if (paused) {
+      parts.push(
+        `已生成并交付前 ${segments.length} 段（共 ${formatSeconds(segments.length
+          ? segments.reduce((sum, item) => sum + (item.seconds || 0), 0) : 0)} 秒）：`
+        + '每段生成完都会问一次要不要继续，这次用户选了先不继续。',
+      );
+    } else if (mode === 'extended') {
+      parts.push(`视频生成成功：先直出 ${formatSeconds(segments[0]?.seconds)} 秒，再延长 ${segments.length - 1} 段。`);
+    } else {
+      parts.push(`视频生成成功：一次直出 ${formatSeconds(segments[0]?.seconds)} 秒，没有超过单段上限，不需要延长。`);
+    }
   } else if (status === 'timeout') {
     parts.push('任务仍在生成中（已超出单次等待时间）。');
   } else if (status === 'unknown') {
@@ -2753,17 +2988,26 @@ function renderVideoResult(value) {
     if (videoPath) {
       const how = mergeMode === 'copy'
         ? '无损拼接'
-        : (mergeMode === 'single'
+        : (mergeMode === 'segment'
+          ? '这一段暂时按原始分段交付（续做时再和后面的段合并）'
+          : (mergeMode === 'single'
           ? '一段直出，无需拼接'
           : (mergeMode === 'seamless'
             ? '无缝拼接（对齐接缝 + 画面/音频交叉淡化，音乐接缝已淡化）'
-            : '重编码拼接'));
+            : '重编码拼接')));
       parts.push(`成片（本地文件）：${videoPath}（${how}）`);
     } else if (segmentsDir) {
       parts.push(`没有合并成一条：分段文件都在 ${segmentsDir}（每段路径见上面的列表）。`);
     } else {
       parts.push('没有生成合并文件，请按上面的上游链接自行下载分段。');
     }
+  }
+  if (paused && resumeDir) {
+    parts.push(
+      `还没生成的部分：还剩 ${formatSeconds(remainingSeconds)} 秒。`
+      + `要接着做就把 resume 原样传回 video_generate（resume="${resumeDir}"），`
+      + '插件会接着已有的分段往下生成，前面几段不会重新生成、也不会重复扣费。',
+    );
   }
   if (videoUrl) parts.push(`最后一段上游链接（约 24 小时内有效）：${videoUrl}`);
   if (note) parts.push(note);
@@ -2774,7 +3018,7 @@ function renderVideoResult(value) {
   return [{ type: 'text', text: parts.filter(Boolean).join('\n') }];
 }
 
-function videoTool(config, deps) {
+function videoTool(config, deps, ctx) {
   return {
     name: 'video_generate',
     description:
@@ -2788,6 +3032,11 @@ function videoTool(config, deps) {
       + '最后用 ffmpeg 合并成一个本地成片文件，默认落在会话工作目录下的 metaontic-video/，'
       + '文件名形如 20261027-201530-25s.mp4。20 秒、25 秒这类目标不用拆成多个任务：'
       + '直接传 duration=20 即可（20 秒 → 15+5，25 秒 → 15+10）。'
+      + '**每段生成完都会先弹一次确认框问用户要不要继续**（循环迭代）：用户点「拒绝」就停下，'
+      + '先把已经生成的部分交付，结果里带 paused=true、resumeDir 和 remainingSeconds；'
+      + '之后用户说「继续」时，把 resumeDir 原样传给 video_generate 的 resume 参数接着做'
+      + '（前面几段不重新生成、不重复扣费），不要从头再生成一遍、也不要改用 video_extend 拼。'
+      + '没有可用确认通道时不会卡住，会按已确认的计划继续并在 note 里说明。'
       + '返回每段任务 ID、上游链接和成片路径。生成通常需要几分钟（每段单独生成），'
       + '单次调用返回 timeout、或某段返回 unknown（查询失败、任务其实已提交）时，'
       + '都用返回的任务 ID 走 video_status 继续等，不要重复提交新任务——'
@@ -2869,6 +3118,13 @@ function videoTool(config, deps) {
           type: 'boolean',
           description: '是否添加水印，默认 false。',
         },
+        resume: {
+          type: 'string',
+          description:
+            '接着上一次暂停的长视频继续生成：传上一次结果里的 resumeDir（那个分段目录）。'
+            + '插件会沿用暂停记录里的提示词、分段计划和已经生成好的前几段，只把剩下的秒数生成完再合并；'
+            + 'prompt 可以省略（要改剧情再传），duration 传更大的数可以顺手把总时长加长。',
+        },
         merge: {
           type: 'boolean',
           description: '是否下载分段并用 ffmpeg 合并成一个本地成片，默认 true；'
@@ -2898,6 +3154,9 @@ function videoTool(config, deps) {
           ffmpegMissing: { type: 'boolean' },
           installHint: { type: 'string' },
           partial: { type: 'boolean' },
+          paused: { type: 'boolean' },
+          resumeDir: { type: 'string' },
+          remainingSeconds: { type: 'integer' },
           pendingTaskId: { type: 'string' },
           images: { type: 'array' },
           note: { type: 'string' },
@@ -2918,42 +3177,87 @@ function videoTool(config, deps) {
       const apiKey = resolveApiKey(config);
       assertConfigured(config, apiKey);
 
-      const prompt = String(args?.prompt ?? '').trim();
-      if (!prompt) throw new Error('提示词 prompt 不能为空。');
+      // 接着上一次暂停的进度继续做（循环迭代的第二轮起）：计划、游标、参考视频都从暂停记录里来。
+      const resumeDir = resumeDirOf(args?.resume);
+      const resume = resumeDir ? await readPauseFile(resumeDir) : null;
 
-      const { plan, singleMax, segmentSeconds, cap, asked, total } = resolveTargetPlan(config, args);
+      const prompt = String(args?.prompt ?? '').trim() || String(resume?.prompt ?? '').trim();
+      if (!prompt) {
+        throw new Error(resumeDir
+          ? '这次是接着上一次暂停的视频继续，但暂停记录里没有提示词：请把 prompt 补上。'
+          : '提示词 prompt 不能为空。');
+      }
+
+      const target = resolveTargetPlan(config, args);
+      const { singleMax, segmentSeconds, cap, asked } = target;
+      const restarted = resume
+        ? resumePlanFrom(resume, {
+          askedTotal: args?.duration == null ? null : asked,
+          segmentSeconds,
+        })
+        : null;
+      const plan = restarted ? restarted.plan : target.plan;
+      const fullPlan = restarted ? restarted.fullPlan : target.plan;
+      const total = restarted ? restarted.total : target.total;
+      const doneBefore = restarted ? (Number(resume.done) || 0) : 0;
       const plannedTotal = plan.reduce((sum, step) => sum + step.seconds, 0);
 
       const notes = [];
-      if (asked > total) {
+      if (restarted) {
+        notes.push(
+          `接着上一次暂停的进度继续：前面 ${doneBefore} 段（${restarted.cursor} 秒）不重新生成，`
+          + `这次还要生成 ${plan.length} 段共 ${plannedTotal} 秒。`,
+        );
+      } else if (asked > total) {
         notes.push(
           `目标 ${asked} 秒超过单条成片上限 ${cap} 秒（首段最长 ${singleMax} 秒 + 每段最多 `
           + `${segmentSeconds} 秒 × ${MAX_SEGMENTS - 1}），本次按 ${total} 秒执行。`,
         );
       }
-      if (plannedTotal < total) {
+      if (!restarted && plannedTotal < total) {
         notes.push(
           `目标 ${total} 秒排不满（每段上限 ${segmentSeconds} 秒 × ${MAX_SEGMENTS} 段），`
           + `本次按 ${plannedTotal} 秒执行。`,
         );
-      } else if (plannedTotal > total) {
+      } else if (!restarted && plannedTotal > total) {
         notes.push(
           `目标 ${total} 秒拆不出完全等长的分段（每段 4-15 秒），本次按 ${plannedTotal} 秒执行。`,
         );
       }
 
       const segments = [];
+      if (restarted) {
+        // 上一次暂停前生成好的段：文件就在同样的分段目录里（序号 + 类型就是文件名），
+        // 放进结果里，续做后的时间线、合并、成片时长才是完整的。
+        for (const step of (resume.steps || [])) {
+          segments.push({
+            index: step.index,
+            kind: step.kind,
+            seconds: step.seconds,
+            taskId: step.taskId,
+            status: 'succeeded',
+            videoUrl: step.videoUrl,
+          });
+        }
+      }
       const resultImages = [];
       let status = 'succeeded';
       let error;
       let errorCode;
-      let referenceUrl = '';
-      let cursor = 0;
+      let referenceUrl = restarted ? String(resume.lastVideoUrl || '') : '';
+      let cursor = restarted ? restarted.cursor : 0;
+      // 用户选择先不继续（确认框里点了拒绝/取消）：先交付已经生成的部分。
+      let paused = false;
+      let confirmWarned = false;
+      // 上次那轮用的参数（续做时调用方可以只传 resume）
+      const resumeOptions = restarted ? (resume.options || {}) : {};
 
-      for (const [index, step] of plan.entries()) {
+      for (const [offset, step] of plan.entries()) {
         if (exec?.signal?.aborted) throw abortError();
+        const position = doneBefore + offset;
 
         const stepArgs = {
+          ...resumeOptions,
           ...args,
           prompt,
           duration: step.seconds,
@@ -2981,7 +3285,7 @@ function videoTool(config, deps) {
           : final.error;
 
         segments.push({
-          index: index + 1,
+          index: position + 1,
           kind: step.kind,
           seconds,
           taskId: final.taskId,
@@ -2998,14 +3302,41 @@ function videoTool(config, deps) {
         }
         referenceUrl = normalizeReferenceUrl(final.videoUrl);
         cursor += seconds;
+
+        // 循环迭代：每段生成完都先问一次用户要不要继续往下生成。
+        const nextStep = plan[offset + 1];
+        if (nextStep) {
+          const verdict = await confirmNextSegment(ctx, config, exec, {
+            done: position + 1,
+            finished: segments,
+            nextSeconds: nextStep.seconds,
+            remainingSteps: plan.slice(offset + 1),
+          });
+          if (verdict.outcome === 'rejected' || verdict.outcome === 'cancelled') {
+            paused = true;
+            notes.push(
+              `第 ${position + 1} 段（${formatSeconds(seconds)} 秒）生成好之后，`
+              + (verdict.outcome === 'rejected' ? '用户选择先不继续往下生成' : '确认框被取消')
+              + '：先把已经生成的部分交付，剩下的随时可以接着做。',
+            );
+            break;
+          }
+          if (verdict.outcome === 'unavailable' && !confirmWarned) {
+            confirmWarned = true;
+            notes.push(
+              `这次没能弹「要不要继续」的确认框（${verdict.reason}），`
+              + '后面的分段按已经确认过的计划继续生成。',
+            );
+          }
+        }
       }
 
       const completed = segments.filter((segment) => segment.status === 'succeeded' && segment.videoUrl);
       // 结果字段随流程追加（合并信息、备注等），显式声明成可扩展对象
       const result: Record<string, any> = {
         status,
-        mode: plan.length > 1 ? 'extended' : 'direct',
-        plannedSeconds: plannedTotal,
+        mode: fullPlan.length > 1 ? 'extended' : 'direct',
+        plannedSeconds: restarted ? total : plannedTotal,
         totalSeconds: completed.reduce((sum, segment) => sum + segment.seconds, 0),
         segments,
         videoUrl: completed.at(-1)?.videoUrl,
@@ -3053,6 +3384,27 @@ function videoTool(config, deps) {
       }
 
       if (args?.merge === false) {
+        if (paused) {
+          // 没下载分段也要留暂停记录：接着做时按记录里的上游链接重新拉。
+          const pauseOutDir = await resolveOutputDir(config, exec, deps);
+          const allocated = await allocateStamp(pauseOutDir, fileStamp());
+          await writePauseFile(allocated.segmentsDir, pauseRecordAt({
+            stamp: allocated.stamp,
+            prompt,
+            fullPlan,
+            done: segments.length,
+            cursor,
+            lastVideoUrl: referenceUrl,
+            options: pickResumeOptions(args),
+            segments,
+          }));
+          result.segmentsDir = allocated.segmentsDir;
+          result.resumeDir = allocated.segmentsDir;
+          result.paused = true;
+          result.remainingSeconds = Math.max(0, total - deliveredSeconds);
+          notes.push('按参数要求只返回上游链接，没有下载分段（resume 时会按链接重新拉）。');
+          notes.push(resumeHint(allocated.segmentsDir, result.remainingSeconds));
+        }
         result.note = [...notes, '按参数要求只返回上游链接，没有下载合并。'].join('\n');
         return result;
       }
@@ -3062,7 +3414,10 @@ function videoTool(config, deps) {
 
       const outDir = await resolveOutputDir(config, exec, deps);
       // 原子占位，拿到本次唯一的 stamp（分段目录 + 成片名前缀），避免并发调用撞名。
-      const { stamp, segmentsDir } = await allocateStamp(outDir, fileStamp());
+      // 接着做时沿用上一次的分段目录与 stamp：前面几段就在里面，合并时一起拼。
+      const { stamp, segmentsDir } = restarted
+        ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir }
+        : await allocateStamp(outDir, fileStamp());
       const files = [];
       let probeWarned = false;
 
@@ -3072,7 +3427,10 @@ function videoTool(config, deps) {
             segmentsDir,
             `${String(segment.index).padStart(2, '0')}-${segment.kind}.mp4`,
           );
-          await downloadFile(segment.videoUrl, dest, { signal: exec?.signal });
+          // 接着做时前面几段上次已经下好了：直接用现成文件，别重复下载（上游链接也可能已过期）。
+          if (!(await exists(dest))) {
+            await downloadFile(segment.videoUrl, dest, { signal: exec?.signal });
+          }
           segment.localPath = dest;
 
           const media = await probeMedia(dest, config, exec?.signal);
@@ -3124,7 +3482,11 @@ function videoTool(config, deps) {
 
       const finalPath = path.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
       try {
-        if (files.length === 1) {
+        if (files.length === 1 && paused) {
+          // 暂停时只有一段：这一段的文件要留在分段目录里给之后续做用，直接把它当交付物。
+          result.mergeMode = 'segment';
+          result.videoPath = files[0];
+        } else if (files.length === 1) {
           await rm(finalPath, { force: true });
           await rename(files[0], finalPath);
           result.mergeMode = 'single';
@@ -3152,7 +3514,7 @@ function videoTool(config, deps) {
           }
         }
         result.merged = true;
-        result.videoPath = finalPath;
+        if (!result.videoPath) result.videoPath = finalPath;
       } catch (failure) {
         if (failure?.code === 'ABORTED') throw failure;
         let reason = `分段已生成，但合并失败：${failure?.message || failure}`;
@@ -3164,6 +3526,32 @@ function videoTool(config, deps) {
         }
         result.segmentsDir = segmentsDir;
         result.note = [...notes, reason].join('\n');
+        return result;
+      }
+
+      if (paused) {
+        // 暂停：分段要留着（接着做时当前几段用），并写下「生成到哪一步」的暂停记录。
+        result.segmentsDir = segmentsDir;
+        result.resumeDir = segmentsDir;
+        result.paused = true;
+        result.remainingSeconds = Math.max(0, total - deliveredSeconds);
+        try {
+          await writePauseFile(segmentsDir, pauseRecordAt({
+            stamp,
+            prompt,
+            fullPlan,
+            done: segments.length,
+            cursor,
+            lastVideoUrl: referenceUrl,
+            options: pickResumeOptions(args),
+            segments,
+          }));
+        } catch (failure) {
+          notes.push(`暂停记录没写成（${failure?.message || failure}）：要接着做只能用上面的链接走 video_extend。`);
+        }
+        notes.push(`已交付的成片是从头到第 ${segments.length} 段，分段仍保留在 ${segmentsDir}。`);
+        notes.push(resumeHint(segmentsDir, result.remainingSeconds));
+        result.note = notes.join('\n');
         return result;
       }
 
@@ -3718,6 +4106,11 @@ function buildPromptGuidance(config) {
       + '分镜只在用户明确要求多镜时使用。'
       + '超过上限时（如 20 秒）会自动拆成首段 + 若干续拍段再合并——那是同一条视频往下续拍，不是多镜拼接。'
       + '所以「20 秒视频」直接传 duration=20，不用拆成多个任务，也不用跟用户解释「模型一次只能出 15 秒」；'
+      + '**超过单段上限的成片是「循环迭代」的：每段生成完都会弹一次确认框问用户要不要继续，'
+      + '不要绕过它、也不要自己拆成多次生成**；'
+      + '用户点了「先不继续」时结果里带 paused=true、resumeDir、remainingSeconds——'
+      + '这时先把已经生成的部分交付给他，等他说「继续」再把 resumeDir 原样传给 video_generate 的 resume 参数'
+      + '（插件接着已有的分段往下做，前面几段不重新生成、不重复扣费），不要从头再来一遍；'
       + `单条成片最长 ${MAX_TOTAL_SECONDS} 秒（最多 ${MAX_SEGMENTS} 段），用户要更长的就按 `
       + `${MAX_TOTAL_SECONDS} 秒生成并说明这是插件当前的上限，不要反复加大 duration；`
       + '成片默认落在会话工作目录下的 metaontic-video/。',
@@ -3758,7 +4151,7 @@ export function apply(ctx: DshContext, config: any = {}) {
   // 可选服务的宿主对象（会话工作目录等），拿到就放进来
   const deps: Record<string, any> = {};
   const disposers = [
-    ctx.tools.register(jsonSafeTool(videoTool(config, deps))),
+    ctx.tools.register(jsonSafeTool(videoTool(config, deps, ctx))),
     ctx.tools.register(jsonSafeTool(extendTool(config))),
     ctx.tools.register(jsonSafeTool(taskTool(config))),
     ctx.tools.register(jsonSafeTool(setupTool(config))),
