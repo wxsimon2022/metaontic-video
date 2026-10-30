@@ -141,6 +141,14 @@ export const Config = z.object({
     .default(false)
     .description('合并后是否保留分段原片')
     .volatile(),
+  resumeLockStaleMinutes: z.number().min(0)
+    .default(60)
+    .description(
+      '暂停目录的「续做锁」超过多少分钟算过期残留（默认 60，0=永不过期）。'
+      + '同一份暂停进度同时只能有一次 resume 在跑，否则剩下的段会被提交两遍、重复扣费；'
+      + '上一次被强杀 / 宿主放弃调用时锁文件会留下，超过这个时间才允许后来者抢过来。',
+    )
+    .volatile(),
   ffmpegBinary: z.string()
     .default('ffmpeg')
     .description('ffmpeg 可执行文件；PATH 里没有时填绝对路径')
@@ -2225,6 +2233,133 @@ async function readPauseFile(dir) {
   return data;
 }
 
+/* ---------------- 暂停目录的「续做锁」：同一份进度只能有一次 resume 在跑 ---------------- */
+
+const RESUME_LOCK = 'resume.lock';
+
+/** 锁过期时间：0 / 负数表示永不过期（配置成 0 的人就是不想让后来者抢）。 */
+function resumeLockStaleMs(config) {
+  const minutes = Number(ref(config, 'resumeLockStaleMinutes', 60));
+  if (!Number.isFinite(minutes) || minutes <= 0) return 0;
+  return minutes * 60 * 1000;
+}
+
+/** 锁文件是不是「过期残留」（进程被杀 / 宿主放弃调用，没来得及删）：只有过期才允许抢过来。 */
+async function resumeLockExpired(file, staleMs) {
+  const raw = await readFile(file, 'utf8').catch(() => null);
+  if (raw === null) return true;              // 刚好被删掉：当成可以重试
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return true;                              // 内容坏了（崩在写锁中途）：当过期
+  }
+  const started = Date.parse(String(data?.startedAt || ''));
+  if (!Number.isFinite(started)) return true;
+  if (!staleMs) return false;
+  return Date.now() - started > staleMs;
+}
+
+/** 读锁文件里「谁拿着」，只用来写一句清楚的报错。 */
+async function describeResumeLock(file) {
+  const raw = await readFile(file, 'utf8').catch(() => null);
+  if (!raw) return '';
+  try {
+    const data = JSON.parse(raw);
+    const bits = [data?.tool, data?.startedAt && `${data.startedAt} 开始`, data?.pid && `pid ${data.pid}`]
+      .filter(Boolean);
+    return bits.length ? `（${bits.join('，')}）` : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * 拿到「续做锁」：用 `wx` 独占创建锁文件，这个操作是原子的，同进程 / 跨进程都拦得住。
+ * 用户连点两次「继续」、或两个会话同时去续做同一份暂停进度时，只有第一个能进，
+ * 第二个直接报错——否则双方各自把剩下的段提交一遍，同样的段生成两遍、钱花两遍。
+ * @returns { file, release } —— release 只删自己写的那把锁（目录可能已经换人用了）。
+ */
+async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
+  const empty = { file: null, async release() {} };
+  const file = path.join(dir, RESUME_LOCK);
+  const token = uniqueSuffix('lock');
+  const record = {
+    tool: toolName,
+    callId: callId || null,
+    pid: process.pid,
+    host: os.hostname(),
+    startedAt: new Date().toISOString(),
+    token,
+  };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const handle = await open(file, 'wx');
+      try {
+        await handle.writeFile(`${JSON.stringify(record, null, 2)}\n`, 'utf8');
+      } finally {
+        await handle.close();
+      }
+      return {
+        file,
+        async release() {
+          const raw = await readFile(file, 'utf8').catch(() => null);
+          if (raw) {
+            try {
+              if (JSON.parse(raw)?.token !== token) return;   // 已经被别人接手了，别删
+            } catch {
+              return;
+            }
+          }
+          await rm(file, { force: true }).catch(() => {});
+        },
+      };
+    } catch (failure) {
+      // 目录都还没有（resume 传错路径）：不拦，交给下面「没找到暂停记录」的提示去说清楚
+      if (failure?.code === 'ENOENT') return empty;
+      if (failure?.code !== 'EEXIST') throw failure;
+      if (attempt === 0 && await resumeLockExpired(file, staleMs)) {
+        await rm(file, { force: true }).catch(() => {});
+        continue;
+      }
+      const holder = await describeResumeLock(file);
+      const minutes = staleMs ? Math.round(staleMs / 60000) : 0;
+      throw Object.assign(new Error(
+        `这份暂停进度已经有一次「继续」在跑了${holder}，先别同时续做：两份请求会把剩下的段各提交一遍、`
+        + '重复扣费。等它跑完再用 resume（结果里会说完成片在哪）。'
+        + (minutes
+          ? `如果确认那一次已经中断了，等 ${minutes} 分钟锁会自动过期，也可以把 ${file} 删掉再试。`
+          : `确认那一次已经中断了就删掉 ${file} 再试。`),
+      ), { code: 'resume_locked' });
+    }
+  }
+  throw new Error(`拿不到 ${file} 的锁（同名文件一直被抢），稍后重试。`);
+}
+
+/**
+ * 给会「接着暂停进度继续」的工具加一层互斥：只有传了 resume 的调用才需要锁，
+ * 普通生成 / 延长之间互不影响（本来就是并发安全的）。
+ */
+function withResumeLock(tool, toolName, config) {
+  return {
+    ...tool,
+    async execute(args, exec) {
+      const dir = resumeDirOf(args?.resume);
+      if (!dir) return tool.execute(args, exec);
+      const lock = await acquireResumeLock(dir, {
+        toolName,
+        callId: exec?.callId,
+        staleMs: resumeLockStaleMs(config),
+      });
+      try {
+        return await tool.execute(args, exec);
+      } finally {
+        await lock.release();
+      }
+    },
+  };
+}
+
 async function writePauseFile(dir, data) {
   await mkdir(dir, { recursive: true });
   const file = path.join(dir, PAUSE_FILE);
@@ -3041,7 +3176,9 @@ function extendTool(config, deps, ctx) {
             '接着上一次暂停的延长继续：传上一次结果里的 resumeDir。'
             + '插件会沿用暂停记录里的提示词、延长方向和剩下的段数，只把没做的部分生成完再合并；'
             + 'prompt / videoUrl / direction 都可以省略。'
-            + '想顺手多延长几段就再传 segments（表示在剩下的基础上「再加」几段）。',
+            + '想顺手多延长几段就再传 segments（表示在剩下的基础上「再加」几段）。'
+            + '同一份暂停进度同时只允许一次 resume 在跑：已经有别的调用在续做时会直接报错，'
+            + '等它跑完再继续，别重复发（重复会把剩下的段提交两遍、重复扣费）。',
         },
       },
       required: ['prompt'],
@@ -3560,7 +3697,9 @@ function videoTool(config, deps, ctx) {
           description:
             '接着上一次暂停的长视频继续生成：传上一次结果里的 resumeDir（那个分段目录）。'
             + '插件会沿用暂停记录里的提示词、分段计划和已经生成好的前几段，只把剩下的秒数生成完再合并；'
-            + 'prompt 可以省略（要改剧情再传），duration 传更大的数可以顺手把总时长加长。',
+            + 'prompt 可以省略（要改剧情再传），duration 传更大的数可以顺手把总时长加长。'
+            + '同一份暂停进度同时只允许一次 resume 在跑：已经有别的调用在续做时会直接报错，'
+            + '等它跑完再继续，别重复发（重复会把剩下的段提交两遍、重复扣费）。',
         },
         merge: {
           type: 'boolean',
@@ -4254,7 +4393,8 @@ const CONFIG_FIELDS = [
   'duration', 'singleMaxSeconds', 'mode', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'pollErrorRetries',
-  'mergeMode', 'bgmFadeSeconds', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary',
+  'mergeMode', 'bgmFadeSeconds', 'outputDir', 'keepSegments', 'resumeLockStaleMinutes',
+  'ffmpegBinary', 'ffprobeBinary',
   'registerEmail', 'registerApi', 'deviceId', 'estimateGroupRatio',
 ];
 
@@ -4315,7 +4455,7 @@ function configTool(config, settings) {
       '读取或修改 MetaOnticVideo 插件自己的配置（baseUrl、submitPath、queryPath、model、'
       + 'duration、singleMaxSeconds、mode、ratio、generateAudio、'
       + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、bgmFadeSeconds、'
-      + 'outputDir、keepSegments、'
+      + 'outputDir、keepSegments、resumeLockStaleMinutes、'
       + 'ffmpegBinary、ffprobeBinary、registerEmail、registerApi、estimateGroupRatio）。'
       + 'apiKey 只能由设置页「登录」时服务端下发，这里只能看、不能改；'
       + '用户要换 Key 就让他去插件详情页点「登录」。'
@@ -4371,6 +4511,11 @@ function configTool(config, settings) {
         },
         outputDir: { type: 'string', description: '成片输出目录；留空用会话工作目录下的 metaontic-video/。' },
         keepSegments: { type: 'boolean', description: '合并后是否保留分段原片。' },
+        resumeLockStaleMinutes: {
+          type: 'number',
+          minimum: 0,
+          description: '暂停目录的续做锁多久算过期（分钟，默认 60，0=永不过期）。',
+        },
         ffmpegBinary: { type: 'string', description: 'ffmpeg 可执行文件路径。' },
         ffprobeBinary: { type: 'string', description: 'ffprobe 可执行文件路径。' },
       },
@@ -4479,6 +4624,8 @@ function buildPromptGuidance(config) {
       + '用户点了「先不继续」时结果里带 paused=true、resumeDir、remainingSeconds——'
       + '这时先把已经生成的部分交付给他，等他说「继续」再把 resumeDir 原样传给 video_generate 的 resume 参数'
       + '（插件接着已有的分段往下做，前面几段不重新生成、不重复扣费），不要从头再来一遍；'
+      + '同一份暂停进度（resumeDir）同一时间只允许一次 resume 在跑：如果结果说「已经有一次『继续』在跑」，'
+      + '就让用户等那一次跑完（或确认它已中断、锁过期）再继续，不要重复发 resume——重复会把剩下的段提交两遍、重复扣费；'
       + '用户中途点了「停止」或这一轮等超时也一样：已经生成好的段会先下载、合并、交付'
       + '（结果里同样是 paused=true + 成片 + resumeDir），不要把那几段丢掉重来；'
       + `单条成片最长 ${MAX_TOTAL_SECONDS} 秒（最多 ${MAX_SEGMENTS} 段），用户要更长的就按 `
@@ -4524,8 +4671,8 @@ export function apply(ctx: DshContext, config: any = {}) {
   // 可选服务的宿主对象（会话工作目录等），拿到就放进来
   const deps: Record<string, any> = {};
   const disposers = [
-    ctx.tools.register(jsonSafeTool(videoTool(config, deps, ctx))),
-    ctx.tools.register(jsonSafeTool(extendTool(config, deps, ctx))),
+    ctx.tools.register(withResumeLock(jsonSafeTool(videoTool(config, deps, ctx)), 'video_generate', config)),
+    ctx.tools.register(withResumeLock(jsonSafeTool(extendTool(config, deps, ctx)), 'video_extend', config)),
     ctx.tools.register(jsonSafeTool(taskTool(config))),
     ctx.tools.register(jsonSafeTool(setupTool(config))),
   ];
