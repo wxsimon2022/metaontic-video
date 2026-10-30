@@ -267,7 +267,7 @@ window.__ModuleLoader__.load({
     const UPDATE_COMMAND = `dsh plugin --profile desktop remove ${PLUGIN_PACKAGE} && dsh plugin --profile desktop add "${UPDATE_SPEC}"`;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "2.8.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "2.8.1".trim().replace(/^v/i, "") : "";
     function currentOs() {
       const nav = window.navigator || {};
       const raw = String(
