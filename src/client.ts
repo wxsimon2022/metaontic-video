@@ -92,6 +92,18 @@ window.__ModuleLoader__.load({
       usageKeyMissing: '还没有密钥：领到 Key 之后，这里会显示用它出片的记录。',
       usageStatusOk: '成功',
       usageStatusFailed: '失败',
+      versionTitle: '插件版本',
+      versionCurrent: '当前版本 v{version}',
+      versionCheck: '检查更新',
+      versionChecking: '检查中…',
+      versionLatest: '已是最新版本',
+      versionNew: '有新版本 v{version}',
+      versionFailed: '检查更新失败：{message}',
+      versionHint: '更新方式：插件 → 已安装 → MetaOnticVideo → 卸载，再点「添加插件」粘贴仓库地址；'
+        + '或者在终端跑下面这条命令。更新完重启 Harness 才生效。',
+      versionCopy: '复制命令',
+      versionCopied: '已复制',
+      versionCheckedAt: '检查于 {time}',
       sectionGeneration: '生成参数',
       sectionMerge: '合并与输出',
       sectionAdvanced: '高级',
@@ -177,6 +189,18 @@ window.__ModuleLoader__.load({
       quotaNotRegistered: 'The service has no registration for this device (new device or cleared data) — ask an admin to reset it.',
       quotaFailed: 'Failed to read quota: {message}',
       quotaUpdatedAt: 'updated {time}',
+      versionTitle: 'Plugin version',
+      versionCurrent: 'Installed v{version}',
+      versionCheck: 'Check for updates',
+      versionChecking: 'Checking…',
+      versionLatest: 'Up to date',
+      versionNew: 'v{version} is available',
+      versionFailed: 'Update check failed: {message}',
+      versionHint: 'To update: Plugins → Installed → MetaOnticVideo → Uninstall, then "Add plugin" and paste the '
+        + 'repository URL; or run the command below. Restart Harness afterwards for it to take effect.',
+      versionCopy: 'Copy command',
+      versionCopied: 'Copied',
+      versionCheckedAt: 'checked {time}',
       register: 'Log in',
       registerWorking: 'Logging in…',
       registerOk: 'Logged in: provider, key, base URL and model written; applies after the config reload.',
@@ -262,6 +286,20 @@ window.__ModuleLoader__.load({
     /** 注册接口的握手请求头 X-Register-Token：与服务端 REGISTER_CLIENT_TOKEN 一致。 */
     const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
 
+    /** 「检查更新」的数据源：Gitee 镜像仓库（Gitee 的 API 带 CORS 头，浏览器半侧能直接读）。 */
+    const UPDATE_PROJECT = 'hackloop/metaontic-video';
+    const UPDATE_FILE_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json`;
+    /** 升级命令：给用户复制用，走 Gitee（国内比 GitHub 稳）。 */
+    const UPDATE_COMMAND = 'dsh plugin --profile desktop remove metaontic-video '
+      + '&& dsh plugin --profile desktop add "git+https://gitee.com/hackloop/metaontic-video.git"';
+    /** 版本检查结果的本地缓存与节流：6 小时内不重复联网，打开设置页先用缓存显示。 */
+    const UPDATE_CACHE_KEY = 'metaontic-video.update-check';
+    const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+    /** 构建时由 esbuild --define 注入的版本号；从源码直接跑（没注入）时为空串。 */
+    const PLUGIN_VERSION = typeof __PLUGIN_VERSION__ === 'string'
+      ? __PLUGIN_VERSION__.trim().replace(/^v/i, '')
+      : '';
+
     /** 这台机器的系统（浏览器半侧只能这么看）：用来挑默认展示的 ffmpeg 安装命令。 */
     function currentOs() {
       const nav: any = window.navigator || {};
@@ -298,6 +336,55 @@ window.__ModuleLoader__.load({
       if (!Number.isFinite(number)) return '0';
       const text = number.toFixed(Math.abs(number) >= 1 ? 2 : 4);
       return text.includes('.') ? text.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '') : text;
+    }
+
+    /** 比较 x.y.z：远端确实比本地新才返回 true；任一边认不出来就当作没有更新。 */
+    function isNewerVersion(remote, local) {
+      const parse = (text) => {
+        const match = /(\d+)\.(\d+)\.(\d+)/.exec(String(text || ''));
+        return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+      };
+      const next = parse(remote);
+      const current = parse(local);
+      if (!next || !current) return false;
+      for (let index = 0; index < 3; index += 1) {
+        if (next[index] !== current[index]) return next[index] > current[index];
+      }
+      return false;
+    }
+
+    /** Gitee 返回的文件内容是 base64：先还原成字节，再按 UTF-8 解出文本。 */
+    function decodeBase64Text(raw) {
+      if (typeof atob !== 'function') return '';
+      const binary = atob(String(raw || '').replace(/\s+/g, ''));
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+      return typeof TextDecoder === 'function' ? new TextDecoder().decode(bytes) : binary;
+    }
+
+    /**
+     * 读 Gitee 上默认分支的 package.json，只用里面的 version 判断有没有新版本。
+     * 不走 npm 源也不用管理端凭据：谁都能查，查不到就只报「检查失败」，不影响生成。
+     */
+    async function fetchLatestVersion() {
+      const controller = typeof AbortController === 'function' ? new AbortController() : null;
+      const timer = controller ? window.setTimeout(() => controller.abort(), 12000) : null;
+      let response;
+      try {
+        response = await fetch(UPDATE_FILE_API, {
+          headers: { accept: 'application/json' },
+          signal: controller ? controller.signal : undefined,
+        });
+      } finally {
+        if (timer) window.clearTimeout(timer);
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const body = await response.json();
+      const text = body && typeof body.content === 'string' ? decodeBase64Text(body.content) : '';
+      if (!text) throw new Error('empty file');
+      const version = String((JSON.parse(text) || {}).version || '').trim().replace(/^v/i, '');
+      if (!version) throw new Error('no version');
+      return version;
     }
 
     const TOKENS = {
@@ -442,6 +529,12 @@ window.__ModuleLoader__.load({
         // ffmpeg 安装引导：默认只展示当前系统那条，可展开看其他系统；复制过的命令给个「已复制」反馈
         const [showAllFfmpeg, setShowAllFfmpeg] = React.useState(false);
         const [copiedFfmpeg, setCopiedFfmpeg] = React.useState('');
+        // 版本 / 检查更新：只读 Gitee 默认分支的 package.json，跟本包版本比大小
+        const [updateStatus, setUpdateStatus] = React.useState('idle');
+        const [updateMessage, setUpdateMessage] = React.useState('');
+        const [updateLatest, setUpdateLatest] = React.useState('');
+        const [updateAt, setUpdateAt] = React.useState('');
+        const [copiedUpdate, setCopiedUpdate] = React.useState('');
 
         // 打开设置页时，若本机还没配 Key，就先问服务端要回自己那把（设备绑定过就能取回）；
         // 但刚点过「重置插件」的不算——那时要保持未登录，等用户自己再点「登录」。
@@ -462,6 +555,20 @@ window.__ModuleLoader__.load({
             return;
           }
           lookupOwnKey().catch(() => {});
+        }, []);
+
+        // 版本卡片：先把上次查到的结果摆上（离线也能看），缓存过期了再静默查一次。
+        const updateTried = React.useRef(false);
+        React.useEffect(() => {
+          if (updateTried.current) return;
+          updateTried.current = true;
+          const cached = readUpdateCache();
+          if (cached.latest) {
+            setUpdateLatest(cached.latest);
+            if (cached.at) setUpdateAt(new Date(cached.at).toLocaleTimeString());
+            setUpdateStatus('ok');
+          }
+          if (!cached.fresh) checkForUpdate(true).catch(() => {});
         }, []);
 
         if (props && props.view === 'summary') {
@@ -905,6 +1012,58 @@ window.__ModuleLoader__.load({
           }
         }
 
+        /**
+         * 上次的版本检查结果（存在浏览器本地）：`fresh` 表示还没过期，
+         * 没过期就只用缓存显示、不再联网——打开设置页不该每次都打一个请求出去。
+         */
+        function readUpdateCache() {
+          try {
+            const raw = window.localStorage.getItem(UPDATE_CACHE_KEY);
+            const saved = raw ? JSON.parse(raw) : null;
+            if (!saved || typeof saved !== 'object') return { latest: '', at: 0, fresh: false };
+            const at = Number(saved.at) || 0;
+            return {
+              latest: String(saved.latest || ''),
+              at,
+              fresh: Boolean(at) && Date.now() - at < UPDATE_MAX_AGE_MS,
+            };
+          } catch {
+            return { latest: '', at: 0, fresh: false };
+          }
+        }
+
+        function rememberUpdateCheck(latest) {
+          try {
+            window.localStorage.setItem(UPDATE_CACHE_KEY, JSON.stringify({ at: Date.now(), latest }));
+          } catch {
+            // 存不住只是下次打开会再查一遍，不影响这次的显示
+          }
+        }
+
+        /**
+         * 检查更新：比 Gitee 上默认分支的版本号与本包版本。
+         * silent 用于打开设置页时的自动检查——失败不打扰用户，页面上还是上次的结果。
+         */
+        async function checkForUpdate(silent = false) {
+          if (!silent) {
+            setUpdateStatus('working');
+            setUpdateMessage('');
+          }
+          try {
+            const latest = await fetchLatestVersion();
+            setUpdateLatest(latest);
+            setUpdateAt(new Date().toLocaleTimeString());
+            setUpdateStatus('ok');
+            rememberUpdateCheck(latest);
+            return latest;
+          } catch (error) {
+            if (silent) return '';
+            setUpdateStatus('failed');
+            setUpdateMessage(t('versionFailed', { message: error?.message || String(error) }));
+            return '';
+          }
+        }
+
         function control(field) {
           const current = draft[field.key] !== undefined ? draft[field.key] : value[field.key];
           const id = `metaontic-video-${field.key}`;
@@ -1140,19 +1299,29 @@ window.__ModuleLoader__.load({
           quotaMessage ? h('span', { key: 'message', className: 'mov-hint' }, quotaMessage) : null,
         ]) : null;
 
-        /** 复制 ffmpeg 安装命令；剪贴板不可用就什么都不做，用户照样能照着敲。 */
-        function copyCommand(command) {
+        /** 复制一段文本；剪贴板不可用就什么都不做，用户照样能照着敲。 */
+        function copyText(text, mark) {
           try {
-            const result = window.navigator?.clipboard?.writeText(command);
+            const result = window.navigator?.clipboard?.writeText(text);
             if (result && typeof result.then === 'function') {
               result.then(() => {
-                setCopiedFfmpeg(command);
-                window.setTimeout(() => setCopiedFfmpeg(''), 2000);
+                mark(text);
+                window.setTimeout(() => mark(''), 2000);
               }, () => {});
             }
           } catch {
-            // 复制失败不影响照着命令自己装
+            // 复制失败不影响照着命令自己装 / 自己更新
           }
+        }
+
+        /** 复制 ffmpeg 安装命令。 */
+        function copyCommand(command) {
+          copyText(command, setCopiedFfmpeg);
+        }
+
+        /** 复制升级命令（卸载 + 重新从 Gitee 装）。 */
+        function copyUpdateCommand() {
+          copyText(UPDATE_COMMAND, setCopiedUpdate);
         }
 
         /** 一条记录里的时间：只到分钟，够看清「什么时候出的片」。 */
@@ -1246,6 +1415,73 @@ window.__ModuleLoader__.load({
           ]) : null,
           usageMessage ? h('span', { key: 'message', className: 'mov-hint' }, usageMessage) : null,
         ]) : null;
+
+        // 版本卡片：当前版本是构建时注入的常量，最新版本来自 Gitee 默认分支的 package.json。
+        // 有新版本时给出升级命令——用 git 源装的插件不会出现在「已安装」里的更新按钮上。
+        const updateAvailable = Boolean(updateLatest) && Boolean(PLUGIN_VERSION)
+          && isNewerVersion(updateLatest, PLUGIN_VERSION);
+        const updateText = updateStatus === 'working'
+          ? t('versionChecking')
+          : (updateStatus === 'failed'
+            ? updateMessage
+            : (updateStatus === 'ok'
+              ? (updateAvailable ? t('versionNew', { version: updateLatest }) : t('versionLatest'))
+              : ''));
+        const versionBox = h('div', {
+          key: 'version',
+          'data-field': 'version',
+          className: 'mov-card',
+        }, [
+          h('div', { key: 'head', className: 'mov-card-head' }, [
+            h('span', { key: 'title', className: 'mov-card-title' }, t('versionTitle')),
+            h('span', {
+              key: 'current',
+              'data-field': 'versionCurrent',
+              className: 'mov-hint',
+              style: { flex: '1 1 120px' },
+            }, PLUGIN_VERSION ? t('versionCurrent', { version: PLUGIN_VERSION }) : ''),
+            h('button', {
+              key: 'check',
+              'data-action': 'update-check',
+              type: 'button',
+              className: 'mov-btn mov-btn-sm mov-trailing',
+              disabled: updateStatus === 'working',
+              onClick: () => { checkForUpdate(false).catch(() => {}); },
+            }, updateStatus === 'working' ? t('versionChecking') : t('versionCheck')),
+          ]),
+          updateText
+            ? h('span', {
+              key: 'state',
+              'data-field': 'versionState',
+              className: 'mov-hint',
+              style: {
+                color: updateStatus === 'failed'
+                  ? TOKENS.error
+                  : (updateAvailable ? TOKENS.success : TOKENS.muted),
+              },
+            }, updateText)
+            : null,
+          updateAvailable
+            ? h('div', { key: 'command', className: 'mov-cmd-row' }, [
+              h('code', {
+                key: 'code',
+                'data-field': 'updateCommand',
+                className: 'mov-code',
+              }, UPDATE_COMMAND),
+              h('button', {
+                key: 'copy',
+                'data-action': 'update-copy',
+                type: 'button',
+                className: 'mov-btn mov-btn-sm',
+                onClick: copyUpdateCommand,
+              }, copiedUpdate ? t('versionCopied') : t('versionCopy')),
+            ])
+            : null,
+          updateAvailable ? h('span', { key: 'hint', className: 'mov-hint' }, t('versionHint')) : null,
+          (updateStatus === 'ok' && updateAt)
+            ? h('span', { key: 'at', className: 'mov-foot-note' }, t('versionCheckedAt', { time: updateAt }))
+            : null,
+        ]);
 
         // 有 Key 就整块不渲染（连标题、提示文字都没有），页面上只剩配置项 + 额度卡片。
         const registerBox = keyReady ? null : h('div', {
@@ -1341,7 +1577,7 @@ window.__ModuleLoader__.load({
         // 配置读不出来（没有表单 / 不可写）时只显示提示，配置项与卡片一律不渲染。
         const blobs = notice && !snapshot.value
           ? []
-          : [ffmpegBox, registerBox, quotaBox, usageBox, footer];
+          : [ffmpegBox, registerBox, quotaBox, usageBox, versionBox, footer];
 
         return h('div', { className: 'mov-page' }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。

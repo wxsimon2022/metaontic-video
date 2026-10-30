@@ -69,6 +69,17 @@ window.__ModuleLoader__.load({
       usageKeyMissing: "\u8FD8\u6CA1\u6709\u5BC6\u94A5\uFF1A\u9886\u5230 Key \u4E4B\u540E\uFF0C\u8FD9\u91CC\u4F1A\u663E\u793A\u7528\u5B83\u51FA\u7247\u7684\u8BB0\u5F55\u3002",
       usageStatusOk: "\u6210\u529F",
       usageStatusFailed: "\u5931\u8D25",
+      versionTitle: "\u63D2\u4EF6\u7248\u672C",
+      versionCurrent: "\u5F53\u524D\u7248\u672C v{version}",
+      versionCheck: "\u68C0\u67E5\u66F4\u65B0",
+      versionChecking: "\u68C0\u67E5\u4E2D\u2026",
+      versionLatest: "\u5DF2\u662F\u6700\u65B0\u7248\u672C",
+      versionNew: "\u6709\u65B0\u7248\u672C v{version}",
+      versionFailed: "\u68C0\u67E5\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
+      versionHint: "\u66F4\u65B0\u65B9\u5F0F\uFF1A\u63D2\u4EF6 \u2192 \u5DF2\u5B89\u88C5 \u2192 MetaOnticVideo \u2192 \u5378\u8F7D\uFF0C\u518D\u70B9\u300C\u6DFB\u52A0\u63D2\u4EF6\u300D\u7C98\u8D34\u4ED3\u5E93\u5730\u5740\uFF1B\u6216\u8005\u5728\u7EC8\u7AEF\u8DD1\u4E0B\u9762\u8FD9\u6761\u547D\u4EE4\u3002\u66F4\u65B0\u5B8C\u91CD\u542F Harness \u624D\u751F\u6548\u3002",
+      versionCopy: "\u590D\u5236\u547D\u4EE4",
+      versionCopied: "\u5DF2\u590D\u5236",
+      versionCheckedAt: "\u68C0\u67E5\u4E8E {time}",
       sectionGeneration: "\u751F\u6210\u53C2\u6570",
       sectionMerge: "\u5408\u5E76\u4E0E\u8F93\u51FA",
       sectionAdvanced: "\u9AD8\u7EA7",
@@ -147,6 +158,17 @@ window.__ModuleLoader__.load({
       quotaNotRegistered: "The service has no registration for this device (new device or cleared data) \u2014 ask an admin to reset it.",
       quotaFailed: "Failed to read quota: {message}",
       quotaUpdatedAt: "updated {time}",
+      versionTitle: "Plugin version",
+      versionCurrent: "Installed v{version}",
+      versionCheck: "Check for updates",
+      versionChecking: "Checking\u2026",
+      versionLatest: "Up to date",
+      versionNew: "v{version} is available",
+      versionFailed: "Update check failed: {message}",
+      versionHint: 'To update: Plugins \u2192 Installed \u2192 MetaOnticVideo \u2192 Uninstall, then "Add plugin" and paste the repository URL; or run the command below. Restart Harness afterwards for it to take effect.',
+      versionCopy: "Copy command",
+      versionCopied: "Copied",
+      versionCheckedAt: "checked {time}",
       register: "Log in",
       registerWorking: "Logging in\u2026",
       registerOk: "Logged in: provider, key, base URL and model written; applies after the config reload.",
@@ -220,6 +242,12 @@ window.__ModuleLoader__.load({
       "model"
     ];
     const DEFAULT_REGISTER_TOKEN = "metaontic-video-register-v1";
+    const UPDATE_PROJECT = "hackloop/metaontic-video";
+    const UPDATE_FILE_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json`;
+    const UPDATE_COMMAND = 'dsh plugin --profile desktop remove metaontic-video && dsh plugin --profile desktop add "git+https://gitee.com/hackloop/metaontic-video.git"';
+    const UPDATE_CACHE_KEY = "metaontic-video.update-check";
+    const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
+    const PLUGIN_VERSION = true ? "2.7.0".trim().replace(/^v/i, "") : "";
     function currentOs() {
       const nav = window.navigator || {};
       const raw = String(
@@ -251,6 +279,46 @@ window.__ModuleLoader__.load({
       if (!Number.isFinite(number)) return "0";
       const text = number.toFixed(Math.abs(number) >= 1 ? 2 : 4);
       return text.includes(".") ? text.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "") : text;
+    }
+    function isNewerVersion(remote, local) {
+      const parse = (text) => {
+        const match = /(\d+)\.(\d+)\.(\d+)/.exec(String(text || ""));
+        return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+      };
+      const next = parse(remote);
+      const current = parse(local);
+      if (!next || !current) return false;
+      for (let index = 0; index < 3; index += 1) {
+        if (next[index] !== current[index]) return next[index] > current[index];
+      }
+      return false;
+    }
+    function decodeBase64Text(raw) {
+      if (typeof atob !== "function") return "";
+      const binary = atob(String(raw || "").replace(/\s+/g, ""));
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+      return typeof TextDecoder === "function" ? new TextDecoder().decode(bytes) : binary;
+    }
+    async function fetchLatestVersion() {
+      const controller = typeof AbortController === "function" ? new AbortController() : null;
+      const timer = controller ? window.setTimeout(() => controller.abort(), 12e3) : null;
+      let response;
+      try {
+        response = await fetch(UPDATE_FILE_API, {
+          headers: { accept: "application/json" },
+          signal: controller ? controller.signal : void 0
+        });
+      } finally {
+        if (timer) window.clearTimeout(timer);
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const body = await response.json();
+      const text = body && typeof body.content === "string" ? decodeBase64Text(body.content) : "";
+      if (!text) throw new Error("empty file");
+      const version = String((JSON.parse(text) || {}).version || "").trim().replace(/^v/i, "");
+      if (!version) throw new Error("no version");
+      return version;
     }
     const TOKENS = {
       text: "var(--dsw-alias-label-primary, inherit)",
@@ -375,6 +443,11 @@ window.__ModuleLoader__.load({
         const [usageMessage, setUsageMessage] = React.useState("");
         const [showAllFfmpeg, setShowAllFfmpeg] = React.useState(false);
         const [copiedFfmpeg, setCopiedFfmpeg] = React.useState("");
+        const [updateStatus, setUpdateStatus] = React.useState("idle");
+        const [updateMessage, setUpdateMessage] = React.useState("");
+        const [updateLatest, setUpdateLatest] = React.useState("");
+        const [updateAt, setUpdateAt] = React.useState("");
+        const [copiedUpdate, setCopiedUpdate] = React.useState("");
         const restoreTried = React.useRef(false);
         React.useEffect(() => {
           if (restoreTried.current) return;
@@ -394,6 +467,19 @@ window.__ModuleLoader__.load({
             return;
           }
           lookupOwnKey().catch(() => {
+          });
+        }, []);
+        const updateTried = React.useRef(false);
+        React.useEffect(() => {
+          if (updateTried.current) return;
+          updateTried.current = true;
+          const cached = readUpdateCache();
+          if (cached.latest) {
+            setUpdateLatest(cached.latest);
+            if (cached.at) setUpdateAt(new Date(cached.at).toLocaleTimeString());
+            setUpdateStatus("ok");
+          }
+          if (!cached.fresh) checkForUpdate(true).catch(() => {
           });
         }, []);
         if (props && props.view === "summary") {
@@ -760,6 +846,46 @@ window.__ModuleLoader__.load({
             throw error;
           }
         }
+        function readUpdateCache() {
+          try {
+            const raw = window.localStorage.getItem(UPDATE_CACHE_KEY);
+            const saved = raw ? JSON.parse(raw) : null;
+            if (!saved || typeof saved !== "object") return { latest: "", at: 0, fresh: false };
+            const at = Number(saved.at) || 0;
+            return {
+              latest: String(saved.latest || ""),
+              at,
+              fresh: Boolean(at) && Date.now() - at < UPDATE_MAX_AGE_MS
+            };
+          } catch {
+            return { latest: "", at: 0, fresh: false };
+          }
+        }
+        function rememberUpdateCheck(latest) {
+          try {
+            window.localStorage.setItem(UPDATE_CACHE_KEY, JSON.stringify({ at: Date.now(), latest }));
+          } catch {
+          }
+        }
+        async function checkForUpdate(silent = false) {
+          if (!silent) {
+            setUpdateStatus("working");
+            setUpdateMessage("");
+          }
+          try {
+            const latest = await fetchLatestVersion();
+            setUpdateLatest(latest);
+            setUpdateAt((/* @__PURE__ */ new Date()).toLocaleTimeString());
+            setUpdateStatus("ok");
+            rememberUpdateCheck(latest);
+            return latest;
+          } catch (error) {
+            if (silent) return "";
+            setUpdateStatus("failed");
+            setUpdateMessage(t("versionFailed", { message: error?.message || String(error) }));
+            return "";
+          }
+        }
         function control(field) {
           const current = draft[field.key] !== void 0 ? draft[field.key] : value[field.key];
           const id = `metaontic-video-${field.key}`;
@@ -952,18 +1078,24 @@ window.__ModuleLoader__.load({
           quotaReady ? h("span", { key: "at", className: "mov-foot-note" }, t("quotaUpdatedAt", { time: quotaAt })) : null,
           quotaMessage ? h("span", { key: "message", className: "mov-hint" }, quotaMessage) : null
         ]) : null;
-        function copyCommand(command) {
+        function copyText(text, mark) {
           try {
-            const result = window.navigator?.clipboard?.writeText(command);
+            const result = window.navigator?.clipboard?.writeText(text);
             if (result && typeof result.then === "function") {
               result.then(() => {
-                setCopiedFfmpeg(command);
-                window.setTimeout(() => setCopiedFfmpeg(""), 2e3);
+                mark(text);
+                window.setTimeout(() => mark(""), 2e3);
               }, () => {
               });
             }
           } catch {
           }
+        }
+        function copyCommand(command) {
+          copyText(command, setCopiedFfmpeg);
+        }
+        function copyUpdateCommand() {
+          copyText(UPDATE_COMMAND, setCopiedUpdate);
         }
         function usageTime(value2) {
           if (!value2) return "-";
@@ -1061,6 +1193,58 @@ window.__ModuleLoader__.load({
           ]) : null,
           usageMessage ? h("span", { key: "message", className: "mov-hint" }, usageMessage) : null
         ]) : null;
+        const updateAvailable = Boolean(updateLatest) && Boolean(PLUGIN_VERSION) && isNewerVersion(updateLatest, PLUGIN_VERSION);
+        const updateText = updateStatus === "working" ? t("versionChecking") : updateStatus === "failed" ? updateMessage : updateStatus === "ok" ? updateAvailable ? t("versionNew", { version: updateLatest }) : t("versionLatest") : "";
+        const versionBox = h("div", {
+          key: "version",
+          "data-field": "version",
+          className: "mov-card"
+        }, [
+          h("div", { key: "head", className: "mov-card-head" }, [
+            h("span", { key: "title", className: "mov-card-title" }, t("versionTitle")),
+            h("span", {
+              key: "current",
+              "data-field": "versionCurrent",
+              className: "mov-hint",
+              style: { flex: "1 1 120px" }
+            }, PLUGIN_VERSION ? t("versionCurrent", { version: PLUGIN_VERSION }) : ""),
+            h("button", {
+              key: "check",
+              "data-action": "update-check",
+              type: "button",
+              className: "mov-btn mov-btn-sm mov-trailing",
+              disabled: updateStatus === "working",
+              onClick: () => {
+                checkForUpdate(false).catch(() => {
+                });
+              }
+            }, updateStatus === "working" ? t("versionChecking") : t("versionCheck"))
+          ]),
+          updateText ? h("span", {
+            key: "state",
+            "data-field": "versionState",
+            className: "mov-hint",
+            style: {
+              color: updateStatus === "failed" ? TOKENS.error : updateAvailable ? TOKENS.success : TOKENS.muted
+            }
+          }, updateText) : null,
+          updateAvailable ? h("div", { key: "command", className: "mov-cmd-row" }, [
+            h("code", {
+              key: "code",
+              "data-field": "updateCommand",
+              className: "mov-code"
+            }, UPDATE_COMMAND),
+            h("button", {
+              key: "copy",
+              "data-action": "update-copy",
+              type: "button",
+              className: "mov-btn mov-btn-sm",
+              onClick: copyUpdateCommand
+            }, copiedUpdate ? t("versionCopied") : t("versionCopy"))
+          ]) : null,
+          updateAvailable ? h("span", { key: "hint", className: "mov-hint" }, t("versionHint")) : null,
+          updateStatus === "ok" && updateAt ? h("span", { key: "at", className: "mov-foot-note" }, t("versionCheckedAt", { time: updateAt })) : null
+        ]);
         const registerBox = keyReady ? null : h("div", {
           key: "register",
           className: "mov-card",
@@ -1146,7 +1330,7 @@ window.__ModuleLoader__.load({
         if (snapshot.status === "loading") notice = t("loading");
         else if (snapshot.value === void 0) notice = t("unavailable");
         else if (snapshot.writable === false) notice = t("readOnly");
-        const blobs = notice && !snapshot.value ? [] : [ffmpegBox, registerBox, quotaBox, usageBox, footer];
+        const blobs = notice && !snapshot.value ? [] : [ffmpegBox, registerBox, quotaBox, usageBox, versionBox, footer];
         return h("div", { className: "mov-page" }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
           h("style", { key: "styles" }, PAGE_CSS),
