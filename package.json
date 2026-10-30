@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "2.15.0",
+  "version": "2.15.1",
   "description": "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
   "license": "MIT",
   "type": "module",
@@ -76,15 +76,11 @@
     "@deepseek-ai/schemastery": "~3.18.5"
   },
   "releaseNotes": {
-    "version": "2.15.0",
+    "version": "2.15.1",
     "items": [
-      "新增 A 服务端领 Key / B 火山 API Key 直连，保存时清理非当前方式配置。",
-      "按模型映射单次时长：2.0 为15秒、2.5 为30秒；暂隐藏2.5选项，保留兼容逻辑。",
-      "长视频逐段交付预览、确认后续做，永久保留原始分段。",
-      "按官方2.0建议修剪接缝，音视频同步处理并报告实际时长。",
-      "升级导演脚本与官方进阶提示词，长视频按段传递新动作和对白。",
-      "完善火山多图、素材模式校验、任务终态及请求大小处理。",
-      "优化设置页：更多设置默认折叠，统一按钮和额度布局，火山模式隐藏登录、额度及记录。"
+      "按当前能力重整README，更新接入方式、逐段预览续做、原始分段保留、素材输入及接缝裁剪说明。",
+      "规范后续发布：使用带新增、优化、修复和验证说明的附注标签，版本更新内容与包版本同步维护。",
+      "保留“视频导演”预设名称。"
     ]
   }
 }
