@@ -33,7 +33,8 @@
  */
 import { spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
-import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -605,36 +606,240 @@ function normalizeImageUrl(value, label) {
   return url;
 }
 
-/** 直出请求体：文本 + 可选首帧/尾帧图，沿用 contents-generation 的原生格式。 */
-function buildGenerationBody(config, args, seconds) {
+/** 允许上传的图片类型：扩展名 → MIME。 */
+const IMAGE_EXT_TO_MIME = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.gif': 'image/gif',
+  '.tif': 'image/tiff',
+  '.tiff': 'image/tiff',
+};
+/** 单张图片上限：内联成 base64 后请求体会涨约 1/3，压在这个大小比较稳。 */
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+/** 用文件头认图片，避免把改了扩展名的非图片文件读进去发走。 */
+function sniffImageMime(buffer: Buffer): string | null {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buffer.length >= 6 && (buffer.subarray(0, 6).toString('latin1') === 'GIF87a' || buffer.subarray(0, 6).toString('latin1') === 'GIF89a')) return 'image/gif';
+  if (buffer.length >= 2 && buffer[0] === 0x42 && buffer[1] === 0x4d) return 'image/bmp';
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString('latin1') === 'RIFF' && buffer.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
+  if (buffer.length >= 4 && ((buffer[0] === 0x49 && buffer[1] === 0x49 && buffer[2] === 0x2a) || (buffer[0] === 0x4d && buffer[1] === 0x4d && buffer[2] === 0x00))) return 'image/tiff';
+  return null;
+}
+
+/**
+ * 目标画幅的像素尺寸：ratio + 720P 算出来，参考图适配画幅时用。
+ * adaptive 表示「让模型按参考图自己决定画幅」，没有固定目标，不参与适配。
+ */
+const CANVAS_SIZES: Record<string, [number, number]> = {
+  '16:9': [1280, 720],
+  '9:16': [720, 1280],
+  '4:3': [960, 720],
+  '3:4': [720, 960],
+  '1:1': [720, 720],
+};
+
+function canvasSize(ratio) {
+  return CANVAS_SIZES[String(ratio ?? '').trim()] || null;
+}
+
+/** 适配后的参考图放这里：同一张图反复提交时不必每次重跑 ffmpeg。 */
+function referenceCacheDir() {
+  return path.join(os.tmpdir(), 'metaontic-video-reference');
+}
+
+/**
+ * 把本机参考图先适配到目标画幅再提交。
+ *
+ * i2v 会按参考图的比例出片：竖版定妆照配 16:9 的请求，拿回来的还是竖版。
+ * 这里沿用 videoflow-ai 的做法——原图等比缩到目标画幅做模糊底、居中叠上原图，
+ * 既不裁掉主体也不留黑边；尺寸本来就对得上就直接用原图。
+ * 只有本机文件能这么处理（公网 URL 交给上游自己取），ffmpeg 缺失或适配失败
+ * 都退回原图，不阻塞生成。
+ */
+async function fitImageToCanvas(absPath, size, config, signal) {
+  const [width, height] = size;
+  const media = await probeMedia(absPath, config, signal);
+  if (media?.width === width && media?.height === height) return absPath;
+  const info = await stat(absPath).catch(() => null);
+  const key = `${path.basename(absPath, path.extname(absPath))}-${info?.size ?? 0}`
+    + `-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`;
+  const dest = path.join(referenceCacheDir(), key);
+  if (await exists(dest)) return dest;
+  await mkdir(referenceCacheDir(), { recursive: true });
+  const graph = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,`
+    + `crop=${width}:${height},gblur=sigma=24[bg];`
+    + `[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease[fg];`
+    + `[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1`;
+  try {
+    const { code } = await runProcess(resolveBinary(config, 'ffmpegBinary', 'ffmpeg'), [
+      '-y', '-i', absPath, '-filter_complex', graph, '-frames:v', '1', '-q:v', '2', dest,
+    ], { signal, timeoutMs: 120000 });
+    // 半途失败可能留下截断的 jpg，下次会被当成缓存命中：落盘后先验尺寸，不合格就删掉退回原图
+    const fitted = code === 0 ? await probeMedia(dest, config, signal) : null;
+    if (fitted?.width === width && fitted?.height === height) return dest;
+    await rm(dest, { force: true }).catch(() => {});
+  } catch {
+    // 没装 ffmpeg、或这张图 ffmpeg 处理不了：按原图提交
+  }
+  return absPath;
+}
+
+/**
+ * 报错里回显用户输入时截断：base64 动辄几十万字符，原样带进错误信息会把结果撑爆。
+ */
+function brief(value, limit = 80) {
+  const text = String(value ?? '');
+  return text.length > limit ? `${text.slice(0, limit)}…（共 ${text.length} 字符）` : text;
+}
+
+/**
+ * 纯 base64（不带 `data:` 前缀）也认：
+ * - 解开能认出图片头 → 补 `data:` 前缀内联；
+ * - 明显是一大坨 base64 但解出来不是图片 → 直接报错，别退回「当路径」让人一头雾水；
+ * - 短的、或不像 base64 的 → 返回 null，交给路径那条分支。
+ */
+function inlineBase64Image(raw, label) {
+  const compact = String(raw ?? '').replace(/\s+/g, '');
+  if (compact.length < 64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return null;
+  const buffer = Buffer.from(compact, 'base64');
+  if (buffer.length > MAX_IMAGE_BYTES) {
+    throw new Error(
+      `${label} 解出来有 ${(buffer.length / 1048576).toFixed(1)} MB，`
+      + `请压到 ${MAX_IMAGE_BYTES / 1048576} MB 以内再传。`,
+    );
+  }
+  const mime = sniffImageMime(buffer);
+  if (mime) return { url: `data:${mime};base64,${compact}`, source: 'inline', bytes: buffer.length };
+  // 长到不可能是文件名的长度，还解不出图片头：按「base64 传错了」报，不退回路径
+  if (compact.length >= 256) {
+    throw new Error(
+      `${label} 看着是 base64，但解出来的内容不是图片（只认 jpg/png/webp/bmp/gif/tiff 的文件头）。`,
+    );
+  }
+  return null;
+}
+
+/**
+ * 把用户给的图片统一成请求里能用的 `image_url.url`，四种入参都收：
+ * - `https://` / `http://`：照原样用（上游自己取图，最省事）；
+ * - `data:image/...;base64,...`：原样内联；
+ * - 纯 base64：认出图片头就补上 `data:` 前缀内联（`Buffer` 能解、文件头是图片才算）；
+ * - 本机路径（含对话里 @ 引用的上传文件、`~` 开头的路径）：读进来内联成
+ *   `data:<mime>;base64,...`——上游取不到本机地址，这是这条线路上唯一可行的形态
+ *   （videoflow-ai 的 `image_ref_to_payload` 也这么干，中转站的图片接口同样把上传文件
+ *   在网关侧转成同名 data URI）。
+ * 本机图片在确定画幅（ratio 不是 adaptive）时会先适配画幅再内联；URL / base64 已经是字节流，原样交给上游。
+ */
+async function resolveImageInput(value, label, fit = null) {
+  const raw = String(value ?? '').trim().replace(/^@/, '');
+  if (!raw) throw new Error(`${label} 不能为空。`);
+  if (/^https?:\/\//i.test(raw)) return { url: raw, source: 'url' };
+  if (/^data:image\//i.test(raw)) return { url: raw, source: 'inline' };
+  const inlined = inlineBase64Image(raw, label);
+  if (inlined) return inlined;
+
+  const abs = path.resolve(raw.startsWith('~/') || raw === '~' ? path.join(os.homedir(), raw.slice(1)) : raw);
+  const ext = path.extname(abs).toLowerCase();
+  if (!IMAGE_EXT_TO_MIME[ext]) {
+    throw new Error(
+      `${label} 既不是 http(s) 链接、base64，也不是支持的图片文件：${brief(raw)}。`
+      + `本机图片请用 ${Object.keys(IMAGE_EXT_TO_MIME).join(' / ')} 之一。`,
+    );
+  }
+  const info = await stat(abs).catch(() => null);
+  if (!info?.isFile()) throw new Error(`${label} 找不到文件：${abs}`);
+
+  // 先适配画幅，再按「真正要发出去的那张图」做大小与格式校验
+  const submitPath = fit?.size
+    ? await fitImageToCanvas(abs, fit.size, fit.config, fit.signal)
+    : abs;
+  const submitInfo = submitPath === abs ? info : await stat(submitPath).catch(() => null);
+  if (!submitInfo?.isFile()) throw new Error(`${label} 读不出来：${abs}`);
+  if (submitInfo.size > MAX_IMAGE_BYTES) {
+    throw new Error(
+      `${label} 太大（${(submitInfo.size / 1048576).toFixed(1)} MB），请压到 `
+      + `${MAX_IMAGE_BYTES / 1048576} MB 以内再传：${abs}`,
+    );
+  }
+  const buffer = await readFile(submitPath);
+  const mime = sniffImageMime(buffer);
+  if (!mime) throw new Error(`${label} 不是有效的图片文件（读到的内容不是 jpg/png/webp/bmp/gif/tiff）：${abs}`);
+  const resolved: Record<string, unknown> = {
+    url: `data:${mime};base64,${buffer.toString('base64')}`,
+    source: 'file',
+    localPath: submitPath,
+    bytes: buffer.length,
+  };
+  if (submitPath !== abs) {
+    resolved.originalPath = abs;
+    resolved.fittedTo = `${fit.size[0]}x${fit.size[1]}`;
+  }
+  return resolved;
+}
+
+/**
+ * 直出请求体：文本 + 可选参考图（首帧 / 尾帧 / 人物形象参考），沿用 contents-generation 的原生格式。
+ *
+ * 图片位与 videoflow-ai 提交视频时的口径一致：首帧、尾帧、人物形象参考各一张，
+ * 人物形象参考多给的那几张会被上游静默丢弃（第二张会被当成尾帧），所以这里只发第一张并说明。
+ */
+async function buildGenerationBody(config, args, seconds, options: { signal?: AbortSignal } = {}) {
   const prompt = String(args.prompt ?? '').trim();
-  // 文本项 + 可选的首帧 / 尾帧图，形状由上游决定，这里只保证顺序与字段名
+  const ratio = args.ratio || ref(config, 'ratio', 'adaptive');
+  const canvas = canvasSize(ratio);
+  const fit = canvas ? { size: canvas, config, signal: options.signal } : null;
+
+  // 文本项 + 可选图片，形状由上游决定，这里只保证顺序与字段名
   const content: Array<Record<string, unknown>> = [
     { type: 'text', text: buildGenerationPrompt({ prompt, seconds }) },
   ];
+  const images = [];
+  const notes: string[] = [];
+
+  const addImage = async (value, role, label) => {
+    const resolved = await resolveImageInput(value, label, fit);
+    content.push({
+      type: 'image_url',
+      image_url: { url: resolved.url },
+      role,
+    });
+    images.push({ role, ...resolved });
+  };
 
   const firstFrame = String(args.firstFrameUrl ?? '').trim();
-  if (firstFrame) {
-    content.push({
-      type: 'image_url',
-      image_url: { url: normalizeImageUrl(firstFrame, '首帧图 URL') },
-      role: 'first_frame',
-    });
-  }
+  if (firstFrame) await addImage(firstFrame, 'first_frame', '首帧图');
+
   const lastFrame = String(args.lastFrameUrl ?? '').trim();
-  if (lastFrame) {
-    content.push({
-      type: 'image_url',
-      image_url: { url: normalizeImageUrl(lastFrame, '尾帧图 URL') },
-      role: 'last_frame',
-    });
+  if (lastFrame) await addImage(lastFrame, 'last_frame', '尾帧图');
+
+  // 人物形象 / 主体参考图：只发第一张（上游每个角色位只认一张）
+  const rawReferences = Array.isArray(args.referenceImages)
+    ? args.referenceImages
+    : (args.referenceImages ? [args.referenceImages] : []);
+  const references = rawReferences.map((item) => String(item ?? '').trim()).filter(Boolean);
+  if (rawReferences.length && !references.length) {
+    throw new Error('参考图（referenceImages）不能是空字符串。');
+  }
+  if (references.length) {
+    if (references.length > 1) {
+      notes.push(
+        `上游一次只认一张人物形象参考图，本次只用第一张，其余 ${references.length - 1} 张已忽略；`
+        + '要固定多个人物，先把他们合成到一张参考图里再传。',
+      );
+    }
+    await addImage(references[0], 'reference_image', '参考图 1');
   }
 
   const body = { ...parseExtraParams(config) };
   body.model = resolveModel(config);
   body.content = content;
   body.duration = seconds;
-  body.ratio = args.ratio || ref(config, 'ratio', 'adaptive');
+  body.ratio = ratio;
 
   body.resolution = FIXED_RESOLUTION;
 
@@ -648,7 +853,7 @@ function buildGenerationBody(config, args, seconds) {
   if (typeof args.returnLastFrame === 'boolean') body.return_last_frame = args.returnLastFrame;
   if (args.seed != null && Number.isFinite(Number(args.seed))) body.seed = Number(args.seed);
 
-  return { body, seconds };
+  return { body, seconds, images, notes };
 }
 
 /** 创建任务并等到结束；超时、取消、失败都归一化成同一形状。 */
@@ -1608,8 +1813,14 @@ function estimateUsage(config, toolName, args) {
   const resolution = FIXED_RESOLUTION;
   const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS[FIXED_RESOLUTION];
   const tokensPerSecond = (pixels[0] * pixels[1] * ESTIMATE_FPS) / ESTIMATE_TOKEN_DIVISOR;
+  // 有首/尾帧或参考图，就算「带参考素材」，价目表里视频一档更便宜。
+  const referenceImages = Array.isArray(args?.referenceImages)
+    ? args.referenceImages
+    : (args?.referenceImages ? [args.referenceImages] : []);
   const hasFrame = Boolean(
-    String(args?.firstFrameUrl ?? '').trim() || String(args?.lastFrameUrl ?? '').trim(),
+    String(args?.firstFrameUrl ?? '').trim()
+    || String(args?.lastFrameUrl ?? '').trim()
+    || referenceImages.length,
   );
   const model = resolveModel(config);
   const groupRatio = finiteNumber(ref(config, 'estimateGroupRatio', 0.8)) ?? 1;
@@ -2450,7 +2661,12 @@ function videoTool(config, deps) {
       + '问他要不要现在装 ffmpeg（给出他系统的命令，说明装好重跑就会自动合并、分段不用重新生成），'
       + '同意就用终端工具装上（宿主会让他确认）并 `ffmpeg -version` 验证，然后按同样的 duration 重发；'
       + '用户不想装就带 merge:false 重发，插件只返回分段列表（每段上游链接 + 本地文件）。'
-      + '拿到 ffmpegMissing=true 的结果时也要照 installHint 引导安装，别只丢一句「已跳过合并」。',
+      + '拿到 ffmpegMissing=true 的结果时也要照 installHint 引导安装，别只丢一句「已跳过合并」。'
+      + '**人物形象 / 参考图**：公网图片 URL、base64（data URI 或纯 base64）、或用户上传的本地图片'
+      + '（对话里拖进来的文件、@ 引用的路径）都支持——'
+      + '要固定人物长相、服装、场景时传 referenceImages（一次只认第一张）；首帧 / 尾帧用 '
+      + 'firstFrameUrl / lastFrameUrl 传。公网 URL 直接交给中转站取图；本地图片由插件读进来'
+      + '（按 ratio 先适配画幅）内联成 image_url 发给中转站，用户不需要自己找图床。',
     parameters: {
       type: 'object',
       properties: {
@@ -2470,11 +2686,22 @@ function videoTool(config, deps) {
         },
         firstFrameUrl: {
           type: 'string',
-          description: '可选：首帧图公网 URL，作为生成的首帧参考。',
+          description: '可选：首帧图，公网 URL、base64 或本机图片路径（含对话里 @ 引用的上传文件）都行，'
+            + '作为生成的首帧参考；本机图片会按 ratio 先适配到目标画幅再提交。',
         },
         lastFrameUrl: {
           type: 'string',
-          description: '可选：尾帧图公网 URL，作为生成的尾帧参考。',
+          description: '可选：尾帧图，公网 URL、base64 或本机图片路径都行，作为生成的尾帧参考。',
+        },
+        referenceImages: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            '可选：人物形象 / 主体参考图（每项是公网 URL、base64（data URI 或纯 base64）或本机图片路径，'
+            + '对话里 @ 引用的上传文件也可以）。'
+            + '想把某个人的长相、发型、服装固定下来时用它，图片以 role=reference_image 传给上游。'
+            + '上游一次只认一张，多给的会被忽略（要固定多个人物请先把他们合成到一张图里）。'
+            + '本地图片单张不超过 8 MB，支持 jpg/jpeg/png/webp/bmp/gif/tiff。',
         },
         segmentSeconds: {
           type: 'integer',
@@ -2532,6 +2759,7 @@ function videoTool(config, deps) {
           installHint: { type: 'string' },
           partial: { type: 'boolean' },
           pendingTaskId: { type: 'string' },
+          images: { type: 'array' },
           note: { type: 'string' },
           error: { type: 'string' },
           errorCode: { type: 'string' },
@@ -2575,6 +2803,7 @@ function videoTool(config, deps) {
       }
 
       const segments = [];
+      const resultImages = [];
       let status = 'succeeded';
       let error;
       let errorCode;
@@ -2592,9 +2821,19 @@ function videoTool(config, deps) {
           direction: 'backward',
           startAt: step.kind === 'extend' ? cursor : undefined,
         };
-        const { body, seconds } = step.kind === 'generate'
-          ? buildGenerationBody(config, stepArgs, step.seconds)
-          : buildRequestBody(config, stepArgs, referenceUrl);
+        let body;
+        let seconds;
+        if (step.kind === 'generate') {
+          const generated = await buildGenerationBody(config, stepArgs, step.seconds, {
+            signal: exec?.signal,
+          });
+          body = generated.body;
+          seconds = generated.seconds;
+          if (generated.images?.length) resultImages.push(...generated.images);
+          if (generated.notes?.length) notes.push(...generated.notes);
+        } else {
+          ({ body, seconds } = buildRequestBody(config, stepArgs, referenceUrl));
+        }
 
         const final = await runTask(config, body, exec?.signal);
         const detail = final.errorCode === 'content_rejected'
@@ -2633,6 +2872,17 @@ function videoTool(config, deps) {
         error,
         errorCode,
       };
+      if (resultImages.length) {
+        // 只回「用了哪些图、来自哪里」，不回 base64 正文（太长）
+        result.images = resultImages.map((item) => ({
+          role: item.role,
+          source: item.source,
+          localPath: item.localPath,
+          bytes: item.bytes,
+          originalPath: item.originalPath,
+          fittedTo: item.fittedTo,
+        }));
+      }
 
       const deliveredSeconds = completed.reduce((sum, segment) => sum + segment.seconds, 0);
       // 没成功的那一段：区分「确实失败」和「只是没查到」。后者任务已经提交、大概率还在生成，

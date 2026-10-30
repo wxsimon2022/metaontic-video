@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
-import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -317,32 +318,172 @@ function normalizeImageUrl(value, label) {
   }
   return url;
 }
-function buildGenerationBody(config, args, seconds) {
+const IMAGE_EXT_TO_MIME = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+  ".gif": "image/gif",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff"
+};
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+function sniffImageMime(buffer) {
+  if (buffer.length >= 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) return "image/jpeg";
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "image/png";
+  if (buffer.length >= 6 && (buffer.subarray(0, 6).toString("latin1") === "GIF87a" || buffer.subarray(0, 6).toString("latin1") === "GIF89a")) return "image/gif";
+  if (buffer.length >= 2 && buffer[0] === 66 && buffer[1] === 77) return "image/bmp";
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString("latin1") === "RIFF" && buffer.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
+  if (buffer.length >= 4 && (buffer[0] === 73 && buffer[1] === 73 && buffer[2] === 42 || buffer[0] === 77 && buffer[1] === 77 && buffer[2] === 0)) return "image/tiff";
+  return null;
+}
+const CANVAS_SIZES = {
+  "16:9": [1280, 720],
+  "9:16": [720, 1280],
+  "4:3": [960, 720],
+  "3:4": [720, 960],
+  "1:1": [720, 720]
+};
+function canvasSize(ratio) {
+  return CANVAS_SIZES[String(ratio ?? "").trim()] || null;
+}
+function referenceCacheDir() {
+  return path.join(os.tmpdir(), "metaontic-video-reference");
+}
+async function fitImageToCanvas(absPath, size, config, signal) {
+  const [width, height] = size;
+  const media = await probeMedia(absPath, config, signal);
+  if (media?.width === width && media?.height === height) return absPath;
+  const info = await stat(absPath).catch(() => null);
+  const key = `${path.basename(absPath, path.extname(absPath))}-${info?.size ?? 0}-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`;
+  const dest = path.join(referenceCacheDir(), key);
+  if (await exists(dest)) return dest;
+  await mkdir(referenceCacheDir(), { recursive: true });
+  const graph = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},gblur=sigma=24[bg];[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1`;
+  try {
+    const { code } = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
+      "-y",
+      "-i",
+      absPath,
+      "-filter_complex",
+      graph,
+      "-frames:v",
+      "1",
+      "-q:v",
+      "2",
+      dest
+    ], { signal, timeoutMs: 12e4 });
+    const fitted = code === 0 ? await probeMedia(dest, config, signal) : null;
+    if (fitted?.width === width && fitted?.height === height) return dest;
+    await rm(dest, { force: true }).catch(() => {
+    });
+  } catch {
+  }
+  return absPath;
+}
+function brief(value, limit = 80) {
+  const text = String(value ?? "");
+  return text.length > limit ? `${text.slice(0, limit)}\u2026\uFF08\u5171 ${text.length} \u5B57\u7B26\uFF09` : text;
+}
+function inlineBase64Image(raw, label) {
+  const compact = String(raw ?? "").replace(/\s+/g, "");
+  if (compact.length < 64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return null;
+  const buffer = Buffer.from(compact, "base64");
+  if (buffer.length > MAX_IMAGE_BYTES) {
+    throw new Error(
+      `${label} \u89E3\u51FA\u6765\u6709 ${(buffer.length / 1048576).toFixed(1)} MB\uFF0C\u8BF7\u538B\u5230 ${MAX_IMAGE_BYTES / 1048576} MB \u4EE5\u5185\u518D\u4F20\u3002`
+    );
+  }
+  const mime = sniffImageMime(buffer);
+  if (mime) return { url: `data:${mime};base64,${compact}`, source: "inline", bytes: buffer.length };
+  if (compact.length >= 256) {
+    throw new Error(
+      `${label} \u770B\u7740\u662F base64\uFF0C\u4F46\u89E3\u51FA\u6765\u7684\u5185\u5BB9\u4E0D\u662F\u56FE\u7247\uFF08\u53EA\u8BA4 jpg/png/webp/bmp/gif/tiff \u7684\u6587\u4EF6\u5934\uFF09\u3002`
+    );
+  }
+  return null;
+}
+async function resolveImageInput(value, label, fit = null) {
+  const raw = String(value ?? "").trim().replace(/^@/, "");
+  if (!raw) throw new Error(`${label} \u4E0D\u80FD\u4E3A\u7A7A\u3002`);
+  if (/^https?:\/\//i.test(raw)) return { url: raw, source: "url" };
+  if (/^data:image\//i.test(raw)) return { url: raw, source: "inline" };
+  const inlined = inlineBase64Image(raw, label);
+  if (inlined) return inlined;
+  const abs = path.resolve(raw.startsWith("~/") || raw === "~" ? path.join(os.homedir(), raw.slice(1)) : raw);
+  const ext = path.extname(abs).toLowerCase();
+  if (!IMAGE_EXT_TO_MIME[ext]) {
+    throw new Error(
+      `${label} \u65E2\u4E0D\u662F http(s) \u94FE\u63A5\u3001base64\uFF0C\u4E5F\u4E0D\u662F\u652F\u6301\u7684\u56FE\u7247\u6587\u4EF6\uFF1A${brief(raw)}\u3002\u672C\u673A\u56FE\u7247\u8BF7\u7528 ${Object.keys(IMAGE_EXT_TO_MIME).join(" / ")} \u4E4B\u4E00\u3002`
+    );
+  }
+  const info = await stat(abs).catch(() => null);
+  if (!info?.isFile()) throw new Error(`${label} \u627E\u4E0D\u5230\u6587\u4EF6\uFF1A${abs}`);
+  const submitPath = fit?.size ? await fitImageToCanvas(abs, fit.size, fit.config, fit.signal) : abs;
+  const submitInfo = submitPath === abs ? info : await stat(submitPath).catch(() => null);
+  if (!submitInfo?.isFile()) throw new Error(`${label} \u8BFB\u4E0D\u51FA\u6765\uFF1A${abs}`);
+  if (submitInfo.size > MAX_IMAGE_BYTES) {
+    throw new Error(
+      `${label} \u592A\u5927\uFF08${(submitInfo.size / 1048576).toFixed(1)} MB\uFF09\uFF0C\u8BF7\u538B\u5230 ${MAX_IMAGE_BYTES / 1048576} MB \u4EE5\u5185\u518D\u4F20\uFF1A${abs}`
+    );
+  }
+  const buffer = await readFile(submitPath);
+  const mime = sniffImageMime(buffer);
+  if (!mime) throw new Error(`${label} \u4E0D\u662F\u6709\u6548\u7684\u56FE\u7247\u6587\u4EF6\uFF08\u8BFB\u5230\u7684\u5185\u5BB9\u4E0D\u662F jpg/png/webp/bmp/gif/tiff\uFF09\uFF1A${abs}`);
+  const resolved = {
+    url: `data:${mime};base64,${buffer.toString("base64")}`,
+    source: "file",
+    localPath: submitPath,
+    bytes: buffer.length
+  };
+  if (submitPath !== abs) {
+    resolved.originalPath = abs;
+    resolved.fittedTo = `${fit.size[0]}x${fit.size[1]}`;
+  }
+  return resolved;
+}
+async function buildGenerationBody(config, args, seconds, options = {}) {
   const prompt = String(args.prompt ?? "").trim();
+  const ratio = args.ratio || ref(config, "ratio", "adaptive");
+  const canvas = canvasSize(ratio);
+  const fit = canvas ? { size: canvas, config, signal: options.signal } : null;
   const content = [
     { type: "text", text: buildGenerationPrompt({ prompt, seconds }) }
   ];
+  const images = [];
+  const notes = [];
+  const addImage = async (value, role, label) => {
+    const resolved = await resolveImageInput(value, label, fit);
+    content.push({
+      type: "image_url",
+      image_url: { url: resolved.url },
+      role
+    });
+    images.push({ role, ...resolved });
+  };
   const firstFrame = String(args.firstFrameUrl ?? "").trim();
-  if (firstFrame) {
-    content.push({
-      type: "image_url",
-      image_url: { url: normalizeImageUrl(firstFrame, "\u9996\u5E27\u56FE URL") },
-      role: "first_frame"
-    });
-  }
+  if (firstFrame) await addImage(firstFrame, "first_frame", "\u9996\u5E27\u56FE");
   const lastFrame = String(args.lastFrameUrl ?? "").trim();
-  if (lastFrame) {
-    content.push({
-      type: "image_url",
-      image_url: { url: normalizeImageUrl(lastFrame, "\u5C3E\u5E27\u56FE URL") },
-      role: "last_frame"
-    });
+  if (lastFrame) await addImage(lastFrame, "last_frame", "\u5C3E\u5E27\u56FE");
+  const rawReferences = Array.isArray(args.referenceImages) ? args.referenceImages : args.referenceImages ? [args.referenceImages] : [];
+  const references = rawReferences.map((item) => String(item ?? "").trim()).filter(Boolean);
+  if (rawReferences.length && !references.length) {
+    throw new Error("\u53C2\u8003\u56FE\uFF08referenceImages\uFF09\u4E0D\u80FD\u662F\u7A7A\u5B57\u7B26\u4E32\u3002");
+  }
+  if (references.length) {
+    if (references.length > 1) {
+      notes.push(
+        `\u4E0A\u6E38\u4E00\u6B21\u53EA\u8BA4\u4E00\u5F20\u4EBA\u7269\u5F62\u8C61\u53C2\u8003\u56FE\uFF0C\u672C\u6B21\u53EA\u7528\u7B2C\u4E00\u5F20\uFF0C\u5176\u4F59 ${references.length - 1} \u5F20\u5DF2\u5FFD\u7565\uFF1B\u8981\u56FA\u5B9A\u591A\u4E2A\u4EBA\u7269\uFF0C\u5148\u628A\u4ED6\u4EEC\u5408\u6210\u5230\u4E00\u5F20\u53C2\u8003\u56FE\u91CC\u518D\u4F20\u3002`
+      );
+    }
+    await addImage(references[0], "reference_image", "\u53C2\u8003\u56FE 1");
   }
   const body = { ...parseExtraParams(config) };
   body.model = resolveModel(config);
   body.content = content;
   body.duration = seconds;
-  body.ratio = args.ratio || ref(config, "ratio", "adaptive");
+  body.ratio = ratio;
   body.resolution = FIXED_RESOLUTION;
   const generateAudio = args.generateAudio ?? ref(config, "generateAudio", true);
   if (typeof generateAudio === "boolean") body.generate_audio = generateAudio;
@@ -351,7 +492,7 @@ function buildGenerationBody(config, args, seconds) {
   if (args.user) body.safety_identifier = String(args.user);
   if (typeof args.returnLastFrame === "boolean") body.return_last_frame = args.returnLastFrame;
   if (args.seed != null && Number.isFinite(Number(args.seed))) body.seed = Number(args.seed);
-  return { body, seconds };
+  return { body, seconds, images, notes };
 }
 async function runTask(config, body, signal) {
   const created = await createTask(config, body, signal);
@@ -574,16 +715,16 @@ async function findInstalledFfmpeg(signal) {
 }
 function ffmpegInstallHint(config) {
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  const { os, installs } = ffmpegInstallOptions();
+  const { os: os2, installs } = ffmpegInstallOptions();
   const lines = [
     `\u672C\u673A\u6CA1\u6709\u627E\u5230\u53EF\u7528\u7684 ffmpeg\uFF08${binary}\uFF09\uFF0C\u6240\u4EE5\u300C\u628A\u591A\u6BB5\u5408\u5E76\u6210\u4E00\u6761\u300D\u8FD9\u6B65\u6682\u65F6\u6CA1\u505A\uFF0C\u5206\u6BB5\u6587\u4EF6\u90FD\u5728\uFF0C\u4E00\u6761\u90FD\u4E0D\u5C11\u3002`,
-    `\u88C5\u4E00\u4E0B ffmpeg \u5C31\u80FD\u5408\u5E76\uFF08\u4F60\u5F53\u524D\u662F ${os}\uFF09\uFF1A`,
+    `\u88C5\u4E00\u4E0B ffmpeg \u5C31\u80FD\u5408\u5E76\uFF08\u4F60\u5F53\u524D\u662F ${os2}\uFF09\uFF1A`,
     ...installs.map((item) => `  \xB7 ${item.label}\uFF1A${item.command}`),
     "\u88C5\u597D\u540E\u91CD\u8DD1\u8FD9\u6B21\u751F\u6210\uFF0C\u5206\u6BB5\u4F1A\u81EA\u52A8\u5408\u5E76\u6210\u4E00\u6761\uFF0C\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF1B\u5982\u679C ffmpeg \u5DF2\u7ECF\u88C5\u4E86\u4F46\u4E0D\u5728\u9ED8\u8BA4\u4F4D\u7F6E\uFF0C\u628A\u5B83\u7684\u7EDD\u5BF9\u8DEF\u5F84\u586B\u5230\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\u4E5F\u4E00\u6837\u7BA1\u7528\u3002",
     "ffmpeg \u7684\u5B89\u88C5\u5305\u91CC\u81EA\u5E26 ffprobe\uFF0C\u88C5\u5B8C\u5206\u6BB5\u63A2\u6D4B\u4E5F\u4E00\u8D77\u597D\u4E86\u3002",
     "\u60F3\u8BA9\u6211\u6765\u88C5\u5C31\u8BF4\u4E00\u58F0 \u2014\u2014 \u6211\u4F1A\u7528 video_setup \u6267\u884C\u5B89\u88C5\uFF08\u6267\u884C\u524D\u5BBF\u4E3B\u4F1A\u5148\u8BA9\u4F60\u786E\u8BA4\u547D\u4EE4\uFF09\u3002"
   ];
-  return { binary, os, installs, hint: lines.join("\n") };
+  return { binary, os: os2, installs, hint: lines.join("\n") };
 }
 async function probeMedia(file, config, signal) {
   try {
@@ -1153,8 +1294,9 @@ function estimateUsage(config, toolName, args) {
   const resolution = FIXED_RESOLUTION;
   const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS[FIXED_RESOLUTION];
   const tokensPerSecond = pixels[0] * pixels[1] * ESTIMATE_FPS / ESTIMATE_TOKEN_DIVISOR;
+  const referenceImages = Array.isArray(args?.referenceImages) ? args.referenceImages : args?.referenceImages ? [args.referenceImages] : [];
   const hasFrame = Boolean(
-    String(args?.firstFrameUrl ?? "").trim() || String(args?.lastFrameUrl ?? "").trim()
+    String(args?.firstFrameUrl ?? "").trim() || String(args?.lastFrameUrl ?? "").trim() || referenceImages.length
   );
   const model = resolveModel(config);
   const groupRatio = finiteNumber(ref(config, "estimateGroupRatio", 0.8)) ?? 1;
@@ -1183,7 +1325,7 @@ function estimateUsage(config, toolName, args) {
 function resolveRegisterApi(config) {
   return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-const PLUGIN_VERSION = true ? "2.10.5".trim().replace(/^v/i, "") : "";
+const PLUGIN_VERSION = true ? "2.11.0".trim().replace(/^v/i, "") : "";
 async function fetchDeviceQuota(config, signal) {
   const api = resolveRegisterApi(config);
   const deviceId = String(ref(config, "deviceId", "")).trim();
@@ -1245,20 +1387,20 @@ function planSummary(estimate) {
 function setupGate(ctx, exec) {
   const args = exec.arguments && typeof exec.arguments === "object" ? exec.arguments : {};
   if (args?.install !== true) return { kind: "allow" };
-  const { os, installs, bootstrap } = ffmpegInstallOptions();
+  const { os: os2, installs, bootstrap } = ffmpegInstallOptions();
   const command = String(args?.target || "ffmpeg") === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
   if (approvalPolicy(ctx, exec) === "never") {
     return {
       kind: "deny",
-      reason: `\u5F53\u524D\u6743\u9650\u6A21\u5F0F\u5173\u95ED\u4E86\u5BA1\u6279\u63D0\u793A\uFF08\u5B8C\u5168\u8BBF\u95EE\uFF09\uFF0C\u88C5\u73AF\u5883\u8FD9\u79CD\u4F1A\u5728\u672C\u673A\u8DD1\u547D\u4EE4\u7684\u64CD\u4F5C\u6CA1\u6CD5\u786E\u8BA4\uFF0C\u5DF2\u505C\u6B62\u3002\u628A\u6743\u9650\u5207\u5230\u300C\u5DE5\u4F5C\u533A\u5199\u5165\u300D\u6216\u300C\u53EA\u8BFB\u300D\u540E\u518D\u8BA9\u6211\u88C5\uFF1B\u4E5F\u53EF\u4EE5\u7167\u7740\u8FD9\u6761\u547D\u4EE4\u81EA\u5DF1\u5728\u7EC8\u7AEF\u6267\u884C\uFF1A${command}\uFF08${os}\uFF09\u3002`
+      reason: `\u5F53\u524D\u6743\u9650\u6A21\u5F0F\u5173\u95ED\u4E86\u5BA1\u6279\u63D0\u793A\uFF08\u5B8C\u5168\u8BBF\u95EE\uFF09\uFF0C\u88C5\u73AF\u5883\u8FD9\u79CD\u4F1A\u5728\u672C\u673A\u8DD1\u547D\u4EE4\u7684\u64CD\u4F5C\u6CA1\u6CD5\u786E\u8BA4\uFF0C\u5DF2\u505C\u6B62\u3002\u628A\u6743\u9650\u5207\u5230\u300C\u5DE5\u4F5C\u533A\u5199\u5165\u300D\u6216\u300C\u53EA\u8BFB\u300D\u540E\u518D\u8BA9\u6211\u88C5\uFF1B\u4E5F\u53EF\u4EE5\u7167\u7740\u8FD9\u6761\u547D\u4EE4\u81EA\u5DF1\u5728\u7EC8\u7AEF\u6267\u884C\uFF1A${command}\uFF08${os2}\uFF09\u3002`
     };
   }
   return {
     kind: "ask",
-    reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u5728 ${os} \u4E0A\u6267\u884C\u5B89\u88C5\u547D\u4EE4\u300C${command}\u300D\u3002`,
+    reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u5728 ${os2} \u4E0A\u6267\u884C\u5B89\u88C5\u547D\u4EE4\u300C${command}\u300D\u3002`,
     displayReason: {
-      zh: `\u51C6\u5907\u5728\u8FD9\u53F0\u7535\u8111\u4E0A\u88C5 ffmpeg\uFF1A${command}\uFF08${os}\uFF09\u3002\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u6267\u884C\uFF0C\u88C5\u5B8C\u4F1A\u81EA\u52A8\u63A5\u7740\u628A\u89C6\u9891\u751F\u6210\u51FA\u6765\u3002`,
-      en: `About to install ffmpeg on this machine: ${command} (${os}). It runs only after you allow it; the video generation continues right after.`
+      zh: `\u51C6\u5907\u5728\u8FD9\u53F0\u7535\u8111\u4E0A\u88C5 ffmpeg\uFF1A${command}\uFF08${os2}\uFF09\u3002\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u6267\u884C\uFF0C\u88C5\u5B8C\u4F1A\u81EA\u52A8\u63A5\u7740\u628A\u89C6\u9891\u751F\u6210\u51FA\u6765\u3002`,
+      en: `About to install ffmpeg on this machine: ${command} (${os2}). It runs only after you allow it; the video generation continues right after.`
     }
   };
 }
@@ -1273,14 +1415,14 @@ async function ffmpegConsentGate(config, exec, args) {
   }
   if (!plan || plan.length < 2) return null;
   if (await hasFfmpeg(config, exec.signal)) return null;
-  const { os, installs } = ffmpegInstallOptions();
+  const { os: os2, installs } = ffmpegInstallOptions();
   const command = installs[0].command;
   const sizes = plan.map((step) => `${step.seconds}s`).join(" + ");
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
   const lines = [
     `\u672C\u673A\u6CA1\u6709 ${binary}\uFF0C\u8FD9\u6B21\u8981\u751F\u6210 ${plan.reduce((sum, step) => sum + step.seconds, 0)} \u79D2\uFF08\u4F1A\u62C6\u6210 ${plan.length} \u6BB5\uFF1A${sizes}\uFF09\uFF0C\u6CA1\u6709 ffmpeg \u5C31\u6CA1\u6CD5\u5408\u5E76\u6210\u4E00\u6761\uFF0C\u6240\u4EE5\u5148\u505C\u4E0B\u6765\u4E86\uFF0C\u8FD8\u6CA1\u6709\u8C03\u7528\u6A21\u578B\u3001\u6CA1\u6709\u4EA7\u751F\u8D39\u7528\u3002`,
     "\u8BF7\u5728\u5BF9\u8BDD\u6846\u91CC\u5148\u548C\u7528\u6237\u786E\u8BA4\uFF0C\u4E0D\u8981\u81EA\u5DF1\u7ED5\u8FC7\u8FD9\u4E00\u6B65\uFF1A",
-    `1) \u95EE\u7528\u6237\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg \u2014\u2014 \u8BF4\u6E05\u4ED6\u7684\u7CFB\u7EDF\uFF08${os}\uFF09\u548C\u547D\u4EE4\uFF1A${command}`,
+    `1) \u95EE\u7528\u6237\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg \u2014\u2014 \u8BF4\u6E05\u4ED6\u7684\u7CFB\u7EDF\uFF08${os2}\uFF09\u548C\u547D\u4EE4\uFF1A${command}`,
     "   \uFF08\u88C5\u597D\u540E\u91CD\u8DD1\u8FD9\u6B21\u751F\u6210\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\u6210\u4E00\u6761\uFF0C\u5206\u6BB5\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\u3002",
     '2) \u7528\u6237\u540C\u610F\u5B89\u88C5\uFF1A\u8C03\u7528 video_setup\uFF08install:true\uFF09\u2014\u2014\u63D2\u4EF6\u4F1A\u6267\u884C\u4E0A\u9762\u7684\u547D\u4EE4\uFF0C\u5BBF\u4E3B\u4F1A\u5148\u628A\u8FD9\u6761\u547D\u4EE4\u62FF\u7ED9\u7528\u6237\u786E\u8BA4\uFF1B\u88C5\u5B8C\u5B83\u4F1A\u81EA\u5DF1\u9A8C\u8BC1\uFF0C\u6210\u529F\u540E\u4F60\u6309\u539F duration \u91CD\u65B0\u8C03\u7528 video_generate \u7EE7\u7EED\u751F\u6210\u5373\u53EF\uFF08\u4E00\u822C\u662F\u5148\u88C5\u5305\u7BA1\u7406\u5668\uFF1A\u672C\u673A\u8FDE brew \u90FD\u6CA1\u6709\u65F6\uFF0Cvideo_setup \u4F1A\u8FD4\u56DE nextStep\uFF0C\u7528 target:"package-manager" \u518D\u88C5\u4E00\u6B21\uFF09\u3002',
     "3) \u7528\u6237\u4E0D\u60F3\u88C5\u3001\u6216\u8005\u88C5\u4E0D\u4E86\uFF1A\u5E26 `merge:false` \u91CD\u65B0\u8C03\u7528 video_generate\uFF0C\u63D2\u4EF6\u5C31\u53EA\u751F\u6210\u5E76\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u94FE\u63A5 + \u672C\u5730\u6587\u4EF6\uFF09\uFF0C\u8FD9\u6B21\u4E0D\u4F1A\u518D\u62E6\u3002",
@@ -1289,7 +1431,7 @@ async function ffmpegConsentGate(config, exec, args) {
   return {
     kind: "deny",
     reason: lines.join("\n"),
-    info: { ffmpegMissing: true, os, command, segments: plan.length }
+    info: { ffmpegMissing: true, os: os2, command, segments: plan.length }
   };
 }
 async function preflightGate(ctx, config, exec) {
@@ -1783,7 +1925,7 @@ function renderVideoResult(value) {
 function videoTool(config, deps) {
   return {
     name: "video_generate",
-    description: `\u751F\u6210\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\uFF08\u89C6\u9891\u751F\u6210\u7684\u9996\u9009\u5DE5\u5177\uFF09\uFF0Cduration \u662F\u76EE\u6807\u603B\u79D2\u6570\uFF1A\u4E0D\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\uFF08\u9ED8\u8BA4 15 \u79D2\uFF09\u65F6\u4E00\u6B21\u76F4\u51FA\uFF1B**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 \u5355\u6BB5\u4E0A\u9650\u7684\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u62C6\u6210\u591A\u6BB5 / \u591A\u955C / \u591A\u6B21\u8C03\u7528\u518D\u62FC\u63A5**\uFF08\u4F8B\u5982\u300C15 \u79D2\u300D\u4E0D\u8BB8\u62C6\u6210 8+7\uFF09\uFF1B\u591A\u955C\u53EA\u5728\u7528\u6237\u660E\u786E\u8981\u6C42\u591A\u955C\u65F6\u624D\u7528\u3002\u66F4\u957F\u65F6\u5148\u76F4\u51FA\u9996\u6BB5\uFF0C\u518D\u628A\u5269\u4F59\u65F6\u957F\u6309 4-15 \u79D2\u5747\u5206\u9010\u6BB5\u7EED\u62CD\uFF08\u9ED8\u8BA4\u5403\u6EE1\u4E0A\u9650\u3001\u6BB5\u6570\u6700\u5C11\uFF0C\u6700\u957F ${MAX_TOTAL_SECONDS} \u79D2\uFF09\u2014\u2014\u8FD9\u662F\u540C\u4E00\u4E2A\u955C\u5934\u7684\u7EED\u62CD\u5EF6\u957F\uFF0C\u4E5F\u4E0D\u662F\u591A\u955C\u62FC\u63A5\uFF0C\u6700\u540E\u7528 ffmpeg \u5408\u5E76\u6210\u4E00\u4E2A\u672C\u5730\u6210\u7247\u6587\u4EF6\uFF0C\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\uFF0C\u6587\u4EF6\u540D\u5F62\u5982 20261027-201530-25s.mp4\u300220 \u79D2\u300125 \u79D2\u8FD9\u7C7B\u76EE\u6807\u4E0D\u7528\u62C6\u6210\u591A\u4E2A\u4EFB\u52A1\uFF1A\u76F4\u63A5\u4F20 duration=20 \u5373\u53EF\uFF0820 \u79D2 \u2192 15+5\uFF0C25 \u79D2 \u2192 15+10\uFF09\u3002\u8FD4\u56DE\u6BCF\u6BB5\u4EFB\u52A1 ID\u3001\u4E0A\u6E38\u94FE\u63A5\u548C\u6210\u7247\u8DEF\u5F84\u3002\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF08\u6BCF\u6BB5\u5355\u72EC\u751F\u6210\uFF09\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout\u3001\u6216\u67D0\u6BB5\u8FD4\u56DE unknown\uFF08\u67E5\u8BE2\u5931\u8D25\u3001\u4EFB\u52A1\u5176\u5B9E\u5DF2\u63D0\u4EA4\uFF09\u65F6\uFF0C\u90FD\u7528\u8FD4\u56DE\u7684\u4EFB\u52A1 ID \u8D70 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u65B0\u4EFB\u52A1\u2014\u2014\u91CD\u590D\u63D0\u4EA4\u4F1A\u91CD\u590D\u6263\u8D39\uFF0C\u67E5\u8BE2\u5931\u8D25\u4E0D\u4EE3\u8868\u6CA1\u6709\u751F\u6210\u3002**\u8C03\u7528\u524D\u5FC5\u987B\u5148\u8BA9\u7528\u6237\u5BA1\u6838\u8FC7\u811A\u672C\u3001\u5E76\u786E\u8BA4\u5F00\u59CB\u5236\u4F5C**\uFF08\u4E24\u9053\u786E\u8BA4\u7F3A\u4E00\u4E0D\u53EF\uFF09\uFF0C\u4E0D\u8981\u8DF3\u8FC7\u811A\u672C\u76F4\u63A5\u751F\u6210\u3002\u5408\u5E76\u9700\u8981\u672C\u673A\u6709 ffmpeg\u3002\u672C\u673A\u6CA1\u88C5 ffmpeg \u65F6\uFF0C\u63D2\u4EF6\u4F1A**\u5148\u628A\u8FD9\u6B21\u8C03\u7528\u62E6\u56DE\u6765\uFF08\u4E0D\u4F1A\u8C03\u7528\u6A21\u578B\u3001\u4E0D\u4EA7\u751F\u8D39\u7528\uFF09**\uFF0C\u8FD4\u56DE\u7684\u8BF4\u660E\u91CC\u5E26\u7740\u6309\u7CFB\u7EDF\u7ED9\u7684\u5B89\u88C5\u547D\u4EE4 \u2014\u2014\u8FD9\u65F6\u8981\u5728\u5BF9\u8BDD\u6846\u91CC\u548C\u7528\u6237\u786E\u8BA4\uFF1A\u95EE\u4ED6\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg\uFF08\u7ED9\u51FA\u4ED6\u7CFB\u7EDF\u7684\u547D\u4EE4\uFF0C\u8BF4\u660E\u88C5\u597D\u91CD\u8DD1\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\u3001\u5206\u6BB5\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\uFF0C\u540C\u610F\u5C31\u7528\u7EC8\u7AEF\u5DE5\u5177\u88C5\u4E0A\uFF08\u5BBF\u4E3B\u4F1A\u8BA9\u4ED6\u786E\u8BA4\uFF09\u5E76 \`ffmpeg -version\` \u9A8C\u8BC1\uFF0C\u7136\u540E\u6309\u540C\u6837\u7684 duration \u91CD\u53D1\uFF1B\u7528\u6237\u4E0D\u60F3\u88C5\u5C31\u5E26 merge:false \u91CD\u53D1\uFF0C\u63D2\u4EF6\u53EA\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u4E0A\u6E38\u94FE\u63A5 + \u672C\u5730\u6587\u4EF6\uFF09\u3002\u62FF\u5230 ffmpegMissing=true \u7684\u7ED3\u679C\u65F6\u4E5F\u8981\u7167 installHint \u5F15\u5BFC\u5B89\u88C5\uFF0C\u522B\u53EA\u4E22\u4E00\u53E5\u300C\u5DF2\u8DF3\u8FC7\u5408\u5E76\u300D\u3002`,
+    description: `\u751F\u6210\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\uFF08\u89C6\u9891\u751F\u6210\u7684\u9996\u9009\u5DE5\u5177\uFF09\uFF0Cduration \u662F\u76EE\u6807\u603B\u79D2\u6570\uFF1A\u4E0D\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\uFF08\u9ED8\u8BA4 15 \u79D2\uFF09\u65F6\u4E00\u6B21\u76F4\u51FA\uFF1B**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 \u5355\u6BB5\u4E0A\u9650\u7684\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u62C6\u6210\u591A\u6BB5 / \u591A\u955C / \u591A\u6B21\u8C03\u7528\u518D\u62FC\u63A5**\uFF08\u4F8B\u5982\u300C15 \u79D2\u300D\u4E0D\u8BB8\u62C6\u6210 8+7\uFF09\uFF1B\u591A\u955C\u53EA\u5728\u7528\u6237\u660E\u786E\u8981\u6C42\u591A\u955C\u65F6\u624D\u7528\u3002\u66F4\u957F\u65F6\u5148\u76F4\u51FA\u9996\u6BB5\uFF0C\u518D\u628A\u5269\u4F59\u65F6\u957F\u6309 4-15 \u79D2\u5747\u5206\u9010\u6BB5\u7EED\u62CD\uFF08\u9ED8\u8BA4\u5403\u6EE1\u4E0A\u9650\u3001\u6BB5\u6570\u6700\u5C11\uFF0C\u6700\u957F ${MAX_TOTAL_SECONDS} \u79D2\uFF09\u2014\u2014\u8FD9\u662F\u540C\u4E00\u4E2A\u955C\u5934\u7684\u7EED\u62CD\u5EF6\u957F\uFF0C\u4E5F\u4E0D\u662F\u591A\u955C\u62FC\u63A5\uFF0C\u6700\u540E\u7528 ffmpeg \u5408\u5E76\u6210\u4E00\u4E2A\u672C\u5730\u6210\u7247\u6587\u4EF6\uFF0C\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\uFF0C\u6587\u4EF6\u540D\u5F62\u5982 20261027-201530-25s.mp4\u300220 \u79D2\u300125 \u79D2\u8FD9\u7C7B\u76EE\u6807\u4E0D\u7528\u62C6\u6210\u591A\u4E2A\u4EFB\u52A1\uFF1A\u76F4\u63A5\u4F20 duration=20 \u5373\u53EF\uFF0820 \u79D2 \u2192 15+5\uFF0C25 \u79D2 \u2192 15+10\uFF09\u3002\u8FD4\u56DE\u6BCF\u6BB5\u4EFB\u52A1 ID\u3001\u4E0A\u6E38\u94FE\u63A5\u548C\u6210\u7247\u8DEF\u5F84\u3002\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF08\u6BCF\u6BB5\u5355\u72EC\u751F\u6210\uFF09\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout\u3001\u6216\u67D0\u6BB5\u8FD4\u56DE unknown\uFF08\u67E5\u8BE2\u5931\u8D25\u3001\u4EFB\u52A1\u5176\u5B9E\u5DF2\u63D0\u4EA4\uFF09\u65F6\uFF0C\u90FD\u7528\u8FD4\u56DE\u7684\u4EFB\u52A1 ID \u8D70 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u65B0\u4EFB\u52A1\u2014\u2014\u91CD\u590D\u63D0\u4EA4\u4F1A\u91CD\u590D\u6263\u8D39\uFF0C\u67E5\u8BE2\u5931\u8D25\u4E0D\u4EE3\u8868\u6CA1\u6709\u751F\u6210\u3002**\u8C03\u7528\u524D\u5FC5\u987B\u5148\u8BA9\u7528\u6237\u5BA1\u6838\u8FC7\u811A\u672C\u3001\u5E76\u786E\u8BA4\u5F00\u59CB\u5236\u4F5C**\uFF08\u4E24\u9053\u786E\u8BA4\u7F3A\u4E00\u4E0D\u53EF\uFF09\uFF0C\u4E0D\u8981\u8DF3\u8FC7\u811A\u672C\u76F4\u63A5\u751F\u6210\u3002\u5408\u5E76\u9700\u8981\u672C\u673A\u6709 ffmpeg\u3002\u672C\u673A\u6CA1\u88C5 ffmpeg \u65F6\uFF0C\u63D2\u4EF6\u4F1A**\u5148\u628A\u8FD9\u6B21\u8C03\u7528\u62E6\u56DE\u6765\uFF08\u4E0D\u4F1A\u8C03\u7528\u6A21\u578B\u3001\u4E0D\u4EA7\u751F\u8D39\u7528\uFF09**\uFF0C\u8FD4\u56DE\u7684\u8BF4\u660E\u91CC\u5E26\u7740\u6309\u7CFB\u7EDF\u7ED9\u7684\u5B89\u88C5\u547D\u4EE4 \u2014\u2014\u8FD9\u65F6\u8981\u5728\u5BF9\u8BDD\u6846\u91CC\u548C\u7528\u6237\u786E\u8BA4\uFF1A\u95EE\u4ED6\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg\uFF08\u7ED9\u51FA\u4ED6\u7CFB\u7EDF\u7684\u547D\u4EE4\uFF0C\u8BF4\u660E\u88C5\u597D\u91CD\u8DD1\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\u3001\u5206\u6BB5\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\uFF0C\u540C\u610F\u5C31\u7528\u7EC8\u7AEF\u5DE5\u5177\u88C5\u4E0A\uFF08\u5BBF\u4E3B\u4F1A\u8BA9\u4ED6\u786E\u8BA4\uFF09\u5E76 \`ffmpeg -version\` \u9A8C\u8BC1\uFF0C\u7136\u540E\u6309\u540C\u6837\u7684 duration \u91CD\u53D1\uFF1B\u7528\u6237\u4E0D\u60F3\u88C5\u5C31\u5E26 merge:false \u91CD\u53D1\uFF0C\u63D2\u4EF6\u53EA\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u4E0A\u6E38\u94FE\u63A5 + \u672C\u5730\u6587\u4EF6\uFF09\u3002\u62FF\u5230 ffmpegMissing=true \u7684\u7ED3\u679C\u65F6\u4E5F\u8981\u7167 installHint \u5F15\u5BFC\u5B89\u88C5\uFF0C\u522B\u53EA\u4E22\u4E00\u53E5\u300C\u5DF2\u8DF3\u8FC7\u5408\u5E76\u300D\u3002**\u4EBA\u7269\u5F62\u8C61 / \u53C2\u8003\u56FE**\uFF1A\u516C\u7F51\u56FE\u7247 URL\u3001base64\uFF08data URI \u6216\u7EAF base64\uFF09\u3001\u6216\u7528\u6237\u4E0A\u4F20\u7684\u672C\u5730\u56FE\u7247\uFF08\u5BF9\u8BDD\u91CC\u62D6\u8FDB\u6765\u7684\u6587\u4EF6\u3001@ \u5F15\u7528\u7684\u8DEF\u5F84\uFF09\u90FD\u652F\u6301\u2014\u2014\u8981\u56FA\u5B9A\u4EBA\u7269\u957F\u76F8\u3001\u670D\u88C5\u3001\u573A\u666F\u65F6\u4F20 referenceImages\uFF08\u4E00\u6B21\u53EA\u8BA4\u7B2C\u4E00\u5F20\uFF09\uFF1B\u9996\u5E27 / \u5C3E\u5E27\u7528 firstFrameUrl / lastFrameUrl \u4F20\u3002\u516C\u7F51 URL \u76F4\u63A5\u4EA4\u7ED9\u4E2D\u8F6C\u7AD9\u53D6\u56FE\uFF1B\u672C\u5730\u56FE\u7247\u7531\u63D2\u4EF6\u8BFB\u8FDB\u6765\uFF08\u6309 ratio \u5148\u9002\u914D\u753B\u5E45\uFF09\u5185\u8054\u6210 image_url \u53D1\u7ED9\u4E2D\u8F6C\u7AD9\uFF0C\u7528\u6237\u4E0D\u9700\u8981\u81EA\u5DF1\u627E\u56FE\u5E8A\u3002`,
     parameters: {
       type: "object",
       properties: {
@@ -1799,11 +1941,16 @@ function videoTool(config, deps) {
         },
         firstFrameUrl: {
           type: "string",
-          description: "\u53EF\u9009\uFF1A\u9996\u5E27\u56FE\u516C\u7F51 URL\uFF0C\u4F5C\u4E3A\u751F\u6210\u7684\u9996\u5E27\u53C2\u8003\u3002"
+          description: "\u53EF\u9009\uFF1A\u9996\u5E27\u56FE\uFF0C\u516C\u7F51 URL\u3001base64 \u6216\u672C\u673A\u56FE\u7247\u8DEF\u5F84\uFF08\u542B\u5BF9\u8BDD\u91CC @ \u5F15\u7528\u7684\u4E0A\u4F20\u6587\u4EF6\uFF09\u90FD\u884C\uFF0C\u4F5C\u4E3A\u751F\u6210\u7684\u9996\u5E27\u53C2\u8003\uFF1B\u672C\u673A\u56FE\u7247\u4F1A\u6309 ratio \u5148\u9002\u914D\u5230\u76EE\u6807\u753B\u5E45\u518D\u63D0\u4EA4\u3002"
         },
         lastFrameUrl: {
           type: "string",
-          description: "\u53EF\u9009\uFF1A\u5C3E\u5E27\u56FE\u516C\u7F51 URL\uFF0C\u4F5C\u4E3A\u751F\u6210\u7684\u5C3E\u5E27\u53C2\u8003\u3002"
+          description: "\u53EF\u9009\uFF1A\u5C3E\u5E27\u56FE\uFF0C\u516C\u7F51 URL\u3001base64 \u6216\u672C\u673A\u56FE\u7247\u8DEF\u5F84\u90FD\u884C\uFF0C\u4F5C\u4E3A\u751F\u6210\u7684\u5C3E\u5E27\u53C2\u8003\u3002"
+        },
+        referenceImages: {
+          type: "array",
+          items: { type: "string" },
+          description: "\u53EF\u9009\uFF1A\u4EBA\u7269\u5F62\u8C61 / \u4E3B\u4F53\u53C2\u8003\u56FE\uFF08\u6BCF\u9879\u662F\u516C\u7F51 URL\u3001base64\uFF08data URI \u6216\u7EAF base64\uFF09\u6216\u672C\u673A\u56FE\u7247\u8DEF\u5F84\uFF0C\u5BF9\u8BDD\u91CC @ \u5F15\u7528\u7684\u4E0A\u4F20\u6587\u4EF6\u4E5F\u53EF\u4EE5\uFF09\u3002\u60F3\u628A\u67D0\u4E2A\u4EBA\u7684\u957F\u76F8\u3001\u53D1\u578B\u3001\u670D\u88C5\u56FA\u5B9A\u4E0B\u6765\u65F6\u7528\u5B83\uFF0C\u56FE\u7247\u4EE5 role=reference_image \u4F20\u7ED9\u4E0A\u6E38\u3002\u4E0A\u6E38\u4E00\u6B21\u53EA\u8BA4\u4E00\u5F20\uFF0C\u591A\u7ED9\u7684\u4F1A\u88AB\u5FFD\u7565\uFF08\u8981\u56FA\u5B9A\u591A\u4E2A\u4EBA\u7269\u8BF7\u5148\u628A\u4ED6\u4EEC\u5408\u6210\u5230\u4E00\u5F20\u56FE\u91CC\uFF09\u3002\u672C\u5730\u56FE\u7247\u5355\u5F20\u4E0D\u8D85\u8FC7 8 MB\uFF0C\u652F\u6301 jpg/jpeg/png/webp/bmp/gif/tiff\u3002"
         },
         segmentSeconds: {
           type: "integer",
@@ -1857,6 +2004,7 @@ function videoTool(config, deps) {
           installHint: { type: "string" },
           partial: { type: "boolean" },
           pendingTaskId: { type: "string" },
+          images: { type: "array" },
           note: { type: "string" },
           error: { type: "string" },
           errorCode: { type: "string" },
@@ -1894,6 +2042,7 @@ function videoTool(config, deps) {
         );
       }
       const segments = [];
+      const resultImages = [];
       let status = "succeeded";
       let error;
       let errorCode;
@@ -1909,7 +2058,19 @@ function videoTool(config, deps) {
           direction: "backward",
           startAt: step.kind === "extend" ? cursor : void 0
         };
-        const { body, seconds } = step.kind === "generate" ? buildGenerationBody(config, stepArgs, step.seconds) : buildRequestBody(config, stepArgs, referenceUrl);
+        let body;
+        let seconds;
+        if (step.kind === "generate") {
+          const generated = await buildGenerationBody(config, stepArgs, step.seconds, {
+            signal: exec?.signal
+          });
+          body = generated.body;
+          seconds = generated.seconds;
+          if (generated.images?.length) resultImages.push(...generated.images);
+          if (generated.notes?.length) notes.push(...generated.notes);
+        } else {
+          ({ body, seconds } = buildRequestBody(config, stepArgs, referenceUrl));
+        }
         const final = await runTask(config, body, exec?.signal);
         const detail = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error;
         segments.push({
@@ -1941,6 +2102,16 @@ function videoTool(config, deps) {
         error,
         errorCode
       };
+      if (resultImages.length) {
+        result.images = resultImages.map((item) => ({
+          role: item.role,
+          source: item.source,
+          localPath: item.localPath,
+          bytes: item.bytes,
+          originalPath: item.originalPath,
+          fittedTo: item.fittedTo
+        }));
+      }
       const deliveredSeconds = completed.reduce((sum, segment) => sum + segment.seconds, 0);
       if (status !== "succeeded") {
         const last = segments.at(-1) || {};
@@ -2100,7 +2271,7 @@ function setupTool(config) {
       render(_args, value) {
         const {
           status,
-          os,
+          os: os2,
           ffmpegVersion,
           ffmpegPath,
           ffprobeVersion,
@@ -2115,7 +2286,7 @@ function setupTool(config) {
           lines.push("ffmpeg \u88C5\u597D\u4E86\uFF0C\u957F\u89C6\u9891\u73B0\u5728\u53EF\u4EE5\u5408\u5E76\u6210\u4E00\u6761\u3002");
         } else if (status === "missing") {
           lines.push("\u672C\u673A\u8FD8\u6CA1\u6709 ffmpeg\uFF1A\u751F\u6210\u8D85\u8FC7 15 \u79D2\u7684\u89C6\u9891\u65F6\u53EA\u80FD\u7ED9\u5206\u6BB5\uFF0C\u6CA1\u6CD5\u5408\u5E76\u6210\u4E00\u6761\u3002");
-          lines.push(`\u88C5\u4E00\u4E0B\u5C31\u597D\uFF08${os || "\u5F53\u524D\u7CFB\u7EDF"}\uFF09\uFF1A${installCommand || ""}`);
+          lines.push(`\u88C5\u4E00\u4E0B\u5C31\u597D\uFF08${os2 || "\u5F53\u524D\u7CFB\u7EDF"}\uFF09\uFF1A${installCommand || ""}`);
           lines.push("\u7528\u6237\u540C\u610F\u7684\u8BDD\uFF0C\u6211\u53EF\u4EE5\u7528 video_setup\uFF08install=true\uFF09\u76F4\u63A5\u5E2E\u4ED6\u88C5\u3002");
         } else if (status === "failed") {
           lines.push("ffmpeg \u6CA1\u88C5\u6210\u529F\uFF0C\u5F97\u624B\u52A8\u88C5\u4E00\u4E0B\u3002");
@@ -2143,14 +2314,14 @@ function setupTool(config) {
       const signal = exec?.signal;
       const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
       const probeBinary = resolveBinary(config, "ffprobeBinary", "ffprobe");
-      const { os, installs, bootstrap } = ffmpegInstallOptions();
+      const { os: os2, installs, bootstrap } = ffmpegInstallOptions();
       const wantsInstall = args?.install === true;
       const target = String(args?.target || "ffmpeg");
       const manualSteps = installs.map((item) => `${item.label}\uFF1A${item.command}`);
       const installCommand = target === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
       const ffmpegVersion = await probeBinaryVersion(binary, signal);
       const ffprobeVersion = await probeBinaryVersion(probeBinary, signal);
-      const base = { os, installCommand, manualSteps, ffmpegVersion, ffprobeVersion };
+      const base = { os: os2, installCommand, manualSteps, ffmpegVersion, ffprobeVersion };
       if (ffmpegVersion) {
         const note = ffprobeVersion ? "ffmpeg \u4E0E ffprobe \u90FD\u53EF\u7528\uFF0C\u957F\u89C6\u9891\u4F1A\u6B63\u5E38\u5408\u5E76\u6210\u4E00\u6761\u3002" : "ffmpeg \u53EF\u7528\uFF1B\u6CA1\u6709 ffprobe\uFF0C\u5206\u6BB5\u65F6\u957F\u63A2\u6D4B\u4F1A\u88AB\u8DF3\u8FC7\uFF08\u4E0D\u5F71\u54CD\u5408\u5E76\uFF09\u3002";
         return { status: "ready", ...base, ffmpegPath: binary, note };
@@ -2169,7 +2340,7 @@ function setupTool(config) {
           return {
             status: "failed",
             ...base,
-            note: `${os} \u4E0D\u9700\u8981\u53E6\u5916\u88C5\u5305\u7BA1\u7406\u5668\uFF0C\u76F4\u63A5\u7528\u7CFB\u7EDF\u81EA\u5E26\u7684\u5305\u7BA1\u7406\u5668\u88C5 ffmpeg \u5C31\u884C\u3002`
+            note: `${os2} \u4E0D\u9700\u8981\u53E6\u5916\u88C5\u5305\u7BA1\u7406\u5668\uFF0C\u76F4\u63A5\u7528\u7CFB\u7EDF\u81EA\u5E26\u7684\u5305\u7BA1\u7406\u5668\u88C5 ffmpeg \u5C31\u884C\u3002`
           };
         }
         const result = await runProcess(shellCommand, [], {
@@ -2210,7 +2381,7 @@ function setupTool(config) {
         installCommand: needsBootstrap ? bootstrap.command : installs[0].command,
         manualSteps: needsBootstrap ? [`\u5148\u88C5\u5305\u7BA1\u7406\u5668\uFF1A${bootstrap.command}`, ...manualSteps] : manualSteps,
         output,
-        note: needsBootstrap ? `\u672C\u673A\u6CA1\u6709 ${os} \u7684\u5305\u7BA1\u7406\u5668\uFF0C\u5F97\u5148\u88C5\u5B83\uFF1A${bootstrap.command}\uFF1B\u88C5\u597D\u4E4B\u540E\u518D\u88C5 ffmpeg\u3002\u8FD9\u4E24\u6B65\u90FD\u53EF\u4EE5\u8BA9\u6211\u6765\u505A \u2014\u2014 \u8BF4\u4E00\u58F0\u5C31\u884C\u3002` : "\u5B89\u88C5\u547D\u4EE4\u6CA1\u6210\u529F\uFF08\u53EF\u80FD\u662F\u6CA1\u6743\u9650\u3001\u6CA1\u8054\u7F51\u6216\u88AB\u5B89\u5168\u7B56\u7565\u62E6\u4E0B\uFF09\u3002\u4E0A\u9762\u662F\u624B\u52A8\u6B65\u9AA4\uFF0C\u7167\u7740\u5728\u7EC8\u7AEF\u91CC\u8DD1\u4E00\u904D\u5373\u53EF\u3002"
+        note: needsBootstrap ? `\u672C\u673A\u6CA1\u6709 ${os2} \u7684\u5305\u7BA1\u7406\u5668\uFF0C\u5F97\u5148\u88C5\u5B83\uFF1A${bootstrap.command}\uFF1B\u88C5\u597D\u4E4B\u540E\u518D\u88C5 ffmpeg\u3002\u8FD9\u4E24\u6B65\u90FD\u53EF\u4EE5\u8BA9\u6211\u6765\u505A \u2014\u2014 \u8BF4\u4E00\u58F0\u5C31\u884C\u3002` : "\u5B89\u88C5\u547D\u4EE4\u6CA1\u6210\u529F\uFF08\u53EF\u80FD\u662F\u6CA1\u6743\u9650\u3001\u6CA1\u8054\u7F51\u6216\u88AB\u5B89\u5168\u7B56\u7565\u62E6\u4E0B\uFF09\u3002\u4E0A\u9762\u662F\u624B\u52A8\u6B65\u9AA4\uFF0C\u7167\u7740\u5728\u7EC8\u7AEF\u91CC\u8DD1\u4E00\u904D\u5373\u53EF\u3002"
       };
     }
   };

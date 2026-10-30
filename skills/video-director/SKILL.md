@@ -121,6 +121,9 @@ approved_by: user
 ## 6. 生成
 
 - 调 `video_generate`：`duration` 设本镜秒数（≤15 直出；>15 自动续拍合并），`ratio`、`resolution`、`generateAudio` 按脚本。
+- 要固定人物长相：把参考图交给 `referenceImages`（用户上传的图片路径 / base64 / 公网 URL 都行），
+  首帧、尾帧分别用 `firstFrameUrl`、`lastFrameUrl`。**上游一次只认一张参考图**，第二张会被当成尾帧，
+  所以要多个角色同框就先合成一张再传；本机图片会按 `ratio` 先适配到目标画幅。
 - 总时长 ≤15 秒时**只调一次** `video_generate`：整条视频一次直出，禁止拆成多段分别生成再拼接。
 - 多个独立镜头可以在同一回合并行调用；同一任务绝不重复提交。
 - 画质默认 720p；要更精细再 1080p。竖屏 9:16，横屏 16:9。
