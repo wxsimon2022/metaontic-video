@@ -31,8 +31,8 @@ const Config = z.object({
   duration: z.number().step(1).min(4).max(30).default(15).description("\u517C\u5BB9\u65E7\u914D\u7F6E\uFF1B\u5206\u6BB5\u9ED8\u8BA4\u6309\u6A21\u578B\u4E0A\u9650\u6620\u5C04\uFF1A2.0 \u4E3A 15 \u79D2\u30012.5 \u4E3A 30 \u79D2\u3002\u9700\u7F29\u77ED\u5206\u6BB5\u65F6\u5728\u5DE5\u5177\u8C03\u7528\u4E2D\u6307\u5B9A\u3002").volatile(),
   singleMaxSeconds: z.number().step(1).min(4).max(30).default(15).description("\u517C\u5BB9\u65E7\u914D\u7F6E\uFF1B\u5355\u6B21\u76F4\u51FA\u4E0A\u9650\u7531\u6A21\u578B\u51B3\u5B9A\uFF1A2.0 \u4E3A 15 \u79D2\u30012.5 \u4E3A 30 \u79D2\u3002").volatile(),
   seamTrimSeconds: z.string().default("").description("2.0 \u9ED8\u8BA4\u6BCF\u63A5\u7F1D\u88C1\u524D\u6BB5\u5C3E6\u5E27\u3001\u540E\u6BB5\u59341\u5E27\uFF1B\u586B0\u5173\u95ED\u3002\u8986\u76D6\u4E3A\u624B\u52A8\u88C1\u526A\uFF1A\u9017\u53F7\u5206\u9694\u79D2\u6570\uFF0C\u5BF9\u5E94\u7B2C2\u30013\u2026\u6BB5\u5F00\u5934\uFF0C0\u20133\u79D2\uFF1B\u9ED8\u8BA4\u4E0D\u88C1\u3002\u5148\u9884\u89C8\u786E\u8BA4\uFF0C\u907F\u514D\u5207\u65AD\u5BF9\u767D\u3002").volatile(),
-  mergeMode: z.union(["seamless", "copy", "reencode"]).default("seamless").description(
-    "\u5408\u5E76\u65B9\u5F0F\uFF1Aseamless=\u628A\u540E\u6BB5\u5BF9\u5230\u524D\u6BB5\u7ED3\u5C3E\u7684\u4EAE\u5EA6/\u97F3\u91CF\uFF0C\u518D\u7528\u77ED\u4EA4\u53C9\u6DE1\u5316\u63A5\u4E0A\uFF08\u9ED8\u8BA4\uFF0C\u63A5\u7F1D\u770B\u4E0D\u51FA\u6362\u6BB5\uFF09\uFF1Bcopy=\u65E0\u635F\u62FC\u63A5\uFF08\u5FEB\uFF0C\u4F46\u63A5\u7F1D\u662F\u786C\u5207\uFF0C\u4E24\u6B21\u751F\u6210\u7684\u8272\u8C03\u4F1A\u5DEE 2-3 \u7EA7\uFF09\uFF1Breencode=\u7EDF\u4E00\u91CD\u7F16\u7801"
+  mergeMode: z.union(["seamless", "copy", "reencode"]).default("copy").description(
+    "\u5408\u5E76\u65B9\u5F0F\uFF1Acopy=\u76F4\u63A5\u62FC\u63A5\uFF08\u9ED8\u8BA4\uFF0C\u65E0\u753B\u9762\u53E0\u5316\uFF09\uFF1Breencode=\u7EDF\u4E00\u91CD\u7F16\u7801\u540E\u76F4\u63A5\u62FC\u63A5\uFF1Bseamless\u4E3A\u65E7\u914D\u7F6E\u517C\u5BB9\u503C\uFF0C\u6309\u76F4\u63A5\u62FC\u63A5\u5904\u7406\u3002"
   ).volatile(),
   bgmFadeSeconds: z.number().min(0).max(3).default(0.8).description(
     "\u5408\u5E76\u65F6\u97F3\u9891\u63A5\u7F1D\u7684\u4EA4\u53C9\u6DE1\u5316\u79D2\u6570\uFF080-3\uFF0C\u9ED8\u8BA4 0.8\uFF0C0=\u5173\uFF09\uFF1A\u4E0A\u6E38\u6BCF\u6BB5\u662F\u5404\u81EA\u751F\u6210\u7684\uFF0C\u7EED\u62CD\u6BB5\u7684\u80CC\u666F\u97F3\u4E50\u4F1A\u4ECE\u5934\u518D\u6765\uFF0C0.25 \u79D2\u7684\u753B\u9762\u6DE1\u5316\u76D6\u4E0D\u4F4F\uFF1B\u97F3\u9891\u5355\u72EC\u62C9\u957F\u6DE1\u5316\u76D6\u4F4F\u97F3\u4E50\u91CD\u542F\uFF0C\u753B\u9762\u6DE1\u5316\u4ECD\u662F 0.25 \u79D2\uFF08\u4E0D\u81F3\u4E8E\u770B\u8D77\u6765\u50CF\u8F6C\u573A\uFF09\u3002"
@@ -1201,22 +1201,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
   );
   files = aligned;
   try {
-    const mergeMode = ref(config, "mergeMode", "seamless");
-    if (mergeMode === "seamless" && files.length > 1) {
-      const seamless = await mergeClipsSeamless(config, files, probed, work, { signal, binary });
-      if (seamless?.path) {
-        await rename(work, outPath);
-        return {
-          path: seamless.path,
-          mode: "seamless",
-          trimmed,
-          seams: seamless.seams,
-          fade: seamless.fade,
-          audioFade: seamless.audioFade
-        };
-      }
-      if (seamless?.error) copyError = seamless.error;
-    }
+    const mergeMode = ref(config, "mergeMode", "copy");
     if (mergeMode !== "reencode" && paramsMatch) {
       const listPath = `${work}.concat.txt`;
       const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
@@ -2004,7 +1989,7 @@ async function confirmNextSegment(ctx, config, exec, {
 function resolveRegisterApi(config) {
   return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-const PLUGIN_VERSION = true ? "2.16.0".trim().replace(/^v/i, "") : "";
+const PLUGIN_VERSION = true ? "2.16.1".trim().replace(/^v/i, "") : "";
 async function fetchDeviceQuota(config, signal) {
   if (isVolcengine(config)) return { status: "unknown", reason: "\u706B\u5C71\u76F4\u8FDE\u8D39\u7528\u548C\u4F59\u989D\u8BF7\u5728\u706B\u5C71\u63A7\u5236\u53F0\u67E5\u770B" };
   const api = resolveRegisterApi(config);
@@ -3691,7 +3676,7 @@ function configTool(config, settings) {
         mergeMode: {
           type: "string",
           enum: ["seamless", "copy", "reencode"],
-          description: "\u5408\u5E76\u65B9\u5F0F\uFF1Aseamless=\u6309\u63A5\u7F1D\u5B9E\u6D4B\u628A\u540E\u6BB5\u7684\u4EAE\u5EA6/\u97F3\u91CF\u5BF9\u9F50\uFF0C\u518D\u7528 0.25 \u79D2\u4EA4\u53C9\u6DE1\u5316\u63A5\u4E0A\uFF08\u9ED8\u8BA4\uFF0C\u63A5\u7F1D\u770B\u4E0D\u51FA\u6362\u6BB5\uFF09\uFF1Bcopy=\u65E0\u635F\u62FC\u63A5\uFF08\u5FEB\uFF0C\u4F46\u63A5\u7F1D\u662F\u786C\u5207\uFF09\uFF1Breencode=\u7EDF\u4E00\u91CD\u7F16\u7801\u3002"
+          description: "\u5408\u5E76\u65B9\u5F0F\uFF1Acopy=\u76F4\u63A5\u65E0\u635F\u62FC\u63A5\uFF08\u9ED8\u8BA4\uFF0C\u4E0D\u505A\u753B\u9762\u53E0\u5316\uFF09\uFF1Breencode=\u7EDF\u4E00\u91CD\u7F16\u7801\u540E\u76F4\u63A5\u62FC\u63A5\uFF1B\u65E7\u914D\u7F6E seamless \u6309 copy \u5904\u7406\u3002"
         },
         outputDir: { type: "string", description: "\u6210\u7247\u8F93\u51FA\u76EE\u5F55\uFF1B\u7559\u7A7A\u7528\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\u3002" },
         keepSegments: { type: "boolean", description: "\u5408\u5E76\u540E\u662F\u5426\u4FDD\u7559\u5206\u6BB5\u539F\u7247\u3002" },

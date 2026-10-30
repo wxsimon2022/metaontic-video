@@ -114,10 +114,9 @@ export const Config = z.object({
     .volatile(),
   seamTrimSeconds: z.string().default('').description('2.0 默认每接缝裁前段尾6帧、后段头1帧；填0关闭。覆盖为手动裁剪：逗号分隔秒数，对应第2、3…段开头，0–3秒；默认不裁。先预览确认，避免切断对白。').volatile(),
   mergeMode: z.union(['seamless', 'copy', 'reencode'])
-    .default('seamless')
+    .default('copy')
     .description(
-      '合并方式：seamless=把后段对到前段结尾的亮度/音量，再用短交叉淡化接上（默认，接缝看不出换段）；'
-      + 'copy=无损拼接（快，但接缝是硬切，两次生成的色调会差 2-3 级）；reencode=统一重编码',
+      '合并方式：copy=直接拼接（默认，无画面叠化）；reencode=统一重编码后直接拼接；seamless为旧配置兼容值，按直接拼接处理。',
     )
     .volatile(),
   bgmFadeSeconds: z.number().min(0).max(3)
@@ -1748,21 +1747,8 @@ async function mergeClips(config, files: string[], outPath: string, { signal }: 
   files = aligned;
   try {
 
-    const mergeMode = ref(config, 'mergeMode', 'seamless');
-
-    // 默认走无缝：分段是两次独立生成，色调/响度本来就有台阶，硬切一眼能看出是两段。
-    // 任何一步不满足条件（分段太短、量不到数据、编码失败）都退回到后面的常规拼接。
-    if (mergeMode === 'seamless' && files.length > 1) {
-      const seamless = await mergeClipsSeamless(config, files, probed, work, { signal, binary });
-      if (seamless?.path) {
-        await rename(work, outPath);
-        return {
-          path: seamless.path, mode: 'seamless', trimmed,
-          seams: seamless.seams, fade: seamless.fade, audioFade: seamless.audioFade,
-        };
-      }
-      if (seamless?.error) copyError = seamless.error;
-    }
+    // 旧seamless配置兼容为直接拼接，避免xfade叠加人物造成双影。
+    const mergeMode = ref(config, 'mergeMode', 'copy');
 
     if (mergeMode !== 'reencode' && paramsMatch) {
       const listPath = `${work}.concat.txt`;
@@ -4714,8 +4700,7 @@ function configTool(config, settings) {
         mergeMode: {
           type: 'string',
           enum: ['seamless', 'copy', 'reencode'],
-          description: '合并方式：seamless=按接缝实测把后段的亮度/音量对齐，再用 0.25 秒交叉淡化接上'
-            + '（默认，接缝看不出换段）；copy=无损拼接（快，但接缝是硬切）；reencode=统一重编码。',
+          description: '合并方式：copy=直接无损拼接（默认，不做画面叠化）；reencode=统一重编码后直接拼接；旧配置 seamless 按 copy 处理。',
         },
         outputDir: { type: 'string', description: '成片输出目录；留空用会话工作目录下的 metaontic-video/。' },
         keepSegments: { type: 'boolean', description: '合并后是否保留分段原片。' },

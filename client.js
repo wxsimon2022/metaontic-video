@@ -2,7 +2,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "2.16.0",
+    version: "2.16.1",
     description: "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
     license: "MIT",
     type: "module",
@@ -78,13 +78,11 @@
       "@deepseek-ai/schemastery": "~3.18.5"
     },
     releaseNotes: {
-      version: "2.16.0",
+      version: "2.16.1",
       items: [
-        "\u65B0\u589E\u751F\u6210\u7B49\u5F85\u5361\u7247\uFF1A\u65CB\u8F6C\u52A8\u753B\u3001\u6D41\u52A8\u6761\u7EB9\u3001\u626B\u5149\u3001\u52A8\u6001\u72B6\u6001\u70B9\u548C\u5B9E\u65F6\u7B49\u5F85\u8BA1\u65F6\u3002",
-        "\u65B0\u589E\u4F30\u7B97\u8FDB\u5EA6\uFF1A\u7B49\u5F85\u671F\u95F4\u6700\u9AD899%\uFF0C\u8BC6\u522B\u6210\u529F\u540E100%\uFF1B\u5931\u8D25\u6216\u505C\u6B62\u660E\u786E\u663E\u793A\uFF0C\u52A8\u6548\u7ED3\u675F\u3002",
-        "\u5F3A\u5316\u9010\u6BB5\u9884\u89C8\u4EA4\u4ED8\uFF1A\u8FD4\u56DEpreviewPath\u548C\u4E0B\u4E00\u6B65\u6307\u4EE4\uFF0C\u5148\u5C55\u793A\u672C\u6B21\u89C6\u9891\u518D\u7B49\u5F85\u7528\u6237\u786E\u8BA4\u7EED\u505A\u3002",
-        "\u670D\u52A1\u7AEF\u4F7F\u7528\u8BB0\u5F55\u6BCF60\u79D2\u81EA\u52A8\u5237\u65B0\uFF0C\u7A97\u53E3\u805A\u7126\u65F6\u91CD\u65B0\u62C9\u53D6\uFF0C\u663E\u793A\u5237\u65B0\u65F6\u95F4\uFF1B\u706B\u5C71\u76F4\u8FDE\u4E0D\u67E5\u8BE2\u3002",
-        "\u89C4\u8303\u53D1\u5E03\u8BF4\u660E\uFF1A\u5305\u5185\u66F4\u65B0\u5185\u5BB9\u3001\u9644\u6CE8\u6807\u7B7E\u4E0E\u63A8\u9001\u540E\u603B\u7ED3\u4FDD\u6301\u4E00\u81F4\uFF0C\u9A8C\u8BC1\u4E0E\u53D1\u5E03\u72B6\u6001\u636E\u5B9E\u62A5\u544A\u3002"
+        "\u4FEE\u590D\u591A\u6BB5\u89C6\u9891\u5408\u5E76\u65F6\u4EA4\u53C9\u6DE1\u5316\u9020\u6210\u7684\u77ED\u6682\u91CD\u5F71\u3002",
+        "\u9ED8\u8BA4\u4F7F\u7528\u76F4\u63A5\u62FC\u63A5\uFF1B\u65E7\u914D\u7F6E\u4E2D\u7684 seamless \u503C\u4E5F\u6309\u76F4\u63A5\u62FC\u63A5\u5904\u7406\uFF0C\u907F\u514D\u753B\u9762\u53E0\u52A0\u3002",
+        "\u540C\u6B65\u66F4\u65B0\u5408\u5E76\u65B9\u5F0F\u8BF4\u660E\u4E0E\u53D1\u5E03\u7248\u672C\u4FE1\u606F\u3002"
       ]
     }
   };
@@ -115,7 +113,7 @@
         model: "\u6A21\u578B",
         modelHint: "mini \u66F4\u7701\uFF08\u9ED8\u8BA4\uFF09\uFF1Bfast \u540C\u4E00\u4EE3\u7684\u52A0\u901F\u7248\uFF0C\u5355\u4EF7\u7EA6 1.6 \u500D\u3002",
         mergeMode: "\u5408\u5E76\u65B9\u5F0F",
-        mergeModeSeamless: "\u65E0\u7F1D\u62FC\u63A5\uFF08\u5BF9\u9F50\u63A5\u7F1D\uFF09",
+        mergeModeSeamless: "\u76F4\u63A5\u62FC\u63A5\uFF08\u65E7\u914D\u7F6E\u517C\u5BB9\uFF09",
         mergeModeCopy: "\u65E0\u635F\u62FC\u63A5",
         mergeModeReencode: "\u91CD\u7F16\u7801\u62FC\u63A5",
         bgmFadeSeconds: "\u97F3\u4E50\u63A5\u7F1D\u6DE1\u5316\uFF08\u79D2\uFF09",
@@ -246,7 +244,7 @@
         model: "Model",
         modelHint: "mini is the cheaper default; fast is the faster sibling at about 1.6\xD7 the price.",
         mergeMode: "Merge mode",
-        mergeModeSeamless: "Seamless (match junctions)",
+        mergeModeSeamless: "Direct concat (legacy setting)",
         mergeModeCopy: "Stream copy",
         mergeModeReencode: "Re-encode",
         bgmFadeSeconds: "Music seam cross-fade (s)",
@@ -409,7 +407,7 @@
       const UPDATE_ATTEMPTS = 3;
       const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
       const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-      const PLUGIN_VERSION = true ? "2.16.0".trim().replace(/^v/i, "") : "";
+      const PLUGIN_VERSION = true ? "2.16.1".trim().replace(/^v/i, "") : "";
       function currentOs() {
         const nav = window.navigator || {};
         const raw = String(
