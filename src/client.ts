@@ -39,6 +39,7 @@ window.__ModuleLoader__.load({
       seamTrimSeconds: '接缝裁剪秒数（如 0.5,0）',
       modelHiddenCurrent: '当前模型（暂不提供选择）',
       releaseNotesTitle: '更新内容',
+      resetConfirm: '确定重置插件吗？这会清除本插件保存的配置、API Key 和登录状态，需要重新配置。已生成的视频不会删除。',
       model: '模型',
       modelHint: 'mini 更省（默认）；fast 同一代的加速版，单价约 1.6 倍。',
       mergeMode: '合并方式',
@@ -174,6 +175,7 @@ window.__ModuleLoader__.load({
       seamTrimSeconds: 'Seam head trims (e.g. 0.5,0)',
       modelHiddenCurrent: 'Current model (selection unavailable)',
       releaseNotesTitle: 'Release notes',
+      resetConfirm: 'Reset this plugin? Saved settings, API keys and login state will be cleared. Generated videos will be kept.',
       model: 'Model',
       modelHint: 'mini is the cheaper default; fast is the faster sibling at about 1.6× the price.',
       mergeMode: 'Merge mode',
@@ -370,7 +372,7 @@ window.__ModuleLoader__.load({
     /** 在线更新最多试几次：Gitee 的匿名 HTTPS 克隆会排队，429 一般过一会儿就好。 */
     const UPDATE_ATTEMPTS = 3;
     /** 版本检查结果的本地缓存与节流：6 小时内不重复联网，打开设置页先用缓存显示。 */
-    const UPDATE_CACHE_KEY = 'metaontic-video.update-check';
+    const UPDATE_CACHE_KEY = 'metaontic-video.update-check-v2';
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
     /** 构建时由 esbuild --define 注入的版本号；从源码直接跑（没注入）时为空串。 */
     const PLUGIN_VERSION = typeof __PLUGIN_VERSION__ === 'string'
@@ -449,7 +451,8 @@ window.__ModuleLoader__.load({
           signal: controller ? controller.signal : undefined,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response;
+        const data = await response.json();
+        return { json: async () => data };
       } finally {
         if (timer) window.clearTimeout(timer);
       }
@@ -458,7 +461,7 @@ window.__ModuleLoader__.load({
     /** 版本号校验：Gitee API 给的是 base64 的 contents 回包，镜像源给的是裸 JSON。 */
     function versionFromFile(body) {
       const version = String((body || {}).version || '').trim().replace(/^v/i, '');
-      if (!version) throw new Error('no version');
+      if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('invalid version');
       return version;
     }
 
@@ -483,28 +486,23 @@ window.__ModuleLoader__.load({
      * 之所以要兜底：Gitee 的 API 会 WAF 限流，一限就是一段时间，而「检查更新」是打开设置页就会跑的。
      */
     async function fetchLatestVersion() {
-      const problems = [];
-      try {
-        const body = await (await fetchUpdateSource(UPDATE_FILE_API)).json();
-        const text = body && typeof body.content === 'string' ? decodeBase64Text(body.content) : '';
-        if (!text) throw new Error('empty file');
-        return versionFromFile(JSON.parse(text));
-      } catch (error) {
-        problems.push(`gitee api: ${error?.message || error}`);
-      }
-      try {
-        return versionFromTags(await (await fetchUpdateSource(UPDATE_TAGS_API)).json());
-      } catch (error) {
-        problems.push(`jsdelivr tags: ${error?.message || error}`);
-      }
+      const github = 'https://api.github.com/repos/wxsimon2022/metaontic-video/contents/package.json?ref=master';
+      const requests = [UPDATE_FILE_API, github].map(async (url) => {
+        const body = await (await fetchUpdateSource(url, 6000)).json();
+        return versionFromFile(JSON.parse(decodeBase64Text(body.content)));
+      });
+      requests.push((async () => versionFromTags(await (await fetchUpdateSource(UPDATE_TAGS_API, 6000)).json()))());
       for (const url of UPDATE_MIRROR_FILES) {
-        try {
-          return versionFromFile(await (await fetchUpdateSource(url)).json());
-        } catch (error) {
-          problems.push(`${String(url).split('/')[2]}: ${error?.message || error}`);
-        }
+        requests.push((async () => versionFromFile(await (await fetchUpdateSource(url, 6000)).json()))());
       }
-      throw new Error(problems.join('；'));
+      const results = await Promise.allSettled(requests);
+      let best = '';
+      for (const result of results) {
+        if (result.status === 'fulfilled' && (!best || isNewerVersion(result.value, best))) best = result.value;
+      }
+      if (!best) throw new Error(results.filter((item) => item.status === 'rejected')
+        .map((item: any) => item.reason?.message || String(item.reason)).join('；'));
+      return best;
     }
 
     /**
@@ -829,6 +827,7 @@ window.__ModuleLoader__.load({
         async function reset() {
           const overridden = Object.keys(snapshot.user || {});
           if (!overridden.length && !keyReady) return;
+          if (!window.confirm(t('resetConfirm'))) return;
           setStatus('saving');
           // 页面自己写过的项 + 兜底清单：宿主没列进 user 的也要清
           const targets = new Set([...overridden, ...PLUGIN_OWNED_KEYS]);
@@ -1267,13 +1266,8 @@ window.__ModuleLoader__.load({
           }
           try {
             const latest = await fetchLatestVersion();
-            // 顺手把默认分支当前提交号也记下：点「立即更新」时就不用再等一次请求。
-            // 取不到不影响检查更新本身，真正更新前还会再试一次。
-            try {
-              updateCommit.current = await fetchLatestCommit();
-            } catch {
-              // 静默：只用上一次记下的提交号，或者干脆走不带后缀的 spec
-            }
+            // 提交号仅服务于安装，不阻塞版本检测结果。
+            fetchLatestCommit().then((commit) => { updateCommit.current = commit; }).catch(() => {});
             setUpdateLatest(latest);
             fetchReleaseNotes(latest).then((notes) => { if (notes) setReleaseNotes(notes); }).catch(() => {});
             setUpdateAt(new Date().toLocaleTimeString());
@@ -1591,17 +1585,11 @@ window.__ModuleLoader__.load({
            *   3) 不带后缀的老 spec——前两条都解析不出来时的退路（只有这条路才可能要卸载）。
            * 带后缀的意义：spec 跟 profile 里记的那条不同，宿主才当新依赖原地覆盖安装，装失败也不会丢插件。
            */
-          let commit = '';
-          try {
-            commit = await fetchLatestCommit();
-          } catch {
-            commit = '';
-          }
-          if (!commit) commit = updateCommit.current;
+          let commit = updateCommit.current || '';
           if (commit) updateCommit.current = commit;
           const candidates = [];
-          if (commit) candidates.push(`${UPDATE_SPEC}#${commit}`);
           if (updateLatest) candidates.push(`${UPDATE_SPEC}#v${updateLatest}`);
+          if (commit) candidates.push(`${UPDATE_SPEC}#${commit}`);
           candidates.push(UPDATE_SPEC);
 
           /** 这条 spec 装不上时值不值得换下一条：只有「这个 committish 解析不出来」才换。 */

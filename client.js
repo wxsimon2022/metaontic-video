@@ -1,462 +1,549 @@
-import packageInfo from "../package.json";
-window.__ModuleLoader__.load({
-  id: "metaontic-video",
-  factory(require2) {
-    const React = require2("react");
-    const h = React.createElement;
-    const NAMESPACE = "metaontic-video";
-    const NS = "settings.metaonticVideo";
-    const zh = {
-      summaryEmpty: "\u672A\u914D\u7F6E\uFF1A\u5230\u63D2\u4EF6\u8BBE\u7F6E\u9875\u70B9\u300C\u767B\u5F55\u300D\u9886\u4E00\u628A\u5BC6\u94A5\u3002",
-      summary: "{provider} \xB7 {model}",
-      providerNewapi: "New API \u4E2D\u8F6C\u7AD9",
-      apiKeyConfigured: "\u5DF2\u914D\u7F6E\uFF0C\u7559\u7A7A\u8868\u793A\u4FDD\u6301\u539F\u503C",
-      connectionMode: "\u63A5\u5165\u65B9\u5F0F",
-      connectionModeHint: "A\uFF1A\u767B\u5F55\u9886\u53D6\u670D\u52A1\u7AEF Key\uFF1BB\uFF1A\u586B\u5199\u81EA\u5DF1\u7684\u706B\u5C71\u5F15\u64CE API Key\u3002\u5207\u6362\u540E\u70B9\u51FB\u4FDD\u5B58\u751F\u6548\u3002",
-      volcengineKeyHint: "\u4ECE\u706B\u5C71\u65B9\u821F\u63A7\u5236\u53F0\u83B7\u53D6 API Key\uFF0C\u586B\u5165\u540E\u4FDD\u5B58\u3002\u8D39\u7528\u7531\u706B\u5C71\u8D26\u6237\u627F\u62C5\uFF0C\u65E0\u9700\u767B\u5F55\u672C\u63D2\u4EF6\u670D\u52A1\u7AEF\u3002",
-      volcengineApiKey: "\u706B\u5C71\u5F15\u64CE API Key",
-      service: "A \xB7 \u670D\u52A1\u7AEF\u4E0B\u53D1 Key",
-      volcengine: "B \xB7 \u706B\u5C71\u5F15\u64CE\u76F4\u8FDE",
-      seamTrimSeconds: "\u63A5\u7F1D\u88C1\u526A\u79D2\u6570\uFF08\u5982 0.5,0\uFF09",
-      modelHiddenCurrent: "\u5F53\u524D\u6A21\u578B\uFF08\u6682\u4E0D\u63D0\u4F9B\u9009\u62E9\uFF09",
-      releaseNotesTitle: "\u66F4\u65B0\u5185\u5BB9",
-      model: "\u6A21\u578B",
-      modelHint: "mini \u66F4\u7701\uFF08\u9ED8\u8BA4\uFF09\uFF1Bfast \u540C\u4E00\u4EE3\u7684\u52A0\u901F\u7248\uFF0C\u5355\u4EF7\u7EA6 1.6 \u500D\u3002",
-      mergeMode: "\u5408\u5E76\u65B9\u5F0F",
-      mergeModeSeamless: "\u65E0\u7F1D\u62FC\u63A5\uFF08\u5BF9\u9F50\u63A5\u7F1D\uFF09",
-      mergeModeCopy: "\u65E0\u635F\u62FC\u63A5",
-      mergeModeReencode: "\u91CD\u7F16\u7801\u62FC\u63A5",
-      bgmFadeSeconds: "\u97F3\u4E50\u63A5\u7F1D\u6DE1\u5316\uFF08\u79D2\uFF09",
-      bgmFadeSecondsHint: "\u7EED\u62CD\u6BB5\u7684\u80CC\u666F\u97F3\u4E50\u4F1A\u4ECE\u5934\u518D\u6765\uFF0C\u8FD9\u91CC\u628A\u63A5\u7F1D\u4E24\u4FA7\u7684\u97F3\u9891\u5355\u72EC\u6DE1\u5316\u8FD9\u4E48\u4E45\uFF08\u9ED8\u8BA4 0.8\uFF0C\u8BBE 0 \u5173\u95ED\uFF09\uFF1B\u753B\u9762\u6DE1\u5316\u4ECD\u662F 0.25 \u79D2\uFF0C\u4E0D\u4F1A\u770B\u51FA\u8F6C\u573A\u3002",
-      outputDir: "\u8F93\u51FA\u76EE\u5F55",
-      keepSegments: "\u4FDD\u7559\u5206\u6BB5",
-      ffmpegBinary: "ffmpeg \u8DEF\u5F84",
-      ffprobeBinary: "ffprobe \u8DEF\u5F84",
-      ffmpegTitle: "\u957F\u89C6\u9891\u5408\u5E76\u9700\u8981 ffmpeg",
-      ffmpegBody: "\u89C6\u9891\u8D85\u8FC7\u6A21\u578B\u5355\u6B21\u4E0A\u9650\uFF082.0 \u4E3A 15 \u79D2\u30012.5 \u4E3A 30 \u79D2\uFF09\u65F6\u4F1A\u62C6\u6210\u51E0\u6BB5\u5206\u522B\u751F\u6210\u3001\u518D\u5728\u672C\u673A\u5408\u5E76\u6210\u4E00\u6761\u2014\u2014\u5408\u5E76\u8FD9\u4E00\u6B65\u7528\u7684\u662F ffmpeg\u3002\u6CA1\u88C5\u4E5F\u80FD\u751F\u6210\uFF0C\u53EA\u662F\u53EA\u7ED9\u5206\u6BB5\u5217\u8868\u3001\u4E0D\u5408\u6210\u6574\u6761\u3002",
-      ffmpegInstallFor: "\u6309\u4F60\u7684\u7CFB\u7EDF\u88C5\u4E00\u4E0B\uFF08\u70B9\u53F3\u8FB9\u6309\u94AE\u590D\u5236\u547D\u4EE4\uFF09\uFF1A",
-      ffmpegCopy: "\u590D\u5236",
-      ffmpegCopied: "\u5DF2\u590D\u5236",
-      ffmpegMore: "\u5176\u4ED6\u7CFB\u7EDF",
-      ffmpegLess: "\u6536\u8D77\u5176\u4ED6\u7CFB\u7EDF",
-      ffmpegAfter: "\u4E0D\u60F3\u81EA\u5DF1\u6572\u547D\u4EE4\u7684\u8BDD\uFF0C\u76F4\u63A5\u5728\u5BF9\u8BDD\u91CC\u8BF4\u300C\u5E2E\u6211\u88C5 ffmpeg\u300D\u2014\u2014\u63D2\u4EF6\u4F1A\u6267\u884C\u5B89\u88C5\uFF08\u547D\u4EE4\u4F1A\u5148\u8BA9\u4F60\u786E\u8BA4\uFF09\uFF1B\u88C5\u597D\u540E\u91CD\u8DD1\u4E00\u6B21\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\uFF08\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\u3002ffmpeg \u88C5\u5728\u975E\u9ED8\u8BA4\u4F4D\u7F6E\u7684\u8BDD\uFF0C\u628A\u7EDD\u5BF9\u8DEF\u5F84\u586B\u5230\u4E0A\u9762\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\u4E5F\u4E00\u6837\u7BA1\u7528\u3002\u5B89\u88C5\u5305\u81EA\u5E26 ffprobe\uFF0C\u5206\u6BB5\u65F6\u957F\u63A2\u6D4B\u4F1A\u4E00\u8D77\u89E3\u51B3\u3002",
-      ffmpegManual: "\u60F3\u81EA\u5DF1\u88C5\uFF1AmacOS \u7528 Homebrew\uFF0CWindows \u7528 winget\uFF0CLinux \u7528\u7CFB\u7EDF\u5305\u7BA1\u7406\u5668\uFF1B\u88C5\u5B8C\u786E\u8BA4\u547D\u4EE4\u884C\u91CC\u80FD\u8DD1 ffmpeg -version \u5C31\u884C\u3002",
-      registerEmail: "\u90AE\u7BB1\uFF08\u8D26\u53F7\uFF09",
-      registerTitle: "\u6CE8\u518C\u63D2\u4EF6",
-      registerHint: "\u586B\u90AE\u7BB1 \u2192 \u83B7\u53D6\u9A8C\u8BC1\u7801 \u2192 \u767B\u5F55\uFF1B\u90AE\u7BB1\u5373\u8D26\u53F7\uFF0C\u4E00\u4E2A\u90AE\u7BB1\u4E00\u628A Key\u3002",
-      registerEmailPlaceholder: "\u4F60\u7684\u90AE\u7BB1\uFF0C\u4F8B\u5982 name@example.com",
-      registerCode: "\u9A8C\u8BC1\u7801",
-      registerCodePlaceholder: "\u9A8C\u8BC1\u7801",
-      registerCodeSend: "\u83B7\u53D6\u9A8C\u8BC1\u7801",
-      registerCodeSending: "\u53D1\u9001\u4E2D\u2026",
-      registerCodeCooldown: "{seconds} \u79D2\u540E\u91CD\u53D1",
-      registerCodeSent: "\u9A8C\u8BC1\u7801\u5DF2\u53D1\u5230 {email}\uFF1A5 \u5206\u949F\u5185\u6709\u6548\uFF0C\u586B\u8FDB\u6765\u70B9\u53F3\u8FB9\u7684\u6309\u94AE\u5373\u53EF\u3002",
-      registerEmailLocked: "\u9A8C\u8BC1\u7801\u521A\u53D1\u5230\u4E0A\u9762\u8FD9\u4E2A\u90AE\u7BB1\uFF1A\u7B49\u5012\u8BA1\u65F6\u7ED3\u675F\u624D\u80FD\u6539\u3002",
-      registerNeedEmail: "\u5148\u586B\u90AE\u7BB1\uFF0C\u518D\u70B9\u300C\u83B7\u53D6\u9A8C\u8BC1\u7801\u300D\u3002",
-      registerNeedCode: "\u5148\u586B\u90AE\u4EF6\u91CC\u6536\u5230\u7684\u9A8C\u8BC1\u7801\u3002",
-      registerRestored: "\u5DF2\u627E\u56DE\u672C\u673A\u5BC6\u94A5\uFF1A\u8FD9\u53F0\u8BBE\u5907\u4E4B\u524D\u9886\u8FC7\u7684\u90A3\u628A\u5E2E\u4F60\u586B\u597D\u4E86\uFF0C\u70B9\u300C\u4FDD\u5B58\u300D\u5373\u53EF\u3002",
-      quotaTitle: "\u989D\u5EA6",
-      quotaRemain: "\u5269\u4F59",
-      quotaUsed: "\u5DF2\u7528",
-      quotaTotal: "\u603B\u989D\u5EA6",
-      quotaUnlimited: "\u4E0D\u9650\u989D\u5EA6",
-      quotaLoading: "\u8BFB\u53D6\u989D\u5EA6\u4E2D\u2026",
-      quotaRefresh: "\u5237\u65B0\u989D\u5EA6",
-      quotaNoKey: "\u8FD8\u6CA1\u6709\u5BC6\u94A5\uFF1A\u6CE8\u518C\u540E\u8FD9\u91CC\u4F1A\u663E\u793A\u5269\u4F59 / \u5DF2\u7528\u989D\u5EA6\u3002",
-      quotaNotRegistered: "\u670D\u52A1\u7AEF\u6CA1\u6709\u8FD9\u53F0\u8BBE\u5907\u7684\u6CE8\u518C\u8BB0\u5F55\uFF08\u6362\u8FC7\u8BBE\u5907 / \u6E05\u8FC7\u6570\u636E\uFF09\uFF1A\u8BF7\u8054\u7CFB\u7BA1\u7406\u5458\u5904\u7406\u540E\u91CD\u65B0\u9886\u53D6\u3002",
-      quotaFailed: "\u8BFB\u53D6\u989D\u5EA6\u5931\u8D25\uFF1A{message}",
-      quotaUpdatedAt: "\u66F4\u65B0\u4E8E {time}",
-      usageTitle: "\u4F7F\u7528\u8BB0\u5F55\uFF08\u6700\u8FD1 {days} \u5929\uFF09",
-      usageSummary: "{count} \u6761 \xB7 \u8D39\u7528\u5408\u8BA1 {amount}",
-      usageColTime: "\u65F6\u95F4",
-      usageColKind: "\u7C7B\u578B",
-      usageColModel: "\u6A21\u578B",
-      usageColCost: "\u8D39\u7528",
-      usageColStatus: "\u7ED3\u679C",
-      usageEmpty: "\u8FD8\u6CA1\u6709\u8BB0\u5F55\uFF1A\u751F\u6210\u6216\u7EED\u62CD\u8FC7\u89C6\u9891\u540E\uFF0C\u8FD9\u91CC\u4F1A\u6309\u65F6\u95F4\u5217\u51FA\u6700\u8FD1\u51E0\u6B21\u3002",
-      usageLoading: "\u8BFB\u53D6\u4F7F\u7528\u8BB0\u5F55\u4E2D\u2026",
-      usageRefresh: "\u5237\u65B0\u8BB0\u5F55",
-      usageFailed: "\u8BFB\u53D6\u4F7F\u7528\u8BB0\u5F55\u5931\u8D25\uFF1A{message}",
-      usageMore: "\u65F6\u95F4\u7A97\u5185\u8FD8\u6709\u66F4\u65E9\u7684\u8BB0\u5F55\uFF0C\u8FD9\u91CC\u53EA\u663E\u793A\u6700\u8FD1\u7684 {count} \u6761\u3002",
-      usageKeyMissing: "\u8FD8\u6CA1\u6709\u5BC6\u94A5\uFF1A\u9886\u5230 Key \u4E4B\u540E\uFF0C\u8FD9\u91CC\u4F1A\u663E\u793A\u7528\u5B83\u51FA\u7247\u7684\u8BB0\u5F55\u3002",
-      usageStatusOk: "\u6210\u529F",
-      usageStatusFailed: "\u5931\u8D25",
-      versionTitle: "\u63D2\u4EF6\u7248\u672C",
-      versionCurrent: "\u5F53\u524D\u7248\u672C v{version}",
-      versionCheck: "\u68C0\u67E5\u66F4\u65B0",
-      versionChecking: "\u68C0\u67E5\u4E2D\u2026",
-      versionLatest: "\u5DF2\u662F\u6700\u65B0\u7248\u672C",
-      versionNew: "\u6709\u65B0\u7248\u672C v{version}",
-      versionFailed: "\u68C0\u67E5\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
-      versionUpdate: "\u7ACB\u5373\u66F4\u65B0",
-      versionUpdateConfirm: "\u786E\u8BA4\u66F4\u65B0\u5230 v{version}",
-      versionUpdateConfirmHint: "\u4F1A\u4ECE Gitee \u88C5\u4E00\u904D\u63D2\u4EF6\u672C\u4F53\uFF08\u914D\u7F6E\u548C\u5BC6\u94A5\u90FD\u4FDD\u7559\uFF09\uFF1B\u88C5\u4E0D\u4E0A\u4E5F\u4E0D\u4F1A\u52A8\u73B0\u5728\u8FD9\u4EFD\u3002\u8FD9\u5F20\u8BBE\u7F6E\u9875\u4F1A\u77ED\u6682\u6D88\u5931\u4E00\u4E0B\u3002",
-      versionUpdating: "\u66F4\u65B0\u4E2D\u2026",
-      versionUpdateDone: "\u5DF2\u66F4\u65B0\u5230 v{version}\uFF0C\u6B63\u5728\u91CD\u65B0\u52A0\u8F7D\u2026",
-      versionUpdateRestart: "\u65B0\u7248\u672C v{version} \u5DF2\u88C5\u597D\uFF1A\u91CD\u542F Harness \u540E\u751F\u6548\u3002",
-      versionUpdateCancelled: "\u66F4\u65B0\u5DF2\u53D6\u6D88\u3002",
-      versionUpdateRetry: "\u88C5\u5230\u4E00\u534A\u6CA1\u6210\u529F\uFF08\u7B2C {attempt}/{total} \u6B21\u5C1D\u8BD5\uFF09\u2026",
-      versionUpdateFailed: "\u5728\u7EBF\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
-      versionUpdateRemoved: "\u8FD9\u6B21\u5148\u5378\u8F7D\u4E86\u672C\u63D2\u4EF6\u3001\u6CA1\u80FD\u88C5\u56DE\u6765\uFF1A\u8BF7\u5230\u300C\u63D2\u4EF6\u300D\u9875\u91CD\u65B0\u6DFB\u52A0\u672C\u63D2\u4EF6\u3002",
-      versionUpdateRateLimited: '\u770B\u8D77\u6765\u662F Gitee \u9650\u6D41\uFF08429\uFF0C\u533F\u540D HTTPS \u514B\u9686\u88AB\u6392\u961F\uFF09\u3002\u672C\u673A\u6267\u884C git config --global url."git@gitee.com:".insteadOf "https://gitee.com/" \u6539\u6210\u8D70 SSH\uFF0C\u518D\u70B9\u4E00\u6B21\u300C\u7ACB\u5373\u66F4\u65B0\u300D\u5373\u53EF\uFF1B\u5BC6\u94A5\u548C\u8BBE\u7F6E\u5728 profile \u91CC\uFF0C\u6CA1\u4E22\u3002',
-      versionUpdateUnavailable: "\u5BBF\u4E3B\u6CA1\u6709\u5F00\u653E\u63D2\u4EF6\u7BA1\u7406\u63A5\u53E3\uFF08{detail}\uFF09\uFF0C\u8BF7\u5230\u300C\u63D2\u4EF6\u300D\u9875\u5378\u8F7D\u540E\u91CD\u65B0\u6DFB\u52A0\u3002",
-      versionHint: "\u70B9\u300C\u7ACB\u5373\u66F4\u65B0\u300D\u7531\u63D2\u4EF6\u81EA\u5DF1\u4ECE Gitee \u91CD\u88C5\u4E00\u904D\uFF0C\u4E0D\u7528\u53BB\u5378\u8F7D\u91CD\u52A0\u3002",
-      versionCheckedAt: "\u68C0\u67E5\u4E8E {time}",
-      sectionGeneration: "\u751F\u6210\u53C2\u6570",
-      sectionMerge: "\u5408\u5E76\u4E0E\u8F93\u51FA",
-      sectionAdvanced: "\u9AD8\u7EA7",
-      sectionCombined: "\u66F4\u591A\u8BBE\u7F6E",
-      sectionCombinedHint: "\u8F93\u51FA\u76EE\u5F55\u3001\u63A5\u7F1D\u5904\u7406\u4E0E\u8FD0\u884C\u53C2\u6570",
-      sectionRuntime: "\u8FD0\u884C\u53C2\u6570",
-      segmentsRetained: "\u6240\u6709\u539F\u59CB\u5206\u6BB5\u81EA\u52A8\u4FDD\u7559\uFF0C\u4FBF\u4E8E\u9884\u89C8\u3001\u7EED\u505A\u548C\u91CD\u65B0\u526A\u8F91\u3002",
-      register: "\u767B\u5F55",
-      registerWorking: "\u767B\u5F55\u4E2D\u2026",
-      registerOk: "\u767B\u5F55\u6210\u529F\uFF1A\u4E0A\u6E38 / Key / \u5730\u5740 / \u6A21\u578B\u90FD\u5199\u597D\u4E86\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u914D\u7F6E\u540E\u751F\u6548\u3002",
-      registerPartial: "\u5DF2\u62FF\u5230\u5BC6\u94A5\uFF0C\u4F46\u6709\u5B57\u6BB5\u5BBF\u4E3B\u6CA1\u63A5\u53D7\uFF0C\u8BF7\u68C0\u67E5\u540E\u624B\u52A8\u4FDD\u5B58\u3002",
-      registerFailed: "\u767B\u5F55\u5931\u8D25\uFF1A{message}",
-      registerDisabled: "\u6CE8\u518C\u670D\u52A1\u4E0D\u53EF\u7528\uFF1A{message}",
-      registerNoKey: "\u6CE8\u518C\u670D\u52A1\u6CA1\u6709\u8FD4\u56DE\u5BC6\u94A5\uFF08\u540E\u7AEF\u4E2D\u8F6C\u7AD9\u914D\u7F6E\u53EF\u80FD\u6709\u95EE\u9898\uFF09\u3002",
-      mode: "\u7EED\u62CD\u65B9\u5F0F",
-      modeContinuous: "\u540C\u673A\u4F4D\u8FDE\u7EED",
-      modeCloseup: "\u5207\u8FD1\u666F",
-      ratio: "\u753B\u9762\u6BD4\u4F8B",
-      generateAudio: "\u751F\u6210\u97F3\u9891",
-      watermark: "\u52A0\u6C34\u5370",
-      extraParams: "\u989D\u5916\u53C2\u6570\uFF08JSON\uFF09",
-      pollIntervalMs: "\u8F6E\u8BE2\u95F4\u9694\uFF08\u6BEB\u79D2\uFF09",
-      maxWaitMs: "\u5355\u6B21\u6700\u957F\u7B49\u5F85\uFF08\u6BEB\u79D2\uFF09",
-      save: "\u4FDD\u5B58",
-      reset: "\u91CD\u7F6E\u63D2\u4EF6",
-      resetHint: "\u6E05\u6389\u672C\u673A\u5199\u8FC7\u7684 Key\u3001\u6A21\u578B\u3001\u8F93\u51FA\u76EE\u5F55\u7B49\uFF0C\u56DE\u5230\u521A\u88C5\u4E0A\u7684\u6837\u5B50\u3002",
-      saving: "\u4FDD\u5B58\u4E2D\u2026",
-      saved: "\u5DF2\u4FDD\u5B58\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u914D\u7F6E\u540E\u751F\u6548\u3002",
-      saveFailed: "\u5BBF\u4E3B\u62D2\u7EDD\u4E86\u8FD9\u6B21\u5199\u5165\uFF0C\u8BF7\u68C0\u67E5\u5B57\u6BB5\u53D6\u503C\u3002",
-      dirty: "\u6709\u672A\u4FDD\u5B58\u7684\u6539\u52A8",
-      loading: "\u8BFB\u53D6\u914D\u7F6E\u4E2D\u2026",
-      unavailable: "\u5BBF\u4E3B\u8FD8\u6CA1\u6709\u628A\u672C\u6761\u76EE\u5F53\u4F5C\u53EF\u7F16\u8F91\u8BBE\u7F6E\u9879\u63D0\u4F9B\u670D\u52A1\uFF08\u914D\u7F6E\u547D\u540D\u7A7A\u95F4 metaontic-video \u672A\u5C31\u7EEA\uFF09\u3002\u82E5 profile \u7684 cordis.patch.yml \u91CC\u5DF2\u6709\u8BE5\u6761\u76EE\uFF0C\u8BF7\u91CD\u542F Harness \u8BA9\u5BBF\u4E3B\u91CD\u65B0\u52A0\u8F7D\uFF1B\u91CD\u542F\u540E\u4ECD\u662F\u8FD9\u53E5\u8BDD\uFF0C\u5C31\u662F\u5BBF\u4E3B\u7248\u672C\u4E0E\u63D2\u4EF6\u7684\u8BBE\u7F6E\u63A5\u53E3\u4E0D\u5339\u914D\u3002",
-      readOnly: "\u5F53\u524D profile \u4E0D\u63A5\u53D7\u8868\u5355\u5199\u5165\u3002"
-    };
-    const en = {
-      summaryEmpty: 'Not configured: open the plugin settings and click "Log in".',
-      summary: "{provider} \xB7 {model}",
-      providerNewapi: "New API relay",
-      apiKeyConfigured: "Configured; leave empty to keep it",
-      connectionMode: "Connection",
-      connectionModeHint: "A: sign in for a service key. B: enter your Volcano Engine API key. Save to apply.",
-      volcengineKeyHint: "Enter an API key from the Volcano Ark console and save. Billed to your Volcano account; no plugin service login required.",
-      volcengineApiKey: "Volcano Engine API Key",
-      service: "A \xB7 Service-issued key",
-      volcengine: "B \xB7 Volcano Engine",
-      seamTrimSeconds: "Seam head trims (e.g. 0.5,0)",
-      modelHiddenCurrent: "Current model (selection unavailable)",
-      releaseNotesTitle: "Release notes",
-      model: "Model",
-      modelHint: "mini is the cheaper default; fast is the faster sibling at about 1.6\xD7 the price.",
-      mergeMode: "Merge mode",
-      mergeModeSeamless: "Seamless (match junctions)",
-      mergeModeCopy: "Stream copy",
-      mergeModeReencode: "Re-encode",
-      bgmFadeSeconds: "Music seam cross-fade (s)",
-      bgmFadeSecondsHint: "Each segment gets its own soundtrack, so the music restarts at the junction. Audio is cross-faded for this long (default 0.8; 0 disables). The picture fade stays at 0.25s, so it never looks like a transition.",
-      outputDir: "Output directory",
-      keepSegments: "Keep segments",
-      ffmpegBinary: "ffmpeg path",
-      ffprobeBinary: "ffprobe path",
-      ffmpegTitle: "Merging long videos needs ffmpeg",
-      ffmpegBody: "Videos exceeding the model limit (15s for 2.0, 30s for 2.5) are generated as several shots and merged into one file on this machine \u2014 that merge needs ffmpeg. Without it you still get the video, just as separate segments instead of one file.",
-      ffmpegInstallFor: "Install it for your OS (click the button to copy the command):",
-      ffmpegCopy: "Copy",
-      ffmpegCopied: "Copied",
-      ffmpegMore: "Other systems",
-      ffmpegLess: "Hide other systems",
-      ffmpegAfter: 'Rather not touch a terminal? Just say "\u5E2E\u6211\u88C5 ffmpeg" in the chat and the plugin runs the install for you (it asks you to confirm the command first). Re-run the generation afterwards and the merge happens automatically \u2014 no need to regenerate. Installed somewhere unusual? Put the absolute path in the "ffmpeg path" field above. The package ships ffprobe too, so segment probing is fixed at the same time.',
-      ffmpegManual: "Installing by hand: Homebrew on macOS, winget on Windows, your distro package manager on Linux \u2014 you are set once `ffmpeg -version` works in a terminal.",
-      registerEmail: "Email (this is your account)",
-      registerTitle: "Register the plugin",
-      registerHint: "Email \u2192 verification code \u2192 log in. One email, one key.",
-      registerEmailPlaceholder: "you@example.com",
-      registerCode: "Verification code",
-      registerCodePlaceholder: "verification code",
-      registerCodeSend: "Send code",
-      registerCodeSending: "Sending\u2026",
-      registerCodeCooldown: "Resend in {seconds}s",
-      registerCodeSent: "Code sent to {email} \u2014 valid for 5 minutes.",
-      registerEmailLocked: "Code just went to this address \u2014 edit it after the countdown.",
-      registerNeedEmail: "Type your email before requesting a code.",
-      registerNeedCode: "Type the code from the email first.",
-      registerRestored: "Restored the key issued to this device; click Save to apply.",
-      quotaTitle: "Quota",
-      quotaRemain: "Remaining",
-      quotaUsed: "Used",
-      quotaTotal: "Total",
-      quotaUnlimited: "Unlimited",
-      quotaLoading: "Reading quota\u2026",
-      quotaRefresh: "Refresh quota",
-      quotaNoKey: "No key yet \u2014 remaining / used quota shows here after registration.",
-      quotaNotRegistered: "The service has no registration for this device (new device or cleared data) \u2014 ask an admin to reset it.",
-      quotaFailed: "Failed to read quota: {message}",
-      quotaUpdatedAt: "updated {time}",
-      versionTitle: "Plugin version",
-      versionCurrent: "Installed v{version}",
-      versionCheck: "Check for updates",
-      versionChecking: "Checking\u2026",
-      versionLatest: "Up to date",
-      versionNew: "v{version} is available",
-      versionFailed: "Update check failed: {message}",
-      versionUpdate: "Update now",
-      versionUpdateConfirm: "Confirm update to v{version}",
-      versionUpdateConfirmHint: "Reinstalls the plugin itself from Gitee (settings and key are kept); a failed install leaves the current copy untouched. This settings page disappears for a moment.",
-      versionUpdating: "Updating\u2026",
-      versionUpdateDone: "Updated to v{version}, reloading\u2026",
-      versionUpdateRestart: "v{version} installed; restart Harness to apply it.",
-      versionUpdateCancelled: "Update cancelled.",
-      versionUpdateRetry: "Install did not go through (attempt {attempt} of {total})\u2026",
-      versionUpdateFailed: "Online update failed: {message}",
-      versionUpdateRemoved: "This run uninstalled the plugin and could not put it back: please re-add it from the Plugins page.",
-      versionUpdateRateLimited: 'Looks like a Gitee rate limit (429; anonymous HTTPS clones are queued). Run git config --global url."git@gitee.com:".insteadOf "https://gitee.com/" on this machine to switch to SSH, then click Update now again; the key and settings are kept in the profile.',
-      versionUpdateUnavailable: "This Host exposes no plugin-management API ({detail}); uninstall and re-add it from the Plugins page.",
-      versionHint: 'Click "Update now": the plugin reinstalls itself from Gitee \u2014 no uninstall/re-add needed.',
-      versionCheckedAt: "checked {time}",
-      register: "Log in",
-      registerWorking: "Logging in\u2026",
-      registerOk: "Logged in: provider, key, base URL and model written; applies after the config reload.",
-      registerPartial: "Key received, but some fields were rejected; please review and save manually.",
-      registerFailed: "Log in failed: {message}",
-      registerDisabled: "Register service unavailable: {message}",
-      registerNoKey: "The register service returned no key (check the relay configuration).",
-      sectionGeneration: "Generation",
-      sectionMerge: "Merge & output",
-      sectionAdvanced: "Advanced",
-      sectionCombined: "More settings",
-      sectionCombinedHint: "Output paths, seams and runtime options",
-      sectionRuntime: "Runtime options",
-      segmentsRetained: "Original segments are always retained for preview, resume and editing.",
-      mode: "Continuation",
-      modeContinuous: "Same camera",
-      modeCloseup: "Cut to close-up",
-      ratio: "Aspect ratio",
-      generateAudio: "Generate audio",
-      watermark: "Watermark",
-      extraParams: "Extra params (JSON)",
-      pollIntervalMs: "Poll interval (ms)",
-      maxWaitMs: "Max wait (ms)",
-      save: "Save",
-      reset: "Reset plugin",
-      resetHint: "Clears the key, model, output dir and anything else this machine wrote \u2014 back to a fresh install.",
-      saving: "Saving\u2026",
-      saved: "Saved; the Host applies it after the config reload.",
-      saveFailed: "The Host rejected this write; check the field values.",
-      dirty: "Unsaved changes",
-      loading: "Reading configuration\u2026",
-      unavailable: "This Host does not serve this entry as an editable setting yet (namespace metaontic-video is not ready). If the row already exists in the profile cordis.patch.yml, restart Harness so the Host reloads it; if the message persists, the Host version and the plugin settings interface do not match.",
-      readOnly: "This profile does not accept form writes."
-    };
-    const MODEL_OPTIONS = [
-      "doubao-seedance-2-0-mini-260615",
-      "doubao-seedance-2-0-fast-260128"
-    ];
-    const SELECTS = {
-      connectionMode: ["service", "volcengine"],
-      model: MODEL_OPTIONS,
-      mode: ["continuous", "closeup"],
-      ratio: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
-      mergeMode: ["seamless", "copy", "reencode"]
-    };
-    const SECTIONS = [
-      { key: "sectionGeneration", fields: ["connectionMode", "volcengineApiKey", "model", "mode", "ratio", "generateAudio", "watermark"] },
-      { key: "sectionMerge", fields: ["seamTrimSeconds", "mergeMode", "bgmFadeSeconds", "outputDir"] },
-      { key: "sectionAdvanced", fields: ["extraParams", "pollIntervalMs", "maxWaitMs", "ffmpegBinary", "ffprobeBinary"] }
-    ];
-    const FIELDS = [
-      { key: "connectionMode", kind: "select", wide: true },
-      { key: "volcengineApiKey", kind: "text", secret: true, wide: true },
-      // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
-      { key: "model", kind: "select", wide: true },
-      { key: "mode", kind: "select" },
-      { key: "ratio", kind: "select" },
-      { key: "generateAudio", kind: "switch" },
-      { key: "watermark", kind: "switch" },
-      { key: "seamTrimSeconds", kind: "text" },
-      { key: "mergeMode", kind: "select" },
-      { key: "bgmFadeSeconds", kind: "number" },
-      { key: "outputDir", kind: "text", wide: true },
-      { key: "keepSegments", kind: "switch" },
-      { key: "extraParams", kind: "text", wide: true },
-      { key: "pollIntervalMs", kind: "number" },
-      { key: "maxWaitMs", kind: "number" },
-      { key: "ffmpegBinary", kind: "text", mono: true },
-      { key: "ffprobeBinary", kind: "text", mono: true }
-    ];
-    const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((field) => [field.key, field]));
-    const DEFAULT_REGISTER_API = "https://video.mybfs.cn";
-    const LOGGED_OUT_KEY = "metaontic-video.logged-out";
-    const PLUGIN_OWNED_KEYS = [
-      "connectionMode",
-      "volcengineApiKey",
-      "apiKey",
-      "keyOrigin",
-      "baseUrl",
-      "registerEmail",
-      "deviceId",
-      "deviceSecret",
-      "model"
-    ];
-    const DEFAULT_REGISTER_TOKEN = "metaontic-video-register-v1";
-    const UPDATE_PROJECT = "hackloop/metaontic-video";
-    const UPDATE_FILE_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json`;
-    const PLUGIN_PACKAGE = "metaontic-video";
-    const UPDATE_SPEC = "git+https://gitee.com/hackloop/metaontic-video.git";
-    const UPDATE_TAGS_API = "https://data.jsdelivr.com/v1/packages/gh/wxsimon2022/metaontic-video";
-    const UPDATE_MIRROR_FILES = [
-      "https://fastly.jsdelivr.net/gh/wxsimon2022/metaontic-video@master/package.json",
-      "https://gcore.jsdelivr.net/gh/wxsimon2022/metaontic-video@master/package.json"
-    ];
-    const UPDATE_BRANCH = "master";
-    const UPDATE_COMMIT_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/commits?sha=${UPDATE_BRANCH}&per_page=1`;
-    const UPDATE_ATTEMPTS = 3;
-    const UPDATE_CACHE_KEY = "metaontic-video.update-check";
-    const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "2.15.1".trim().replace(/^v/i, "") : "";
-    function currentOs() {
-      const nav = window.navigator || {};
-      const raw = String(
-        nav.userAgentData?.platform || nav.platform || nav.userAgent || ""
-      ).toLowerCase();
-      if (/mac|darwin|iphone|ipad/.test(raw)) return "macos";
-      if (/win/.test(raw)) return "windows";
-      return "linux";
-    }
-    const FFMPEG_INSTALLS = {
-      macos: { label: "macOS\uFF08Homebrew\uFF09", command: "brew install ffmpeg" },
-      windows: { label: "Windows\uFF08winget\uFF09", command: "winget install --id Gyan.FFmpeg -e" },
-      linux: { label: "Linux\uFF08Debian / Ubuntu\uFF09", command: "sudo apt update && sudo apt install -y ffmpeg" }
-    };
-    const FFMPEG_ALL = [
-      { os: "macos", label: "macOS\uFF08Homebrew\uFF09", command: "brew install ffmpeg" },
-      {
-        os: "macos",
-        label: "macOS\uFF08\u8FD8\u6CA1\u88C5 Homebrew\uFF09",
-        command: '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+(() => {
+  // package.json
+  var package_default = {
+    name: "metaontic-video",
+    version: "2.15.2",
+    description: "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
+    license: "MIT",
+    type: "module",
+    keywords: [
+      "deepseek-harness",
+      "dsh",
+      "dsh-plugin",
+      "seedance",
+      "video",
+      "video-extension",
+      "text-to-video",
+      "ffmpeg",
+      "new-api",
+      "agent-preset",
+      "video-director"
+    ],
+    repository: {
+      type: "git",
+      url: "git+https://github.com/wxsimon2022/metaontic-video.git"
+    },
+    homepage: "https://github.com/wxsimon2022/metaontic-video#readme",
+    bugs: {
+      url: "https://github.com/wxsimon2022/metaontic-video/issues"
+    },
+    exports: {
+      ".": "./index.js",
+      "./client": "./client.js",
+      "./locale/*.json": "./locale/*.json",
+      "./icon": "./icon.svg",
+      "./package.json": "./package.json"
+    },
+    files: [
+      "index.js",
+      "client.js",
+      "cordis.patch.yml",
+      "skills",
+      "locale/*.json",
+      "icon.svg",
+      "logo.svg",
+      "README.md",
+      "LICENSE"
+    ],
+    engines: {
+      node: ">=20"
+    },
+    dsh: {
+      bundle: {
+        patch: "./cordis.patch.yml"
       },
-      { os: "windows", label: "Windows\uFF08winget\uFF09", command: "winget install --id Gyan.FFmpeg -e" },
-      { os: "windows", label: "Windows\uFF08Chocolatey\uFF09", command: "choco install ffmpeg" },
-      { os: "linux", label: "Linux\uFF08Debian / Ubuntu\uFF09", command: "sudo apt update && sudo apt install -y ffmpeg" },
-      { os: "linux", label: "Linux\uFF08Fedora / RHEL / CentOS\uFF09", command: "sudo dnf install -y ffmpeg" }
-    ];
-    function formatMoney(value) {
-      const number = Number(value);
-      if (!Number.isFinite(number)) return "0";
-      const text = number.toFixed(Math.abs(number) >= 1 ? 2 : 4);
-      return text.includes(".") ? text.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "") : text;
+      client: {
+        platform: "web",
+        inject: [
+          "@deepseek-ai/dsh-client-locale",
+          "@deepseek-ai/dsh-client-ui-settings",
+          "@deepseek-ai/dsh-client-ui-plugin-manager",
+          "@deepseek-ai/dsh-api-remotes"
+        ]
+      }
+    },
+    devDependencies: {
+      "@types/node": "^20.19.43",
+      esbuild: "^0.28.2",
+      typescript: "^5.9.3"
+    },
+    scripts: {
+      typecheck: "tsc -p tsconfig.json",
+      "build:locale": "esbuild scripts/build-locale.ts --format=esm --platform=node --packages=external --outfile=node_modules/.cache/build-locale.mjs --log-level=warning && node node_modules/.cache/build-locale.mjs",
+      "build:host": `esbuild src/index.ts --format=esm --platform=node --target=node20 --packages=external --define:__PLUGIN_VERSION__=$(node -p 'JSON.stringify(require("./package.json").version)') --outfile=index.js`,
+      "build:client": `esbuild src/client.ts --bundle --format=iife --platform=browser --target=es2022 --define:__PLUGIN_VERSION__=$(node -p 'JSON.stringify(require("./package.json").version)') --outfile=client.js`,
+      build: "npm run typecheck && npm run build:locale && npm run build:host && npm run build:client"
+    },
+    dependencies: {
+      "@deepseek-ai/schemastery": "~3.18.5"
+    },
+    releaseNotes: {
+      version: "2.15.2",
+      items: [
+        "\u4FEE\u590D\u63D2\u4EF6\u542F\u52A8\u5931\u8D25\uFF1A\u5BA2\u6237\u7AEF\u6253\u5305\u4E3A\u72EC\u7ACB\u666E\u901A\u811A\u672C\uFF0C\u6D88\u9664\u9876\u5C42 import\u3002",
+        "\u4F18\u5316\u7248\u672C\u68C0\u6D4B\uFF1A\u591A\u6E90\u5E76\u53D1\u53D6\u6700\u9AD8\u7248\u672C\uFF0C\u63D0\u4EA4\u53F7\u67E5\u8BE2\u4E0D\u518D\u963B\u585E\u7ED3\u679C\uFF0C\u5237\u65B0\u65E7\u7F13\u5B58\u3002",
+        "\u5728\u7EBF\u66F4\u65B0\u4F18\u5148\u4F7F\u7528\u7248\u672C\u6807\u7B7E\uFF0C\u51CF\u5C11\u5BF9 Gitee \u63D0\u4EA4\u63A5\u53E3\u7684\u4F9D\u8D56\u3002",
+        "\u91CD\u7F6E\u63D2\u4EF6\u589E\u52A0\u4E8C\u6B21\u786E\u8BA4\uFF0C\u660E\u786E\u6E05\u9664\u914D\u7F6E\u3001Key \u548C\u767B\u5F55\u72B6\u6001\uFF0C\u4FDD\u7559\u5DF2\u751F\u6210\u89C6\u9891\u3002"
+      ]
     }
-    function isNewerVersion(remote, local) {
-      const parse = (text) => {
-        const match = /(\d+)\.(\d+)\.(\d+)/.exec(String(text || ""));
-        return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+  };
+
+  // src/client.ts
+  window.__ModuleLoader__.load({
+    id: "metaontic-video",
+    factory(require2) {
+      const React = require2("react");
+      const h = React.createElement;
+      const NAMESPACE = "metaontic-video";
+      const NS = "settings.metaonticVideo";
+      const zh = {
+        summaryEmpty: "\u672A\u914D\u7F6E\uFF1A\u5230\u63D2\u4EF6\u8BBE\u7F6E\u9875\u70B9\u300C\u767B\u5F55\u300D\u9886\u4E00\u628A\u5BC6\u94A5\u3002",
+        summary: "{provider} \xB7 {model}",
+        providerNewapi: "New API \u4E2D\u8F6C\u7AD9",
+        apiKeyConfigured: "\u5DF2\u914D\u7F6E\uFF0C\u7559\u7A7A\u8868\u793A\u4FDD\u6301\u539F\u503C",
+        connectionMode: "\u63A5\u5165\u65B9\u5F0F",
+        connectionModeHint: "A\uFF1A\u767B\u5F55\u9886\u53D6\u670D\u52A1\u7AEF Key\uFF1BB\uFF1A\u586B\u5199\u81EA\u5DF1\u7684\u706B\u5C71\u5F15\u64CE API Key\u3002\u5207\u6362\u540E\u70B9\u51FB\u4FDD\u5B58\u751F\u6548\u3002",
+        volcengineKeyHint: "\u4ECE\u706B\u5C71\u65B9\u821F\u63A7\u5236\u53F0\u83B7\u53D6 API Key\uFF0C\u586B\u5165\u540E\u4FDD\u5B58\u3002\u8D39\u7528\u7531\u706B\u5C71\u8D26\u6237\u627F\u62C5\uFF0C\u65E0\u9700\u767B\u5F55\u672C\u63D2\u4EF6\u670D\u52A1\u7AEF\u3002",
+        volcengineApiKey: "\u706B\u5C71\u5F15\u64CE API Key",
+        service: "A \xB7 \u670D\u52A1\u7AEF\u4E0B\u53D1 Key",
+        volcengine: "B \xB7 \u706B\u5C71\u5F15\u64CE\u76F4\u8FDE",
+        seamTrimSeconds: "\u63A5\u7F1D\u88C1\u526A\u79D2\u6570\uFF08\u5982 0.5,0\uFF09",
+        modelHiddenCurrent: "\u5F53\u524D\u6A21\u578B\uFF08\u6682\u4E0D\u63D0\u4F9B\u9009\u62E9\uFF09",
+        releaseNotesTitle: "\u66F4\u65B0\u5185\u5BB9",
+        resetConfirm: "\u786E\u5B9A\u91CD\u7F6E\u63D2\u4EF6\u5417\uFF1F\u8FD9\u4F1A\u6E05\u9664\u672C\u63D2\u4EF6\u4FDD\u5B58\u7684\u914D\u7F6E\u3001API Key \u548C\u767B\u5F55\u72B6\u6001\uFF0C\u9700\u8981\u91CD\u65B0\u914D\u7F6E\u3002\u5DF2\u751F\u6210\u7684\u89C6\u9891\u4E0D\u4F1A\u5220\u9664\u3002",
+        model: "\u6A21\u578B",
+        modelHint: "mini \u66F4\u7701\uFF08\u9ED8\u8BA4\uFF09\uFF1Bfast \u540C\u4E00\u4EE3\u7684\u52A0\u901F\u7248\uFF0C\u5355\u4EF7\u7EA6 1.6 \u500D\u3002",
+        mergeMode: "\u5408\u5E76\u65B9\u5F0F",
+        mergeModeSeamless: "\u65E0\u7F1D\u62FC\u63A5\uFF08\u5BF9\u9F50\u63A5\u7F1D\uFF09",
+        mergeModeCopy: "\u65E0\u635F\u62FC\u63A5",
+        mergeModeReencode: "\u91CD\u7F16\u7801\u62FC\u63A5",
+        bgmFadeSeconds: "\u97F3\u4E50\u63A5\u7F1D\u6DE1\u5316\uFF08\u79D2\uFF09",
+        bgmFadeSecondsHint: "\u7EED\u62CD\u6BB5\u7684\u80CC\u666F\u97F3\u4E50\u4F1A\u4ECE\u5934\u518D\u6765\uFF0C\u8FD9\u91CC\u628A\u63A5\u7F1D\u4E24\u4FA7\u7684\u97F3\u9891\u5355\u72EC\u6DE1\u5316\u8FD9\u4E48\u4E45\uFF08\u9ED8\u8BA4 0.8\uFF0C\u8BBE 0 \u5173\u95ED\uFF09\uFF1B\u753B\u9762\u6DE1\u5316\u4ECD\u662F 0.25 \u79D2\uFF0C\u4E0D\u4F1A\u770B\u51FA\u8F6C\u573A\u3002",
+        outputDir: "\u8F93\u51FA\u76EE\u5F55",
+        keepSegments: "\u4FDD\u7559\u5206\u6BB5",
+        ffmpegBinary: "ffmpeg \u8DEF\u5F84",
+        ffprobeBinary: "ffprobe \u8DEF\u5F84",
+        ffmpegTitle: "\u957F\u89C6\u9891\u5408\u5E76\u9700\u8981 ffmpeg",
+        ffmpegBody: "\u89C6\u9891\u8D85\u8FC7\u6A21\u578B\u5355\u6B21\u4E0A\u9650\uFF082.0 \u4E3A 15 \u79D2\u30012.5 \u4E3A 30 \u79D2\uFF09\u65F6\u4F1A\u62C6\u6210\u51E0\u6BB5\u5206\u522B\u751F\u6210\u3001\u518D\u5728\u672C\u673A\u5408\u5E76\u6210\u4E00\u6761\u2014\u2014\u5408\u5E76\u8FD9\u4E00\u6B65\u7528\u7684\u662F ffmpeg\u3002\u6CA1\u88C5\u4E5F\u80FD\u751F\u6210\uFF0C\u53EA\u662F\u53EA\u7ED9\u5206\u6BB5\u5217\u8868\u3001\u4E0D\u5408\u6210\u6574\u6761\u3002",
+        ffmpegInstallFor: "\u6309\u4F60\u7684\u7CFB\u7EDF\u88C5\u4E00\u4E0B\uFF08\u70B9\u53F3\u8FB9\u6309\u94AE\u590D\u5236\u547D\u4EE4\uFF09\uFF1A",
+        ffmpegCopy: "\u590D\u5236",
+        ffmpegCopied: "\u5DF2\u590D\u5236",
+        ffmpegMore: "\u5176\u4ED6\u7CFB\u7EDF",
+        ffmpegLess: "\u6536\u8D77\u5176\u4ED6\u7CFB\u7EDF",
+        ffmpegAfter: "\u4E0D\u60F3\u81EA\u5DF1\u6572\u547D\u4EE4\u7684\u8BDD\uFF0C\u76F4\u63A5\u5728\u5BF9\u8BDD\u91CC\u8BF4\u300C\u5E2E\u6211\u88C5 ffmpeg\u300D\u2014\u2014\u63D2\u4EF6\u4F1A\u6267\u884C\u5B89\u88C5\uFF08\u547D\u4EE4\u4F1A\u5148\u8BA9\u4F60\u786E\u8BA4\uFF09\uFF1B\u88C5\u597D\u540E\u91CD\u8DD1\u4E00\u6B21\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\uFF08\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\u3002ffmpeg \u88C5\u5728\u975E\u9ED8\u8BA4\u4F4D\u7F6E\u7684\u8BDD\uFF0C\u628A\u7EDD\u5BF9\u8DEF\u5F84\u586B\u5230\u4E0A\u9762\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\u4E5F\u4E00\u6837\u7BA1\u7528\u3002\u5B89\u88C5\u5305\u81EA\u5E26 ffprobe\uFF0C\u5206\u6BB5\u65F6\u957F\u63A2\u6D4B\u4F1A\u4E00\u8D77\u89E3\u51B3\u3002",
+        ffmpegManual: "\u60F3\u81EA\u5DF1\u88C5\uFF1AmacOS \u7528 Homebrew\uFF0CWindows \u7528 winget\uFF0CLinux \u7528\u7CFB\u7EDF\u5305\u7BA1\u7406\u5668\uFF1B\u88C5\u5B8C\u786E\u8BA4\u547D\u4EE4\u884C\u91CC\u80FD\u8DD1 ffmpeg -version \u5C31\u884C\u3002",
+        registerEmail: "\u90AE\u7BB1\uFF08\u8D26\u53F7\uFF09",
+        registerTitle: "\u6CE8\u518C\u63D2\u4EF6",
+        registerHint: "\u586B\u90AE\u7BB1 \u2192 \u83B7\u53D6\u9A8C\u8BC1\u7801 \u2192 \u767B\u5F55\uFF1B\u90AE\u7BB1\u5373\u8D26\u53F7\uFF0C\u4E00\u4E2A\u90AE\u7BB1\u4E00\u628A Key\u3002",
+        registerEmailPlaceholder: "\u4F60\u7684\u90AE\u7BB1\uFF0C\u4F8B\u5982 name@example.com",
+        registerCode: "\u9A8C\u8BC1\u7801",
+        registerCodePlaceholder: "\u9A8C\u8BC1\u7801",
+        registerCodeSend: "\u83B7\u53D6\u9A8C\u8BC1\u7801",
+        registerCodeSending: "\u53D1\u9001\u4E2D\u2026",
+        registerCodeCooldown: "{seconds} \u79D2\u540E\u91CD\u53D1",
+        registerCodeSent: "\u9A8C\u8BC1\u7801\u5DF2\u53D1\u5230 {email}\uFF1A5 \u5206\u949F\u5185\u6709\u6548\uFF0C\u586B\u8FDB\u6765\u70B9\u53F3\u8FB9\u7684\u6309\u94AE\u5373\u53EF\u3002",
+        registerEmailLocked: "\u9A8C\u8BC1\u7801\u521A\u53D1\u5230\u4E0A\u9762\u8FD9\u4E2A\u90AE\u7BB1\uFF1A\u7B49\u5012\u8BA1\u65F6\u7ED3\u675F\u624D\u80FD\u6539\u3002",
+        registerNeedEmail: "\u5148\u586B\u90AE\u7BB1\uFF0C\u518D\u70B9\u300C\u83B7\u53D6\u9A8C\u8BC1\u7801\u300D\u3002",
+        registerNeedCode: "\u5148\u586B\u90AE\u4EF6\u91CC\u6536\u5230\u7684\u9A8C\u8BC1\u7801\u3002",
+        registerRestored: "\u5DF2\u627E\u56DE\u672C\u673A\u5BC6\u94A5\uFF1A\u8FD9\u53F0\u8BBE\u5907\u4E4B\u524D\u9886\u8FC7\u7684\u90A3\u628A\u5E2E\u4F60\u586B\u597D\u4E86\uFF0C\u70B9\u300C\u4FDD\u5B58\u300D\u5373\u53EF\u3002",
+        quotaTitle: "\u989D\u5EA6",
+        quotaRemain: "\u5269\u4F59",
+        quotaUsed: "\u5DF2\u7528",
+        quotaTotal: "\u603B\u989D\u5EA6",
+        quotaUnlimited: "\u4E0D\u9650\u989D\u5EA6",
+        quotaLoading: "\u8BFB\u53D6\u989D\u5EA6\u4E2D\u2026",
+        quotaRefresh: "\u5237\u65B0\u989D\u5EA6",
+        quotaNoKey: "\u8FD8\u6CA1\u6709\u5BC6\u94A5\uFF1A\u6CE8\u518C\u540E\u8FD9\u91CC\u4F1A\u663E\u793A\u5269\u4F59 / \u5DF2\u7528\u989D\u5EA6\u3002",
+        quotaNotRegistered: "\u670D\u52A1\u7AEF\u6CA1\u6709\u8FD9\u53F0\u8BBE\u5907\u7684\u6CE8\u518C\u8BB0\u5F55\uFF08\u6362\u8FC7\u8BBE\u5907 / \u6E05\u8FC7\u6570\u636E\uFF09\uFF1A\u8BF7\u8054\u7CFB\u7BA1\u7406\u5458\u5904\u7406\u540E\u91CD\u65B0\u9886\u53D6\u3002",
+        quotaFailed: "\u8BFB\u53D6\u989D\u5EA6\u5931\u8D25\uFF1A{message}",
+        quotaUpdatedAt: "\u66F4\u65B0\u4E8E {time}",
+        usageTitle: "\u4F7F\u7528\u8BB0\u5F55\uFF08\u6700\u8FD1 {days} \u5929\uFF09",
+        usageSummary: "{count} \u6761 \xB7 \u8D39\u7528\u5408\u8BA1 {amount}",
+        usageColTime: "\u65F6\u95F4",
+        usageColKind: "\u7C7B\u578B",
+        usageColModel: "\u6A21\u578B",
+        usageColCost: "\u8D39\u7528",
+        usageColStatus: "\u7ED3\u679C",
+        usageEmpty: "\u8FD8\u6CA1\u6709\u8BB0\u5F55\uFF1A\u751F\u6210\u6216\u7EED\u62CD\u8FC7\u89C6\u9891\u540E\uFF0C\u8FD9\u91CC\u4F1A\u6309\u65F6\u95F4\u5217\u51FA\u6700\u8FD1\u51E0\u6B21\u3002",
+        usageLoading: "\u8BFB\u53D6\u4F7F\u7528\u8BB0\u5F55\u4E2D\u2026",
+        usageRefresh: "\u5237\u65B0\u8BB0\u5F55",
+        usageFailed: "\u8BFB\u53D6\u4F7F\u7528\u8BB0\u5F55\u5931\u8D25\uFF1A{message}",
+        usageMore: "\u65F6\u95F4\u7A97\u5185\u8FD8\u6709\u66F4\u65E9\u7684\u8BB0\u5F55\uFF0C\u8FD9\u91CC\u53EA\u663E\u793A\u6700\u8FD1\u7684 {count} \u6761\u3002",
+        usageKeyMissing: "\u8FD8\u6CA1\u6709\u5BC6\u94A5\uFF1A\u9886\u5230 Key \u4E4B\u540E\uFF0C\u8FD9\u91CC\u4F1A\u663E\u793A\u7528\u5B83\u51FA\u7247\u7684\u8BB0\u5F55\u3002",
+        usageStatusOk: "\u6210\u529F",
+        usageStatusFailed: "\u5931\u8D25",
+        versionTitle: "\u63D2\u4EF6\u7248\u672C",
+        versionCurrent: "\u5F53\u524D\u7248\u672C v{version}",
+        versionCheck: "\u68C0\u67E5\u66F4\u65B0",
+        versionChecking: "\u68C0\u67E5\u4E2D\u2026",
+        versionLatest: "\u5DF2\u662F\u6700\u65B0\u7248\u672C",
+        versionNew: "\u6709\u65B0\u7248\u672C v{version}",
+        versionFailed: "\u68C0\u67E5\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
+        versionUpdate: "\u7ACB\u5373\u66F4\u65B0",
+        versionUpdateConfirm: "\u786E\u8BA4\u66F4\u65B0\u5230 v{version}",
+        versionUpdateConfirmHint: "\u4F1A\u4ECE Gitee \u88C5\u4E00\u904D\u63D2\u4EF6\u672C\u4F53\uFF08\u914D\u7F6E\u548C\u5BC6\u94A5\u90FD\u4FDD\u7559\uFF09\uFF1B\u88C5\u4E0D\u4E0A\u4E5F\u4E0D\u4F1A\u52A8\u73B0\u5728\u8FD9\u4EFD\u3002\u8FD9\u5F20\u8BBE\u7F6E\u9875\u4F1A\u77ED\u6682\u6D88\u5931\u4E00\u4E0B\u3002",
+        versionUpdating: "\u66F4\u65B0\u4E2D\u2026",
+        versionUpdateDone: "\u5DF2\u66F4\u65B0\u5230 v{version}\uFF0C\u6B63\u5728\u91CD\u65B0\u52A0\u8F7D\u2026",
+        versionUpdateRestart: "\u65B0\u7248\u672C v{version} \u5DF2\u88C5\u597D\uFF1A\u91CD\u542F Harness \u540E\u751F\u6548\u3002",
+        versionUpdateCancelled: "\u66F4\u65B0\u5DF2\u53D6\u6D88\u3002",
+        versionUpdateRetry: "\u88C5\u5230\u4E00\u534A\u6CA1\u6210\u529F\uFF08\u7B2C {attempt}/{total} \u6B21\u5C1D\u8BD5\uFF09\u2026",
+        versionUpdateFailed: "\u5728\u7EBF\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
+        versionUpdateRemoved: "\u8FD9\u6B21\u5148\u5378\u8F7D\u4E86\u672C\u63D2\u4EF6\u3001\u6CA1\u80FD\u88C5\u56DE\u6765\uFF1A\u8BF7\u5230\u300C\u63D2\u4EF6\u300D\u9875\u91CD\u65B0\u6DFB\u52A0\u672C\u63D2\u4EF6\u3002",
+        versionUpdateRateLimited: '\u770B\u8D77\u6765\u662F Gitee \u9650\u6D41\uFF08429\uFF0C\u533F\u540D HTTPS \u514B\u9686\u88AB\u6392\u961F\uFF09\u3002\u672C\u673A\u6267\u884C git config --global url."git@gitee.com:".insteadOf "https://gitee.com/" \u6539\u6210\u8D70 SSH\uFF0C\u518D\u70B9\u4E00\u6B21\u300C\u7ACB\u5373\u66F4\u65B0\u300D\u5373\u53EF\uFF1B\u5BC6\u94A5\u548C\u8BBE\u7F6E\u5728 profile \u91CC\uFF0C\u6CA1\u4E22\u3002',
+        versionUpdateUnavailable: "\u5BBF\u4E3B\u6CA1\u6709\u5F00\u653E\u63D2\u4EF6\u7BA1\u7406\u63A5\u53E3\uFF08{detail}\uFF09\uFF0C\u8BF7\u5230\u300C\u63D2\u4EF6\u300D\u9875\u5378\u8F7D\u540E\u91CD\u65B0\u6DFB\u52A0\u3002",
+        versionHint: "\u70B9\u300C\u7ACB\u5373\u66F4\u65B0\u300D\u7531\u63D2\u4EF6\u81EA\u5DF1\u4ECE Gitee \u91CD\u88C5\u4E00\u904D\uFF0C\u4E0D\u7528\u53BB\u5378\u8F7D\u91CD\u52A0\u3002",
+        versionCheckedAt: "\u68C0\u67E5\u4E8E {time}",
+        sectionGeneration: "\u751F\u6210\u53C2\u6570",
+        sectionMerge: "\u5408\u5E76\u4E0E\u8F93\u51FA",
+        sectionAdvanced: "\u9AD8\u7EA7",
+        sectionCombined: "\u66F4\u591A\u8BBE\u7F6E",
+        sectionCombinedHint: "\u8F93\u51FA\u76EE\u5F55\u3001\u63A5\u7F1D\u5904\u7406\u4E0E\u8FD0\u884C\u53C2\u6570",
+        sectionRuntime: "\u8FD0\u884C\u53C2\u6570",
+        segmentsRetained: "\u6240\u6709\u539F\u59CB\u5206\u6BB5\u81EA\u52A8\u4FDD\u7559\uFF0C\u4FBF\u4E8E\u9884\u89C8\u3001\u7EED\u505A\u548C\u91CD\u65B0\u526A\u8F91\u3002",
+        register: "\u767B\u5F55",
+        registerWorking: "\u767B\u5F55\u4E2D\u2026",
+        registerOk: "\u767B\u5F55\u6210\u529F\uFF1A\u4E0A\u6E38 / Key / \u5730\u5740 / \u6A21\u578B\u90FD\u5199\u597D\u4E86\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u914D\u7F6E\u540E\u751F\u6548\u3002",
+        registerPartial: "\u5DF2\u62FF\u5230\u5BC6\u94A5\uFF0C\u4F46\u6709\u5B57\u6BB5\u5BBF\u4E3B\u6CA1\u63A5\u53D7\uFF0C\u8BF7\u68C0\u67E5\u540E\u624B\u52A8\u4FDD\u5B58\u3002",
+        registerFailed: "\u767B\u5F55\u5931\u8D25\uFF1A{message}",
+        registerDisabled: "\u6CE8\u518C\u670D\u52A1\u4E0D\u53EF\u7528\uFF1A{message}",
+        registerNoKey: "\u6CE8\u518C\u670D\u52A1\u6CA1\u6709\u8FD4\u56DE\u5BC6\u94A5\uFF08\u540E\u7AEF\u4E2D\u8F6C\u7AD9\u914D\u7F6E\u53EF\u80FD\u6709\u95EE\u9898\uFF09\u3002",
+        mode: "\u7EED\u62CD\u65B9\u5F0F",
+        modeContinuous: "\u540C\u673A\u4F4D\u8FDE\u7EED",
+        modeCloseup: "\u5207\u8FD1\u666F",
+        ratio: "\u753B\u9762\u6BD4\u4F8B",
+        generateAudio: "\u751F\u6210\u97F3\u9891",
+        watermark: "\u52A0\u6C34\u5370",
+        extraParams: "\u989D\u5916\u53C2\u6570\uFF08JSON\uFF09",
+        pollIntervalMs: "\u8F6E\u8BE2\u95F4\u9694\uFF08\u6BEB\u79D2\uFF09",
+        maxWaitMs: "\u5355\u6B21\u6700\u957F\u7B49\u5F85\uFF08\u6BEB\u79D2\uFF09",
+        save: "\u4FDD\u5B58",
+        reset: "\u91CD\u7F6E\u63D2\u4EF6",
+        resetHint: "\u6E05\u6389\u672C\u673A\u5199\u8FC7\u7684 Key\u3001\u6A21\u578B\u3001\u8F93\u51FA\u76EE\u5F55\u7B49\uFF0C\u56DE\u5230\u521A\u88C5\u4E0A\u7684\u6837\u5B50\u3002",
+        saving: "\u4FDD\u5B58\u4E2D\u2026",
+        saved: "\u5DF2\u4FDD\u5B58\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u914D\u7F6E\u540E\u751F\u6548\u3002",
+        saveFailed: "\u5BBF\u4E3B\u62D2\u7EDD\u4E86\u8FD9\u6B21\u5199\u5165\uFF0C\u8BF7\u68C0\u67E5\u5B57\u6BB5\u53D6\u503C\u3002",
+        dirty: "\u6709\u672A\u4FDD\u5B58\u7684\u6539\u52A8",
+        loading: "\u8BFB\u53D6\u914D\u7F6E\u4E2D\u2026",
+        unavailable: "\u5BBF\u4E3B\u8FD8\u6CA1\u6709\u628A\u672C\u6761\u76EE\u5F53\u4F5C\u53EF\u7F16\u8F91\u8BBE\u7F6E\u9879\u63D0\u4F9B\u670D\u52A1\uFF08\u914D\u7F6E\u547D\u540D\u7A7A\u95F4 metaontic-video \u672A\u5C31\u7EEA\uFF09\u3002\u82E5 profile \u7684 cordis.patch.yml \u91CC\u5DF2\u6709\u8BE5\u6761\u76EE\uFF0C\u8BF7\u91CD\u542F Harness \u8BA9\u5BBF\u4E3B\u91CD\u65B0\u52A0\u8F7D\uFF1B\u91CD\u542F\u540E\u4ECD\u662F\u8FD9\u53E5\u8BDD\uFF0C\u5C31\u662F\u5BBF\u4E3B\u7248\u672C\u4E0E\u63D2\u4EF6\u7684\u8BBE\u7F6E\u63A5\u53E3\u4E0D\u5339\u914D\u3002",
+        readOnly: "\u5F53\u524D profile \u4E0D\u63A5\u53D7\u8868\u5355\u5199\u5165\u3002"
       };
-      const next = parse(remote);
-      const current = parse(local);
-      if (!next || !current) return false;
-      for (let index = 0; index < 3; index += 1) {
-        if (next[index] !== current[index]) return next[index] > current[index];
-      }
-      return false;
-    }
-    function decodeBase64Text(raw) {
-      if (typeof atob !== "function") return "";
-      const binary = atob(String(raw || "").replace(/\s+/g, ""));
-      const bytes = new Uint8Array(binary.length);
-      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-      return typeof TextDecoder === "function" ? new TextDecoder().decode(bytes) : binary;
-    }
-    async function fetchUpdateSource(url, ms = 12e3) {
-      const controller = typeof AbortController === "function" ? new AbortController() : null;
-      const timer = controller ? window.setTimeout(() => controller.abort(), ms) : null;
-      try {
-        const response = await fetch(url, {
-          headers: { accept: "application/json" },
-          signal: controller ? controller.signal : void 0
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response;
-      } finally {
-        if (timer) window.clearTimeout(timer);
-      }
-    }
-    function versionFromFile(body) {
-      const version = String((body || {}).version || "").trim().replace(/^v/i, "");
-      if (!version) throw new Error("no version");
-      return version;
-    }
-    function versionFromTags(body) {
-      const versions = Array.isArray(body?.versions) ? body.versions : [];
-      let best = "";
-      for (const entry of versions) {
-        const version = String(entry && entry.version || "").trim().replace(/^v/i, "");
-        if (!/^\d+\.\d+\.\d+$/.test(version)) continue;
-        if (!best || isNewerVersion(version, best)) best = version;
-      }
-      if (!best) throw new Error("no tags");
-      return best;
-    }
-    async function fetchLatestVersion() {
-      const problems = [];
-      try {
-        const body = await (await fetchUpdateSource(UPDATE_FILE_API)).json();
-        const text = body && typeof body.content === "string" ? decodeBase64Text(body.content) : "";
-        if (!text) throw new Error("empty file");
-        return versionFromFile(JSON.parse(text));
-      } catch (error) {
-        problems.push(`gitee api: ${error?.message || error}`);
-      }
-      try {
-        return versionFromTags(await (await fetchUpdateSource(UPDATE_TAGS_API)).json());
-      } catch (error) {
-        problems.push(`jsdelivr tags: ${error?.message || error}`);
-      }
-      for (const url of UPDATE_MIRROR_FILES) {
-        try {
-          return versionFromFile(await (await fetchUpdateSource(url)).json());
-        } catch (error) {
-          problems.push(`${String(url).split("/")[2]}: ${error?.message || error}`);
-        }
-      }
-      throw new Error(problems.join("\uFF1B"));
-    }
-    async function fetchReleaseNotes(version) {
-      const urls = [
-        `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json?ref=v${encodeURIComponent(version)}`,
-        `https://fastly.jsdelivr.net/gh/wxsimon2022/metaontic-video@${encodeURIComponent(version)}/package.json`
+      const en = {
+        summaryEmpty: 'Not configured: open the plugin settings and click "Log in".',
+        summary: "{provider} \xB7 {model}",
+        providerNewapi: "New API relay",
+        apiKeyConfigured: "Configured; leave empty to keep it",
+        connectionMode: "Connection",
+        connectionModeHint: "A: sign in for a service key. B: enter your Volcano Engine API key. Save to apply.",
+        volcengineKeyHint: "Enter an API key from the Volcano Ark console and save. Billed to your Volcano account; no plugin service login required.",
+        volcengineApiKey: "Volcano Engine API Key",
+        service: "A \xB7 Service-issued key",
+        volcengine: "B \xB7 Volcano Engine",
+        seamTrimSeconds: "Seam head trims (e.g. 0.5,0)",
+        modelHiddenCurrent: "Current model (selection unavailable)",
+        releaseNotesTitle: "Release notes",
+        resetConfirm: "Reset this plugin? Saved settings, API keys and login state will be cleared. Generated videos will be kept.",
+        model: "Model",
+        modelHint: "mini is the cheaper default; fast is the faster sibling at about 1.6\xD7 the price.",
+        mergeMode: "Merge mode",
+        mergeModeSeamless: "Seamless (match junctions)",
+        mergeModeCopy: "Stream copy",
+        mergeModeReencode: "Re-encode",
+        bgmFadeSeconds: "Music seam cross-fade (s)",
+        bgmFadeSecondsHint: "Each segment gets its own soundtrack, so the music restarts at the junction. Audio is cross-faded for this long (default 0.8; 0 disables). The picture fade stays at 0.25s, so it never looks like a transition.",
+        outputDir: "Output directory",
+        keepSegments: "Keep segments",
+        ffmpegBinary: "ffmpeg path",
+        ffprobeBinary: "ffprobe path",
+        ffmpegTitle: "Merging long videos needs ffmpeg",
+        ffmpegBody: "Videos exceeding the model limit (15s for 2.0, 30s for 2.5) are generated as several shots and merged into one file on this machine \u2014 that merge needs ffmpeg. Without it you still get the video, just as separate segments instead of one file.",
+        ffmpegInstallFor: "Install it for your OS (click the button to copy the command):",
+        ffmpegCopy: "Copy",
+        ffmpegCopied: "Copied",
+        ffmpegMore: "Other systems",
+        ffmpegLess: "Hide other systems",
+        ffmpegAfter: 'Rather not touch a terminal? Just say "\u5E2E\u6211\u88C5 ffmpeg" in the chat and the plugin runs the install for you (it asks you to confirm the command first). Re-run the generation afterwards and the merge happens automatically \u2014 no need to regenerate. Installed somewhere unusual? Put the absolute path in the "ffmpeg path" field above. The package ships ffprobe too, so segment probing is fixed at the same time.',
+        ffmpegManual: "Installing by hand: Homebrew on macOS, winget on Windows, your distro package manager on Linux \u2014 you are set once `ffmpeg -version` works in a terminal.",
+        registerEmail: "Email (this is your account)",
+        registerTitle: "Register the plugin",
+        registerHint: "Email \u2192 verification code \u2192 log in. One email, one key.",
+        registerEmailPlaceholder: "you@example.com",
+        registerCode: "Verification code",
+        registerCodePlaceholder: "verification code",
+        registerCodeSend: "Send code",
+        registerCodeSending: "Sending\u2026",
+        registerCodeCooldown: "Resend in {seconds}s",
+        registerCodeSent: "Code sent to {email} \u2014 valid for 5 minutes.",
+        registerEmailLocked: "Code just went to this address \u2014 edit it after the countdown.",
+        registerNeedEmail: "Type your email before requesting a code.",
+        registerNeedCode: "Type the code from the email first.",
+        registerRestored: "Restored the key issued to this device; click Save to apply.",
+        quotaTitle: "Quota",
+        quotaRemain: "Remaining",
+        quotaUsed: "Used",
+        quotaTotal: "Total",
+        quotaUnlimited: "Unlimited",
+        quotaLoading: "Reading quota\u2026",
+        quotaRefresh: "Refresh quota",
+        quotaNoKey: "No key yet \u2014 remaining / used quota shows here after registration.",
+        quotaNotRegistered: "The service has no registration for this device (new device or cleared data) \u2014 ask an admin to reset it.",
+        quotaFailed: "Failed to read quota: {message}",
+        quotaUpdatedAt: "updated {time}",
+        versionTitle: "Plugin version",
+        versionCurrent: "Installed v{version}",
+        versionCheck: "Check for updates",
+        versionChecking: "Checking\u2026",
+        versionLatest: "Up to date",
+        versionNew: "v{version} is available",
+        versionFailed: "Update check failed: {message}",
+        versionUpdate: "Update now",
+        versionUpdateConfirm: "Confirm update to v{version}",
+        versionUpdateConfirmHint: "Reinstalls the plugin itself from Gitee (settings and key are kept); a failed install leaves the current copy untouched. This settings page disappears for a moment.",
+        versionUpdating: "Updating\u2026",
+        versionUpdateDone: "Updated to v{version}, reloading\u2026",
+        versionUpdateRestart: "v{version} installed; restart Harness to apply it.",
+        versionUpdateCancelled: "Update cancelled.",
+        versionUpdateRetry: "Install did not go through (attempt {attempt} of {total})\u2026",
+        versionUpdateFailed: "Online update failed: {message}",
+        versionUpdateRemoved: "This run uninstalled the plugin and could not put it back: please re-add it from the Plugins page.",
+        versionUpdateRateLimited: 'Looks like a Gitee rate limit (429; anonymous HTTPS clones are queued). Run git config --global url."git@gitee.com:".insteadOf "https://gitee.com/" on this machine to switch to SSH, then click Update now again; the key and settings are kept in the profile.',
+        versionUpdateUnavailable: "This Host exposes no plugin-management API ({detail}); uninstall and re-add it from the Plugins page.",
+        versionHint: 'Click "Update now": the plugin reinstalls itself from Gitee \u2014 no uninstall/re-add needed.',
+        versionCheckedAt: "checked {time}",
+        register: "Log in",
+        registerWorking: "Logging in\u2026",
+        registerOk: "Logged in: provider, key, base URL and model written; applies after the config reload.",
+        registerPartial: "Key received, but some fields were rejected; please review and save manually.",
+        registerFailed: "Log in failed: {message}",
+        registerDisabled: "Register service unavailable: {message}",
+        registerNoKey: "The register service returned no key (check the relay configuration).",
+        sectionGeneration: "Generation",
+        sectionMerge: "Merge & output",
+        sectionAdvanced: "Advanced",
+        sectionCombined: "More settings",
+        sectionCombinedHint: "Output paths, seams and runtime options",
+        sectionRuntime: "Runtime options",
+        segmentsRetained: "Original segments are always retained for preview, resume and editing.",
+        mode: "Continuation",
+        modeContinuous: "Same camera",
+        modeCloseup: "Cut to close-up",
+        ratio: "Aspect ratio",
+        generateAudio: "Generate audio",
+        watermark: "Watermark",
+        extraParams: "Extra params (JSON)",
+        pollIntervalMs: "Poll interval (ms)",
+        maxWaitMs: "Max wait (ms)",
+        save: "Save",
+        reset: "Reset plugin",
+        resetHint: "Clears the key, model, output dir and anything else this machine wrote \u2014 back to a fresh install.",
+        saving: "Saving\u2026",
+        saved: "Saved; the Host applies it after the config reload.",
+        saveFailed: "The Host rejected this write; check the field values.",
+        dirty: "Unsaved changes",
+        loading: "Reading configuration\u2026",
+        unavailable: "This Host does not serve this entry as an editable setting yet (namespace metaontic-video is not ready). If the row already exists in the profile cordis.patch.yml, restart Harness so the Host reloads it; if the message persists, the Host version and the plugin settings interface do not match.",
+        readOnly: "This profile does not accept form writes."
+      };
+      const MODEL_OPTIONS = [
+        "doubao-seedance-2-0-mini-260615",
+        "doubao-seedance-2-0-fast-260128"
       ];
-      for (const url of urls) {
+      const SELECTS = {
+        connectionMode: ["service", "volcengine"],
+        model: MODEL_OPTIONS,
+        mode: ["continuous", "closeup"],
+        ratio: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
+        mergeMode: ["seamless", "copy", "reencode"]
+      };
+      const SECTIONS = [
+        { key: "sectionGeneration", fields: ["connectionMode", "volcengineApiKey", "model", "mode", "ratio", "generateAudio", "watermark"] },
+        { key: "sectionMerge", fields: ["seamTrimSeconds", "mergeMode", "bgmFadeSeconds", "outputDir"] },
+        { key: "sectionAdvanced", fields: ["extraParams", "pollIntervalMs", "maxWaitMs", "ffmpegBinary", "ffprobeBinary"] }
+      ];
+      const FIELDS = [
+        { key: "connectionMode", kind: "select", wide: true },
+        { key: "volcengineApiKey", kind: "text", secret: true, wide: true },
+        // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
+        { key: "model", kind: "select", wide: true },
+        { key: "mode", kind: "select" },
+        { key: "ratio", kind: "select" },
+        { key: "generateAudio", kind: "switch" },
+        { key: "watermark", kind: "switch" },
+        { key: "seamTrimSeconds", kind: "text" },
+        { key: "mergeMode", kind: "select" },
+        { key: "bgmFadeSeconds", kind: "number" },
+        { key: "outputDir", kind: "text", wide: true },
+        { key: "keepSegments", kind: "switch" },
+        { key: "extraParams", kind: "text", wide: true },
+        { key: "pollIntervalMs", kind: "number" },
+        { key: "maxWaitMs", kind: "number" },
+        { key: "ffmpegBinary", kind: "text", mono: true },
+        { key: "ffprobeBinary", kind: "text", mono: true }
+      ];
+      const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((field) => [field.key, field]));
+      const DEFAULT_REGISTER_API = "https://video.mybfs.cn";
+      const LOGGED_OUT_KEY = "metaontic-video.logged-out";
+      const PLUGIN_OWNED_KEYS = [
+        "connectionMode",
+        "volcengineApiKey",
+        "apiKey",
+        "keyOrigin",
+        "baseUrl",
+        "registerEmail",
+        "deviceId",
+        "deviceSecret",
+        "model"
+      ];
+      const DEFAULT_REGISTER_TOKEN = "metaontic-video-register-v1";
+      const UPDATE_PROJECT = "hackloop/metaontic-video";
+      const UPDATE_FILE_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json`;
+      const PLUGIN_PACKAGE = "metaontic-video";
+      const UPDATE_SPEC = "git+https://gitee.com/hackloop/metaontic-video.git";
+      const UPDATE_TAGS_API = "https://data.jsdelivr.com/v1/packages/gh/wxsimon2022/metaontic-video";
+      const UPDATE_MIRROR_FILES = [
+        "https://fastly.jsdelivr.net/gh/wxsimon2022/metaontic-video@master/package.json",
+        "https://gcore.jsdelivr.net/gh/wxsimon2022/metaontic-video@master/package.json"
+      ];
+      const UPDATE_BRANCH = "master";
+      const UPDATE_COMMIT_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/commits?sha=${UPDATE_BRANCH}&per_page=1`;
+      const UPDATE_ATTEMPTS = 3;
+      const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
+      const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
+      const PLUGIN_VERSION = true ? "2.15.2".trim().replace(/^v/i, "") : "";
+      function currentOs() {
+        const nav = window.navigator || {};
+        const raw = String(
+          nav.userAgentData?.platform || nav.platform || nav.userAgent || ""
+        ).toLowerCase();
+        if (/mac|darwin|iphone|ipad/.test(raw)) return "macos";
+        if (/win/.test(raw)) return "windows";
+        return "linux";
+      }
+      const FFMPEG_INSTALLS = {
+        macos: { label: "macOS\uFF08Homebrew\uFF09", command: "brew install ffmpeg" },
+        windows: { label: "Windows\uFF08winget\uFF09", command: "winget install --id Gyan.FFmpeg -e" },
+        linux: { label: "Linux\uFF08Debian / Ubuntu\uFF09", command: "sudo apt update && sudo apt install -y ffmpeg" }
+      };
+      const FFMPEG_ALL = [
+        { os: "macos", label: "macOS\uFF08Homebrew\uFF09", command: "brew install ffmpeg" },
+        {
+          os: "macos",
+          label: "macOS\uFF08\u8FD8\u6CA1\u88C5 Homebrew\uFF09",
+          command: '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+        },
+        { os: "windows", label: "Windows\uFF08winget\uFF09", command: "winget install --id Gyan.FFmpeg -e" },
+        { os: "windows", label: "Windows\uFF08Chocolatey\uFF09", command: "choco install ffmpeg" },
+        { os: "linux", label: "Linux\uFF08Debian / Ubuntu\uFF09", command: "sudo apt update && sudo apt install -y ffmpeg" },
+        { os: "linux", label: "Linux\uFF08Fedora / RHEL / CentOS\uFF09", command: "sudo dnf install -y ffmpeg" }
+      ];
+      function formatMoney(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return "0";
+        const text = number.toFixed(Math.abs(number) >= 1 ? 2 : 4);
+        return text.includes(".") ? text.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "") : text;
+      }
+      function isNewerVersion(remote, local) {
+        const parse = (text) => {
+          const match = /(\d+)\.(\d+)\.(\d+)/.exec(String(text || ""));
+          return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+        };
+        const next = parse(remote);
+        const current = parse(local);
+        if (!next || !current) return false;
+        for (let index = 0; index < 3; index += 1) {
+          if (next[index] !== current[index]) return next[index] > current[index];
+        }
+        return false;
+      }
+      function decodeBase64Text(raw) {
+        if (typeof atob !== "function") return "";
+        const binary = atob(String(raw || "").replace(/\s+/g, ""));
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+        return typeof TextDecoder === "function" ? new TextDecoder().decode(bytes) : binary;
+      }
+      async function fetchUpdateSource(url, ms = 12e3) {
+        const controller = typeof AbortController === "function" ? new AbortController() : null;
+        const timer = controller ? window.setTimeout(() => controller.abort(), ms) : null;
         try {
-          const body = await (await fetchUpdateSource(url)).json();
-          const pkg = body.content ? JSON.parse(decodeBase64Text(body.content)) : body;
-          const notes = pkg.releaseNotes;
-          if (notes?.version === version && Array.isArray(notes.items) && notes.items.every((item) => typeof item === "string")) return notes;
-        } catch {
+          const response = await fetch(url, {
+            headers: { accept: "application/json" },
+            signal: controller ? controller.signal : void 0
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = await response.json();
+          return { json: async () => data };
+        } finally {
+          if (timer) window.clearTimeout(timer);
         }
       }
-      return null;
-    }
-    async function fetchLatestCommit() {
-      const body = await (await fetchUpdateSource(UPDATE_COMMIT_API)).json();
-      const sha = String((Array.isArray(body) ? body[0]?.sha : "") || "").trim();
-      if (!/^[0-9a-f]{40}$/i.test(sha)) throw new Error("no commit");
-      return sha;
-    }
-    const TOKENS = {
-      text: "var(--dsw-alias-label-primary, inherit)",
-      muted: "var(--dsw-alias-label-caption, #8886)",
-      border: "var(--dsw-alias-border-l2, #8884)",
-      cardFill: "var(--dsw-alias-settings-card-fill, transparent)",
-      controlFill: "var(--dsw-specific-input-major, transparent)",
-      primaryFill: "var(--dsw-alias-button-primary-fill, #247bbf)",
-      error: "var(--dsw-alias-state-error-primary, #d9534f)",
-      success: "var(--dsw-alias-state-success-primary, #2e9e5b)"
-    };
-    const inputStyle = { width: "100%", boxSizing: "border-box" };
-    const PAGE_CSS = `
+      function versionFromFile(body) {
+        const version = String((body || {}).version || "").trim().replace(/^v/i, "");
+        if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("invalid version");
+        return version;
+      }
+      function versionFromTags(body) {
+        const versions = Array.isArray(body?.versions) ? body.versions : [];
+        let best = "";
+        for (const entry of versions) {
+          const version = String(entry && entry.version || "").trim().replace(/^v/i, "");
+          if (!/^\d+\.\d+\.\d+$/.test(version)) continue;
+          if (!best || isNewerVersion(version, best)) best = version;
+        }
+        if (!best) throw new Error("no tags");
+        return best;
+      }
+      async function fetchLatestVersion() {
+        const github = "https://api.github.com/repos/wxsimon2022/metaontic-video/contents/package.json?ref=master";
+        const requests = [UPDATE_FILE_API, github].map(async (url) => {
+          const body = await (await fetchUpdateSource(url, 6e3)).json();
+          return versionFromFile(JSON.parse(decodeBase64Text(body.content)));
+        });
+        requests.push((async () => versionFromTags(await (await fetchUpdateSource(UPDATE_TAGS_API, 6e3)).json()))());
+        for (const url of UPDATE_MIRROR_FILES) {
+          requests.push((async () => versionFromFile(await (await fetchUpdateSource(url, 6e3)).json()))());
+        }
+        const results = await Promise.allSettled(requests);
+        let best = "";
+        for (const result of results) {
+          if (result.status === "fulfilled" && (!best || isNewerVersion(result.value, best))) best = result.value;
+        }
+        if (!best) throw new Error(results.filter((item) => item.status === "rejected").map((item) => item.reason?.message || String(item.reason)).join("\uFF1B"));
+        return best;
+      }
+      async function fetchReleaseNotes(version) {
+        const urls = [
+          `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json?ref=v${encodeURIComponent(version)}`,
+          `https://fastly.jsdelivr.net/gh/wxsimon2022/metaontic-video@${encodeURIComponent(version)}/package.json`
+        ];
+        for (const url of urls) {
+          try {
+            const body = await (await fetchUpdateSource(url)).json();
+            const pkg = body.content ? JSON.parse(decodeBase64Text(body.content)) : body;
+            const notes = pkg.releaseNotes;
+            if (notes?.version === version && Array.isArray(notes.items) && notes.items.every((item) => typeof item === "string")) return notes;
+          } catch {
+          }
+        }
+        return null;
+      }
+      async function fetchLatestCommit() {
+        const body = await (await fetchUpdateSource(UPDATE_COMMIT_API)).json();
+        const sha = String((Array.isArray(body) ? body[0]?.sha : "") || "").trim();
+        if (!/^[0-9a-f]{40}$/i.test(sha)) throw new Error("no commit");
+        return sha;
+      }
+      const TOKENS = {
+        text: "var(--dsw-alias-label-primary, inherit)",
+        muted: "var(--dsw-alias-label-caption, #8886)",
+        border: "var(--dsw-alias-border-l2, #8884)",
+        cardFill: "var(--dsw-alias-settings-card-fill, transparent)",
+        controlFill: "var(--dsw-specific-input-major, transparent)",
+        primaryFill: "var(--dsw-alias-button-primary-fill, #247bbf)",
+        error: "var(--dsw-alias-state-error-primary, #d9534f)",
+        success: "var(--dsw-alias-state-success-primary, #2e9e5b)"
+      };
+      const inputStyle = { width: "100%", boxSizing: "border-box" };
+      const PAGE_CSS = `
       /* \u6574\u9875\u7EB5\u5411\u6392\u5E03\uFF1A\u5757\u4E0E\u5757\u4E4B\u95F4\u7EDF\u4E00 16px\uFF0C\u6BD4\u4E00\u6574\u7247\u8868\u5355\u597D\u626B */
       .mov-page { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; color: ${TOKENS.text}; }
       /* \u5206\u7EC4\u5361\u7247\uFF1A16 \u4E2A\u5B57\u6BB5\u644A\u5728\u4E00\u683C\u91CC\u592A\u7CCA\uFF0C\u6309\u7528\u9014\u5404\u88C5\u4E00\u5F20\u5361 */
@@ -536,1139 +623,1135 @@ window.__ModuleLoader__.load({
       .mov-footer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 2px 2px; border-top: 1px solid ${TOKENS.border}; }
       .mov-notice { margin: 0; font-size: 12px; color: ${TOKENS.muted}; line-height: 1.5; }
     `;
-    function optionLabel(t, key, option) {
-      if (key === "connectionMode") return t(option);
-      if (key === "mode") return option === "closeup" ? t("modeCloseup") : t("modeContinuous");
-      if (key === "mergeMode") {
-        if (option === "reencode") return t("mergeModeReencode");
-        return option === "copy" ? t("mergeModeCopy") : t("mergeModeSeamless");
+      function optionLabel(t, key, option) {
+        if (key === "connectionMode") return t(option);
+        if (key === "mode") return option === "closeup" ? t("modeCloseup") : t("modeContinuous");
+        if (key === "mergeMode") {
+          if (option === "reencode") return t("mergeModeReencode");
+          return option === "copy" ? t("mergeModeCopy") : t("mergeModeSeamless");
+        }
+        return option;
       }
-      return option;
-    }
-    function useSnapshot(form) {
-      const [revision, bump] = React.useState(0);
-      React.useEffect(() => form.subscribe(() => bump((value) => value + 1)), [form, revision]);
-      return form.getSnapshot();
-    }
-    function same(a, b) {
-      return a === b || a === void 0 && b === "" || a === "" && b === void 0;
-    }
-    function makePage({ form, t, manager }) {
-      return function ConfigPage(props) {
-        const snapshot = useSnapshot(form);
-        const value = snapshot.value || {};
-        const [draft, setDraft] = React.useState({});
-        const selectedMode = draft.connectionMode ?? value.connectionMode ?? "service";
-        const directMode = selectedMode === "volcengine";
-        const [status, setStatus] = React.useState("idle");
-        const statusTimer = React.useRef(null);
-        const [registerStatus, setRegisterStatus] = React.useState("idle");
-        const [registerMessage, setRegisterMessage] = React.useState("");
-        const [registerEmail, setRegisterEmail] = React.useState(() => {
-          const saved = form.getSnapshot().value || {};
-          return String(saved.registerEmail || "");
-        });
-        const [registerCode, setRegisterCode] = React.useState("");
-        const [codeStatus, setCodeStatus] = React.useState("idle");
-        const [codeMessage, setCodeMessage] = React.useState("");
-        const [codeCooldown, setCodeCooldown] = React.useState(0);
-        const emailLocked = codeCooldown > 0;
-        const [quota, setQuota] = React.useState(null);
-        const [quotaStatus, setQuotaStatus] = React.useState("idle");
-        const [quotaMessage, setQuotaMessage] = React.useState("");
-        const [quotaAt, setQuotaAt] = React.useState("");
-        const [usage, setUsage] = React.useState(null);
-        const [usageStatus, setUsageStatus] = React.useState("idle");
-        const [usageMessage, setUsageMessage] = React.useState("");
-        const [showAllFfmpeg, setShowAllFfmpeg] = React.useState(false);
-        const [copiedFfmpeg, setCopiedFfmpeg] = React.useState("");
-        const [updateStatus, setUpdateStatus] = React.useState("idle");
-        const [updateMessage, setUpdateMessage] = React.useState("");
-        const [updateLatest, setUpdateLatest] = React.useState("");
-        const [releaseNotes, setReleaseNotes] = React.useState(packageInfo.releaseNotes);
-        const [updateAt, setUpdateAt] = React.useState("");
-        const updateCommit = React.useRef("");
-        const [updateConfirm, setUpdateConfirm] = React.useState(false);
-        const restoreTried = React.useRef(false);
-        React.useEffect(() => {
-          if (restoreTried.current) return;
-          restoreTried.current = true;
-          const snap = form.getSnapshot() || {};
-          if ((snap.value || {}).connectionMode === "volcengine") return;
-          if (loggedOut()) {
-            setRegisterStatus("idle");
-            return;
-          }
-          syncDeviceIdentity().catch(() => {
+      function useSnapshot(form) {
+        const [revision, bump] = React.useState(0);
+        React.useEffect(() => form.subscribe(() => bump((value) => value + 1)), [form, revision]);
+        return form.getSnapshot();
+      }
+      function same(a, b) {
+        return a === b || a === void 0 && b === "" || a === "" && b === void 0;
+      }
+      function makePage({ form, t, manager }) {
+        return function ConfigPage(props) {
+          const snapshot = useSnapshot(form);
+          const value = snapshot.value || {};
+          const [draft, setDraft] = React.useState({});
+          const selectedMode = draft.connectionMode ?? value.connectionMode ?? "service";
+          const directMode = selectedMode === "volcengine";
+          const [status, setStatus] = React.useState("idle");
+          const statusTimer = React.useRef(null);
+          const [registerStatus, setRegisterStatus] = React.useState("idle");
+          const [registerMessage, setRegisterMessage] = React.useState("");
+          const [registerEmail, setRegisterEmail] = React.useState(() => {
+            const saved = form.getSnapshot().value || {};
+            return String(saved.registerEmail || "");
           });
-          if (snap.secrets?.apiKey || (snap.value || {}).apiKey) {
+          const [registerCode, setRegisterCode] = React.useState("");
+          const [codeStatus, setCodeStatus] = React.useState("idle");
+          const [codeMessage, setCodeMessage] = React.useState("");
+          const [codeCooldown, setCodeCooldown] = React.useState(0);
+          const emailLocked = codeCooldown > 0;
+          const [quota, setQuota] = React.useState(null);
+          const [quotaStatus, setQuotaStatus] = React.useState("idle");
+          const [quotaMessage, setQuotaMessage] = React.useState("");
+          const [quotaAt, setQuotaAt] = React.useState("");
+          const [usage, setUsage] = React.useState(null);
+          const [usageStatus, setUsageStatus] = React.useState("idle");
+          const [usageMessage, setUsageMessage] = React.useState("");
+          const [showAllFfmpeg, setShowAllFfmpeg] = React.useState(false);
+          const [copiedFfmpeg, setCopiedFfmpeg] = React.useState("");
+          const [updateStatus, setUpdateStatus] = React.useState("idle");
+          const [updateMessage, setUpdateMessage] = React.useState("");
+          const [updateLatest, setUpdateLatest] = React.useState("");
+          const [releaseNotes, setReleaseNotes] = React.useState(package_default.releaseNotes);
+          const [updateAt, setUpdateAt] = React.useState("");
+          const updateCommit = React.useRef("");
+          const [updateConfirm, setUpdateConfirm] = React.useState(false);
+          const restoreTried = React.useRef(false);
+          React.useEffect(() => {
+            if (restoreTried.current) return;
+            restoreTried.current = true;
+            const snap = form.getSnapshot() || {};
+            if ((snap.value || {}).connectionMode === "volcengine") return;
+            if (loggedOut()) {
+              setRegisterStatus("idle");
+              return;
+            }
+            syncDeviceIdentity().catch(() => {
+            });
+            if (snap.secrets?.apiKey || (snap.value || {}).apiKey) {
+              loadQuota().catch(() => {
+              });
+              loadUsage().catch(() => {
+              });
+              return;
+            }
+            lookupOwnKey().catch(() => {
+            });
+          }, []);
+          const updateTried = React.useRef(false);
+          React.useEffect(() => {
+            if (updateTried.current) return;
+            updateTried.current = true;
+            const cached = readUpdateCache();
+            if (cached.latest) {
+              setUpdateLatest(cached.latest);
+              if (cached.latest !== package_default.releaseNotes.version) {
+                fetchReleaseNotes(cached.latest).then((notes) => {
+                  if (notes) setReleaseNotes(notes);
+                }).catch(() => {
+                });
+              }
+              if (cached.at) setUpdateAt(new Date(cached.at).toLocaleTimeString());
+              if (cached.commit) updateCommit.current = cached.commit;
+              setUpdateStatus("ok");
+            }
+            if (!cached.fresh) checkForUpdate(true).catch(() => {
+            });
+          }, []);
+          if (props && props.view === "summary") {
+            const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
+            const text = configured ? t("summary", { provider: t("providerNewapi"), model: value.model || "-" }) : t("summaryEmpty");
+            return h("span", { style: { color: TOKENS.muted } }, text);
+          }
+          const pending = Object.entries(draft).filter(([key, next]) => !same(value[key], next));
+          const edit = (key, next) => {
+            clearStatusTimer();
+            setStatus((current) => current === "idle" ? current : "idle");
+            setDraft((current) => ({ ...current, [key]: next }));
+          };
+          const clear = (key) => setDraft((current) => {
+            const next = { ...current };
+            delete next[key];
+            return next;
+          });
+          function clearStatusTimer() {
+            if (statusTimer.current) {
+              window.clearTimeout(statusTimer.current);
+              statusTimer.current = null;
+            }
+          }
+          function flashStatus(next, holdMs = 2500) {
+            clearStatusTimer();
+            setStatus(next);
+            statusTimer.current = window.setTimeout(() => {
+              statusTimer.current = null;
+              setStatus("idle");
+            }, holdMs);
+          }
+          async function save() {
+            setStatus("saving");
+            const nextMode = draft.connectionMode ?? value.connectionMode ?? "service";
+            const inactiveKeys = nextMode === "volcengine" ? [
+              "apiKey",
+              "keyOrigin",
+              "baseUrl",
+              "submitPath",
+              "queryPath",
+              "registerEmail",
+              "deviceId",
+              "deviceSecret",
+              "registerApi",
+              "registerToken"
+            ] : ["volcengineApiKey"];
+            try {
+              for (const [key, next] of pending) {
+                if (inactiveKeys.includes(key)) continue;
+                const accepted = await form.set(key, next);
+                if (!accepted) throw new Error(`\u4FDD\u5B58 ${key} \u5931\u8D25`);
+              }
+              for (const key of inactiveKeys) {
+                const accepted = await form.unset(key);
+                if (accepted === false) throw new Error(`\u6E05\u7406 ${key} \u5931\u8D25`);
+              }
+              if (nextMode === "volcengine") {
+                forgetDevice();
+                setRegisterEmail("");
+                setRegisterCode("");
+                setRegisterStatus("idle");
+                setRegisterMessage("");
+                setQuota(null);
+              }
+              setDraft({});
+              flashStatus("saved");
+            } catch {
+              setStatus("failed");
+            }
+          }
+          async function reset() {
+            const overridden = Object.keys(snapshot.user || {});
+            if (!overridden.length && !keyReady) return;
+            if (!window.confirm(t("resetConfirm"))) return;
+            setStatus("saving");
+            const targets = /* @__PURE__ */ new Set([...overridden, ...PLUGIN_OWNED_KEYS]);
+            for (const key of targets) await form.unset(key);
+            forgetDevice();
+            setDraft({});
+            setRegisterStatus("idle");
+            setRegisterMessage("");
+            setRegisterCode("");
+            setStatus("idle");
+          }
+          function registerApiRoot() {
+            const configured = String(value.registerApi || "").trim();
+            return (configured || DEFAULT_REGISTER_API).replace(/\/+$/, "");
+          }
+          function loggedOut() {
+            try {
+              return window.localStorage.getItem(LOGGED_OUT_KEY) === "1";
+            } catch {
+              return false;
+            }
+          }
+          function setLoggedOut() {
+            try {
+              window.localStorage.setItem(LOGGED_OUT_KEY, "1");
+            } catch {
+            }
+          }
+          function clearLoggedOut() {
+            try {
+              window.localStorage.removeItem(LOGGED_OUT_KEY);
+            } catch {
+            }
+          }
+          function forgetDevice() {
+            try {
+              window.localStorage.removeItem("metaontic-video.device-id");
+              window.localStorage.removeItem("metaontic-video.device-secret");
+            } catch {
+            }
+            setLoggedOut();
+          }
+          function deviceIdentity() {
+            const ID_KEY = "metaontic-video.device-id";
+            const SECRET_KEY = "metaontic-video.device-secret";
+            const rand = () => Math.random().toString(36).slice(2, 10);
+            let id = `dsh-${rand()}${Date.now().toString(36)}`;
+            let secret = `dsk-${rand()}${rand()}${rand()}`;
+            try {
+              const savedId = window.localStorage.getItem(ID_KEY);
+              const savedSecret = window.localStorage.getItem(SECRET_KEY);
+              if (savedId) id = savedId;
+              else window.localStorage.setItem(ID_KEY, id);
+              if (savedSecret) secret = savedSecret;
+              else window.localStorage.setItem(SECRET_KEY, secret);
+            } catch {
+            }
+            return { id, secret };
+          }
+          function deviceFingerprint() {
+            const pick = (read) => {
+              try {
+                const value2 = read();
+                return value2 ? String(value2).slice(0, 120) : void 0;
+              } catch {
+                return void 0;
+              }
+            };
+            const nav = () => window.navigator;
+            const info = {
+              app: "Harness",
+              plugin: "metaontic-video",
+              platform: pick(() => nav().userAgentData?.platform || nav().platform),
+              os: pick(() => nav().userAgentData?.platform || nav().platform),
+              language: pick(() => nav().language),
+              timezone: pick(() => window.Intl?.DateTimeFormat().resolvedOptions().timeZone),
+              screen: pick(() => `${window.screen?.width}x${window.screen?.height}`),
+              agent: pick(() => nav().userAgent)
+            };
+            return Object.fromEntries(Object.entries(info).filter(([, v]) => v !== void 0));
+          }
+          function deviceLabel(info) {
+            const platform = info?.platform || info?.os;
+            return platform ? `Harness-${platform}` : "Harness";
+          }
+          function deviceWrites(device = void 0) {
+            const identity = device || deviceIdentity();
+            const current = form.getSnapshot().value || {};
+            const writes = [];
+            if (!same(current.deviceId, identity.id)) writes.push(["deviceId", identity.id]);
+            if (!same(current.deviceSecret, identity.secret)) {
+              writes.push(["deviceSecret", identity.secret]);
+            }
+            return writes;
+          }
+          async function syncDeviceIdentity() {
+            try {
+              for (const [key, next] of deviceWrites()) {
+                const accepted = await form.set(key, next);
+                if (accepted) clear(key);
+              }
+            } catch {
+            }
+          }
+          async function callRegister(url, init = {}) {
+            const controller = typeof AbortController === "function" ? new AbortController() : null;
+            const timer = controller ? window.setTimeout(() => controller.abort(), 9e4) : null;
+            const token = String(value.registerToken || DEFAULT_REGISTER_TOKEN);
+            const options = { ...init || {} };
+            options.headers = {
+              accept: "application/json",
+              "x-register-token": token,
+              // 本插件版本：服务端会记进请求日志，便于回溯「这版有没有问题」
+              ...PLUGIN_VERSION ? { "x-plugin-version": PLUGIN_VERSION } : {},
+              ...init && init.headers || {}
+            };
+            let response;
+            try {
+              response = await fetch(url, {
+                signal: controller ? controller.signal : void 0,
+                ...options
+              });
+            } finally {
+              if (timer) window.clearTimeout(timer);
+            }
+            const text = await response.text();
+            let body = null;
+            try {
+              body = text ? JSON.parse(text) : null;
+            } catch {
+              body = null;
+            }
+            const payload = body && typeof body === "object" && "data" in body ? body.data : body;
+            if (!response.ok || body && typeof body === "object" && body.code) {
+              const failure = new Error(
+                body && (body.message || body.detail) || text.slice(0, 200) || `HTTP ${response.status}`
+              );
+              failure.status = response.status;
+              throw failure;
+            }
+            return payload || {};
+          }
+          async function applyRegistration(result, fallbackBase, device) {
+            clearLoggedOut();
+            const writes = [
+              ["apiKey", result.api_key],
+              ["keyOrigin", "register"],
+              ["baseUrl", result.base_url || fallbackBase || registerApiRoot()],
+              ...await deviceWrites(device)
+            ];
+            const account = result.email || result.display_name || "";
+            if (account) writes.push(["registerEmail", account]);
+            if (result.model) writes.push(["model", result.model]);
+            let ok = true;
+            for (const [key, next] of writes) {
+              const accepted = await form.set(key, next);
+              if (accepted) clear(key);
+              else ok = false;
+            }
+            setRegisterStatus(ok ? "ok" : "partial");
             loadQuota().catch(() => {
             });
             loadUsage().catch(() => {
             });
-            return;
+            return ok;
           }
-          lookupOwnKey().catch(() => {
-          });
-        }, []);
-        const updateTried = React.useRef(false);
-        React.useEffect(() => {
-          if (updateTried.current) return;
-          updateTried.current = true;
-          const cached = readUpdateCache();
-          if (cached.latest) {
-            setUpdateLatest(cached.latest);
-            if (cached.latest !== packageInfo.releaseNotes.version) {
-              fetchReleaseNotes(cached.latest).then((notes) => {
-                if (notes) setReleaseNotes(notes);
-              }).catch(() => {
-              });
-            }
-            if (cached.at) setUpdateAt(new Date(cached.at).toLocaleTimeString());
-            if (cached.commit) updateCommit.current = cached.commit;
-            setUpdateStatus("ok");
-          }
-          if (!cached.fresh) checkForUpdate(true).catch(() => {
-          });
-        }, []);
-        if (props && props.view === "summary") {
-          const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
-          const text = configured ? t("summary", { provider: t("providerNewapi"), model: value.model || "-" }) : t("summaryEmpty");
-          return h("span", { style: { color: TOKENS.muted } }, text);
-        }
-        const pending = Object.entries(draft).filter(([key, next]) => !same(value[key], next));
-        const edit = (key, next) => {
-          clearStatusTimer();
-          setStatus((current) => current === "idle" ? current : "idle");
-          setDraft((current) => ({ ...current, [key]: next }));
-        };
-        const clear = (key) => setDraft((current) => {
-          const next = { ...current };
-          delete next[key];
-          return next;
-        });
-        function clearStatusTimer() {
-          if (statusTimer.current) {
-            window.clearTimeout(statusTimer.current);
-            statusTimer.current = null;
-          }
-        }
-        function flashStatus(next, holdMs = 2500) {
-          clearStatusTimer();
-          setStatus(next);
-          statusTimer.current = window.setTimeout(() => {
-            statusTimer.current = null;
-            setStatus("idle");
-          }, holdMs);
-        }
-        async function save() {
-          setStatus("saving");
-          const nextMode = draft.connectionMode ?? value.connectionMode ?? "service";
-          const inactiveKeys = nextMode === "volcengine" ? [
-            "apiKey",
-            "keyOrigin",
-            "baseUrl",
-            "submitPath",
-            "queryPath",
-            "registerEmail",
-            "deviceId",
-            "deviceSecret",
-            "registerApi",
-            "registerToken"
-          ] : ["volcengineApiKey"];
-          try {
-            for (const [key, next] of pending) {
-              if (inactiveKeys.includes(key)) continue;
-              const accepted = await form.set(key, next);
-              if (!accepted) throw new Error(`\u4FDD\u5B58 ${key} \u5931\u8D25`);
-            }
-            for (const key of inactiveKeys) {
-              const accepted = await form.unset(key);
-              if (accepted === false) throw new Error(`\u6E05\u7406 ${key} \u5931\u8D25`);
-            }
-            if (nextMode === "volcengine") {
-              forgetDevice();
-              setRegisterEmail("");
-              setRegisterCode("");
-              setRegisterStatus("idle");
-              setRegisterMessage("");
-              setQuota(null);
-            }
-            setDraft({});
-            flashStatus("saved");
-          } catch {
-            setStatus("failed");
-          }
-        }
-        async function reset() {
-          const overridden = Object.keys(snapshot.user || {});
-          if (!overridden.length && !keyReady) return;
-          setStatus("saving");
-          const targets = /* @__PURE__ */ new Set([...overridden, ...PLUGIN_OWNED_KEYS]);
-          for (const key of targets) await form.unset(key);
-          forgetDevice();
-          setDraft({});
-          setRegisterStatus("idle");
-          setRegisterMessage("");
-          setRegisterCode("");
-          setStatus("idle");
-        }
-        function registerApiRoot() {
-          const configured = String(value.registerApi || "").trim();
-          return (configured || DEFAULT_REGISTER_API).replace(/\/+$/, "");
-        }
-        function loggedOut() {
-          try {
-            return window.localStorage.getItem(LOGGED_OUT_KEY) === "1";
-          } catch {
-            return false;
-          }
-        }
-        function setLoggedOut() {
-          try {
-            window.localStorage.setItem(LOGGED_OUT_KEY, "1");
-          } catch {
-          }
-        }
-        function clearLoggedOut() {
-          try {
-            window.localStorage.removeItem(LOGGED_OUT_KEY);
-          } catch {
-          }
-        }
-        function forgetDevice() {
-          try {
-            window.localStorage.removeItem("metaontic-video.device-id");
-            window.localStorage.removeItem("metaontic-video.device-secret");
-          } catch {
-          }
-          setLoggedOut();
-        }
-        function deviceIdentity() {
-          const ID_KEY = "metaontic-video.device-id";
-          const SECRET_KEY = "metaontic-video.device-secret";
-          const rand = () => Math.random().toString(36).slice(2, 10);
-          let id = `dsh-${rand()}${Date.now().toString(36)}`;
-          let secret = `dsk-${rand()}${rand()}${rand()}`;
-          try {
-            const savedId = window.localStorage.getItem(ID_KEY);
-            const savedSecret = window.localStorage.getItem(SECRET_KEY);
-            if (savedId) id = savedId;
-            else window.localStorage.setItem(ID_KEY, id);
-            if (savedSecret) secret = savedSecret;
-            else window.localStorage.setItem(SECRET_KEY, secret);
-          } catch {
-          }
-          return { id, secret };
-        }
-        function deviceFingerprint() {
-          const pick = (read) => {
-            try {
-              const value2 = read();
-              return value2 ? String(value2).slice(0, 120) : void 0;
-            } catch {
-              return void 0;
-            }
-          };
-          const nav = () => window.navigator;
-          const info = {
-            app: "Harness",
-            plugin: "metaontic-video",
-            platform: pick(() => nav().userAgentData?.platform || nav().platform),
-            os: pick(() => nav().userAgentData?.platform || nav().platform),
-            language: pick(() => nav().language),
-            timezone: pick(() => window.Intl?.DateTimeFormat().resolvedOptions().timeZone),
-            screen: pick(() => `${window.screen?.width}x${window.screen?.height}`),
-            agent: pick(() => nav().userAgent)
-          };
-          return Object.fromEntries(Object.entries(info).filter(([, v]) => v !== void 0));
-        }
-        function deviceLabel(info) {
-          const platform = info?.platform || info?.os;
-          return platform ? `Harness-${platform}` : "Harness";
-        }
-        function deviceWrites(device = void 0) {
-          const identity = device || deviceIdentity();
-          const current = form.getSnapshot().value || {};
-          const writes = [];
-          if (!same(current.deviceId, identity.id)) writes.push(["deviceId", identity.id]);
-          if (!same(current.deviceSecret, identity.secret)) {
-            writes.push(["deviceSecret", identity.secret]);
-          }
-          return writes;
-        }
-        async function syncDeviceIdentity() {
-          try {
-            for (const [key, next] of deviceWrites()) {
-              const accepted = await form.set(key, next);
-              if (accepted) clear(key);
-            }
-          } catch {
-          }
-        }
-        async function callRegister(url, init = {}) {
-          const controller = typeof AbortController === "function" ? new AbortController() : null;
-          const timer = controller ? window.setTimeout(() => controller.abort(), 9e4) : null;
-          const token = String(value.registerToken || DEFAULT_REGISTER_TOKEN);
-          const options = { ...init || {} };
-          options.headers = {
-            accept: "application/json",
-            "x-register-token": token,
-            // 本插件版本：服务端会记进请求日志，便于回溯「这版有没有问题」
-            ...PLUGIN_VERSION ? { "x-plugin-version": PLUGIN_VERSION } : {},
-            ...init && init.headers || {}
-          };
-          let response;
-          try {
-            response = await fetch(url, {
-              signal: controller ? controller.signal : void 0,
-              ...options
-            });
-          } finally {
-            if (timer) window.clearTimeout(timer);
-          }
-          const text = await response.text();
-          let body = null;
-          try {
-            body = text ? JSON.parse(text) : null;
-          } catch {
-            body = null;
-          }
-          const payload = body && typeof body === "object" && "data" in body ? body.data : body;
-          if (!response.ok || body && typeof body === "object" && body.code) {
-            const failure = new Error(
-              body && (body.message || body.detail) || text.slice(0, 200) || `HTTP ${response.status}`
-            );
-            failure.status = response.status;
-            throw failure;
-          }
-          return payload || {};
-        }
-        async function applyRegistration(result, fallbackBase, device) {
-          clearLoggedOut();
-          const writes = [
-            ["apiKey", result.api_key],
-            ["keyOrigin", "register"],
-            ["baseUrl", result.base_url || fallbackBase || registerApiRoot()],
-            ...await deviceWrites(device)
-          ];
-          const account = result.email || result.display_name || "";
-          if (account) writes.push(["registerEmail", account]);
-          if (result.model) writes.push(["model", result.model]);
-          let ok = true;
-          for (const [key, next] of writes) {
-            const accepted = await form.set(key, next);
-            if (accepted) clear(key);
-            else ok = false;
-          }
-          setRegisterStatus(ok ? "ok" : "partial");
-          loadQuota().catch(() => {
-          });
-          loadUsage().catch(() => {
-          });
-          return ok;
-        }
-        async function lookupOwnKey() {
-          const device = deviceIdentity();
-          const result = await callRegister(`${registerApiRoot()}/api/v1/register/lookup`, {
-            method: "POST",
-            headers: { "content-type": "application/json", accept: "application/json" },
-            body: JSON.stringify({ device_id: device.id, device_secret: device.secret })
-          });
-          if (!result.api_key) throw new Error(t("registerNoKey"));
-          await applyRegistration(result, null, device);
-          setRegisterStatus("restored");
-          return result;
-        }
-        function startCooldown(seconds) {
-          const total = Math.max(Math.round(Number(seconds) || 0), 0);
-          if (!total) return;
-          setCodeCooldown(total);
-          const tick = (left) => {
-            if (left <= 0) {
-              setCodeCooldown(0);
-              return;
-            }
-            setCodeCooldown(left);
-            window.setTimeout(() => tick(left - 1), 1e3);
-          };
-          window.setTimeout(() => tick(total - 1), 1e3);
-        }
-        async function sendEmailCode() {
-          const account = registerEmail.trim();
-          if (!account) {
-            setCodeStatus("failed");
-            setCodeMessage(t("registerNeedEmail"));
-            return;
-          }
-          setCodeStatus("working");
-          setCodeMessage("");
-          try {
-            const status2 = await callRegister(`${registerApiRoot()}/api/v1/register/status`);
-            if (!status2.enabled) {
-              setCodeStatus("failed");
-              setCodeMessage(t("registerDisabled", { message: status2.hint || "-" }));
-              return;
-            }
-            const result = await callRegister(`${registerApiRoot()}/api/v1/register/email/code`, {
-              method: "POST",
-              headers: { "content-type": "application/json", accept: "application/json" },
-              body: JSON.stringify({ email: account })
-            });
-            setCodeStatus("sent");
-            setCodeMessage(t("registerCodeSent", { email: result.email || account }));
-            startCooldown(result.retry_after ?? 60);
-            setRegisterStatus("idle");
-            setRegisterMessage("");
-          } catch (error) {
-            setCodeStatus("failed");
-            setCodeMessage(error?.message || String(error));
-          }
-        }
-        async function register() {
-          const root = registerApiRoot();
-          const account = registerEmail.trim();
-          const code = registerCode.trim();
-          if (!account) {
-            setRegisterStatus("failed");
-            setRegisterMessage(t("registerNeedEmail"));
-            return;
-          }
-          if (!code) {
-            setRegisterStatus("failed");
-            setRegisterMessage(t("registerNeedCode"));
-            return;
-          }
-          setRegisterStatus("working");
-          setRegisterMessage("");
-          const device = deviceIdentity();
-          const fingerprint = deviceFingerprint();
-          try {
-            const status2 = await callRegister(`${root}/api/v1/register/status`);
-            if (!status2.enabled) {
-              setRegisterStatus("disabled");
-              setRegisterMessage(t("registerDisabled", { message: status2.hint || "-" }));
-              return;
-            }
-            const result = await callRegister(`${root}/api/v1/register`, {
-              method: "POST",
-              headers: { "content-type": "application/json", accept: "application/json" },
-              body: JSON.stringify({
-                email: account,
-                code,
-                device_id: device.id,
-                device_secret: device.secret,
-                device_info: fingerprint,
-                note: `Harness \u63D2\u4EF6\u8BBE\u7F6E\u9875\u6CE8\u518C\uFF08${deviceLabel(fingerprint)}\uFF09`
-              })
-            });
-            if (!result.api_key) {
-              setRegisterStatus("failed");
-              setRegisterMessage(t("registerNoKey"));
-              return;
-            }
-            await applyRegistration(result, status2.base_url || root, device);
-          } catch (error) {
-            if (error?.status === 409 || error?.status === 404) {
-              try {
-                await lookupOwnKey();
-                return;
-              } catch {
-              }
-            }
-            setRegisterStatus("failed");
-            setRegisterMessage(t("registerFailed", { message: error?.message || String(error) }));
-          }
-        }
-        async function loadQuota() {
-          if (directMode) return;
-          const device = deviceIdentity();
-          setQuotaStatus("working");
-          setQuotaMessage("");
-          try {
-            const result = await callRegister(`${registerApiRoot()}/api/v1/register/quota`, {
+          async function lookupOwnKey() {
+            const device = deviceIdentity();
+            const result = await callRegister(`${registerApiRoot()}/api/v1/register/lookup`, {
               method: "POST",
               headers: { "content-type": "application/json", accept: "application/json" },
               body: JSON.stringify({ device_id: device.id, device_secret: device.secret })
             });
-            setQuota(result);
-            setQuotaAt((/* @__PURE__ */ new Date()).toLocaleTimeString());
-            setQuotaStatus("ok");
+            if (!result.api_key) throw new Error(t("registerNoKey"));
+            await applyRegistration(result, null, device);
+            setRegisterStatus("restored");
             return result;
-          } catch (error) {
-            setQuota(null);
-            setQuotaStatus("failed");
-            setQuotaMessage(error?.status === 404 ? t("quotaNotRegistered") : t("quotaFailed", { message: error?.message || String(error) }));
-            throw error;
           }
-        }
-        async function loadUsage() {
-          if (directMode) return;
-          const device = deviceIdentity();
-          setUsageStatus("working");
-          setUsageMessage("");
-          try {
-            const result = await callRegister(`${registerApiRoot()}/api/v1/usage/list`, {
-              method: "POST",
-              headers: { "content-type": "application/json", accept: "application/json" },
-              body: JSON.stringify({
-                device_id: device.id,
-                device_secret: device.secret,
-                limit: 10
-              })
-            });
-            setUsage(result);
-            setUsageStatus("ok");
-            return result;
-          } catch (error) {
-            setUsage(null);
-            setUsageStatus("failed");
-            setUsageMessage(error?.status === 404 ? t("quotaNotRegistered") : t("usageFailed", { message: error?.message || String(error) }));
-            throw error;
+          function startCooldown(seconds) {
+            const total = Math.max(Math.round(Number(seconds) || 0), 0);
+            if (!total) return;
+            setCodeCooldown(total);
+            const tick = (left) => {
+              if (left <= 0) {
+                setCodeCooldown(0);
+                return;
+              }
+              setCodeCooldown(left);
+              window.setTimeout(() => tick(left - 1), 1e3);
+            };
+            window.setTimeout(() => tick(total - 1), 1e3);
           }
-        }
-        function readUpdateCache() {
-          try {
-            const raw = window.localStorage.getItem(UPDATE_CACHE_KEY);
-            const saved = raw ? JSON.parse(raw) : null;
-            if (!saved || typeof saved !== "object") {
+          async function sendEmailCode() {
+            const account = registerEmail.trim();
+            if (!account) {
+              setCodeStatus("failed");
+              setCodeMessage(t("registerNeedEmail"));
+              return;
+            }
+            setCodeStatus("working");
+            setCodeMessage("");
+            try {
+              const status2 = await callRegister(`${registerApiRoot()}/api/v1/register/status`);
+              if (!status2.enabled) {
+                setCodeStatus("failed");
+                setCodeMessage(t("registerDisabled", { message: status2.hint || "-" }));
+                return;
+              }
+              const result = await callRegister(`${registerApiRoot()}/api/v1/register/email/code`, {
+                method: "POST",
+                headers: { "content-type": "application/json", accept: "application/json" },
+                body: JSON.stringify({ email: account })
+              });
+              setCodeStatus("sent");
+              setCodeMessage(t("registerCodeSent", { email: result.email || account }));
+              startCooldown(result.retry_after ?? 60);
+              setRegisterStatus("idle");
+              setRegisterMessage("");
+            } catch (error) {
+              setCodeStatus("failed");
+              setCodeMessage(error?.message || String(error));
+            }
+          }
+          async function register() {
+            const root = registerApiRoot();
+            const account = registerEmail.trim();
+            const code = registerCode.trim();
+            if (!account) {
+              setRegisterStatus("failed");
+              setRegisterMessage(t("registerNeedEmail"));
+              return;
+            }
+            if (!code) {
+              setRegisterStatus("failed");
+              setRegisterMessage(t("registerNeedCode"));
+              return;
+            }
+            setRegisterStatus("working");
+            setRegisterMessage("");
+            const device = deviceIdentity();
+            const fingerprint = deviceFingerprint();
+            try {
+              const status2 = await callRegister(`${root}/api/v1/register/status`);
+              if (!status2.enabled) {
+                setRegisterStatus("disabled");
+                setRegisterMessage(t("registerDisabled", { message: status2.hint || "-" }));
+                return;
+              }
+              const result = await callRegister(`${root}/api/v1/register`, {
+                method: "POST",
+                headers: { "content-type": "application/json", accept: "application/json" },
+                body: JSON.stringify({
+                  email: account,
+                  code,
+                  device_id: device.id,
+                  device_secret: device.secret,
+                  device_info: fingerprint,
+                  note: `Harness \u63D2\u4EF6\u8BBE\u7F6E\u9875\u6CE8\u518C\uFF08${deviceLabel(fingerprint)}\uFF09`
+                })
+              });
+              if (!result.api_key) {
+                setRegisterStatus("failed");
+                setRegisterMessage(t("registerNoKey"));
+                return;
+              }
+              await applyRegistration(result, status2.base_url || root, device);
+            } catch (error) {
+              if (error?.status === 409 || error?.status === 404) {
+                try {
+                  await lookupOwnKey();
+                  return;
+                } catch {
+                }
+              }
+              setRegisterStatus("failed");
+              setRegisterMessage(t("registerFailed", { message: error?.message || String(error) }));
+            }
+          }
+          async function loadQuota() {
+            if (directMode) return;
+            const device = deviceIdentity();
+            setQuotaStatus("working");
+            setQuotaMessage("");
+            try {
+              const result = await callRegister(`${registerApiRoot()}/api/v1/register/quota`, {
+                method: "POST",
+                headers: { "content-type": "application/json", accept: "application/json" },
+                body: JSON.stringify({ device_id: device.id, device_secret: device.secret })
+              });
+              setQuota(result);
+              setQuotaAt((/* @__PURE__ */ new Date()).toLocaleTimeString());
+              setQuotaStatus("ok");
+              return result;
+            } catch (error) {
+              setQuota(null);
+              setQuotaStatus("failed");
+              setQuotaMessage(error?.status === 404 ? t("quotaNotRegistered") : t("quotaFailed", { message: error?.message || String(error) }));
+              throw error;
+            }
+          }
+          async function loadUsage() {
+            if (directMode) return;
+            const device = deviceIdentity();
+            setUsageStatus("working");
+            setUsageMessage("");
+            try {
+              const result = await callRegister(`${registerApiRoot()}/api/v1/usage/list`, {
+                method: "POST",
+                headers: { "content-type": "application/json", accept: "application/json" },
+                body: JSON.stringify({
+                  device_id: device.id,
+                  device_secret: device.secret,
+                  limit: 10
+                })
+              });
+              setUsage(result);
+              setUsageStatus("ok");
+              return result;
+            } catch (error) {
+              setUsage(null);
+              setUsageStatus("failed");
+              setUsageMessage(error?.status === 404 ? t("quotaNotRegistered") : t("usageFailed", { message: error?.message || String(error) }));
+              throw error;
+            }
+          }
+          function readUpdateCache() {
+            try {
+              const raw = window.localStorage.getItem(UPDATE_CACHE_KEY);
+              const saved = raw ? JSON.parse(raw) : null;
+              if (!saved || typeof saved !== "object") {
+                return { latest: "", commit: "", at: 0, fresh: false };
+              }
+              const at = Number(saved.at) || 0;
+              return {
+                latest: String(saved.latest || ""),
+                commit: String(saved.commit || ""),
+                at,
+                fresh: Boolean(at) && Date.now() - at < UPDATE_MAX_AGE_MS
+              };
+            } catch {
               return { latest: "", commit: "", at: 0, fresh: false };
             }
-            const at = Number(saved.at) || 0;
-            return {
-              latest: String(saved.latest || ""),
-              commit: String(saved.commit || ""),
-              at,
-              fresh: Boolean(at) && Date.now() - at < UPDATE_MAX_AGE_MS
-            };
-          } catch {
-            return { latest: "", commit: "", at: 0, fresh: false };
           }
-        }
-        function rememberUpdateCheck(latest, commit) {
-          try {
-            window.localStorage.setItem(
-              UPDATE_CACHE_KEY,
-              JSON.stringify({ at: Date.now(), latest, commit: commit || "" })
-            );
-          } catch {
-          }
-        }
-        function forgetUpdateCheck() {
-          try {
-            window.localStorage.removeItem(UPDATE_CACHE_KEY);
-          } catch {
-          }
-        }
-        async function checkForUpdate(silent = false) {
-          if (!silent) {
-            setUpdateStatus("working");
-            setUpdateMessage("");
-          }
-          try {
-            const latest = await fetchLatestVersion();
+          function rememberUpdateCheck(latest, commit) {
             try {
-              updateCommit.current = await fetchLatestCommit();
+              window.localStorage.setItem(
+                UPDATE_CACHE_KEY,
+                JSON.stringify({ at: Date.now(), latest, commit: commit || "" })
+              );
             } catch {
             }
-            setUpdateLatest(latest);
-            fetchReleaseNotes(latest).then((notes) => {
-              if (notes) setReleaseNotes(notes);
-            }).catch(() => {
-            });
-            setUpdateAt((/* @__PURE__ */ new Date()).toLocaleTimeString());
-            setUpdateStatus("ok");
-            rememberUpdateCheck(latest, updateCommit.current);
-            return latest;
-          } catch (error) {
-            if (silent) return "";
-            setUpdateStatus("failed");
-            setUpdateMessage(t("versionFailed", { message: error?.message || String(error) }));
-            return "";
           }
-        }
-        function control(field) {
-          const current = draft[field.key] !== void 0 ? draft[field.key] : value[field.key];
-          const id = `metaontic-video-${field.key}`;
-          if (field.kind === "switch") {
-            return h(
-              "label",
-              { htmlFor: id, className: "mov-switch" },
-              h("input", {
+          function forgetUpdateCheck() {
+            try {
+              window.localStorage.removeItem(UPDATE_CACHE_KEY);
+            } catch {
+            }
+          }
+          async function checkForUpdate(silent = false) {
+            if (!silent) {
+              setUpdateStatus("working");
+              setUpdateMessage("");
+            }
+            try {
+              const latest = await fetchLatestVersion();
+              fetchLatestCommit().then((commit) => {
+                updateCommit.current = commit;
+              }).catch(() => {
+              });
+              setUpdateLatest(latest);
+              fetchReleaseNotes(latest).then((notes) => {
+                if (notes) setReleaseNotes(notes);
+              }).catch(() => {
+              });
+              setUpdateAt((/* @__PURE__ */ new Date()).toLocaleTimeString());
+              setUpdateStatus("ok");
+              rememberUpdateCheck(latest, updateCommit.current);
+              return latest;
+            } catch (error) {
+              if (silent) return "";
+              setUpdateStatus("failed");
+              setUpdateMessage(t("versionFailed", { message: error?.message || String(error) }));
+              return "";
+            }
+          }
+          function control(field) {
+            const current = draft[field.key] !== void 0 ? draft[field.key] : value[field.key];
+            const id = `metaontic-video-${field.key}`;
+            if (field.kind === "switch") {
+              return h(
+                "label",
+                { htmlFor: id, className: "mov-switch" },
+                h("input", {
+                  id,
+                  "data-field": field.key,
+                  type: "checkbox",
+                  checked: Boolean(current),
+                  onChange: (event) => edit(field.key, event.target.checked)
+                }),
+                h("span", null, t(field.key))
+              );
+            }
+            if (field.kind === "select") {
+              const options = SELECTS[field.key] || [];
+              const hiddenModel = field.key === "model" && /seedance-2(?:-5|\.5)/i.test(String(current || ""));
+              const list = current && !options.includes(current) && !hiddenModel ? [...options, current] : options;
+              return h("select", {
                 id,
                 "data-field": field.key,
-                type: "checkbox",
-                checked: Boolean(current),
-                onChange: (event) => edit(field.key, event.target.checked)
-              }),
-              h("span", null, t(field.key))
-            );
-          }
-          if (field.kind === "select") {
-            const options = SELECTS[field.key] || [];
-            const hiddenModel = field.key === "model" && /seedance-2(?:-5|\.5)/i.test(String(current || ""));
-            const list = current && !options.includes(current) && !hiddenModel ? [...options, current] : options;
-            return h("select", {
+                className: `mov-input${field.mono ? " mov-mono" : ""}`,
+                style: inputStyle,
+                value: current ?? "",
+                onChange: (event) => edit(field.key, event.target.value)
+              }, [
+                hiddenModel ? h("option", { key: "hidden-current", value: current, hidden: true }, t("modelHiddenCurrent")) : null,
+                ...list.map((option) => h("option", { key: option, value: option }, optionLabel(t, field.key, option)))
+              ]);
+            }
+            return h("input", {
               id,
               "data-field": field.key,
               className: `mov-input${field.mono ? " mov-mono" : ""}`,
               style: inputStyle,
+              type: field.kind === "number" ? "number" : field.secret ? "password" : "text",
               value: current ?? "",
-              onChange: (event) => edit(field.key, event.target.value)
-            }, [
-              hiddenModel ? h("option", { key: "hidden-current", value: current, hidden: true }, t("modelHiddenCurrent")) : null,
-              ...list.map((option) => h("option", { key: option, value: option }, optionLabel(t, field.key, option)))
+              placeholder: field.secret && (snapshot.secrets?.[field.key] || value[field.key]) ? t("apiKeyConfigured") : "",
+              onChange: (event) => edit(
+                field.key,
+                field.kind === "number" && event.target.value !== "" ? Number(event.target.value) : event.target.value
+              )
+            });
+          }
+          const hints = {
+            connectionMode: t("connectionModeHint"),
+            volcengineApiKey: t("volcengineKeyHint"),
+            model: t("modelHint"),
+            bgmFadeSeconds: t("bgmFadeSecondsHint")
+          };
+          function fieldCell(field) {
+            const classes = ["mov-field"];
+            if (field.kind === "switch") classes.push("mov-field-switch");
+            if (field.wide) classes.push("mov-field-wide");
+            return h("div", { key: field.key, className: classes.join(" ") }, [
+              field.kind === "switch" ? null : h("label", { key: "label", className: "mov-label", htmlFor: `metaontic-video-${field.key}` }, t(field.key)),
+              control(field),
+              hints[field.key] ? h("span", { key: "hint", className: "mov-hint", style: { marginTop: 4 } }, hints[field.key]) : null
             ]);
           }
-          return h("input", {
-            id,
-            "data-field": field.key,
-            className: `mov-input${field.mono ? " mov-mono" : ""}`,
-            style: inputStyle,
-            type: field.kind === "number" ? "number" : field.secret ? "password" : "text",
-            value: current ?? "",
-            placeholder: field.secret && (snapshot.secrets?.[field.key] || value[field.key]) ? t("apiKeyConfigured") : "",
-            onChange: (event) => edit(
-              field.key,
-              field.kind === "number" && event.target.value !== "" ? Number(event.target.value) : event.target.value
-            )
-          });
-        }
-        const hints = {
-          connectionMode: t("connectionModeHint"),
-          volcengineApiKey: t("volcengineKeyHint"),
-          model: t("modelHint"),
-          bgmFadeSeconds: t("bgmFadeSecondsHint")
-        };
-        function fieldCell(field) {
-          const classes = ["mov-field"];
-          if (field.kind === "switch") classes.push("mov-field-switch");
-          if (field.wide) classes.push("mov-field-wide");
-          return h("div", { key: field.key, className: classes.join(" ") }, [
-            field.kind === "switch" ? null : h("label", { key: "label", className: "mov-label", htmlFor: `metaontic-video-${field.key}` }, t(field.key)),
-            control(field),
-            hints[field.key] ? h("span", { key: "hint", className: "mov-hint", style: { marginTop: 4 } }, hints[field.key]) : null
-          ]);
-        }
-        const renderGrid = (section) => h(
-          "div",
-          { key: section.key, className: "mov-grid" },
-          section.fields.filter((key) => key !== "volcengineApiKey" || directMode).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
-        );
-        const rows = [
-          h("div", { key: "generation", className: "mov-section" }, [
-            h("div", { key: "title", className: "mov-section-title" }, t("sectionGeneration")),
-            renderGrid(SECTIONS[0])
-          ]),
-          h("details", { key: "advanced", className: "mov-section mov-advanced" }, [
-            h("summary", { key: "toggle", className: "mov-advanced-toggle" }, [
-              h("span", { key: "title" }, t("sectionCombined")),
-              h("span", { key: "hint", className: "mov-hint" }, t("sectionCombinedHint"))
-            ]),
-            h("div", { key: "body", className: "mov-advanced-body" }, [
-              h("div", { key: "merge-title", className: "mov-section-title" }, t("sectionMerge")),
-              renderGrid(SECTIONS[1]),
-              h("p", { key: "retained", className: "mov-hint", style: { margin: 0 } }, t("segmentsRetained")),
-              h("div", { key: "runtime-title", className: "mov-section-title" }, t("sectionRuntime")),
-              renderGrid(SECTIONS[2])
-            ])
-          ])
-        ];
-        const overrides = Object.keys(snapshot.user || {});
-        const footerMessage = status === "saved" ? t("saved") : status === "failed" ? t("saveFailed") : pending.length ? t("dirty") : "";
-        const footer = pending.length || status !== "idle" ? h("div", { key: "footer", className: "mov-footer" }, [
-          footerMessage ? h("span", {
-            key: "status",
-            style: {
-              fontSize: 12,
-              color: status === "failed" ? TOKENS.error : status === "saved" ? TOKENS.success : TOKENS.muted
-            }
-          }, footerMessage) : null
-        ]) : null;
-        const resetRow = overrides.length || pending.length ? h("div", { key: "reset-row", className: "mov-footer mov-reset-row" }, [
-          h("span", { key: "hint", className: "mov-hint", style: { flex: "1 1 200px" } }, t("resetHint")),
-          pending.length ? h("button", {
-            key: "save",
-            "data-action": "save",
-            type: "button",
-            className: "mov-btn mov-btn-primary",
-            disabled: status === "saving" || snapshot.writable === false,
-            onClick: save
-          }, status === "saving" ? t("saving") : t("save")) : null,
-          h("button", {
-            key: "reset",
-            "data-action": "reset",
-            type: "button",
-            className: "mov-btn",
-            disabled: status === "saving",
-            onClick: reset
-          }, t("reset"))
-        ]) : null;
-        const registerMessageColors = {
-          ok: TOKENS.success,
-          restored: TOKENS.success,
-          partial: TOKENS.success,
-          disabled: TOKENS.error,
-          failed: TOKENS.error
-        };
-        const serverIssuedKey = value.keyOrigin === "register" || Boolean(value.deviceId && value.deviceSecret && value.registerEmail);
-        const keyReady = !directMode && Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;
-        const registerText = registerStatus === "ok" ? t("registerOk") : registerStatus === "partial" ? t("registerPartial") : registerStatus === "restored" ? t("registerRestored") : registerMessage;
-        const quotaSymbol = quota && quota.currency_symbol ? quota.currency_symbol : "\xA5";
-        const money = (field) => `${quotaSymbol}${formatMoney(quota ? quota[field] : 0)}`;
-        const quotaReady = quotaStatus === "ok" && quota;
-        const quotaFallback = keyReady ? t("quotaLoading") : t("quotaNoKey");
-        const quotaStats = quotaReady ? [
-          {
-            key: "remain",
-            label: t("quotaRemain"),
-            value: quota.unlimited_quota ? t("quotaUnlimited") : money("remain_amount"),
-            color: TOKENS.success
-          },
-          { key: "used", label: t("quotaUsed"), value: money("used_amount"), color: TOKENS.text },
-          { key: "total", label: t("quotaTotal"), value: money("total_amount"), color: TOKENS.muted }
-        ] : null;
-        const quotaBox = !directMode && keyReady ? h("div", {
-          key: "quota",
-          "data-field": "quota",
-          className: "mov-card mov-quota-compact"
-        }, [
-          h("div", { key: "head", className: "mov-card-head" }, [
-            h("span", { key: "title", className: "mov-card-title" }, t("quotaTitle"))
-          ]),
-          quotaStats ? h(
+          const renderGrid = (section) => h(
             "div",
-            { key: "text", "data-field": "quotaValue", className: "mov-stats" },
-            quotaStats.map((item) => h("div", { key: item.key, className: "mov-stat" }, [
-              h("span", { key: "label", className: "mov-stat-label" }, item.label),
-              h("span", {
-                key: "value",
-                className: "mov-stat-value",
-                style: { color: item.color }
-              }, item.value)
-            ]))
-          ) : h("span", {
-            key: "text",
-            "data-field": "quotaValue",
-            className: "mov-hint"
-          }, quotaFallback),
-          quotaReady ? h("span", { key: "at", className: "mov-foot-note" }, t("quotaUpdatedAt", { time: quotaAt })) : null,
-          quotaMessage ? h("span", { key: "message", className: "mov-hint" }, quotaMessage) : null,
-          keyReady ? h("button", {
-            key: "refresh",
-            "data-action": "quota-refresh",
-            type: "button",
-            className: "mov-btn mov-btn-sm mov-trailing",
-            disabled: quotaStatus === "working",
-            onClick: () => {
-              loadQuota().catch(() => {
-              });
-            }
-          }, t("quotaRefresh")) : null
-        ]) : null;
-        function copyText(text, mark) {
-          try {
-            const result = window.navigator?.clipboard?.writeText(text);
-            if (result && typeof result.then === "function") {
-              result.then(() => {
-                mark(text);
-                window.setTimeout(() => mark(""), 2e3);
-              }, () => {
-              });
-            }
-          } catch {
-          }
-        }
-        function copyCommand(command) {
-          copyText(command, setCopiedFfmpeg);
-        }
-        async function runOnlineUpdate() {
-          setUpdateConfirm(false);
-          setUpdateStatus("installing");
-          setUpdateMessage("");
-          const probe = manager ? manager() : { manager: null, tried: ["\u672A\u6CE8\u5165"] };
-          const pluginManager = probe.manager;
-          if (!pluginManager || typeof pluginManager.installBundle !== "function") {
-            setUpdateStatus("failed");
-            setUpdateMessage(t("versionUpdateUnavailable", { detail: probe.tried.join("\uFF0C") }));
-            return;
-          }
-          const requestId = `${PLUGIN_PACKAGE}-update-${Date.now()}`;
-          const install = async (spec) => {
-            try {
-              return await pluginManager.installBundle(spec, { enabled: true, requestId });
-            } catch (error) {
-              return { ok: false, error: { message: error?.message || String(error) } };
-            }
-          };
-          const remove = async () => {
-            if (typeof pluginManager.removeBundle !== "function") return null;
-            try {
-              return await pluginManager.removeBundle(PLUGIN_PACKAGE);
-            } catch (error) {
-              return { ok: false, error: { message: error?.message || String(error) } };
-            }
-          };
-          const failureText = (result) => String(
-            result?.error?.message ?? result?.value?.error?.diagnostic ?? result?.value?.error?.code ?? "unknown"
+            { key: section.key, className: "mov-grid" },
+            section.fields.filter((key) => key !== "volcengineApiKey" || directMode).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
           );
-          const worthRetrying = (text) => /429|queue overflowed|timed out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|unable to access|network|fetch/i.test(text);
-          let commit = "";
-          try {
-            commit = await fetchLatestCommit();
-          } catch {
-            commit = "";
-          }
-          if (!commit) commit = updateCommit.current;
-          if (commit) updateCommit.current = commit;
-          const candidates = [];
-          if (commit) candidates.push(`${UPDATE_SPEC}#${commit}`);
-          if (updateLatest) candidates.push(`${UPDATE_SPEC}#v${updateLatest}`);
-          candidates.push(UPDATE_SPEC);
-          const specUnresolvable = (text) => /Could not resolve|No matching version|ERR_PNPM_NO_MATCHING_VERSION/i.test(text);
-          let removed = false;
-          const trySpec = async (spec) => {
-            for (let round = 1; round <= UPDATE_ATTEMPTS; round += 1) {
-              let result = await install(spec);
-              if (result?.ok === true && result.value?.error?.code === "already-installed") {
-                removed = true;
-                await remove();
-                result = await install(spec);
-              }
-              if (result?.ok === true && result.value?.application !== "failed") {
-                return { outcome: result.value || {} };
-              }
-              const text = failureText(result);
-              const transient = worthRetrying(text);
-              if (transient && round < UPDATE_ATTEMPTS) {
-                setUpdateMessage(t("versionUpdateRetry", { attempt: round + 1, total: UPDATE_ATTEMPTS }));
-                await new Promise((resolve) => window.setTimeout(resolve, round * 1200));
-                continue;
-              }
-              return { failure: text, next: !transient && specUnresolvable(text) };
-            }
-            return { failure: "unknown" };
-          };
-          let outcome = null;
-          let failure = "";
-          for (const spec of candidates) {
-            const attempt = await trySpec(spec);
-            if (attempt.outcome) {
-              outcome = attempt.outcome;
-              break;
-            }
-            failure = attempt.failure || failure;
-            if (!attempt.next) break;
-          }
-          if (!outcome) {
-            setUpdateStatus("failed");
-            setUpdateMessage([
-              t("versionUpdateFailed", { message: failure }),
-              removed ? t("versionUpdateRemoved") : "",
-              worthRetrying(failure) || /429|queue overflowed/i.test(failure) ? t("versionUpdateRateLimited") : ""
-            ].filter(Boolean).join(" "));
-            return;
-          }
-          if (outcome.application === "cancelled") {
-            setUpdateStatus("ok");
-            setUpdateMessage(t("versionUpdateCancelled"));
-            return;
-          }
-          forgetUpdateCheck();
-          const version = outcome.version || updateLatest;
-          setUpdateLatest("");
-          setUpdateStatus("restart");
-          setUpdateMessage(outcome.application === "restart-required" ? t("versionUpdateRestart", { version }) : t("versionUpdateDone", { version }));
-        }
-        function usageTime(value2) {
-          if (!value2) return "-";
-          const at = new Date(value2);
-          if (Number.isNaN(at.getTime())) return "-";
-          return at.toLocaleString(void 0, {
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit"
-          });
-        }
-        const usageRows = usage && Array.isArray(usage.items) ? usage.items : [];
-        const usageSymbol = usage && usage.currency_symbol ? usage.currency_symbol : "\xA5";
-        const usageSummaryText = usage ? usageRows.length ? `${t("usageSummary", {
-          count: usage.count,
-          amount: `${usageSymbol}${formatMoney(usage.amount_sum)}`
-        })}${usage.truncated ? ` \xB7 ${t("usageMore", { count: usage.count })}` : ""}` : t("usageEmpty") : usageStatus === "working" ? t("usageLoading") : t("usageKeyMissing");
-        const usageBox = !directMode && keyReady ? h("div", {
-          key: "usage",
-          "data-field": "usage",
-          className: "mov-card"
-        }, [
-          h("div", { key: "head", className: "mov-card-head" }, [
-            h(
-              "span",
-              { key: "title", className: "mov-card-title" },
-              t("usageTitle", { days: usage ? usage.window_days : 7 })
-            ),
-            h("span", {
-              key: "summary",
-              "data-field": "usageSummary",
-              className: "mov-hint",
-              style: { flex: "1 1 160px" }
-            }, usageSummaryText),
-            h("button", {
-              key: "refresh",
-              "data-action": "usage-refresh",
-              type: "button",
-              className: "mov-btn mov-btn-sm",
-              disabled: usageStatus === "working",
-              onClick: () => {
-                loadUsage().catch(() => {
-                });
-              }
-            }, t("usageRefresh"))
-          ]),
-          usageRows.length ? h("div", {
-            key: "table",
-            className: "mov-table"
-          }, [
-            h("div", {
-              key: "head-row",
-              "data-field": "usage-head",
-              className: "mov-table-head"
-            }, [
-              h("span", { key: "time" }, t("usageColTime")),
-              h("span", { key: "kind" }, t("usageColKind")),
-              h("span", { key: "model" }, t("usageColModel")),
-              h("span", { key: "cost" }, t("usageColCost")),
-              h("span", { key: "status" }, t("usageColStatus"))
+          const rows = [
+            h("div", { key: "generation", className: "mov-section" }, [
+              h("div", { key: "title", className: "mov-section-title" }, t("sectionGeneration")),
+              renderGrid(SECTIONS[0])
             ]),
-            ...usageRows.map((row, index) => h("div", {
-              key: `${row.id}-${index}`,
-              "data-field": "usage-row",
-              className: "mov-table-row"
-            }, [
-              h(
-                "span",
-                { key: "time", className: "mov-num", style: { color: TOKENS.muted } },
-                usageTime(row.created_at)
-              ),
-              h("span", { key: "kind" }, row.kind_label || ""),
-              // 模型 ID 是这一行最有用的信息之一（换过模型一眼能看出来是哪次用的哪个）
-              h("span", {
-                key: "model",
-                className: "mov-model",
-                title: row.model || ""
-              }, row.model || "\u2014"),
-              h("span", {
-                key: "amount",
-                "data-field": "usage-amount",
-                className: "mov-num",
-                style: { color: row.status === "succeeded" ? TOKENS.success : TOKENS.muted }
-              }, `${usageSymbol}${formatMoney(row.amount)}`),
-              h(
-                "span",
-                { key: "status" },
-                h("span", {
-                  key: "chip",
-                  className: `mov-chip ${row.status === "succeeded" ? "mov-chip-ok" : "mov-chip-bad"}`
-                }, row.status === "succeeded" ? t("usageStatusOk") : t("usageStatusFailed"))
-              )
-            ]))
-          ]) : null,
-          usageMessage ? h("span", { key: "message", className: "mov-hint" }, usageMessage) : null
-        ]) : null;
-        const updateAvailable = Boolean(updateLatest) && Boolean(PLUGIN_VERSION) && isNewerVersion(updateLatest, PLUGIN_VERSION);
-        const updateText = updateStatus === "working" ? t("versionChecking") : updateStatus === "failed" ? updateMessage : updateStatus === "installing" ? t("versionUpdating") : updateStatus === "restart" ? updateMessage : updateStatus === "ok" ? updateAvailable ? t("versionNew", { version: updateLatest }) : t("versionLatest") : "";
-        const updateTone = updateStatus === "failed" ? TOKENS.error : updateStatus === "restart" || updateAvailable ? TOKENS.success : TOKENS.muted;
-        const versionBox = h("div", {
-          key: "version",
-          "data-field": "version",
-          className: "mov-card"
-        }, [
-          h("div", { key: "head", className: "mov-card-head" }, [
-            h("span", { key: "title", className: "mov-card-title" }, t("versionTitle")),
-            h("span", {
-              key: "current",
-              "data-field": "versionCurrent",
-              className: "mov-hint",
-              style: { flex: "1 1 120px" }
-            }, PLUGIN_VERSION ? t("versionCurrent", { version: PLUGIN_VERSION }) : ""),
-            h("button", {
-              key: "check",
-              "data-action": "update-check",
-              type: "button",
-              className: "mov-btn mov-btn-sm mov-trailing",
-              disabled: updateStatus === "working" || updateStatus === "installing",
-              onClick: () => {
-                checkForUpdate(false).catch(() => {
-                });
-              }
-            }, updateStatus === "working" ? t("versionChecking") : t("versionCheck"))
-          ]),
-          releaseNotes?.items?.length ? h("div", { key: "release-notes", "data-field": "releaseNotes" }, [
-            h("span", { key: "title", className: "mov-card-title" }, `${releaseNotes.version} \xB7 ${t("releaseNotesTitle")}`),
-            h(
-              "ul",
-              { key: "items", style: { margin: "8px 0 0", paddingLeft: 18, fontSize: 12, lineHeight: 1.7, color: TOKENS.muted } },
-              releaseNotes.items.map((item, index) => h("li", { key: index }, item))
-            )
-          ]) : null,
-          updateText ? h("span", {
-            key: "state",
-            "data-field": "versionState",
-            className: "mov-hint",
-            style: { color: updateTone }
-          }, updateText) : null,
-          updateAvailable ? h("div", { key: "command", className: "mov-cmd-row" }, [
-            // 点一下转成「确认更新」，再点一下让宿主重装本插件
-            h("button", {
-              key: "online",
-              "data-action": "update-online",
-              type: "button",
-              className: "mov-btn mov-btn-sm mov-btn-primary",
-              disabled: updateStatus === "installing",
-              onClick: () => {
-                if (updateConfirm) runOnlineUpdate().catch(() => {
-                });
-                else setUpdateConfirm(true);
-              }
-            }, updateStatus === "installing" ? t("versionUpdating") : updateConfirm ? t("versionUpdateConfirm", { version: updateLatest }) : t("versionUpdate"))
-          ]) : null,
-          updateAvailable && updateConfirm ? h("span", {
-            key: "confirm-hint",
-            "data-field": "updateConfirmHint",
-            className: "mov-hint"
-          }, t("versionUpdateConfirmHint")) : null,
-          updateAvailable ? h("span", { key: "hint", className: "mov-hint" }, t("versionHint")) : null,
-          updateStatus === "ok" && updateAt ? h("span", { key: "at", className: "mov-foot-note" }, t("versionCheckedAt", { time: updateAt })) : null
-        ]);
-        const registerBox = keyReady || directMode ? null : h("div", {
-          key: "register",
-          className: "mov-card",
-          style: { gap: 10 }
-        }, [
-          h("div", { key: "text", style: { display: "flex", flexDirection: "column", gap: 4 } }, [
-            h(
-              "span",
-              { key: "title", className: "mov-card-title" },
-              t("registerTitle")
-            ),
-            h("span", { key: "hint", className: "mov-hint" }, t("registerHint"))
-          ]),
-          h("div", { key: "form", className: "mov-register-form" }, [
-            h("input", {
-              key: "email",
-              "data-field": "registerEmail",
-              type: "text",
-              className: "mov-input",
-              value: registerEmail,
-              placeholder: t("registerEmailPlaceholder"),
-              "aria-label": t("registerEmail"),
-              // 验证码已经发出去了：冷却期内不让改邮箱，免得「码发到 A、注册填 B」
-              disabled: emailLocked,
-              "data-locked": emailLocked ? "true" : "false",
-              title: emailLocked ? t("registerEmailLocked") : void 0,
-              onChange: (event) => setRegisterEmail(event.target.value),
+            h("details", { key: "advanced", className: "mov-section mov-advanced" }, [
+              h("summary", { key: "toggle", className: "mov-advanced-toggle" }, [
+                h("span", { key: "title" }, t("sectionCombined")),
+                h("span", { key: "hint", className: "mov-hint" }, t("sectionCombinedHint"))
+              ]),
+              h("div", { key: "body", className: "mov-advanced-body" }, [
+                h("div", { key: "merge-title", className: "mov-section-title" }, t("sectionMerge")),
+                renderGrid(SECTIONS[1]),
+                h("p", { key: "retained", className: "mov-hint", style: { margin: 0 } }, t("segmentsRetained")),
+                h("div", { key: "runtime-title", className: "mov-section-title" }, t("sectionRuntime")),
+                renderGrid(SECTIONS[2])
+              ])
+            ])
+          ];
+          const overrides = Object.keys(snapshot.user || {});
+          const footerMessage = status === "saved" ? t("saved") : status === "failed" ? t("saveFailed") : pending.length ? t("dirty") : "";
+          const footer = pending.length || status !== "idle" ? h("div", { key: "footer", className: "mov-footer" }, [
+            footerMessage ? h("span", {
+              key: "status",
               style: {
-                ...inputStyle,
-                flex: "1 1 220px",
-                width: "auto",
-                opacity: emailLocked ? 0.6 : 1,
-                cursor: emailLocked ? "not-allowed" : "text"
+                fontSize: 12,
+                color: status === "failed" ? TOKENS.error : status === "saved" ? TOKENS.success : TOKENS.muted
               }
-            }),
-            h("button", {
-              key: "code",
-              "data-action": "send-code",
-              type: "button",
-              className: "mov-btn",
-              disabled: codeStatus === "working" || codeCooldown > 0 || !registerEmail.trim(),
-              onClick: () => {
-                sendEmailCode().catch(() => {
-                });
-              }
-            }, codeCooldown > 0 ? t("registerCodeCooldown", { seconds: codeCooldown }) : codeStatus === "working" ? t("registerCodeSending") : t("registerCodeSend")),
-            h("input", {
-              key: "code-input",
-              "data-field": "registerCode",
-              type: "text",
-              inputMode: "numeric",
-              className: "mov-input",
-              value: registerCode,
-              placeholder: t("registerCodePlaceholder"),
-              "aria-label": t("registerCode"),
-              onChange: (event) => setRegisterCode(event.target.value),
-              style: { ...inputStyle, flex: "0 1 130px", width: "auto" }
-            }),
-            h("button", {
-              key: "button",
-              "data-action": "register",
+            }, footerMessage) : null
+          ]) : null;
+          const resetRow = overrides.length || pending.length ? h("div", { key: "reset-row", className: "mov-footer mov-reset-row" }, [
+            h("span", { key: "hint", className: "mov-hint", style: { flex: "1 1 200px" } }, t("resetHint")),
+            pending.length ? h("button", {
+              key: "save",
+              "data-action": "save",
               type: "button",
               className: "mov-btn mov-btn-primary",
-              disabled: registerStatus === "working" || !registerEmail.trim() || !registerCode.trim() || snapshot.writable === false,
-              onClick: register
-            }, registerStatus === "working" ? t("registerWorking") : t("register"))
-          ]),
-          codeMessage ? h("span", {
-            key: "code-message",
-            "data-field": "codeMessage",
-            style: {
-              flex: "1 1 100%",
-              fontSize: 12,
-              color: codeStatus === "failed" ? TOKENS.error : TOKENS.success
+              disabled: status === "saving" || snapshot.writable === false,
+              onClick: save
+            }, status === "saving" ? t("saving") : t("save")) : null,
+            h("button", {
+              key: "reset",
+              "data-action": "reset",
+              type: "button",
+              className: "mov-btn",
+              disabled: status === "saving",
+              onClick: reset
+            }, t("reset"))
+          ]) : null;
+          const registerMessageColors = {
+            ok: TOKENS.success,
+            restored: TOKENS.success,
+            partial: TOKENS.success,
+            disabled: TOKENS.error,
+            failed: TOKENS.error
+          };
+          const serverIssuedKey = value.keyOrigin === "register" || Boolean(value.deviceId && value.deviceSecret && value.registerEmail);
+          const keyReady = !directMode && Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;
+          const registerText = registerStatus === "ok" ? t("registerOk") : registerStatus === "partial" ? t("registerPartial") : registerStatus === "restored" ? t("registerRestored") : registerMessage;
+          const quotaSymbol = quota && quota.currency_symbol ? quota.currency_symbol : "\xA5";
+          const money = (field) => `${quotaSymbol}${formatMoney(quota ? quota[field] : 0)}`;
+          const quotaReady = quotaStatus === "ok" && quota;
+          const quotaFallback = keyReady ? t("quotaLoading") : t("quotaNoKey");
+          const quotaStats = quotaReady ? [
+            {
+              key: "remain",
+              label: t("quotaRemain"),
+              value: quota.unlimited_quota ? t("quotaUnlimited") : money("remain_amount"),
+              color: TOKENS.success
+            },
+            { key: "used", label: t("quotaUsed"), value: money("used_amount"), color: TOKENS.text },
+            { key: "total", label: t("quotaTotal"), value: money("total_amount"), color: TOKENS.muted }
+          ] : null;
+          const quotaBox = !directMode && keyReady ? h("div", {
+            key: "quota",
+            "data-field": "quota",
+            className: "mov-card mov-quota-compact"
+          }, [
+            h("div", { key: "head", className: "mov-card-head" }, [
+              h("span", { key: "title", className: "mov-card-title" }, t("quotaTitle"))
+            ]),
+            quotaStats ? h(
+              "div",
+              { key: "text", "data-field": "quotaValue", className: "mov-stats" },
+              quotaStats.map((item) => h("div", { key: item.key, className: "mov-stat" }, [
+                h("span", { key: "label", className: "mov-stat-label" }, item.label),
+                h("span", {
+                  key: "value",
+                  className: "mov-stat-value",
+                  style: { color: item.color }
+                }, item.value)
+              ]))
+            ) : h("span", {
+              key: "text",
+              "data-field": "quotaValue",
+              className: "mov-hint"
+            }, quotaFallback),
+            quotaReady ? h("span", { key: "at", className: "mov-foot-note" }, t("quotaUpdatedAt", { time: quotaAt })) : null,
+            quotaMessage ? h("span", { key: "message", className: "mov-hint" }, quotaMessage) : null,
+            keyReady ? h("button", {
+              key: "refresh",
+              "data-action": "quota-refresh",
+              type: "button",
+              className: "mov-btn mov-btn-sm mov-trailing",
+              disabled: quotaStatus === "working",
+              onClick: () => {
+                loadQuota().catch(() => {
+                });
+              }
+            }, t("quotaRefresh")) : null
+          ]) : null;
+          function copyText(text, mark) {
+            try {
+              const result = window.navigator?.clipboard?.writeText(text);
+              if (result && typeof result.then === "function") {
+                result.then(() => {
+                  mark(text);
+                  window.setTimeout(() => mark(""), 2e3);
+                }, () => {
+                });
+              }
+            } catch {
             }
-          }, codeMessage) : null,
-          registerText ? h("span", {
-            key: "message",
-            style: { flex: "1 1 100%", fontSize: 12, color: registerMessageColors[registerStatus] || TOKENS.muted }
-          }, registerText) : null
-        ]);
-        let notice = null;
-        if (snapshot.status === "loading") notice = t("loading");
-        else if (snapshot.value === void 0) notice = t("unavailable");
-        else if (snapshot.writable === false) notice = t("readOnly");
-        const blobs = notice && !snapshot.value ? [] : [registerBox, footer, resetRow, ...directMode ? [] : [quotaBox, usageBox], versionBox];
-        return h("div", { className: "mov-page" }, [
-          // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
-          h("style", { key: "styles" }, PAGE_CSS),
-          notice ? h("p", { key: "notice", className: "mov-notice" }, notice) : null,
-          ...notice && !snapshot.value ? [] : rows,
-          ...blobs
-        ]);
+          }
+          function copyCommand(command) {
+            copyText(command, setCopiedFfmpeg);
+          }
+          async function runOnlineUpdate() {
+            setUpdateConfirm(false);
+            setUpdateStatus("installing");
+            setUpdateMessage("");
+            const probe = manager ? manager() : { manager: null, tried: ["\u672A\u6CE8\u5165"] };
+            const pluginManager = probe.manager;
+            if (!pluginManager || typeof pluginManager.installBundle !== "function") {
+              setUpdateStatus("failed");
+              setUpdateMessage(t("versionUpdateUnavailable", { detail: probe.tried.join("\uFF0C") }));
+              return;
+            }
+            const requestId = `${PLUGIN_PACKAGE}-update-${Date.now()}`;
+            const install = async (spec) => {
+              try {
+                return await pluginManager.installBundle(spec, { enabled: true, requestId });
+              } catch (error) {
+                return { ok: false, error: { message: error?.message || String(error) } };
+              }
+            };
+            const remove = async () => {
+              if (typeof pluginManager.removeBundle !== "function") return null;
+              try {
+                return await pluginManager.removeBundle(PLUGIN_PACKAGE);
+              } catch (error) {
+                return { ok: false, error: { message: error?.message || String(error) } };
+              }
+            };
+            const failureText = (result) => String(
+              result?.error?.message ?? result?.value?.error?.diagnostic ?? result?.value?.error?.code ?? "unknown"
+            );
+            const worthRetrying = (text) => /429|queue overflowed|timed out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|unable to access|network|fetch/i.test(text);
+            let commit = updateCommit.current || "";
+            if (commit) updateCommit.current = commit;
+            const candidates = [];
+            if (updateLatest) candidates.push(`${UPDATE_SPEC}#v${updateLatest}`);
+            if (commit) candidates.push(`${UPDATE_SPEC}#${commit}`);
+            candidates.push(UPDATE_SPEC);
+            const specUnresolvable = (text) => /Could not resolve|No matching version|ERR_PNPM_NO_MATCHING_VERSION/i.test(text);
+            let removed = false;
+            const trySpec = async (spec) => {
+              for (let round = 1; round <= UPDATE_ATTEMPTS; round += 1) {
+                let result = await install(spec);
+                if (result?.ok === true && result.value?.error?.code === "already-installed") {
+                  removed = true;
+                  await remove();
+                  result = await install(spec);
+                }
+                if (result?.ok === true && result.value?.application !== "failed") {
+                  return { outcome: result.value || {} };
+                }
+                const text = failureText(result);
+                const transient = worthRetrying(text);
+                if (transient && round < UPDATE_ATTEMPTS) {
+                  setUpdateMessage(t("versionUpdateRetry", { attempt: round + 1, total: UPDATE_ATTEMPTS }));
+                  await new Promise((resolve) => window.setTimeout(resolve, round * 1200));
+                  continue;
+                }
+                return { failure: text, next: !transient && specUnresolvable(text) };
+              }
+              return { failure: "unknown" };
+            };
+            let outcome = null;
+            let failure = "";
+            for (const spec of candidates) {
+              const attempt = await trySpec(spec);
+              if (attempt.outcome) {
+                outcome = attempt.outcome;
+                break;
+              }
+              failure = attempt.failure || failure;
+              if (!attempt.next) break;
+            }
+            if (!outcome) {
+              setUpdateStatus("failed");
+              setUpdateMessage([
+                t("versionUpdateFailed", { message: failure }),
+                removed ? t("versionUpdateRemoved") : "",
+                worthRetrying(failure) || /429|queue overflowed/i.test(failure) ? t("versionUpdateRateLimited") : ""
+              ].filter(Boolean).join(" "));
+              return;
+            }
+            if (outcome.application === "cancelled") {
+              setUpdateStatus("ok");
+              setUpdateMessage(t("versionUpdateCancelled"));
+              return;
+            }
+            forgetUpdateCheck();
+            const version = outcome.version || updateLatest;
+            setUpdateLatest("");
+            setUpdateStatus("restart");
+            setUpdateMessage(outcome.application === "restart-required" ? t("versionUpdateRestart", { version }) : t("versionUpdateDone", { version }));
+          }
+          function usageTime(value2) {
+            if (!value2) return "-";
+            const at = new Date(value2);
+            if (Number.isNaN(at.getTime())) return "-";
+            return at.toLocaleString(void 0, {
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit"
+            });
+          }
+          const usageRows = usage && Array.isArray(usage.items) ? usage.items : [];
+          const usageSymbol = usage && usage.currency_symbol ? usage.currency_symbol : "\xA5";
+          const usageSummaryText = usage ? usageRows.length ? `${t("usageSummary", {
+            count: usage.count,
+            amount: `${usageSymbol}${formatMoney(usage.amount_sum)}`
+          })}${usage.truncated ? ` \xB7 ${t("usageMore", { count: usage.count })}` : ""}` : t("usageEmpty") : usageStatus === "working" ? t("usageLoading") : t("usageKeyMissing");
+          const usageBox = !directMode && keyReady ? h("div", {
+            key: "usage",
+            "data-field": "usage",
+            className: "mov-card"
+          }, [
+            h("div", { key: "head", className: "mov-card-head" }, [
+              h(
+                "span",
+                { key: "title", className: "mov-card-title" },
+                t("usageTitle", { days: usage ? usage.window_days : 7 })
+              ),
+              h("span", {
+                key: "summary",
+                "data-field": "usageSummary",
+                className: "mov-hint",
+                style: { flex: "1 1 160px" }
+              }, usageSummaryText),
+              h("button", {
+                key: "refresh",
+                "data-action": "usage-refresh",
+                type: "button",
+                className: "mov-btn mov-btn-sm",
+                disabled: usageStatus === "working",
+                onClick: () => {
+                  loadUsage().catch(() => {
+                  });
+                }
+              }, t("usageRefresh"))
+            ]),
+            usageRows.length ? h("div", {
+              key: "table",
+              className: "mov-table"
+            }, [
+              h("div", {
+                key: "head-row",
+                "data-field": "usage-head",
+                className: "mov-table-head"
+              }, [
+                h("span", { key: "time" }, t("usageColTime")),
+                h("span", { key: "kind" }, t("usageColKind")),
+                h("span", { key: "model" }, t("usageColModel")),
+                h("span", { key: "cost" }, t("usageColCost")),
+                h("span", { key: "status" }, t("usageColStatus"))
+              ]),
+              ...usageRows.map((row, index) => h("div", {
+                key: `${row.id}-${index}`,
+                "data-field": "usage-row",
+                className: "mov-table-row"
+              }, [
+                h(
+                  "span",
+                  { key: "time", className: "mov-num", style: { color: TOKENS.muted } },
+                  usageTime(row.created_at)
+                ),
+                h("span", { key: "kind" }, row.kind_label || ""),
+                // 模型 ID 是这一行最有用的信息之一（换过模型一眼能看出来是哪次用的哪个）
+                h("span", {
+                  key: "model",
+                  className: "mov-model",
+                  title: row.model || ""
+                }, row.model || "\u2014"),
+                h("span", {
+                  key: "amount",
+                  "data-field": "usage-amount",
+                  className: "mov-num",
+                  style: { color: row.status === "succeeded" ? TOKENS.success : TOKENS.muted }
+                }, `${usageSymbol}${formatMoney(row.amount)}`),
+                h(
+                  "span",
+                  { key: "status" },
+                  h("span", {
+                    key: "chip",
+                    className: `mov-chip ${row.status === "succeeded" ? "mov-chip-ok" : "mov-chip-bad"}`
+                  }, row.status === "succeeded" ? t("usageStatusOk") : t("usageStatusFailed"))
+                )
+              ]))
+            ]) : null,
+            usageMessage ? h("span", { key: "message", className: "mov-hint" }, usageMessage) : null
+          ]) : null;
+          const updateAvailable = Boolean(updateLatest) && Boolean(PLUGIN_VERSION) && isNewerVersion(updateLatest, PLUGIN_VERSION);
+          const updateText = updateStatus === "working" ? t("versionChecking") : updateStatus === "failed" ? updateMessage : updateStatus === "installing" ? t("versionUpdating") : updateStatus === "restart" ? updateMessage : updateStatus === "ok" ? updateAvailable ? t("versionNew", { version: updateLatest }) : t("versionLatest") : "";
+          const updateTone = updateStatus === "failed" ? TOKENS.error : updateStatus === "restart" || updateAvailable ? TOKENS.success : TOKENS.muted;
+          const versionBox = h("div", {
+            key: "version",
+            "data-field": "version",
+            className: "mov-card"
+          }, [
+            h("div", { key: "head", className: "mov-card-head" }, [
+              h("span", { key: "title", className: "mov-card-title" }, t("versionTitle")),
+              h("span", {
+                key: "current",
+                "data-field": "versionCurrent",
+                className: "mov-hint",
+                style: { flex: "1 1 120px" }
+              }, PLUGIN_VERSION ? t("versionCurrent", { version: PLUGIN_VERSION }) : ""),
+              h("button", {
+                key: "check",
+                "data-action": "update-check",
+                type: "button",
+                className: "mov-btn mov-btn-sm mov-trailing",
+                disabled: updateStatus === "working" || updateStatus === "installing",
+                onClick: () => {
+                  checkForUpdate(false).catch(() => {
+                  });
+                }
+              }, updateStatus === "working" ? t("versionChecking") : t("versionCheck"))
+            ]),
+            releaseNotes?.items?.length ? h("div", { key: "release-notes", "data-field": "releaseNotes" }, [
+              h("span", { key: "title", className: "mov-card-title" }, `${releaseNotes.version} \xB7 ${t("releaseNotesTitle")}`),
+              h(
+                "ul",
+                { key: "items", style: { margin: "8px 0 0", paddingLeft: 18, fontSize: 12, lineHeight: 1.7, color: TOKENS.muted } },
+                releaseNotes.items.map((item, index) => h("li", { key: index }, item))
+              )
+            ]) : null,
+            updateText ? h("span", {
+              key: "state",
+              "data-field": "versionState",
+              className: "mov-hint",
+              style: { color: updateTone }
+            }, updateText) : null,
+            updateAvailable ? h("div", { key: "command", className: "mov-cmd-row" }, [
+              // 点一下转成「确认更新」，再点一下让宿主重装本插件
+              h("button", {
+                key: "online",
+                "data-action": "update-online",
+                type: "button",
+                className: "mov-btn mov-btn-sm mov-btn-primary",
+                disabled: updateStatus === "installing",
+                onClick: () => {
+                  if (updateConfirm) runOnlineUpdate().catch(() => {
+                  });
+                  else setUpdateConfirm(true);
+                }
+              }, updateStatus === "installing" ? t("versionUpdating") : updateConfirm ? t("versionUpdateConfirm", { version: updateLatest }) : t("versionUpdate"))
+            ]) : null,
+            updateAvailable && updateConfirm ? h("span", {
+              key: "confirm-hint",
+              "data-field": "updateConfirmHint",
+              className: "mov-hint"
+            }, t("versionUpdateConfirmHint")) : null,
+            updateAvailable ? h("span", { key: "hint", className: "mov-hint" }, t("versionHint")) : null,
+            updateStatus === "ok" && updateAt ? h("span", { key: "at", className: "mov-foot-note" }, t("versionCheckedAt", { time: updateAt })) : null
+          ]);
+          const registerBox = keyReady || directMode ? null : h("div", {
+            key: "register",
+            className: "mov-card",
+            style: { gap: 10 }
+          }, [
+            h("div", { key: "text", style: { display: "flex", flexDirection: "column", gap: 4 } }, [
+              h(
+                "span",
+                { key: "title", className: "mov-card-title" },
+                t("registerTitle")
+              ),
+              h("span", { key: "hint", className: "mov-hint" }, t("registerHint"))
+            ]),
+            h("div", { key: "form", className: "mov-register-form" }, [
+              h("input", {
+                key: "email",
+                "data-field": "registerEmail",
+                type: "text",
+                className: "mov-input",
+                value: registerEmail,
+                placeholder: t("registerEmailPlaceholder"),
+                "aria-label": t("registerEmail"),
+                // 验证码已经发出去了：冷却期内不让改邮箱，免得「码发到 A、注册填 B」
+                disabled: emailLocked,
+                "data-locked": emailLocked ? "true" : "false",
+                title: emailLocked ? t("registerEmailLocked") : void 0,
+                onChange: (event) => setRegisterEmail(event.target.value),
+                style: {
+                  ...inputStyle,
+                  flex: "1 1 220px",
+                  width: "auto",
+                  opacity: emailLocked ? 0.6 : 1,
+                  cursor: emailLocked ? "not-allowed" : "text"
+                }
+              }),
+              h("button", {
+                key: "code",
+                "data-action": "send-code",
+                type: "button",
+                className: "mov-btn",
+                disabled: codeStatus === "working" || codeCooldown > 0 || !registerEmail.trim(),
+                onClick: () => {
+                  sendEmailCode().catch(() => {
+                  });
+                }
+              }, codeCooldown > 0 ? t("registerCodeCooldown", { seconds: codeCooldown }) : codeStatus === "working" ? t("registerCodeSending") : t("registerCodeSend")),
+              h("input", {
+                key: "code-input",
+                "data-field": "registerCode",
+                type: "text",
+                inputMode: "numeric",
+                className: "mov-input",
+                value: registerCode,
+                placeholder: t("registerCodePlaceholder"),
+                "aria-label": t("registerCode"),
+                onChange: (event) => setRegisterCode(event.target.value),
+                style: { ...inputStyle, flex: "0 1 130px", width: "auto" }
+              }),
+              h("button", {
+                key: "button",
+                "data-action": "register",
+                type: "button",
+                className: "mov-btn mov-btn-primary",
+                disabled: registerStatus === "working" || !registerEmail.trim() || !registerCode.trim() || snapshot.writable === false,
+                onClick: register
+              }, registerStatus === "working" ? t("registerWorking") : t("register"))
+            ]),
+            codeMessage ? h("span", {
+              key: "code-message",
+              "data-field": "codeMessage",
+              style: {
+                flex: "1 1 100%",
+                fontSize: 12,
+                color: codeStatus === "failed" ? TOKENS.error : TOKENS.success
+              }
+            }, codeMessage) : null,
+            registerText ? h("span", {
+              key: "message",
+              style: { flex: "1 1 100%", fontSize: 12, color: registerMessageColors[registerStatus] || TOKENS.muted }
+            }, registerText) : null
+          ]);
+          let notice = null;
+          if (snapshot.status === "loading") notice = t("loading");
+          else if (snapshot.value === void 0) notice = t("unavailable");
+          else if (snapshot.writable === false) notice = t("readOnly");
+          const blobs = notice && !snapshot.value ? [] : [registerBox, footer, resetRow, ...directMode ? [] : [quotaBox, usageBox], versionBox];
+          return h("div", { className: "mov-page" }, [
+            // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
+            h("style", { key: "styles" }, PAGE_CSS),
+            notice ? h("p", { key: "notice", className: "mov-notice" }, notice) : null,
+            ...notice && !snapshot.value ? [] : rows,
+            ...blobs
+          ]);
+        };
+      }
+      return {
+        inject: ["slots", "locale", "configForms"],
+        apply(ctx) {
+          const t = ctx.locale.bind(NS);
+          ctx.effect(() => ctx.locale.register(NS, { zh, en }), "metaontic-video: dictionaries");
+          const form = ctx.configForms.get(NAMESPACE);
+          const pluginManager = () => {
+            const tried = [];
+            const shape = (value) => value === void 0 ? "undefined" : value === null ? "null" : typeof value;
+            try {
+              const direct = typeof ctx.get === "function" ? ctx.get("remote.pluginManager") : void 0;
+              if (direct && typeof direct.installBundle === "function") return { manager: direct, tried };
+              tried.push(`remote.pluginManager=${shape(direct)}`);
+            } catch (error) {
+              tried.push(`remote.pluginManager \u629B\u9519\uFF1A${error && error.message ? error.message : String(error)}`);
+            }
+            try {
+              const remote = typeof ctx.get === "function" ? ctx.get("remote") : void 0;
+              const nested = remote && remote.pluginManager;
+              if (nested && typeof nested.installBundle === "function") return { manager: nested, tried };
+              tried.push(`remote=${shape(remote)}`);
+            } catch (error) {
+              tried.push(`remote \u629B\u9519\uFF1A${error && error.message ? error.message : String(error)}`);
+            }
+            return { manager: null, tried };
+          };
+          const Page = makePage({ form, t, manager: pluginManager });
+          ctx.effect(() => ctx.slots.inject("plugins.bundle.config", () => ctx.slots.register({
+            name: "plugins.bundle.config",
+            key: NAMESPACE,
+            locale: NS
+          }, Page)), "metaontic-video: configuration page");
+        }
       };
     }
-    return {
-      inject: ["slots", "locale", "configForms"],
-      apply(ctx) {
-        const t = ctx.locale.bind(NS);
-        ctx.effect(() => ctx.locale.register(NS, { zh, en }), "metaontic-video: dictionaries");
-        const form = ctx.configForms.get(NAMESPACE);
-        const pluginManager = () => {
-          const tried = [];
-          const shape = (value) => value === void 0 ? "undefined" : value === null ? "null" : typeof value;
-          try {
-            const direct = typeof ctx.get === "function" ? ctx.get("remote.pluginManager") : void 0;
-            if (direct && typeof direct.installBundle === "function") return { manager: direct, tried };
-            tried.push(`remote.pluginManager=${shape(direct)}`);
-          } catch (error) {
-            tried.push(`remote.pluginManager \u629B\u9519\uFF1A${error && error.message ? error.message : String(error)}`);
-          }
-          try {
-            const remote = typeof ctx.get === "function" ? ctx.get("remote") : void 0;
-            const nested = remote && remote.pluginManager;
-            if (nested && typeof nested.installBundle === "function") return { manager: nested, tried };
-            tried.push(`remote=${shape(remote)}`);
-          } catch (error) {
-            tried.push(`remote \u629B\u9519\uFF1A${error && error.message ? error.message : String(error)}`);
-          }
-          return { manager: null, tried };
-        };
-        const Page = makePage({ form, t, manager: pluginManager });
-        ctx.effect(() => ctx.slots.inject("plugins.bundle.config", () => ctx.slots.register({
-          name: "plugins.bundle.config",
-          key: NAMESPACE,
-          locale: NS
-        }, Page)), "metaontic-video: configuration page");
-      }
-    };
-  }
-});
+  });
+})();

@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "2.15.1",
+  "version": "2.15.2",
   "description": "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
   "license": "MIT",
   "type": "module",
@@ -69,18 +69,19 @@
     "typecheck": "tsc -p tsconfig.json",
     "build:locale": "esbuild scripts/build-locale.ts --format=esm --platform=node --packages=external --outfile=node_modules/.cache/build-locale.mjs --log-level=warning && node node_modules/.cache/build-locale.mjs",
     "build:host": "esbuild src/index.ts --format=esm --platform=node --target=node20 --packages=external --define:__PLUGIN_VERSION__=$(node -p 'JSON.stringify(require(\"./package.json\").version)') --outfile=index.js",
-    "build:client": "esbuild src/client.ts --format=esm --platform=browser --target=es2022 --define:__PLUGIN_VERSION__=$(node -p 'JSON.stringify(require(\"./package.json\").version)') --outfile=client.js",
+    "build:client": "esbuild src/client.ts --bundle --format=iife --platform=browser --target=es2022 --define:__PLUGIN_VERSION__=$(node -p 'JSON.stringify(require(\"./package.json\").version)') --outfile=client.js",
     "build": "npm run typecheck && npm run build:locale && npm run build:host && npm run build:client"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "~3.18.5"
   },
   "releaseNotes": {
-    "version": "2.15.1",
+    "version": "2.15.2",
     "items": [
-      "按当前能力重整README，更新接入方式、逐段预览续做、原始分段保留、素材输入及接缝裁剪说明。",
-      "规范后续发布：使用带新增、优化、修复和验证说明的附注标签，版本更新内容与包版本同步维护。",
-      "保留“视频导演”预设名称。"
+      "修复插件启动失败：客户端打包为独立普通脚本，消除顶层 import。",
+      "优化版本检测：多源并发取最高版本，提交号查询不再阻塞结果，刷新旧缓存。",
+      "在线更新优先使用版本标签，减少对 Gitee 提交接口的依赖。",
+      "重置插件增加二次确认，明确清除配置、Key 和登录状态，保留已生成视频。"
     ]
   }
 }
