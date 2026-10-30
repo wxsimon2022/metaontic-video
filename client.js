@@ -247,7 +247,7 @@ window.__ModuleLoader__.load({
     const UPDATE_COMMAND = 'dsh plugin --profile desktop remove metaontic-video && dsh plugin --profile desktop add "git+https://gitee.com/hackloop/metaontic-video.git"';
     const UPDATE_CACHE_KEY = "metaontic-video.update-check";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "2.7.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "2.7.1".trim().replace(/^v/i, "") : "";
     function currentOs() {
       const nav = window.navigator || {};
       const raw = String(
@@ -637,6 +637,8 @@ window.__ModuleLoader__.load({
           options.headers = {
             accept: "application/json",
             "x-register-token": token,
+            // 本插件版本：服务端会记进请求日志，便于回溯「这版有没有问题」
+            ...PLUGIN_VERSION ? { "x-plugin-version": PLUGIN_VERSION } : {},
             ...init && init.headers || {}
           };
           let response;

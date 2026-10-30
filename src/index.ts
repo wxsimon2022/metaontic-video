@@ -1558,6 +1558,11 @@ function resolveRegisterApi(config) {
   return (String(ref(config, 'registerApi', '')).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, '');
 }
 
+/** 本插件版本：构建时由 esbuild --define 从 package.json 注入，跟着请求带给服务端。 */
+const PLUGIN_VERSION = typeof __PLUGIN_VERSION__ === 'string'
+  ? __PLUGIN_VERSION__.trim().replace(/^v/i, '')
+  : '';
+
 /**
  * 问插件服务要「本机这把 Key 还剩多少额度」。
  * 服务端按设备凭据去中转站读密钥详情，只回剩余 / 已用额度。
@@ -1580,6 +1585,7 @@ async function fetchDeviceQuota(config, signal) {
         accept: 'application/json',
         'content-type': 'application/json',
         'X-Register-Token': String(ref(config, 'registerToken', '')).trim() || DEFAULT_REGISTER_TOKEN,
+        ...(PLUGIN_VERSION ? { 'X-Plugin-Version': PLUGIN_VERSION } : {}),
       },
       body: JSON.stringify({ device_id: deviceId, device_secret: deviceSecret }),
       ...(signal ? { signal } : {}),

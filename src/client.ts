@@ -775,6 +775,8 @@ window.__ModuleLoader__.load({
           options.headers = {
             accept: 'application/json',
             'x-register-token': token,
+            // 本插件版本：服务端会记进请求日志，便于回溯「这版有没有问题」
+            ...(PLUGIN_VERSION ? { 'x-plugin-version': PLUGIN_VERSION } : {}),
             ...((init && init.headers) || {}),
           };
           let response;

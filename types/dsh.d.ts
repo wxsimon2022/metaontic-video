@@ -32,6 +32,9 @@ declare module '@deepseek-ai/schemastery' {
   export default z;
 }
 
+/** 构建时由 esbuild `--define:__PLUGIN_VERSION__` 注入的插件版本号；源码直跑时未定义。 */
+declare const __PLUGIN_VERSION__: string;
+
 /** 一次工具调用的执行上下文。 */
 interface DshToolExec {
   /** 工具名，例如 video_generate。 */

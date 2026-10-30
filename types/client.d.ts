@@ -17,5 +17,3 @@ interface Navigator {
   userAgentData?: { platform?: string };
 }
 
-/** 构建时由 esbuild `--define:__PLUGIN_VERSION__` 注入的插件版本号；源码直跑时未定义。 */
-declare const __PLUGIN_VERSION__: string;

@@ -1132,6 +1132,7 @@ function estimateUsage(config, toolName, args) {
 function resolveRegisterApi(config) {
   return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
+const PLUGIN_VERSION = true ? "2.7.1".trim().replace(/^v/i, "") : "";
 async function fetchDeviceQuota(config, signal) {
   const api = resolveRegisterApi(config);
   const deviceId = String(ref(config, "deviceId", "")).trim();
@@ -1148,7 +1149,8 @@ async function fetchDeviceQuota(config, signal) {
       headers: {
         accept: "application/json",
         "content-type": "application/json",
-        "X-Register-Token": String(ref(config, "registerToken", "")).trim() || DEFAULT_REGISTER_TOKEN
+        "X-Register-Token": String(ref(config, "registerToken", "")).trim() || DEFAULT_REGISTER_TOKEN,
+        ...PLUGIN_VERSION ? { "X-Plugin-Version": PLUGIN_VERSION } : {}
       },
       body: JSON.stringify({ device_id: deviceId, device_secret: deviceSecret }),
       ...signal ? { signal } : {}

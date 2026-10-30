@@ -360,17 +360,19 @@ Key、服务地址、模型由「登录」自动写好，正常不用出现在�
 
 ## 改代码（开发者）
 
-源码是 TypeScript，放在 `src/`；仓库根目录的 `index.js` / `client.js` 是**构建产物**
-（宿主与 App 客户端都是直接加载这两个文件，运行时没有 TS 转译），所以改完必须重新构建并一起提交。
+源码是 TypeScript，放在 `src/`；仓库根目录的 `index.js` / `client.js` 与 `locale/*.json` 都是**构建产物**
+（宿主与 App 客户端直接加载前两个，插件页的标题 / 描述只认 JSON），所以改完必须重新构建并一起提交。
 
 ```bash
 npm install        # 只装开发依赖：typescript + esbuild + @types/node
 npm run typecheck  # tsc 类型检查（types/dsh.d.ts 里声明了宿主用到的接口）
-npm run build      # 检查 + 构建出根目录的 index.js / client.js
+npm run build      # 检查 + 构建：locale/*.json（从 src/locale/*.ts）+ index.js + client.js
 ```
 
 - `src/index.ts`：宿主半侧（`video_generate` / `video_extend` / `video_status` / `video_config`）。
 - `src/client.ts`：浏览器半侧（插件页那张卡片），必须保持单文件、无 import。
+- `src/locale/zh.ts` / `src/locale/en.ts`：插件页显示的标题与描述（全部语言都在 TS 里），
+  由 `scripts/build-locale.ts` 生成 `locale/zh.json` / `locale/en.json`。
 - 客户端构建用 `--define:__PLUGIN_VERSION__` 把 `package.json` 的版本号烧进 `client.js`
   （就是版本卡片上的「当前版本」）——所以**改了版本号要重新 `npm run build`**。
 - `types/dsh.d.ts`：本插件用到的宿主接口（工具定义、`tools/pre-execute` 卡口、审批、settings 等）。
