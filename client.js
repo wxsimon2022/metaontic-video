@@ -268,12 +268,16 @@ window.__ModuleLoader__.load({
     const UPDATE_FILE_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json`;
     const PLUGIN_PACKAGE = "metaontic-video";
     const UPDATE_SPEC = "git+https://gitee.com/hackloop/metaontic-video.git";
+    const UPDATE_MIRROR_FILES = [
+      "https://fastly.jsdelivr.net/gh/wxsimon2022/metaontic-video@master/package.json",
+      "https://gcore.jsdelivr.net/gh/wxsimon2022/metaontic-video@master/package.json"
+    ];
     const UPDATE_BRANCH = "master";
     const UPDATE_COMMIT_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/commits?sha=${UPDATE_BRANCH}&per_page=1`;
     const UPDATE_ATTEMPTS = 3;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "2.10.3".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "2.10.4".trim().replace(/^v/i, "") : "";
     function currentOs() {
       const nav = window.navigator || {};
       const raw = String(
@@ -326,40 +330,46 @@ window.__ModuleLoader__.load({
       for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
       return typeof TextDecoder === "function" ? new TextDecoder().decode(bytes) : binary;
     }
-    async function fetchLatestVersion() {
+    async function fetchUpdateSource(url, ms = 12e3) {
       const controller = typeof AbortController === "function" ? new AbortController() : null;
-      const timer = controller ? window.setTimeout(() => controller.abort(), 12e3) : null;
-      let response;
+      const timer = controller ? window.setTimeout(() => controller.abort(), ms) : null;
       try {
-        response = await fetch(UPDATE_FILE_API, {
+        const response = await fetch(url, {
           headers: { accept: "application/json" },
           signal: controller ? controller.signal : void 0
         });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response;
       } finally {
         if (timer) window.clearTimeout(timer);
       }
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const body = await response.json();
-      const text = body && typeof body.content === "string" ? decodeBase64Text(body.content) : "";
-      if (!text) throw new Error("empty file");
-      const version = String((JSON.parse(text) || {}).version || "").trim().replace(/^v/i, "");
+    }
+    function versionFromFile(body) {
+      const version = String((body || {}).version || "").trim().replace(/^v/i, "");
       if (!version) throw new Error("no version");
       return version;
     }
-    async function fetchLatestCommit() {
-      const controller = typeof AbortController === "function" ? new AbortController() : null;
-      const timer = controller ? window.setTimeout(() => controller.abort(), 12e3) : null;
-      let response;
+    async function fetchLatestVersion() {
+      const problems = [];
       try {
-        response = await fetch(UPDATE_COMMIT_API, {
-          headers: { accept: "application/json" },
-          signal: controller ? controller.signal : void 0
-        });
-      } finally {
-        if (timer) window.clearTimeout(timer);
+        const body = await (await fetchUpdateSource(UPDATE_FILE_API)).json();
+        const text = body && typeof body.content === "string" ? decodeBase64Text(body.content) : "";
+        if (!text) throw new Error("empty file");
+        return versionFromFile(JSON.parse(text));
+      } catch (error) {
+        problems.push(`gitee api: ${error?.message || error}`);
       }
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const body = await response.json();
+      for (const url of UPDATE_MIRROR_FILES) {
+        try {
+          return versionFromFile(await (await fetchUpdateSource(url)).json());
+        } catch (error) {
+          problems.push(`${String(url).split("/")[2]}: ${error?.message || error}`);
+        }
+      }
+      throw new Error(problems.join("\uFF1B"));
+    }
+    async function fetchLatestCommit() {
+      const body = await (await fetchUpdateSource(UPDATE_COMMIT_API)).json();
       const sha = String((Array.isArray(body) ? body[0]?.sha : "") || "").trim();
       if (!/^[0-9a-f]{40}$/i.test(sha)) throw new Error("no commit");
       return sha;
@@ -1173,9 +1183,9 @@ window.__ModuleLoader__.load({
             return;
           }
           const requestId = `${PLUGIN_PACKAGE}-update-${Date.now()}`;
-          const install = async (spec2) => {
+          const install = async (spec) => {
             try {
-              return await pluginManager.installBundle(spec2, { enabled: true, requestId });
+              return await pluginManager.installBundle(spec, { enabled: true, requestId });
             } catch (error) {
               return { ok: false, error: { message: error?.message || String(error) } };
             }
@@ -1192,39 +1202,52 @@ window.__ModuleLoader__.load({
             result?.error?.message ?? result?.value?.error?.diagnostic ?? result?.value?.error?.code ?? "unknown"
           );
           const worthRetrying = (text) => /429|queue overflowed|timed out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|unable to access|network|fetch/i.test(text);
-          let spec = UPDATE_SPEC;
           let commit = "";
           try {
             commit = await fetchLatestCommit();
           } catch {
             commit = "";
           }
-          const latest = commit || updateCommit.current;
-          if (latest) {
-            updateCommit.current = latest;
-            spec = `${UPDATE_SPEC}#${latest}`;
-          }
+          if (!commit) commit = updateCommit.current;
+          if (commit) updateCommit.current = commit;
+          const candidates = [];
+          if (commit) candidates.push(`${UPDATE_SPEC}#${commit}`);
+          if (updateLatest) candidates.push(`${UPDATE_SPEC}#v${updateLatest}`);
+          candidates.push(UPDATE_SPEC);
+          const specUnresolvable = (text) => /Could not resolve|No matching version|ERR_PNPM_NO_MATCHING_VERSION/i.test(text);
+          let removed = false;
+          const trySpec = async (spec) => {
+            for (let round = 1; round <= UPDATE_ATTEMPTS; round += 1) {
+              let result = await install(spec);
+              if (result?.ok === true && result.value?.error?.code === "already-installed") {
+                removed = true;
+                await remove();
+                result = await install(spec);
+              }
+              if (result?.ok === true && result.value?.application !== "failed") {
+                return { outcome: result.value || {} };
+              }
+              const text = failureText(result);
+              const transient = worthRetrying(text);
+              if (transient && round < UPDATE_ATTEMPTS) {
+                setUpdateMessage(t("versionUpdateRetry", { attempt: round + 1, total: UPDATE_ATTEMPTS }));
+                await new Promise((resolve) => window.setTimeout(resolve, round * 1200));
+                continue;
+              }
+              return { failure: text, next: !transient && specUnresolvable(text) };
+            }
+            return { failure: "unknown" };
+          };
           let outcome = null;
           let failure = "";
-          let removed = false;
-          for (let round = 1; round <= UPDATE_ATTEMPTS && !outcome; round += 1) {
-            let result = await install(spec);
-            if (result?.ok === true && result.value?.error?.code === "already-installed") {
-              removed = true;
-              await remove();
-              result = await install(spec);
-            }
-            if (result?.ok === true && result.value?.application !== "failed") {
-              outcome = result.value || {};
+          for (const spec of candidates) {
+            const attempt = await trySpec(spec);
+            if (attempt.outcome) {
+              outcome = attempt.outcome;
               break;
             }
-            failure = failureText(result);
-            if (round < UPDATE_ATTEMPTS && worthRetrying(failure)) {
-              setUpdateMessage(t("versionUpdateRetry", { attempt: round + 1, total: UPDATE_ATTEMPTS }));
-              await new Promise((resolve) => window.setTimeout(resolve, round * 1200));
-              continue;
-            }
-            break;
+            failure = attempt.failure || failure;
+            if (!attempt.next) break;
           }
           if (!outcome) {
             setUpdateStatus("failed");

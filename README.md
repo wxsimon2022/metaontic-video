@@ -345,6 +345,10 @@ Key、服务地址、模型由「登录」自动写好，正常不用出现在�
 查的是 **Gitee 镜像仓库**默认分支上的 `package.json`（国内网络比 GitHub 稳），只读一个版本号，
 不发你的 Key、也不上传任何本机信息。查不到（断网 / 限流）只会提示「检查更新失败」，不影响出片。
 
+Gitee 的 API 会被 WAF 限流（返回 `403 Rate Limit Exceeded`），所以版本检查有兜底：Gitee API 读不到时，
+自动改读同一个仓库在 GitHub 上镜像、经 jsDelivr（`fastly` / `gcore` 两个域名，`cdn.jsdelivr.net`
+在国内常被墙所以不排第一）取版本号；两个源都失败才报「检查更新失败」。
+
 更新怎么做：
 
 1. **一键在线更新**：点 **「立即更新」**（再确认一下）。插件会让宿主把本插件从 Gitee **原地重装**
@@ -364,11 +368,25 @@ Key、服务地址、模型由「登录」自动写好，正常不用出现在�
 你现有的配置（Key、模型、输出目录等）都存在 profile 里，卸载重装不受影响，不用重新登录。
 
 在线更新为什么能「原地重装」：宿主对**同一个 spec** 重复安装会直接拒绝（`already-installed`），
-所以插件会把默认分支当前最新的提交号接到 spec 后面（`git+https://gitee.com/hackloop/
-metaontic-video.git#<commit>`）。这跟 profile 里记的那条永远不同，pnpm 就当一条新依赖原地覆盖安装；
-提交号取不到时才退回不带后缀的老 spec。Gitee 的匿名 HTTPS 克隆偶尔会排队报 429，插件会自动重试
-三次；还是不行的话，按卡片上的提示在本机执行一次
-`git config --global url."git@gitee.com:".insteadOf "https://gitee.com/"` 让安装改走 SSH 再点一次。
+所以插件会在 spec 后面接一个「每次都不同、而且都指向最新版」的后缀，pnpm 就当一条新依赖原地覆盖安装：
+
+1. `git+https://gitee.com/hackloop/metaontic-video.git#<commit>`——Gitee API 能读时的首选（最准）；
+2. `…git#v<版本号>`——Gitee API 被限流时退到 **tag**（所以**每次发版都要打 tag**，见本文末尾「发版」）；
+3. 不带后缀的老 spec——前两条都解析不出来时的退路，只有这条路才会先卸载（失败时会提示去「插件」页重加）。
+
+Gitee 的匿名 HTTPS 克隆偶尔会排队报 429，插件会自动重试三次；还是不行的话，按卡片上的提示在本机
+执行一次 `git config --global url."git@gitee.com:".insteadOf "https://gitee.com/"` 让安装改走 SSH 再点一次。
+
+## 发版（维护者）
+
+改完版本号、`npm run build`、提交推送之后，**别忘了打 tag**：
+
+```bash
+git tag v2.10.4 && git push origin v2.10.4   # 两个 remote（GitHub + Gitee）都会收到
+```
+
+tag 不只是留痕：Gitee 的 API 被 WAF 限流时，「一键在线更新」要靠 `#v<版本号>` 这条 spec 才能装，
+tag 缺失就会退到「先卸载再装」那条老路（能用，但不如前者稳）。
 
 ## 限制
 
@@ -407,7 +425,7 @@ npm run build      # 检查 + 构建：locale/*.json（从 src/locale/*.ts）+ i
 - 在线更新走宿主的插件管理服务：它是宿主远程层按**命名空间服务**注册的独立服务，名字就是带点的
   `remote.pluginManager`，所以浏览器半侧用 `ctx.get('remote.pluginManager')` 取（不要写成
   `ctx.get('remote').pluginManager`，那个取不到，表现就是「点确认更新没反应」）。
-  更新走的是「**带提交号的 spec + 只 `installBundle`**」：宿主对「同一个 spec」重复安装会直接拒
+  更新走的是「**带后缀（提交号 / 版本 tag）的 spec + 只 `installBundle`**」：宿主对「同一个 spec」重复安装会直接拒
   （`already-installed`），spec 带上最新提交号就不会撞上——重点是**不要**沿用「先 `removeBundle`
   再 `installBundle`」那套，那样一旦装不上插件就没了（2.9.0 踩过这个坑）。只有在
   `already-installed` 这条兜底路上才卸载，且此时失败文案会提醒去「插件」页重新添加。
@@ -415,4 +433,5 @@ npm run build      # 检查 + 构建：locale/*.json（从 src/locale/*.ts）+ i
   `client-smoke-register.mjs` 跑设置页渲染，`client-smoke-update.mjs` / `client-smoke-update-auto.mjs`
   跑「检查更新」的手动与自动两条路径，`client-smoke-update-online.mjs` 跑「立即更新」的九条分支
   （正常 / 确认两步 / 要重启 / 429 重试成功 / 429 一直失败 / already-installed 兜底 / 兜底后仍失败 /
-  取不到提交号 / 宿主没这个服务），宿主服务用一个假实现顶着。
+  取不到提交号 / 宿主没这个服务 / Gitee 被限流走镜像 / tag 解析不出来退回老 spec / 两个源都挂），
+  宿主服务用一个假实现顶着。

@@ -312,6 +312,15 @@ window.__ModuleLoader__.load({
     /** 本包在 profile 里的包名，以及能重装自己的那条依赖 spec——在线更新直接复用这两样。 */
     const PLUGIN_PACKAGE = 'metaontic-video';
     const UPDATE_SPEC = 'git+https://gitee.com/hackloop/metaontic-video.git';
+    /**
+     * Gitee 的 API 会被 WAF 限流（403 Rate Limit Exceeded），「检查更新」不应该因此变瞎。
+     * 这几条是同一个仓库在 GitHub 上的镜像，走 jsDelivr 的 CDN 读（带 CORS），
+     * 只在 Gitee API 读不到时兜底取版本号；cdn.jsdelivr.net 在国内常被墙，所以列的是它的备用域名。
+     */
+    const UPDATE_MIRROR_FILES = [
+      'https://fastly.jsdelivr.net/gh/wxsimon2022/metaontic-video@master/package.json',
+      'https://gcore.jsdelivr.net/gh/wxsimon2022/metaontic-video@master/package.json',
+    ];
     /** 默认分支，以及「默认分支最新提交」的 Gitee API：在线更新要拿它当 spec 的 committish。 */
     const UPDATE_BRANCH = 'master';
     const UPDATE_COMMIT_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/commits`
@@ -388,29 +397,54 @@ window.__ModuleLoader__.load({
       return typeof TextDecoder === 'function' ? new TextDecoder().decode(bytes) : binary;
     }
 
-    /**
-     * 读 Gitee 上默认分支的 package.json，只用里面的 version 判断有没有新版本。
-     * 不走 npm 源也不用管理端凭据：谁都能查，查不到就只报「检查失败」，不影响生成。
-     */
-    async function fetchLatestVersion() {
+    /** 带超时的 GET（检查更新只读公开文件，不带任何本机凭据）。 */
+    async function fetchUpdateSource(url, ms = 12000) {
       const controller = typeof AbortController === 'function' ? new AbortController() : null;
-      const timer = controller ? window.setTimeout(() => controller.abort(), 12000) : null;
-      let response;
+      const timer = controller ? window.setTimeout(() => controller.abort(), ms) : null;
       try {
-        response = await fetch(UPDATE_FILE_API, {
+        const response = await fetch(url, {
           headers: { accept: 'application/json' },
           signal: controller ? controller.signal : undefined,
         });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response;
       } finally {
         if (timer) window.clearTimeout(timer);
       }
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const body = await response.json();
-      const text = body && typeof body.content === 'string' ? decodeBase64Text(body.content) : '';
-      if (!text) throw new Error('empty file');
-      const version = String((JSON.parse(text) || {}).version || '').trim().replace(/^v/i, '');
+    }
+
+    /** 版本号校验：Gitee API 给的是 base64 的 contents 回包，镜像源给的是裸 JSON。 */
+    function versionFromFile(body) {
+      const version = String((body || {}).version || '').trim().replace(/^v/i, '');
       if (!version) throw new Error('no version');
       return version;
+    }
+
+    /**
+     * 读默认分支的 package.json，只用里面的 version 判断有没有新版本。
+     * 不走 npm 源也不用管理端凭据：谁都能查，查不到就只报「检查失败」，不影响生成。
+     *
+     * 顺序：Gitee API（权威、带 CORS）→ jsDelivr 上的 GitHub 镜像（Gitee 被限流时用）。
+     * 之所以要兜底：Gitee 的 API 会 WAF 限流，一限就是一段时间，而「检查更新」是打开设置页就会跑的。
+     */
+    async function fetchLatestVersion() {
+      const problems = [];
+      try {
+        const body = await (await fetchUpdateSource(UPDATE_FILE_API)).json();
+        const text = body && typeof body.content === 'string' ? decodeBase64Text(body.content) : '';
+        if (!text) throw new Error('empty file');
+        return versionFromFile(JSON.parse(text));
+      } catch (error) {
+        problems.push(`gitee api: ${error?.message || error}`);
+      }
+      for (const url of UPDATE_MIRROR_FILES) {
+        try {
+          return versionFromFile(await (await fetchUpdateSource(url)).json());
+        } catch (error) {
+          problems.push(`${String(url).split('/')[2]}: ${error?.message || error}`);
+        }
+      }
+      throw new Error(problems.join('；'));
     }
 
     /**
@@ -422,19 +456,7 @@ window.__ModuleLoader__.load({
      * 直接原地覆盖安装，装失败也不会动现有版本。
      */
     async function fetchLatestCommit() {
-      const controller = typeof AbortController === 'function' ? new AbortController() : null;
-      const timer = controller ? window.setTimeout(() => controller.abort(), 12000) : null;
-      let response;
-      try {
-        response = await fetch(UPDATE_COMMIT_API, {
-          headers: { accept: 'application/json' },
-          signal: controller ? controller.signal : undefined,
-        });
-      } finally {
-        if (timer) window.clearTimeout(timer);
-      }
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const body = await response.json();
+      const body = await (await fetchUpdateSource(UPDATE_COMMIT_API)).json();
       const sha = String((Array.isArray(body) ? body[0]?.sha : '') || '').trim();
       if (!/^[0-9a-f]{40}$/i.test(sha)) throw new Error('no commit');
       return sha;
@@ -1459,42 +1481,66 @@ window.__ModuleLoader__.load({
           /** 过一会儿可能就好的失败：Gitee 排队（429）、超时、连接被掐。 */
           const worthRetrying = (text) => /429|queue overflowed|timed out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|unable to access|network|fetch/i.test(text);
 
-          // 拿默认分支最新提交号当 spec 后缀；取不到就退回不带后缀的老 spec（那时才可能要卸载）。
-          let spec = UPDATE_SPEC;
+          /**
+           * spec 的候选顺序（越靠前越准）：
+           *   1) `#<默认分支最新提交号>`——Gitee API 活着时用这个；
+           *   2) `#v<版本号>`——Gitee API 被限流（403）时退到 tag；每次发版都会打 tag（见 README「发版」）；
+           *   3) 不带后缀的老 spec——前两条都解析不出来时的退路（只有这条路才可能要卸载）。
+           * 带后缀的意义：spec 跟 profile 里记的那条不同，宿主才当新依赖原地覆盖安装，装失败也不会丢插件。
+           */
           let commit = '';
           try {
             commit = await fetchLatestCommit();
           } catch {
             commit = '';
           }
-          const latest = commit || updateCommit.current;
-          if (latest) {
-            updateCommit.current = latest;
-            spec = `${UPDATE_SPEC}#${latest}`;
-          }
+          if (!commit) commit = updateCommit.current;
+          if (commit) updateCommit.current = commit;
+          const candidates = [];
+          if (commit) candidates.push(`${UPDATE_SPEC}#${commit}`);
+          if (updateLatest) candidates.push(`${UPDATE_SPEC}#v${updateLatest}`);
+          candidates.push(UPDATE_SPEC);
+
+          /** 这条 spec 装不上时值不值得换下一条：只有「这个 committish 解析不出来」才换。 */
+          const specUnresolvable = (text) => /Could not resolve|No matching version|ERR_PNPM_NO_MATCHING_VERSION/i.test(text);
+
+          let removed = false;
+          /** 装一条 spec：限流/超时自动重试，already-installed 走一次「卸了再装」的兜底。 */
+          const trySpec = async (spec) => {
+            for (let round = 1; round <= UPDATE_ATTEMPTS; round += 1) {
+              let result = await install(spec);
+              if (result?.ok === true && result.value?.error?.code === 'already-installed') {
+                // profile 里已经记着这条 spec（上次刚好装到同一个提交）：卸载再装，强制刷一遍。
+                removed = true;
+                await remove();
+                result = await install(spec);
+              }
+              if (result?.ok === true && result.value?.application !== 'failed') {
+                return { outcome: result.value || {} };
+              }
+              const text = failureText(result);
+              const transient = worthRetrying(text);
+              if (transient && round < UPDATE_ATTEMPTS) {
+                setUpdateMessage(t('versionUpdateRetry', { attempt: round + 1, total: UPDATE_ATTEMPTS }));
+                await new Promise((resolve) => window.setTimeout(resolve, round * 1200));
+                continue;
+              }
+              return { failure: text, next: !transient && specUnresolvable(text) };
+            }
+            return { failure: 'unknown' };
+          };
 
           let outcome = null;
           let failure = '';
-          let removed = false;
-          for (let round = 1; round <= UPDATE_ATTEMPTS && !outcome; round += 1) {
-            let result = await install(spec);
-            if (result?.ok === true && result.value?.error?.code === 'already-installed') {
-              // profile 里已经记着这条 spec（上次刚好装到同一个提交）：卸载再装，强制刷一遍。
-              removed = true;
-              await remove();
-              result = await install(spec);
-            }
-            if (result?.ok === true && result.value?.application !== 'failed') {
-              outcome = result.value || {};
+          for (const spec of candidates) {
+            const attempt = await trySpec(spec);
+            if (attempt.outcome) {
+              outcome = attempt.outcome;
               break;
             }
-            failure = failureText(result);
-            if (round < UPDATE_ATTEMPTS && worthRetrying(failure)) {
-              setUpdateMessage(t('versionUpdateRetry', { attempt: round + 1, total: UPDATE_ATTEMPTS }));
-              await new Promise((resolve) => window.setTimeout(resolve, round * 1200));
-              continue;
-            }
-            break;
+            failure = attempt.failure || failure;
+            // 换 spec 也没用的失败（限流、断网、权限）就停在这里，别把同一套错误在候选之间跑一遍
+            if (!attempt.next) break;
           }
 
           if (!outcome) {
