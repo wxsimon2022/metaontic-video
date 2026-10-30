@@ -1131,7 +1131,7 @@ function estimateUsage(config, toolName, args) {
 function resolveRegisterApi(config) {
   return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-const PLUGIN_VERSION = true ? "2.8.2".trim().replace(/^v/i, "") : "";
+const PLUGIN_VERSION = true ? "2.8.3".trim().replace(/^v/i, "") : "";
 async function fetchDeviceQuota(config, signal) {
   const api = resolveRegisterApi(config);
   const deviceId = String(ref(config, "deviceId", "")).trim();
