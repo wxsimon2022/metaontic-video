@@ -2,7 +2,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "2.15.3",
+    version: "2.15.4",
     description: "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
     license: "MIT",
     type: "module",
@@ -78,11 +78,12 @@
       "@deepseek-ai/schemastery": "~3.18.5"
     },
     releaseNotes: {
-      version: "2.15.3",
+      version: "2.15.4",
       items: [
-        "\u65B0\u589E\u672C\u5730\u8131\u654F\u8BF7\u6C42\u65E5\u5FD7\uFF0C\u6309\u65E5\u4FDD\u5B58\u521B\u5EFA\u4EFB\u52A1\u4E0E\u67E5\u8BE2\u4EFB\u52A1\u7684\u8BF7\u6C42\u8BB0\u5F55\u3002",
-        "\u8BB0\u5F55\u72EC\u7ACB\u8BF7\u6C42ID\u3001\u8017\u65F6\u3001HTTP\u72B6\u6001\u3001\u6A21\u578B\u3001\u4EFB\u52A1ID\u548C\u4E0A\u6E38\u8BF7\u6C42ID\uFF0C\u4FBF\u4E8E\u6392\u67E5\u91CD\u590D\u63D0\u4EA4\u3002",
-        "\u4E0D\u8BB0\u5F55API Key\u3001\u5B8C\u6574\u63D0\u793A\u8BCD\u3001\u8BF7\u6C42\u4F53\u548C\u7B7E\u540D\u89C6\u9891\u94FE\u63A5\uFF1B\u65E5\u5FD7\u5199\u5165\u5931\u8D25\u4E0D\u5F71\u54CD\u751F\u6210\u3002"
+        "\u4FEE\u590D\u4EA4\u4ED8\u5355\u6587\u4EF6\u65F6\u79FB\u52A8\u539F\u7247\u7684\u95EE\u9898\uFF0C\u4E24\u6BB5\u539F\u7247\u4E0E\u5408\u6210\u6210\u7247\u5206\u522B\u4FDD\u7559\u3002",
+        "\u4F18\u531630\u79D2\u811A\u672C\u5206\u6BB5\u4E0E\u7EED\u62CD\u4EA4\u63A5\uFF0C\u660E\u786E\u672C\u6BB5\u65B0\u52A8\u4F5C\u3001\u65B0\u5BF9\u767D\u548C\u7ED3\u675F\u72B6\u6001\uFF0C\u51CF\u5C11\u5267\u60C5\u91CD\u6F14\u3002",
+        "\u8865\u9F50\u5DE5\u5177\u6267\u884C\u3001\u7EED\u505A\u9501\u3001\u4EFB\u52A1\u3001\u5206\u6BB5\u843D\u76D8\u3001\u88C1\u526A\u548C\u5408\u5E76\u65E5\u5FD7\uFF0C\u7528callId\u4E32\u8054\u6392\u67E5\u3002",
+        "\u65E5\u5FD7\u6309\u672C\u673A\u65E5\u671F\u4FDD\u5B58\u5230YYYYMMDD\u76EE\u5F55\uFF0C\u4E0D\u8BB0\u5F55Key\u3001\u5B8C\u6574\u63D0\u793A\u8BCD\u6216\u7B7E\u540D\u94FE\u63A5\u3002"
       ]
     }
   };
@@ -407,7 +408,7 @@
       const UPDATE_ATTEMPTS = 3;
       const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
       const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-      const PLUGIN_VERSION = true ? "2.15.3".trim().replace(/^v/i, "") : "";
+      const PLUGIN_VERSION = true ? "2.15.4".trim().replace(/^v/i, "") : "";
       function currentOs() {
         const nav = window.navigator || {};
         const raw = String(

@@ -1,6 +1,7 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
-import { appendFile, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, copyFile, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -325,6 +326,15 @@ function resolveSegmentPrompts(prompts, planLength) {
   }
   return prompts.map((value) => value.trim());
 }
+function buildSegmentExecutionPrompt({ prompt, kind, index, count }) {
+  const boundary = kind === "generate" ? "\u8FD9\u662F\u9996\u6BB5\uFF1A\u53EA\u6F14\u672C\u6BB5\u4E8B\u4EF6\uFF0C\u7ED3\u5C3E\u505C\u5728\u672C\u6BB5\u6307\u5B9A\u72B6\u6001\uFF0C\u4E0D\u62A2\u6F14\u540E\u6BB5\u5267\u60C5\uFF0C\u4E0D\u505A\u6574\u7247\u7ED3\u675F\u5F0F\u6536\u5C3E\u3002" : "\u8FD9\u662F\u7EED\u62CD\u6BB5\uFF1A\u89C6\u98911\u63D0\u4F9B\u4E0A\u4E00\u6BB5\u7ED3\u675F\u72B6\u6001\uFF0C\u4ECE\u5176\u540E\u7684\u65B0\u4E8B\u4EF6\u7EE7\u7EED\u3002\u4E0D\u8981\u91CD\u6F14\u8FDB\u573A\u3001\u9012\u63A5\u7269\u54C1\u6216\u5DF2\u8BF4\u53F0\u8BCD\u3002";
+  return [
+    `\u3010\u751F\u6210\u6BB5 ${index + 1}/${count}\u3011\u751F\u6210\u6BB5\u7F16\u53F7\u4E0D\u662F\u5207\u955C\u6307\u4EE4\uFF1B\u955C\u5934\u662F\u5426\u5207\u6362\u4EE5\u811A\u672C\u4E3A\u51C6\u3002`,
+    "\u3010\u6267\u884C\u5185\u5BB9\u3011" + String(prompt).trim(),
+    boundary,
+    index < count - 1 ? "\u5728\u5B8C\u6574\u53E5\u7ED3\u675F\u3001\u52A8\u4F5C\u5B8C\u6210\u6216\u81EA\u7136\u53CD\u5E94\u5904\u4EA4\u63A5\uFF0C\u4FDD\u7559\u4EBA\u7269\u4F4D\u7F6E\u3001\u89C6\u7EBF\u3001\u6301\u7269\u624B\u548C\u955C\u5934\u8FD0\u52A8\u72B6\u6001\uFF0C\u4E0D\u7528\u5B9A\u683C\u7B49\u5F85\u586B\u6EE1\u65F6\u957F\u3002" : "\u5B8C\u6210\u672C\u6BB5\u7684\u6545\u4E8B\u53D8\u5316\uFF0C\u518D\u7528\u81EA\u7136\u53CD\u5E94\u6216\u753B\u9762\u6536\u675F\uFF1B\u4E0D\u91CD\u8FF0\u524D\u60C5\u3002"
+  ].join("\n");
+}
 function buildGenerationPrompt({ prompt, seconds, model = "" }) {
   const timing = isOmniExtendModel(model) ? "\u6309\u672C\u6BB5\u4E8B\u4EF6\u987A\u5E8F\u63A8\u8FDB\uFF1B\u5982\u6709\u65F6\u95F4\u533A\u95F4\uFF0C\u4EE5\u672C\u6BB50\u79D2\u4E3A\u8D77\u70B9\uFF0C\u533A\u95F4\u8FDE\u7EED\uFF0C\u4E0D\u9057\u6F0F\u505C\u987F\u4E0E\u53CD\u5E94\u65F6\u95F4\u3002" : "\u6309\u672C\u6BB5\u4E8B\u4EF6\u987A\u5E8F\u81EA\u7136\u63A8\u8FDB\uFF0C\u4EE5\u955C\u5934\u5E8F\u53F7\u6216\u5148\u540E\u9636\u6BB5\u7EC4\u7EC7\u5185\u5BB9\uFF0C\u4E0D\u4F9D\u8D56\u7CBE\u786E\u65F6\u95F4\u6233\uFF0C\u4E0D\u4E3A\u8FFD\u9010\u79D2\u70B9\u538B\u7F29\u52A8\u4F5C\u6216\u5BF9\u767D\u3002";
   return [
@@ -639,9 +649,11 @@ async function buildGenerationBody(config, args, seconds, options = {}) {
 async function runTask(config, body, signal) {
   const created = await createTask(config, body, signal);
   const taskId = extractTaskId(created);
+  await appendRequestLog({ event: "task_created", taskId, model: body?.model, duration: body?.duration });
   if (!taskId) throw new Error("\u521B\u5EFA\u4EFB\u52A1\u5931\u8D25\uFF1A\u54CD\u5E94\u4E2D\u7F3A\u5C11\u4EFB\u52A1 ID\u3002");
   try {
     const final = await waitForCompletion(config, taskId, signal);
+    await appendRequestLog({ event: "task_finished", taskId, status: final.status, errorCode: final.errorCode });
     return { ...final, taskId };
   } catch (failure) {
     if (failure?.code === "ABORTED") throw failure;
@@ -1365,6 +1377,13 @@ async function downloadSegmentsAndMerge(config, {
       return { files, segmentsDir, deliveredSeconds, error: reason };
     }
     segment.localPath = dest;
+    await appendRequestLog({
+      event: "segment_saved",
+      index: segment.index,
+      taskId: segment.taskId,
+      path: dest,
+      bytes: (await stat(dest)).size
+    });
     const media = await probeMedia(dest, config, signal);
     if (media?.durationSeconds) {
       segment.durationSeconds = Number(media.durationSeconds.toFixed(2));
@@ -1375,6 +1394,7 @@ async function downloadSegmentsAndMerge(config, {
       );
       const looksCumulative = files.length > 0 && Math.abs(media.durationSeconds - cumulative) <= tolerance && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
       if (looksCumulative) {
+        await appendRequestLog({ event: "cumulative_output_detected", index: segment.index, duration: media.durationSeconds, plannedCumulative: cumulative });
         files.length = 0;
         notes.push(
           `\u7B2C ${segment.index} \u6BB5\u5B9E\u6D4B ${formatSeconds(media.durationSeconds)} \u79D2\uFF0C\u63A5\u8FD1\u7D2F\u8BA1\u65F6\u957F ${cumulative} \u79D2\uFF0C\u6309\u300C\u4E0A\u6E38\u8FD4\u56DE\u7684\u662F\u7D2F\u8BA1\u6210\u7247\u300D\u5904\u7406\u3002`
@@ -1408,10 +1428,13 @@ async function downloadSegmentsAndMerge(config, {
     if (files.length === 1) {
       await mkdir(path.dirname(finalPath), { recursive: true });
       await rm(finalPath, { force: true });
-      await rename(files[0], finalPath);
+      await copyFile(files[0], finalPath);
+      await appendRequestLog({ event: "delivery_copied", sourcePath: files[0], videoPath: finalPath });
       return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "single", videoPath: finalPath };
     }
+    await appendRequestLog({ event: "merge_started", inputPaths: files, videoPath: finalPath });
     const prepared = await prepareSeamTrims(config, files, finalPath, { signal });
+    await appendRequestLog({ event: "seam_trims_prepared", cuts: prepared.cuts });
     let merged;
     try {
       merged = await mergeClips(prepared.cuts.length ? { ...config, mergeMode: "copy" } : config, prepared.files, finalPath, { signal });
@@ -1422,6 +1445,13 @@ async function downloadSegmentsAndMerge(config, {
       notes.push(`\u5DF2\u6309\u786E\u8BA4\u7684\u88C1\u526A\u91CF\u79FB\u9664\u7EED\u62CD\u6BB5\u5F00\u5934\uFF1A${prepared.cuts.map((cut) => `\u7B2C ${cut.index} \u6BB5\uFF1A\u5934\u90E8 ${cut.seconds.toFixed(3)} \u79D2\u3001\u5C3E\u90E8 ${cut.tailSeconds.toFixed(3)} \u79D2`).join("\uFF1B")}\u3002\u539F\u59CB\u5206\u6BB5\u672A\u6539\u52A8\uFF1B\u5B9E\u9645\u6210\u7247\u4F1A\u7F29\u77ED\uFF0C\u4E0D\u8865\u5E27\u51D1\u65F6\u957F\u3002`);
     }
     const actual = await probeMedia(finalPath, config, signal);
+    await appendRequestLog({
+      event: "merge_completed",
+      videoPath: finalPath,
+      mode: merged.mode,
+      actualSeconds: actual?.durationSeconds,
+      sourceCount: segments.length
+    });
     if (merged.trimmed?.length) {
       notes.push(
         `\u7B2C ${merged.trimmed.map((item) => item.index).join("\u3001")} \u6BB5\u7684\u97F3\u9891\u6BD4\u89C6\u9891\u957F\uFF08\u6700\u957F ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} \u79D2\uFF09\uFF0C\u5DF2\u88C1\u9F50\u540E\u518D\u62FC\u63A5\uFF0C\u907F\u514D\u63A5\u7F1D\u5904\u7F3A\u4E00\u5C0F\u6BB5\u753B\u9762\u3002`
@@ -1444,6 +1474,7 @@ async function downloadSegmentsAndMerge(config, {
       reason = guide.hint;
     }
     notes.push(reason);
+    await appendRequestLog({ event: "merge_failed", errorCode: String(failure?.code || "merge_error"), segmentsDir });
     return { files, segmentsDir, deliveredSeconds, error: reason, ffmpegMissing: Boolean(installHint), installHint };
   }
 }
@@ -1792,18 +1823,47 @@ function withResumeLock(tool, toolName, config) {
   return {
     ...tool,
     async execute(args, exec) {
-      const dir = resumeDirOf(args?.resume);
-      if (!dir) return tool.execute(args, exec);
-      const lock = await acquireResumeLock(dir, {
-        toolName,
-        callId: exec?.callId,
-        staleMs: resumeLockStaleMs(config)
+      return requestLogContext.run({ callId: exec?.callId || uniqueSuffix("call"), tool: toolName }, async () => {
+        const started = Date.now();
+        const dir = resumeDirOf(args?.resume);
+        let lock;
+        await appendRequestLog({
+          event: "tool_started",
+          provider: isVolcengine(config) ? "volcengine" : "service",
+          model: resolveModel(config),
+          duration: args?.duration,
+          segmentSeconds: args?.segmentSeconds,
+          resuming: Boolean(dir),
+          resumeDir: dir || void 0
+        });
+        try {
+          if (dir) {
+            lock = await acquireResumeLock(dir, { toolName, callId: exec?.callId, staleMs: resumeLockStaleMs(config) });
+            await appendRequestLog({ event: "resume_lock_acquired", resumeDir: dir });
+          }
+          const result = await tool.execute(args, exec);
+          await appendRequestLog({
+            event: "tool_completed",
+            elapsedMs: Date.now() - started,
+            status: result?.status,
+            paused: result?.paused,
+            videoPath: result?.videoPath,
+            segmentsDir: result?.segmentsDir,
+            segmentCount: result?.segments?.length,
+            actualSeconds: result?.actualSeconds,
+            errorCode: result?.errorCode
+          });
+          return result;
+        } catch (error) {
+          await appendRequestLog({ event: "tool_failed", elapsedMs: Date.now() - started, errorCode: String(error?.code || "tool_error") });
+          throw error;
+        } finally {
+          if (lock) {
+            await lock.release();
+            await appendRequestLog({ event: "resume_lock_released", resumeDir: dir });
+          }
+        }
       });
-      try {
-        return await tool.execute(args, exec);
-      } finally {
-        await lock.release();
-      }
     }
   };
 }
@@ -1944,7 +2004,7 @@ async function confirmNextSegment(ctx, config, exec, {
 function resolveRegisterApi(config) {
   return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-const PLUGIN_VERSION = true ? "2.15.3".trim().replace(/^v/i, "") : "";
+const PLUGIN_VERSION = true ? "2.15.4".trim().replace(/^v/i, "") : "";
 async function fetchDeviceQuota(config, signal) {
   if (isVolcengine(config)) return { status: "unknown", reason: "\u706B\u5C71\u76F4\u8FDE\u8D39\u7528\u548C\u4F59\u989D\u8BF7\u5728\u706B\u5C71\u63A7\u5236\u53F0\u67E5\u770B" };
   const api = resolveRegisterApi(config);
@@ -2137,14 +2197,17 @@ async function preflightGate(ctx, config, exec) {
   };
 }
 const RELAY_TIMEOUT_MS = 12e4;
+const requestLogContext = new AsyncLocalStorage();
 function requestLogPath() {
-  return path.join(dshHome(), "logs", "metaontic-video", `${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.jsonl`);
+  const now = /* @__PURE__ */ new Date();
+  const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  return path.join(dshHome(), "logs", "metaontic-video", date, "requests.jsonl");
 }
 async function appendRequestLog(record) {
   try {
     const file = requestLogPath();
     await mkdir(path.dirname(file), { recursive: true, mode: 448 });
-    await appendFile(file, JSON.stringify({ time: (/* @__PURE__ */ new Date()).toISOString(), ...record }) + "\n", { mode: 384 });
+    await appendFile(file, JSON.stringify({ time: (/* @__PURE__ */ new Date()).toISOString(), pluginVersion: PLUGIN_VERSION, ...requestLogContext.getStore(), ...record }) + "\n", { mode: 384 });
   } catch {
   }
 }
@@ -2858,7 +2921,7 @@ function videoTool(config, deps, ctx) {
   const TOOL_NAME = "video_generate";
   return {
     name: "video_generate",
-    description: `\u751F\u6210\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\uFF08\u89C6\u9891\u751F\u6210\u7684\u9996\u9009\u5DE5\u5177\uFF09\uFF0Cduration \u662F\u76EE\u6807\u603B\u79D2\u6570\uFF1A\u4E0D\u8D85\u8FC7\u6A21\u578B\u5355\u6BB5\u4E0A\u9650\uFF082.0 \u4E3A 15 \u79D2\u30012.5 \u4E3A 30 \u79D2\uFF09\u65F6\u4E00\u6B21\u76F4\u51FA\uFF1B**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 \u5355\u6BB5\u4E0A\u9650\u7684\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u62C6\u6210\u591A\u6BB5 / \u591A\u955C / \u591A\u6B21\u8C03\u7528\u518D\u62FC\u63A5**\uFF08\u4F8B\u5982\u300C15 \u79D2\u300D\u4E0D\u8BB8\u62C6\u6210 8+7\uFF09\uFF1B\u591A\u955C\u53EA\u5728\u7528\u6237\u660E\u786E\u8981\u6C42\u591A\u955C\u65F6\u624D\u7528\u3002\u66F4\u957F\u65F6\u5148\u76F4\u51FA\u9996\u6BB5\uFF0C\u518D\u628A\u5269\u4F59\u65F6\u957F\u6309 4 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09 \u79D2\u5747\u5206\u9010\u6BB5\u7EED\u62CD\uFF08\u9ED8\u8BA4\u5403\u6EE1\u4E0A\u9650\u3001\u6BB5\u6570\u6700\u5C11\uFF0C\u6700\u957F ${MAX_TOTAL_SECONDS} \u79D2\uFF09\u2014\u2014\u8FD9\u662F\u540C\u4E00\u4E2A\u955C\u5934\u7684\u7EED\u62CD\u5EF6\u957F\uFF0C\u4E5F\u4E0D\u662F\u591A\u955C\u62FC\u63A5\uFF0C\u6700\u540E\u7528 ffmpeg \u5408\u5E76\u6210\u4E00\u4E2A\u672C\u5730\u6210\u7247\u6587\u4EF6\uFF0C\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\uFF0C\u6587\u4EF6\u540D\u5F62\u5982 20261027-201530-25s.mp4\u300220 \u79D2\u300125 \u79D2\u8FD9\u7C7B\u76EE\u6807\u4E0D\u7528\u62C6\u6210\u591A\u4E2A\u4EFB\u52A1\uFF1A\u76F4\u63A5\u4F20 duration=20 \u5373\u53EF\uFF0820 \u79D2 \u2192 15+5\uFF0C25 \u79D2 \u2192 15+10\uFF09\u3002**\u6BCF\u6BB5\u751F\u6210\u5B8C\u90FD\u4F1A\u5148\u5F39\u4E00\u6B21\u786E\u8BA4\u6846\u95EE\u7528\u6237\u8981\u4E0D\u8981\u7EE7\u7EED**\uFF08\u5FAA\u73AF\u8FED\u4EE3\uFF09\uFF1A\u7528\u6237\u70B9\u300C\u62D2\u7EDD\u300D\u5C31\u505C\u4E0B\uFF0C\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\uFF0C\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir \u548C remainingSeconds\uFF1B\u4E4B\u540E\u7528\u6237\u8BF4\u300C\u7EE7\u7EED\u300D\u65F6\uFF0C\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_generate \u7684 resume \u53C2\u6570\u63A5\u7740\u505A\uFF08\u524D\u9762\u51E0\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\u3001\u4E0D\u91CD\u590D\u6263\u8D39\uFF09\uFF0C\u4E0D\u8981\u4ECE\u5934\u518D\u751F\u6210\u4E00\u904D\u3001\u4E5F\u4E0D\u8981\u6539\u7528 video_extend \u62FC\u3002\u6CA1\u6709\u53EF\u7528\u786E\u8BA4\u901A\u9053\u65F6\u4E0D\u4F1A\u5361\u4F4F\uFF0C\u4F1A\u6309\u5DF2\u786E\u8BA4\u7684\u8BA1\u5212\u7EE7\u7EED\u5E76\u5728 note \u91CC\u8BF4\u660E\u3002\u8FD4\u56DE\u6BCF\u6BB5\u4EFB\u52A1 ID\u3001\u4E0A\u6E38\u94FE\u63A5\u548C\u6210\u7247\u8DEF\u5F84\u3002\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF08\u6BCF\u6BB5\u5355\u72EC\u751F\u6210\uFF09\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout\u3001\u6216\u67D0\u6BB5\u8FD4\u56DE unknown\uFF08\u67E5\u8BE2\u5931\u8D25\u3001\u4EFB\u52A1\u5176\u5B9E\u5DF2\u63D0\u4EA4\uFF09\u65F6\uFF0C\u90FD\u7528\u8FD4\u56DE\u7684\u4EFB\u52A1 ID \u8D70 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u65B0\u4EFB\u52A1\u2014\u2014\u91CD\u590D\u63D0\u4EA4\u4F1A\u91CD\u590D\u6263\u8D39\uFF0C\u67E5\u8BE2\u5931\u8D25\u4E0D\u4EE3\u8868\u6CA1\u6709\u751F\u6210\u3002**\u8C03\u7528\u524D\u5FC5\u987B\u5148\u8BA9\u7528\u6237\u5BA1\u6838\u8FC7\u811A\u672C\u3001\u5E76\u786E\u8BA4\u5F00\u59CB\u5236\u4F5C**\uFF08\u4E24\u9053\u786E\u8BA4\u7F3A\u4E00\u4E0D\u53EF\uFF09\uFF0C\u4E0D\u8981\u8DF3\u8FC7\u811A\u672C\u76F4\u63A5\u751F\u6210\u3002\u5408\u5E76\u9700\u8981\u672C\u673A\u6709 ffmpeg\u3002\u672C\u673A\u6CA1\u88C5 ffmpeg \u65F6\uFF0C\u63D2\u4EF6\u4F1A**\u5148\u628A\u8FD9\u6B21\u8C03\u7528\u62E6\u56DE\u6765\uFF08\u4E0D\u4F1A\u8C03\u7528\u6A21\u578B\u3001\u4E0D\u4EA7\u751F\u8D39\u7528\uFF09**\uFF0C\u8FD4\u56DE\u7684\u8BF4\u660E\u91CC\u5E26\u7740\u6309\u7CFB\u7EDF\u7ED9\u7684\u5B89\u88C5\u547D\u4EE4 \u2014\u2014\u8FD9\u65F6\u8981\u5728\u5BF9\u8BDD\u6846\u91CC\u548C\u7528\u6237\u786E\u8BA4\uFF1A\u95EE\u4ED6\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg\uFF08\u7ED9\u51FA\u4ED6\u7CFB\u7EDF\u7684\u547D\u4EE4\uFF0C\u8BF4\u660E\u88C5\u597D\u91CD\u8DD1\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\u3001\u5206\u6BB5\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\uFF0C\u540C\u610F\u5C31\u7528\u7EC8\u7AEF\u5DE5\u5177\u88C5\u4E0A\uFF08\u5BBF\u4E3B\u4F1A\u8BA9\u4ED6\u786E\u8BA4\uFF09\u5E76 \`ffmpeg -version\` \u9A8C\u8BC1\uFF0C\u7136\u540E\u6309\u540C\u6837\u7684 duration \u91CD\u53D1\uFF1B\u7528\u6237\u4E0D\u60F3\u88C5\u5C31\u5E26 merge:false \u91CD\u53D1\uFF0C\u63D2\u4EF6\u53EA\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u4E0A\u6E38\u94FE\u63A5 + \u672C\u5730\u6587\u4EF6\uFF09\u3002\u62FF\u5230 ffmpegMissing=true \u7684\u7ED3\u679C\u65F6\u4E5F\u8981\u7167 installHint \u5F15\u5BFC\u5B89\u88C5\uFF0C\u522B\u53EA\u4E22\u4E00\u53E5\u300C\u5DF2\u8DF3\u8FC7\u5408\u5E76\u300D\u3002**\u4EBA\u7269\u5F62\u8C61 / \u53C2\u8003\u56FE**\uFF1A\u516C\u7F51\u56FE\u7247 URL\u3001base64\uFF08data URI \u6216\u7EAF base64\uFF09\u3001\u672C\u673A\u56FE\u7247\u8DEF\u5F84\uFF0C\u6216\u7B80\u5199 \`latest\` \u90FD\u652F\u6301\u2014\u2014\u8981\u56FA\u5B9A\u4EBA\u7269\u957F\u76F8\u3001\u670D\u88C5\u3001\u573A\u666F\u65F6\u4F20 referenceImages\uFF08\u4E00\u6B21\u53EA\u8BA4\u7B2C\u4E00\u5F20\uFF09\uFF1B\u9996\u5E27 / \u5C3E\u5E27\u7528 firstFrameUrl / lastFrameUrl \u4F20\u3002\u516C\u7F51 URL \u76F4\u63A5\u4EA4\u7ED9\u4E2D\u8F6C\u7AD9\u53D6\u56FE\uFF1B\u672C\u5730\u56FE\u7247\u7531\u63D2\u4EF6\u8BFB\u8FDB\u6765\uFF08\u6309 ratio \u5148\u9002\u914D\u753B\u5E45\uFF09\u5185\u8054\u6210 image_url \u53D1\u7ED9\u4E2D\u8F6C\u7AD9\uFF0C\u7528\u6237\u4E0D\u9700\u8981\u81EA\u5DF1\u627E\u56FE\u5E8A\u3002**\u7528\u6237\u8BF4\u300C\u5C31\u7528\u6211\u521A\u4E0A\u4F20/\u521A\u62D6\u8FDB\u6765\u7684\u90A3\u5F20\u56FE\u300D\u65F6\u76F4\u63A5\u4F20 \`latest\`**\uFF08\`latest:2\` \u53D6\u7B2C 2 \u65B0\u7684\uFF09\uFF1A\u63D2\u4EF6\u4F1A\u53BB Harness \u9644\u4EF6\u5E93\u91CC\u627E\u6700\u8FD1 2 \u5C0F\u65F6\u4E0A\u4F20\u7684\u56FE\u7247\u2014\u2014\u54EA\u6015\u5F53\u524D\u804A\u5929\u6A21\u578B\u4E0D\u652F\u6301\u56FE\u7247\u3001\u9644\u4EF6\u88AB \`MODEL_DOES_NOT_SUPPORT_IMAGES\` \u62E6\u4E0B\uFF0C\u56FE\u7247\u672C\u8EAB\u4E5F\u5DF2\u7ECF\u843D\u76D8\uFF0C\u7167\u6837\u80FD\u7528\u3002\u522B\u5728\u8FD9\u65F6\u8BF4\u300C\u6211\u770B\u4E0D\u5230\u56FE\u7247\u300D\uFF0C\u4E5F\u522B\u8BA9\u7528\u6237\u81EA\u5DF1\u53BB\u627E\u8DEF\u5F84\u3002`,
+    description: `\u751F\u6210\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\uFF08\u89C6\u9891\u751F\u6210\u7684\u9996\u9009\u5DE5\u5177\uFF09\uFF0Cduration \u662F\u76EE\u6807\u603B\u79D2\u6570\uFF1A\u4E0D\u8D85\u8FC7\u6A21\u578B\u5355\u6BB5\u4E0A\u9650\uFF082.0 \u4E3A 15 \u79D2\u30012.5 \u4E3A 30 \u79D2\uFF09\u65F6\u4E00\u6B21\u76F4\u51FA\uFF1B**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 \u5355\u6BB5\u4E0A\u9650\u7684\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u62C6\u6210\u591A\u6BB5 / \u591A\u955C / \u591A\u6B21\u8C03\u7528\u518D\u62FC\u63A5**\uFF08\u4F8B\u5982\u300C15 \u79D2\u300D\u4E0D\u8BB8\u62C6\u6210 8+7\uFF09\uFF1B\u591A\u955C\u53EA\u5728\u7528\u6237\u660E\u786E\u8981\u6C42\u591A\u955C\u65F6\u624D\u7528\u3002\u66F4\u957F\u65F6\u5148\u76F4\u51FA\u9996\u6BB5\uFF0C\u518D\u628A\u5269\u4F59\u65F6\u957F\u6309 4 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09 \u79D2\u5747\u5206\u9010\u6BB5\u7EED\u62CD\uFF08\u9ED8\u8BA4\u5403\u6EE1\u4E0A\u9650\u3001\u6BB5\u6570\u6700\u5C11\uFF0C\u6700\u957F ${MAX_TOTAL_SECONDS} \u79D2\uFF09\u2014\u2014\u8FD9\u662F\u8FDE\u7EED\u5267\u60C5\u7684\u7EED\u62CD\u5EF6\u957F\uFF0C\u751F\u6210\u5206\u6BB5\u672C\u8EAB\u4E0D\u4EE3\u8868\u53D9\u4E8B\u5207\u955C\uFF0C\u6700\u540E\u7528 ffmpeg \u5408\u5E76\u6210\u4E00\u4E2A\u672C\u5730\u6210\u7247\u6587\u4EF6\uFF0C\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\uFF0C\u6587\u4EF6\u540D\u5F62\u5982 20261027-201530-25s.mp4\u300220 \u79D2\u300125 \u79D2\u8FD9\u7C7B\u76EE\u6807\u4E0D\u7528\u62C6\u6210\u591A\u4E2A\u4EFB\u52A1\uFF1A\u76F4\u63A5\u4F20 duration=20 \u5373\u53EF\uFF0820 \u79D2 \u2192 15+5\uFF0C25 \u79D2 \u2192 15+10\uFF09\u3002**\u6BCF\u6BB5\u751F\u6210\u5B8C\u5148\u8FD4\u56DE\u89C6\u9891\u4F9B\u9884\u89C8**\uFF1A\u5148\u5C55\u793A\u6210\u679C\uFF0C\u518D\u8BE2\u95EE\u662F\u5426\u7EE7\u7EED\uFF1B\u672A\u786E\u8BA4\u5C31\u505C\u4E0B\uFF0C\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\uFF0C\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir \u548C remainingSeconds\uFF1B\u4E4B\u540E\u7528\u6237\u8BF4\u300C\u7EE7\u7EED\u300D\u65F6\uFF0C\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_generate \u7684 resume \u53C2\u6570\u63A5\u7740\u505A\uFF08\u524D\u9762\u51E0\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\u3001\u4E0D\u91CD\u590D\u6263\u8D39\uFF09\uFF0C\u4E0D\u8981\u4ECE\u5934\u518D\u751F\u6210\u4E00\u904D\u3001\u4E5F\u4E0D\u8981\u6539\u7528 video_extend \u62FC\u3002\u6BCF\u6B21\u8C03\u7528\u6700\u591A\u5B8C\u6210\u5F53\u524D\u4E00\u6BB5\uFF1B\u540E\u7EED\u5FC5\u987B\u4F7F\u7528resume\uFF0C\u4E0D\u91CD\u65B0\u521B\u5EFA\u9996\u6BB5\u4EFB\u52A1\u3002\u8FD4\u56DE\u6BCF\u6BB5\u4EFB\u52A1 ID\u3001\u4E0A\u6E38\u94FE\u63A5\u548C\u6210\u7247\u8DEF\u5F84\u3002\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF08\u6BCF\u6BB5\u5355\u72EC\u751F\u6210\uFF09\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout\u3001\u6216\u67D0\u6BB5\u8FD4\u56DE unknown\uFF08\u67E5\u8BE2\u5931\u8D25\u3001\u4EFB\u52A1\u5176\u5B9E\u5DF2\u63D0\u4EA4\uFF09\u65F6\uFF0C\u90FD\u7528\u8FD4\u56DE\u7684\u4EFB\u52A1 ID \u8D70 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u65B0\u4EFB\u52A1\u2014\u2014\u91CD\u590D\u63D0\u4EA4\u4F1A\u91CD\u590D\u6263\u8D39\uFF0C\u67E5\u8BE2\u5931\u8D25\u4E0D\u4EE3\u8868\u6CA1\u6709\u751F\u6210\u3002**\u8C03\u7528\u524D\u5FC5\u987B\u5148\u8BA9\u7528\u6237\u5BA1\u6838\u8FC7\u811A\u672C\u3001\u5E76\u786E\u8BA4\u5F00\u59CB\u5236\u4F5C**\uFF08\u4E24\u9053\u786E\u8BA4\u7F3A\u4E00\u4E0D\u53EF\uFF09\uFF0C\u4E0D\u8981\u8DF3\u8FC7\u811A\u672C\u76F4\u63A5\u751F\u6210\u3002\u5408\u5E76\u9700\u8981\u672C\u673A\u6709 ffmpeg\u3002\u672C\u673A\u6CA1\u88C5 ffmpeg \u65F6\uFF0C\u63D2\u4EF6\u4F1A**\u5148\u628A\u8FD9\u6B21\u8C03\u7528\u62E6\u56DE\u6765\uFF08\u4E0D\u4F1A\u8C03\u7528\u6A21\u578B\u3001\u4E0D\u4EA7\u751F\u8D39\u7528\uFF09**\uFF0C\u8FD4\u56DE\u7684\u8BF4\u660E\u91CC\u5E26\u7740\u6309\u7CFB\u7EDF\u7ED9\u7684\u5B89\u88C5\u547D\u4EE4 \u2014\u2014\u8FD9\u65F6\u8981\u5728\u5BF9\u8BDD\u6846\u91CC\u548C\u7528\u6237\u786E\u8BA4\uFF1A\u95EE\u4ED6\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg\uFF08\u7ED9\u51FA\u4ED6\u7CFB\u7EDF\u7684\u547D\u4EE4\uFF0C\u8BF4\u660E\u88C5\u597D\u91CD\u8DD1\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\u3001\u5206\u6BB5\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\uFF0C\u540C\u610F\u5C31\u7528\u7EC8\u7AEF\u5DE5\u5177\u88C5\u4E0A\uFF08\u5BBF\u4E3B\u4F1A\u8BA9\u4ED6\u786E\u8BA4\uFF09\u5E76 \`ffmpeg -version\` \u9A8C\u8BC1\uFF0C\u7136\u540E\u6309\u540C\u6837\u7684 duration \u91CD\u53D1\uFF1B\u7528\u6237\u4E0D\u60F3\u88C5\u5C31\u5E26 merge:false \u91CD\u53D1\uFF0C\u63D2\u4EF6\u53EA\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u4E0A\u6E38\u94FE\u63A5 + \u672C\u5730\u6587\u4EF6\uFF09\u3002\u62FF\u5230 ffmpegMissing=true \u7684\u7ED3\u679C\u65F6\u4E5F\u8981\u7167 installHint \u5F15\u5BFC\u5B89\u88C5\uFF0C\u522B\u53EA\u4E22\u4E00\u53E5\u300C\u5DF2\u8DF3\u8FC7\u5408\u5E76\u300D\u3002**\u4EBA\u7269\u5F62\u8C61 / \u53C2\u8003\u56FE**\uFF1A\u516C\u7F51\u56FE\u7247 URL\u3001base64\uFF08data URI \u6216\u7EAF base64\uFF09\u3001\u672C\u673A\u56FE\u7247\u8DEF\u5F84\uFF0C\u6216\u7B80\u5199 \`latest\` \u90FD\u652F\u6301\u2014\u2014\u8981\u56FA\u5B9A\u4EBA\u7269\u957F\u76F8\u3001\u670D\u88C5\u3001\u573A\u666F\u65F6\u4F20 referenceImages\uFF08\u4E00\u6B21\u53EA\u8BA4\u7B2C\u4E00\u5F20\uFF09\uFF1B\u9996\u5E27 / \u5C3E\u5E27\u7528 firstFrameUrl / lastFrameUrl \u4F20\u3002\u516C\u7F51 URL \u76F4\u63A5\u4EA4\u7ED9\u4E2D\u8F6C\u7AD9\u53D6\u56FE\uFF1B\u672C\u5730\u56FE\u7247\u7531\u63D2\u4EF6\u8BFB\u8FDB\u6765\uFF08\u6309 ratio \u5148\u9002\u914D\u753B\u5E45\uFF09\u5185\u8054\u6210 image_url \u53D1\u7ED9\u4E2D\u8F6C\u7AD9\uFF0C\u7528\u6237\u4E0D\u9700\u8981\u81EA\u5DF1\u627E\u56FE\u5E8A\u3002**\u7528\u6237\u8BF4\u300C\u5C31\u7528\u6211\u521A\u4E0A\u4F20/\u521A\u62D6\u8FDB\u6765\u7684\u90A3\u5F20\u56FE\u300D\u65F6\u76F4\u63A5\u4F20 \`latest\`**\uFF08\`latest:2\` \u53D6\u7B2C 2 \u65B0\u7684\uFF09\uFF1A\u63D2\u4EF6\u4F1A\u53BB Harness \u9644\u4EF6\u5E93\u91CC\u627E\u6700\u8FD1 2 \u5C0F\u65F6\u4E0A\u4F20\u7684\u56FE\u7247\u2014\u2014\u54EA\u6015\u5F53\u524D\u804A\u5929\u6A21\u578B\u4E0D\u652F\u6301\u56FE\u7247\u3001\u9644\u4EF6\u88AB \`MODEL_DOES_NOT_SUPPORT_IMAGES\` \u62E6\u4E0B\uFF0C\u56FE\u7247\u672C\u8EAB\u4E5F\u5DF2\u7ECF\u843D\u76D8\uFF0C\u7167\u6837\u80FD\u7528\u3002\u522B\u5728\u8FD9\u65F6\u8BF4\u300C\u6211\u770B\u4E0D\u5230\u56FE\u7247\u300D\uFF0C\u4E5F\u522B\u8BA9\u7528\u6237\u81EA\u5DF1\u53BB\u627E\u8DEF\u5F84\u3002`,
     parameters: {
       type: "object",
       properties: {
@@ -3037,8 +3100,7 @@ function videoTool(config, deps, ctx) {
         for (const [offset, step] of plan.entries()) {
           if (exec?.signal?.aborted) throw abortError();
           const position = doneBefore + offset;
-          const focusedPrompt = suppliedPrompts ? `\u3010\u672C\u6BB5\u5185\u5BB9\u3011${suppliedPrompts[position]}
-` + (step.kind === "extend" ? "\u4ECE\u89C6\u98911\u7ED3\u675F\u540E\u7684\u4E0B\u4E00\u4E8B\u4EF6\u7EE7\u7EED\uFF0C\u4EC5\u8F93\u51FA\u672C\u6BB5\u65B0\u589E\u52A8\u4F5C\u4E0E\u5BF9\u767D\u3002" : "") : prompt;
+          const focusedPrompt = suppliedPrompts ? buildSegmentExecutionPrompt({ prompt: suppliedPrompts[position], kind: step.kind, index: position, count: fullPlan.length }) : prompt;
           const stepArgs = {
             ...resumeOptions,
             ...args,

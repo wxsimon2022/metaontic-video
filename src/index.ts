@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 /**
  * MetaOnticVideo —— Seedance 视频生成 Host plugin（含长视频的分段生成与合并）。
  *
@@ -33,7 +34,7 @@
  */
 import { spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
-import { appendFile, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { appendFile, copyFile, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
@@ -620,6 +621,21 @@ function resolveSegmentPrompts(prompts, planLength) {
   return prompts.map((value) => value.trim());
 }
 
+/** 逐段执行契约：连续剧情只带当前段内容，上一段只提供状态。 */
+function buildSegmentExecutionPrompt({ prompt, kind, index, count }) {
+  const boundary = kind === 'generate'
+    ? '这是首段：只演本段事件，结尾停在本段指定状态，不抢演后段剧情，不做整片结束式收尾。'
+    : '这是续拍段：视频1提供上一段结束状态，从其后的新事件继续。不要重演进场、递接物品或已说台词。';
+  return [
+    `【生成段 ${index + 1}/${count}】生成段编号不是切镜指令；镜头是否切换以脚本为准。`,
+    '【执行内容】' + String(prompt).trim(),
+    boundary,
+    index < count - 1
+      ? '在完整句结束、动作完成或自然反应处交接，保留人物位置、视线、持物手和镜头运动状态，不用定格等待填满时长。'
+      : '完成本段的故事变化，再用自然反应或画面收束；不重述前情。',
+  ].join('\n');
+}
+
 function buildGenerationPrompt({ prompt, seconds, model = '' }) {
   const timing = isOmniExtendModel(model)
     ? '按本段事件顺序推进；如有时间区间，以本段0秒为起点，区间连续，不遗漏停顿与反应时间。'
@@ -1052,9 +1068,11 @@ async function buildGenerationBody(config, args, seconds, options: { signal?: Ab
 async function runTask(config, body, signal): Promise<TaskResult> {
   const created = await createTask(config, body, signal);
   const taskId = extractTaskId(created);
+  await appendRequestLog({ event: 'task_created', taskId, model: body?.model, duration: body?.duration });
   if (!taskId) throw new Error('创建任务失败：响应中缺少任务 ID。');
   try {
     const final = await waitForCompletion(config, taskId, signal);
+    await appendRequestLog({ event: 'task_finished', taskId, status: final.status, errorCode: final.errorCode });
     return { ...final, taskId };
   } catch (failure) {
     if (failure?.code === 'ABORTED') throw failure;
@@ -1902,6 +1920,8 @@ async function downloadSegmentsAndMerge(config, {
       return { files, segmentsDir, deliveredSeconds, error: reason };
     }
     segment.localPath = dest;
+    await appendRequestLog({ event: 'segment_saved', index: segment.index, taskId: segment.taskId, path: dest,
+      bytes: (await stat(dest)).size });
 
     const media = await probeMedia(dest, config, signal);
     if (media?.durationSeconds) {
@@ -1916,6 +1936,7 @@ async function downloadSegmentsAndMerge(config, {
         && Math.abs(media.durationSeconds - cumulative) <= tolerance
         && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
       if (looksCumulative) {
+        await appendRequestLog({ event: 'cumulative_output_detected', index: segment.index, duration: media.durationSeconds, plannedCumulative: cumulative });
         files.length = 0;
         notes.push(
           `第 ${segment.index} 段实测 ${formatSeconds(media.durationSeconds)} 秒，`
@@ -1950,10 +1971,14 @@ async function downloadSegmentsAndMerge(config, {
     if (files.length === 1) {
       await mkdir(path.dirname(finalPath), { recursive: true });
       await rm(finalPath, { force: true });
-      await rename(files[0], finalPath);
+      // 交付副本，不移动原始分段；累计成片识别后也必须保留每个下载原片。
+      await copyFile(files[0], finalPath);
+      await appendRequestLog({ event: 'delivery_copied', sourcePath: files[0], videoPath: finalPath });
       return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: 'single', videoPath: finalPath };
     }
+    await appendRequestLog({ event: 'merge_started', inputPaths: files, videoPath: finalPath });
     const prepared = await prepareSeamTrims(config, files, finalPath, { signal });
+    await appendRequestLog({ event: 'seam_trims_prepared', cuts: prepared.cuts });
     let merged;
     try {
       merged = await mergeClips(prepared.cuts.length ? { ...config, mergeMode: 'copy' } : config, prepared.files, finalPath, { signal });
@@ -1964,6 +1989,8 @@ async function downloadSegmentsAndMerge(config, {
       notes.push(`已按确认的裁剪量移除续拍段开头：${prepared.cuts.map((cut) => `第 ${cut.index} 段：头部 ${cut.seconds.toFixed(3)} 秒、尾部 ${cut.tailSeconds.toFixed(3)} 秒`).join('；')}。原始分段未改动；实际成片会缩短，不补帧凑时长。`);
     }
     const actual = await probeMedia(finalPath, config, signal);
+    await appendRequestLog({ event: 'merge_completed', videoPath: finalPath, mode: merged.mode,
+      actualSeconds: actual?.durationSeconds, sourceCount: segments.length });
     if (merged.trimmed?.length) {
       notes.push(
         `第 ${merged.trimmed.map((item) => item.index).join('、')} 段的音频比视频长`
@@ -1994,6 +2021,7 @@ async function downloadSegmentsAndMerge(config, {
       reason = guide.hint;
     }
     notes.push(reason);
+    await appendRequestLog({ event: 'merge_failed', errorCode: String(failure?.code || 'merge_error'), segmentsDir });
     return { files, segmentsDir, deliveredSeconds, error: reason, ffmpegMissing: Boolean(installHint), installHint };
   }
 }
@@ -2436,18 +2464,31 @@ function withResumeLock(tool, toolName, config) {
   return {
     ...tool,
     async execute(args, exec) {
-      const dir = resumeDirOf(args?.resume);
-      if (!dir) return tool.execute(args, exec);
-      const lock = await acquireResumeLock(dir, {
-        toolName,
-        callId: exec?.callId,
-        staleMs: resumeLockStaleMs(config),
+      return requestLogContext.run({ callId: exec?.callId || uniqueSuffix('call'), tool: toolName }, async () => {
+        const started = Date.now();
+        const dir = resumeDirOf(args?.resume);
+        let lock;
+        await appendRequestLog({ event: 'tool_started', provider: isVolcengine(config) ? 'volcengine' : 'service',
+          model: resolveModel(config), duration: args?.duration, segmentSeconds: args?.segmentSeconds,
+          resuming: Boolean(dir), resumeDir: dir || undefined });
+        try {
+          if (dir) {
+            lock = await acquireResumeLock(dir, { toolName, callId: exec?.callId, staleMs: resumeLockStaleMs(config) });
+            await appendRequestLog({ event: 'resume_lock_acquired', resumeDir: dir });
+          }
+          const result = await tool.execute(args, exec);
+          await appendRequestLog({ event: 'tool_completed', elapsedMs: Date.now() - started,
+            status: result?.status, paused: result?.paused, videoPath: result?.videoPath,
+            segmentsDir: result?.segmentsDir, segmentCount: result?.segments?.length,
+            actualSeconds: result?.actualSeconds, errorCode: result?.errorCode });
+          return result;
+        } catch (error) {
+          await appendRequestLog({ event: 'tool_failed', elapsedMs: Date.now() - started, errorCode: String(error?.code || 'tool_error') });
+          throw error;
+        } finally {
+          if (lock) { await lock.release(); await appendRequestLog({ event: 'resume_lock_released', resumeDir: dir }); }
+        }
       });
-      try {
-        return await tool.execute(args, exec);
-      } finally {
-        await lock.release();
-      }
     },
   };
 }
@@ -2905,15 +2946,19 @@ async function preflightGate(ctx, config, exec) {
 const RELAY_TIMEOUT_MS = 120000;
 
 /** 日志仅包含白名单字段；每日一个JSONL文件，不写请求体、鉴权头或输出URL。 */
+const requestLogContext = new AsyncLocalStorage<Record<string, unknown>>();
+
 function requestLogPath() {
-  return path.join(dshHome(), 'logs', 'metaontic-video', `${new Date().toISOString().slice(0, 10)}.jsonl`);
+  const now = new Date();
+  const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  return path.join(dshHome(), 'logs', 'metaontic-video', date, 'requests.jsonl');
 }
 
 async function appendRequestLog(record) {
   try {
     const file = requestLogPath();
     await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
-    await appendFile(file, JSON.stringify({ time: new Date().toISOString(), ...record }) + '\n', { mode: 0o600 });
+    await appendFile(file, JSON.stringify({ time: new Date().toISOString(), pluginVersion: PLUGIN_VERSION, ...requestLogContext.getStore(), ...record }) + '\n', { mode: 0o600 });
   } catch {
     // 日志不可写不能改变生成结果，也不能因此重提付费请求。
   }
@@ -3745,15 +3790,15 @@ function videoTool(config, deps, ctx) {
       + '（例如「15 秒」不许拆成 8+7）；多镜只在用户明确要求多镜时才用。'
       + `更长时先直出首段，再把剩余时长按 4 至模型上限（2.0 为 15、2.5 为 30） 秒均分逐段续拍（默认吃满上限、段数最少，最长 `
       + `${MAX_TOTAL_SECONDS} 秒）——`
-      + '这是同一个镜头的续拍延长，也不是多镜拼接，'
+      + '这是连续剧情的续拍延长，生成分段本身不代表叙事切镜，'
       + '最后用 ffmpeg 合并成一个本地成片文件，默认落在会话工作目录下的 metaontic-video/，'
       + '文件名形如 20261027-201530-25s.mp4。20 秒、25 秒这类目标不用拆成多个任务：'
       + '直接传 duration=20 即可（20 秒 → 15+5，25 秒 → 15+10）。'
-      + '**每段生成完都会先弹一次确认框问用户要不要继续**（循环迭代）：用户点「拒绝」就停下，'
+      + '**每段生成完先返回视频供预览**：先展示成果，再询问是否继续；未确认就停下，'
       + '先把已经生成的部分交付，结果里带 paused=true、resumeDir 和 remainingSeconds；'
       + '之后用户说「继续」时，把 resumeDir 原样传给 video_generate 的 resume 参数接着做'
       + '（前面几段不重新生成、不重复扣费），不要从头再生成一遍、也不要改用 video_extend 拼。'
-      + '没有可用确认通道时不会卡住，会按已确认的计划继续并在 note 里说明。'
+      + '每次调用最多完成当前一段；后续必须使用resume，不重新创建首段任务。'
       + '返回每段任务 ID、上游链接和成片路径。生成通常需要几分钟（每段单独生成），'
       + '单次调用返回 timeout、或某段返回 unknown（查询失败、任务其实已提交）时，'
       + '都用返回的任务 ID 走 video_status 继续等，不要重复提交新任务——'
@@ -3989,8 +4034,7 @@ function videoTool(config, deps, ctx) {
         const position = doneBefore + offset;
 
         const focusedPrompt = suppliedPrompts
-          ? `【本段内容】${suppliedPrompts[position]}\n`
-            + (step.kind === 'extend' ? '从视频1结束后的下一事件继续，仅输出本段新增动作与对白。' : '')
+          ? buildSegmentExecutionPrompt({ prompt: suppliedPrompts[position], kind: step.kind, index: position, count: fullPlan.length })
           : prompt;
         const stepArgs = {
           ...resumeOptions,

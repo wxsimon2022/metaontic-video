@@ -1,0 +1,44 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import * as fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import vm from 'node:vm';
+
+for (const cumulative of [false, true]) {
+  test(`delivery retains both source segments (${cumulative ? 'cumulative output' : 'incremental output'})`, async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mv-preserve-'));
+    try {
+      const segmentsDir = path.join(dir, 'segments');
+      await fs.mkdir(segmentsDir);
+      const originals = ['01-generate.mp4', '02-extend.mp4'].map(name => path.join(segmentsDir, name));
+      await fs.writeFile(originals[0], 'first-source');
+      await fs.writeFile(originals[1], 'second-source');
+      const source = await fs.readFile(new URL('../index.js', import.meta.url), 'utf8');
+      const context = vm.createContext({
+        path, ...fs, appendRequestLog: async () => {}, exists: async file => { try { await fs.stat(file); return true; } catch { return false; } },
+        hasFfmpeg: async () => true,
+        probeMedia: async file => ({durationSeconds: file === originals[1] && cumulative ? 30 : 15}),
+        CUMULATIVE_TOLERANCE_MIN_SECONDS: 1.5, CUMULATIVE_TOLERANCE_RATIO: 0.25,
+        formatSeconds: String,
+        prepareSeamTrims: async (_config, files) => ({files, temps: [], cuts: []}),
+        cleanupSegmentTemps: async () => {},
+        mergeClips: async (_config, files, out) => {
+          await fs.writeFile(out, (await Promise.all(files.map(file => fs.readFile(file)))).join('|'));
+          return {mode:'copy'};
+        },
+      });
+      const start = source.indexOf('async function downloadSegmentsAndMerge(');
+      vm.runInContext(source.slice(start, source.indexOf('async function resolveOutputDir', start)), context);
+      const result = await context.downloadSegmentsAndMerge({}, {
+        segments: [{index:1,kind:'generate',seconds:15},{index:2,kind:'extend',seconds:15}],
+        segmentsDir, outDir:dir, stamp:'test',
+      });
+      assert.equal(result.merged, true);
+      assert.equal(await fs.readFile(originals[0], 'utf8'), 'first-source');
+      assert.equal(await fs.readFile(originals[1], 'utf8'), 'second-source');
+      assert.ok((await fs.stat(result.videoPath)).size > 0);
+      assert.notEqual(result.videoPath, originals[1]);
+    } finally { await fs.rm(dir, {recursive:true,force:true}); }
+  });
+}
