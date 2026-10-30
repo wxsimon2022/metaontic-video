@@ -653,7 +653,7 @@ function buildGenerationBody(config, args, seconds) {
 
 /** 创建任务并等到结束；超时、取消、失败都归一化成同一形状。 */
 async function runTask(config, body, signal): Promise<TaskResult> {
-  const created = await createTask(config, body);
+  const created = await createTask(config, body, signal);
   const taskId = extractTaskId(created);
   if (!taskId) throw new Error('创建任务失败：响应中缺少任务 ID。');
   try {
@@ -695,6 +695,28 @@ function fileStamp(date = new Date()) {
   const pad = (value) => String(value).padStart(2, '0');
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`
     + `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
+
+/**
+ * 给这次生成占一个唯一的「时间戳」：它同时用作分段目录名和成片文件名前缀。
+ * 光靠秒级时间戳会撞：工具是并发安全的、多镜也会并行发起，同一秒里的两次调用会
+ * 写同一批分段文件、成片互相覆盖（关掉 keepSegments 时还会把对方正在用的分段删掉）。
+ * 用 `mkdir` 原子占位来确定唯一后缀，避免「先查后建」之间的竞态。
+ */
+async function allocateStamp(outDir: string, base: string) {
+  const parent = path.join(outDir, 'segments');
+  await mkdir(parent, { recursive: true });
+  for (let attempt = 1; attempt <= 100; attempt += 1) {
+    const stamp = attempt === 1 ? base : `${base}-${attempt}`;
+    const dir = path.join(parent, stamp);
+    try {
+      await mkdir(dir);
+      return { stamp, segmentsDir: dir };
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error;
+    }
+  }
+  throw new Error(`无法在 ${parent} 下分配唯一的分段目录（同名太多）。`);
 }
 
 /**
@@ -958,30 +980,47 @@ async function probeMedia(file, config, signal) {
   }
 }
 
+/** 单段下载的超时（毫秒）：成片也就几十 MB，卡住的连接不该一直挂着。 */
+const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
+
 async function downloadFile(url: string, destPath: string, { signal }: RunOptions = {}) {
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw Object.assign(new Error(`下载分段失败（HTTP ${response.status}）：${url}`), {
-      code: 'download_failed',
-    });
-  }
-  if (!response.body) {
-    throw Object.assign(new Error(`下载分段失败：响应没有内容（${url}）。`), {
-      code: 'download_failed',
-    });
-  }
   await mkdir(path.dirname(destPath), { recursive: true });
   const partial = `${destPath}.part`;
-  await pipeline(Readable.fromWeb(response.body as any), createWriteStream(partial));
-  await rename(partial, destPath);
-  return destPath;
+  const timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  try {
+    const response = await fetch(url, { signal: requestSignal });
+    if (!response.ok) {
+      throw Object.assign(new Error(`下载分段失败（HTTP ${response.status}）：${url}`), {
+        code: 'download_failed',
+      });
+    }
+    if (!response.body) {
+      throw Object.assign(new Error(`下载分段失败：响应没有内容（${url}）。`), {
+        code: 'download_failed',
+      });
+    }
+    await pipeline(Readable.fromWeb(response.body as any), createWriteStream(partial));
+    await rename(partial, destPath);
+    return destPath;
+  } catch (error) {
+    // 下载中断时清掉半截文件，别在分段目录里留下 *.part
+    await rm(partial, { force: true }).catch(() => {});
+    if (error?.code === 'download_failed') throw error;
+    if (signal?.aborted) throw abortError();
+    throw Object.assign(new Error(`下载分段失败：${error?.message || error}（${url}）`), {
+      code: 'download_failed',
+    });
+  }
 }
 
 function evenNumber(value, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number) || number <= 0) return fallback;
   const rounded = Math.round(number);
-  return rounded % 2 === 0 ? rounded : rounded - 1;
+  const even = rounded % 2 === 0 ? rounded : rounded - 1;
+  // 极小（1 这种）或异常值会算出 0，scale=0 会让 ffmpeg 直接失败，兜底成 2。
+  return even >= 2 ? even : 2;
 }
 
 /**
@@ -1350,7 +1389,7 @@ async function resolveOutputDir(config, exec, deps) {
 
 /* ---------------- 响应解析：兼容中转站的不同响应形状 ---------------- */
 
-function findKey(payload, keys) {
+function findKey(payload, keys, depth = Infinity) {
   if (payload && typeof payload === 'object') {
     if (!Array.isArray(payload)) {
       for (const key of keys) {
@@ -1358,8 +1397,9 @@ function findKey(payload, keys) {
         if (value !== undefined && value !== null && value !== '') return value;
       }
     }
+    if (depth <= 0) return undefined;
     for (const value of Array.isArray(payload) ? payload : Object.values(payload)) {
-      const found = findKey(value, keys);
+      const found = findKey(value, keys, depth - 1);
       if (found !== undefined && found !== null && found !== '') return found;
     }
   }
@@ -1389,7 +1429,9 @@ function looksLikeImageUrl(url) {
 }
 
 function extractTaskId(payload) {
-  const value = findKey(payload, ['id', 'task_id', 'taskId', 'request_id']);
+  // 只搜前 4 层：够拿到 {id} 与 {data:{output:{id}}} 这类形状，又不会把响应里
+  // 更深处的、不相干的 id / request_id 误当成任务 ID。
+  const value = findKey(payload, ['id', 'task_id', 'taskId', 'request_id'], 4);
   return typeof value === 'string' && value ? value : undefined;
 }
 
@@ -1846,8 +1888,17 @@ async function preflightGate(ctx, config, exec) {
 
 /* ---------------- 请求与轮询 ---------------- */
 
-async function relayRequest(config, path, { method = 'GET', body }: { method?: string; body?: unknown } = {}): Promise<any> {
+/** 中转站单次请求的超时（毫秒）：卡住的连接不要拖到宿主工具超时才结束。 */
+const RELAY_TIMEOUT_MS = 120000;
+
+async function relayRequest(
+  config,
+  path,
+  { method = 'GET', body, signal }: { method?: string; body?: unknown; signal?: AbortSignal } = {},
+): Promise<any> {
   const url = `${resolveBaseUrl(config)}${path}`;
+  const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   let response;
   try {
     response = await fetch(url, {
@@ -1857,8 +1908,10 @@ async function relayRequest(config, path, { method = 'GET', body }: { method?: s
         'Content-Type': 'application/json',
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      signal: requestSignal,
     });
   } catch (error) {
+    if (signal?.aborted) throw abortError();
     throw Object.assign(new Error(`中转站请求失败：${error?.message || error}`), {
       code: 'provider_network_error',
     });
@@ -1876,11 +1929,16 @@ async function relayRequest(config, path, { method = 'GET', body }: { method?: s
 
   const upstreamError = data && typeof data === 'object' && data.error;
   if (!response.ok || upstreamError) {
+    const httpStatus = response.status >= 400 ? response.status : 400;
     const classified = classifyError(
-      response.status >= 400 ? response.status : 400,
+      httpStatus,
       data,
     );
-    throw Object.assign(new Error(classified.message), { code: classified.code });
+    // 带上 HTTP 状态：轮询用得上——5xx / 429 / 401 这类要重试，400 这类是终局。
+    throw Object.assign(new Error(classified.message), {
+      code: classified.code,
+      status: httpStatus,
+    });
   }
   return data;
 }
@@ -1910,12 +1968,24 @@ function sleep(ms, signal): Promise<void> {
   });
 }
 
-function createTask(config, body) {
-  return relayRequest(config, resolveSubmitPath(config), { method: 'POST', body });
+function createTask(config, body, signal) {
+  return relayRequest(config, resolveSubmitPath(config), { method: 'POST', body, signal });
 }
 
-function getTask(config, taskId) {
-  return relayRequest(config, resolveQueryPath(config, taskId));
+function getTask(config, taskId, signal) {
+  return relayRequest(config, resolveQueryPath(config, taskId), { signal });
+}
+
+/**
+ * 轮询查询失败里哪些值得重试：网络中断、超时、5xx、限流、以及最像「Key 抖了一下」的 401/403。
+ * 4xx 里那些明确的请求错误（比如路径不对、任务 ID 非法）重试也没用，重试只是白等。
+ */
+function isRetryablePollError(failure): boolean {
+  if (!failure || failure.code === 'ABORTED') return false;
+  const status = Number(failure.status);
+  if (!Number.isFinite(status)) return true;
+  if (status >= 500) return true;
+  return status === 401 || status === 403 || status === 408 || status === 429;
 }
 
 /**
@@ -1938,10 +2008,21 @@ async function waitForCompletion(config, taskId, signal): Promise<TaskResult> {
 
     let task;
     try {
-      task = await getTask(config, taskId);
+      task = await getTask(config, taskId, signal);
       pollErrors = 0;
     } catch (failure) {
       if (failure?.code === 'ABORTED') throw failure;
+      // 明确是请求本身的问题（不是网络抖动）：别白等 5 轮，直接按「查询返回失败」结束，
+      // 但任务 ID 照样保留——上游报的是这次查询失败，不是「没生成」。
+      if (!isRetryablePollError(failure)) {
+        return {
+          taskId,
+          status: 'failed',
+          errorCode: failure?.code || 'provider_poll_error',
+          error: `任务已提交（${taskId}），查询返回失败：${failure?.message || failure}。`
+            + '可用 video_status 按这个 ID 复查确认。',
+        };
+      }
       pollErrors += 1;
       if (pollErrors >= maxPollErrors || Date.now() > deadline) {
         return {
@@ -2079,7 +2160,8 @@ function extendTool(config) {
       + '内容写清延长方向、剧情发展、主体状态、镜头运动和声音延续，减少接缝。'
       + '每段 4-15 秒，默认按 15 秒上限拆、段数最少；上游对卡满 15 秒敏感时再调小。'
       + '返回每段的任务 ID 和最终视频下载链接（约 24 小时内有效）；生成通常需要几分钟，'
-      + '单次调用返回 timeout 时用 video_status 继续等，不要重复提交同一段。',
+      + '单次调用返回 timeout、或某段返回 unknown（查询失败、任务其实已提交）时，'
+      + '都用返回的任务 ID 走 video_status 继续等，不要重复提交同一段。',
     parameters: {
       type: 'object',
       properties: {
@@ -2190,7 +2272,18 @@ function extendTool(config) {
 
       let referenceUrl = String(args?.videoUrl ?? '').trim();
       if (!referenceUrl && args?.taskId) {
-        const source = await getTask(config, String(args.taskId).trim());
+        const sourceId = String(args.taskId).trim();
+        let source;
+        try {
+          source = await getTask(config, sourceId, exec?.signal);
+        } catch (failure) {
+          if (failure?.code === 'ABORTED') throw failure;
+          // 查不到源视频 ≠ 源任务没生成：给一个明确的说法，别抛原始 401。
+          throw new Error(
+            `读取参考视频任务 ${sourceId} 失败：${failure?.message || failure}。`
+            + '这不代表该任务没有生成——稍后重试，或直接把成片的公网链接用 videoUrl 传进来。',
+          );
+        }
         referenceUrl = extractVideoUrl(source) || '';
         if (!referenceUrl) {
           throw new Error(
@@ -2574,9 +2667,9 @@ function videoTool(config, deps) {
       // 多段才需要合成；本机没有 ffmpeg 就直接跳过，别白跑一遍合并再报错。
       const ffmpegReady = completed.length > 1 ? await hasFfmpeg(config, exec?.signal) : true;
 
-      const stamp = fileStamp();
       const outDir = await resolveOutputDir(config, exec, deps);
-      const segmentsDir = path.join(outDir, 'segments', stamp);
+      // 原子占位，拿到本次唯一的 stamp（分段目录 + 成片名前缀），避免并发调用撞名。
+      const { stamp, segmentsDir } = await allocateStamp(outDir, fileStamp());
       const files = [];
       let probeWarned = false;
 
@@ -2616,6 +2709,7 @@ function videoTool(config, deps) {
         }
       } catch (failure) {
         if (failure?.code === 'ABORTED') throw failure;
+        result.segmentsDir = segmentsDir;
         result.note = [...notes, `分段已生成，但下载失败：${failure?.message || failure}`].join('\n');
         return result;
       }
@@ -2954,7 +3048,7 @@ function taskTool(config) {
       // 返回 unknown + 提示，让用户/模型稍后重试，而不是弹一个看起来像「任务失败」的报错。
       let task;
       try {
-        task = await getTask(config, taskId);
+        task = await getTask(config, taskId, exec?.signal);
       } catch (failure) {
         return {
           taskId,
@@ -2969,6 +3063,19 @@ function taskTool(config) {
 
       if (SUCCESS_STATES.has(status) && videoUrl) {
         return { taskId, status: 'succeeded', model, videoUrl };
+      }
+      // 上游说成功、但没有可下载的视频链接：当成失败并说明原因，别让 render 显示「已完成 /（无）」。
+      if (SUCCESS_STATES.has(status) && !videoUrl) {
+        const imageUrl = extractImageUrl(task);
+        return {
+          taskId,
+          status: 'failed',
+          model,
+          errorCode: 'provider_bad_response',
+          error: imageUrl
+            ? `上游返回的是图片而不是视频（${imageUrl.split('?')[0].slice(-60)}）。`
+            : '上游报告成功但没有返回视频地址。',
+        };
       }
       if (FAILED_STATES.has(status)) {
         const detail = findKey(task, ['error', 'fail_reason', 'message', 'detail']);
@@ -3093,6 +3200,13 @@ function configTool(config, settings) {
         extraParams: { type: 'string', description: '额外请求参数（JSON 对象字符串）。' },
         pollIntervalMs: { type: 'integer', minimum: 1000, description: '轮询间隔（毫秒）。' },
         maxWaitMs: { type: 'integer', minimum: 1000, description: '单次调用最长等待（毫秒）。' },
+        pollErrorRetries: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 60,
+          description: '轮询「查询失败」的容忍次数（默认 5）：连续失败这么多次才放弃等待；'
+            + '放弃时任务 ID 仍保留，可用 video_status 补查。',
+        },
         singleMaxSeconds: {
           type: 'integer',
           minimum: 4,

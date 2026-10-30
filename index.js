@@ -354,7 +354,7 @@ function buildGenerationBody(config, args, seconds) {
   return { body, seconds };
 }
 async function runTask(config, body, signal) {
-  const created = await createTask(config, body);
+  const created = await createTask(config, body, signal);
   const taskId = extractTaskId(created);
   if (!taskId) throw new Error("\u521B\u5EFA\u4EFB\u52A1\u5931\u8D25\uFF1A\u54CD\u5E94\u4E2D\u7F3A\u5C11\u4EFB\u52A1 ID\u3002");
   try {
@@ -385,6 +385,21 @@ function formatSeconds(value) {
 function fileStamp(date = /* @__PURE__ */ new Date()) {
   const pad = (value) => String(value).padStart(2, "0");
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
+async function allocateStamp(outDir, base) {
+  const parent = path.join(outDir, "segments");
+  await mkdir(parent, { recursive: true });
+  for (let attempt = 1; attempt <= 100; attempt += 1) {
+    const stamp = attempt === 1 ? base : `${base}-${attempt}`;
+    const dir = path.join(parent, stamp);
+    try {
+      await mkdir(dir);
+      return { stamp, segmentsDir: dir };
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+    }
+  }
+  throw new Error(`\u65E0\u6CD5\u5728 ${parent} \u4E0B\u5206\u914D\u552F\u4E00\u7684\u5206\u6BB5\u76EE\u5F55\uFF08\u540C\u540D\u592A\u591A\uFF09\u3002`);
 }
 function toJsonSafe(value, seen = /* @__PURE__ */ new Set()) {
   if (value === null) return null;
@@ -603,29 +618,43 @@ async function probeMedia(file, config, signal) {
     return null;
   }
 }
+const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1e3;
 async function downloadFile(url, destPath, { signal } = {}) {
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF08HTTP ${response.status}\uFF09\uFF1A${url}`), {
-      code: "download_failed"
-    });
-  }
-  if (!response.body) {
-    throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF1A\u54CD\u5E94\u6CA1\u6709\u5185\u5BB9\uFF08${url}\uFF09\u3002`), {
-      code: "download_failed"
-    });
-  }
   await mkdir(path.dirname(destPath), { recursive: true });
   const partial = `${destPath}.part`;
-  await pipeline(Readable.fromWeb(response.body), createWriteStream(partial));
-  await rename(partial, destPath);
-  return destPath;
+  const timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  try {
+    const response = await fetch(url, { signal: requestSignal });
+    if (!response.ok) {
+      throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF08HTTP ${response.status}\uFF09\uFF1A${url}`), {
+        code: "download_failed"
+      });
+    }
+    if (!response.body) {
+      throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF1A\u54CD\u5E94\u6CA1\u6709\u5185\u5BB9\uFF08${url}\uFF09\u3002`), {
+        code: "download_failed"
+      });
+    }
+    await pipeline(Readable.fromWeb(response.body), createWriteStream(partial));
+    await rename(partial, destPath);
+    return destPath;
+  } catch (error) {
+    await rm(partial, { force: true }).catch(() => {
+    });
+    if (error?.code === "download_failed") throw error;
+    if (signal?.aborted) throw abortError();
+    throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF1A${error?.message || error}\uFF08${url}\uFF09`), {
+      code: "download_failed"
+    });
+  }
 }
 function evenNumber(value, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number) || number <= 0) return fallback;
   const rounded = Math.round(number);
-  return rounded % 2 === 0 ? rounded : rounded - 1;
+  const even = rounded % 2 === 0 ? rounded : rounded - 1;
+  return even >= 2 ? even : 2;
 }
 const AUDIO_PADDING_TOLERANCE_FRAMES = 1;
 const SEAM_FADE_SECONDS = 0.25;
@@ -946,7 +975,7 @@ async function resolveOutputDir(config, exec, deps) {
   }
   return path.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
 }
-function findKey(payload, keys) {
+function findKey(payload, keys, depth = Infinity) {
   if (payload && typeof payload === "object") {
     if (!Array.isArray(payload)) {
       for (const key of keys) {
@@ -954,8 +983,9 @@ function findKey(payload, keys) {
         if (value !== void 0 && value !== null && value !== "") return value;
       }
     }
+    if (depth <= 0) return void 0;
     for (const value of Array.isArray(payload) ? payload : Object.values(payload)) {
-      const found = findKey(value, keys);
+      const found = findKey(value, keys, depth - 1);
       if (found !== void 0 && found !== null && found !== "") return found;
     }
   }
@@ -981,7 +1011,7 @@ function looksLikeImageUrl(url) {
   return IMAGE_EXTENSIONS.some((ext) => url.split("?")[0].toLowerCase().endsWith(ext));
 }
 function extractTaskId(payload) {
-  const value = findKey(payload, ["id", "task_id", "taskId", "request_id"]);
+  const value = findKey(payload, ["id", "task_id", "taskId", "request_id"], 4);
   return typeof value === "string" && value ? value : void 0;
 }
 function extractVideoUrl(payload) {
@@ -1153,7 +1183,7 @@ function estimateUsage(config, toolName, args) {
 function resolveRegisterApi(config) {
   return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-const PLUGIN_VERSION = true ? "2.10.1".trim().replace(/^v/i, "") : "";
+const PLUGIN_VERSION = true ? "2.10.2".trim().replace(/^v/i, "") : "";
 async function fetchDeviceQuota(config, signal) {
   const api = resolveRegisterApi(config);
   const deviceId = String(ref(config, "deviceId", "")).trim();
@@ -1309,8 +1339,11 @@ async function preflightGate(ctx, config, exec) {
     }
   };
 }
-async function relayRequest(config, path2, { method = "GET", body } = {}) {
+const RELAY_TIMEOUT_MS = 12e4;
+async function relayRequest(config, path2, { method = "GET", body, signal } = {}) {
   const url = `${resolveBaseUrl(config)}${path2}`;
+  const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   let response;
   try {
     response = await fetch(url, {
@@ -1319,9 +1352,11 @@ async function relayRequest(config, path2, { method = "GET", body } = {}) {
         Authorization: `Bearer ${resolveApiKey(config)}`,
         "Content-Type": "application/json"
       },
-      ...body !== void 0 ? { body: JSON.stringify(body) } : {}
+      ...body !== void 0 ? { body: JSON.stringify(body) } : {},
+      signal: requestSignal
     });
   } catch (error) {
+    if (signal?.aborted) throw abortError();
     throw Object.assign(new Error(`\u4E2D\u8F6C\u7AD9\u8BF7\u6C42\u5931\u8D25\uFF1A${error?.message || error}`), {
       code: "provider_network_error"
     });
@@ -1337,11 +1372,15 @@ async function relayRequest(config, path2, { method = "GET", body } = {}) {
   }
   const upstreamError = data && typeof data === "object" && data.error;
   if (!response.ok || upstreamError) {
+    const httpStatus = response.status >= 400 ? response.status : 400;
     const classified = classifyError(
-      response.status >= 400 ? response.status : 400,
+      httpStatus,
       data
     );
-    throw Object.assign(new Error(classified.message), { code: classified.code });
+    throw Object.assign(new Error(classified.message), {
+      code: classified.code,
+      status: httpStatus
+    });
   }
   return data;
 }
@@ -1363,11 +1402,18 @@ function sleep(ms, signal) {
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
-function createTask(config, body) {
-  return relayRequest(config, resolveSubmitPath(config), { method: "POST", body });
+function createTask(config, body, signal) {
+  return relayRequest(config, resolveSubmitPath(config), { method: "POST", body, signal });
 }
-function getTask(config, taskId) {
-  return relayRequest(config, resolveQueryPath(config, taskId));
+function getTask(config, taskId, signal) {
+  return relayRequest(config, resolveQueryPath(config, taskId), { signal });
+}
+function isRetryablePollError(failure) {
+  if (!failure || failure.code === "ABORTED") return false;
+  const status = Number(failure.status);
+  if (!Number.isFinite(status)) return true;
+  if (status >= 500) return true;
+  return status === 401 || status === 403 || status === 408 || status === 429;
 }
 async function waitForCompletion(config, taskId, signal) {
   const deadline = Date.now() + ref(config, "maxWaitMs", 6e5);
@@ -1377,10 +1423,18 @@ async function waitForCompletion(config, taskId, signal) {
     if (signal?.aborted) throw abortError();
     let task;
     try {
-      task = await getTask(config, taskId);
+      task = await getTask(config, taskId, signal);
       pollErrors = 0;
     } catch (failure) {
       if (failure?.code === "ABORTED") throw failure;
+      if (!isRetryablePollError(failure)) {
+        return {
+          taskId,
+          status: "failed",
+          errorCode: failure?.code || "provider_poll_error",
+          error: `\u4EFB\u52A1\u5DF2\u63D0\u4EA4\uFF08${taskId}\uFF09\uFF0C\u67E5\u8BE2\u8FD4\u56DE\u5931\u8D25\uFF1A${failure?.message || failure}\u3002\u53EF\u7528 video_status \u6309\u8FD9\u4E2A ID \u590D\u67E5\u786E\u8BA4\u3002`
+        };
+      }
       pollErrors += 1;
       if (pollErrors >= maxPollErrors || Date.now() > deadline) {
         return {
@@ -1495,7 +1549,7 @@ const SEGMENT_OUTPUT_SCHEMA = {
 function extendTool(config) {
   return {
     name: "video_extend",
-    description: "\u628A\u4E00\u6BB5\u5DF2\u6709\u7684\u89C6\u9891\u5411\u524D\u6216\u5411\u540E\u5EF6\u957F\uFF1A\u4EE5\u516C\u7F51\u89C6\u9891 URL \u4F5C\u4E3A\u8F93\u5165\u7D20\u6750\uFF0C\u8C03\u7528 Seedance \u751F\u6210\u8854\u63A5\u7247\u6BB5\uFF0C\u4FDD\u6301\u4EBA\u7269\u3001\u670D\u88C5\u3001\u573A\u666F\u5149\u7EBF\u548C\u58F0\u97F3\u8FDE\u7EED\uFF1B\u53EF\u4E00\u6B21\u8FDE\u7EED\u5EF6\u957F\u591A\u6BB5\uFF0C\u6BCF\u6BB5\u90FD\u7528\u4E0A\u4E00\u6BB5\u7684\u7ED3\u679C\u7EE7\u7EED\u5EF6\u957F\u3002\u63D0\u793A\u8BCD\u89C4\u5219\uFF1A\u4EE5\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D\u6216\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\u5F00\u5934\uFF08\u4E5F\u53EF\u5199\u300C\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A\u300D\uFF09\uFF0C\u5168\u7A0B\u7528\u300C\u89C6\u98911\u300D\u6307\u4EE3\u8F93\u5165\u7D20\u6750\uFF0C\u4E0D\u8981\u5199\u6210\u300C\u53C2\u8003\u89C6\u98911\u300D\uFF08\u4F1A\u88AB\u5F53\u6210\u53C2\u8003\u751F\u89C6\u9891\uFF0C\u4E0D\u662F\u5EF6\u957F\uFF09\uFF1B\u5185\u5BB9\u5199\u6E05\u5EF6\u957F\u65B9\u5411\u3001\u5267\u60C5\u53D1\u5C55\u3001\u4E3B\u4F53\u72B6\u6001\u3001\u955C\u5934\u8FD0\u52A8\u548C\u58F0\u97F3\u5EF6\u7EED\uFF0C\u51CF\u5C11\u63A5\u7F1D\u3002\u6BCF\u6BB5 4-15 \u79D2\uFF0C\u9ED8\u8BA4\u6309 15 \u79D2\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\uFF1B\u4E0A\u6E38\u5BF9\u5361\u6EE1 15 \u79D2\u654F\u611F\u65F6\u518D\u8C03\u5C0F\u3002\u8FD4\u56DE\u6BCF\u6BB5\u7684\u4EFB\u52A1 ID \u548C\u6700\u7EC8\u89C6\u9891\u4E0B\u8F7D\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF1B\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout \u65F6\u7528 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u540C\u4E00\u6BB5\u3002",
+    description: "\u628A\u4E00\u6BB5\u5DF2\u6709\u7684\u89C6\u9891\u5411\u524D\u6216\u5411\u540E\u5EF6\u957F\uFF1A\u4EE5\u516C\u7F51\u89C6\u9891 URL \u4F5C\u4E3A\u8F93\u5165\u7D20\u6750\uFF0C\u8C03\u7528 Seedance \u751F\u6210\u8854\u63A5\u7247\u6BB5\uFF0C\u4FDD\u6301\u4EBA\u7269\u3001\u670D\u88C5\u3001\u573A\u666F\u5149\u7EBF\u548C\u58F0\u97F3\u8FDE\u7EED\uFF1B\u53EF\u4E00\u6B21\u8FDE\u7EED\u5EF6\u957F\u591A\u6BB5\uFF0C\u6BCF\u6BB5\u90FD\u7528\u4E0A\u4E00\u6BB5\u7684\u7ED3\u679C\u7EE7\u7EED\u5EF6\u957F\u3002\u63D0\u793A\u8BCD\u89C4\u5219\uFF1A\u4EE5\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D\u6216\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\u5F00\u5934\uFF08\u4E5F\u53EF\u5199\u300C\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A\u300D\uFF09\uFF0C\u5168\u7A0B\u7528\u300C\u89C6\u98911\u300D\u6307\u4EE3\u8F93\u5165\u7D20\u6750\uFF0C\u4E0D\u8981\u5199\u6210\u300C\u53C2\u8003\u89C6\u98911\u300D\uFF08\u4F1A\u88AB\u5F53\u6210\u53C2\u8003\u751F\u89C6\u9891\uFF0C\u4E0D\u662F\u5EF6\u957F\uFF09\uFF1B\u5185\u5BB9\u5199\u6E05\u5EF6\u957F\u65B9\u5411\u3001\u5267\u60C5\u53D1\u5C55\u3001\u4E3B\u4F53\u72B6\u6001\u3001\u955C\u5934\u8FD0\u52A8\u548C\u58F0\u97F3\u5EF6\u7EED\uFF0C\u51CF\u5C11\u63A5\u7F1D\u3002\u6BCF\u6BB5 4-15 \u79D2\uFF0C\u9ED8\u8BA4\u6309 15 \u79D2\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\uFF1B\u4E0A\u6E38\u5BF9\u5361\u6EE1 15 \u79D2\u654F\u611F\u65F6\u518D\u8C03\u5C0F\u3002\u8FD4\u56DE\u6BCF\u6BB5\u7684\u4EFB\u52A1 ID \u548C\u6700\u7EC8\u89C6\u9891\u4E0B\u8F7D\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF1B\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout\u3001\u6216\u67D0\u6BB5\u8FD4\u56DE unknown\uFF08\u67E5\u8BE2\u5931\u8D25\u3001\u4EFB\u52A1\u5176\u5B9E\u5DF2\u63D0\u4EA4\uFF09\u65F6\uFF0C\u90FD\u7528\u8FD4\u56DE\u7684\u4EFB\u52A1 ID \u8D70 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u540C\u4E00\u6BB5\u3002",
     parameters: {
       type: "object",
       properties: {
@@ -1594,7 +1648,16 @@ function extendTool(config) {
       );
       let referenceUrl = String(args?.videoUrl ?? "").trim();
       if (!referenceUrl && args?.taskId) {
-        const source = await getTask(config, String(args.taskId).trim());
+        const sourceId = String(args.taskId).trim();
+        let source;
+        try {
+          source = await getTask(config, sourceId, exec?.signal);
+        } catch (failure) {
+          if (failure?.code === "ABORTED") throw failure;
+          throw new Error(
+            `\u8BFB\u53D6\u53C2\u8003\u89C6\u9891\u4EFB\u52A1 ${sourceId} \u5931\u8D25\uFF1A${failure?.message || failure}\u3002\u8FD9\u4E0D\u4EE3\u8868\u8BE5\u4EFB\u52A1\u6CA1\u6709\u751F\u6210\u2014\u2014\u7A0D\u540E\u91CD\u8BD5\uFF0C\u6216\u76F4\u63A5\u628A\u6210\u7247\u7684\u516C\u7F51\u94FE\u63A5\u7528 videoUrl \u4F20\u8FDB\u6765\u3002`
+          );
+        }
         referenceUrl = extractVideoUrl(source) || "";
         if (!referenceUrl) {
           throw new Error(
@@ -1904,9 +1967,8 @@ function videoTool(config, deps) {
         return result;
       }
       const ffmpegReady = completed.length > 1 ? await hasFfmpeg(config, exec?.signal) : true;
-      const stamp = fileStamp();
       const outDir = await resolveOutputDir(config, exec, deps);
-      const segmentsDir = path.join(outDir, "segments", stamp);
+      const { stamp, segmentsDir } = await allocateStamp(outDir, fileStamp());
       const files = [];
       let probeWarned = false;
       try {
@@ -1940,6 +2002,7 @@ function videoTool(config, deps) {
         }
       } catch (failure) {
         if (failure?.code === "ABORTED") throw failure;
+        result.segmentsDir = segmentsDir;
         result.note = [...notes, `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u4E0B\u8F7D\u5931\u8D25\uFF1A${failure?.message || failure}`].join("\n");
         return result;
       }
@@ -2219,7 +2282,7 @@ function taskTool(config) {
       if (!taskId) throw new Error("taskId \u4E0D\u80FD\u4E3A\u7A7A\u3002");
       let task;
       try {
-        task = await getTask(config, taskId);
+        task = await getTask(config, taskId, exec?.signal);
       } catch (failure) {
         return {
           taskId,
@@ -2233,6 +2296,16 @@ function taskTool(config) {
       const videoUrl = extractVideoUrl(task);
       if (SUCCESS_STATES.has(status) && videoUrl) {
         return { taskId, status: "succeeded", model, videoUrl };
+      }
+      if (SUCCESS_STATES.has(status) && !videoUrl) {
+        const imageUrl = extractImageUrl(task);
+        return {
+          taskId,
+          status: "failed",
+          model,
+          errorCode: "provider_bad_response",
+          error: imageUrl ? `\u4E0A\u6E38\u8FD4\u56DE\u7684\u662F\u56FE\u7247\u800C\u4E0D\u662F\u89C6\u9891\uFF08${imageUrl.split("?")[0].slice(-60)}\uFF09\u3002` : "\u4E0A\u6E38\u62A5\u544A\u6210\u529F\u4F46\u6CA1\u6709\u8FD4\u56DE\u89C6\u9891\u5730\u5740\u3002"
+        };
       }
       if (FAILED_STATES.has(status)) {
         const detail = findKey(task, ["error", "fail_reason", "message", "detail"]);
@@ -2349,6 +2422,12 @@ function configTool(config, settings) {
         extraParams: { type: "string", description: "\u989D\u5916\u8BF7\u6C42\u53C2\u6570\uFF08JSON \u5BF9\u8C61\u5B57\u7B26\u4E32\uFF09\u3002" },
         pollIntervalMs: { type: "integer", minimum: 1e3, description: "\u8F6E\u8BE2\u95F4\u9694\uFF08\u6BEB\u79D2\uFF09\u3002" },
         maxWaitMs: { type: "integer", minimum: 1e3, description: "\u5355\u6B21\u8C03\u7528\u6700\u957F\u7B49\u5F85\uFF08\u6BEB\u79D2\uFF09\u3002" },
+        pollErrorRetries: {
+          type: "integer",
+          minimum: 1,
+          maximum: 60,
+          description: "\u8F6E\u8BE2\u300C\u67E5\u8BE2\u5931\u8D25\u300D\u7684\u5BB9\u5FCD\u6B21\u6570\uFF08\u9ED8\u8BA4 5\uFF09\uFF1A\u8FDE\u7EED\u5931\u8D25\u8FD9\u4E48\u591A\u6B21\u624D\u653E\u5F03\u7B49\u5F85\uFF1B\u653E\u5F03\u65F6\u4EFB\u52A1 ID \u4ECD\u4FDD\u7559\uFF0C\u53EF\u7528 video_status \u8865\u67E5\u3002"
+        },
         singleMaxSeconds: {
           type: "integer",
           minimum: 4,
