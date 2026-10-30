@@ -354,6 +354,14 @@ function canvasSize(ratio) {
 function referenceCacheDir() {
   return path.join(os.tmpdir(), "metaontic-video-reference");
 }
+async function isUsableFit(dest, width, height, config, signal) {
+  const info = await stat(dest).catch(() => null);
+  if (!info?.isFile() || info.size <= 0) return false;
+  const media = await probeMedia(dest, config, signal);
+  if (!media?.width || !media?.height) return true;
+  return media.width === width && media.height === height;
+}
+const fitInFlight = /* @__PURE__ */ new Map();
 async function fitImageToCanvas(absPath, size, config, signal) {
   const [width, height] = size;
   const media = await probeMedia(absPath, config, signal);
@@ -361,29 +369,47 @@ async function fitImageToCanvas(absPath, size, config, signal) {
   const info = await stat(absPath).catch(() => null);
   const key = `${path.basename(absPath, path.extname(absPath))}-${info?.size ?? 0}-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`;
   const dest = path.join(referenceCacheDir(), key);
-  if (await exists(dest)) return dest;
-  await mkdir(referenceCacheDir(), { recursive: true });
-  const graph = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},gblur=sigma=24[bg];[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1`;
-  try {
-    const { code } = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
-      "-y",
-      "-i",
-      absPath,
-      "-filter_complex",
-      graph,
-      "-frames:v",
-      "1",
-      "-q:v",
-      "2",
-      dest
-    ], { signal, timeoutMs: 12e4 });
-    const fitted = code === 0 ? await probeMedia(dest, config, signal) : null;
-    if (fitted?.width === width && fitted?.height === height) return dest;
-    await rm(dest, { force: true }).catch(() => {
+  if (await isUsableFit(dest, width, height, config, signal)) return dest;
+  const running = fitInFlight.get(dest);
+  if (running) {
+    await running.catch(() => {
     });
-  } catch {
+    if (await isUsableFit(dest, width, height, config, signal)) return dest;
+    if (signal?.aborted) return absPath;
   }
-  return absPath;
+  const task = (async () => {
+    await mkdir(referenceCacheDir(), { recursive: true });
+    const graph = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},gblur=sigma=24[bg];[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1`;
+    const temp = `${dest.replace(/\.jpg$/, "")}.${uniqueSuffix("fit")}.jpg`;
+    try {
+      const { code } = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
+        "-y",
+        "-i",
+        absPath,
+        "-filter_complex",
+        graph,
+        "-frames:v",
+        "1",
+        "-q:v",
+        "2",
+        temp
+      ], { signal, timeoutMs: 12e4 });
+      if (code !== 0) return;
+      const fitted = await probeMedia(temp, config, signal);
+      if (fitted?.width === width && fitted?.height === height) await rename(temp, dest);
+    } catch {
+    } finally {
+      await rm(temp, { force: true }).catch(() => {
+      });
+    }
+  })();
+  fitInFlight.set(dest, task);
+  try {
+    await task;
+  } finally {
+    fitInFlight.delete(dest);
+  }
+  return await isUsableFit(dest, width, height, config, signal) ? dest : absPath;
 }
 const UPLOAD_ALIAS_PATTERN = /^(?:latest|newest|recent|最近上传(?:的图片)?|最新上传(?:的图片)?|刚上传(?:的图片)?|最新图片|刚拖进来的图片)$/i;
 const UPLOAD_WINDOW_MS = 2 * 60 * 60 * 1e3;
@@ -599,6 +625,11 @@ function formatSeconds(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return String(value ?? "");
   return Number.isInteger(number) ? String(number) : number.toFixed(1);
+}
+let tempSequence = 0;
+function uniqueSuffix(prefix = "tmp") {
+  tempSequence = (tempSequence + 1) % 1e9;
+  return `${prefix}-${process.pid}-${tempSequence}-${Math.random().toString(36).slice(2, 8)}`;
 }
 function fileStamp(date = /* @__PURE__ */ new Date()) {
   const pad = (value) => String(value).padStart(2, "0");
@@ -839,7 +870,7 @@ async function probeMedia(file, config, signal) {
 const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1e3;
 async function downloadFile(url, destPath, { signal } = {}) {
   await mkdir(path.dirname(destPath), { recursive: true });
-  const partial = `${destPath}.part`;
+  const partial = `${destPath}.${uniqueSuffix("part")}`;
   const timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   try {
@@ -1062,7 +1093,7 @@ async function alignSegmentAudio(config, files, probed, outPath, { signal, binar
       aligned.push(file);
       continue;
     }
-    const temp = `${outPath}.align${index + 1}.mp4`;
+    const temp = `${outPath}.${uniqueSuffix(`align${index + 1}`)}.mp4`;
     const { code } = await runProcess(
       binary || resolveBinary(config, "ffmpegBinary", "ffmpeg"),
       [
@@ -1103,6 +1134,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
   await mkdir(path.dirname(outPath), { recursive: true });
   await rm(outPath, { force: true });
+  const work = `${outPath}.${uniqueSuffix("work")}.mp4`;
   let copyError = "";
   let audioError = "";
   const probed = [];
@@ -1113,15 +1145,16 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
     config,
     files,
     probed,
-    outPath,
+    work,
     { signal, binary }
   );
   files = aligned;
   try {
     const mergeMode = ref(config, "mergeMode", "seamless");
     if (mergeMode === "seamless" && files.length > 1) {
-      const seamless = await mergeClipsSeamless(config, files, probed, outPath, { signal, binary });
+      const seamless = await mergeClipsSeamless(config, files, probed, work, { signal, binary });
       if (seamless?.path) {
+        await rename(work, outPath);
         return {
           path: seamless.path,
           mode: "seamless",
@@ -1134,7 +1167,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
       if (seamless?.error) copyError = seamless.error;
     }
     if (mergeMode !== "reencode" && paramsMatch) {
-      const listPath = `${outPath}.concat.txt`;
+      const listPath = `${work}.concat.txt`;
       const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
       await writeFile(listPath, `${lines}
 `, "utf8");
@@ -1151,9 +1184,12 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
           "copy",
           "-movflags",
           "+faststart",
-          outPath
+          work
         ], { signal });
-        if (code2 === 0 && await exists(outPath)) return { path: outPath, mode: "copy", trimmed };
+        if (code2 === 0 && await exists(work)) {
+          await rename(work, outPath);
+          return { path: outPath, mode: "copy", trimmed };
+        }
         copyError = stderr2.trim().slice(-400);
       } finally {
         await rm(listPath, { force: true });
@@ -1169,12 +1205,12 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
     const videoParts = files.map((_, index) => `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${index}]`);
     const videoInputs = files.map((_, index) => `[v${index}]`).join("");
     async function encode(filter2, maps, withAudioTrack) {
-      await rm(outPath, { force: true });
+      await rm(work, { force: true });
       const args = ["-y"];
       for (const file of files) args.push("-i", file);
       args.push("-filter_complex", filter2, ...maps, "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p");
       if (withAudioTrack) args.push("-c:a", "aac", "-b:a", "192k");
-      args.push("-movflags", "+faststart", outPath);
+      args.push("-movflags", "+faststart", work);
       return runProcess(binary, args, { signal });
     }
     if (withAudio) {
@@ -1186,18 +1222,123 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
         `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`
       ].join(";");
       const { code: code2, stderr: stderr2 } = await encode(filter2, ["-map", "[v]", "-map", "[a]"], true);
-      if (code2 === 0 && await exists(outPath)) return { path: outPath, mode: "reencode", trimmed };
+      if (code2 === 0 && await exists(work)) {
+        await rename(work, outPath);
+        return { path: outPath, mode: "reencode", trimmed };
+      }
       audioError = stderr2.trim().slice(-400);
     }
     const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(";");
     const { code, stderr } = await encode(filter, ["-map", "[v]"], false);
-    if (code === 0 && await exists(outPath)) {
+    if (code === 0 && await exists(work)) {
+      await rename(work, outPath);
       return { path: outPath, mode: withAudio ? "reencode-video-only" : "reencode", trimmed };
     }
     const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
     throw Object.assign(new Error(`ffmpeg \u5408\u5E76\u5931\u8D25\uFF1A${detail || "\u672A\u77E5\u9519\u8BEF"}`), { code: "ffmpeg_failed" });
   } finally {
-    await cleanupSegmentTemps(temps);
+    await cleanupSegmentTemps([...temps, work]);
+  }
+}
+async function downloadSegmentsAndMerge(config, {
+  segments,
+  segmentsDir,
+  outDir,
+  stamp,
+  notes = [],
+  keepSingleFile = false,
+  signal
+}) {
+  const files = [];
+  const deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0);
+  const ffmpegReady = segments.length > 1 ? await hasFfmpeg(config, signal) : true;
+  let probeWarned = false;
+  for (const [index, segment] of segments.entries()) {
+    const dest = path.join(
+      segmentsDir,
+      `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`
+    );
+    try {
+      if (!await exists(dest)) {
+        await downloadFile(segment.videoUrl, dest, { signal });
+      }
+    } catch (failure) {
+      if (failure?.code === "ABORTED") throw failure;
+      const reason = `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u4E0B\u8F7D\u5931\u8D25\uFF1A${failure?.message || failure}`;
+      notes.push(reason);
+      return { files, segmentsDir, deliveredSeconds, error: reason };
+    }
+    segment.localPath = dest;
+    const media = await probeMedia(dest, config, signal);
+    if (media?.durationSeconds) {
+      segment.durationSeconds = Number(media.durationSeconds.toFixed(2));
+      const cumulative = segments.slice(0, index + 1).reduce((sum, item) => sum + (item.seconds || 0), 0);
+      const tolerance = Math.max(
+        CUMULATIVE_TOLERANCE_MIN_SECONDS,
+        cumulative * CUMULATIVE_TOLERANCE_RATIO
+      );
+      const looksCumulative = files.length > 0 && Math.abs(media.durationSeconds - cumulative) <= tolerance && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
+      if (looksCumulative) {
+        files.length = 0;
+        notes.push(
+          `\u7B2C ${segment.index} \u6BB5\u5B9E\u6D4B ${formatSeconds(media.durationSeconds)} \u79D2\uFF0C\u63A5\u8FD1\u7D2F\u8BA1\u65F6\u957F ${cumulative} \u79D2\uFF0C\u6309\u300C\u4E0A\u6E38\u8FD4\u56DE\u7684\u662F\u7D2F\u8BA1\u6210\u7247\u300D\u5904\u7406\u3002`
+        );
+      }
+    } else if (!probeWarned) {
+      probeWarned = true;
+      notes.push("\u6CA1\u6709\u53EF\u7528\u7684 ffprobe\uFF0C\u65E0\u6CD5\u63A2\u6D4B\u5206\u6BB5\u65F6\u957F\uFF0C\u6309\u300C\u6BCF\u6BB5\u90FD\u662F\u589E\u91CF\u7247\u6BB5\u300D\u76F4\u63A5\u62FC\u63A5\u3002");
+    }
+    files.push(dest);
+  }
+  if (!files.length) return { files, segmentsDir, deliveredSeconds };
+  if (!ffmpegReady && files.length > 1) {
+    const guide = ffmpegInstallHint(config);
+    notes.push(`\u5206\u6BB5\u6587\u4EF6\u90FD\u5DF2\u4E0B\u8F7D\u5230 ${segmentsDir}\u3002`);
+    notes.push(guide.hint);
+    return {
+      files,
+      segmentsDir,
+      deliveredSeconds,
+      merged: false,
+      ffmpegMissing: true,
+      installHint: guide.hint
+    };
+  }
+  const finalPath = path.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
+  try {
+    if (files.length === 1 && keepSingleFile) {
+      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "segment", videoPath: files[0] };
+    }
+    if (files.length === 1) {
+      await mkdir(path.dirname(finalPath), { recursive: true });
+      await rm(finalPath, { force: true });
+      await rename(files[0], finalPath);
+      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "single", videoPath: finalPath };
+    }
+    const merged = await mergeClips(config, files, finalPath, { signal });
+    if (merged.trimmed?.length) {
+      notes.push(
+        `\u7B2C ${merged.trimmed.map((item) => item.index).join("\u3001")} \u6BB5\u7684\u97F3\u9891\u6BD4\u89C6\u9891\u957F\uFF08\u6700\u957F ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} \u79D2\uFF09\uFF0C\u5DF2\u88C1\u9F50\u540E\u518D\u62FC\u63A5\uFF0C\u907F\u514D\u63A5\u7F1D\u5904\u7F3A\u4E00\u5C0F\u6BB5\u753B\u9762\u3002`
+      );
+    }
+    if (merged.mode === "seamless") {
+      const fixed = (merged.seams || []).filter((seam) => Math.abs(seam.lumaDelta) >= 0.5 || Math.abs(seam.audioGainDb) >= 0.2).map((seam) => `\u7B2C ${seam.index} \u6BB5\u63A5\u7F1D\uFF1A\u753B\u9762 ${seam.lumaDelta >= 0 ? "+" : ""}${seam.lumaDelta.toFixed(1)} \u7EA7\u3001\u97F3\u91CF ${seam.audioGainDb >= 0 ? "+" : ""}${seam.audioGainDb.toFixed(1)} dB`);
+      notes.push(
+        `\u5408\u5E76\u65B9\u5F0F\uFF1A\u65E0\u7F1D\u62FC\u63A5\uFF08\u63A5\u7F1D ${merged.fade} \u79D2\u4EA4\u53C9\u6DE1\u5316${fixed.length ? `\uFF0C\u5E76\u5DF2\u5BF9\u9F50${fixed.join("\uFF1B")}` : ""}\uFF09\u3002`
+      );
+    }
+    return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: merged.mode, videoPath: finalPath };
+  } catch (failure) {
+    if (failure?.code === "ABORTED") throw failure;
+    let reason = `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u5408\u5E76\u5931\u8D25\uFF1A${failure?.message || failure}`;
+    let installHint;
+    if (failure?.code === "ffmpeg_missing") {
+      const guide = ffmpegInstallHint(config);
+      installHint = guide.hint;
+      reason = guide.hint;
+    }
+    notes.push(reason);
+    return { files, segmentsDir, deliveredSeconds, error: reason, ffmpegMissing: Boolean(installHint), installHint };
   }
 }
 async function resolveOutputDir(config, exec, deps) {
@@ -1458,8 +1599,17 @@ async function readPauseFile(dir) {
 }
 async function writePauseFile(dir, data) {
   await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, PAUSE_FILE), `${JSON.stringify(data, null, 2)}
+  const file = path.join(dir, PAUSE_FILE);
+  const temp = `${file}.${uniqueSuffix("part")}`;
+  try {
+    await writeFile(temp, `${JSON.stringify(data, null, 2)}
 `, "utf8");
+    await rename(temp, file);
+  } catch (failure) {
+    await rm(temp, { force: true }).catch(() => {
+    });
+    throw failure;
+  }
 }
 function sumStepSeconds(steps) {
   return (steps || []).reduce((sum, step) => sum + (Number(step?.seconds) || 0), 0);
@@ -1481,7 +1631,16 @@ function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
   return { fullPlan, plan: remaining, cursor, total };
 }
 function pickResumeOptions(args) {
-  const keys = ["mode", "ratio", "generateAudio", "watermark"];
+  const keys = [
+    "mode",
+    "ratio",
+    "generateAudio",
+    "watermark",
+    // 这几个是 video_extend 的口径（延长方向、提示词写法、整片时间轴位置）
+    "direction",
+    "wording",
+    "startAt"
+  ];
   const options = {};
   for (const key of keys) {
     if (args?.[key] !== void 0) options[key] = args[key];
@@ -1510,8 +1669,8 @@ function pauseRecordAt({ stamp, prompt, fullPlan, done, cursor, lastVideoUrl, op
     }))
   };
 }
-function resumeHint(dir, remainingSeconds) {
-  return `\u8981\u63A5\u7740\u505A\u5C31\u628A resume="${dir}" \u518D\u8C03\u4E00\u6B21 video_generate\uFF08prompt \u53EF\u4EE5\u7701\u7565\uFF0C\u5176\u4F59\u53C2\u6570\u7167\u65E7\uFF09\uFF1A\u63D2\u4EF6\u4F1A\u63A5\u7740\u5DF2\u7ECF\u751F\u6210\u7684\u5206\u6BB5\u7EE7\u7EED\uFF0C\u5269\u4E0B\u7684 ${remainingSeconds} \u79D2\u4E0D\u7528\u91CD\u5934\u751F\u6210\u3001\u4E0D\u4F1A\u91CD\u590D\u6263\u8D39\u3002`;
+function resumeHint(dir, remainingSeconds, toolName = "video_generate") {
+  return `\u8981\u63A5\u7740\u505A\u5C31\u628A resume="${dir}" \u518D\u8C03\u4E00\u6B21 ${toolName}\uFF08prompt \u53EF\u4EE5\u7701\u7565\uFF0C\u5176\u4F59\u53C2\u6570\u7167\u65E7\uFF09\uFF1A\u63D2\u4EF6\u4F1A\u63A5\u7740\u5DF2\u7ECF\u751F\u6210\u7684\u5206\u6BB5\u7EE7\u7EED\uFF0C\u5269\u4E0B\u7684 ${remainingSeconds} \u79D2\u4E0D\u7528\u91CD\u5934\u751F\u6210\u3001\u4E0D\u4F1A\u91CD\u590D\u6263\u8D39\u3002`;
 }
 async function remainingCostText(config, exec, remainingSteps) {
   try {
@@ -1534,7 +1693,13 @@ async function remainingCostText(config, exec, remainingSteps) {
     return { cost: `\u9884\u4F30\u8D39\u7528\u6CA1\u7B97\u51FA\u6765\uFF08${error?.message || error}\uFF09`, remain: "" };
   }
 }
-async function confirmNextSegment(ctx, config, exec, { done, finished, nextSeconds, remainingSteps }) {
+async function confirmNextSegment(ctx, config, exec, {
+  done,
+  finished,
+  nextSeconds,
+  remainingSteps,
+  toolName = "video_generate"
+}) {
   const approval = ctx?.get?.("approval");
   const agent = exec?.agent;
   if (!approval || typeof approval.request !== "function" || !agent) {
@@ -1550,7 +1715,7 @@ async function confirmNextSegment(ctx, config, exec, { done, finished, nextSecon
   try {
     const outcome = await approval.request({
       agent,
-      toolName: "video_generate",
+      toolName,
       ...exec?.callId ? { callId: exec.callId } : {},
       ...exec?.signal ? { signal: exec.signal } : {},
       reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u7EE7\u7EED\u751F\u6210\u7B2C ${done + 1} \u6BB5\u89C6\u9891\uFF08${nextSeconds} \u79D2\uFF09\u3002${alreadyDone}\uFF0C\u6574\u6761\u8FD8\u5DEE ${rest} \u79D2\uFF08${cost}${remain ? `\uFF1B${remain}` : ""}\uFF09\u3002`,
@@ -1567,7 +1732,7 @@ async function confirmNextSegment(ctx, config, exec, { done, finished, nextSecon
 function resolveRegisterApi(config) {
   return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-const PLUGIN_VERSION = true ? "2.13.0".trim().replace(/^v/i, "") : "";
+const PLUGIN_VERSION = true ? "2.14.0".trim().replace(/^v/i, "") : "";
 async function fetchDeviceQuota(config, signal) {
   const api = resolveRegisterApi(config);
   const deviceId = String(ref(config, "deviceId", "")).trim();
@@ -1647,7 +1812,7 @@ function setupGate(ctx, exec) {
   };
 }
 async function ffmpegConsentGate(config, exec, args) {
-  if (exec.name !== "video_generate") return null;
+  if (exec.name !== "video_generate" && exec.name !== "video_extend") return null;
   if (args?.merge === false) return null;
   let plan = null;
   let doneSteps = [];
@@ -1888,22 +2053,49 @@ async function waitForCompletion(config, taskId, signal) {
   }
 }
 function renderResult(value) {
-  const { status, segments = [], videoUrl, error } = value || {};
+  const {
+    status,
+    segments = [],
+    videoUrl,
+    error,
+    videoPath,
+    mergeMode,
+    segmentsDir,
+    paused,
+    resumeDir,
+    remainingSeconds,
+    note
+  } = value || {};
   const lines = segments.map((segment) => {
     const head = `\u7B2C ${segment.index} \u6BB5\uFF1A+${segment.seconds}s\uFF08\u4EFB\u52A1 ${segment.taskId}\uFF09`;
-    return segment.status === "succeeded" && segment.videoUrl ? `${head} \u2192 ${segment.videoUrl}` : `${head} \u2192 ${segment.status}${segment.error ? `\uFF1A${segment.error}` : ""}`;
+    if (segment.status !== "succeeded" || !segment.videoUrl) {
+      return `${head} \u2192 ${segment.status}${segment.error ? `\uFF1A${segment.error}` : ""}`;
+    }
+    return segment.localPath ? `${head} \u2192 ${segment.videoUrl}
+    \u672C\u5730\u6587\u4EF6\uFF1A${segment.localPath}` : `${head} \u2192 ${segment.videoUrl}`;
   });
   if (status === "succeeded") {
-    return [
-      {
-        type: "text",
-        text: [
-          "\u89C6\u9891\u5EF6\u957F\u6210\u529F\u3002",
-          ...lines,
-          `\u6700\u7EC8\u89C6\u9891\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF1A${videoUrl || "\uFF08\u65E0\uFF09"}`
-        ].join("\n")
-      }
-    ];
+    const parts = [];
+    if (paused) {
+      parts.push(
+        `\u5DF2\u5EF6\u957F\u5E76\u4EA4\u4ED8\u524D ${segments.length} \u6BB5\uFF08\u5171 ${formatSeconds(segments.reduce(
+          (sum, item) => sum + (item.seconds || 0),
+          0
+        ))} \u79D2\uFF09\uFF1A\u6BCF\u6BB5\u5EF6\u957F\u5B8C\u90FD\u4F1A\u95EE\u4E00\u6B21\u8981\u4E0D\u8981\u7EE7\u7EED\uFF1B\u8FD9\u6B21\u5148\u4EA4\u4ED8\u5230\u8FD9\u91CC\uFF08\u7528\u6237\u9009\u4E86\u5148\u4E0D\u7EE7\u7EED\uFF0C\u6216\u8FD9\u4E00\u8F6E\u88AB\u505C\u6B62 / \u7B49\u8D85\u65F6\u4E86\uFF09\u3002`
+      );
+    } else {
+      parts.push("\u89C6\u9891\u5EF6\u957F\u6210\u529F\u3002");
+    }
+    parts.push(...lines);
+    if (videoPath) parts.push(`\u6210\u7247\uFF08\u672C\u5730\u6587\u4EF6\uFF09\uFF1A${videoPath}\uFF08${mergeModeLabel(mergeMode)}\uFF09`);
+    if (paused && resumeDir) {
+      parts.push(
+        `\u8FD8\u6CA1\u751F\u6210\u7684\u90E8\u5206\uFF1A\u8FD8\u5269 ${formatSeconds(remainingSeconds)} \u79D2\u3002\u8981\u63A5\u7740\u505A\u5C31\u628A resume="${resumeDir}" \u4F20\u56DE video_extend\uFF08prompt \u53EF\u4EE5\u7701\u7565\uFF0C\u5176\u4F59\u53C2\u6570\u7167\u65E7\uFF09\uFF1A\u524D\u9762\u51E0\u6BB5\u4E0D\u4F1A\u91CD\u65B0\u751F\u6210\u3001\u4E0D\u4F1A\u91CD\u590D\u6263\u8D39\u3002`
+      );
+    }
+    parts.push(`\u6700\u7EC8\u89C6\u9891\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF1A${videoUrl || "\uFF08\u65E0\uFF09"}`);
+    if (note) parts.push(note);
+    return [{ type: "text", text: parts.filter(Boolean).join("\n") }];
   }
   if (status === "timeout") {
     return [
@@ -1948,17 +2140,21 @@ const SEGMENT_OUTPUT_SCHEMA = {
   type: "object",
   properties: {
     index: { type: "integer" },
+    kind: { type: "string" },
     seconds: { type: "integer" },
     taskId: { type: "string" },
     status: { type: "string" },
     videoUrl: { type: "string" },
+    localPath: { type: "string" },
+    durationSeconds: { type: "number" },
     error: { type: "string" }
   }
 };
-function extendTool(config) {
+function extendTool(config, deps, ctx) {
+  const TOOL_NAME = "video_extend";
   return {
     name: "video_extend",
-    description: "\u628A\u4E00\u6BB5\u5DF2\u6709\u7684\u89C6\u9891\u5411\u524D\u6216\u5411\u540E\u5EF6\u957F\uFF1A\u4EE5\u516C\u7F51\u89C6\u9891 URL \u4F5C\u4E3A\u8F93\u5165\u7D20\u6750\uFF0C\u8C03\u7528 Seedance \u751F\u6210\u8854\u63A5\u7247\u6BB5\uFF0C\u4FDD\u6301\u4EBA\u7269\u3001\u670D\u88C5\u3001\u573A\u666F\u5149\u7EBF\u548C\u58F0\u97F3\u8FDE\u7EED\uFF1B\u53EF\u4E00\u6B21\u8FDE\u7EED\u5EF6\u957F\u591A\u6BB5\uFF0C\u6BCF\u6BB5\u90FD\u7528\u4E0A\u4E00\u6BB5\u7684\u7ED3\u679C\u7EE7\u7EED\u5EF6\u957F\u3002\u63D0\u793A\u8BCD\u89C4\u5219\uFF1A\u4EE5\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D\u6216\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\u5F00\u5934\uFF08\u4E5F\u53EF\u5199\u300C\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A\u300D\uFF09\uFF0C\u5168\u7A0B\u7528\u300C\u89C6\u98911\u300D\u6307\u4EE3\u8F93\u5165\u7D20\u6750\uFF0C\u4E0D\u8981\u5199\u6210\u300C\u53C2\u8003\u89C6\u98911\u300D\uFF08\u4F1A\u88AB\u5F53\u6210\u53C2\u8003\u751F\u89C6\u9891\uFF0C\u4E0D\u662F\u5EF6\u957F\uFF09\uFF1B\u5185\u5BB9\u5199\u6E05\u5EF6\u957F\u65B9\u5411\u3001\u5267\u60C5\u53D1\u5C55\u3001\u4E3B\u4F53\u72B6\u6001\u3001\u955C\u5934\u8FD0\u52A8\u548C\u58F0\u97F3\u5EF6\u7EED\uFF08\u80CC\u666F\u97F3\u4E50\u8981\u63A5\u7740\u89C6\u98911\u7ED3\u5C3E\u5F80\u4E0B\u8D70\uFF0C\u7981\u6B62\u4ECE\u5934\u64AD\u653E/\u6362\u66F2\uFF09\uFF0C\u51CF\u5C11\u63A5\u7F1D\u3002\u6BCF\u6BB5 4-15 \u79D2\uFF0C\u9ED8\u8BA4\u6309 15 \u79D2\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\uFF1B\u4E0A\u6E38\u5BF9\u5361\u6EE1 15 \u79D2\u654F\u611F\u65F6\u518D\u8C03\u5C0F\u3002\u8FD4\u56DE\u6BCF\u6BB5\u7684\u4EFB\u52A1 ID \u548C\u6700\u7EC8\u89C6\u9891\u4E0B\u8F7D\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF1B\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout\u3001\u6216\u67D0\u6BB5\u8FD4\u56DE unknown\uFF08\u67E5\u8BE2\u5931\u8D25\u3001\u4EFB\u52A1\u5176\u5B9E\u5DF2\u63D0\u4EA4\uFF09\u65F6\uFF0C\u90FD\u7528\u8FD4\u56DE\u7684\u4EFB\u52A1 ID \u8D70 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u540C\u4E00\u6BB5\u3002",
+    description: "\u628A\u4E00\u6BB5\u5DF2\u6709\u7684\u89C6\u9891\u5411\u524D\u6216\u5411\u540E\u5EF6\u957F\uFF1A\u4EE5\u516C\u7F51\u89C6\u9891 URL \u4F5C\u4E3A\u8F93\u5165\u7D20\u6750\uFF0C\u8C03\u7528 Seedance \u751F\u6210\u8854\u63A5\u7247\u6BB5\uFF0C\u4FDD\u6301\u4EBA\u7269\u3001\u670D\u88C5\u3001\u573A\u666F\u5149\u7EBF\u548C\u58F0\u97F3\u8FDE\u7EED\uFF1B\u53EF\u4E00\u6B21\u8FDE\u7EED\u5EF6\u957F\u591A\u6BB5\uFF0C\u6BCF\u6BB5\u90FD\u7528\u4E0A\u4E00\u6BB5\u7684\u7ED3\u679C\u7EE7\u7EED\u5EF6\u957F\u3002\u63D0\u793A\u8BCD\u89C4\u5219\uFF1A\u4EE5\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D\u6216\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\u5F00\u5934\uFF08\u4E5F\u53EF\u5199\u300C\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A\u300D\uFF09\uFF0C\u5168\u7A0B\u7528\u300C\u89C6\u98911\u300D\u6307\u4EE3\u8F93\u5165\u7D20\u6750\uFF0C\u4E0D\u8981\u5199\u6210\u300C\u53C2\u8003\u89C6\u98911\u300D\uFF08\u4F1A\u88AB\u5F53\u6210\u53C2\u8003\u751F\u89C6\u9891\uFF0C\u4E0D\u662F\u5EF6\u957F\uFF09\uFF1B\u5185\u5BB9\u5199\u6E05\u5EF6\u957F\u65B9\u5411\u3001\u5267\u60C5\u53D1\u5C55\u3001\u4E3B\u4F53\u72B6\u6001\u3001\u955C\u5934\u8FD0\u52A8\u548C\u58F0\u97F3\u5EF6\u7EED\uFF08\u80CC\u666F\u97F3\u4E50\u8981\u63A5\u7740\u89C6\u98911\u7ED3\u5C3E\u5F80\u4E0B\u8D70\uFF0C\u7981\u6B62\u4ECE\u5934\u64AD\u653E/\u6362\u66F2\uFF09\uFF0C\u51CF\u5C11\u63A5\u7F1D\u3002\u6BCF\u6BB5 4-15 \u79D2\uFF0C\u9ED8\u8BA4\u6309 15 \u79D2\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\uFF1B\u4E0A\u6E38\u5BF9\u5361\u6EE1 15 \u79D2\u654F\u611F\u65F6\u518D\u8C03\u5C0F\u3002\u8FD4\u56DE\u6BCF\u6BB5\u7684\u4EFB\u52A1 ID \u548C\u6700\u7EC8\u89C6\u9891\u4E0B\u8F7D\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF1B\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout\u3001\u6216\u67D0\u6BB5\u8FD4\u56DE unknown\uFF08\u67E5\u8BE2\u5931\u8D25\u3001\u4EFB\u52A1\u5176\u5B9E\u5DF2\u63D0\u4EA4\uFF09\u65F6\uFF0C\u90FD\u7528\u8FD4\u56DE\u7684\u4EFB\u52A1 ID \u8D70 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u540C\u4E00\u6BB5\u3002\u6BCF\u6BB5\u5EF6\u957F\u5B8C\u90FD\u4F1A\u5148\u5F39\u4E00\u6B21\u786E\u8BA4\u6846\u95EE\u7528\u6237\u8981\u4E0D\u8981\u7EE7\u7EED\uFF1A\u70B9\u300C\u62D2\u7EDD\u300D\u5C31\u5148\u4EA4\u4ED8\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u90E8\u5206\uFF0C\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir\u3001remainingSeconds\uFF1B\u4E4B\u540E\u7528\u6237\u8BF4\u300C\u7EE7\u7EED\u300D\u65F6\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_extend \u7684 resume \u53C2\u6570\u63A5\u7740\u505A\uFF08\u524D\u9762\u51E0\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\u3001\u4E0D\u91CD\u590D\u6263\u8D39\uFF09\u3002\u591A\u6BB5\u9ED8\u8BA4\u4F1A\u4E0B\u8F7D\u5206\u6BB5\u5E76\u5728\u672C\u673A\u5408\u5E76\u6210\u4E00\u6761\u6210\u7247\uFF08\u9700\u8981 ffmpeg\uFF09\uFF1A\u6CA1\u6709 ffmpeg \u65F6\u4F1A\u5148\u62E6\u4E0B\u6765\u95EE\u7528\u6237\uFF0C\u7ED3\u679C\u91CC\u4E5F\u4F1A\u5E26 ffmpegMissing \u4E0E\u5B89\u88C5\u5F15\u5BFC\u3002\u4E2D\u9014\u88AB\u505C\u6B62 / \u7B49\u8D85\u65F6\u540C\u7406\uFF1A\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u6BB5\u5148\u4EA4\u4ED8\uFF0C\u5269\u4E0B\u7684\u7528 resume \u63A5\u7740\u505A\u3002",
     parameters: {
       type: "object",
       properties: {
@@ -2018,6 +2214,10 @@ function extendTool(config) {
         watermark: {
           type: "boolean",
           description: "\u662F\u5426\u6DFB\u52A0\u6C34\u5370\uFF0C\u9ED8\u8BA4 false\u3002"
+        },
+        resume: {
+          type: "string",
+          description: "\u63A5\u7740\u4E0A\u4E00\u6B21\u6682\u505C\u7684\u5EF6\u957F\u7EE7\u7EED\uFF1A\u4F20\u4E0A\u4E00\u6B21\u7ED3\u679C\u91CC\u7684 resumeDir\u3002\u63D2\u4EF6\u4F1A\u6CBF\u7528\u6682\u505C\u8BB0\u5F55\u91CC\u7684\u63D0\u793A\u8BCD\u3001\u5EF6\u957F\u65B9\u5411\u548C\u5269\u4E0B\u7684\u6BB5\u6570\uFF0C\u53EA\u628A\u6CA1\u505A\u7684\u90E8\u5206\u751F\u6210\u5B8C\u518D\u5408\u5E76\uFF1Bprompt / videoUrl / direction \u90FD\u53EF\u4EE5\u7701\u7565\u3002\u60F3\u987A\u624B\u591A\u5EF6\u957F\u51E0\u6BB5\u5C31\u518D\u4F20 segments\uFF08\u8868\u793A\u5728\u5269\u4E0B\u7684\u57FA\u7840\u4E0A\u300C\u518D\u52A0\u300D\u51E0\u6BB5\uFF09\u3002"
         }
       },
       required: ["prompt"]
@@ -2028,9 +2228,20 @@ function extendTool(config) {
         properties: {
           status: { type: "string" },
           videoUrl: { type: "string" },
+          videoPath: { type: "string" },
+          merged: { type: "boolean" },
+          mergeMode: { type: "string" },
+          segmentsDir: { type: "string" },
+          ffmpegMissing: { type: "boolean" },
+          installHint: { type: "string" },
+          partial: { type: "boolean" },
+          paused: { type: "boolean" },
+          resumeDir: { type: "string" },
+          remainingSeconds: { type: "integer" },
           totalSeconds: { type: "integer" },
           error: { type: "string" },
           errorCode: { type: "string" },
+          note: { type: "string" },
           segments: { type: "array", items: SEGMENT_OUTPUT_SCHEMA }
         }
       },
@@ -2045,9 +2256,15 @@ function extendTool(config) {
     async execute(args, exec) {
       const apiKey = resolveApiKey(config);
       assertConfigured(config, apiKey);
-      const prompt = String(args?.prompt ?? "").trim();
-      if (!prompt) throw new Error("\u63D0\u793A\u8BCD prompt \u4E0D\u80FD\u4E3A\u7A7A\u3002");
-      const direction = args?.direction === "forward" ? "forward" : "backward";
+      const resumeDir = resumeDirOf(args?.resume);
+      const resume = resumeDir ? await readPauseFile(resumeDir) : null;
+      const prompt = String(args?.prompt ?? "").trim() || String(resume?.prompt ?? "").trim();
+      if (!prompt) {
+        throw new Error(resumeDir ? "\u8FD9\u6B21\u662F\u63A5\u7740\u4E0A\u4E00\u6B21\u6682\u505C\u7684\u5EF6\u957F\u7EE7\u7EED\uFF0C\u4F46\u6682\u505C\u8BB0\u5F55\u91CC\u6CA1\u6709\u63D0\u793A\u8BCD\uFF1A\u8BF7\u628A prompt \u8865\u4E0A\u3002" : "\u63D0\u793A\u8BCD prompt \u4E0D\u80FD\u4E3A\u7A7A\u3002");
+      }
+      const lastOptions = resume ? resume.options || {} : {};
+      const direction = (args?.direction ?? lastOptions.direction) === "forward" ? "forward" : "backward";
+      const wording = (args?.wording ?? lastOptions.wording) === "after" ? "after" : "extend";
       const requestedSegments = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
       const secondsPerSegment = clampInteger(
         args?.duration ?? ref(config, "duration", 5),
@@ -2074,49 +2291,202 @@ function extendTool(config) {
           );
         }
       }
+      if (!referenceUrl && resume) referenceUrl = String(resume.lastVideoUrl ?? "").trim();
       referenceUrl = normalizeReferenceUrl(referenceUrl);
-      let cursor = args?.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
+      const doneBefore = resume ? Number(resume.done) || 0 : 0;
+      const fullPlan = resume ? (resume.plan || []).map((step) => ({ ...step })) : [];
+      if (!resume) {
+        for (let index = 0; index < requestedSegments; index += 1) {
+          fullPlan.push({ kind: "extend", seconds: secondsPerSegment });
+        }
+      } else if (args?.segments != null) {
+        for (let index = 0; index < requestedSegments && fullPlan.length < MAX_SEGMENTS; index += 1) {
+          fullPlan.push({ kind: "extend", seconds: secondsPerSegment });
+        }
+      }
+      const plan = fullPlan.slice(doneBefore);
+      const plannedSeconds = plan.reduce((sum, step) => sum + step.seconds, 0);
+      let cursor = resume ? resume.cursor ?? null : args?.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
+      const notes = [];
       const segments = [];
+      if (resume) {
+        for (const step of resume.steps || []) {
+          segments.push({
+            index: step.index,
+            kind: "extend",
+            seconds: step.seconds,
+            taskId: step.taskId,
+            status: "succeeded",
+            videoUrl: step.videoUrl
+          });
+        }
+      }
       let status = "succeeded";
       let error;
       let errorCode;
-      for (let index = 1; index <= requestedSegments; index += 1) {
-        if (exec?.signal?.aborted) throw abortError();
-        const { body, seconds } = buildRequestBody(
-          config,
-          { ...args, prompt, duration: secondsPerSegment, startAt: cursor },
-          referenceUrl
+      let paused = false;
+      let confirmWarned = false;
+      let interrupted = false;
+      try {
+        for (const [offset, step] of plan.entries()) {
+          if (exec?.signal?.aborted) throw abortError();
+          const position = doneBefore + offset;
+          const { body, seconds } = buildRequestBody(
+            config,
+            {
+              ...lastOptions,
+              ...args,
+              prompt,
+              duration: step.seconds,
+              startAt: cursor,
+              direction,
+              wording
+            },
+            referenceUrl
+          );
+          const final = await runTask(config, body, exec?.signal);
+          const taskId = final.taskId;
+          segments.push({
+            index: position + 1,
+            kind: "extend",
+            seconds,
+            taskId,
+            status: final.status,
+            videoUrl: final.videoUrl,
+            error: final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error
+          });
+          if (final.status !== "succeeded" || !final.videoUrl) {
+            status = final.status;
+            errorCode = final.errorCode;
+            error = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error;
+            break;
+          }
+          referenceUrl = normalizeReferenceUrl(final.videoUrl);
+          if (cursor != null) {
+            cursor = direction === "forward" ? cursor - seconds : cursor + seconds;
+            if (cursor < 0) cursor = null;
+          }
+          const nextStep = plan[offset + 1];
+          if (nextStep) {
+            const verdict = await confirmNextSegment(ctx, config, exec, {
+              done: position + 1,
+              finished: segments,
+              nextSeconds: nextStep.seconds,
+              remainingSteps: plan.slice(offset + 1),
+              toolName: TOOL_NAME
+            });
+            if (verdict.outcome === "rejected" || verdict.outcome === "cancelled") {
+              paused = true;
+              notes.push(
+                `\u7B2C ${position + 1} \u6BB5\uFF08${formatSeconds(seconds)} \u79D2\uFF09\u5EF6\u957F\u597D\u4E4B\u540E\uFF0C` + (verdict.outcome === "rejected" ? "\u7528\u6237\u9009\u62E9\u5148\u4E0D\u7EE7\u7EED\u5F80\u4E0B\u5EF6\u957F" : "\u786E\u8BA4\u6846\u88AB\u53D6\u6D88") + "\uFF1A\u5148\u628A\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u90E8\u5206\u4EA4\u4ED8\uFF0C\u5269\u4E0B\u7684\u968F\u65F6\u53EF\u4EE5\u63A5\u7740\u505A\u3002"
+              );
+              break;
+            }
+            if (verdict.outcome === "unavailable" && !confirmWarned) {
+              confirmWarned = true;
+              notes.push(
+                `\u8FD9\u6B21\u6CA1\u80FD\u5F39\u300C\u8981\u4E0D\u8981\u7EE7\u7EED\u300D\u7684\u786E\u8BA4\u6846\uFF08${verdict.reason}\uFF09\uFF0C\u540E\u9762\u7684\u5206\u6BB5\u6309\u5DF2\u7ECF\u786E\u8BA4\u8FC7\u7684\u8BA1\u5212\u7EE7\u7EED\u751F\u6210\u3002`
+              );
+            }
+          }
+        }
+      } catch (failure) {
+        const doneYet = segments.some((segment) => segment.status === "succeeded" && segment.videoUrl);
+        if (failure?.code !== "ABORTED" || !doneYet) throw failure;
+        interrupted = true;
+        paused = true;
+        notes.push(
+          "\u8FD9\u6B21\u8C03\u7528\u88AB\u4E2D\u65AD\u4E86\uFF08\u7528\u6237\u70B9\u4E86\u505C\u6B62\uFF0C\u6216\u8005\u7B49\u8D85\u65F6\u4E86\uFF09\uFF1A\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u90E8\u5206\u4F1A\u5148\u4E0B\u8F7D\u3001\u5408\u5E76\u3001\u4EA4\u4ED8\uFF0C\u5269\u4E0B\u7684\u6BB5\u4E0D\u7528\u91CD\u5934\u518D\u6765\u2014\u2014\u7528 resume \u5C31\u80FD\u63A5\u7740\u505A\u3002"
         );
-        const final = await runTask(config, body, exec?.signal);
-        const taskId = final.taskId;
-        segments.push({
-          index,
-          seconds,
-          taskId,
-          status: final.status,
-          videoUrl: final.videoUrl,
-          error: final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error
-        });
-        if (final.status !== "succeeded" || !final.videoUrl) {
-          status = final.status;
-          errorCode = final.errorCode;
-          error = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error;
-          break;
-        }
-        referenceUrl = normalizeReferenceUrl(final.videoUrl);
-        if (cursor != null) {
-          cursor = direction === "forward" ? cursor - seconds : cursor + seconds;
-          if (cursor < 0) cursor = null;
-        }
       }
-      return {
+      const completed = segments.filter((segment) => segment.status === "succeeded" && segment.videoUrl);
+      const deliveredSeconds = completed.reduce((sum, segment) => sum + (segment.seconds || 0), 0);
+      const result = {
         status,
         error,
         errorCode,
         segments,
-        videoUrl: segments.filter((segment) => segment.videoUrl).at(-1)?.videoUrl,
-        totalSeconds: segments.filter((segment) => segment.status === "succeeded").length * secondsPerSegment
+        videoUrl: completed.at(-1)?.videoUrl,
+        totalSeconds: deliveredSeconds
       };
+      if (!completed.length) {
+        if (notes.length) result.note = notes.join("\n");
+        return result;
+      }
+      if (status !== "succeeded") {
+        notes.push(`\u5DF2\u628A\u6210\u529F\u7684 ${completed.length} \u6BB5\uFF08${deliveredSeconds} \u79D2\uFF09\u4EA4\u4ED8\uFF0C\u53EF\u4F5C\u4E3A\u6B8B\u7247\u4F7F\u7528\u3002`);
+        result.partial = true;
+      }
+      if (resume) {
+        notes.push(
+          `\u63A5\u7740\u4E0A\u4E00\u6B21\u6682\u505C\u7684\u8FDB\u5EA6\u7EE7\u7EED\uFF1A\u524D\u9762 ${doneBefore} \u6BB5\uFF08${formatSeconds(resume.cursor ?? 0)}\uFF09\u4E0D\u91CD\u65B0\u751F\u6210\uFF0C\u8FD9\u6B21\u8FD8\u8981\u5EF6\u957F ${plan.length} \u6BB5\u5171 ${plannedSeconds} \u79D2\u3002`
+        );
+      }
+      const outDir = await resolveOutputDir(config, exec, deps);
+      const { stamp, segmentsDir } = resume ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir } : await allocateStamp(outDir, fileStamp());
+      const delivery = await downloadSegmentsAndMerge(config, {
+        segments: completed,
+        segmentsDir,
+        outDir,
+        stamp,
+        notes,
+        keepSingleFile: paused,
+        // 被中断时请求信号已经 abort：收尾（下载 + 合并）不能被它打断，否则等于白生成。
+        signal: interrupted ? void 0 : exec?.signal
+      });
+      if (delivery.error) {
+        result.segmentsDir = delivery.segmentsDir;
+        result.note = notes.join("\n");
+        return result;
+      }
+      if (delivery.ffmpegMissing) {
+        result.segmentsDir = delivery.segmentsDir;
+        result.merged = false;
+        result.ffmpegMissing = true;
+        result.installHint = delivery.installHint;
+        result.note = notes.join("\n");
+        return result;
+      }
+      if (!delivery.files.length) {
+        result.note = notes.join("\n");
+        return result;
+      }
+      if (delivery.merged) {
+        result.merged = true;
+        result.videoPath = delivery.videoPath;
+        result.mergeMode = delivery.mergeMode;
+      }
+      if (paused) {
+        result.segmentsDir = segmentsDir;
+        result.resumeDir = segmentsDir;
+        result.paused = true;
+        result.remainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - deliveredSeconds);
+        try {
+          await writePauseFile(segmentsDir, pauseRecordAt({
+            stamp,
+            prompt,
+            fullPlan,
+            done: segments.length,
+            cursor,
+            lastVideoUrl: referenceUrl,
+            options: { ...pickResumeOptions(args), direction, wording, startAt: cursor },
+            segments
+          }));
+        } catch (failure) {
+          notes.push(`\u6682\u505C\u8BB0\u5F55\u6CA1\u5199\u6210\uFF08${failure?.message || failure}\uFF09\uFF1A\u8981\u63A5\u7740\u505A\u53EA\u80FD\u7528\u4E0A\u9762\u7684\u94FE\u63A5\u91CD\u65B0\u5EF6\u957F\u3002`);
+        }
+        notes.push(`\u5DF2\u4EA4\u4ED8\u7684\u6210\u7247\u662F\u5230\u7B2C ${segments.length} \u6BB5\uFF0C\u5206\u6BB5\u4ECD\u4FDD\u7559\u5728 ${segmentsDir}\u3002`);
+        notes.push(resumeHint(segmentsDir, result.remainingSeconds, TOOL_NAME));
+        result.note = notes.join("\n");
+        return result;
+      }
+      if (args?.keepSegments ?? ref(config, "keepSegments", false)) {
+        result.segmentsDir = segmentsDir;
+      } else {
+        await rm(segmentsDir, { recursive: true, force: true });
+      }
+      if (notes.length) result.note = notes.join("\n");
+      return result;
     }
   };
 }
@@ -2134,6 +2504,13 @@ const VIDEO_SEGMENT_OUTPUT_SCHEMA = {
     error: { type: "string" }
   }
 };
+function mergeModeLabel(mergeMode) {
+  if (mergeMode === "copy") return "\u65E0\u635F\u62FC\u63A5";
+  if (mergeMode === "segment") return "\u8FD9\u4E00\u6BB5\u6682\u65F6\u6309\u539F\u59CB\u5206\u6BB5\u4EA4\u4ED8\uFF08\u7EED\u505A\u65F6\u518D\u548C\u540E\u9762\u7684\u6BB5\u5408\u5E76\uFF09";
+  if (mergeMode === "single") return "\u4E00\u6BB5\u76F4\u51FA\uFF0C\u65E0\u9700\u62FC\u63A5";
+  if (mergeMode === "seamless") return "\u65E0\u7F1D\u62FC\u63A5\uFF08\u5BF9\u9F50\u63A5\u7F1D + \u753B\u9762/\u97F3\u9891\u4EA4\u53C9\u6DE1\u5316\uFF0C\u97F3\u4E50\u63A5\u7F1D\u5DF2\u6DE1\u5316\uFF09";
+  return "\u91CD\u7F16\u7801\u62FC\u63A5";
+}
 function renderVideoResult(value) {
   const {
     status,
@@ -2163,7 +2540,7 @@ function renderVideoResult(value) {
   if (status === "succeeded") {
     if (paused) {
       parts.push(
-        `\u5DF2\u751F\u6210\u5E76\u4EA4\u4ED8\u524D ${segments.length} \u6BB5\uFF08\u5171 ${formatSeconds(segments.length ? segments.reduce((sum, item) => sum + (item.seconds || 0), 0) : 0)} \u79D2\uFF09\uFF1A\u6BCF\u6BB5\u751F\u6210\u5B8C\u90FD\u4F1A\u95EE\u4E00\u6B21\u8981\u4E0D\u8981\u7EE7\u7EED\uFF0C\u8FD9\u6B21\u7528\u6237\u9009\u4E86\u5148\u4E0D\u7EE7\u7EED\u3002`
+        `\u5DF2\u751F\u6210\u5E76\u4EA4\u4ED8\u524D ${segments.length} \u6BB5\uFF08\u5171 ${formatSeconds(segments.length ? segments.reduce((sum, item) => sum + (item.seconds || 0), 0) : 0)} \u79D2\uFF09\uFF1A\u6BCF\u6BB5\u751F\u6210\u5B8C\u90FD\u4F1A\u95EE\u4E00\u6B21\u8981\u4E0D\u8981\u7EE7\u7EED\uFF1B\u8FD9\u6B21\u5148\u4EA4\u4ED8\u5230\u8FD9\u91CC\uFF08\u7528\u6237\u9009\u4E86\u5148\u4E0D\u7EE7\u7EED\uFF0C\u6216\u8FD9\u4E00\u8F6E\u88AB\u505C\u6B62 / \u7B49\u8D85\u65F6\u4E86\uFF09\u3002`
       );
     } else if (mode === "extended") {
       parts.push(`\u89C6\u9891\u751F\u6210\u6210\u529F\uFF1A\u5148\u76F4\u51FA ${formatSeconds(segments[0]?.seconds)} \u79D2\uFF0C\u518D\u5EF6\u957F ${segments.length - 1} \u6BB5\u3002`);
@@ -2184,8 +2561,7 @@ function renderVideoResult(value) {
   parts.push(...lines);
   if (status === "succeeded") {
     if (videoPath) {
-      const how = mergeMode === "copy" ? "\u65E0\u635F\u62FC\u63A5" : mergeMode === "segment" ? "\u8FD9\u4E00\u6BB5\u6682\u65F6\u6309\u539F\u59CB\u5206\u6BB5\u4EA4\u4ED8\uFF08\u7EED\u505A\u65F6\u518D\u548C\u540E\u9762\u7684\u6BB5\u5408\u5E76\uFF09" : mergeMode === "single" ? "\u4E00\u6BB5\u76F4\u51FA\uFF0C\u65E0\u9700\u62FC\u63A5" : mergeMode === "seamless" ? "\u65E0\u7F1D\u62FC\u63A5\uFF08\u5BF9\u9F50\u63A5\u7F1D + \u753B\u9762/\u97F3\u9891\u4EA4\u53C9\u6DE1\u5316\uFF0C\u97F3\u4E50\u63A5\u7F1D\u5DF2\u6DE1\u5316\uFF09" : "\u91CD\u7F16\u7801\u62FC\u63A5";
-      parts.push(`\u6210\u7247\uFF08\u672C\u5730\u6587\u4EF6\uFF09\uFF1A${videoPath}\uFF08${how}\uFF09`);
+      parts.push(`\u6210\u7247\uFF08\u672C\u5730\u6587\u4EF6\uFF09\uFF1A${videoPath}\uFF08${mergeModeLabel(mergeMode)}\uFF09`);
     } else if (segmentsDir) {
       parts.push(`\u6CA1\u6709\u5408\u5E76\u6210\u4E00\u6761\uFF1A\u5206\u6BB5\u6587\u4EF6\u90FD\u5728 ${segmentsDir}\uFF08\u6BCF\u6BB5\u8DEF\u5F84\u89C1\u4E0A\u9762\u7684\u5217\u8868\uFF09\u3002`);
     } else {
@@ -2206,6 +2582,7 @@ function renderVideoResult(value) {
   return [{ type: "text", text: parts.filter(Boolean).join("\n") }];
 }
 function videoTool(config, deps, ctx) {
+  const TOOL_NAME = "video_generate";
   return {
     name: "video_generate",
     description: `\u751F\u6210\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\uFF08\u89C6\u9891\u751F\u6210\u7684\u9996\u9009\u5DE5\u5177\uFF09\uFF0Cduration \u662F\u76EE\u6807\u603B\u79D2\u6570\uFF1A\u4E0D\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\uFF08\u9ED8\u8BA4 15 \u79D2\uFF09\u65F6\u4E00\u6B21\u76F4\u51FA\uFF1B**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 \u5355\u6BB5\u4E0A\u9650\u7684\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u62C6\u6210\u591A\u6BB5 / \u591A\u955C / \u591A\u6B21\u8C03\u7528\u518D\u62FC\u63A5**\uFF08\u4F8B\u5982\u300C15 \u79D2\u300D\u4E0D\u8BB8\u62C6\u6210 8+7\uFF09\uFF1B\u591A\u955C\u53EA\u5728\u7528\u6237\u660E\u786E\u8981\u6C42\u591A\u955C\u65F6\u624D\u7528\u3002\u66F4\u957F\u65F6\u5148\u76F4\u51FA\u9996\u6BB5\uFF0C\u518D\u628A\u5269\u4F59\u65F6\u957F\u6309 4-15 \u79D2\u5747\u5206\u9010\u6BB5\u7EED\u62CD\uFF08\u9ED8\u8BA4\u5403\u6EE1\u4E0A\u9650\u3001\u6BB5\u6570\u6700\u5C11\uFF0C\u6700\u957F ${MAX_TOTAL_SECONDS} \u79D2\uFF09\u2014\u2014\u8FD9\u662F\u540C\u4E00\u4E2A\u955C\u5934\u7684\u7EED\u62CD\u5EF6\u957F\uFF0C\u4E5F\u4E0D\u662F\u591A\u955C\u62FC\u63A5\uFF0C\u6700\u540E\u7528 ffmpeg \u5408\u5E76\u6210\u4E00\u4E2A\u672C\u5730\u6210\u7247\u6587\u4EF6\uFF0C\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\uFF0C\u6587\u4EF6\u540D\u5F62\u5982 20261027-201530-25s.mp4\u300220 \u79D2\u300125 \u79D2\u8FD9\u7C7B\u76EE\u6807\u4E0D\u7528\u62C6\u6210\u591A\u4E2A\u4EFB\u52A1\uFF1A\u76F4\u63A5\u4F20 duration=20 \u5373\u53EF\uFF0820 \u79D2 \u2192 15+5\uFF0C25 \u79D2 \u2192 15+10\uFF09\u3002**\u6BCF\u6BB5\u751F\u6210\u5B8C\u90FD\u4F1A\u5148\u5F39\u4E00\u6B21\u786E\u8BA4\u6846\u95EE\u7528\u6237\u8981\u4E0D\u8981\u7EE7\u7EED**\uFF08\u5FAA\u73AF\u8FED\u4EE3\uFF09\uFF1A\u7528\u6237\u70B9\u300C\u62D2\u7EDD\u300D\u5C31\u505C\u4E0B\uFF0C\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\uFF0C\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir \u548C remainingSeconds\uFF1B\u4E4B\u540E\u7528\u6237\u8BF4\u300C\u7EE7\u7EED\u300D\u65F6\uFF0C\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_generate \u7684 resume \u53C2\u6570\u63A5\u7740\u505A\uFF08\u524D\u9762\u51E0\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\u3001\u4E0D\u91CD\u590D\u6263\u8D39\uFF09\uFF0C\u4E0D\u8981\u4ECE\u5934\u518D\u751F\u6210\u4E00\u904D\u3001\u4E5F\u4E0D\u8981\u6539\u7528 video_extend \u62FC\u3002\u6CA1\u6709\u53EF\u7528\u786E\u8BA4\u901A\u9053\u65F6\u4E0D\u4F1A\u5361\u4F4F\uFF0C\u4F1A\u6309\u5DF2\u786E\u8BA4\u7684\u8BA1\u5212\u7EE7\u7EED\u5E76\u5728 note \u91CC\u8BF4\u660E\u3002\u8FD4\u56DE\u6BCF\u6BB5\u4EFB\u52A1 ID\u3001\u4E0A\u6E38\u94FE\u63A5\u548C\u6210\u7247\u8DEF\u5F84\u3002\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF08\u6BCF\u6BB5\u5355\u72EC\u751F\u6210\uFF09\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout\u3001\u6216\u67D0\u6BB5\u8FD4\u56DE unknown\uFF08\u67E5\u8BE2\u5931\u8D25\u3001\u4EFB\u52A1\u5176\u5B9E\u5DF2\u63D0\u4EA4\uFF09\u65F6\uFF0C\u90FD\u7528\u8FD4\u56DE\u7684\u4EFB\u52A1 ID \u8D70 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u65B0\u4EFB\u52A1\u2014\u2014\u91CD\u590D\u63D0\u4EA4\u4F1A\u91CD\u590D\u6263\u8D39\uFF0C\u67E5\u8BE2\u5931\u8D25\u4E0D\u4EE3\u8868\u6CA1\u6709\u751F\u6210\u3002**\u8C03\u7528\u524D\u5FC5\u987B\u5148\u8BA9\u7528\u6237\u5BA1\u6838\u8FC7\u811A\u672C\u3001\u5E76\u786E\u8BA4\u5F00\u59CB\u5236\u4F5C**\uFF08\u4E24\u9053\u786E\u8BA4\u7F3A\u4E00\u4E0D\u53EF\uFF09\uFF0C\u4E0D\u8981\u8DF3\u8FC7\u811A\u672C\u76F4\u63A5\u751F\u6210\u3002\u5408\u5E76\u9700\u8981\u672C\u673A\u6709 ffmpeg\u3002\u672C\u673A\u6CA1\u88C5 ffmpeg \u65F6\uFF0C\u63D2\u4EF6\u4F1A**\u5148\u628A\u8FD9\u6B21\u8C03\u7528\u62E6\u56DE\u6765\uFF08\u4E0D\u4F1A\u8C03\u7528\u6A21\u578B\u3001\u4E0D\u4EA7\u751F\u8D39\u7528\uFF09**\uFF0C\u8FD4\u56DE\u7684\u8BF4\u660E\u91CC\u5E26\u7740\u6309\u7CFB\u7EDF\u7ED9\u7684\u5B89\u88C5\u547D\u4EE4 \u2014\u2014\u8FD9\u65F6\u8981\u5728\u5BF9\u8BDD\u6846\u91CC\u548C\u7528\u6237\u786E\u8BA4\uFF1A\u95EE\u4ED6\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg\uFF08\u7ED9\u51FA\u4ED6\u7CFB\u7EDF\u7684\u547D\u4EE4\uFF0C\u8BF4\u660E\u88C5\u597D\u91CD\u8DD1\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\u3001\u5206\u6BB5\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\uFF0C\u540C\u610F\u5C31\u7528\u7EC8\u7AEF\u5DE5\u5177\u88C5\u4E0A\uFF08\u5BBF\u4E3B\u4F1A\u8BA9\u4ED6\u786E\u8BA4\uFF09\u5E76 \`ffmpeg -version\` \u9A8C\u8BC1\uFF0C\u7136\u540E\u6309\u540C\u6837\u7684 duration \u91CD\u53D1\uFF1B\u7528\u6237\u4E0D\u60F3\u88C5\u5C31\u5E26 merge:false \u91CD\u53D1\uFF0C\u63D2\u4EF6\u53EA\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u4E0A\u6E38\u94FE\u63A5 + \u672C\u5730\u6587\u4EF6\uFF09\u3002\u62FF\u5230 ffmpegMissing=true \u7684\u7ED3\u679C\u65F6\u4E5F\u8981\u7167 installHint \u5F15\u5BFC\u5B89\u88C5\uFF0C\u522B\u53EA\u4E22\u4E00\u53E5\u300C\u5DF2\u8DF3\u8FC7\u5408\u5E76\u300D\u3002**\u4EBA\u7269\u5F62\u8C61 / \u53C2\u8003\u56FE**\uFF1A\u516C\u7F51\u56FE\u7247 URL\u3001base64\uFF08data URI \u6216\u7EAF base64\uFF09\u3001\u672C\u673A\u56FE\u7247\u8DEF\u5F84\uFF0C\u6216\u7B80\u5199 \`latest\` \u90FD\u652F\u6301\u2014\u2014\u8981\u56FA\u5B9A\u4EBA\u7269\u957F\u76F8\u3001\u670D\u88C5\u3001\u573A\u666F\u65F6\u4F20 referenceImages\uFF08\u4E00\u6B21\u53EA\u8BA4\u7B2C\u4E00\u5F20\uFF09\uFF1B\u9996\u5E27 / \u5C3E\u5E27\u7528 firstFrameUrl / lastFrameUrl \u4F20\u3002\u516C\u7F51 URL \u76F4\u63A5\u4EA4\u7ED9\u4E2D\u8F6C\u7AD9\u53D6\u56FE\uFF1B\u672C\u5730\u56FE\u7247\u7531\u63D2\u4EF6\u8BFB\u8FDB\u6765\uFF08\u6309 ratio \u5148\u9002\u914D\u753B\u5E45\uFF09\u5185\u8054\u6210 image_url \u53D1\u7ED9\u4E2D\u8F6C\u7AD9\uFF0C\u7528\u6237\u4E0D\u9700\u8981\u81EA\u5DF1\u627E\u56FE\u5E8A\u3002**\u7528\u6237\u8BF4\u300C\u5C31\u7528\u6211\u521A\u4E0A\u4F20/\u521A\u62D6\u8FDB\u6765\u7684\u90A3\u5F20\u56FE\u300D\u65F6\u76F4\u63A5\u4F20 \`latest\`**\uFF08\`latest:2\` \u53D6\u7B2C 2 \u65B0\u7684\uFF09\uFF1A\u63D2\u4EF6\u4F1A\u53BB Harness \u9644\u4EF6\u5E93\u91CC\u627E\u6700\u8FD1 2 \u5C0F\u65F6\u4E0A\u4F20\u7684\u56FE\u7247\u2014\u2014\u54EA\u6015\u5F53\u524D\u804A\u5929\u6A21\u578B\u4E0D\u652F\u6301\u56FE\u7247\u3001\u9644\u4EF6\u88AB \`MODEL_DOES_NOT_SUPPORT_IMAGES\` \u62E6\u4E0B\uFF0C\u56FE\u7247\u672C\u8EAB\u4E5F\u5DF2\u7ECF\u843D\u76D8\uFF0C\u7167\u6837\u80FD\u7528\u3002\u522B\u5728\u8FD9\u65F6\u8BF4\u300C\u6211\u770B\u4E0D\u5230\u56FE\u7247\u300D\uFF0C\u4E5F\u522B\u8BA9\u7528\u6237\u81EA\u5DF1\u53BB\u627E\u8DEF\u5F84\u3002`,
@@ -2370,72 +2747,83 @@ function videoTool(config, deps, ctx) {
       let paused = false;
       let confirmWarned = false;
       const resumeOptions = restarted ? resume.options || {} : {};
-      for (const [offset, step] of plan.entries()) {
-        if (exec?.signal?.aborted) throw abortError();
-        const position = doneBefore + offset;
-        const stepArgs = {
-          ...resumeOptions,
-          ...args,
-          prompt,
-          duration: step.seconds,
-          // 这条流程是「先直出再向后续拍」，分段的拼接顺序固定为向后延长。
-          direction: "backward",
-          startAt: step.kind === "extend" ? cursor : void 0
-        };
-        let body;
-        let seconds;
-        if (step.kind === "generate") {
-          const generated = await buildGenerationBody(config, stepArgs, step.seconds, {
-            signal: exec?.signal
+      let interrupted = false;
+      try {
+        for (const [offset, step] of plan.entries()) {
+          if (exec?.signal?.aborted) throw abortError();
+          const position = doneBefore + offset;
+          const stepArgs = {
+            ...resumeOptions,
+            ...args,
+            prompt,
+            duration: step.seconds,
+            // 这条流程是「先直出再向后续拍」，分段的拼接顺序固定为向后延长。
+            direction: "backward",
+            startAt: step.kind === "extend" ? cursor : void 0
+          };
+          let body;
+          let seconds;
+          if (step.kind === "generate") {
+            const generated = await buildGenerationBody(config, stepArgs, step.seconds, {
+              signal: exec?.signal
+            });
+            body = generated.body;
+            seconds = generated.seconds;
+            if (generated.images?.length) resultImages.push(...generated.images);
+            if (generated.notes?.length) notes.push(...generated.notes);
+          } else {
+            ({ body, seconds } = buildRequestBody(config, stepArgs, referenceUrl));
+          }
+          const final = await runTask(config, body, exec?.signal);
+          const detail = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error;
+          segments.push({
+            index: position + 1,
+            kind: step.kind,
+            seconds,
+            taskId: final.taskId,
+            status: final.status,
+            videoUrl: final.videoUrl,
+            error: detail
           });
-          body = generated.body;
-          seconds = generated.seconds;
-          if (generated.images?.length) resultImages.push(...generated.images);
-          if (generated.notes?.length) notes.push(...generated.notes);
-        } else {
-          ({ body, seconds } = buildRequestBody(config, stepArgs, referenceUrl));
-        }
-        const final = await runTask(config, body, exec?.signal);
-        const detail = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error;
-        segments.push({
-          index: position + 1,
-          kind: step.kind,
-          seconds,
-          taskId: final.taskId,
-          status: final.status,
-          videoUrl: final.videoUrl,
-          error: detail
-        });
-        if (final.status !== "succeeded" || !final.videoUrl) {
-          status = final.status;
-          errorCode = final.errorCode;
-          error = detail;
-          break;
-        }
-        referenceUrl = normalizeReferenceUrl(final.videoUrl);
-        cursor += seconds;
-        const nextStep = plan[offset + 1];
-        if (nextStep) {
-          const verdict = await confirmNextSegment(ctx, config, exec, {
-            done: position + 1,
-            finished: segments,
-            nextSeconds: nextStep.seconds,
-            remainingSteps: plan.slice(offset + 1)
-          });
-          if (verdict.outcome === "rejected" || verdict.outcome === "cancelled") {
-            paused = true;
-            notes.push(
-              `\u7B2C ${position + 1} \u6BB5\uFF08${formatSeconds(seconds)} \u79D2\uFF09\u751F\u6210\u597D\u4E4B\u540E\uFF0C` + (verdict.outcome === "rejected" ? "\u7528\u6237\u9009\u62E9\u5148\u4E0D\u7EE7\u7EED\u5F80\u4E0B\u751F\u6210" : "\u786E\u8BA4\u6846\u88AB\u53D6\u6D88") + "\uFF1A\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\uFF0C\u5269\u4E0B\u7684\u968F\u65F6\u53EF\u4EE5\u63A5\u7740\u505A\u3002"
-            );
+          if (final.status !== "succeeded" || !final.videoUrl) {
+            status = final.status;
+            errorCode = final.errorCode;
+            error = detail;
             break;
           }
-          if (verdict.outcome === "unavailable" && !confirmWarned) {
-            confirmWarned = true;
-            notes.push(
-              `\u8FD9\u6B21\u6CA1\u80FD\u5F39\u300C\u8981\u4E0D\u8981\u7EE7\u7EED\u300D\u7684\u786E\u8BA4\u6846\uFF08${verdict.reason}\uFF09\uFF0C\u540E\u9762\u7684\u5206\u6BB5\u6309\u5DF2\u7ECF\u786E\u8BA4\u8FC7\u7684\u8BA1\u5212\u7EE7\u7EED\u751F\u6210\u3002`
-            );
+          referenceUrl = normalizeReferenceUrl(final.videoUrl);
+          cursor += seconds;
+          const nextStep = plan[offset + 1];
+          if (nextStep) {
+            const verdict = await confirmNextSegment(ctx, config, exec, {
+              done: position + 1,
+              finished: segments,
+              nextSeconds: nextStep.seconds,
+              remainingSteps: plan.slice(offset + 1)
+            });
+            if (verdict.outcome === "rejected" || verdict.outcome === "cancelled") {
+              paused = true;
+              notes.push(
+                `\u7B2C ${position + 1} \u6BB5\uFF08${formatSeconds(seconds)} \u79D2\uFF09\u751F\u6210\u597D\u4E4B\u540E\uFF0C` + (verdict.outcome === "rejected" ? "\u7528\u6237\u9009\u62E9\u5148\u4E0D\u7EE7\u7EED\u5F80\u4E0B\u751F\u6210" : "\u786E\u8BA4\u6846\u88AB\u53D6\u6D88") + "\uFF1A\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\uFF0C\u5269\u4E0B\u7684\u968F\u65F6\u53EF\u4EE5\u63A5\u7740\u505A\u3002"
+              );
+              break;
+            }
+            if (verdict.outcome === "unavailable" && !confirmWarned) {
+              confirmWarned = true;
+              notes.push(
+                `\u8FD9\u6B21\u6CA1\u80FD\u5F39\u300C\u8981\u4E0D\u8981\u7EE7\u7EED\u300D\u7684\u786E\u8BA4\u6846\uFF08${verdict.reason}\uFF09\uFF0C\u540E\u9762\u7684\u5206\u6BB5\u6309\u5DF2\u7ECF\u786E\u8BA4\u8FC7\u7684\u8BA1\u5212\u7EE7\u7EED\u751F\u6210\u3002`
+              );
+            }
           }
         }
+      } catch (failure) {
+        const doneYet = segments.some((segment) => segment.status === "succeeded" && segment.videoUrl);
+        if (failure?.code !== "ABORTED" || !doneYet) throw failure;
+        interrupted = true;
+        paused = true;
+        notes.push(
+          "\u8FD9\u6B21\u8C03\u7528\u88AB\u4E2D\u65AD\u4E86\uFF08\u7528\u6237\u70B9\u4E86\u505C\u6B62\uFF0C\u6216\u8005\u7B49\u8D85\u65F6\u4E86\uFF09\uFF1A\u5DF2\u7ECF\u751F\u6210\u597D\u7684\u90E8\u5206\u4F1A\u5148\u4E0B\u8F7D\u3001\u5408\u5E76\u3001\u4EA4\u4ED8\uFF0C\u5269\u4E0B\u7684\u79D2\u6570\u4E0D\u7528\u91CD\u5934\u518D\u6765\u2014\u2014\u7528 resume \u5C31\u80FD\u63A5\u7740\u505A\u3002"
+        );
       }
       const completed = segments.filter((segment) => segment.status === "succeeded" && segment.videoUrl);
       const result = {
@@ -2505,98 +2893,37 @@ function videoTool(config, deps, ctx) {
         result.note = [...notes, "\u6309\u53C2\u6570\u8981\u6C42\u53EA\u8FD4\u56DE\u4E0A\u6E38\u94FE\u63A5\uFF0C\u6CA1\u6709\u4E0B\u8F7D\u5408\u5E76\u3002"].join("\n");
         return result;
       }
-      const ffmpegReady = completed.length > 1 ? await hasFfmpeg(config, exec?.signal) : true;
       const outDir = await resolveOutputDir(config, exec, deps);
       const { stamp, segmentsDir } = restarted ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir } : await allocateStamp(outDir, fileStamp());
-      const files = [];
-      let probeWarned = false;
-      try {
-        for (const [index, segment] of completed.entries()) {
-          const dest = path.join(
-            segmentsDir,
-            `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`
-          );
-          if (!await exists(dest)) {
-            await downloadFile(segment.videoUrl, dest, { signal: exec?.signal });
-          }
-          segment.localPath = dest;
-          const media = await probeMedia(dest, config, exec?.signal);
-          if (media?.durationSeconds) {
-            segment.durationSeconds = Number(media.durationSeconds.toFixed(2));
-            const cumulative = completed.slice(0, index + 1).reduce((sum, item) => sum + item.seconds, 0);
-            const tolerance = Math.max(
-              CUMULATIVE_TOLERANCE_MIN_SECONDS,
-              cumulative * CUMULATIVE_TOLERANCE_RATIO
-            );
-            const looksCumulative = files.length > 0 && Math.abs(media.durationSeconds - cumulative) <= tolerance && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
-            if (looksCumulative) {
-              files.length = 0;
-              notes.push(
-                `\u7B2C ${segment.index} \u6BB5\u5B9E\u6D4B ${formatSeconds(media.durationSeconds)} \u79D2\uFF0C\u63A5\u8FD1\u7D2F\u8BA1\u65F6\u957F ${cumulative} \u79D2\uFF0C\u6309\u300C\u4E0A\u6E38\u8FD4\u56DE\u7684\u662F\u7D2F\u8BA1\u6210\u7247\u300D\u5904\u7406\u3002`
-              );
-            }
-          } else if (!probeWarned) {
-            probeWarned = true;
-            notes.push("\u6CA1\u6709\u53EF\u7528\u7684 ffprobe\uFF0C\u65E0\u6CD5\u63A2\u6D4B\u5206\u6BB5\u65F6\u957F\uFF0C\u6309\u300C\u6BCF\u6BB5\u90FD\u662F\u589E\u91CF\u7247\u6BB5\u300D\u76F4\u63A5\u62FC\u63A5\u3002");
-          }
-          files.push(dest);
-        }
-      } catch (failure) {
-        if (failure?.code === "ABORTED") throw failure;
-        result.segmentsDir = segmentsDir;
-        result.note = [...notes, `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u4E0B\u8F7D\u5931\u8D25\uFF1A${failure?.message || failure}`].join("\n");
+      const delivery = await downloadSegmentsAndMerge(config, {
+        segments: completed,
+        segmentsDir,
+        outDir,
+        stamp,
+        notes,
+        // 暂停时只有一段的话，这一段的文件要留在分段目录里给之后续做用。
+        keepSingleFile: paused,
+        // 被中断时请求信号已经 abort：收尾（下载 + 合并）不能被它打断，否则等于白生成。
+        signal: interrupted ? void 0 : exec?.signal
+      });
+      if (delivery.error) {
+        result.segmentsDir = delivery.segmentsDir;
+        result.note = [...notes, delivery.error].join("\n");
         return result;
       }
-      if (!files.length) return result;
-      if (!ffmpegReady && files.length > 1) {
-        const guide = ffmpegInstallHint(config);
-        result.segmentsDir = segmentsDir;
+      if (delivery.ffmpegMissing) {
+        result.segmentsDir = delivery.segmentsDir;
         result.merged = false;
         result.ffmpegMissing = true;
-        result.installHint = guide.hint;
-        notes.push(`\u5206\u6BB5\u6587\u4EF6\u90FD\u5DF2\u4E0B\u8F7D\u5230 ${segmentsDir}\u3002`);
-        notes.push(guide.hint);
+        result.installHint = delivery.installHint;
         result.note = notes.join("\n");
         return result;
       }
-      const finalPath = path.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
-      try {
-        if (files.length === 1 && paused) {
-          result.mergeMode = "segment";
-          result.videoPath = files[0];
-        } else if (files.length === 1) {
-          await rm(finalPath, { force: true });
-          await rename(files[0], finalPath);
-          result.mergeMode = "single";
-        } else {
-          const merged = await mergeClips(config, files, finalPath, { signal: exec?.signal });
-          result.mergeMode = merged.mode;
-          if (merged.trimmed?.length) {
-            notes.push(
-              `\u7B2C ${merged.trimmed.map((item) => item.index).join("\u3001")} \u6BB5\u7684\u97F3\u9891\u6BD4\u89C6\u9891\u957F\uFF08\u6700\u957F ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} \u79D2\uFF09\uFF0C\u5DF2\u88C1\u9F50\u540E\u518D\u62FC\u63A5\uFF0C\u907F\u514D\u63A5\u7F1D\u5904\u7F3A\u4E00\u5C0F\u6BB5\u753B\u9762\u3002`
-            );
-          }
-          if (merged.mode === "seamless") {
-            const fixed = (merged.seams || []).filter((seam) => Math.abs(seam.lumaDelta) >= 0.5 || Math.abs(seam.audioGainDb) >= 0.2).map((seam) => `\u7B2C ${seam.index} \u6BB5\u63A5\u7F1D\uFF1A\u753B\u9762 ${seam.lumaDelta >= 0 ? "+" : ""}${seam.lumaDelta.toFixed(1)} \u7EA7\u3001\u97F3\u91CF ${seam.audioGainDb >= 0 ? "+" : ""}${seam.audioGainDb.toFixed(1)} dB`);
-            notes.push(
-              `\u5408\u5E76\u65B9\u5F0F\uFF1A\u65E0\u7F1D\u62FC\u63A5\uFF08\u63A5\u7F1D ${merged.fade} \u79D2\u4EA4\u53C9\u6DE1\u5316${fixed.length ? `\uFF0C\u5E76\u5DF2\u5BF9\u9F50${fixed.join("\uFF1B")}` : ""}\uFF09\u3002`
-            );
-          }
-        }
+      if (!delivery.files.length) return result;
+      if (delivery.merged) {
         result.merged = true;
-        if (!result.videoPath) result.videoPath = finalPath;
-      } catch (failure) {
-        if (failure?.code === "ABORTED") throw failure;
-        let reason = `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u5408\u5E76\u5931\u8D25\uFF1A${failure?.message || failure}`;
-        if (failure?.code === "ffmpeg_missing") {
-          const guide = ffmpegInstallHint(config);
-          result.ffmpegMissing = true;
-          result.installHint = guide.hint;
-          reason = guide.hint;
-        }
-        result.segmentsDir = segmentsDir;
-        result.note = [...notes, reason].join("\n");
-        return result;
+        result.videoPath = delivery.videoPath;
+        result.mergeMode = delivery.mergeMode;
       }
       if (paused) {
         result.segmentsDir = segmentsDir;
@@ -2618,7 +2945,7 @@ function videoTool(config, deps, ctx) {
           notes.push(`\u6682\u505C\u8BB0\u5F55\u6CA1\u5199\u6210\uFF08${failure?.message || failure}\uFF09\uFF1A\u8981\u63A5\u7740\u505A\u53EA\u80FD\u7528\u4E0A\u9762\u7684\u94FE\u63A5\u8D70 video_extend\u3002`);
         }
         notes.push(`\u5DF2\u4EA4\u4ED8\u7684\u6210\u7247\u662F\u4ECE\u5934\u5230\u7B2C ${segments.length} \u6BB5\uFF0C\u5206\u6BB5\u4ECD\u4FDD\u7559\u5728 ${segmentsDir}\u3002`);
-        notes.push(resumeHint(segmentsDir, result.remainingSeconds));
+        notes.push(resumeHint(segmentsDir, result.remainingSeconds, TOOL_NAME));
         result.note = notes.join("\n");
         return result;
       }
@@ -3091,8 +3418,8 @@ function buildPromptGuidance(config) {
   return [
     "MetaOnticVideo\uFF08Seedance \u89C6\u9891\u751F\u6210\u63D2\u4EF6\uFF09\uFF1A\u9700\u8981\u751F\u6210\u89C6\u9891\u3001\u7ED9\u89C6\u9891\u52A0\u957F\u65F6\u4F18\u5148\u7528\u5B83\uFF1B\u7528\u6237\u53EA\u8981\u8BF4\u60F3\u8981\u591A\u957F\uFF08duration\uFF09\uFF0C\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\u7684\u90E8\u5206\u63D2\u4EF6\u81EA\u5DF1\u5206\u6BB5\u7EED\u62CD\u518D\u5408\u5E76\uFF0C\u4E0D\u7528\u7528\u6237\u81EA\u5DF1\u62C6\u4EFB\u52A1\u3002",
     "\xB7 **\u751F\u6210\u4E00\u6761\u65B0\u89C6\u9891\u5FC5\u987B\u5148\u8FC7\u4E24\u9053\u786E\u8BA4\uFF0C\u7F3A\u4E00\u4E0D\u53EF**\uFF1A\u2460 \u5148\u628A**\u89C6\u9891\u811A\u672C**\u5199\u51FA\u6765\u4EA4\u7ED9\u7528\u6237**\u5BA1\u6838**\uFF08\u811A\u672C\u8981\u542B\uFF1A\u753B\u9762\u98CE\u683C\u3001\u4EBA\u7269\u5F62\u8C61\u3001\u5206\u955C\u2014\u2014\u9010\u955C\u7684\u955C\u5934 / \u65F6\u95F4 / \u753B\u9762\u3001\u5BF9\u767D\u2014\u2014\u6709\u5BF9\u8BDD\u5C31\u9010\u53E5\u5199\u6E05\u8C01\u5728\u51E0\u79D2\u8BF4\u4EC0\u4E48\uFF09\uFF1B\u2461 \u811A\u672C\u5BA1\u6838\u901A\u8FC7\u540E\uFF0C**\u518D\u5355\u72EC\u95EE\u4E00\u6B21\u8981\u4E0D\u8981\u5F00\u59CB\u505A**\uFF08\u8BF4\u6E05\u4F1A\u6D88\u8017\u989D\u5EA6\u4E0E\u9884\u4F30\u8D39\u7528\uFF09\uFF0C\u7528\u6237\u70B9\u5934\u4E86\u624D\u8C03\u7528 video_generate\u3002\u811A\u672C\u4E00\u6539\uFF0C\u4E24\u9053\u786E\u8BA4\u5168\u90E8\u4F5C\u5E9F\uFF0C\u8981\u91CD\u65B0\u8D70\u3002\u7528\u6237\u8BF4\u300C\u76F4\u63A5\u751F\u6210\u300D\u4E5F\u8981\u5148\u8D70\u8FD9\u4E24\u6B65\uFF0C\u4E0D\u8981\u8DF3\u8FC7\u3002\u7ED9\u5DF2\u6709\u89C6\u9891\u63A5\u957F\uFF08video_extend\uFF09\u4E0D\u9700\u8981\u811A\u672C\uFF0C\u4F46\u540C\u6837\u8981\u5148\u786E\u8BA4\u518D\u8C03\u7528\u3002",
-    `\xB7 \u65B0\u89C6\u9891\u7528 video_generate\uFF0Cduration \u4F20\u76EE\u6807\u603B\u79D2\u6570\u3002**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 ${singleMax} \u79D2\uFF08\u5355\u6BB5\u4E0A\u9650\uFF09\u7684\u6574\u6761\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u62C6\u6210\u591A\u955C / \u591A\u6BB5 / \u591A\u6B21 video_generate \u518D\u62FC\u63A5**\u2014\u2014\u4F8B\u5982\u300C15 \u79D2\u300D\u5C31\u662F\u4E00\u6B21 15 \u79D2\uFF0C\u4E0D\u8BB8\u62C6\u6210 8+7\uFF1B\u4E5F\u4E0D\u8981\u4E3A\u4E86\u300C\u4E2D\u95F4\u5207\u4E00\u5200\u66F4\u597D\u770B\u300D\u800C\u5206\u955C\uFF0C\u5206\u955C\u53EA\u5728\u7528\u6237\u660E\u786E\u8981\u6C42\u591A\u955C\u65F6\u4F7F\u7528\u3002\u8D85\u8FC7\u4E0A\u9650\u65F6\uFF08\u5982 20 \u79D2\uFF09\u4F1A\u81EA\u52A8\u62C6\u6210\u9996\u6BB5 + \u82E5\u5E72\u7EED\u62CD\u6BB5\u518D\u5408\u5E76\u2014\u2014\u90A3\u662F\u540C\u4E00\u6761\u89C6\u9891\u5F80\u4E0B\u7EED\u62CD\uFF0C\u4E0D\u662F\u591A\u955C\u62FC\u63A5\u3002\u6240\u4EE5\u300C20 \u79D2\u89C6\u9891\u300D\u76F4\u63A5\u4F20 duration=20\uFF0C\u4E0D\u7528\u62C6\u6210\u591A\u4E2A\u4EFB\u52A1\uFF0C\u4E5F\u4E0D\u7528\u8DDF\u7528\u6237\u89E3\u91CA\u300C\u6A21\u578B\u4E00\u6B21\u53EA\u80FD\u51FA 15 \u79D2\u300D\uFF1B**\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\u7684\u6210\u7247\u662F\u300C\u5FAA\u73AF\u8FED\u4EE3\u300D\u7684\uFF1A\u6BCF\u6BB5\u751F\u6210\u5B8C\u90FD\u4F1A\u5F39\u4E00\u6B21\u786E\u8BA4\u6846\u95EE\u7528\u6237\u8981\u4E0D\u8981\u7EE7\u7EED\uFF0C\u4E0D\u8981\u7ED5\u8FC7\u5B83\u3001\u4E5F\u4E0D\u8981\u81EA\u5DF1\u62C6\u6210\u591A\u6B21\u751F\u6210**\uFF1B\u7528\u6237\u70B9\u4E86\u300C\u5148\u4E0D\u7EE7\u7EED\u300D\u65F6\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir\u3001remainingSeconds\u2014\u2014\u8FD9\u65F6\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\u7ED9\u4ED6\uFF0C\u7B49\u4ED6\u8BF4\u300C\u7EE7\u7EED\u300D\u518D\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_generate \u7684 resume \u53C2\u6570\uFF08\u63D2\u4EF6\u63A5\u7740\u5DF2\u6709\u7684\u5206\u6BB5\u5F80\u4E0B\u505A\uFF0C\u524D\u9762\u51E0\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\u3001\u4E0D\u91CD\u590D\u6263\u8D39\uFF09\uFF0C\u4E0D\u8981\u4ECE\u5934\u518D\u6765\u4E00\u904D\uFF1B\u5355\u6761\u6210\u7247\u6700\u957F ${MAX_TOTAL_SECONDS} \u79D2\uFF08\u6700\u591A ${MAX_SEGMENTS} \u6BB5\uFF09\uFF0C\u7528\u6237\u8981\u66F4\u957F\u7684\u5C31\u6309 ${MAX_TOTAL_SECONDS} \u79D2\u751F\u6210\u5E76\u8BF4\u660E\u8FD9\u662F\u63D2\u4EF6\u5F53\u524D\u7684\u4E0A\u9650\uFF0C\u4E0D\u8981\u53CD\u590D\u52A0\u5927 duration\uFF1B\u6210\u7247\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\u3002`,
-    "\xB7 \u7ED9\u5DF2\u6709\u89C6\u9891\u63A5\u957F\u7528 video_extend\uFF0C\u8F93\u5165\u5FC5\u987B\u662F\u516C\u7F51 URL\uFF1B\u63D0\u793A\u8BCD\u4EE5\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D\u6216\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\u5F00\u5934\uFF0C\u5168\u7A0B\u7528\u300C\u89C6\u98911\u300D\u6307\u4EE3\u7D20\u6750\uFF0C\u4E0D\u8981\u5199\u300C\u53C2\u8003\u89C6\u98911\u300D\uFF1B\u5199\u6E05\u5EF6\u957F\u65B9\u5411\u3001\u5267\u60C5\u53D1\u5C55\u3001\u4E3B\u4F53\u72B6\u6001\u3001\u955C\u5934\u8FD0\u52A8\u3001\u58F0\u97F3\u5EF6\u7EED\uFF08\u80CC\u666F\u97F3\u4E50\u63A5\u5728\u89C6\u98911\u7ED3\u5C3E\u5904\u3001\u4E0D\u8981\u4ECE\u5934\u64AD\u653E\uFF0C\u73AF\u5883\u58F0\u548C\u5BF9\u767D\u4E5F\u8981\u8FDE\u7EED\uFF09\uFF1B\u6BCF\u6BB5 4-15 \u79D2\uFF0C\u9ED8\u8BA4\u6309\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\u3002",
+    `\xB7 \u65B0\u89C6\u9891\u7528 video_generate\uFF0Cduration \u4F20\u76EE\u6807\u603B\u79D2\u6570\u3002**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 ${singleMax} \u79D2\uFF08\u5355\u6BB5\u4E0A\u9650\uFF09\u7684\u6574\u6761\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u62C6\u6210\u591A\u955C / \u591A\u6BB5 / \u591A\u6B21 video_generate \u518D\u62FC\u63A5**\u2014\u2014\u4F8B\u5982\u300C15 \u79D2\u300D\u5C31\u662F\u4E00\u6B21 15 \u79D2\uFF0C\u4E0D\u8BB8\u62C6\u6210 8+7\uFF1B\u4E5F\u4E0D\u8981\u4E3A\u4E86\u300C\u4E2D\u95F4\u5207\u4E00\u5200\u66F4\u597D\u770B\u300D\u800C\u5206\u955C\uFF0C\u5206\u955C\u53EA\u5728\u7528\u6237\u660E\u786E\u8981\u6C42\u591A\u955C\u65F6\u4F7F\u7528\u3002\u8D85\u8FC7\u4E0A\u9650\u65F6\uFF08\u5982 20 \u79D2\uFF09\u4F1A\u81EA\u52A8\u62C6\u6210\u9996\u6BB5 + \u82E5\u5E72\u7EED\u62CD\u6BB5\u518D\u5408\u5E76\u2014\u2014\u90A3\u662F\u540C\u4E00\u6761\u89C6\u9891\u5F80\u4E0B\u7EED\u62CD\uFF0C\u4E0D\u662F\u591A\u955C\u62FC\u63A5\u3002\u6240\u4EE5\u300C20 \u79D2\u89C6\u9891\u300D\u76F4\u63A5\u4F20 duration=20\uFF0C\u4E0D\u7528\u62C6\u6210\u591A\u4E2A\u4EFB\u52A1\uFF0C\u4E5F\u4E0D\u7528\u8DDF\u7528\u6237\u89E3\u91CA\u300C\u6A21\u578B\u4E00\u6B21\u53EA\u80FD\u51FA 15 \u79D2\u300D\uFF1B**\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\u7684\u6210\u7247\u662F\u300C\u5FAA\u73AF\u8FED\u4EE3\u300D\u7684\uFF1A\u6BCF\u6BB5\u751F\u6210\u5B8C\u90FD\u4F1A\u5F39\u4E00\u6B21\u786E\u8BA4\u6846\u95EE\u7528\u6237\u8981\u4E0D\u8981\u7EE7\u7EED\uFF0C\u4E0D\u8981\u7ED5\u8FC7\u5B83\u3001\u4E5F\u4E0D\u8981\u81EA\u5DF1\u62C6\u6210\u591A\u6B21\u751F\u6210**\uFF1B\u7528\u6237\u70B9\u4E86\u300C\u5148\u4E0D\u7EE7\u7EED\u300D\u65F6\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir\u3001remainingSeconds\u2014\u2014\u8FD9\u65F6\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\u7ED9\u4ED6\uFF0C\u7B49\u4ED6\u8BF4\u300C\u7EE7\u7EED\u300D\u518D\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_generate \u7684 resume \u53C2\u6570\uFF08\u63D2\u4EF6\u63A5\u7740\u5DF2\u6709\u7684\u5206\u6BB5\u5F80\u4E0B\u505A\uFF0C\u524D\u9762\u51E0\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\u3001\u4E0D\u91CD\u590D\u6263\u8D39\uFF09\uFF0C\u4E0D\u8981\u4ECE\u5934\u518D\u6765\u4E00\u904D\uFF1B\u7528\u6237\u4E2D\u9014\u70B9\u4E86\u300C\u505C\u6B62\u300D\u6216\u8FD9\u4E00\u8F6E\u7B49\u8D85\u65F6\u4E5F\u4E00\u6837\uFF1A\u5DF2\u7ECF\u751F\u6210\u597D\u7684\u6BB5\u4F1A\u5148\u4E0B\u8F7D\u3001\u5408\u5E76\u3001\u4EA4\u4ED8\uFF08\u7ED3\u679C\u91CC\u540C\u6837\u662F paused=true + \u6210\u7247 + resumeDir\uFF09\uFF0C\u4E0D\u8981\u628A\u90A3\u51E0\u6BB5\u4E22\u6389\u91CD\u6765\uFF1B\u5355\u6761\u6210\u7247\u6700\u957F ${MAX_TOTAL_SECONDS} \u79D2\uFF08\u6700\u591A ${MAX_SEGMENTS} \u6BB5\uFF09\uFF0C\u7528\u6237\u8981\u66F4\u957F\u7684\u5C31\u6309 ${MAX_TOTAL_SECONDS} \u79D2\u751F\u6210\u5E76\u8BF4\u660E\u8FD9\u662F\u63D2\u4EF6\u5F53\u524D\u7684\u4E0A\u9650\uFF0C\u4E0D\u8981\u53CD\u590D\u52A0\u5927 duration\uFF1B\u6210\u7247\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\u3002`,
+    "\xB7 \u7ED9\u5DF2\u6709\u89C6\u9891\u63A5\u957F\u7528 video_extend\uFF0C\u8F93\u5165\u5FC5\u987B\u662F\u516C\u7F51 URL\uFF1B\u63D0\u793A\u8BCD\u4EE5\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D\u6216\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\u5F00\u5934\uFF0C\u5168\u7A0B\u7528\u300C\u89C6\u98911\u300D\u6307\u4EE3\u7D20\u6750\uFF0C\u4E0D\u8981\u5199\u300C\u53C2\u8003\u89C6\u98911\u300D\uFF1B\u5199\u6E05\u5EF6\u957F\u65B9\u5411\u3001\u5267\u60C5\u53D1\u5C55\u3001\u4E3B\u4F53\u72B6\u6001\u3001\u955C\u5934\u8FD0\u52A8\u3001\u58F0\u97F3\u5EF6\u7EED\uFF08\u80CC\u666F\u97F3\u4E50\u63A5\u5728\u89C6\u98911\u7ED3\u5C3E\u5904\u3001\u4E0D\u8981\u4ECE\u5934\u64AD\u653E\uFF0C\u73AF\u5883\u58F0\u548C\u5BF9\u767D\u4E5F\u8981\u8FDE\u7EED\uFF09\uFF1B\u6BCF\u6BB5 4-15 \u79D2\uFF0C\u9ED8\u8BA4\u6309\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\uFF1B\u8FDE\u7740\u5EF6\u957F\u591A\u6BB5\u65F6\u6BCF\u6BB5\u4E4B\u95F4\u4F1A\u5148\u95EE\u7528\u6237\u4E00\u6B21\u8981\u4E0D\u8981\u7EE7\u7EED\uFF0C\u5E76\u9ED8\u8BA4\u4E0B\u8F7D\u5206\u6BB5\u5728\u672C\u673A\u5408\u5E76\u6210\u4E00\u6761\u6210\u7247\uFF08\u7F3A ffmpeg \u4F1A\u5148\u62E6\u4E0B\u6765\u95EE\uFF09\uFF1B\u7528\u6237\u70B9\u300C\u62D2\u7EDD\u300D\u6216\u4E2D\u9014\u88AB\u505C\u6B62\u65F6\uFF0C\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u90E8\u5206\u7167\u6837\u5148\u4EA4\u4ED8\uFF08paused=true + resumeDir\uFF09\uFF0C\u4E4B\u540E\u628A resumeDir \u4F20\u7ED9 video_extend \u7684 resume \u53C2\u6570\u63A5\u7740\u505A\u5373\u53EF\uFF0C\u4E0D\u91CD\u590D\u751F\u6210\u3001\u4E0D\u91CD\u590D\u6263\u8D39\u3002",
     "\xB7 \u751F\u6210\u901A\u5E38\u8981\u51E0\u5206\u949F\uFF1A\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout \u4E0D\u7B49\u4E8E\u5931\u8D25\uFF0C\u7528 video_status \u52A0 taskId \u7EE7\u7EED\u67E5\uFF08\u4E0A\u6E38\u94FE\u63A5\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u540C\u4E00\u6BB5\u3002",
     "\xB7 \u73AF\u5883\u6709\u95EE\u9898\uFF08\u7F3A ffmpeg \u88C5\u4E0D\u4E0A\u3001\u60F3\u786E\u8BA4\u80FD\u4E0D\u80FD\u5408\u5E76\uFF09\u7528 video_setup\uFF1A\u9ED8\u8BA4\u53EA\u68C0\u67E5\uFF0Cinstall:true \u624D\u4F1A\u771F\u88C5\uFF1B\u88C5\u547D\u4EE4\u4F1A\u5148\u7ED9\u7528\u6237\u786E\u8BA4\uFF0C\u88C5\u5B8C\u81EA\u52A8\u9A8C\u8BC1\u3002\u7528\u6237\u8BF4\u300C\u5E2E\u6211\u88C5 ffmpeg\u300D\u65F6\u5C31\u7528\u5B83\uFF0C\u522B\u81EA\u5DF1\u62FC\u547D\u4EE4\u884C\u3002",
     "\xB7 \u6362\u6A21\u578B\u3001\u65F6\u957F\u7B49\u914D\u7F6E\u7528 video_config\uFF08\u5199\u8FDB profile\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u540E\u751F\u6548\uFF09\uFF1B\u4F46 apiKey \u4F8B\u5916\uFF1A\u5B83\u53EA\u80FD\u7531\u670D\u52A1\u7AEF\u5728\u300C\u767B\u5F55\u300D\u65F6\u4E0B\u53D1\uFF0C\u4E0D\u8981\u624B\u586B\u3001\u4E5F\u4E0D\u8981\u8BA9\u7528\u6237\u624B\u586B\uFF0C\u7F3A Key \u6216\u63D0\u793A\u300C\u4E0D\u662F\u670D\u52A1\u7AEF\u4E0B\u53D1\u7684\u300D\u65F6\uFF0C\u5C31\u5F15\u5BFC\u7528\u6237\u53BB\u63D2\u4EF6\u8BE6\u60C5\u9875\u70B9\u300C\u767B\u5F55\u300D\u3002\u957F\u89C6\u9891\u8981\u5728\u672C\u673A\u5408\u5E76\uFF0C\u9700\u8981 ffmpeg\uFF1A\u672C\u673A\u6CA1\u88C5\u65F6\uFF0C\u63D2\u4EF6\u4F1A\u5148\u628A\u8FD9\u6B21\u751F\u6210\u62E6\u56DE\u6765\uFF08\u4E0D\u4EA7\u751F\u8D39\u7528\uFF09\uFF0C\u8FD9\u65F6\u8981\u5728\u5BF9\u8BDD\u6846\u91CC\u95EE\u7528\u6237\u300C\u8981\u4E0D\u8981\u6388\u6743\u6211\u88C5 ffmpeg\u300D\u2014\u2014\u6309\u8FD4\u56DE\u7684\u8BF4\u660E\u8BF4\u6E05\u4ED6\u7684\u7CFB\u7EDF\u4E0E\u547D\u4EE4\uFF0C\u7528\u6237\u540C\u610F\u5C31\u8C03\u7528 video_setup\uFF08install:true\uFF09\u7531\u63D2\u4EF6\u6765\u88C5\uFF08\u5BBF\u4E3B\u4F1A\u5148\u8BA9\u4ED6\u786E\u8BA4\u90A3\u6761\u547D\u4EE4\uFF09\uFF0C\u88C5\u5B8C\u5B83\u4F1A\u81EA\u5DF1\u9A8C\u8BC1\uFF0C\u518D\u6309\u539F duration \u91CD\u53D1\uFF1B\u7528\u6237\u4E0D\u60F3\u88C5\u5C31\u5E26 merge:false \u91CD\u53D1\uFF0C\u63D2\u4EF6\u53EA\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u94FE\u63A5 + \u672C\u5730\u6587\u4EF6\uFF09\uFF0C\u7ED3\u679C\u91CC\u4F1A\u5E26 ffmpegMissing=true \u4E0E installHint\uFF0C\u7167\u5B83\u5F15\u5BFC\u5B89\u88C5\u5373\u53EF\u3002",
@@ -3107,7 +3434,7 @@ function apply(ctx, config = {}) {
   const deps = {};
   const disposers = [
     ctx.tools.register(jsonSafeTool(videoTool(config, deps, ctx))),
-    ctx.tools.register(jsonSafeTool(extendTool(config))),
+    ctx.tools.register(jsonSafeTool(extendTool(config, deps, ctx))),
     ctx.tools.register(jsonSafeTool(taskTool(config))),
     ctx.tools.register(jsonSafeTool(setupTool(config)))
   ];

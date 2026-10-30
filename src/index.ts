@@ -672,6 +672,23 @@ function referenceCacheDir() {
  * 只有本机文件能这么处理（公网 URL 交给上游自己取），ffmpeg 缺失或适配失败
  * 都退回原图，不阻塞生成。
  */
+/**
+ * 缓存文件是不是「完整的、画幅也对」。
+ * 以前只判断 `exists`：并发调用里另一个正在写同一个文件时，会命中写到一半的 jpg
+ * （base64 发上去就是坏图）。这里要求文件存在且非空；探得出尺寸时再核对画幅。
+ * 没有可用的 ffprobe 时只能按「存在且非空」放行，否则缓存永远命不中。
+ */
+async function isUsableFit(dest, width, height, config, signal) {
+  const info = await stat(dest).catch(() => null);
+  if (!info?.isFile() || info.size <= 0) return false;
+  const media = await probeMedia(dest, config, signal);
+  if (!media?.width || !media?.height) return true;
+  return media.width === width && media.height === height;
+}
+
+/** 同一张图的适配任务：并发调用共用同一个 Promise，避免同时开 N 个 ffmpeg 写同一个文件。 */
+const fitInFlight = new Map();
+
 async function fitImageToCanvas(absPath, size, config, signal) {
   const [width, height] = size;
   const media = await probeMedia(absPath, config, signal);
@@ -680,24 +697,46 @@ async function fitImageToCanvas(absPath, size, config, signal) {
   const key = `${path.basename(absPath, path.extname(absPath))}-${info?.size ?? 0}`
     + `-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`;
   const dest = path.join(referenceCacheDir(), key);
-  if (await exists(dest)) return dest;
-  await mkdir(referenceCacheDir(), { recursive: true });
-  const graph = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,`
-    + `crop=${width}:${height},gblur=sigma=24[bg];`
-    + `[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease[fg];`
-    + `[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1`;
-  try {
-    const { code } = await runProcess(resolveBinary(config, 'ffmpegBinary', 'ffmpeg'), [
-      '-y', '-i', absPath, '-filter_complex', graph, '-frames:v', '1', '-q:v', '2', dest,
-    ], { signal, timeoutMs: 120000 });
-    // 半途失败可能留下截断的 jpg，下次会被当成缓存命中：落盘后先验尺寸，不合格就删掉退回原图
-    const fitted = code === 0 ? await probeMedia(dest, config, signal) : null;
-    if (fitted?.width === width && fitted?.height === height) return dest;
-    await rm(dest, { force: true }).catch(() => {});
-  } catch {
-    // 没装 ffmpeg、或这张图 ffmpeg 处理不了：按原图提交
+  if (await isUsableFit(dest, width, height, config, signal)) return dest;
+
+  // 已经有一次适配在跑（并发调用同一张图）：等它，而不是再跑一遍 ffmpeg 写同一个文件。
+  const running = fitInFlight.get(dest);
+  if (running) {
+    await running.catch(() => {});
+    if (await isUsableFit(dest, width, height, config, signal)) return dest;
+    // 那一次没成（比如它的调用被中断了）：自己再试一次；这次也被取消就直接用原图。
+    if (signal?.aborted) return absPath;
   }
-  return absPath;
+
+  const task = (async () => {
+    await mkdir(referenceCacheDir(), { recursive: true });
+    const graph = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,`
+      + `crop=${width}:${height},gblur=sigma=24[bg];`
+      + `[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease[fg];`
+      + `[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1`;
+    // 先写唯一的临时文件、验过画幅再 rename 顶上：并发读者永远看不到写了一半的 jpg。
+    // 尾巴要留在扩展名前面——ffmpeg 按扩展名挑封装器，`.jpg.fit-…` 这种名字它会直接报错。
+    const temp = `${dest.replace(/\.jpg$/, '')}.${uniqueSuffix('fit')}.jpg`;
+    try {
+      const { code } = await runProcess(resolveBinary(config, 'ffmpegBinary', 'ffmpeg'), [
+        '-y', '-i', absPath, '-filter_complex', graph, '-frames:v', '1', '-q:v', '2', temp,
+      ], { signal, timeoutMs: 120000 });
+      if (code !== 0) return;
+      const fitted = await probeMedia(temp, config, signal);
+      if (fitted?.width === width && fitted?.height === height) await rename(temp, dest);
+    } catch {
+      // 没装 ffmpeg、或这张图 ffmpeg 处理不了：按原图提交
+    } finally {
+      await rm(temp, { force: true }).catch(() => {});
+    }
+  })();
+  fitInFlight.set(dest, task);
+  try {
+    await task;
+  } finally {
+    fitInFlight.delete(dest);
+  }
+  return (await isUsableFit(dest, width, height, config, signal)) ? dest : absPath;
 }
 
 /** 用户说「我刚上传的那张图」时的简写：latest / latest:2（第 2 新的）等。 */
@@ -1002,6 +1041,18 @@ function formatSeconds(value) {
   return Number.isInteger(number) ? String(number) : number.toFixed(1);
 }
 
+/**
+ * 临时文件名用的唯一尾巴：进程号 + 自增序号 + 随机串。
+ * 插件对宿主声明「并发安全」，同一个会话里可能同时跑多次调用（多镜并行、用户连点两次「继续」）；
+ * 固定的临时名（`x.mp4.part`、`x.align1.mp4`、`x.work.mp4`）会让并发调用互相踩——
+ * 一边还在写、另一边已经 rename/读取，拿到的就是半截文件。所有中间产物都带这个尾巴。
+ */
+let tempSequence = 0;
+function uniqueSuffix(prefix = 'tmp') {
+  tempSequence = (tempSequence + 1) % 1000000000;
+  return `${prefix}-${process.pid}-${tempSequence}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function fileStamp(date = new Date()) {
   const pad = (value) => String(value).padStart(2, '0');
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`
@@ -1296,7 +1347,9 @@ const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
 
 async function downloadFile(url: string, destPath: string, { signal }: RunOptions = {}) {
   await mkdir(path.dirname(destPath), { recursive: true });
-  const partial = `${destPath}.part`;
+  // 同名 dest 可能被并发下载（尤其是两次 resume 补同一段）：.part 必须带唯一尾巴，
+  // 否则一个在写、另一个 rename 走，落盘的就是半截文件。
+  const partial = `${destPath}.${uniqueSuffix('part')}`;
   const timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   try {
@@ -1577,7 +1630,8 @@ async function alignSegmentAudio(
       aligned.push(file);
       continue;
     }
-    const temp = `${outPath}.align${index + 1}.mp4`;
+    // 文件名带唯一尾巴：并发的两次合并（比如同时 resume 同一个目录）不会互相覆盖中间产物。
+    const temp = `${outPath}.${uniqueSuffix(`align${index + 1}`)}.mp4`;
     const { code } = await runProcess(
       binary || resolveBinary(config, 'ffmpegBinary', 'ffmpeg'),
       [
@@ -1609,6 +1663,9 @@ async function mergeClips(config, files: string[], outPath: string, { signal }: 
   const binary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
   await mkdir(path.dirname(outPath), { recursive: true });
   await rm(outPath, { force: true });
+  // 所有 ffmpeg 产物先写这个唯一的工作文件，成功后再原子 rename 到 outPath：
+  // 并发合并同一个目标路径时，读者要么看到旧文件、要么看到完整的新文件，不会拿到半截 mp4。
+  const work = `${outPath}.${uniqueSuffix('work')}.mp4`;
   let copyError = '';
   let audioError = '';
 
@@ -1621,7 +1678,7 @@ async function mergeClips(config, files: string[], outPath: string, { signal }: 
 
   // 先裁齐音频，接缝才不会有空洞；后面的拼接统一用对齐后的分段。
   const { files: aligned, temps, trimmed } = await alignSegmentAudio(
-    config, files, probed, outPath, { signal, binary },
+    config, files, probed, work, { signal, binary },
   );
   files = aligned;
   try {
@@ -1631,8 +1688,9 @@ async function mergeClips(config, files: string[], outPath: string, { signal }: 
     // 默认走无缝：分段是两次独立生成，色调/响度本来就有台阶，硬切一眼能看出是两段。
     // 任何一步不满足条件（分段太短、量不到数据、编码失败）都退回到后面的常规拼接。
     if (mergeMode === 'seamless' && files.length > 1) {
-      const seamless = await mergeClipsSeamless(config, files, probed, outPath, { signal, binary });
+      const seamless = await mergeClipsSeamless(config, files, probed, work, { signal, binary });
       if (seamless?.path) {
+        await rename(work, outPath);
         return {
           path: seamless.path, mode: 'seamless', trimmed,
           seams: seamless.seams, fade: seamless.fade, audioFade: seamless.audioFade,
@@ -1642,15 +1700,18 @@ async function mergeClips(config, files: string[], outPath: string, { signal }: 
     }
 
     if (mergeMode !== 'reencode' && paramsMatch) {
-      const listPath = `${outPath}.concat.txt`;
+      const listPath = `${work}.concat.txt`;
       const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join('\n');
       await writeFile(listPath, `${lines}\n`, 'utf8');
       try {
         const { code, stderr } = await runProcess(binary, [
           '-y', '-f', 'concat', '-safe', '0', '-i', listPath,
-          '-c', 'copy', '-movflags', '+faststart', outPath,
+          '-c', 'copy', '-movflags', '+faststart', work,
         ], { signal });
-        if (code === 0 && await exists(outPath)) return { path: outPath, mode: 'copy', trimmed };
+        if (code === 0 && await exists(work)) {
+          await rename(work, outPath);
+          return { path: outPath, mode: 'copy', trimmed };
+        }
         copyError = stderr.trim().slice(-400);
       } finally {
         await rm(listPath, { force: true });
@@ -1672,12 +1733,12 @@ async function mergeClips(config, files: string[], outPath: string, { signal }: 
     const videoInputs = files.map((_, index) => `[v${index}]`).join('');
 
     async function encode(filter, maps, withAudioTrack) {
-      await rm(outPath, { force: true });
+      await rm(work, { force: true });
       const args = ['-y'];
       for (const file of files) args.push('-i', file);
       args.push('-filter_complex', filter, ...maps, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p');
       if (withAudioTrack) args.push('-c:a', 'aac', '-b:a', '192k');
-      args.push('-movflags', '+faststart', outPath);
+      args.push('-movflags', '+faststart', work);
       return runProcess(binary, args, { signal });
     }
 
@@ -1695,19 +1756,145 @@ async function mergeClips(config, files: string[], outPath: string, { signal }: 
         `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`,
       ].join(';');
       const { code, stderr } = await encode(filter, ['-map', '[v]', '-map', '[a]'], true);
-      if (code === 0 && await exists(outPath)) return { path: outPath, mode: 'reencode', trimmed };
+      if (code === 0 && await exists(work)) {
+        await rename(work, outPath);
+        return { path: outPath, mode: 'reencode', trimmed };
+      }
       audioError = stderr.trim().slice(-400);
     }
 
     const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(';');
     const { code, stderr } = await encode(filter, ['-map', '[v]'], false);
-    if (code === 0 && await exists(outPath)) {
+    if (code === 0 && await exists(work)) {
+      await rename(work, outPath);
       return { path: outPath, mode: withAudio ? 'reencode-video-only' : 'reencode', trimmed };
     }
     const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(' | ');
     throw Object.assign(new Error(`ffmpeg 合并失败：${detail || '未知错误'}`), { code: 'ffmpeg_failed' });
   } finally {
-    await cleanupSegmentTemps(temps);
+    await cleanupSegmentTemps([...temps, work]);
+  }
+}
+
+/**
+ * 下载分段 + 合并成一条成片（video_generate 与 video_extend 共用）。
+ * 只负责「把已经生成好的段落盘、再拼成一条」；暂停 / 保留分段 / 写暂停记录这些策略由调用方决定。
+ * @param notes - 调用方的说明数组，函数会往里追加接缝、音频裁齐、缺 ffmpeg 之类的提示。
+ * @param keepSingleFile - 只有一段时不要把它改名搬走（暂停时那段还要留着续做）。
+ * @param signal - 下载/合并用的信号；中断收尾时可以传 undefined，让收尾不被中断打断。
+ * @returns files / segmentsDir / deliveredSeconds，以及下面几种结果之一：
+ *   error（下载或合并失败，说明已写进 notes）、ffmpegMissing + installHint（缺 ffmpeg 且不止一段）、
+ *   merged + videoPath + mergeMode（成功）。
+ */
+async function downloadSegmentsAndMerge(config, {
+  segments, segmentsDir, outDir, stamp, notes = [], keepSingleFile = false, signal,
+}) {
+  const files = [];
+  const deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0);
+  // 多段才需要合成；本机没有 ffmpeg 就早点说清楚，别白跑一遍合并再报错。
+  const ffmpegReady = segments.length > 1 ? await hasFfmpeg(config, signal) : true;
+  let probeWarned = false;
+
+  for (const [index, segment] of segments.entries()) {
+    const dest = path.join(
+      segmentsDir,
+      `${String(segment.index).padStart(2, '0')}-${segment.kind}.mp4`,
+    );
+    try {
+      // 已经下过的分段（接着做时复用）直接用现成文件：上游链接可能已经过期。
+      if (!(await exists(dest))) {
+        await downloadFile(segment.videoUrl, dest, { signal });
+      }
+    } catch (failure) {
+      if (failure?.code === 'ABORTED') throw failure;
+      const reason = `分段已生成，但下载失败：${failure?.message || failure}`;
+      notes.push(reason);
+      return { files, segmentsDir, deliveredSeconds, error: reason };
+    }
+    segment.localPath = dest;
+
+    const media = await probeMedia(dest, config, signal);
+    if (media?.durationSeconds) {
+      segment.durationSeconds = Number(media.durationSeconds.toFixed(2));
+      const cumulative = segments.slice(0, index + 1)
+        .reduce((sum, item) => sum + (item.seconds || 0), 0);
+      const tolerance = Math.max(
+        CUMULATIVE_TOLERANCE_MIN_SECONDS,
+        cumulative * CUMULATIVE_TOLERANCE_RATIO,
+      );
+      const looksCumulative = files.length > 0
+        && Math.abs(media.durationSeconds - cumulative) <= tolerance
+        && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
+      if (looksCumulative) {
+        files.length = 0;
+        notes.push(
+          `第 ${segment.index} 段实测 ${formatSeconds(media.durationSeconds)} 秒，`
+          + `接近累计时长 ${cumulative} 秒，按「上游返回的是累计成片」处理。`,
+        );
+      }
+    } else if (!probeWarned) {
+      probeWarned = true;
+      notes.push('没有可用的 ffprobe，无法探测分段时长，按「每段都是增量片段」直接拼接。');
+    }
+    files.push(dest);
+  }
+
+  if (!files.length) return { files, segmentsDir, deliveredSeconds };
+
+  if (!ffmpegReady && files.length > 1) {
+    // 缺 ffmpeg 不是失败：分段照样交付，但必须把「怎么装」交出去。
+    const guide = ffmpegInstallHint(config);
+    notes.push(`分段文件都已下载到 ${segmentsDir}。`);
+    notes.push(guide.hint);
+    return {
+      files, segmentsDir, deliveredSeconds, merged: false,
+      ffmpegMissing: true, installHint: guide.hint,
+    };
+  }
+
+  const finalPath = path.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
+  try {
+    if (files.length === 1 && keepSingleFile) {
+      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: 'segment', videoPath: files[0] };
+    }
+    if (files.length === 1) {
+      await mkdir(path.dirname(finalPath), { recursive: true });
+      await rm(finalPath, { force: true });
+      await rename(files[0], finalPath);
+      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: 'single', videoPath: finalPath };
+    }
+    const merged = await mergeClips(config, files, finalPath, { signal });
+    if (merged.trimmed?.length) {
+      notes.push(
+        `第 ${merged.trimmed.map((item) => item.index).join('、')} 段的音频比视频长`
+        + `（最长 ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} 秒），`
+        + '已裁齐后再拼接，避免接缝处缺一小段画面。',
+      );
+    }
+    if (merged.mode === 'seamless') {
+      // 把接缝补正的实测值写在结果里，用户/模型能看出「不是硬切上去的」
+      const fixed = (merged.seams || [])
+        .filter((seam) => Math.abs(seam.lumaDelta) >= 0.5 || Math.abs(seam.audioGainDb) >= 0.2)
+        .map((seam) => `第 ${seam.index} 段接缝：画面 ${seam.lumaDelta >= 0 ? '+' : ''}`
+          + `${seam.lumaDelta.toFixed(1)} 级、音量 ${seam.audioGainDb >= 0 ? '+' : ''}`
+          + `${seam.audioGainDb.toFixed(1)} dB`);
+      notes.push(
+        `合并方式：无缝拼接（接缝 ${merged.fade} 秒交叉淡化`
+        + `${fixed.length ? `，并已对齐${fixed.join('；')}` : ''}）。`,
+      );
+    }
+    return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: merged.mode, videoPath: finalPath };
+  } catch (failure) {
+    if (failure?.code === 'ABORTED') throw failure;
+    let reason = `分段已生成，但合并失败：${failure?.message || failure}`;
+    let installHint;
+    if (failure?.code === 'ffmpeg_missing') {
+      const guide = ffmpegInstallHint(config);
+      installHint = guide.hint;
+      reason = guide.hint;
+    }
+    notes.push(reason);
+    return { files, segmentsDir, deliveredSeconds, error: reason, ffmpegMissing: Boolean(installHint), installHint };
   }
 }
 
@@ -2040,7 +2227,16 @@ async function readPauseFile(dir) {
 
 async function writePauseFile(dir, data) {
   await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, PAUSE_FILE), `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  const file = path.join(dir, PAUSE_FILE);
+  // 先写唯一的临时文件、再原子 rename 顶上：并发读（另一次 resume）不会读到写到一半的 JSON。
+  const temp = `${file}.${uniqueSuffix('part')}`;
+  try {
+    await writeFile(temp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+    await rename(temp, file);
+  } catch (failure) {
+    await rm(temp, { force: true }).catch(() => {});
+    throw failure;
+  }
 }
 
 function sumStepSeconds(steps) {
@@ -2071,7 +2267,11 @@ function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
 
 /** 续做时要沿用的参数：调用方只传 resume 时，靠这份记录还原上次的口径。 */
 function pickResumeOptions(args) {
-  const keys = ['mode', 'ratio', 'generateAudio', 'watermark'];
+  const keys = [
+    'mode', 'ratio', 'generateAudio', 'watermark',
+    // 这几个是 video_extend 的口径（延长方向、提示词写法、整片时间轴位置）
+    'direction', 'wording', 'startAt',
+  ];
   const options = {};
   for (const key of keys) {
     if (args?.[key] !== undefined) options[key] = args[key];
@@ -2104,8 +2304,8 @@ function pauseRecordAt({ stamp, prompt, fullPlan, done, cursor, lastVideoUrl, op
 }
 
 /** 暂停后怎么接着做：这段说明会交到模型手里，正是「循环迭代」的续做入口。 */
-function resumeHint(dir, remainingSeconds) {
-  return `要接着做就把 resume="${dir}" 再调一次 video_generate（prompt 可以省略，其余参数照旧）：`
+function resumeHint(dir, remainingSeconds, toolName = 'video_generate') {
+  return `要接着做就把 resume="${dir}" 再调一次 ${toolName}（prompt 可以省略，其余参数照旧）：`
     + `插件会接着已经生成的分段继续，剩下的 ${remainingSeconds} 秒不用重头生成、不会重复扣费。`;
 }
 
@@ -2140,7 +2340,9 @@ async function remainingCostText(config, exec, remainingSteps) {
  *   unavailable —— 没有可用的确认通道（没有审批服务 / 没有会话 / 提问失败）：
  *     这次调用在动手前已经确认过费用，就不把生成堵在这里，按继续处理并在 note 里说明。
  */
-async function confirmNextSegment(ctx, config, exec, { done, finished, nextSeconds, remainingSteps }) {
+async function confirmNextSegment(ctx, config, exec, {
+  done, finished, nextSeconds, remainingSteps, toolName = 'video_generate',
+}) {
   const approval = ctx?.get?.('approval');
   const agent = exec?.agent;
   if (!approval || typeof approval.request !== 'function' || !agent) {
@@ -2156,7 +2358,7 @@ async function confirmNextSegment(ctx, config, exec, { done, finished, nextSecon
   try {
     const outcome = await approval.request({
       agent,
-      toolName: 'video_generate',
+      toolName,
       ...(exec?.callId ? { callId: exec.callId } : {}),
       ...(exec?.signal ? { signal: exec.signal } : {}),
       reason: `人工确认：继续生成第 ${done + 1} 段视频（${nextSeconds} 秒）。`
@@ -2298,7 +2500,7 @@ function setupGate(ctx, exec) {
  * 返回 null 表示不用拦（不需要合并、或本机已经能跑 ffmpeg）。
  */
 async function ffmpegConsentGate(config, exec, args) {
-  if (exec.name !== 'video_generate') return null;
+  if (exec.name !== 'video_generate' && exec.name !== 'video_extend') return null;
   // 用户已经明确说要「只返回分段」，就别再拦了。
   if (args?.merge === false) return null;
 
@@ -2647,25 +2849,44 @@ async function waitForCompletion(config, taskId, signal): Promise<TaskResult> {
 }
 
 function renderResult(value) {
-  const { status, segments = [], videoUrl, error } = value || {};
+  const {
+    status, segments = [], videoUrl, error, videoPath, mergeMode, segmentsDir,
+    paused, resumeDir, remainingSeconds, note,
+  } = value || {};
   const lines = segments.map((segment) => {
     const head = `第 ${segment.index} 段：+${segment.seconds}s（任务 ${segment.taskId}）`;
-    return segment.status === 'succeeded' && segment.videoUrl
-      ? `${head} → ${segment.videoUrl}`
-      : `${head} → ${segment.status}${segment.error ? `：${segment.error}` : ''}`;
+    if (segment.status !== 'succeeded' || !segment.videoUrl) {
+      return `${head} → ${segment.status}${segment.error ? `：${segment.error}` : ''}`;
+    }
+    return segment.localPath
+      ? `${head} → ${segment.videoUrl}\n    本地文件：${segment.localPath}`
+      : `${head} → ${segment.videoUrl}`;
   });
 
   if (status === 'succeeded') {
-    return [
-      {
-        type: 'text',
-        text: [
-          '视频延长成功。',
-          ...lines,
-          `最终视频链接（约 24 小时内有效）：${videoUrl || '（无）'}`,
-        ].join('\n'),
-      },
-    ];
+    const parts = [];
+    if (paused) {
+      parts.push(
+        `已延长并交付前 ${segments.length} 段（共 ${formatSeconds(segments.reduce(
+          (sum, item) => sum + (item.seconds || 0), 0,
+        ))} 秒）：每段延长完都会问一次要不要继续；这次先交付到这里`
+        + '（用户选了先不继续，或这一轮被停止 / 等超时了）。',
+      );
+    } else {
+      parts.push('视频延长成功。');
+    }
+    parts.push(...lines);
+    if (videoPath) parts.push(`成片（本地文件）：${videoPath}（${mergeModeLabel(mergeMode)}）`);
+    if (paused && resumeDir) {
+      parts.push(
+        `还没生成的部分：还剩 ${formatSeconds(remainingSeconds)} 秒。`
+        + `要接着做就把 resume="${resumeDir}" 传回 video_extend（prompt 可以省略，其余参数照旧）：`
+        + '前面几段不会重新生成、不会重复扣费。',
+      );
+    }
+    parts.push(`最终视频链接（约 24 小时内有效）：${videoUrl || '（无）'}`);
+    if (note) parts.push(note);
+    return [{ type: 'text', text: parts.filter(Boolean).join('\n') }];
   }
   if (status === 'timeout') {
     return [
@@ -2713,15 +2934,19 @@ const SEGMENT_OUTPUT_SCHEMA = {
   type: 'object',
   properties: {
     index: { type: 'integer' },
+    kind: { type: 'string' },
     seconds: { type: 'integer' },
     taskId: { type: 'string' },
     status: { type: 'string' },
     videoUrl: { type: 'string' },
+    localPath: { type: 'string' },
+    durationSeconds: { type: 'number' },
     error: { type: 'string' },
   },
 };
 
-function extendTool(config) {
+function extendTool(config, deps, ctx) {
+  const TOOL_NAME = 'video_extend';
   return {
     name: 'video_extend',
     description:
@@ -2734,7 +2959,13 @@ function extendTool(config) {
       + '每段 4-15 秒，默认按 15 秒上限拆、段数最少；上游对卡满 15 秒敏感时再调小。'
       + '返回每段的任务 ID 和最终视频下载链接（约 24 小时内有效）；生成通常需要几分钟，'
       + '单次调用返回 timeout、或某段返回 unknown（查询失败、任务其实已提交）时，'
-      + '都用返回的任务 ID 走 video_status 继续等，不要重复提交同一段。',
+      + '都用返回的任务 ID 走 video_status 继续等，不要重复提交同一段。'
+      + '每段延长完都会先弹一次确认框问用户要不要继续：点「拒绝」就先交付已经延长好的部分，'
+      + '结果里带 paused=true、resumeDir、remainingSeconds；之后用户说「继续」时把 resumeDir '
+      + '原样传给 video_extend 的 resume 参数接着做（前面几段不重新生成、不重复扣费）。'
+      + '多段默认会下载分段并在本机合并成一条成片（需要 ffmpeg）：没有 ffmpeg 时会先拦下来问用户，'
+      + '结果里也会带 ffmpegMissing 与安装引导。'
+      + '中途被停止 / 等超时同理：已经延长好的段先交付，剩下的用 resume 接着做。',
     parameters: {
       type: 'object',
       properties: {
@@ -2804,6 +3035,14 @@ function extendTool(config) {
           type: 'boolean',
           description: '是否添加水印，默认 false。',
         },
+        resume: {
+          type: 'string',
+          description:
+            '接着上一次暂停的延长继续：传上一次结果里的 resumeDir。'
+            + '插件会沿用暂停记录里的提示词、延长方向和剩下的段数，只把没做的部分生成完再合并；'
+            + 'prompt / videoUrl / direction 都可以省略。'
+            + '想顺手多延长几段就再传 segments（表示在剩下的基础上「再加」几段）。',
+        },
       },
       required: ['prompt'],
     },
@@ -2813,9 +3052,20 @@ function extendTool(config) {
         properties: {
           status: { type: 'string' },
           videoUrl: { type: 'string' },
+          videoPath: { type: 'string' },
+          merged: { type: 'boolean' },
+          mergeMode: { type: 'string' },
+          segmentsDir: { type: 'string' },
+          ffmpegMissing: { type: 'boolean' },
+          installHint: { type: 'string' },
+          partial: { type: 'boolean' },
+          paused: { type: 'boolean' },
+          resumeDir: { type: 'string' },
+          remainingSeconds: { type: 'integer' },
           totalSeconds: { type: 'integer' },
           error: { type: 'string' },
           errorCode: { type: 'string' },
+          note: { type: 'string' },
           segments: { type: 'array', items: SEGMENT_OUTPUT_SCHEMA },
         },
       },
@@ -2831,10 +3081,20 @@ function extendTool(config) {
       const apiKey = resolveApiKey(config);
       assertConfigured(config, apiKey);
 
-      const prompt = String(args?.prompt ?? '').trim();
-      if (!prompt) throw new Error('提示词 prompt 不能为空。');
+      // 接着上一次暂停的延长继续（长视频循环迭代的第二轮起）
+      const resumeDir = resumeDirOf(args?.resume);
+      const resume = resumeDir ? await readPauseFile(resumeDir) : null;
 
-      const direction = args?.direction === 'forward' ? 'forward' : 'backward';
+      const prompt = String(args?.prompt ?? '').trim() || String(resume?.prompt ?? '').trim();
+      if (!prompt) {
+        throw new Error(resumeDir
+          ? '这次是接着上一次暂停的延长继续，但暂停记录里没有提示词：请把 prompt 补上。'
+          : '提示词 prompt 不能为空。');
+      }
+
+      const lastOptions = resume ? (resume.options || {}) : {};
+      const direction = (args?.direction ?? lastOptions.direction) === 'forward' ? 'forward' : 'backward';
+      const wording = (args?.wording ?? lastOptions.wording) === 'after' ? 'after' : 'extend';
       const requestedSegments = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
       const secondsPerSegment = clampInteger(
         args?.duration ?? ref(config, 'duration', 5),
@@ -2866,27 +3126,76 @@ function extendTool(config) {
           );
         }
       }
+      // 接着做时，参考视频是上次最后一段的链接（暂停记录里有）
+      if (!referenceUrl && resume) referenceUrl = String(resume.lastVideoUrl ?? '').trim();
       referenceUrl = normalizeReferenceUrl(referenceUrl);
 
-      let cursor = args?.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
+      // 计划：续做时先把暂停记录里剩下的段跑完；再传 segments 就是「再追加这么多段」
+      const doneBefore = resume ? (Number(resume.done) || 0) : 0;
+      const fullPlan = resume ? (resume.plan || []).map((step) => ({ ...step })) : [];
+      if (!resume) {
+        for (let index = 0; index < requestedSegments; index += 1) {
+          fullPlan.push({ kind: 'extend', seconds: secondsPerSegment });
+        }
+      } else if (args?.segments != null) {
+        for (let index = 0; index < requestedSegments && fullPlan.length < MAX_SEGMENTS; index += 1) {
+          fullPlan.push({ kind: 'extend', seconds: secondsPerSegment });
+        }
+      }
+      const plan = fullPlan.slice(doneBefore);
+      const plannedSeconds = plan.reduce((sum, step) => sum + step.seconds, 0);
+
+      let cursor = resume
+        ? (resume.cursor ?? null)
+        : (args?.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt))));
+      const notes = [];
       const segments = [];
+      if (resume) {
+        // 上次暂停前生成好的延长段：文件就在同样的分段目录里（序号 + extend 就是文件名）
+        for (const step of (resume.steps || [])) {
+          segments.push({
+            index: step.index,
+            kind: 'extend',
+            seconds: step.seconds,
+            taskId: step.taskId,
+            status: 'succeeded',
+            videoUrl: step.videoUrl,
+          });
+        }
+      }
       let status = 'succeeded';
       let error;
       let errorCode;
+      // 用户选择先不继续（确认框里点了拒绝/取消）：先把已经延长好的部分交付
+      let paused = false;
+      let confirmWarned = false;
 
-      for (let index = 1; index <= requestedSegments; index += 1) {
+      // 被停止 / 超时也一样：已经延长好的部分先交付，留暂停记录给 resume。
+      let interrupted = false;
+      try {
+      for (const [offset, step] of plan.entries()) {
         if (exec?.signal?.aborted) throw abortError();
+        const position = doneBefore + offset;
 
         const { body, seconds } = buildRequestBody(
           config,
-          { ...args, prompt, duration: secondsPerSegment, startAt: cursor },
+          {
+            ...lastOptions,
+            ...args,
+            prompt,
+            duration: step.seconds,
+            startAt: cursor,
+            direction,
+            wording,
+          },
           referenceUrl,
         );
         const final = await runTask(config, body, exec?.signal);
         const taskId = final.taskId;
 
         segments.push({
-          index,
+          index: position + 1,
+          kind: 'extend',
           seconds,
           taskId,
           status: final.status,
@@ -2911,17 +3220,142 @@ function extendTool(config) {
           cursor = direction === 'forward' ? cursor - seconds : cursor + seconds;
           if (cursor < 0) cursor = null;
         }
+
+        // 循环迭代：每段延长完都先问一次用户要不要继续往下延长
+        const nextStep = plan[offset + 1];
+        if (nextStep) {
+          const verdict = await confirmNextSegment(ctx, config, exec, {
+            done: position + 1,
+            finished: segments,
+            nextSeconds: nextStep.seconds,
+            remainingSteps: plan.slice(offset + 1),
+            toolName: TOOL_NAME,
+          });
+          if (verdict.outcome === 'rejected' || verdict.outcome === 'cancelled') {
+            paused = true;
+            notes.push(
+              `第 ${position + 1} 段（${formatSeconds(seconds)} 秒）延长好之后，`
+              + (verdict.outcome === 'rejected' ? '用户选择先不继续往下延长' : '确认框被取消')
+              + '：先把已经延长好的部分交付，剩下的随时可以接着做。',
+            );
+            break;
+          }
+          if (verdict.outcome === 'unavailable' && !confirmWarned) {
+            confirmWarned = true;
+            notes.push(
+              `这次没能弹「要不要继续」的确认框（${verdict.reason}），`
+              + '后面的分段按已经确认过的计划继续生成。',
+            );
+          }
+        }
+      }
+      } catch (failure) {
+        const doneYet = segments.some((segment) => segment.status === 'succeeded' && segment.videoUrl);
+        if (failure?.code !== 'ABORTED' || !doneYet) throw failure;
+        interrupted = true;
+        paused = true;
+        notes.push(
+          '这次调用被中断了（用户点了停止，或者等超时了）：已经延长好的部分会先下载、合并、交付，'
+          + '剩下的段不用重头再来——用 resume 就能接着做。',
+        );
       }
 
-      return {
+      const completed = segments.filter((segment) => segment.status === 'succeeded' && segment.videoUrl);
+      const deliveredSeconds = completed.reduce((sum, segment) => sum + (segment.seconds || 0), 0);
+      const result: Record<string, any> = {
         status,
         error,
         errorCode,
         segments,
-        videoUrl: segments.filter((segment) => segment.videoUrl).at(-1)?.videoUrl,
-        totalSeconds: segments.filter((segment) => segment.status === 'succeeded').length
-          * secondsPerSegment,
+        videoUrl: completed.at(-1)?.videoUrl,
+        totalSeconds: deliveredSeconds,
       };
+      if (!completed.length) {
+        if (notes.length) result.note = notes.join('\n');
+        return result;
+      }
+      if (status !== 'succeeded') {
+        notes.push(`已把成功的 ${completed.length} 段（${deliveredSeconds} 秒）交付，可作为残片使用。`);
+        result.partial = true;
+      }
+      if (resume) {
+        notes.push(
+          `接着上一次暂停的进度继续：前面 ${doneBefore} 段（${formatSeconds(resume.cursor ?? 0)}）不重新生成，`
+          + `这次还要延长 ${plan.length} 段共 ${plannedSeconds} 秒。`,
+        );
+      }
+
+      const outDir = await resolveOutputDir(config, exec, deps);
+      const { stamp, segmentsDir } = resume
+        ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir }
+        : await allocateStamp(outDir, fileStamp());
+
+      const delivery = await downloadSegmentsAndMerge(config, {
+        segments: completed,
+        segmentsDir,
+        outDir,
+        stamp,
+        notes,
+        keepSingleFile: paused,
+        // 被中断时请求信号已经 abort：收尾（下载 + 合并）不能被它打断，否则等于白生成。
+        signal: interrupted ? undefined : exec?.signal,
+      });
+      if (delivery.error) {
+        result.segmentsDir = delivery.segmentsDir;
+        result.note = notes.join('\n');
+        return result;
+      }
+      if (delivery.ffmpegMissing) {
+        result.segmentsDir = delivery.segmentsDir;
+        result.merged = false;
+        result.ffmpegMissing = true;
+        result.installHint = delivery.installHint;
+        result.note = notes.join('\n');
+        return result;
+      }
+      if (!delivery.files.length) {
+        result.note = notes.join('\n');
+        return result;
+      }
+      if (delivery.merged) {
+        result.merged = true;
+        result.videoPath = delivery.videoPath;
+        result.mergeMode = delivery.mergeMode;
+      }
+
+      if (paused) {
+        // 暂停：延长好的分段留着（接着做时要复用），并写下「延长到哪一步」的记录
+        result.segmentsDir = segmentsDir;
+        result.resumeDir = segmentsDir;
+        result.paused = true;
+        result.remainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - deliveredSeconds);
+        try {
+          await writePauseFile(segmentsDir, pauseRecordAt({
+            stamp,
+            prompt,
+            fullPlan,
+            done: segments.length,
+            cursor,
+            lastVideoUrl: referenceUrl,
+            options: { ...pickResumeOptions(args), direction, wording, startAt: cursor },
+            segments,
+          }));
+        } catch (failure) {
+          notes.push(`暂停记录没写成（${failure?.message || failure}）：要接着做只能用上面的链接重新延长。`);
+        }
+        notes.push(`已交付的成片是到第 ${segments.length} 段，分段仍保留在 ${segmentsDir}。`);
+        notes.push(resumeHint(segmentsDir, result.remainingSeconds, TOOL_NAME));
+        result.note = notes.join('\n');
+        return result;
+      }
+
+      if (args?.keepSegments ?? ref(config, 'keepSegments', false)) {
+        result.segmentsDir = segmentsDir;
+      } else {
+        await rm(segmentsDir, { recursive: true, force: true });
+      }
+      if (notes.length) result.note = notes.join('\n');
+      return result;
     },
   };
 }
@@ -2940,6 +3374,15 @@ const VIDEO_SEGMENT_OUTPUT_SCHEMA = {
     error: { type: 'string' },
   },
 };
+
+/** 合并方式的说法（两个工具的结果里都用它）。 */
+function mergeModeLabel(mergeMode) {
+  if (mergeMode === 'copy') return '无损拼接';
+  if (mergeMode === 'segment') return '这一段暂时按原始分段交付（续做时再和后面的段合并）';
+  if (mergeMode === 'single') return '一段直出，无需拼接';
+  if (mergeMode === 'seamless') return '无缝拼接（对齐接缝 + 画面/音频交叉淡化，音乐接缝已淡化）';
+  return '重编码拼接';
+}
 
 function renderVideoResult(value) {
   const {
@@ -2963,7 +3406,8 @@ function renderVideoResult(value) {
       parts.push(
         `已生成并交付前 ${segments.length} 段（共 ${formatSeconds(segments.length
           ? segments.reduce((sum, item) => sum + (item.seconds || 0), 0) : 0)} 秒）：`
-        + '每段生成完都会问一次要不要继续，这次用户选了先不继续。',
+        + '每段生成完都会问一次要不要继续；这次先交付到这里'
+        + '（用户选了先不继续，或这一轮被停止 / 等超时了）。',
       );
     } else if (mode === 'extended') {
       parts.push(`视频生成成功：先直出 ${formatSeconds(segments[0]?.seconds)} 秒，再延长 ${segments.length - 1} 段。`);
@@ -2986,16 +3430,7 @@ function renderVideoResult(value) {
 
   if (status === 'succeeded') {
     if (videoPath) {
-      const how = mergeMode === 'copy'
-        ? '无损拼接'
-        : (mergeMode === 'segment'
-          ? '这一段暂时按原始分段交付（续做时再和后面的段合并）'
-          : (mergeMode === 'single'
-          ? '一段直出，无需拼接'
-          : (mergeMode === 'seamless'
-            ? '无缝拼接（对齐接缝 + 画面/音频交叉淡化，音乐接缝已淡化）'
-            : '重编码拼接')));
-      parts.push(`成片（本地文件）：${videoPath}（${how}）`);
+      parts.push(`成片（本地文件）：${videoPath}（${mergeModeLabel(mergeMode)}）`);
     } else if (segmentsDir) {
       parts.push(`没有合并成一条：分段文件都在 ${segmentsDir}（每段路径见上面的列表）。`);
     } else {
@@ -3019,6 +3454,8 @@ function renderVideoResult(value) {
 }
 
 function videoTool(config, deps, ctx) {
+  // 结果里的「接着做要调哪个工具」和确认框里的工具名都用它
+  const TOOL_NAME = 'video_generate';
   return {
     name: 'video_generate',
     description:
@@ -3252,6 +3689,9 @@ function videoTool(config, deps, ctx) {
       // 上次那轮用的参数（续做时调用方可以只传 resume）
       const resumeOptions = restarted ? (resume.options || {}) : {};
 
+      // 被用户停止 / 宿主超时时，别把已经生成好的分段丢掉：按「暂停」收尾，留暂停记录给 resume。
+      let interrupted = false;
+      try {
       for (const [offset, step] of plan.entries()) {
         if (exec?.signal?.aborted) throw abortError();
         const position = doneBefore + offset;
@@ -3329,6 +3769,17 @@ function videoTool(config, deps, ctx) {
             );
           }
         }
+      }
+      } catch (failure) {
+        const doneYet = segments.some((segment) => segment.status === 'succeeded' && segment.videoUrl);
+        if (failure?.code !== 'ABORTED' || !doneYet) throw failure;
+        // 中断/超时：已经生成的部分照常下载合并交付，剩下的交给 resume。
+        interrupted = true;
+        paused = true;
+        notes.push(
+          '这次调用被中断了（用户点了停止，或者等超时了）：已经生成好的部分会先下载、合并、交付，'
+          + '剩下的秒数不用重头再来——用 resume 就能接着做。',
+        );
       }
 
       const completed = segments.filter((segment) => segment.status === 'succeeded' && segment.videoUrl);
@@ -3409,124 +3860,41 @@ function videoTool(config, deps, ctx) {
         return result;
       }
 
-      // 多段才需要合成；本机没有 ffmpeg 就直接跳过，别白跑一遍合并再报错。
-      const ffmpegReady = completed.length > 1 ? await hasFfmpeg(config, exec?.signal) : true;
-
       const outDir = await resolveOutputDir(config, exec, deps);
       // 原子占位，拿到本次唯一的 stamp（分段目录 + 成片名前缀），避免并发调用撞名。
       // 接着做时沿用上一次的分段目录与 stamp：前面几段就在里面，合并时一起拼。
       const { stamp, segmentsDir } = restarted
         ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir }
         : await allocateStamp(outDir, fileStamp());
-      const files = [];
-      let probeWarned = false;
-
-      try {
-        for (const [index, segment] of completed.entries()) {
-          const dest = path.join(
-            segmentsDir,
-            `${String(segment.index).padStart(2, '0')}-${segment.kind}.mp4`,
-          );
-          // 接着做时前面几段上次已经下好了：直接用现成文件，别重复下载（上游链接也可能已过期）。
-          if (!(await exists(dest))) {
-            await downloadFile(segment.videoUrl, dest, { signal: exec?.signal });
-          }
-          segment.localPath = dest;
-
-          const media = await probeMedia(dest, config, exec?.signal);
-          if (media?.durationSeconds) {
-            segment.durationSeconds = Number(media.durationSeconds.toFixed(2));
-            const cumulative = completed.slice(0, index + 1)
-              .reduce((sum, item) => sum + item.seconds, 0);
-            const tolerance = Math.max(
-              CUMULATIVE_TOLERANCE_MIN_SECONDS,
-              cumulative * CUMULATIVE_TOLERANCE_RATIO,
-            );
-            const looksCumulative = files.length > 0
-              && Math.abs(media.durationSeconds - cumulative) <= tolerance
-              && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
-            if (looksCumulative) {
-              files.length = 0;
-              notes.push(
-                `第 ${segment.index} 段实测 ${formatSeconds(media.durationSeconds)} 秒，`
-                + `接近累计时长 ${cumulative} 秒，按「上游返回的是累计成片」处理。`,
-              );
-            }
-          } else if (!probeWarned) {
-            probeWarned = true;
-            notes.push('没有可用的 ffprobe，无法探测分段时长，按「每段都是增量片段」直接拼接。');
-          }
-          files.push(dest);
-        }
-      } catch (failure) {
-        if (failure?.code === 'ABORTED') throw failure;
-        result.segmentsDir = segmentsDir;
-        result.note = [...notes, `分段已生成，但下载失败：${failure?.message || failure}`].join('\n');
+      const delivery = await downloadSegmentsAndMerge(config, {
+        segments: completed,
+        segmentsDir,
+        outDir,
+        stamp,
+        notes,
+        // 暂停时只有一段的话，这一段的文件要留在分段目录里给之后续做用。
+        keepSingleFile: paused,
+        // 被中断时请求信号已经 abort：收尾（下载 + 合并）不能被它打断，否则等于白生成。
+        signal: interrupted ? undefined : exec?.signal,
+      });
+      if (delivery.error) {
+        result.segmentsDir = delivery.segmentsDir;
+        result.note = [...notes, delivery.error].join('\n');
         return result;
       }
-
-      if (!files.length) return result;
-
-      if (!ffmpegReady && files.length > 1) {
-        // 缺 ffmpeg 不是失败：分段照样交付，但必须把「怎么装」== 引导 ==交出去。
-        const guide = ffmpegInstallHint(config);
-        result.segmentsDir = segmentsDir;
+      if (delivery.ffmpegMissing) {
+        result.segmentsDir = delivery.segmentsDir;
         result.merged = false;
         result.ffmpegMissing = true;
-        result.installHint = guide.hint;
-        notes.push(`分段文件都已下载到 ${segmentsDir}。`);
-        notes.push(guide.hint);
+        result.installHint = delivery.installHint;
         result.note = notes.join('\n');
         return result;
       }
-
-      const finalPath = path.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
-      try {
-        if (files.length === 1 && paused) {
-          // 暂停时只有一段：这一段的文件要留在分段目录里给之后续做用，直接把它当交付物。
-          result.mergeMode = 'segment';
-          result.videoPath = files[0];
-        } else if (files.length === 1) {
-          await rm(finalPath, { force: true });
-          await rename(files[0], finalPath);
-          result.mergeMode = 'single';
-        } else {
-          const merged = await mergeClips(config, files, finalPath, { signal: exec?.signal });
-          result.mergeMode = merged.mode;
-          if (merged.trimmed?.length) {
-            notes.push(
-              `第 ${merged.trimmed.map((item) => item.index).join('、')} 段的音频比视频长`
-              + `（最长 ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} 秒），`
-              + '已裁齐后再拼接，避免接缝处缺一小段画面。',
-            );
-          }
-          if (merged.mode === 'seamless') {
-            // 把接缝补正的实测值写在结果里，用户/模型能看出「不是硬切上去的」
-            const fixed = (merged.seams || [])
-              .filter((seam) => Math.abs(seam.lumaDelta) >= 0.5 || Math.abs(seam.audioGainDb) >= 0.2)
-              .map((seam) => `第 ${seam.index} 段接缝：画面 ${seam.lumaDelta >= 0 ? '+' : ''}`
-                + `${seam.lumaDelta.toFixed(1)} 级、音量 ${seam.audioGainDb >= 0 ? '+' : ''}`
-                + `${seam.audioGainDb.toFixed(1)} dB`);
-            notes.push(
-              `合并方式：无缝拼接（接缝 ${merged.fade} 秒交叉淡化`
-              + `${fixed.length ? `，并已对齐${fixed.join('；')}` : ''}）。`,
-            );
-          }
-        }
+      if (!delivery.files.length) return result;
+      if (delivery.merged) {
         result.merged = true;
-        if (!result.videoPath) result.videoPath = finalPath;
-      } catch (failure) {
-        if (failure?.code === 'ABORTED') throw failure;
-        let reason = `分段已生成，但合并失败：${failure?.message || failure}`;
-        if (failure?.code === 'ffmpeg_missing') {
-          const guide = ffmpegInstallHint(config);
-          result.ffmpegMissing = true;
-          result.installHint = guide.hint;
-          reason = guide.hint;
-        }
-        result.segmentsDir = segmentsDir;
-        result.note = [...notes, reason].join('\n');
-        return result;
+        result.videoPath = delivery.videoPath;
+        result.mergeMode = delivery.mergeMode;
       }
 
       if (paused) {
@@ -3550,7 +3918,7 @@ function videoTool(config, deps, ctx) {
           notes.push(`暂停记录没写成（${failure?.message || failure}）：要接着做只能用上面的链接走 video_extend。`);
         }
         notes.push(`已交付的成片是从头到第 ${segments.length} 段，分段仍保留在 ${segmentsDir}。`);
-        notes.push(resumeHint(segmentsDir, result.remainingSeconds));
+        notes.push(resumeHint(segmentsDir, result.remainingSeconds, TOOL_NAME));
         result.note = notes.join('\n');
         return result;
       }
@@ -4111,13 +4479,18 @@ function buildPromptGuidance(config) {
       + '用户点了「先不继续」时结果里带 paused=true、resumeDir、remainingSeconds——'
       + '这时先把已经生成的部分交付给他，等他说「继续」再把 resumeDir 原样传给 video_generate 的 resume 参数'
       + '（插件接着已有的分段往下做，前面几段不重新生成、不重复扣费），不要从头再来一遍；'
+      + '用户中途点了「停止」或这一轮等超时也一样：已经生成好的段会先下载、合并、交付'
+      + '（结果里同样是 paused=true + 成片 + resumeDir），不要把那几段丢掉重来；'
       + `单条成片最长 ${MAX_TOTAL_SECONDS} 秒（最多 ${MAX_SEGMENTS} 段），用户要更长的就按 `
       + `${MAX_TOTAL_SECONDS} 秒生成并说明这是插件当前的上限，不要反复加大 duration；`
       + '成片默认落在会话工作目录下的 metaontic-video/。',
     '· 给已有视频接长用 video_extend，输入必须是公网 URL；提示词以「向后延长视频1」或「向前延长视频1」开头，'
       + '全程用「视频1」指代素材，不要写「参考视频1」；写清延长方向、剧情发展、主体状态、镜头运动、'
       + '声音延续（背景音乐接在视频1结尾处、不要从头播放，环境声和对白也要连续）；'
-      + '每段 4-15 秒，默认按上限拆、段数最少。',
+      + '每段 4-15 秒，默认按上限拆、段数最少；连着延长多段时每段之间会先问用户一次要不要继续，'
+      + '并默认下载分段在本机合并成一条成片（缺 ffmpeg 会先拦下来问）；'
+      + '用户点「拒绝」或中途被停止时，已经延长好的部分照样先交付（paused=true + resumeDir），'
+      + '之后把 resumeDir 传给 video_extend 的 resume 参数接着做即可，不重复生成、不重复扣费。',
     '· 生成通常要几分钟：单次调用返回 timeout 不等于失败，用 video_status 加 taskId 继续查'
       + '（上游链接约 24 小时内有效），不要重复提交同一段。',
     '· 环境有问题（缺 ffmpeg 装不上、想确认能不能合并）用 video_setup：默认只检查，'
@@ -4152,7 +4525,7 @@ export function apply(ctx: DshContext, config: any = {}) {
   const deps: Record<string, any> = {};
   const disposers = [
     ctx.tools.register(jsonSafeTool(videoTool(config, deps, ctx))),
-    ctx.tools.register(jsonSafeTool(extendTool(config))),
+    ctx.tools.register(jsonSafeTool(extendTool(config, deps, ctx))),
     ctx.tools.register(jsonSafeTool(taskTool(config))),
     ctx.tools.register(jsonSafeTool(setupTool(config))),
   ];
