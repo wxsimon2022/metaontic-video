@@ -101,12 +101,15 @@ window.__ModuleLoader__.load({
       versionFailed: '检查更新失败：{message}',
       versionUpdate: '立即更新',
       versionUpdateConfirm: '确认更新到 v{version}',
-      versionUpdateConfirmHint: '会先卸载再从 Gitee 装一遍插件本体（配置和密钥都保留），这张设置页会短暂消失一下。',
+      versionUpdateConfirmHint: '会从 Gitee 装一遍插件本体（配置和密钥都保留）；装不上也不会动现在这份。这张设置页会短暂消失一下。',
       versionUpdating: '更新中…',
       versionUpdateDone: '已更新到 v{version}，正在重新加载…',
       versionUpdateRestart: '新版本 v{version} 已装好：重启 Harness 后生效。',
       versionUpdateCancelled: '更新已取消。',
-      versionUpdateFailed: '在线更新失败：{message}（可以到「插件」页卸载后重新添加）',
+      versionUpdateRetry: '装到一半没成功（第 {attempt}/{total} 次尝试）…',
+      versionUpdateFailed: '在线更新失败：{message}',
+      versionUpdateRemoved: '这次先卸载了本插件、没能装回来：请到「插件」页重新添加本插件。',
+      versionUpdateRateLimited: '看起来是 Gitee 限流（429，匿名 HTTPS 克隆被排队）。本机执行 git config --global url."git@gitee.com:".insteadOf "https://gitee.com/" 改成走 SSH，再点一次「立即更新」即可；密钥和设置在 profile 里，没丢。',
       versionUpdateUnavailable: '宿主没有开放插件管理接口（{detail}），请到「插件」页卸载后重新添加。',
       versionHint: '点「立即更新」由插件自己从 Gitee 重装一遍，不用去卸载重加。',
       versionCheckedAt: '检查于 {time}',
@@ -205,12 +208,15 @@ window.__ModuleLoader__.load({
       versionFailed: 'Update check failed: {message}',
       versionUpdate: 'Update now',
       versionUpdateConfirm: 'Confirm update to v{version}',
-      versionUpdateConfirmHint: 'Reinstalls the plugin itself from Gitee (settings and key are kept); this settings page disappears for a moment.',
+      versionUpdateConfirmHint: 'Reinstalls the plugin itself from Gitee (settings and key are kept); a failed install leaves the current copy untouched. This settings page disappears for a moment.',
       versionUpdating: 'Updating…',
       versionUpdateDone: 'Updated to v{version}, reloading…',
       versionUpdateRestart: 'v{version} installed; restart Harness to apply it.',
       versionUpdateCancelled: 'Update cancelled.',
-      versionUpdateFailed: 'Online update failed: {message} (uninstall and re-add it from the Plugins page).',
+      versionUpdateRetry: 'Install did not go through (attempt {attempt} of {total})…',
+      versionUpdateFailed: 'Online update failed: {message}',
+      versionUpdateRemoved: 'This run uninstalled the plugin and could not put it back: please re-add it from the Plugins page.',
+      versionUpdateRateLimited: 'Looks like a Gitee rate limit (429; anonymous HTTPS clones are queued). Run git config --global url."git@gitee.com:".insteadOf "https://gitee.com/" on this machine to switch to SSH, then click Update now again; the key and settings are kept in the profile.',
       versionUpdateUnavailable: 'This Host exposes no plugin-management API ({detail}); uninstall and re-add it from the Plugins page.',
       versionHint: 'Click "Update now": the plugin reinstalls itself from Gitee — no uninstall/re-add needed.',
       versionCheckedAt: 'checked {time}',
@@ -306,6 +312,12 @@ window.__ModuleLoader__.load({
     /** 本包在 profile 里的包名，以及能重装自己的那条依赖 spec——在线更新直接复用这两样。 */
     const PLUGIN_PACKAGE = 'metaontic-video';
     const UPDATE_SPEC = 'git+https://gitee.com/hackloop/metaontic-video.git';
+    /** 默认分支，以及「默认分支最新提交」的 Gitee API：在线更新要拿它当 spec 的 committish。 */
+    const UPDATE_BRANCH = 'master';
+    const UPDATE_COMMIT_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/commits`
+      + `?sha=${UPDATE_BRANCH}&per_page=1`;
+    /** 在线更新最多试几次：Gitee 的匿名 HTTPS 克隆会排队，429 一般过一会儿就好。 */
+    const UPDATE_ATTEMPTS = 3;
     /** 版本检查结果的本地缓存与节流：6 小时内不重复联网，打开设置页先用缓存显示。 */
     const UPDATE_CACHE_KEY = 'metaontic-video.update-check';
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -399,6 +411,33 @@ window.__ModuleLoader__.load({
       const version = String((JSON.parse(text) || {}).version || '').trim().replace(/^v/i, '');
       if (!version) throw new Error('no version');
       return version;
+    }
+
+    /**
+     * 默认分支最新提交的完整 sha。
+     *
+     * 在线更新为什么不直接装 `UPDATE_SPEC`：宿主对「同一个 spec 再装一遍」是直接拒绝的
+     * （already-installed），想绕开就得先卸载——而卸载之后一旦装不上（Gitee 429、断网），
+     * 插件就没了。改成带上当前最新提交号，spec 跟已装的永远不同，宿主当新依赖处理、
+     * 直接原地覆盖安装，装失败也不会动现有版本。
+     */
+    async function fetchLatestCommit() {
+      const controller = typeof AbortController === 'function' ? new AbortController() : null;
+      const timer = controller ? window.setTimeout(() => controller.abort(), 12000) : null;
+      let response;
+      try {
+        response = await fetch(UPDATE_COMMIT_API, {
+          headers: { accept: 'application/json' },
+          signal: controller ? controller.signal : undefined,
+        });
+      } finally {
+        if (timer) window.clearTimeout(timer);
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const body = await response.json();
+      const sha = String((Array.isArray(body) ? body[0]?.sha : '') || '').trim();
+      if (!/^[0-9a-f]{40}$/i.test(sha)) throw new Error('no commit');
+      return sha;
     }
 
     const TOKENS = {
@@ -548,6 +587,8 @@ window.__ModuleLoader__.load({
         const [updateMessage, setUpdateMessage] = React.useState('');
         const [updateLatest, setUpdateLatest] = React.useState('');
         const [updateAt, setUpdateAt] = React.useState('');
+        // 上次看到的默认分支提交号：在线更新拿它当 spec 后缀用（取不到再联网取一次）
+        const updateCommit = React.useRef('');
         // 一键在线更新：第一下把按钮转成「确认更新」，第二下才真的重装本插件
         const [updateConfirm, setUpdateConfirm] = React.useState(false);
 
@@ -581,6 +622,7 @@ window.__ModuleLoader__.load({
           if (cached.latest) {
             setUpdateLatest(cached.latest);
             if (cached.at) setUpdateAt(new Date(cached.at).toLocaleTimeString());
+            if (cached.commit) updateCommit.current = cached.commit;
             setUpdateStatus('ok');
           }
           if (!cached.fresh) checkForUpdate(true).catch(() => {});
@@ -1037,21 +1079,28 @@ window.__ModuleLoader__.load({
           try {
             const raw = window.localStorage.getItem(UPDATE_CACHE_KEY);
             const saved = raw ? JSON.parse(raw) : null;
-            if (!saved || typeof saved !== 'object') return { latest: '', at: 0, fresh: false };
+            if (!saved || typeof saved !== 'object') {
+              return { latest: '', commit: '', at: 0, fresh: false };
+            }
             const at = Number(saved.at) || 0;
             return {
               latest: String(saved.latest || ''),
+              commit: String(saved.commit || ''),
               at,
               fresh: Boolean(at) && Date.now() - at < UPDATE_MAX_AGE_MS,
             };
           } catch {
-            return { latest: '', at: 0, fresh: false };
+            return { latest: '', commit: '', at: 0, fresh: false };
           }
         }
 
-        function rememberUpdateCheck(latest) {
+        /** 缓存里带上默认分支的提交号：在线更新要用它拼 spec 后缀，省一次联网。 */
+        function rememberUpdateCheck(latest, commit) {
           try {
-            window.localStorage.setItem(UPDATE_CACHE_KEY, JSON.stringify({ at: Date.now(), latest }));
+            window.localStorage.setItem(
+              UPDATE_CACHE_KEY,
+              JSON.stringify({ at: Date.now(), latest, commit: commit || '' }),
+            );
           } catch {
             // 存不住只是下次打开会再查一遍，不影响这次的显示
           }
@@ -1077,10 +1126,17 @@ window.__ModuleLoader__.load({
           }
           try {
             const latest = await fetchLatestVersion();
+            // 顺手把默认分支当前提交号也记下：点「立即更新」时就不用再等一次请求。
+            // 取不到不影响检查更新本身，真正更新前还会再试一次。
+            try {
+              updateCommit.current = await fetchLatestCommit();
+            } catch {
+              // 静默：只用上一次记下的提交号，或者干脆走不带后缀的 spec
+            }
             setUpdateLatest(latest);
             setUpdateAt(new Date().toLocaleTimeString());
             setUpdateStatus('ok');
-            rememberUpdateCheck(latest);
+            rememberUpdateCheck(latest, updateCommit.current);
             return latest;
           } catch (error) {
             if (silent) return '';
@@ -1354,9 +1410,10 @@ window.__ModuleLoader__.load({
         /**
          * 一键在线更新：让宿主的插件管理服务把本插件重装一遍。
          *
-         * 宿主对「同一个 spec 重复安装」是直接拒绝的（already-installed），所以先卸载再装——
-         * 这也是宿主「插件」页那个「更新」按钮的做法。配置与密钥都存在 profile 的
-         * cordis.patch.yml 里，卸载重装不受影响。
+         * 关键点是**先装、不卸载**：宿主对「同一个 spec 重复安装」直接拒绝（already-installed），
+         * 所以 spec 带上默认分支当前最新的提交号——跟 profile 里记的那条永远不同，宿主当一条新依赖
+         * 处理，pnpm 原地覆盖安装。这样装到一半失败（Gitee 限流、断网）时，手上这份插件还在；
+         * 旧做法「先卸载再安装」一旦装不上，插件就没了。
          *
          * 期间本插件的客户端模块会被宿主换掉，这张设置页会短暂消失：属正常现象，
          * 更新完（或重启 Harness 后）再回来就是新版本。所以引用要提前取好。
@@ -1374,58 +1431,96 @@ window.__ModuleLoader__.load({
             setUpdateMessage(t('versionUpdateUnavailable', { detail: probe.tried.join('，') }));
             return;
           }
+          const requestId = `${PLUGIN_PACKAGE}-update-${Date.now()}`;
+          const install = async (spec) => {
+            try {
+              return await pluginManager.installBundle(spec, { enabled: true, requestId });
+            } catch (error) {
+              return { ok: false, error: { message: error?.message || String(error) } };
+            }
+          };
+          // 卸载只在「同 spec 已在 profile 里」这条兜底路上用（正常更新用不到）：
+          // 卸载失败也继续装——没有 HMR 的宿主会报 stop-profile，安装会直接盖过去。
+          const remove = async () => {
+            if (typeof pluginManager.removeBundle !== 'function') return null;
+            try {
+              return await pluginManager.removeBundle(PLUGIN_PACKAGE);
+            } catch (error) {
+              return { ok: false, error: { message: error?.message || String(error) } };
+            }
+          };
+          /** 宿主两种失败回包（调用失败 / 安装阶段失败）里那句可以给人看的话。 */
+          const failureText = (result) => String(
+            result?.error?.message
+              ?? result?.value?.error?.diagnostic
+              ?? result?.value?.error?.code
+              ?? 'unknown',
+          );
+          /** 过一会儿可能就好的失败：Gitee 排队（429）、超时、连接被掐。 */
+          const worthRetrying = (text) => /429|queue overflowed|timed out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|unable to access|network|fetch/i.test(text);
+
+          // 拿默认分支最新提交号当 spec 后缀；取不到就退回不带后缀的老 spec（那时才可能要卸载）。
+          let spec = UPDATE_SPEC;
+          let commit = '';
           try {
-            // 卸载一定要在安装之前：宿主对「同一个 spec 重复安装」会直接拒（already-installed）。
-            // 卸载失败也继续装——没有 HMR 的宿主会报 stop-profile，安装会直接盖过去。
-            const remove = async () => {
-              if (typeof pluginManager.removeBundle !== 'function') return null;
-              try {
-                return await pluginManager.removeBundle(PLUGIN_PACKAGE);
-              } catch (error) {
-                return { ok: false, error: { message: error?.message || String(error) } };
-              }
-            };
-            const install = () => pluginManager.installBundle(UPDATE_SPEC, {
-              enabled: true,
-              requestId: `${PLUGIN_PACKAGE}-update-${Date.now()}`,
-            });
-            await remove();
-            let result = await install();
-            // 卸载没生效时宿主会回 already-installed：再卸一次重试一遍，仍不行才报错
-            if (result && result.ok === true && result.value?.error?.code === 'already-installed') {
-              await remove();
-              result = await install();
-            }
-            if (!result || result.ok !== true) {
-              setUpdateStatus('failed');
-              setUpdateMessage(t('versionUpdateFailed', { message: result?.error?.message || 'unknown' }));
-              return;
-            }
-            const outcome = result.value || {};
-            if (outcome.application === 'failed') {
-              setUpdateStatus('failed');
-              setUpdateMessage(t('versionUpdateFailed', {
-                message: outcome.error?.diagnostic || outcome.error?.code || 'failed',
-              }));
-              return;
-            }
-            if (outcome.application === 'cancelled') {
-              setUpdateStatus('ok');
-              setUpdateMessage(t('versionUpdateCancelled'));
-              return;
-            }
-            // 装好了：缓存作废，卡片不再是「有新版本」，只报更新结果
-            forgetUpdateCheck();
-            const version = outcome.version || updateLatest;
-            setUpdateLatest('');
-            setUpdateStatus('restart');
-            setUpdateMessage(outcome.application === 'restart-required'
-              ? t('versionUpdateRestart', { version })
-              : t('versionUpdateDone', { version }));
-          } catch (error) {
-            setUpdateStatus('failed');
-            setUpdateMessage(t('versionUpdateFailed', { message: error?.message || String(error) }));
+            commit = await fetchLatestCommit();
+          } catch {
+            commit = '';
           }
+          const latest = commit || updateCommit.current;
+          if (latest) {
+            updateCommit.current = latest;
+            spec = `${UPDATE_SPEC}#${latest}`;
+          }
+
+          let outcome = null;
+          let failure = '';
+          let removed = false;
+          for (let round = 1; round <= UPDATE_ATTEMPTS && !outcome; round += 1) {
+            let result = await install(spec);
+            if (result?.ok === true && result.value?.error?.code === 'already-installed') {
+              // profile 里已经记着这条 spec（上次刚好装到同一个提交）：卸载再装，强制刷一遍。
+              removed = true;
+              await remove();
+              result = await install(spec);
+            }
+            if (result?.ok === true && result.value?.application !== 'failed') {
+              outcome = result.value || {};
+              break;
+            }
+            failure = failureText(result);
+            if (round < UPDATE_ATTEMPTS && worthRetrying(failure)) {
+              setUpdateMessage(t('versionUpdateRetry', { attempt: round + 1, total: UPDATE_ATTEMPTS }));
+              await new Promise((resolve) => window.setTimeout(resolve, round * 1200));
+              continue;
+            }
+            break;
+          }
+
+          if (!outcome) {
+            setUpdateStatus('failed');
+            setUpdateMessage([
+              t('versionUpdateFailed', { message: failure }),
+              removed ? t('versionUpdateRemoved') : '',
+              worthRetrying(failure) || /429|queue overflowed/i.test(failure)
+                ? t('versionUpdateRateLimited')
+                : '',
+            ].filter(Boolean).join(' '));
+            return;
+          }
+          if (outcome.application === 'cancelled') {
+            setUpdateStatus('ok');
+            setUpdateMessage(t('versionUpdateCancelled'));
+            return;
+          }
+          // 装好了：缓存作废，卡片不再是「有新版本」，只报更新结果
+          forgetUpdateCheck();
+          const version = outcome.version || updateLatest;
+          setUpdateLatest('');
+          setUpdateStatus('restart');
+          setUpdateMessage(outcome.application === 'restart-required'
+            ? t('versionUpdateRestart', { version })
+            : t('versionUpdateDone', { version }));
         }
 
         /** 一条记录里的时间：只到分钟，够看清「什么时候出的片」。 */

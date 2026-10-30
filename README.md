@@ -86,7 +86,10 @@ node -v && ffmpeg -version | head -1 && ffprobe -version | head -1
 ## 自带一个「视频导演」预设
 
 插件自带一个智能体预设 **视频导演**（在新区里选它就能用）：
-先写脚本、等你确认，确认后才调用 `video_generate` 生成，最后用 ffmpeg 合成交付。
+用户给一段创意后，它先写**视频脚本**给你**审核**；脚本审核通过后，它再单独问你**要不要开始做视频**
+（会消耗额度）；两道关都过了才调用 `video_generate` 生成，最后用 ffmpeg 合成交付。
+
+- 两道确认是分开的：先改脚本、再审脚本，审完才问做不做；脚本一改，之前两道确认都作废。
 
 - 不选它也行：直接用普通对话说要什么，一样能出片。
 
@@ -336,9 +339,10 @@ Key、服务地址、模型由「登录」自动写好，正常不用出现在�
 
 更新怎么做：
 
-1. **一键在线更新**：点 **「立即更新」**（再确认一下）。插件会让宿主把本插件从 Gitee 重装一遍，
-   不用你去「插件」页卸载重加、也不用开终端；这张设置页会短暂消失再回来，属正常。
-   装完若提示「重启 Harness 后生效」，重启一次即可。
+1. **一键在线更新**：点 **「立即更新」**（再确认一下）。插件会让宿主把本插件从 Gitee **原地重装**
+   一遍——不是先卸载再装，所以装到一半失败（Gitee 限流 429、断网）时，你手上这份插件还是好的，
+   在原版本上再点一次即可。不用去「插件」页卸载重加、也不用开终端；这张设置页会短暂消失再回来，
+   属正常。装完若提示「重启 Harness 后生效」，重启一次即可。
 2. **手动（一键失败时的退路）**：**插件 → 已安装 → MetaOnticVideo → 卸载**，再点 **添加插件**
    粘上仓库地址 `git+https://gitee.com/hackloop/metaontic-video.git`；终端里等价的两条命令是：
 
@@ -350,6 +354,13 @@ Key、服务地址、模型由「登录」自动写好，正常不用出现在�
    这两条更新完要**重启一次 Harness** 才生效（卡片上不再放「复制命令」，只留一键更新）。
 
 你现有的配置（Key、模型、输出目录等）都存在 profile 里，卸载重装不受影响，不用重新登录。
+
+在线更新为什么能「原地重装」：宿主对**同一个 spec** 重复安装会直接拒绝（`already-installed`），
+所以插件会把默认分支当前最新的提交号接到 spec 后面（`git+https://gitee.com/hackloop/
+metaontic-video.git#<commit>`）。这跟 profile 里记的那条永远不同，pnpm 就当一条新依赖原地覆盖安装；
+提交号取不到时才退回不带后缀的老 spec。Gitee 的匿名 HTTPS 克隆偶尔会排队报 429，插件会自动重试
+三次；还是不行的话，按卡片上的提示在本机执行一次
+`git config --global url."git@gitee.com:".insteadOf "https://gitee.com/"` 让安装改走 SSH 再点一次。
 
 ## 限制
 
@@ -388,10 +399,12 @@ npm run build      # 检查 + 构建：locale/*.json（从 src/locale/*.ts）+ i
 - 在线更新走宿主的插件管理服务：它是宿主远程层按**命名空间服务**注册的独立服务，名字就是带点的
   `remote.pluginManager`，所以浏览器半侧用 `ctx.get('remote.pluginManager')` 取（不要写成
   `ctx.get('remote').pluginManager`，那个取不到，表现就是「点确认更新没反应」）。
-  宿主对「同一个 spec」重复安装会直接拒（`already-installed`），所以是**先 `removeBundle` 再
-  `installBundle`**——跟宿主「插件」页那个「更新」按钮同一套路；服务不存在时卡片给出诊断信息
-  并退回「复制命令」。
+  更新走的是「**带提交号的 spec + 只 `installBundle`**」：宿主对「同一个 spec」重复安装会直接拒
+  （`already-installed`），spec 带上最新提交号就不会撞上——重点是**不要**沿用「先 `removeBundle`
+  再 `installBundle`」那套，那样一旦装不上插件就没了（2.9.0 踩过这个坑）。只有在
+  `already-installed` 这条兜底路上才卸载，且此时失败文案会提醒去「插件」页重新添加。
 - 冒烟脚本在 `/private/tmp/dsh-plugin/`（不进仓库）：`video-smoke.mjs` 跑合并与卡口，
   `client-smoke-register.mjs` 跑设置页渲染，`client-smoke-update.mjs` / `client-smoke-update-auto.mjs`
-  跑「检查更新」的手动与自动两条路径，`client-smoke-update-online.mjs` 跑「立即更新」的
-  确认 → 卸载 → 重装 → 提示四条分支（宿主服务用一个假实现顶着）。
+  跑「检查更新」的手动与自动两条路径，`client-smoke-update-online.mjs` 跑「立即更新」的九条分支
+  （正常 / 确认两步 / 要重启 / 429 重试成功 / 429 一直失败 / already-installed 兜底 / 兜底后仍失败 /
+  取不到提交号 / 宿主没这个服务），宿主服务用一个假实现顶着。

@@ -78,12 +78,15 @@ window.__ModuleLoader__.load({
       versionFailed: "\u68C0\u67E5\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
       versionUpdate: "\u7ACB\u5373\u66F4\u65B0",
       versionUpdateConfirm: "\u786E\u8BA4\u66F4\u65B0\u5230 v{version}",
-      versionUpdateConfirmHint: "\u4F1A\u5148\u5378\u8F7D\u518D\u4ECE Gitee \u88C5\u4E00\u904D\u63D2\u4EF6\u672C\u4F53\uFF08\u914D\u7F6E\u548C\u5BC6\u94A5\u90FD\u4FDD\u7559\uFF09\uFF0C\u8FD9\u5F20\u8BBE\u7F6E\u9875\u4F1A\u77ED\u6682\u6D88\u5931\u4E00\u4E0B\u3002",
+      versionUpdateConfirmHint: "\u4F1A\u4ECE Gitee \u88C5\u4E00\u904D\u63D2\u4EF6\u672C\u4F53\uFF08\u914D\u7F6E\u548C\u5BC6\u94A5\u90FD\u4FDD\u7559\uFF09\uFF1B\u88C5\u4E0D\u4E0A\u4E5F\u4E0D\u4F1A\u52A8\u73B0\u5728\u8FD9\u4EFD\u3002\u8FD9\u5F20\u8BBE\u7F6E\u9875\u4F1A\u77ED\u6682\u6D88\u5931\u4E00\u4E0B\u3002",
       versionUpdating: "\u66F4\u65B0\u4E2D\u2026",
       versionUpdateDone: "\u5DF2\u66F4\u65B0\u5230 v{version}\uFF0C\u6B63\u5728\u91CD\u65B0\u52A0\u8F7D\u2026",
       versionUpdateRestart: "\u65B0\u7248\u672C v{version} \u5DF2\u88C5\u597D\uFF1A\u91CD\u542F Harness \u540E\u751F\u6548\u3002",
       versionUpdateCancelled: "\u66F4\u65B0\u5DF2\u53D6\u6D88\u3002",
-      versionUpdateFailed: "\u5728\u7EBF\u66F4\u65B0\u5931\u8D25\uFF1A{message}\uFF08\u53EF\u4EE5\u5230\u300C\u63D2\u4EF6\u300D\u9875\u5378\u8F7D\u540E\u91CD\u65B0\u6DFB\u52A0\uFF09",
+      versionUpdateRetry: "\u88C5\u5230\u4E00\u534A\u6CA1\u6210\u529F\uFF08\u7B2C {attempt}/{total} \u6B21\u5C1D\u8BD5\uFF09\u2026",
+      versionUpdateFailed: "\u5728\u7EBF\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
+      versionUpdateRemoved: "\u8FD9\u6B21\u5148\u5378\u8F7D\u4E86\u672C\u63D2\u4EF6\u3001\u6CA1\u80FD\u88C5\u56DE\u6765\uFF1A\u8BF7\u5230\u300C\u63D2\u4EF6\u300D\u9875\u91CD\u65B0\u6DFB\u52A0\u672C\u63D2\u4EF6\u3002",
+      versionUpdateRateLimited: '\u770B\u8D77\u6765\u662F Gitee \u9650\u6D41\uFF08429\uFF0C\u533F\u540D HTTPS \u514B\u9686\u88AB\u6392\u961F\uFF09\u3002\u672C\u673A\u6267\u884C git config --global url."git@gitee.com:".insteadOf "https://gitee.com/" \u6539\u6210\u8D70 SSH\uFF0C\u518D\u70B9\u4E00\u6B21\u300C\u7ACB\u5373\u66F4\u65B0\u300D\u5373\u53EF\uFF1B\u5BC6\u94A5\u548C\u8BBE\u7F6E\u5728 profile \u91CC\uFF0C\u6CA1\u4E22\u3002',
       versionUpdateUnavailable: "\u5BBF\u4E3B\u6CA1\u6709\u5F00\u653E\u63D2\u4EF6\u7BA1\u7406\u63A5\u53E3\uFF08{detail}\uFF09\uFF0C\u8BF7\u5230\u300C\u63D2\u4EF6\u300D\u9875\u5378\u8F7D\u540E\u91CD\u65B0\u6DFB\u52A0\u3002",
       versionHint: "\u70B9\u300C\u7ACB\u5373\u66F4\u65B0\u300D\u7531\u63D2\u4EF6\u81EA\u5DF1\u4ECE Gitee \u91CD\u88C5\u4E00\u904D\uFF0C\u4E0D\u7528\u53BB\u5378\u8F7D\u91CD\u52A0\u3002",
       versionCheckedAt: "\u68C0\u67E5\u4E8E {time}",
@@ -175,12 +178,15 @@ window.__ModuleLoader__.load({
       versionFailed: "Update check failed: {message}",
       versionUpdate: "Update now",
       versionUpdateConfirm: "Confirm update to v{version}",
-      versionUpdateConfirmHint: "Reinstalls the plugin itself from Gitee (settings and key are kept); this settings page disappears for a moment.",
+      versionUpdateConfirmHint: "Reinstalls the plugin itself from Gitee (settings and key are kept); a failed install leaves the current copy untouched. This settings page disappears for a moment.",
       versionUpdating: "Updating\u2026",
       versionUpdateDone: "Updated to v{version}, reloading\u2026",
       versionUpdateRestart: "v{version} installed; restart Harness to apply it.",
       versionUpdateCancelled: "Update cancelled.",
-      versionUpdateFailed: "Online update failed: {message} (uninstall and re-add it from the Plugins page).",
+      versionUpdateRetry: "Install did not go through (attempt {attempt} of {total})\u2026",
+      versionUpdateFailed: "Online update failed: {message}",
+      versionUpdateRemoved: "This run uninstalled the plugin and could not put it back: please re-add it from the Plugins page.",
+      versionUpdateRateLimited: 'Looks like a Gitee rate limit (429; anonymous HTTPS clones are queued). Run git config --global url."git@gitee.com:".insteadOf "https://gitee.com/" on this machine to switch to SSH, then click Update now again; the key and settings are kept in the profile.',
       versionUpdateUnavailable: "This Host exposes no plugin-management API ({detail}); uninstall and re-add it from the Plugins page.",
       versionHint: 'Click "Update now": the plugin reinstalls itself from Gitee \u2014 no uninstall/re-add needed.',
       versionCheckedAt: "checked {time}",
@@ -262,9 +268,12 @@ window.__ModuleLoader__.load({
     const UPDATE_FILE_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json`;
     const PLUGIN_PACKAGE = "metaontic-video";
     const UPDATE_SPEC = "git+https://gitee.com/hackloop/metaontic-video.git";
+    const UPDATE_BRANCH = "master";
+    const UPDATE_COMMIT_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/commits?sha=${UPDATE_BRANCH}&per_page=1`;
+    const UPDATE_ATTEMPTS = 3;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "2.9.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "2.9.1".trim().replace(/^v/i, "") : "";
     function currentOs() {
       const nav = window.navigator || {};
       const raw = String(
@@ -336,6 +345,24 @@ window.__ModuleLoader__.load({
       const version = String((JSON.parse(text) || {}).version || "").trim().replace(/^v/i, "");
       if (!version) throw new Error("no version");
       return version;
+    }
+    async function fetchLatestCommit() {
+      const controller = typeof AbortController === "function" ? new AbortController() : null;
+      const timer = controller ? window.setTimeout(() => controller.abort(), 12e3) : null;
+      let response;
+      try {
+        response = await fetch(UPDATE_COMMIT_API, {
+          headers: { accept: "application/json" },
+          signal: controller ? controller.signal : void 0
+        });
+      } finally {
+        if (timer) window.clearTimeout(timer);
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const body = await response.json();
+      const sha = String((Array.isArray(body) ? body[0]?.sha : "") || "").trim();
+      if (!/^[0-9a-f]{40}$/i.test(sha)) throw new Error("no commit");
+      return sha;
     }
     const TOKENS = {
       text: "var(--dsw-alias-label-primary, inherit)",
@@ -464,6 +491,7 @@ window.__ModuleLoader__.load({
         const [updateMessage, setUpdateMessage] = React.useState("");
         const [updateLatest, setUpdateLatest] = React.useState("");
         const [updateAt, setUpdateAt] = React.useState("");
+        const updateCommit = React.useRef("");
         const [updateConfirm, setUpdateConfirm] = React.useState(false);
         const restoreTried = React.useRef(false);
         React.useEffect(() => {
@@ -494,6 +522,7 @@ window.__ModuleLoader__.load({
           if (cached.latest) {
             setUpdateLatest(cached.latest);
             if (cached.at) setUpdateAt(new Date(cached.at).toLocaleTimeString());
+            if (cached.commit) updateCommit.current = cached.commit;
             setUpdateStatus("ok");
           }
           if (!cached.fresh) checkForUpdate(true).catch(() => {
@@ -869,20 +898,26 @@ window.__ModuleLoader__.load({
           try {
             const raw = window.localStorage.getItem(UPDATE_CACHE_KEY);
             const saved = raw ? JSON.parse(raw) : null;
-            if (!saved || typeof saved !== "object") return { latest: "", at: 0, fresh: false };
+            if (!saved || typeof saved !== "object") {
+              return { latest: "", commit: "", at: 0, fresh: false };
+            }
             const at = Number(saved.at) || 0;
             return {
               latest: String(saved.latest || ""),
+              commit: String(saved.commit || ""),
               at,
               fresh: Boolean(at) && Date.now() - at < UPDATE_MAX_AGE_MS
             };
           } catch {
-            return { latest: "", at: 0, fresh: false };
+            return { latest: "", commit: "", at: 0, fresh: false };
           }
         }
-        function rememberUpdateCheck(latest) {
+        function rememberUpdateCheck(latest, commit) {
           try {
-            window.localStorage.setItem(UPDATE_CACHE_KEY, JSON.stringify({ at: Date.now(), latest }));
+            window.localStorage.setItem(
+              UPDATE_CACHE_KEY,
+              JSON.stringify({ at: Date.now(), latest, commit: commit || "" })
+            );
           } catch {
           }
         }
@@ -899,10 +934,14 @@ window.__ModuleLoader__.load({
           }
           try {
             const latest = await fetchLatestVersion();
+            try {
+              updateCommit.current = await fetchLatestCommit();
+            } catch {
+            }
             setUpdateLatest(latest);
             setUpdateAt((/* @__PURE__ */ new Date()).toLocaleTimeString());
             setUpdateStatus("ok");
-            rememberUpdateCheck(latest);
+            rememberUpdateCheck(latest, updateCommit.current);
             return latest;
           } catch (error) {
             if (silent) return "";
@@ -1133,52 +1172,79 @@ window.__ModuleLoader__.load({
             setUpdateMessage(t("versionUpdateUnavailable", { detail: probe.tried.join("\uFF0C") }));
             return;
           }
+          const requestId = `${PLUGIN_PACKAGE}-update-${Date.now()}`;
+          const install = async (spec2) => {
+            try {
+              return await pluginManager.installBundle(spec2, { enabled: true, requestId });
+            } catch (error) {
+              return { ok: false, error: { message: error?.message || String(error) } };
+            }
+          };
+          const remove = async () => {
+            if (typeof pluginManager.removeBundle !== "function") return null;
+            try {
+              return await pluginManager.removeBundle(PLUGIN_PACKAGE);
+            } catch (error) {
+              return { ok: false, error: { message: error?.message || String(error) } };
+            }
+          };
+          const failureText = (result) => String(
+            result?.error?.message ?? result?.value?.error?.diagnostic ?? result?.value?.error?.code ?? "unknown"
+          );
+          const worthRetrying = (text) => /429|queue overflowed|timed out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|unable to access|network|fetch/i.test(text);
+          let spec = UPDATE_SPEC;
+          let commit = "";
           try {
-            const remove = async () => {
-              if (typeof pluginManager.removeBundle !== "function") return null;
-              try {
-                return await pluginManager.removeBundle(PLUGIN_PACKAGE);
-              } catch (error) {
-                return { ok: false, error: { message: error?.message || String(error) } };
-              }
-            };
-            const install = () => pluginManager.installBundle(UPDATE_SPEC, {
-              enabled: true,
-              requestId: `${PLUGIN_PACKAGE}-update-${Date.now()}`
-            });
-            await remove();
-            let result = await install();
-            if (result && result.ok === true && result.value?.error?.code === "already-installed") {
-              await remove();
-              result = await install();
-            }
-            if (!result || result.ok !== true) {
-              setUpdateStatus("failed");
-              setUpdateMessage(t("versionUpdateFailed", { message: result?.error?.message || "unknown" }));
-              return;
-            }
-            const outcome = result.value || {};
-            if (outcome.application === "failed") {
-              setUpdateStatus("failed");
-              setUpdateMessage(t("versionUpdateFailed", {
-                message: outcome.error?.diagnostic || outcome.error?.code || "failed"
-              }));
-              return;
-            }
-            if (outcome.application === "cancelled") {
-              setUpdateStatus("ok");
-              setUpdateMessage(t("versionUpdateCancelled"));
-              return;
-            }
-            forgetUpdateCheck();
-            const version = outcome.version || updateLatest;
-            setUpdateLatest("");
-            setUpdateStatus("restart");
-            setUpdateMessage(outcome.application === "restart-required" ? t("versionUpdateRestart", { version }) : t("versionUpdateDone", { version }));
-          } catch (error) {
-            setUpdateStatus("failed");
-            setUpdateMessage(t("versionUpdateFailed", { message: error?.message || String(error) }));
+            commit = await fetchLatestCommit();
+          } catch {
+            commit = "";
           }
+          const latest = commit || updateCommit.current;
+          if (latest) {
+            updateCommit.current = latest;
+            spec = `${UPDATE_SPEC}#${latest}`;
+          }
+          let outcome = null;
+          let failure = "";
+          let removed = false;
+          for (let round = 1; round <= UPDATE_ATTEMPTS && !outcome; round += 1) {
+            let result = await install(spec);
+            if (result?.ok === true && result.value?.error?.code === "already-installed") {
+              removed = true;
+              await remove();
+              result = await install(spec);
+            }
+            if (result?.ok === true && result.value?.application !== "failed") {
+              outcome = result.value || {};
+              break;
+            }
+            failure = failureText(result);
+            if (round < UPDATE_ATTEMPTS && worthRetrying(failure)) {
+              setUpdateMessage(t("versionUpdateRetry", { attempt: round + 1, total: UPDATE_ATTEMPTS }));
+              await new Promise((resolve) => window.setTimeout(resolve, round * 1200));
+              continue;
+            }
+            break;
+          }
+          if (!outcome) {
+            setUpdateStatus("failed");
+            setUpdateMessage([
+              t("versionUpdateFailed", { message: failure }),
+              removed ? t("versionUpdateRemoved") : "",
+              worthRetrying(failure) || /429|queue overflowed/i.test(failure) ? t("versionUpdateRateLimited") : ""
+            ].filter(Boolean).join(" "));
+            return;
+          }
+          if (outcome.application === "cancelled") {
+            setUpdateStatus("ok");
+            setUpdateMessage(t("versionUpdateCancelled"));
+            return;
+          }
+          forgetUpdateCheck();
+          const version = outcome.version || updateLatest;
+          setUpdateLatest("");
+          setUpdateStatus("restart");
+          setUpdateMessage(outcome.application === "restart-required" ? t("versionUpdateRestart", { version }) : t("versionUpdateDone", { version }));
         }
         function usageTime(value2) {
           if (!value2) return "-";
