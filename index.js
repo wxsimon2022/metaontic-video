@@ -1989,7 +1989,7 @@ async function confirmNextSegment(ctx, config, exec, {
 function resolveRegisterApi(config) {
   return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-const PLUGIN_VERSION = true ? "2.16.1".trim().replace(/^v/i, "") : "";
+const PLUGIN_VERSION = true ? "3.0.1".trim().replace(/^v/i, "") : "";
 async function fetchDeviceQuota(config, signal) {
   if (isVolcengine(config)) return { status: "unknown", reason: "\u706B\u5C71\u76F4\u8FDE\u8D39\u7528\u548C\u4F59\u989D\u8BF7\u5728\u706B\u5C71\u63A7\u5236\u53F0\u67E5\u770B" };
   const api = resolveRegisterApi(config);

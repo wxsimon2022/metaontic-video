@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "2.16.1",
+  "version": "3.0.1",
   "description": "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
   "license": "MIT",
   "type": "module",
@@ -76,11 +76,12 @@
     "@deepseek-ai/schemastery": "~3.18.5"
   },
   "releaseNotes": {
-    "version": "2.16.1",
+    "version": "3.0.1",
     "items": [
-      "修复多段视频合并时交叉淡化造成的短暂重影。",
-      "默认使用直接拼接；旧配置中的 seamless 值也按直接拼接处理，避免画面叠加。",
-      "同步更新合并方式说明与发布版本信息。"
+      "修复设置页更新内容与当前版本不一致的问题，始终显示本机当前版本的更新说明。",
+      "检查更新和历史缓存不再覆盖当前版本说明。",
+      "视频生成进度按三分钟推进，达到99%后等待实际结果，成功后显示100%。",
+      "精简生成进度提示文案。"
     ]
   }
 }

@@ -2,7 +2,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "2.16.1",
+    version: "3.0.1",
     description: "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
     license: "MIT",
     type: "module",
@@ -78,11 +78,12 @@
       "@deepseek-ai/schemastery": "~3.18.5"
     },
     releaseNotes: {
-      version: "2.16.1",
+      version: "3.0.1",
       items: [
-        "\u4FEE\u590D\u591A\u6BB5\u89C6\u9891\u5408\u5E76\u65F6\u4EA4\u53C9\u6DE1\u5316\u9020\u6210\u7684\u77ED\u6682\u91CD\u5F71\u3002",
-        "\u9ED8\u8BA4\u4F7F\u7528\u76F4\u63A5\u62FC\u63A5\uFF1B\u65E7\u914D\u7F6E\u4E2D\u7684 seamless \u503C\u4E5F\u6309\u76F4\u63A5\u62FC\u63A5\u5904\u7406\uFF0C\u907F\u514D\u753B\u9762\u53E0\u52A0\u3002",
-        "\u540C\u6B65\u66F4\u65B0\u5408\u5E76\u65B9\u5F0F\u8BF4\u660E\u4E0E\u53D1\u5E03\u7248\u672C\u4FE1\u606F\u3002"
+        "\u4FEE\u590D\u8BBE\u7F6E\u9875\u66F4\u65B0\u5185\u5BB9\u4E0E\u5F53\u524D\u7248\u672C\u4E0D\u4E00\u81F4\u7684\u95EE\u9898\uFF0C\u59CB\u7EC8\u663E\u793A\u672C\u673A\u5F53\u524D\u7248\u672C\u7684\u66F4\u65B0\u8BF4\u660E\u3002",
+        "\u68C0\u67E5\u66F4\u65B0\u548C\u5386\u53F2\u7F13\u5B58\u4E0D\u518D\u8986\u76D6\u5F53\u524D\u7248\u672C\u8BF4\u660E\u3002",
+        "\u89C6\u9891\u751F\u6210\u8FDB\u5EA6\u6309\u4E09\u5206\u949F\u63A8\u8FDB\uFF0C\u8FBE\u523099%\u540E\u7B49\u5F85\u5B9E\u9645\u7ED3\u679C\uFF0C\u6210\u529F\u540E\u663E\u793A100%\u3002",
+        "\u7CBE\u7B80\u751F\u6210\u8FDB\u5EA6\u63D0\u793A\u6587\u6848\u3002"
       ]
     }
   };
@@ -407,7 +408,7 @@
       const UPDATE_ATTEMPTS = 3;
       const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
       const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-      const PLUGIN_VERSION = true ? "2.16.1".trim().replace(/^v/i, "") : "";
+      const PLUGIN_VERSION = true ? "3.0.1".trim().replace(/^v/i, "") : "";
       function currentOs() {
         const nav = window.navigator || {};
         const raw = String(
@@ -508,22 +509,6 @@
         }
         if (!best) throw new Error(results.filter((item) => item.status === "rejected").map((item) => item.reason?.message || String(item.reason)).join("\uFF1B"));
         return best;
-      }
-      async function fetchReleaseNotes(version) {
-        const urls = [
-          `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json?ref=v${encodeURIComponent(version)}`,
-          `https://fastly.jsdelivr.net/gh/wxsimon2022/metaontic-video@${encodeURIComponent(version)}/package.json`
-        ];
-        for (const url of urls) {
-          try {
-            const body = await (await fetchUpdateSource(url)).json();
-            const pkg = body.content ? JSON.parse(decodeBase64Text(body.content)) : body;
-            const notes = pkg.releaseNotes;
-            if (notes?.version === version && Array.isArray(notes.items) && notes.items.every((item) => typeof item === "string")) return notes;
-          } catch {
-          }
-        }
-        return null;
       }
       async function fetchLatestCommit() {
         const body = await (await fetchUpdateSource(UPDATE_COMMIT_API)).json();
@@ -673,7 +658,7 @@
           const [updateStatus, setUpdateStatus] = React.useState("idle");
           const [updateMessage, setUpdateMessage] = React.useState("");
           const [updateLatest, setUpdateLatest] = React.useState("");
-          const [releaseNotes, setReleaseNotes] = React.useState(package_default.releaseNotes);
+          const releaseNotes = package_default.releaseNotes;
           const [updateAt, setUpdateAt] = React.useState("");
           const updateCommit = React.useRef("");
           const [updateConfirm, setUpdateConfirm] = React.useState(false);
@@ -723,12 +708,6 @@
             const cached = readUpdateCache();
             if (cached.latest) {
               setUpdateLatest(cached.latest);
-              if (cached.latest !== package_default.releaseNotes.version) {
-                fetchReleaseNotes(cached.latest).then((notes) => {
-                  if (notes) setReleaseNotes(notes);
-                }).catch(() => {
-                });
-              }
               if (cached.at) setUpdateAt(new Date(cached.at).toLocaleTimeString());
               if (cached.commit) updateCommit.current = cached.commit;
               setUpdateStatus("ok");
@@ -1181,10 +1160,6 @@
               }).catch(() => {
               });
               setUpdateLatest(latest);
-              fetchReleaseNotes(latest).then((notes) => {
-                if (notes) setReleaseNotes(notes);
-              }).catch(() => {
-              });
               setUpdateAt((/* @__PURE__ */ new Date()).toLocaleTimeString());
               setUpdateStatus("ok");
               rememberUpdateCheck(latest, updateCommit.current);

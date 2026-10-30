@@ -513,23 +513,6 @@ window.__ModuleLoader__.load({
      * 插件就没了。改成带上当前最新提交号，spec 跟已装的永远不同，宿主当新依赖处理、
      * 直接原地覆盖安装，装失败也不会动现有版本。
      */
-    async function fetchReleaseNotes(version) {
-      const urls = [
-        `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json?ref=v${encodeURIComponent(version)}`,
-        `https://fastly.jsdelivr.net/gh/wxsimon2022/metaontic-video@${encodeURIComponent(version)}/package.json`,
-      ];
-      for (const url of urls) {
-        try {
-          const body = await (await fetchUpdateSource(url)).json();
-          const pkg = body.content ? JSON.parse(decodeBase64Text(body.content)) : body;
-          const notes = pkg.releaseNotes;
-          if (notes?.version === version && Array.isArray(notes.items)
-            && notes.items.every((item) => typeof item === 'string')) return notes;
-        } catch { /* 当前镜像失败继续下一源；不影响更新检测。 */ }
-      }
-      return null;
-    }
-
     async function fetchLatestCommit() {
       const body = await (await fetchUpdateSource(UPDATE_COMMIT_API)).json();
       const sha = String((Array.isArray(body) ? body[0]?.sha : '') || '').trim();
@@ -699,7 +682,8 @@ window.__ModuleLoader__.load({
         const [updateStatus, setUpdateStatus] = React.useState('idle');
         const [updateMessage, setUpdateMessage] = React.useState('');
         const [updateLatest, setUpdateLatest] = React.useState('');
-        const [releaseNotes, setReleaseNotes] = React.useState(packageInfo.releaseNotes);
+        // 更新说明固定使用本机包内内容，不受远端版本和检查缓存影响。
+        const releaseNotes = packageInfo.releaseNotes;
         const [updateAt, setUpdateAt] = React.useState('');
         // 上次看到的默认分支提交号：在线更新拿它当 spec 后缀用（取不到再联网取一次）
         const updateCommit = React.useRef('');
@@ -755,9 +739,6 @@ window.__ModuleLoader__.load({
           const cached = readUpdateCache();
           if (cached.latest) {
             setUpdateLatest(cached.latest);
-            if (cached.latest !== packageInfo.releaseNotes.version) {
-              fetchReleaseNotes(cached.latest).then((notes) => { if (notes) setReleaseNotes(notes); }).catch(() => {});
-            }
             if (cached.at) setUpdateAt(new Date(cached.at).toLocaleTimeString());
             if (cached.commit) updateCommit.current = cached.commit;
             setUpdateStatus('ok');
@@ -1293,7 +1274,6 @@ window.__ModuleLoader__.load({
             // 提交号仅服务于安装，不阻塞版本检测结果。
             fetchLatestCommit().then((commit) => { updateCommit.current = commit; }).catch(() => {});
             setUpdateLatest(latest);
-            fetchReleaseNotes(latest).then((notes) => { if (notes) setReleaseNotes(notes); }).catch(() => {});
             setUpdateAt(new Date().toLocaleTimeString());
             setUpdateStatus('ok');
             rememberUpdateCheck(latest, updateCommit.current);
