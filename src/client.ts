@@ -107,7 +107,7 @@ window.__ModuleLoader__.load({
       versionUpdateRestart: '新版本 v{version} 已装好：重启 Harness 后生效。',
       versionUpdateCancelled: '更新已取消。',
       versionUpdateFailed: '在线更新失败：{message}',
-      versionUpdateUnavailable: '宿主没有开放插件管理接口，请用下面的命令，或者到「插件」页手动更新。',
+      versionUpdateUnavailable: '宿主没有开放插件管理接口（{detail}），请用下面的命令，或者到「插件」页手动更新。',
       versionHint: '点「立即更新」直接在线更新；也可以复制下面这条命令在终端里跑（终端更新完要重启 Harness 才生效）。',
       versionCopy: '复制命令',
       versionCopied: '已复制',
@@ -212,7 +212,7 @@ window.__ModuleLoader__.load({
       versionUpdateRestart: 'v{version} installed; restart Harness to apply it.',
       versionUpdateCancelled: 'Update cancelled.',
       versionUpdateFailed: 'Online update failed: {message}',
-      versionUpdateUnavailable: 'This Host exposes no plugin-management API; use the command below or the Plugins page.',
+      versionUpdateUnavailable: 'This Host exposes no plugin-management API ({detail}); use the command below or the Plugins page.',
       versionHint: 'Click "Update now" to update in place, or copy the command below into a terminal (a terminal update applies after restarting Harness).',
       versionCopy: 'Copy command',
       versionCopied: 'Copied',
@@ -1367,24 +1367,40 @@ window.__ModuleLoader__.load({
          * 更新完（或重启 Harness 后）再回来就是新版本。所以引用要提前取好。
          */
         async function runOnlineUpdate() {
-          const pluginManager = manager && manager();
           setUpdateConfirm(false);
-          if (!pluginManager || typeof pluginManager.installBundle !== 'function') {
-            setUpdateStatus('failed');
-            setUpdateMessage(t('versionUpdateUnavailable'));
-            return;
-          }
+          // 先把「更新中」摆上：重装会把本插件的客户端模块换掉，页面随时可能消失，
+          // 用户至少要立刻看到按钮/文案变了，而不是以为点了没反应。
           setUpdateStatus('installing');
           setUpdateMessage('');
+          const probe = manager ? manager() : { manager: null, tried: ['未注入'] };
+          const pluginManager = probe.manager;
+          if (!pluginManager || typeof pluginManager.installBundle !== 'function') {
+            setUpdateStatus('failed');
+            setUpdateMessage(t('versionUpdateUnavailable', { detail: probe.tried.join('，') }));
+            return;
+          }
           try {
-            // 卸载失败也继续装：没有 HMR 的宿主会报 stop-profile，安装会直接盖过去
-            if (typeof pluginManager.removeBundle === 'function') {
-              await pluginManager.removeBundle(PLUGIN_PACKAGE).catch(() => {});
-            }
-            const result = await pluginManager.installBundle(UPDATE_SPEC, {
+            // 卸载一定要在安装之前：宿主对「同一个 spec 重复安装」会直接拒（already-installed）。
+            // 卸载失败也继续装——没有 HMR 的宿主会报 stop-profile，安装会直接盖过去。
+            const remove = async () => {
+              if (typeof pluginManager.removeBundle !== 'function') return null;
+              try {
+                return await pluginManager.removeBundle(PLUGIN_PACKAGE);
+              } catch (error) {
+                return { ok: false, error: { message: error?.message || String(error) } };
+              }
+            };
+            const install = () => pluginManager.installBundle(UPDATE_SPEC, {
               enabled: true,
               requestId: `${PLUGIN_PACKAGE}-update-${Date.now()}`,
             });
+            await remove();
+            let result = await install();
+            // 卸载没生效时宿主会回 already-installed：再卸一次重试一遍，仍不行才报错
+            if (result && result.ok === true && result.value?.error?.code === 'already-installed') {
+              await remove();
+              result = await install();
+            }
             if (!result || result.ok !== true) {
               setUpdateStatus('failed');
               setUpdateMessage(t('versionUpdateFailed', { message: result?.error?.message || 'unknown' }));
@@ -1715,11 +1731,30 @@ window.__ModuleLoader__.load({
         const t = ctx.locale.bind(NS);
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'metaontic-video: dictionaries');
         const form = ctx.configForms.get(NAMESPACE);
-        // 在线更新用的宿主服务（`ctx.remote.pluginManager`）：宿主没有它时页面只留「复制命令」。
-        // 包一层 getter，点击时再取；重装过程里本插件马上会被卸掉，服务引用要赶在卸载前拿到。
+        // 在线更新要用宿主的插件管理服务。它不是一个 `remote` 上的属性，而是宿主远程层按
+        // 「命名空间服务」注册的独立服务，名字就是带点的 `remote.pluginManager`（cordis 的
+        // `ctx.get()` 认这种名字）；所以先按全名取，取不到再退回属性写法，两条都记下来，
+        // 失败时把结果写进提示里，省得又变成「点了没反应」。
+        // 包一层 getter：点击时才取，重装过程里本插件马上会被卸掉，引用要赶在卸载之前拿到。
         const pluginManager = () => {
-          const remote = typeof ctx.get === 'function' ? ctx.get('remote') : undefined;
-          return remote && remote.pluginManager ? remote.pluginManager : null;
+          const tried = [];
+          const shape = (value) => (value === undefined ? 'undefined' : (value === null ? 'null' : typeof value));
+          try {
+            const direct = typeof ctx.get === 'function' ? ctx.get('remote.pluginManager') : undefined;
+            if (direct && typeof direct.installBundle === 'function') return { manager: direct, tried };
+            tried.push(`remote.pluginManager=${shape(direct)}`);
+          } catch (error) {
+            tried.push(`remote.pluginManager 抛错：${error && error.message ? error.message : String(error)}`);
+          }
+          try {
+            const remote = typeof ctx.get === 'function' ? ctx.get('remote') : undefined;
+            const nested = remote && remote.pluginManager;
+            if (nested && typeof nested.installBundle === 'function') return { manager: nested, tried };
+            tried.push(`remote=${shape(remote)}`);
+          } catch (error) {
+            tried.push(`remote 抛错：${error && error.message ? error.message : String(error)}`);
+          }
+          return { manager: null, tried };
         };
         const Page = makePage({ form, t, manager: pluginManager });
         // 第三方 bundle 的配置页注册到 plugins.bundle.config，以 npm 包名为 key；

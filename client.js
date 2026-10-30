@@ -84,7 +84,7 @@ window.__ModuleLoader__.load({
       versionUpdateRestart: "\u65B0\u7248\u672C v{version} \u5DF2\u88C5\u597D\uFF1A\u91CD\u542F Harness \u540E\u751F\u6548\u3002",
       versionUpdateCancelled: "\u66F4\u65B0\u5DF2\u53D6\u6D88\u3002",
       versionUpdateFailed: "\u5728\u7EBF\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
-      versionUpdateUnavailable: "\u5BBF\u4E3B\u6CA1\u6709\u5F00\u653E\u63D2\u4EF6\u7BA1\u7406\u63A5\u53E3\uFF0C\u8BF7\u7528\u4E0B\u9762\u7684\u547D\u4EE4\uFF0C\u6216\u8005\u5230\u300C\u63D2\u4EF6\u300D\u9875\u624B\u52A8\u66F4\u65B0\u3002",
+      versionUpdateUnavailable: "\u5BBF\u4E3B\u6CA1\u6709\u5F00\u653E\u63D2\u4EF6\u7BA1\u7406\u63A5\u53E3\uFF08{detail}\uFF09\uFF0C\u8BF7\u7528\u4E0B\u9762\u7684\u547D\u4EE4\uFF0C\u6216\u8005\u5230\u300C\u63D2\u4EF6\u300D\u9875\u624B\u52A8\u66F4\u65B0\u3002",
       versionHint: "\u70B9\u300C\u7ACB\u5373\u66F4\u65B0\u300D\u76F4\u63A5\u5728\u7EBF\u66F4\u65B0\uFF1B\u4E5F\u53EF\u4EE5\u590D\u5236\u4E0B\u9762\u8FD9\u6761\u547D\u4EE4\u5728\u7EC8\u7AEF\u91CC\u8DD1\uFF08\u7EC8\u7AEF\u66F4\u65B0\u5B8C\u8981\u91CD\u542F Harness \u624D\u751F\u6548\uFF09\u3002",
       versionCopy: "\u590D\u5236\u547D\u4EE4",
       versionCopied: "\u5DF2\u590D\u5236",
@@ -182,7 +182,7 @@ window.__ModuleLoader__.load({
       versionUpdateRestart: "v{version} installed; restart Harness to apply it.",
       versionUpdateCancelled: "Update cancelled.",
       versionUpdateFailed: "Online update failed: {message}",
-      versionUpdateUnavailable: "This Host exposes no plugin-management API; use the command below or the Plugins page.",
+      versionUpdateUnavailable: "This Host exposes no plugin-management API ({detail}); use the command below or the Plugins page.",
       versionHint: 'Click "Update now" to update in place, or copy the command below into a terminal (a terminal update applies after restarting Harness).',
       versionCopy: "Copy command",
       versionCopied: "Copied",
@@ -267,7 +267,7 @@ window.__ModuleLoader__.load({
     const UPDATE_COMMAND = `dsh plugin --profile desktop remove ${PLUGIN_PACKAGE} && dsh plugin --profile desktop add "${UPDATE_SPEC}"`;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "2.8.1".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "2.8.2".trim().replace(/^v/i, "") : "";
     function currentOs() {
       const nav = window.navigator || {};
       const raw = String(
@@ -1127,24 +1127,35 @@ window.__ModuleLoader__.load({
           copyText(UPDATE_COMMAND, setCopiedUpdate);
         }
         async function runOnlineUpdate() {
-          const pluginManager = manager && manager();
           setUpdateConfirm(false);
-          if (!pluginManager || typeof pluginManager.installBundle !== "function") {
-            setUpdateStatus("failed");
-            setUpdateMessage(t("versionUpdateUnavailable"));
-            return;
-          }
           setUpdateStatus("installing");
           setUpdateMessage("");
+          const probe = manager ? manager() : { manager: null, tried: ["\u672A\u6CE8\u5165"] };
+          const pluginManager = probe.manager;
+          if (!pluginManager || typeof pluginManager.installBundle !== "function") {
+            setUpdateStatus("failed");
+            setUpdateMessage(t("versionUpdateUnavailable", { detail: probe.tried.join("\uFF0C") }));
+            return;
+          }
           try {
-            if (typeof pluginManager.removeBundle === "function") {
-              await pluginManager.removeBundle(PLUGIN_PACKAGE).catch(() => {
-              });
-            }
-            const result = await pluginManager.installBundle(UPDATE_SPEC, {
+            const remove = async () => {
+              if (typeof pluginManager.removeBundle !== "function") return null;
+              try {
+                return await pluginManager.removeBundle(PLUGIN_PACKAGE);
+              } catch (error) {
+                return { ok: false, error: { message: error?.message || String(error) } };
+              }
+            };
+            const install = () => pluginManager.installBundle(UPDATE_SPEC, {
               enabled: true,
               requestId: `${PLUGIN_PACKAGE}-update-${Date.now()}`
             });
+            await remove();
+            let result = await install();
+            if (result && result.ok === true && result.value?.error?.code === "already-installed") {
+              await remove();
+              result = await install();
+            }
             if (!result || result.ok !== true) {
               setUpdateStatus("failed");
               setUpdateMessage(t("versionUpdateFailed", { message: result?.error?.message || "unknown" }));
@@ -1440,8 +1451,24 @@ window.__ModuleLoader__.load({
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), "metaontic-video: dictionaries");
         const form = ctx.configForms.get(NAMESPACE);
         const pluginManager = () => {
-          const remote = typeof ctx.get === "function" ? ctx.get("remote") : void 0;
-          return remote && remote.pluginManager ? remote.pluginManager : null;
+          const tried = [];
+          const shape = (value) => value === void 0 ? "undefined" : value === null ? "null" : typeof value;
+          try {
+            const direct = typeof ctx.get === "function" ? ctx.get("remote.pluginManager") : void 0;
+            if (direct && typeof direct.installBundle === "function") return { manager: direct, tried };
+            tried.push(`remote.pluginManager=${shape(direct)}`);
+          } catch (error) {
+            tried.push(`remote.pluginManager \u629B\u9519\uFF1A${error && error.message ? error.message : String(error)}`);
+          }
+          try {
+            const remote = typeof ctx.get === "function" ? ctx.get("remote") : void 0;
+            const nested = remote && remote.pluginManager;
+            if (nested && typeof nested.installBundle === "function") return { manager: nested, tried };
+            tried.push(`remote=${shape(remote)}`);
+          } catch (error) {
+            tried.push(`remote \u629B\u9519\uFF1A${error && error.message ? error.message : String(error)}`);
+          }
+          return { manager: null, tried };
         };
         const Page = makePage({ form, t, manager: pluginManager });
         ctx.effect(() => ctx.slots.inject("plugins.bundle.config", () => ctx.slots.register({

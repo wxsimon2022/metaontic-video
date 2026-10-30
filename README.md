@@ -380,9 +380,12 @@ npm run build      # 检查 + 构建：locale/*.json（从 src/locale/*.ts）+ i
 - 客户端构建用 `--define:__PLUGIN_VERSION__` 把 `package.json` 的版本号烧进 `client.js`
   （就是版本卡片上的「当前版本」）——所以**改了版本号要重新 `npm run build`**。
 - `types/dsh.d.ts`：本插件用到的宿主接口（工具定义、`tools/pre-execute` 卡口、审批、settings 等）。
-- 在线更新走宿主的插件管理服务（浏览器半侧的 `ctx.remote.pluginManager`）：宿主对「同一个 spec」
-  重复安装会直接拒（`already-installed`），所以是**先 `removeBundle` 再 `installBundle`**——
-  跟宿主「插件」页那个「更新」按钮同一套路；服务不存在时卡片自动退回「复制命令」。
+- 在线更新走宿主的插件管理服务：它是宿主远程层按**命名空间服务**注册的独立服务，名字就是带点的
+  `remote.pluginManager`，所以浏览器半侧用 `ctx.get('remote.pluginManager')` 取（不要写成
+  `ctx.get('remote').pluginManager`，那个取不到，表现就是「点确认更新没反应」）。
+  宿主对「同一个 spec」重复安装会直接拒（`already-installed`），所以是**先 `removeBundle` 再
+  `installBundle`**——跟宿主「插件」页那个「更新」按钮同一套路；服务不存在时卡片给出诊断信息
+  并退回「复制命令」。
 - 冒烟脚本在 `/private/tmp/dsh-plugin/`（不进仓库）：`video-smoke.mjs` 跑合并与卡口，
   `client-smoke-register.mjs` 跑设置页渲染，`client-smoke-update.mjs` / `client-smoke-update-auto.mjs`
   跑「检查更新」的手动与自动两条路径，`client-smoke-update-online.mjs` 跑「立即更新」的
