@@ -106,11 +106,9 @@ window.__ModuleLoader__.load({
       versionUpdateDone: '已更新到 v{version}，正在重新加载…',
       versionUpdateRestart: '新版本 v{version} 已装好：重启 Harness 后生效。',
       versionUpdateCancelled: '更新已取消。',
-      versionUpdateFailed: '在线更新失败：{message}',
-      versionUpdateUnavailable: '宿主没有开放插件管理接口（{detail}），请用下面的命令，或者到「插件」页手动更新。',
-      versionHint: '点「立即更新」直接在线更新；也可以复制下面这条命令在终端里跑（终端更新完要重启 Harness 才生效）。',
-      versionCopy: '复制命令',
-      versionCopied: '已复制',
+      versionUpdateFailed: '在线更新失败：{message}（可以到「插件」页卸载后重新添加）',
+      versionUpdateUnavailable: '宿主没有开放插件管理接口（{detail}），请到「插件」页卸载后重新添加。',
+      versionHint: '点「立即更新」由插件自己从 Gitee 重装一遍，不用去卸载重加。',
       versionCheckedAt: '检查于 {time}',
       sectionGeneration: '生成参数',
       sectionMerge: '合并与输出',
@@ -133,6 +131,7 @@ window.__ModuleLoader__.load({
       maxWaitMs: '单次最长等待（毫秒）',
       save: '保存',
       reset: '重置插件',
+      resetHint: '清掉本机写过的 Key、模型、输出目录等，回到刚装上的样子。',
       saving: '保存中…',
       saved: '已保存，宿主重载配置后生效。',
       saveFailed: '宿主拒绝了这次写入，请检查字段取值。',
@@ -211,11 +210,9 @@ window.__ModuleLoader__.load({
       versionUpdateDone: 'Updated to v{version}, reloading…',
       versionUpdateRestart: 'v{version} installed; restart Harness to apply it.',
       versionUpdateCancelled: 'Update cancelled.',
-      versionUpdateFailed: 'Online update failed: {message}',
-      versionUpdateUnavailable: 'This Host exposes no plugin-management API ({detail}); use the command below or the Plugins page.',
-      versionHint: 'Click "Update now" to update in place, or copy the command below into a terminal (a terminal update applies after restarting Harness).',
-      versionCopy: 'Copy command',
-      versionCopied: 'Copied',
+      versionUpdateFailed: 'Online update failed: {message} (uninstall and re-add it from the Plugins page).',
+      versionUpdateUnavailable: 'This Host exposes no plugin-management API ({detail}); uninstall and re-add it from the Plugins page.',
+      versionHint: 'Click "Update now": the plugin reinstalls itself from Gitee — no uninstall/re-add needed.',
       versionCheckedAt: 'checked {time}',
       register: 'Log in',
       registerWorking: 'Logging in…',
@@ -238,6 +235,7 @@ window.__ModuleLoader__.load({
       maxWaitMs: 'Max wait (ms)',
       save: 'Save',
       reset: 'Reset plugin',
+      resetHint: 'Clears the key, model, output dir and anything else this machine wrote — back to a fresh install.',
       saving: 'Saving…',
       saved: 'Saved; the Host applies it after the config reload.',
       saveFailed: 'The Host rejected this write; check the field values.',
@@ -308,9 +306,6 @@ window.__ModuleLoader__.load({
     /** 本包在 profile 里的包名，以及能重装自己的那条依赖 spec——在线更新直接复用这两样。 */
     const PLUGIN_PACKAGE = 'metaontic-video';
     const UPDATE_SPEC = 'git+https://gitee.com/hackloop/metaontic-video.git';
-    /** 升级命令：在线更新走不通时给用户复制用，走 Gitee（国内比 GitHub 稳）。 */
-    const UPDATE_COMMAND = `dsh plugin --profile desktop remove ${PLUGIN_PACKAGE} `
-      + `&& dsh plugin --profile desktop add "${UPDATE_SPEC}"`;
     /** 版本检查结果的本地缓存与节流：6 小时内不重复联网，打开设置页先用缓存显示。 */
     const UPDATE_CACHE_KEY = 'metaontic-video.update-check';
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -553,7 +548,6 @@ window.__ModuleLoader__.load({
         const [updateMessage, setUpdateMessage] = React.useState('');
         const [updateLatest, setUpdateLatest] = React.useState('');
         const [updateAt, setUpdateAt] = React.useState('');
-        const [copiedUpdate, setCopiedUpdate] = React.useState('');
         // 一键在线更新：第一下把按钮转成「确认更新」，第二下才真的重装本插件
         const [updateConfirm, setUpdateConfirm] = React.useState(false);
 
@@ -1165,15 +1159,15 @@ window.__ModuleLoader__.load({
             section.fields.map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)),
         ]));
 
-        // 操作条只在「有改动 / 有可恢复的默认值 / 正要给反馈」时出现：
-        // 没有改动就没有「保存」按钮，页面干干净净，也不会有空点一下的疑问。
+        // 操作条只在「有改动 / 正要给反馈」时出现：没有改动就没有「保存」按钮，
+        // 页面干干净净，也不会有空点一下的疑问（「重置插件」不在这儿，它沉在页面最底部）。
         const overrides = Object.keys(snapshot.user || {});
         const footerMessage = status === 'saved'
           ? t('saved')
           : (status === 'failed'
             ? t('saveFailed')
             : (pending.length ? t('dirty') : ''));
-        const footer = (pending.length || overrides.length || status !== 'idle')
+        const footer = (pending.length || status !== 'idle')
           ? h('div', { key: 'footer', className: 'mov-footer' }, [
             pending.length
               ? h('button', {
@@ -1185,16 +1179,6 @@ window.__ModuleLoader__.load({
                 onClick: save,
               }, status === 'saving' ? t('saving') : t('save'))
               : null,
-            overrides.length
-              ? h('button', {
-                key: 'reset',
-                'data-action': 'reset',
-                type: 'button',
-                className: 'mov-btn',
-                disabled: status === 'saving',
-                onClick: reset,
-              }, t('reset'))
-              : null,
             footerMessage
               ? h('span', {
                 key: 'status',
@@ -1204,6 +1188,22 @@ window.__ModuleLoader__.load({
                 },
               }, footerMessage)
               : null,
+          ])
+          : null;
+
+        // 「重置插件」跟「保存」不是一回事（它清的是本机写过的配置、不是这次没保存的改动），
+        // 所以从保存条里拿出来，单独沉到页面最底部——宿主紧接着渲染的就是插件来源那一块。
+        const resetRow = overrides.length
+          ? h('div', { key: 'reset-row', className: 'mov-footer mov-reset-row' }, [
+            h('span', { key: 'hint', className: 'mov-hint', style: { flex: '1 1 200px' } }, t('resetHint')),
+            h('button', {
+              key: 'reset',
+              'data-action': 'reset',
+              type: 'button',
+              className: 'mov-btn',
+              disabled: status === 'saving',
+              onClick: reset,
+            }, t('reset')),
           ])
           : null;
 
@@ -1349,11 +1349,6 @@ window.__ModuleLoader__.load({
         /** 复制 ffmpeg 安装命令。 */
         function copyCommand(command) {
           copyText(command, setCopiedFfmpeg);
-        }
-
-        /** 复制升级命令（卸载 + 重新从 Gitee 装）。 */
-        function copyUpdateCommand() {
-          copyText(UPDATE_COMMAND, setCopiedUpdate);
         }
 
         /**
@@ -1576,7 +1571,7 @@ window.__ModuleLoader__.load({
             : null,
           updateAvailable
             ? h('div', { key: 'command', className: 'mov-cmd-row' }, [
-              // 主按钮：点一下转成「确认更新」，再点一下让宿主重装本插件
+              // 点一下转成「确认更新」，再点一下让宿主重装本插件
               h('button', {
                 key: 'online',
                 'data-action': 'update-online',
@@ -1592,18 +1587,6 @@ window.__ModuleLoader__.load({
                 : (updateConfirm
                   ? t('versionUpdateConfirm', { version: updateLatest })
                   : t('versionUpdate'))),
-              h('code', {
-                key: 'code',
-                'data-field': 'updateCommand',
-                className: 'mov-code',
-              }, UPDATE_COMMAND),
-              h('button', {
-                key: 'copy',
-                'data-action': 'update-copy',
-                type: 'button',
-                className: 'mov-btn mov-btn-sm',
-                onClick: copyUpdateCommand,
-              }, copiedUpdate ? t('versionCopied') : t('versionCopy')),
             ])
             : null,
           updateAvailable && updateConfirm
@@ -1713,7 +1696,7 @@ window.__ModuleLoader__.load({
         // 配置读不出来（没有表单 / 不可写）时只显示提示，配置项与卡片一律不渲染。
         const blobs = notice && !snapshot.value
           ? []
-          : [ffmpegBox, registerBox, quotaBox, usageBox, versionBox, footer];
+          : [ffmpegBox, registerBox, quotaBox, usageBox, versionBox, footer, resetRow];
 
         return h('div', { className: 'mov-page' }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。

@@ -83,11 +83,9 @@ window.__ModuleLoader__.load({
       versionUpdateDone: "\u5DF2\u66F4\u65B0\u5230 v{version}\uFF0C\u6B63\u5728\u91CD\u65B0\u52A0\u8F7D\u2026",
       versionUpdateRestart: "\u65B0\u7248\u672C v{version} \u5DF2\u88C5\u597D\uFF1A\u91CD\u542F Harness \u540E\u751F\u6548\u3002",
       versionUpdateCancelled: "\u66F4\u65B0\u5DF2\u53D6\u6D88\u3002",
-      versionUpdateFailed: "\u5728\u7EBF\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
-      versionUpdateUnavailable: "\u5BBF\u4E3B\u6CA1\u6709\u5F00\u653E\u63D2\u4EF6\u7BA1\u7406\u63A5\u53E3\uFF08{detail}\uFF09\uFF0C\u8BF7\u7528\u4E0B\u9762\u7684\u547D\u4EE4\uFF0C\u6216\u8005\u5230\u300C\u63D2\u4EF6\u300D\u9875\u624B\u52A8\u66F4\u65B0\u3002",
-      versionHint: "\u70B9\u300C\u7ACB\u5373\u66F4\u65B0\u300D\u76F4\u63A5\u5728\u7EBF\u66F4\u65B0\uFF1B\u4E5F\u53EF\u4EE5\u590D\u5236\u4E0B\u9762\u8FD9\u6761\u547D\u4EE4\u5728\u7EC8\u7AEF\u91CC\u8DD1\uFF08\u7EC8\u7AEF\u66F4\u65B0\u5B8C\u8981\u91CD\u542F Harness \u624D\u751F\u6548\uFF09\u3002",
-      versionCopy: "\u590D\u5236\u547D\u4EE4",
-      versionCopied: "\u5DF2\u590D\u5236",
+      versionUpdateFailed: "\u5728\u7EBF\u66F4\u65B0\u5931\u8D25\uFF1A{message}\uFF08\u53EF\u4EE5\u5230\u300C\u63D2\u4EF6\u300D\u9875\u5378\u8F7D\u540E\u91CD\u65B0\u6DFB\u52A0\uFF09",
+      versionUpdateUnavailable: "\u5BBF\u4E3B\u6CA1\u6709\u5F00\u653E\u63D2\u4EF6\u7BA1\u7406\u63A5\u53E3\uFF08{detail}\uFF09\uFF0C\u8BF7\u5230\u300C\u63D2\u4EF6\u300D\u9875\u5378\u8F7D\u540E\u91CD\u65B0\u6DFB\u52A0\u3002",
+      versionHint: "\u70B9\u300C\u7ACB\u5373\u66F4\u65B0\u300D\u7531\u63D2\u4EF6\u81EA\u5DF1\u4ECE Gitee \u91CD\u88C5\u4E00\u904D\uFF0C\u4E0D\u7528\u53BB\u5378\u8F7D\u91CD\u52A0\u3002",
       versionCheckedAt: "\u68C0\u67E5\u4E8E {time}",
       sectionGeneration: "\u751F\u6210\u53C2\u6570",
       sectionMerge: "\u5408\u5E76\u4E0E\u8F93\u51FA",
@@ -110,6 +108,7 @@ window.__ModuleLoader__.load({
       maxWaitMs: "\u5355\u6B21\u6700\u957F\u7B49\u5F85\uFF08\u6BEB\u79D2\uFF09",
       save: "\u4FDD\u5B58",
       reset: "\u91CD\u7F6E\u63D2\u4EF6",
+      resetHint: "\u6E05\u6389\u672C\u673A\u5199\u8FC7\u7684 Key\u3001\u6A21\u578B\u3001\u8F93\u51FA\u76EE\u5F55\u7B49\uFF0C\u56DE\u5230\u521A\u88C5\u4E0A\u7684\u6837\u5B50\u3002",
       saving: "\u4FDD\u5B58\u4E2D\u2026",
       saved: "\u5DF2\u4FDD\u5B58\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u914D\u7F6E\u540E\u751F\u6548\u3002",
       saveFailed: "\u5BBF\u4E3B\u62D2\u7EDD\u4E86\u8FD9\u6B21\u5199\u5165\uFF0C\u8BF7\u68C0\u67E5\u5B57\u6BB5\u53D6\u503C\u3002",
@@ -181,11 +180,9 @@ window.__ModuleLoader__.load({
       versionUpdateDone: "Updated to v{version}, reloading\u2026",
       versionUpdateRestart: "v{version} installed; restart Harness to apply it.",
       versionUpdateCancelled: "Update cancelled.",
-      versionUpdateFailed: "Online update failed: {message}",
-      versionUpdateUnavailable: "This Host exposes no plugin-management API ({detail}); use the command below or the Plugins page.",
-      versionHint: 'Click "Update now" to update in place, or copy the command below into a terminal (a terminal update applies after restarting Harness).',
-      versionCopy: "Copy command",
-      versionCopied: "Copied",
+      versionUpdateFailed: "Online update failed: {message} (uninstall and re-add it from the Plugins page).",
+      versionUpdateUnavailable: "This Host exposes no plugin-management API ({detail}); uninstall and re-add it from the Plugins page.",
+      versionHint: 'Click "Update now": the plugin reinstalls itself from Gitee \u2014 no uninstall/re-add needed.',
       versionCheckedAt: "checked {time}",
       register: "Log in",
       registerWorking: "Logging in\u2026",
@@ -208,6 +205,7 @@ window.__ModuleLoader__.load({
       maxWaitMs: "Max wait (ms)",
       save: "Save",
       reset: "Reset plugin",
+      resetHint: "Clears the key, model, output dir and anything else this machine wrote \u2014 back to a fresh install.",
       saving: "Saving\u2026",
       saved: "Saved; the Host applies it after the config reload.",
       saveFailed: "The Host rejected this write; check the field values.",
@@ -264,10 +262,9 @@ window.__ModuleLoader__.load({
     const UPDATE_FILE_API = `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json`;
     const PLUGIN_PACKAGE = "metaontic-video";
     const UPDATE_SPEC = "git+https://gitee.com/hackloop/metaontic-video.git";
-    const UPDATE_COMMAND = `dsh plugin --profile desktop remove ${PLUGIN_PACKAGE} && dsh plugin --profile desktop add "${UPDATE_SPEC}"`;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "2.8.3".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "2.8.4".trim().replace(/^v/i, "") : "";
     function currentOs() {
       const nav = window.navigator || {};
       const raw = String(
@@ -467,7 +464,6 @@ window.__ModuleLoader__.load({
         const [updateMessage, setUpdateMessage] = React.useState("");
         const [updateLatest, setUpdateLatest] = React.useState("");
         const [updateAt, setUpdateAt] = React.useState("");
-        const [copiedUpdate, setCopiedUpdate] = React.useState("");
         const [updateConfirm, setUpdateConfirm] = React.useState(false);
         const restoreTried = React.useRef(false);
         React.useEffect(() => {
@@ -979,7 +975,7 @@ window.__ModuleLoader__.load({
         ]));
         const overrides = Object.keys(snapshot.user || {});
         const footerMessage = status === "saved" ? t("saved") : status === "failed" ? t("saveFailed") : pending.length ? t("dirty") : "";
-        const footer = pending.length || overrides.length || status !== "idle" ? h("div", { key: "footer", className: "mov-footer" }, [
+        const footer = pending.length || status !== "idle" ? h("div", { key: "footer", className: "mov-footer" }, [
           pending.length ? h("button", {
             key: "save",
             "data-action": "save",
@@ -988,14 +984,6 @@ window.__ModuleLoader__.load({
             disabled: status === "saving" || snapshot.writable === false,
             onClick: save
           }, status === "saving" ? t("saving") : t("save")) : null,
-          overrides.length ? h("button", {
-            key: "reset",
-            "data-action": "reset",
-            type: "button",
-            className: "mov-btn",
-            disabled: status === "saving",
-            onClick: reset
-          }, t("reset")) : null,
           footerMessage ? h("span", {
             key: "status",
             style: {
@@ -1003,6 +991,17 @@ window.__ModuleLoader__.load({
               color: status === "failed" ? TOKENS.error : status === "saved" ? TOKENS.success : TOKENS.muted
             }
           }, footerMessage) : null
+        ]) : null;
+        const resetRow = overrides.length ? h("div", { key: "reset-row", className: "mov-footer mov-reset-row" }, [
+          h("span", { key: "hint", className: "mov-hint", style: { flex: "1 1 200px" } }, t("resetHint")),
+          h("button", {
+            key: "reset",
+            "data-action": "reset",
+            type: "button",
+            className: "mov-btn",
+            disabled: status === "saving",
+            onClick: reset
+          }, t("reset"))
         ]) : null;
         const registerMessageColors = {
           ok: TOKENS.success,
@@ -1122,9 +1121,6 @@ window.__ModuleLoader__.load({
         }
         function copyCommand(command) {
           copyText(command, setCopiedFfmpeg);
-        }
-        function copyUpdateCommand() {
-          copyText(UPDATE_COMMAND, setCopiedUpdate);
         }
         async function runOnlineUpdate() {
           setUpdateConfirm(false);
@@ -1315,7 +1311,7 @@ window.__ModuleLoader__.load({
             style: { color: updateTone }
           }, updateText) : null,
           updateAvailable ? h("div", { key: "command", className: "mov-cmd-row" }, [
-            // 主按钮：点一下转成「确认更新」，再点一下让宿主重装本插件
+            // 点一下转成「确认更新」，再点一下让宿主重装本插件
             h("button", {
               key: "online",
               "data-action": "update-online",
@@ -1327,19 +1323,7 @@ window.__ModuleLoader__.load({
                 });
                 else setUpdateConfirm(true);
               }
-            }, updateStatus === "installing" ? t("versionUpdating") : updateConfirm ? t("versionUpdateConfirm", { version: updateLatest }) : t("versionUpdate")),
-            h("code", {
-              key: "code",
-              "data-field": "updateCommand",
-              className: "mov-code"
-            }, UPDATE_COMMAND),
-            h("button", {
-              key: "copy",
-              "data-action": "update-copy",
-              type: "button",
-              className: "mov-btn mov-btn-sm",
-              onClick: copyUpdateCommand
-            }, copiedUpdate ? t("versionCopied") : t("versionCopy"))
+            }, updateStatus === "installing" ? t("versionUpdating") : updateConfirm ? t("versionUpdateConfirm", { version: updateLatest }) : t("versionUpdate"))
           ]) : null,
           updateAvailable && updateConfirm ? h("span", {
             key: "confirm-hint",
@@ -1434,7 +1418,7 @@ window.__ModuleLoader__.load({
         if (snapshot.status === "loading") notice = t("loading");
         else if (snapshot.value === void 0) notice = t("unavailable");
         else if (snapshot.writable === false) notice = t("readOnly");
-        const blobs = notice && !snapshot.value ? [] : [ffmpegBox, registerBox, quotaBox, usageBox, versionBox, footer];
+        const blobs = notice && !snapshot.value ? [] : [ffmpegBox, registerBox, quotaBox, usageBox, versionBox, footer, resetRow];
         return h("div", { className: "mov-page" }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
           h("style", { key: "styles" }, PAGE_CSS),
