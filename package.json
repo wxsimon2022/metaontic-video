@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "2.15.4",
+  "version": "2.16.0",
   "description": "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
   "license": "MIT",
   "type": "module",
@@ -76,12 +76,13 @@
     "@deepseek-ai/schemastery": "~3.18.5"
   },
   "releaseNotes": {
-    "version": "2.15.4",
+    "version": "2.16.0",
     "items": [
-      "修复交付单文件时移动原片的问题，两段原片与合成成片分别保留。",
-      "优化30秒脚本分段与续拍交接，明确本段新动作、新对白和结束状态，减少剧情重演。",
-      "补齐工具执行、续做锁、任务、分段落盘、裁剪和合并日志，用callId串联排查。",
-      "日志按本机日期保存到YYYYMMDD目录，不记录Key、完整提示词或签名链接。"
+      "新增生成等待卡片：旋转动画、流动条纹、扫光、动态状态点和实时等待计时。",
+      "新增估算进度：等待期间最高99%，识别成功后100%；失败或停止明确显示，动效结束。",
+      "强化逐段预览交付：返回previewPath和下一步指令，先展示本次视频再等待用户确认续做。",
+      "服务端使用记录每60秒自动刷新，窗口聚焦时重新拉取，显示刷新时间；火山直连不查询。",
+      "规范发布说明：包内更新内容、附注标签与推送后总结保持一致，验证与发布状态据实报告。"
     ]
   }
 }

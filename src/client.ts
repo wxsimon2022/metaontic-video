@@ -690,6 +690,8 @@ window.__ModuleLoader__.load({
         const [usage, setUsage] = React.useState(null);
         const [usageStatus, setUsageStatus] = React.useState('idle');
         const [usageMessage, setUsageMessage] = React.useState('');
+        const usageInFlight = React.useRef(false);
+        const [usageAt, setUsageAt] = React.useState('');
         // ffmpeg 安装引导：默认只展示当前系统那条，可展开看其他系统；复制过的命令给个「已复制」反馈
         const [showAllFfmpeg, setShowAllFfmpeg] = React.useState(false);
         const [copiedFfmpeg, setCopiedFfmpeg] = React.useState('');
@@ -725,6 +727,25 @@ window.__ModuleLoader__.load({
           }
           lookupOwnKey().catch(() => {});
         }, []);
+
+        // 页面可见时定时拉取，重新聚焦时立即刷新；火山直连不查询服务端记录。
+        React.useEffect(() => {
+          if (directMode || props?.view === 'summary'
+            || !(snapshot.secrets?.apiKey || value.apiKey)) return;
+          const refresh = () => {
+            if (window.document?.visibilityState === 'hidden') return;
+            loadUsage().catch(() => {});
+          };
+          refresh();
+          const timer = window.setInterval(refresh, 60000);
+          window.addEventListener('focus', refresh);
+          window.document?.addEventListener('visibilitychange', refresh);
+          return () => {
+            window.clearInterval(timer);
+            window.removeEventListener('focus', refresh);
+            window.document?.removeEventListener('visibilitychange', refresh);
+          };
+        }, [directMode, Boolean(snapshot.secrets?.apiKey || value.apiKey), value.deviceId, props?.view]);
 
         // 版本卡片：先把上次查到的结果摆上（离线也能看），缓存过期了再静默查一次。
         const updateTried = React.useRef(false);
@@ -1184,7 +1205,8 @@ window.__ModuleLoader__.load({
          * 再去读它的调用日志（谁什么时候出了片、消耗多少），一次任务只显示一行。
          */
         async function loadUsage() {
-          if (directMode) return;
+          if (directMode || usageInFlight.current) return;
+          usageInFlight.current = true;
           const device = deviceIdentity();
           setUsageStatus('working');
           setUsageMessage('');
@@ -1199,15 +1221,17 @@ window.__ModuleLoader__.load({
               }),
             });
             setUsage(result);
+            setUsageAt(new Date().toLocaleTimeString());
             setUsageStatus('ok');
             return result;
           } catch (error) {
-            setUsage(null);
             setUsageStatus('failed');
             setUsageMessage(error?.status === 404
               ? t('quotaNotRegistered')
               : t('usageFailed', { message: error?.message || String(error) }));
             throw error;
+          } finally {
+            usageInFlight.current = false;
           }
         }
 
@@ -1749,6 +1773,7 @@ window.__ModuleLoader__.load({
                 }, row.status === 'succeeded' ? t('usageStatusOk') : t('usageStatusFailed'))),
             ])),
           ]) : null,
+          usageAt ? h('span', { key: 'updated-at', className: 'mov-foot-note' }, t('quotaUpdatedAt', { time: usageAt })) : null,
           usageMessage ? h('span', { key: 'message', className: 'mov-hint' }, usageMessage) : null,
         ]) : null;
 
@@ -1945,12 +1970,84 @@ window.__ModuleLoader__.load({
       };
     }
 
+    function estimatedVideoProgress(elapsed, succeeded) {
+      if (succeeded) return 100;
+      const seconds = Math.max(0, Number(elapsed) || 0);
+      return Math.min(99, Math.max(1, Math.floor(100 * (1 - Math.exp(-seconds / 75)))));
+    }
+
+    /** 宿主工具卡片：仅消费实际运行状态，等待动画不代表百分比进度。 */
+    function VideoTaskProgress({ block = {}, toolName = 'video_generate', callId }: { block?: any; toolName?: string; callId?: string }) {
+      const done = 'kind' in block;
+      const [elapsed, setElapsed] = React.useState(0);
+      const began = React.useRef(Date.now());
+      React.useEffect(() => {
+        if (done) return;
+        const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - began.current) / 1000)), 1000);
+        return () => window.clearInterval(timer);
+      }, [done, callId]);
+      const failed = Boolean(block.isError || block.error);
+      const status = done ? (failed ? '执行失败或已停止' : '本次任务已返回')
+        : block.phase === 'preparing' ? '准备参数 / 等待授权' : '正在执行 · 等待生成结果';
+      const output = Array.isArray(block.content) ? block.content
+        .filter((part) => part.type === 'text').map((part) => part.text).join('\n') : '';
+      const succeeded = done && !failed && /视频生成成功|视频延长成功|已生成并交付|已延长并交付|succeeded/.test(output);
+      const progress = estimatedVideoProgress(elapsed, succeeded);
+      const waitingDots = '.'.repeat((elapsed % 3) + 1);
+      const duration = block.args?.duration;
+      const title = toolName === 'video_extend' ? '视频续拍' : toolName === 'video_status' ? '查询视频状态' : '视频生成';
+      return h('div', { className: 'mov-task', 'data-field': 'video-task-progress' }, [
+        h('style', { key: 'style' }, `
+          @keyframes mov-task-spin { to { transform: rotate(360deg); } }
+          @keyframes mov-task-flow { from { background-position:0 0; } to { background-position:32px 0; } }
+          @keyframes mov-task-shimmer { from { transform:translateX(-120%); } to { transform:translateX(420%); } }
+          @keyframes mov-task-pulse { 0%,100% { opacity:.45; } 50% { opacity:1; } }
+          .mov-task { border:1px solid ${TOKENS.border}; border-radius:10px; padding:12px 14px; color:${TOKENS.text}; margin:6px 0; }
+          .mov-task-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13px; }
+          .mov-task-spinner { width:14px; height:14px; border:2px solid ${TOKENS.border}; border-top-color:${TOKENS.primaryFill}; border-radius:50%; animation:mov-task-spin .9s linear infinite; }
+          .mov-task-note { font-size:12px; color:${TOKENS.muted}; margin-top:8px; }
+          .mov-task-track { height:5px; border-radius:999px; overflow:hidden; background:${TOKENS.border}; margin-top:10px; }
+          .mov-task-fill { height:100%; border-radius:999px; background:${TOKENS.primaryFill}; transition:width 1s ease; position:relative; overflow:hidden; }
+          .mov-task-active .mov-task-fill { background-image:repeating-linear-gradient(110deg,transparent 0px,transparent 12px,rgba(255,255,255,.22) 12px,rgba(255,255,255,.22) 22px,transparent 22px,transparent 32px); background-size:32px 100%; animation:mov-task-flow 1s linear infinite; }
+          .mov-task-active .mov-task-fill::after { content:''; position:absolute; inset:0; width:30%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent); animation:mov-task-shimmer 2s linear infinite; }
+          .mov-task-live { display:inline-block; width:6px; height:6px; border-radius:50%; background:${TOKENS.primaryFill}; margin-right:6px; animation:mov-task-pulse 1.4s ease-in-out infinite; }
+          .mov-task-dots { display:inline-block; width:18px; text-align:left; }
+          .mov-task-output { white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; max-height:320px; overflow:auto; }
+          @media(prefers-reduced-motion:reduce) { .mov-task-spinner, .mov-task-live, .mov-task-active .mov-task-fill, .mov-task-active .mov-task-fill::after { animation:none; } }
+        `),
+        h('div', { key: 'head', className: 'mov-task-head' }, [
+          !done ? h('span', { key: 'spinner', className: 'mov-task-spinner', 'aria-hidden': true }) : null,
+          h('strong', { key: 'title' }, title),
+          h('span', { key: 'status', role: 'status' }, [status, !done ? h('span', { key: 'dots', className: 'mov-task-dots', 'aria-hidden': true }, waitingDots) : null]),
+          !done ? h('span', { key: 'elapsed', style: { marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' } },
+            `已等待 ${Math.floor(elapsed / 60)}分${String(elapsed % 60).padStart(2, '0')}秒`) : null,
+        ]),
+        h('div', { key: 'progress', className: `mov-task-track${!done ? ' mov-task-active' : ''}`, role: 'progressbar', 'aria-label': '估算进度', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': progress },
+          h('div', { className: 'mov-task-fill', style: { width: `${progress}%`, background: failed ? TOKENS.error : undefined } })),
+        h('div', { key: 'percent', className: 'mov-task-note' }, `${progress}%${succeeded ? ' · 本次生成完成' : ' · 估算进度，未成功最多99%'}${failed ? ' · 执行失败或已停止' : ''}`),
+        !done ? h('div', { key: 'note', className: 'mov-task-note' },
+          [
+            h('span', { key: 'live', className: 'mov-task-live', 'aria-hidden': true }),
+            `${duration ? `目标 ${duration} 秒 · ` : ''}${progress >= 99 ? '任务仍在等待结果，进度停在99%不表示失败。' : '任务处理中，完成后自动显示结果。'}请勿重复提交。`,
+          ]) : null,
+        done && output ? h('details', { key: 'output', open: failed }, [
+          h('summary', { key: 'toggle', className: 'mov-task-note' }, failed ? '查看错误详情' : '查看视频结果与文件路径'),
+          h('pre', { key: 'text', className: 'mov-task-output' }, output),
+        ]) : null,
+      ]);
+    }
+
     return {
       inject: ['slots', 'locale', 'configForms'],
       apply(ctx) {
         const t = ctx.locale.bind(NS);
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'metaontic-video: dictionaries');
         const form = ctx.configForms.get(NAMESPACE);
+        ctx.effect(() => ctx.slots.inject('tool.call.toolview', function* () {
+          for (const tool of ['video_generate', 'video_extend', 'video_status']) {
+            yield ctx.slots.register({ name: 'tool.call.toolview', key: tool, locale: NS }, VideoTaskProgress);
+          }
+        }), 'metaontic-video: video task progress');
         // 在线更新要用宿主的插件管理服务。它不是一个 `remote` 上的属性，而是宿主远程层按
         // 「命名空间服务」注册的独立服务，名字就是带点的 `remote.pluginManager`（cordis 的
         // `ctx.get()` 认这种名字）；所以先按全名取，取不到再退回属性写法，两条都记下来，

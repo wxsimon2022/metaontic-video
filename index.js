@@ -2004,7 +2004,7 @@ async function confirmNextSegment(ctx, config, exec, {
 function resolveRegisterApi(config) {
   return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-const PLUGIN_VERSION = true ? "2.15.4".trim().replace(/^v/i, "") : "";
+const PLUGIN_VERSION = true ? "2.16.0".trim().replace(/^v/i, "") : "";
 async function fetchDeviceQuota(config, signal) {
   if (isVolcengine(config)) return { status: "unknown", reason: "\u706B\u5C71\u76F4\u8FDE\u8D39\u7528\u548C\u4F59\u989D\u8BF7\u5728\u706B\u5C71\u63A7\u5236\u53F0\u67E5\u770B" };
   const api = resolveRegisterApi(config);
@@ -2405,6 +2405,11 @@ async function waitForCompletion(config, taskId, signal) {
     await sleep(ref(config, "pollIntervalMs", 5e3), signal);
   }
 }
+function previewInstruction(value) {
+  const latest = (value?.segments || []).filter((segment) => segment.status === "succeeded").at(-1);
+  const target = latest?.localPath || value?.videoPath || latest?.videoUrl || value?.videoUrl;
+  return `\u3010\u4E0B\u4E00\u6B65\uFF1A\u5148\u5C55\u793A\u89C6\u9891\uFF0C\u7B49\u5F85\u7528\u6237\u9884\u89C8\u3011\u8BF7\u7ACB\u5373\u4F7F\u7528\u5F53\u524D\u5BBF\u4E3B\u7684 present/\u6587\u4EF6\u5C55\u793A\u5DE5\u5177\u5C55\u793A\u672C\u6B21\u5B8C\u6210\u7684\u5206\u6BB5\uFF1A${target || "\u89C1\u672C\u6B21\u5206\u6BB5\u7ED3\u679C"}\u3002\u4E0D\u80FD\u53EA\u8BF4\u201C\u751F\u6210\u6210\u529F\u201D\u6216\u53EA\u5217\u4EFB\u52A1ID\u3002\u5C55\u793A\u540E\u8BE2\u95EE\u201C\u5148\u770B\u8FD9\u6BB5\uFF0C\u6548\u679C\u53EF\u4EE5\u5417\uFF1F\u786E\u8BA4\u540E\u518D\u7EE7\u7EED\u4E0B\u4E00\u6BB5\u3002\u201D\u5E76\u7ED3\u675F\u672C\u8F6E\u7B49\u5F85\u56DE\u590D\u3002\u7528\u6237\u9996\u6B21\u6388\u6743\u5236\u4F5C\u4E0D\u7B49\u4E8E\u5DF2\u770B\u8FC7\u672C\u6BB5\uFF0C\u4E0D\u5F97\u81EA\u52A8resume\u6216\u8C03\u7528\u5176\u4ED6\u751F\u6210\u5DE5\u5177\u7ED5\u8FC7\u9884\u89C8\uFF1B\u5C55\u793A\u5DE5\u5177\u4E0D\u53EF\u7528\u65F6\u7ED9\u51FA\u53EF\u70B9\u51FB\u89C6\u9891\u8DEF\u5F84\u6216\u64AD\u653E\u94FE\u63A5\uFF0C\u4ECD\u987B\u7B49\u5F85\u660E\u786E\u786E\u8BA4\u3002`;
+}
 function renderResult(value) {
   const {
     status,
@@ -2430,11 +2435,12 @@ function renderResult(value) {
   if (status === "succeeded") {
     const parts = [];
     if (paused) {
+      parts.push(previewInstruction(value));
       parts.push(
         `\u5DF2\u5EF6\u957F\u5E76\u4EA4\u4ED8\u524D ${segments.length} \u6BB5\uFF08\u5171 ${formatSeconds(segments.reduce(
           (sum, item) => sum + (item.seconds || 0),
           0
-        ))} \u79D2\uFF09\uFF1A\u6BCF\u6BB5\u5EF6\u957F\u5B8C\u90FD\u4F1A\u95EE\u4E00\u6B21\u8981\u4E0D\u8981\u7EE7\u7EED\uFF1B\u8FD9\u6B21\u5148\u4EA4\u4ED8\u5230\u8FD9\u91CC\uFF08\u7528\u6237\u9009\u4E86\u5148\u4E0D\u7EE7\u7EED\uFF0C\u6216\u8FD9\u4E00\u8F6E\u88AB\u505C\u6B62 / \u7B49\u8D85\u65F6\u4E86\uFF09\u3002`
+        ))} \u79D2\uFF09\uFF1A\u6BCF\u6BB5\u5EF6\u957F\u5B8C\u90FD\u4F1A\u95EE\u4E00\u6B21\u8981\u4E0D\u8981\u7EE7\u7EED\uFF1B\u8FD9\u6B21\u5148\u4EA4\u4ED8\u5230\u8FD9\u91CC\uFF08\u5F53\u524D\u6682\u505C\u7B49\u5F85\u9884\u89C8\u786E\u8BA4\uFF1B\u4E5F\u53EF\u80FD\u56E0\u505C\u6B62\u6216\u8D85\u65F6\u6682\u505C\uFF09\u3002`
       );
     } else {
       parts.push("\u89C6\u9891\u5EF6\u957F\u6210\u529F\u3002");
@@ -2592,6 +2598,8 @@ function extendTool(config, deps, ctx) {
           installHint: { type: "string" },
           partial: { type: "boolean" },
           paused: { type: "boolean" },
+          nextAction: { type: "string" },
+          previewPath: { type: "string" },
           resumeDir: { type: "string" },
           remainingSeconds: { type: "integer" },
           totalSeconds: { type: "integer" },
@@ -2800,6 +2808,9 @@ function extendTool(config, deps, ctx) {
         result.segmentsDir = segmentsDir;
         result.resumeDir = segmentsDir;
         result.paused = true;
+        result.nextAction = "present_video_then_wait_for_user";
+        result.previewPath = completed.at(-1)?.localPath || result.videoPath;
+        await appendRequestLog({ event: "preview_required", previewPath: result.previewPath, resumeDir: result.resumeDir });
         result.remainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - deliveredSeconds);
         try {
           await writePauseFile(segmentsDir, pauseRecordAt({
@@ -2872,11 +2883,11 @@ function renderVideoResult(value) {
     return segment.localPath ? `${head} \u2192 ${segment.videoUrl}
     \u672C\u5730\u6587\u4EF6\uFF1A${segment.localPath}` : `${head} \u2192 ${segment.videoUrl}`;
   });
-  const parts = [];
+  const parts = paused ? [previewInstruction(value)] : [];
   if (status === "succeeded") {
     if (paused) {
       parts.push(
-        `\u5DF2\u751F\u6210\u5E76\u4EA4\u4ED8\u524D ${segments.length} \u6BB5\uFF08\u5171 ${formatSeconds(segments.length ? segments.reduce((sum, item) => sum + (item.seconds || 0), 0) : 0)} \u79D2\uFF09\uFF1A\u6BCF\u6BB5\u751F\u6210\u5B8C\u90FD\u4F1A\u95EE\u4E00\u6B21\u8981\u4E0D\u8981\u7EE7\u7EED\uFF1B\u8FD9\u6B21\u5148\u4EA4\u4ED8\u5230\u8FD9\u91CC\uFF08\u7528\u6237\u9009\u4E86\u5148\u4E0D\u7EE7\u7EED\uFF0C\u6216\u8FD9\u4E00\u8F6E\u88AB\u505C\u6B62 / \u7B49\u8D85\u65F6\u4E86\uFF09\u3002`
+        `\u5DF2\u751F\u6210\u5E76\u4EA4\u4ED8\u524D ${segments.length} \u6BB5\uFF08\u5171 ${formatSeconds(segments.length ? segments.reduce((sum, item) => sum + (item.seconds || 0), 0) : 0)} \u79D2\uFF09\uFF1A\u6BCF\u6BB5\u751F\u6210\u5B8C\u90FD\u4F1A\u95EE\u4E00\u6B21\u8981\u4E0D\u8981\u7EE7\u7EED\uFF1B\u8FD9\u6B21\u5148\u4EA4\u4ED8\u5230\u8FD9\u91CC\uFF08\u5F53\u524D\u6682\u505C\u7B49\u5F85\u9884\u89C8\u786E\u8BA4\uFF1B\u4E5F\u53EF\u80FD\u56E0\u505C\u6B62\u6216\u8D85\u65F6\u6682\u505C\uFF09\u3002`
       );
     } else if (mode === "extended") {
       parts.push(`\u89C6\u9891\u751F\u6210\u6210\u529F\uFF1A\u5148\u76F4\u51FA ${formatSeconds(segments[0]?.seconds)} \u79D2\uFF0C\u518D\u5EF6\u957F ${segments.length - 1} \u6BB5\u3002`);
@@ -3012,6 +3023,8 @@ function videoTool(config, deps, ctx) {
           installHint: { type: "string" },
           partial: { type: "boolean" },
           paused: { type: "boolean" },
+          nextAction: { type: "string" },
+          previewPath: { type: "string" },
           resumeDir: { type: "string" },
           remainingSeconds: { type: "integer" },
           pendingTaskId: { type: "string" },
@@ -3218,6 +3231,9 @@ function videoTool(config, deps, ctx) {
           result.segmentsDir = allocated.segmentsDir;
           result.resumeDir = allocated.segmentsDir;
           result.paused = true;
+          result.nextAction = "present_video_then_wait_for_user";
+          result.previewPath = completed.at(-1)?.localPath || result.videoPath;
+          await appendRequestLog({ event: "preview_required", previewPath: result.previewPath, resumeDir: result.resumeDir });
           result.remainingSeconds = Math.max(0, total - deliveredSeconds);
           notes.push("\u6309\u53C2\u6570\u8981\u6C42\u53EA\u8FD4\u56DE\u4E0A\u6E38\u94FE\u63A5\uFF0C\u6CA1\u6709\u4E0B\u8F7D\u5206\u6BB5\uFF08resume \u65F6\u4F1A\u6309\u94FE\u63A5\u91CD\u65B0\u62C9\uFF09\u3002");
           notes.push(resumeHint(allocated.segmentsDir, result.remainingSeconds));
@@ -3263,6 +3279,9 @@ function videoTool(config, deps, ctx) {
         result.segmentsDir = segmentsDir;
         result.resumeDir = segmentsDir;
         result.paused = true;
+        result.nextAction = "present_video_then_wait_for_user";
+        result.previewPath = completed.at(-1)?.localPath || result.videoPath;
+        await appendRequestLog({ event: "preview_required", previewPath: result.previewPath, resumeDir: result.resumeDir });
         result.remainingSeconds = Math.max(0, total - deliveredSeconds);
         try {
           await writePauseFile(segmentsDir, pauseRecordAt({

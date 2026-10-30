@@ -2,7 +2,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "2.15.4",
+    version: "2.16.0",
     description: "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
     license: "MIT",
     type: "module",
@@ -78,12 +78,13 @@
       "@deepseek-ai/schemastery": "~3.18.5"
     },
     releaseNotes: {
-      version: "2.15.4",
+      version: "2.16.0",
       items: [
-        "\u4FEE\u590D\u4EA4\u4ED8\u5355\u6587\u4EF6\u65F6\u79FB\u52A8\u539F\u7247\u7684\u95EE\u9898\uFF0C\u4E24\u6BB5\u539F\u7247\u4E0E\u5408\u6210\u6210\u7247\u5206\u522B\u4FDD\u7559\u3002",
-        "\u4F18\u531630\u79D2\u811A\u672C\u5206\u6BB5\u4E0E\u7EED\u62CD\u4EA4\u63A5\uFF0C\u660E\u786E\u672C\u6BB5\u65B0\u52A8\u4F5C\u3001\u65B0\u5BF9\u767D\u548C\u7ED3\u675F\u72B6\u6001\uFF0C\u51CF\u5C11\u5267\u60C5\u91CD\u6F14\u3002",
-        "\u8865\u9F50\u5DE5\u5177\u6267\u884C\u3001\u7EED\u505A\u9501\u3001\u4EFB\u52A1\u3001\u5206\u6BB5\u843D\u76D8\u3001\u88C1\u526A\u548C\u5408\u5E76\u65E5\u5FD7\uFF0C\u7528callId\u4E32\u8054\u6392\u67E5\u3002",
-        "\u65E5\u5FD7\u6309\u672C\u673A\u65E5\u671F\u4FDD\u5B58\u5230YYYYMMDD\u76EE\u5F55\uFF0C\u4E0D\u8BB0\u5F55Key\u3001\u5B8C\u6574\u63D0\u793A\u8BCD\u6216\u7B7E\u540D\u94FE\u63A5\u3002"
+        "\u65B0\u589E\u751F\u6210\u7B49\u5F85\u5361\u7247\uFF1A\u65CB\u8F6C\u52A8\u753B\u3001\u6D41\u52A8\u6761\u7EB9\u3001\u626B\u5149\u3001\u52A8\u6001\u72B6\u6001\u70B9\u548C\u5B9E\u65F6\u7B49\u5F85\u8BA1\u65F6\u3002",
+        "\u65B0\u589E\u4F30\u7B97\u8FDB\u5EA6\uFF1A\u7B49\u5F85\u671F\u95F4\u6700\u9AD899%\uFF0C\u8BC6\u522B\u6210\u529F\u540E100%\uFF1B\u5931\u8D25\u6216\u505C\u6B62\u660E\u786E\u663E\u793A\uFF0C\u52A8\u6548\u7ED3\u675F\u3002",
+        "\u5F3A\u5316\u9010\u6BB5\u9884\u89C8\u4EA4\u4ED8\uFF1A\u8FD4\u56DEpreviewPath\u548C\u4E0B\u4E00\u6B65\u6307\u4EE4\uFF0C\u5148\u5C55\u793A\u672C\u6B21\u89C6\u9891\u518D\u7B49\u5F85\u7528\u6237\u786E\u8BA4\u7EED\u505A\u3002",
+        "\u670D\u52A1\u7AEF\u4F7F\u7528\u8BB0\u5F55\u6BCF60\u79D2\u81EA\u52A8\u5237\u65B0\uFF0C\u7A97\u53E3\u805A\u7126\u65F6\u91CD\u65B0\u62C9\u53D6\uFF0C\u663E\u793A\u5237\u65B0\u65F6\u95F4\uFF1B\u706B\u5C71\u76F4\u8FDE\u4E0D\u67E5\u8BE2\u3002",
+        "\u89C4\u8303\u53D1\u5E03\u8BF4\u660E\uFF1A\u5305\u5185\u66F4\u65B0\u5185\u5BB9\u3001\u9644\u6CE8\u6807\u7B7E\u4E0E\u63A8\u9001\u540E\u603B\u7ED3\u4FDD\u6301\u4E00\u81F4\uFF0C\u9A8C\u8BC1\u4E0E\u53D1\u5E03\u72B6\u6001\u636E\u5B9E\u62A5\u544A\u3002"
       ]
     }
   };
@@ -408,7 +409,7 @@
       const UPDATE_ATTEMPTS = 3;
       const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
       const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-      const PLUGIN_VERSION = true ? "2.15.4".trim().replace(/^v/i, "") : "";
+      const PLUGIN_VERSION = true ? "2.16.0".trim().replace(/^v/i, "") : "";
       function currentOs() {
         const nav = window.navigator || {};
         const raw = String(
@@ -667,6 +668,8 @@
           const [usage, setUsage] = React.useState(null);
           const [usageStatus, setUsageStatus] = React.useState("idle");
           const [usageMessage, setUsageMessage] = React.useState("");
+          const usageInFlight = React.useRef(false);
+          const [usageAt, setUsageAt] = React.useState("");
           const [showAllFfmpeg, setShowAllFfmpeg] = React.useState(false);
           const [copiedFfmpeg, setCopiedFfmpeg] = React.useState("");
           const [updateStatus, setUpdateStatus] = React.useState("idle");
@@ -698,6 +701,23 @@
             lookupOwnKey().catch(() => {
             });
           }, []);
+          React.useEffect(() => {
+            if (directMode || props?.view === "summary" || !(snapshot.secrets?.apiKey || value.apiKey)) return;
+            const refresh = () => {
+              if (window.document?.visibilityState === "hidden") return;
+              loadUsage().catch(() => {
+              });
+            };
+            refresh();
+            const timer = window.setInterval(refresh, 6e4);
+            window.addEventListener("focus", refresh);
+            window.document?.addEventListener("visibilitychange", refresh);
+            return () => {
+              window.clearInterval(timer);
+              window.removeEventListener("focus", refresh);
+              window.document?.removeEventListener("visibilitychange", refresh);
+            };
+          }, [directMode, Boolean(snapshot.secrets?.apiKey || value.apiKey), value.deviceId, props?.view]);
           const updateTried = React.useRef(false);
           React.useEffect(() => {
             if (updateTried.current) return;
@@ -1091,7 +1111,8 @@
             }
           }
           async function loadUsage() {
-            if (directMode) return;
+            if (directMode || usageInFlight.current) return;
+            usageInFlight.current = true;
             const device = deviceIdentity();
             setUsageStatus("working");
             setUsageMessage("");
@@ -1106,13 +1127,15 @@
                 })
               });
               setUsage(result);
+              setUsageAt((/* @__PURE__ */ new Date()).toLocaleTimeString());
               setUsageStatus("ok");
               return result;
             } catch (error) {
-              setUsage(null);
               setUsageStatus("failed");
               setUsageMessage(error?.status === 404 ? t("quotaNotRegistered") : t("usageFailed", { message: error?.message || String(error) }));
               throw error;
+            } finally {
+              usageInFlight.current = false;
             }
           }
           function readUpdateCache() {
@@ -1556,6 +1579,7 @@
                 )
               ]))
             ]) : null,
+            usageAt ? h("span", { key: "updated-at", className: "mov-foot-note" }, t("quotaUpdatedAt", { time: usageAt })) : null,
             usageMessage ? h("span", { key: "message", className: "mov-hint" }, usageMessage) : null
           ]) : null;
           const updateAvailable = Boolean(updateLatest) && Boolean(PLUGIN_VERSION) && isNewerVersion(updateLatest, PLUGIN_VERSION);
@@ -1718,12 +1742,88 @@
           ]);
         };
       }
+      function estimatedVideoProgress(elapsed, succeeded) {
+        if (succeeded) return 100;
+        const seconds = Math.max(0, Number(elapsed) || 0);
+        return Math.min(99, Math.max(1, Math.floor(100 * (1 - Math.exp(-seconds / 75)))));
+      }
+      function VideoTaskProgress({ block = {}, toolName = "video_generate", callId }) {
+        const done = "kind" in block;
+        const [elapsed, setElapsed] = React.useState(0);
+        const began = React.useRef(Date.now());
+        React.useEffect(() => {
+          if (done) return;
+          const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - began.current) / 1e3)), 1e3);
+          return () => window.clearInterval(timer);
+        }, [done, callId]);
+        const failed = Boolean(block.isError || block.error);
+        const status = done ? failed ? "\u6267\u884C\u5931\u8D25\u6216\u5DF2\u505C\u6B62" : "\u672C\u6B21\u4EFB\u52A1\u5DF2\u8FD4\u56DE" : block.phase === "preparing" ? "\u51C6\u5907\u53C2\u6570 / \u7B49\u5F85\u6388\u6743" : "\u6B63\u5728\u6267\u884C \xB7 \u7B49\u5F85\u751F\u6210\u7ED3\u679C";
+        const output = Array.isArray(block.content) ? block.content.filter((part) => part.type === "text").map((part) => part.text).join("\n") : "";
+        const succeeded = done && !failed && /视频生成成功|视频延长成功|已生成并交付|已延长并交付|succeeded/.test(output);
+        const progress = estimatedVideoProgress(elapsed, succeeded);
+        const waitingDots = ".".repeat(elapsed % 3 + 1);
+        const duration = block.args?.duration;
+        const title = toolName === "video_extend" ? "\u89C6\u9891\u7EED\u62CD" : toolName === "video_status" ? "\u67E5\u8BE2\u89C6\u9891\u72B6\u6001" : "\u89C6\u9891\u751F\u6210";
+        return h("div", { className: "mov-task", "data-field": "video-task-progress" }, [
+          h("style", { key: "style" }, `
+          @keyframes mov-task-spin { to { transform: rotate(360deg); } }
+          @keyframes mov-task-flow { from { background-position:0 0; } to { background-position:32px 0; } }
+          @keyframes mov-task-shimmer { from { transform:translateX(-120%); } to { transform:translateX(420%); } }
+          @keyframes mov-task-pulse { 0%,100% { opacity:.45; } 50% { opacity:1; } }
+          .mov-task { border:1px solid ${TOKENS.border}; border-radius:10px; padding:12px 14px; color:${TOKENS.text}; margin:6px 0; }
+          .mov-task-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13px; }
+          .mov-task-spinner { width:14px; height:14px; border:2px solid ${TOKENS.border}; border-top-color:${TOKENS.primaryFill}; border-radius:50%; animation:mov-task-spin .9s linear infinite; }
+          .mov-task-note { font-size:12px; color:${TOKENS.muted}; margin-top:8px; }
+          .mov-task-track { height:5px; border-radius:999px; overflow:hidden; background:${TOKENS.border}; margin-top:10px; }
+          .mov-task-fill { height:100%; border-radius:999px; background:${TOKENS.primaryFill}; transition:width 1s ease; position:relative; overflow:hidden; }
+          .mov-task-active .mov-task-fill { background-image:repeating-linear-gradient(110deg,transparent 0px,transparent 12px,rgba(255,255,255,.22) 12px,rgba(255,255,255,.22) 22px,transparent 22px,transparent 32px); background-size:32px 100%; animation:mov-task-flow 1s linear infinite; }
+          .mov-task-active .mov-task-fill::after { content:''; position:absolute; inset:0; width:30%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent); animation:mov-task-shimmer 2s linear infinite; }
+          .mov-task-live { display:inline-block; width:6px; height:6px; border-radius:50%; background:${TOKENS.primaryFill}; margin-right:6px; animation:mov-task-pulse 1.4s ease-in-out infinite; }
+          .mov-task-dots { display:inline-block; width:18px; text-align:left; }
+          .mov-task-output { white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; max-height:320px; overflow:auto; }
+          @media(prefers-reduced-motion:reduce) { .mov-task-spinner, .mov-task-live, .mov-task-active .mov-task-fill, .mov-task-active .mov-task-fill::after { animation:none; } }
+        `),
+          h("div", { key: "head", className: "mov-task-head" }, [
+            !done ? h("span", { key: "spinner", className: "mov-task-spinner", "aria-hidden": true }) : null,
+            h("strong", { key: "title" }, title),
+            h("span", { key: "status", role: "status" }, [status, !done ? h("span", { key: "dots", className: "mov-task-dots", "aria-hidden": true }, waitingDots) : null]),
+            !done ? h(
+              "span",
+              { key: "elapsed", style: { marginLeft: "auto", fontVariantNumeric: "tabular-nums" } },
+              `\u5DF2\u7B49\u5F85 ${Math.floor(elapsed / 60)}\u5206${String(elapsed % 60).padStart(2, "0")}\u79D2`
+            ) : null
+          ]),
+          h(
+            "div",
+            { key: "progress", className: `mov-task-track${!done ? " mov-task-active" : ""}`, role: "progressbar", "aria-label": "\u4F30\u7B97\u8FDB\u5EA6", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": progress },
+            h("div", { className: "mov-task-fill", style: { width: `${progress}%`, background: failed ? TOKENS.error : void 0 } })
+          ),
+          h("div", { key: "percent", className: "mov-task-note" }, `${progress}%${succeeded ? " \xB7 \u672C\u6B21\u751F\u6210\u5B8C\u6210" : " \xB7 \u4F30\u7B97\u8FDB\u5EA6\uFF0C\u672A\u6210\u529F\u6700\u591A99%"}${failed ? " \xB7 \u6267\u884C\u5931\u8D25\u6216\u5DF2\u505C\u6B62" : ""}`),
+          !done ? h(
+            "div",
+            { key: "note", className: "mov-task-note" },
+            [
+              h("span", { key: "live", className: "mov-task-live", "aria-hidden": true }),
+              `${duration ? `\u76EE\u6807 ${duration} \u79D2 \xB7 ` : ""}${progress >= 99 ? "\u4EFB\u52A1\u4ECD\u5728\u7B49\u5F85\u7ED3\u679C\uFF0C\u8FDB\u5EA6\u505C\u572899%\u4E0D\u8868\u793A\u5931\u8D25\u3002" : "\u4EFB\u52A1\u5904\u7406\u4E2D\uFF0C\u5B8C\u6210\u540E\u81EA\u52A8\u663E\u793A\u7ED3\u679C\u3002"}\u8BF7\u52FF\u91CD\u590D\u63D0\u4EA4\u3002`
+            ]
+          ) : null,
+          done && output ? h("details", { key: "output", open: failed }, [
+            h("summary", { key: "toggle", className: "mov-task-note" }, failed ? "\u67E5\u770B\u9519\u8BEF\u8BE6\u60C5" : "\u67E5\u770B\u89C6\u9891\u7ED3\u679C\u4E0E\u6587\u4EF6\u8DEF\u5F84"),
+            h("pre", { key: "text", className: "mov-task-output" }, output)
+          ]) : null
+        ]);
+      }
       return {
         inject: ["slots", "locale", "configForms"],
         apply(ctx) {
           const t = ctx.locale.bind(NS);
           ctx.effect(() => ctx.locale.register(NS, { zh, en }), "metaontic-video: dictionaries");
           const form = ctx.configForms.get(NAMESPACE);
+          ctx.effect(() => ctx.slots.inject("tool.call.toolview", function* () {
+            for (const tool of ["video_generate", "video_extend", "video_status"]) {
+              yield ctx.slots.register({ name: "tool.call.toolview", key: tool, locale: NS }, VideoTaskProgress);
+            }
+          }), "metaontic-video: video task progress");
           const pluginManager = () => {
             const tried = [];
             const shape = (value) => value === void 0 ? "undefined" : value === null ? "null" : typeof value;

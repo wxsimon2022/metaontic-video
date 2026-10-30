@@ -3189,6 +3189,14 @@ async function waitForCompletion(config, taskId, signal): Promise<TaskResult> {
   }
 }
 
+function previewInstruction(value) {
+  const latest = (value?.segments || []).filter((segment) => segment.status === 'succeeded').at(-1);
+  const target = latest?.localPath || value?.videoPath || latest?.videoUrl || value?.videoUrl;
+  return `【下一步：先展示视频，等待用户预览】请立即使用当前宿主的 present/文件展示工具展示本次完成的分段：${target || '见本次分段结果'}。`
+    + '不能只说“生成成功”或只列任务ID。展示后询问“先看这段，效果可以吗？确认后再继续下一段。”并结束本轮等待回复。'
+    + '用户首次授权制作不等于已看过本段，不得自动resume或调用其他生成工具绕过预览；展示工具不可用时给出可点击视频路径或播放链接，仍须等待明确确认。';
+}
+
 function renderResult(value) {
   const {
     status, segments = [], videoUrl, error, videoPath, mergeMode, segmentsDir,
@@ -3207,11 +3215,12 @@ function renderResult(value) {
   if (status === 'succeeded') {
     const parts = [];
     if (paused) {
+      parts.push(previewInstruction(value));
       parts.push(
         `已延长并交付前 ${segments.length} 段（共 ${formatSeconds(segments.reduce(
           (sum, item) => sum + (item.seconds || 0), 0,
         ))} 秒）：每段延长完都会问一次要不要继续；这次先交付到这里`
-        + '（用户选了先不继续，或这一轮被停止 / 等超时了）。',
+        + '（当前暂停等待预览确认；也可能因停止或超时暂停）。',
       );
     } else {
       parts.push('视频延长成功。');
@@ -3406,6 +3415,8 @@ function extendTool(config, deps, ctx) {
           installHint: { type: 'string' },
           partial: { type: 'boolean' },
           paused: { type: 'boolean' },
+          nextAction: { type: 'string' },
+          previewPath: { type: 'string' },
           resumeDir: { type: 'string' },
           remainingSeconds: { type: 'integer' },
           totalSeconds: { type: 'integer' },
@@ -3656,6 +3667,9 @@ function extendTool(config, deps, ctx) {
         result.segmentsDir = segmentsDir;
         result.resumeDir = segmentsDir;
         result.paused = true;
+        result.nextAction = 'present_video_then_wait_for_user';
+        result.previewPath = completed.at(-1)?.localPath || result.videoPath;
+        await appendRequestLog({ event: 'preview_required', previewPath: result.previewPath, resumeDir: result.resumeDir });
         result.remainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - deliveredSeconds);
         try {
           await writePauseFile(segmentsDir, pauseRecordAt({
@@ -3725,14 +3739,14 @@ function renderVideoResult(value) {
       : `${head} → ${segment.videoUrl}`;
   });
 
-  const parts = [];
+  const parts = paused ? [previewInstruction(value)] : [];
   if (status === 'succeeded') {
     if (paused) {
       parts.push(
         `已生成并交付前 ${segments.length} 段（共 ${formatSeconds(segments.length
           ? segments.reduce((sum, item) => sum + (item.seconds || 0), 0) : 0)} 秒）：`
         + '每段生成完都会问一次要不要继续；这次先交付到这里'
-        + '（用户选了先不继续，或这一轮被停止 / 等超时了）。',
+        + '（当前暂停等待预览确认；也可能因停止或超时暂停）。',
       );
     } else if (mode === 'extended') {
       parts.push(`视频生成成功：先直出 ${formatSeconds(segments[0]?.seconds)} 秒，再延长 ${segments.length - 1} 段。`);
@@ -3926,6 +3940,8 @@ function videoTool(config, deps, ctx) {
           installHint: { type: 'string' },
           partial: { type: 'boolean' },
           paused: { type: 'boolean' },
+          nextAction: { type: 'string' },
+          previewPath: { type: 'string' },
           resumeDir: { type: 'string' },
           remainingSeconds: { type: 'integer' },
           pendingTaskId: { type: 'string' },
@@ -4173,6 +4189,9 @@ function videoTool(config, deps, ctx) {
           result.segmentsDir = allocated.segmentsDir;
           result.resumeDir = allocated.segmentsDir;
           result.paused = true;
+        result.nextAction = 'present_video_then_wait_for_user';
+        result.previewPath = completed.at(-1)?.localPath || result.videoPath;
+        await appendRequestLog({ event: 'preview_required', previewPath: result.previewPath, resumeDir: result.resumeDir });
           result.remainingSeconds = Math.max(0, total - deliveredSeconds);
           notes.push('按参数要求只返回上游链接，没有下载分段（resume 时会按链接重新拉）。');
           notes.push(resumeHint(allocated.segmentsDir, result.remainingSeconds));
@@ -4225,6 +4244,9 @@ function videoTool(config, deps, ctx) {
         result.segmentsDir = segmentsDir;
         result.resumeDir = segmentsDir;
         result.paused = true;
+        result.nextAction = 'present_video_then_wait_for_user';
+        result.previewPath = completed.at(-1)?.localPath || result.videoPath;
+        await appendRequestLog({ event: 'preview_required', previewPath: result.previewPath, resumeDir: result.resumeDir });
         result.remainingSeconds = Math.max(0, total - deliveredSeconds);
         try {
           await writePauseFile(segmentsDir, pauseRecordAt({
