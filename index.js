@@ -39,7 +39,6 @@ const Config = z.object({
   ffmpegBinary: z.string().default("ffmpeg").description("ffmpeg \u53EF\u6267\u884C\u6587\u4EF6\uFF1BPATH \u91CC\u6CA1\u6709\u65F6\u586B\u7EDD\u5BF9\u8DEF\u5F84").volatile(),
   ffprobeBinary: z.string().default("ffprobe").description("ffprobe \u53EF\u6267\u884C\u6587\u4EF6\uFF1BPATH \u91CC\u6CA1\u6709\u65F6\u586B\u7EDD\u5BF9\u8DEF\u5F84").volatile(),
   mode: z.union(["continuous", "closeup"]).default("continuous").description("continuous=\u540C\u673A\u4F4D\u8FDE\u7EED\u7EED\u62CD\uFF1Bcloseup=\u5728\u53F0\u8BCD\u7ED3\u675F\u5904\u5207\u8FD1\u666F\u7EED\u62CD").volatile(),
-  resolution: z.union(["480p", "720p", "1080p"]).default("720p").description("\u5206\u8FA8\u7387").volatile(),
   ratio: z.union(["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"]).default("adaptive").description("\u753B\u9762\u6BD4\u4F8B\uFF1Bseedance 2.5 \u5EF6\u957F\u65F6\u56FA\u5B9A\u6539\u7528 adaptive").volatile(),
   generateAudio: z.boolean().default(true).description("\u662F\u5426\u751F\u6210\u97F3\u9891").volatile(),
   watermark: z.boolean().default(false).description("\u662F\u5426\u6DFB\u52A0\u6C34\u5370\uFF1B\u90E8\u5206\u4E2D\u8F6C\u7AD9\u53EA\u63A5\u53D7 true").volatile(),
@@ -53,6 +52,7 @@ const MIN_SECONDS = 4;
 const MIN_SEGMENT_SECONDS = 4;
 const MAX_SEGMENT_SECONDS = 15;
 const MAX_DIRECT_SECONDS = 15;
+const FIXED_RESOLUTION = "720p";
 const DEFAULT_OUTPUT_DIR = "metaontic-video";
 const CUMULATIVE_TOLERANCE_RATIO = 0.25;
 const CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5;
@@ -241,8 +241,7 @@ function buildRequestBody(config, args, referenceVideoUrl) {
   body.content = content;
   body.duration = seconds;
   body.ratio = args.ratio || ref(config, "ratio", "adaptive");
-  const resolution = args.resolution ?? ref(config, "resolution", "720p");
-  if (resolution) body.resolution = resolution;
+  body.resolution = FIXED_RESOLUTION;
   const generateAudio = args.generateAudio ?? ref(config, "generateAudio", true);
   if (typeof generateAudio === "boolean") body.generate_audio = generateAudio;
   const watermark = args.watermark ?? ref(config, "watermark", false);
@@ -338,8 +337,7 @@ function buildGenerationBody(config, args, seconds) {
   body.content = content;
   body.duration = seconds;
   body.ratio = args.ratio || ref(config, "ratio", "adaptive");
-  const resolution = args.resolution ?? ref(config, "resolution", "720p");
-  if (resolution) body.resolution = resolution;
+  body.resolution = FIXED_RESOLUTION;
   const generateAudio = args.generateAudio ?? ref(config, "generateAudio", true);
   if (typeof generateAudio === "boolean") body.generate_audio = generateAudio;
   const watermark = args.watermark ?? ref(config, "watermark", false);
@@ -1101,8 +1099,8 @@ function estimatePlan(config, toolName, args) {
 }
 function estimateUsage(config, toolName, args) {
   const plan = estimatePlan(config, toolName, args);
-  const resolution = String(args?.resolution ?? ref(config, "resolution", "720p"));
-  const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS["720p"];
+  const resolution = FIXED_RESOLUTION;
+  const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS[FIXED_RESOLUTION];
   const tokensPerSecond = pixels[0] * pixels[1] * ESTIMATE_FPS / ESTIMATE_TOKEN_DIVISOR;
   const hasFrame = Boolean(
     String(args?.firstFrameUrl ?? "").trim() || String(args?.lastFrameUrl ?? "").trim()
@@ -1277,7 +1275,7 @@ async function preflightGate(ctx, config, exec) {
       reason: `\u989D\u5EA6\u4E0D\u8DB3\uFF0C\u5DF2\u505C\u6B62\u8C03\u7528\uFF1A\u672C\u6B21\u9884\u4F30\u9700\u8981 ${needMoney ?? "\u65E0\u6CD5\u9884\u4F30"}\uFF0C\u8FD9\u628A Key \u53EA\u5269 ${remainMoneyText}\u3002\u8BF7\u5145\u503C\u6216\u627E\u7BA1\u7406\u5458\u6362\u4E00\u628A\u989D\u5EA6\u591F\u7684 Key \u540E\u91CD\u8BD5\u3002`
     };
   }
-  const total = estimate ? `${estimate.model} \xB7 ${estimate.resolution} \xB7 ${planSummary(estimate)}` : `${resolveModel(config)} \xB7 ${String(args.resolution ?? ref(config, "resolution", "720p"))}`;
+  const total = estimate ? `${estimate.model} \xB7 ${estimate.resolution} \xB7 ${planSummary(estimate)}` : `${resolveModel(config)} \xB7 ${FIXED_RESOLUTION}`;
   const auditTax = estimate ? `\u9884\u4F30\u6D88\u8017 ${estimate.tokens.toLocaleString("en-US")} token \u2248 ${needMoney ?? "\u65E0\u6CD5\u9884\u4F30"}\uFF08${needQuota === null ? "\u989D\u5EA6\u672A\u77E5" : `${needQuota.toLocaleString("en-US")} \u989D\u5EA6`}\uFF09` : "\u8FD9\u6B21\u8C03\u7528\u7684\u8D39\u7528\u65E0\u6CD5\u9884\u4F30";
   return {
     kind: "ask",
@@ -1491,11 +1489,6 @@ function extendTool(config) {
           minimum: 0,
           description: "\u89C6\u98911\u5DF2\u6709\u7684\u79D2\u6570\uFF1B\u7ED9\u4E86\u5C31\u6309\u300C\u6574\u7247\u7B2C X\u2013Y \u79D2\u300D\u63CF\u8FF0\u672C\u6BB5\u3002\u5411\u540E\u5EF6\u957F\u65F6\u9010\u6BB5\u7D2F\u52A0\uFF0C\u5411\u524D\u5EF6\u957F\u65F6\u9010\u6BB5\u524D\u79FB\u3002"
         },
-        resolution: {
-          type: "string",
-          enum: ["480p", "720p", "1080p"],
-          description: "\u5206\u8FA8\u7387\uFF0C\u9ED8\u8BA4\u6CBF\u7528\u914D\u7F6E\u3002"
-        },
         ratio: {
           type: "string",
           enum: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
@@ -1699,11 +1692,6 @@ function videoTool(config, deps) {
           type: "string",
           enum: ["continuous", "closeup"],
           description: "\u5EF6\u957F\u65F6\u7684\u8854\u63A5\u65B9\u5F0F\uFF1Acontinuous=\u540C\u673A\u4F4D\u8FDE\u7EED\uFF08\u9ED8\u8BA4\uFF09\uFF1Bcloseup=\u5728\u53F0\u8BCD\u7ED3\u675F\u5904\u5207\u8FD1\u666F\u3002"
-        },
-        resolution: {
-          type: "string",
-          enum: ["480p", "720p", "1080p"],
-          description: "\u5206\u8FA8\u7387\uFF0C\u9ED8\u8BA4\u6CBF\u7528\u914D\u7F6E\u3002"
         },
         ratio: {
           type: "string",
@@ -2176,7 +2164,6 @@ const CONFIG_FIELDS = [
   "duration",
   "singleMaxSeconds",
   "mode",
-  "resolution",
   "ratio",
   "generateAudio",
   "watermark",
@@ -2236,7 +2223,7 @@ async function writeProfileConfig(settings, config, patch) {
 function configTool(config, settings) {
   return {
     name: "video_config",
-    description: "\u8BFB\u53D6\u6216\u4FEE\u6539 MetaOnticVideo \u63D2\u4EF6\u81EA\u5DF1\u7684\u914D\u7F6E\uFF08baseUrl\u3001submitPath\u3001queryPath\u3001model\u3001duration\u3001singleMaxSeconds\u3001mode\u3001resolution\u3001ratio\u3001generateAudio\u3001watermark\u3001extraParams\u3001pollIntervalMs\u3001maxWaitMs\u3001mergeMode\u3001outputDir\u3001keepSegments\u3001ffmpegBinary\u3001ffprobeBinary\u3001registerEmail\u3001registerApi\u3001estimateGroupRatio\uFF09\u3002apiKey \u53EA\u80FD\u7531\u8BBE\u7F6E\u9875\u300C\u6FC0\u6D3B\u300D\u65F6\u670D\u52A1\u7AEF\u4E0B\u53D1\uFF0C\u8FD9\u91CC\u53EA\u80FD\u770B\u3001\u4E0D\u80FD\u6539\uFF1B\u7528\u6237\u8981\u6362 Key \u5C31\u8BA9\u4ED6\u53BB\u63D2\u4EF6\u8BE6\u60C5\u9875\u70B9\u300C\u6FC0\u6D3B\u300D\u3002\u6539\u52A8\u5199\u8FDB profile \u7684 cordis.patch.yml\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u540E\u751F\u6548\u3002\u7528\u6237\u8BF4\u300C\u628A\u4E2D\u8F6C\u7AD9\u5730\u5740/\u6A21\u578B/\u65F6\u957F\u6539\u6210 X\u300D\u65F6\u7528 action=set\uFF0C\u770B\u5F53\u524D\u503C\u7528 action=get\uFF1Bduration \u662F\u6BCF\u6BB5\u65B0\u589E\u79D2\u6570\u4E0A\u9650\uFF084-15\uFF0C\u9ED8\u8BA4 15\u3001\u6BB5\u6570\u6700\u5C11\uFF09\uFF0CsingleMaxSeconds \u662F\u5355\u6B21\u76F4\u51FA\u4E0A\u9650\uFF08\u9ED8\u8BA4 15\uFF09\u3002",
+    description: "\u8BFB\u53D6\u6216\u4FEE\u6539 MetaOnticVideo \u63D2\u4EF6\u81EA\u5DF1\u7684\u914D\u7F6E\uFF08baseUrl\u3001submitPath\u3001queryPath\u3001model\u3001duration\u3001singleMaxSeconds\u3001mode\u3001ratio\u3001generateAudio\u3001watermark\u3001extraParams\u3001pollIntervalMs\u3001maxWaitMs\u3001mergeMode\u3001outputDir\u3001keepSegments\u3001ffmpegBinary\u3001ffprobeBinary\u3001registerEmail\u3001registerApi\u3001estimateGroupRatio\uFF09\u3002apiKey \u53EA\u80FD\u7531\u8BBE\u7F6E\u9875\u300C\u6FC0\u6D3B\u300D\u65F6\u670D\u52A1\u7AEF\u4E0B\u53D1\uFF0C\u8FD9\u91CC\u53EA\u80FD\u770B\u3001\u4E0D\u80FD\u6539\uFF1B\u7528\u6237\u8981\u6362 Key \u5C31\u8BA9\u4ED6\u53BB\u63D2\u4EF6\u8BE6\u60C5\u9875\u70B9\u300C\u6FC0\u6D3B\u300D\u3002\u6539\u52A8\u5199\u8FDB profile \u7684 cordis.patch.yml\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u540E\u751F\u6548\u3002\u7528\u6237\u8BF4\u300C\u628A\u4E2D\u8F6C\u7AD9\u5730\u5740/\u6A21\u578B/\u65F6\u957F\u6539\u6210 X\u300D\u65F6\u7528 action=set\uFF0C\u770B\u5F53\u524D\u503C\u7528 action=get\uFF1Bduration \u662F\u6BCF\u6BB5\u65B0\u589E\u79D2\u6570\u4E0A\u9650\uFF084-15\uFF0C\u9ED8\u8BA4 15\u3001\u6BB5\u6570\u6700\u5C11\uFF09\uFF0CsingleMaxSeconds \u662F\u5355\u6B21\u76F4\u51FA\u4E0A\u9650\uFF08\u9ED8\u8BA4 15\uFF09\u3002",
     parameters: {
       type: "object",
       properties: {
@@ -2254,7 +2241,6 @@ function configTool(config, settings) {
         model: { type: "string", description: "\u6A21\u578B ID\uFF0C\u4F8B\u5982 doubao-seedance-2-0-mini-260615\u3002" },
         duration: { type: "integer", minimum: 4, maximum: 15, description: "\u6BCF\u6BB5\u65B0\u589E\u79D2\u6570\u4E0A\u9650\uFF084-15 \u7684\u6574\u6570\uFF0C\u9ED8\u8BA4 15\u3001\u6BB5\u6570\u6700\u5C11\uFF09\u3002" },
         mode: { type: "string", enum: ["continuous", "closeup"], description: "\u7EED\u62CD\u65B9\u5F0F\u3002" },
-        resolution: { type: "string", enum: ["480p", "720p", "1080p"], description: "\u5206\u8FA8\u7387\u3002" },
         ratio: {
           type: "string",
           enum: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],

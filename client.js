@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const NAMESPACE = "metaontic-video";
     const NS = "settings.metaonticVideo";
     const zh = {
-      summaryEmpty: "\u672A\u914D\u7F6E\uFF1A\u5230\u63D2\u4EF6\u8BBE\u7F6E\u9875\u70B9\u300C\u6FC0\u6D3B\u300D\u9886\u4E00\u628A\u5BC6\u94A5\u3002",
+      summaryEmpty: "\u672A\u914D\u7F6E\uFF1A\u5230\u63D2\u4EF6\u8BBE\u7F6E\u9875\u70B9\u300C\u767B\u5F55\u300D\u9886\u4E00\u628A\u5BC6\u94A5\u3002",
       summary: "{provider} \xB7 {model}",
       providerNewapi: "New API \u4E2D\u8F6C\u7AD9",
       apiKeyConfigured: "\u5DF2\u914D\u7F6E\uFF0C\u7559\u7A7A\u8868\u793A\u4FDD\u6301\u539F\u503C",
@@ -30,11 +30,11 @@ window.__ModuleLoader__.load({
       ffmpegAfter: "\u4E0D\u60F3\u81EA\u5DF1\u6572\u547D\u4EE4\u7684\u8BDD\uFF0C\u76F4\u63A5\u5728\u5BF9\u8BDD\u91CC\u8BF4\u300C\u5E2E\u6211\u88C5 ffmpeg\u300D\u2014\u2014\u63D2\u4EF6\u4F1A\u6267\u884C\u5B89\u88C5\uFF08\u547D\u4EE4\u4F1A\u5148\u8BA9\u4F60\u786E\u8BA4\uFF09\uFF1B\u88C5\u597D\u540E\u91CD\u8DD1\u4E00\u6B21\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\uFF08\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\u3002ffmpeg \u88C5\u5728\u975E\u9ED8\u8BA4\u4F4D\u7F6E\u7684\u8BDD\uFF0C\u628A\u7EDD\u5BF9\u8DEF\u5F84\u586B\u5230\u4E0A\u9762\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\u4E5F\u4E00\u6837\u7BA1\u7528\u3002\u5B89\u88C5\u5305\u81EA\u5E26 ffprobe\uFF0C\u5206\u6BB5\u65F6\u957F\u63A2\u6D4B\u4F1A\u4E00\u8D77\u89E3\u51B3\u3002",
       ffmpegManual: "\u60F3\u81EA\u5DF1\u88C5\uFF1AmacOS \u7528 Homebrew\uFF0CWindows \u7528 winget\uFF0CLinux \u7528\u7CFB\u7EDF\u5305\u7BA1\u7406\u5668\uFF1B\u88C5\u5B8C\u786E\u8BA4\u547D\u4EE4\u884C\u91CC\u80FD\u8DD1 ffmpeg -version \u5C31\u884C\u3002",
       registerEmail: "\u90AE\u7BB1\uFF08\u8D26\u53F7\uFF09",
-      registerTitle: "\u6CA1\u6709 API Key\uFF1F",
-      registerHint: "\u7528\u90AE\u7BB1\u9886\uFF1A\u586B\u90AE\u7BB1 \u2192 \u70B9\u300C\u83B7\u53D6\u9A8C\u8BC1\u7801\u300D\u2192 \u628A\u90AE\u4EF6\u91CC\u7684\u6570\u5B57\u586B\u8FDB\u6765 \u2192 \u70B9\u300C\u6FC0\u6D3B\u300D\u3002\u90AE\u7BB1\u5C31\u662F\u4F60\u7684\u8D26\u53F7\uFF0C\u4E00\u4E2A\u90AE\u7BB1\u53EA\u53D1\u4E00\u628A Key\uFF1B\u6210\u529F\u540E\u670D\u52A1\u7AEF\u628A Key\u3001\u4E0A\u6E38\u5730\u5740\u4E0E\u6A21\u578B\u76F4\u63A5\u5199\u8FDB\u914D\u7F6E\uFF0C\u4E0D\u7528\u624B\u586B\uFF0C\u9ED8\u8BA4\u989D\u5EA6 \xA50.01\u3002",
+      registerTitle: "\u6CE8\u518C\u63D2\u4EF6",
+      registerHint: "\u586B\u90AE\u7BB1 \u2192 \u83B7\u53D6\u9A8C\u8BC1\u7801 \u2192 \u767B\u5F55\uFF1B\u90AE\u7BB1\u5373\u8D26\u53F7\uFF0C\u4E00\u4E2A\u90AE\u7BB1\u4E00\u628A Key\u3002",
       registerEmailPlaceholder: "\u4F60\u7684\u90AE\u7BB1\uFF0C\u4F8B\u5982 name@example.com",
       registerCode: "\u9A8C\u8BC1\u7801",
-      registerCodePlaceholder: "\u90AE\u4EF6\u91CC\u7684\u6570\u5B57",
+      registerCodePlaceholder: "\u9A8C\u8BC1\u7801",
       registerCodeSend: "\u83B7\u53D6\u9A8C\u8BC1\u7801",
       registerCodeSending: "\u53D1\u9001\u4E2D\u2026",
       registerCodeCooldown: "{seconds} \u79D2\u540E\u91CD\u53D1",
@@ -72,17 +72,16 @@ window.__ModuleLoader__.load({
       sectionGeneration: "\u751F\u6210\u53C2\u6570",
       sectionMerge: "\u5408\u5E76\u4E0E\u8F93\u51FA",
       sectionAdvanced: "\u9AD8\u7EA7",
-      register: "\u6FC0\u6D3B",
-      registerWorking: "\u6CE8\u518C\u4E2D\u2026",
-      registerOk: "\u6CE8\u518C\u6210\u529F\uFF1A\u4E0A\u6E38 / Key / \u5730\u5740 / \u6A21\u578B\u90FD\u5199\u597D\u4E86\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u914D\u7F6E\u540E\u751F\u6548\u3002",
+      register: "\u767B\u5F55",
+      registerWorking: "\u767B\u5F55\u4E2D\u2026",
+      registerOk: "\u767B\u5F55\u6210\u529F\uFF1A\u4E0A\u6E38 / Key / \u5730\u5740 / \u6A21\u578B\u90FD\u5199\u597D\u4E86\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u914D\u7F6E\u540E\u751F\u6548\u3002",
       registerPartial: "\u5DF2\u62FF\u5230\u5BC6\u94A5\uFF0C\u4F46\u6709\u5B57\u6BB5\u5BBF\u4E3B\u6CA1\u63A5\u53D7\uFF0C\u8BF7\u68C0\u67E5\u540E\u624B\u52A8\u4FDD\u5B58\u3002",
-      registerFailed: "\u6CE8\u518C\u5931\u8D25\uFF1A{message}",
+      registerFailed: "\u767B\u5F55\u5931\u8D25\uFF1A{message}",
       registerDisabled: "\u6CE8\u518C\u670D\u52A1\u4E0D\u53EF\u7528\uFF1A{message}",
       registerNoKey: "\u6CE8\u518C\u670D\u52A1\u6CA1\u6709\u8FD4\u56DE\u5BC6\u94A5\uFF08\u540E\u7AEF\u4E2D\u8F6C\u7AD9\u914D\u7F6E\u53EF\u80FD\u6709\u95EE\u9898\uFF09\u3002",
       mode: "\u7EED\u62CD\u65B9\u5F0F",
       modeContinuous: "\u540C\u673A\u4F4D\u8FDE\u7EED",
       modeCloseup: "\u5207\u8FD1\u666F",
-      resolution: "\u5206\u8FA8\u7387",
       ratio: "\u753B\u9762\u6BD4\u4F8B",
       generateAudio: "\u751F\u6210\u97F3\u9891",
       watermark: "\u52A0\u6C34\u5370",
@@ -90,7 +89,7 @@ window.__ModuleLoader__.load({
       pollIntervalMs: "\u8F6E\u8BE2\u95F4\u9694\uFF08\u6BEB\u79D2\uFF09",
       maxWaitMs: "\u5355\u6B21\u6700\u957F\u7B49\u5F85\uFF08\u6BEB\u79D2\uFF09",
       save: "\u4FDD\u5B58",
-      reset: "\u6062\u590D\u9ED8\u8BA4",
+      reset: "\u91CD\u7F6E\u63D2\u4EF6",
       saving: "\u4FDD\u5B58\u4E2D\u2026",
       saved: "\u5DF2\u4FDD\u5B58\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u914D\u7F6E\u540E\u751F\u6548\u3002",
       saveFailed: "\u5BBF\u4E3B\u62D2\u7EDD\u4E86\u8FD9\u6B21\u5199\u5165\uFF0C\u8BF7\u68C0\u67E5\u5B57\u6BB5\u53D6\u503C\u3002",
@@ -100,7 +99,7 @@ window.__ModuleLoader__.load({
       readOnly: "\u5F53\u524D profile \u4E0D\u63A5\u53D7\u8868\u5355\u5199\u5165\u3002"
     };
     const en = {
-      summaryEmpty: 'Not configured: open the plugin settings and click "Register & fill in".',
+      summaryEmpty: 'Not configured: open the plugin settings and click "Log in".',
       summary: "{provider} \xB7 {model}",
       providerNewapi: "New API relay",
       apiKeyConfigured: "Configured; leave empty to keep it",
@@ -124,11 +123,11 @@ window.__ModuleLoader__.load({
       ffmpegAfter: 'Rather not touch a terminal? Just say "\u5E2E\u6211\u88C5 ffmpeg" in the chat and the plugin runs the install for you (it asks you to confirm the command first). Re-run the generation afterwards and the merge happens automatically \u2014 no need to regenerate. Installed somewhere unusual? Put the absolute path in the "ffmpeg path" field above. The package ships ffprobe too, so segment probing is fixed at the same time.',
       ffmpegManual: "Installing by hand: Homebrew on macOS, winget on Windows, your distro package manager on Linux \u2014 you are set once `ffmpeg -version` works in a terminal.",
       registerEmail: "Email (this is your account)",
-      registerTitle: "No API key yet?",
-      registerHint: 'Register with your email: type it, click "Send code", then paste the number from the mail and click "Register & fill in". One email gets one key. Provider, key, base URL and model are filled in for you. Default quota \xA50.01.',
+      registerTitle: "Register the plugin",
+      registerHint: "Email \u2192 verification code \u2192 log in. One email, one key.",
       registerEmailPlaceholder: "you@example.com",
       registerCode: "Verification code",
-      registerCodePlaceholder: "code from the mail",
+      registerCodePlaceholder: "verification code",
       registerCodeSend: "Send code",
       registerCodeSending: "Sending\u2026",
       registerCodeCooldown: "Resend in {seconds}s",
@@ -148,11 +147,11 @@ window.__ModuleLoader__.load({
       quotaNotRegistered: "The service has no registration for this device (new device or cleared data) \u2014 ask an admin to reset it.",
       quotaFailed: "Failed to read quota: {message}",
       quotaUpdatedAt: "updated {time}",
-      register: "Register & fill in",
-      registerWorking: "Registering\u2026",
-      registerOk: "Registered: provider, key, base URL and model written; applies after the config reload.",
+      register: "Log in",
+      registerWorking: "Logging in\u2026",
+      registerOk: "Logged in: provider, key, base URL and model written; applies after the config reload.",
       registerPartial: "Key received, but some fields were rejected; please review and save manually.",
-      registerFailed: "Registration failed: {message}",
+      registerFailed: "Log in failed: {message}",
       registerDisabled: "Register service unavailable: {message}",
       registerNoKey: "The register service returned no key (check the relay configuration).",
       sectionGeneration: "Generation",
@@ -161,7 +160,6 @@ window.__ModuleLoader__.load({
       mode: "Continuation",
       modeContinuous: "Same camera",
       modeCloseup: "Cut to close-up",
-      resolution: "Resolution",
       ratio: "Aspect ratio",
       generateAudio: "Generate audio",
       watermark: "Watermark",
@@ -169,7 +167,7 @@ window.__ModuleLoader__.load({
       pollIntervalMs: "Poll interval (ms)",
       maxWaitMs: "Max wait (ms)",
       save: "Save",
-      reset: "Reset to defaults",
+      reset: "Reset plugin",
       saving: "Saving\u2026",
       saved: "Saved; the Host applies it after the config reload.",
       saveFailed: "The Host rejected this write; check the field values.",
@@ -185,12 +183,11 @@ window.__ModuleLoader__.load({
     const SELECTS = {
       model: MODEL_OPTIONS,
       mode: ["continuous", "closeup"],
-      resolution: ["480p", "720p", "1080p"],
       ratio: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
       mergeMode: ["seamless", "copy", "reencode"]
     };
     const SECTIONS = [
-      { key: "sectionGeneration", fields: ["model", "mode", "resolution", "ratio", "generateAudio", "watermark"] },
+      { key: "sectionGeneration", fields: ["model", "mode", "ratio", "generateAudio", "watermark"] },
       { key: "sectionMerge", fields: ["mergeMode", "outputDir", "keepSegments"] },
       { key: "sectionAdvanced", fields: ["extraParams", "pollIntervalMs", "maxWaitMs", "ffmpegBinary", "ffprobeBinary"] }
     ];
@@ -198,7 +195,6 @@ window.__ModuleLoader__.load({
       // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
       { key: "model", kind: "select", wide: true },
       { key: "mode", kind: "select" },
-      { key: "resolution", kind: "select" },
       { key: "ratio", kind: "select" },
       { key: "generateAudio", kind: "switch" },
       { key: "watermark", kind: "switch" },
@@ -213,6 +209,16 @@ window.__ModuleLoader__.load({
     ];
     const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((field) => [field.key, field]));
     const DEFAULT_REGISTER_API = "https://video.mybfs.cn";
+    const LOGGED_OUT_KEY = "metaontic-video.logged-out";
+    const PLUGIN_OWNED_KEYS = [
+      "apiKey",
+      "keyOrigin",
+      "baseUrl",
+      "registerEmail",
+      "deviceId",
+      "deviceSecret",
+      "model"
+    ];
     const DEFAULT_REGISTER_TOKEN = "metaontic-video-register-v1";
     function currentOs() {
       const nav = window.navigator || {};
@@ -373,9 +379,13 @@ window.__ModuleLoader__.load({
         React.useEffect(() => {
           if (restoreTried.current) return;
           restoreTried.current = true;
+          const snap = form.getSnapshot() || {};
+          if (loggedOut()) {
+            setRegisterStatus("idle");
+            return;
+          }
           syncDeviceIdentity().catch(() => {
           });
-          const snap = form.getSnapshot() || {};
           if (snap.secrets?.apiKey || (snap.value || {}).apiKey) {
             loadQuota().catch(() => {
             });
@@ -429,15 +439,47 @@ window.__ModuleLoader__.load({
         }
         async function reset() {
           const overridden = Object.keys(snapshot.user || {});
-          if (!overridden.length) return;
+          if (!overridden.length && !keyReady) return;
           setStatus("saving");
-          for (const key of overridden) await form.unset(key);
+          const targets = /* @__PURE__ */ new Set([...overridden, ...PLUGIN_OWNED_KEYS]);
+          for (const key of targets) await form.unset(key);
+          forgetDevice();
           setDraft({});
-          flashStatus("saved");
+          setRegisterStatus("idle");
+          setRegisterMessage("");
+          setRegisterCode("");
+          setStatus("idle");
         }
         function registerApiRoot() {
           const configured = String(value.registerApi || "").trim();
           return (configured || DEFAULT_REGISTER_API).replace(/\/+$/, "");
+        }
+        function loggedOut() {
+          try {
+            return window.localStorage.getItem(LOGGED_OUT_KEY) === "1";
+          } catch {
+            return false;
+          }
+        }
+        function setLoggedOut() {
+          try {
+            window.localStorage.setItem(LOGGED_OUT_KEY, "1");
+          } catch {
+          }
+        }
+        function clearLoggedOut() {
+          try {
+            window.localStorage.removeItem(LOGGED_OUT_KEY);
+          } catch {
+          }
+        }
+        function forgetDevice() {
+          try {
+            window.localStorage.removeItem("metaontic-video.device-id");
+            window.localStorage.removeItem("metaontic-video.device-secret");
+          } catch {
+          }
+          setLoggedOut();
         }
         function deviceIdentity() {
           const ID_KEY = "metaontic-video.device-id";
@@ -538,6 +580,7 @@ window.__ModuleLoader__.load({
           return payload || {};
         }
         async function applyRegistration(result, fallbackBase, device) {
+          clearLoggedOut();
           const writes = [
             ["apiKey", result.api_key],
             ["keyOrigin", "register"],
@@ -871,7 +914,7 @@ window.__ModuleLoader__.load({
           ])),
           h("span", { key: "after", className: "mov-hint" }, t("ffmpegAfter"))
         ]);
-        const quotaBox = h("div", {
+        const quotaBox = keyReady ? h("div", {
           key: "quota",
           "data-field": "quota",
           className: "mov-card"
@@ -908,7 +951,7 @@ window.__ModuleLoader__.load({
           }, quotaFallback),
           quotaReady ? h("span", { key: "at", className: "mov-foot-note" }, t("quotaUpdatedAt", { time: quotaAt })) : null,
           quotaMessage ? h("span", { key: "message", className: "mov-hint" }, quotaMessage) : null
-        ]);
+        ]) : null;
         function copyCommand(command) {
           try {
             const result = window.navigator?.clipboard?.writeText(command);

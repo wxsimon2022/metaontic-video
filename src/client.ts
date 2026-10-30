@@ -7,7 +7,7 @@
  *   - `form.getSnapshot()` 读当前值/修订号，`form.subscribe()` 订阅变化；
  *   - `form.set(field, value)` / `form.unset(field)` 排队写入，修订号由宿主校验。
  * 页面注册进插件页的 `plugins.bundle.config` 槽位，key 为本包名 metaontic-video；
- * 卡片底部还有「激活」按钮：向注册服务申请一个中转站密钥（新 API Key），
+ * 卡片底部还有「登录」按钮：向注册服务申请一个中转站密钥（新 API Key），
  * 成功后自动写回 provider/apiKey/baseUrl/model，用户点「保存」即可用。
  *
  * 样式只用宿主主题 token（`--dsw-alias-*`），并都带兜底值；不 import 任何
@@ -25,7 +25,7 @@ window.__ModuleLoader__.load({
     const NS = 'settings.metaonticVideo';
 
     const zh = {
-      summaryEmpty: '未配置：到插件设置页点「激活」领一把密钥。',
+      summaryEmpty: '未配置：到插件设置页点「登录」领一把密钥。',
       summary: '{provider} · {model}',
       providerNewapi: 'New API 中转站',
       apiKeyConfigured: '已配置，留空表示保持原值',
@@ -53,13 +53,11 @@ window.__ModuleLoader__.load({
       ffmpegManual: '想自己装：macOS 用 Homebrew，Windows 用 winget，Linux 用系统包管理器；'
         + '装完确认命令行里能跑 ffmpeg -version 就行。',
       registerEmail: '邮箱（账号）',
-      registerTitle: '没有 API Key？',
-      registerHint: '用邮箱领：填邮箱 → 点「获取验证码」→ 把邮件里的数字填进来 → 点「激活」。'
-        + '邮箱就是你的账号，一个邮箱只发一把 Key；成功后服务端把 Key、上游地址与模型直接写进配置，'
-        + '不用手填，默认额度 ¥0.01。',
+      registerTitle: '注册插件',
+      registerHint: '填邮箱 → 获取验证码 → 登录；邮箱即账号，一个邮箱一把 Key。',
       registerEmailPlaceholder: '你的邮箱，例如 name@example.com',
       registerCode: '验证码',
-      registerCodePlaceholder: '邮件里的数字',
+      registerCodePlaceholder: '验证码',
       registerCodeSend: '获取验证码',
       registerCodeSending: '发送中…',
       registerCodeCooldown: '{seconds} 秒后重发',
@@ -97,17 +95,16 @@ window.__ModuleLoader__.load({
       sectionGeneration: '生成参数',
       sectionMerge: '合并与输出',
       sectionAdvanced: '高级',
-      register: '激活',
-      registerWorking: '注册中…',
-      registerOk: '注册成功：上游 / Key / 地址 / 模型都写好了，宿主重载配置后生效。',
+      register: '登录',
+      registerWorking: '登录中…',
+      registerOk: '登录成功：上游 / Key / 地址 / 模型都写好了，宿主重载配置后生效。',
       registerPartial: '已拿到密钥，但有字段宿主没接受，请检查后手动保存。',
-      registerFailed: '注册失败：{message}',
+      registerFailed: '登录失败：{message}',
       registerDisabled: '注册服务不可用：{message}',
       registerNoKey: '注册服务没有返回密钥（后端中转站配置可能有问题）。',
       mode: '续拍方式',
       modeContinuous: '同机位连续',
       modeCloseup: '切近景',
-      resolution: '分辨率',
       ratio: '画面比例',
       generateAudio: '生成音频',
       watermark: '加水印',
@@ -115,7 +112,7 @@ window.__ModuleLoader__.load({
       pollIntervalMs: '轮询间隔（毫秒）',
       maxWaitMs: '单次最长等待（毫秒）',
       save: '保存',
-      reset: '恢复默认',
+      reset: '重置插件',
       saving: '保存中…',
       saved: '已保存，宿主重载配置后生效。',
       saveFailed: '宿主拒绝了这次写入，请检查字段取值。',
@@ -125,7 +122,7 @@ window.__ModuleLoader__.load({
       readOnly: '当前 profile 不接受表单写入。',
     };
     const en = {
-      summaryEmpty: 'Not configured: open the plugin settings and click "Register & fill in".',
+      summaryEmpty: 'Not configured: open the plugin settings and click "Log in".',
       summary: '{provider} · {model}',
       providerNewapi: 'New API relay',
       apiKeyConfigured: 'Configured; leave empty to keep it',
@@ -156,13 +153,11 @@ window.__ModuleLoader__.load({
       ffmpegManual: 'Installing by hand: Homebrew on macOS, winget on Windows, your distro package '
         + 'manager on Linux — you are set once `ffmpeg -version` works in a terminal.',
       registerEmail: 'Email (this is your account)',
-      registerTitle: 'No API key yet?',
-      registerHint: 'Register with your email: type it, click "Send code", then paste the number from the mail '
-        + 'and click "Register & fill in". One email gets one key. Provider, key, base URL and model are filled '
-        + 'in for you. Default quota ¥0.01.',
+      registerTitle: 'Register the plugin',
+      registerHint: 'Email → verification code → log in. One email, one key.',
       registerEmailPlaceholder: 'you@example.com',
       registerCode: 'Verification code',
-      registerCodePlaceholder: 'code from the mail',
+      registerCodePlaceholder: 'verification code',
       registerCodeSend: 'Send code',
       registerCodeSending: 'Sending…',
       registerCodeCooldown: 'Resend in {seconds}s',
@@ -182,11 +177,11 @@ window.__ModuleLoader__.load({
       quotaNotRegistered: 'The service has no registration for this device (new device or cleared data) — ask an admin to reset it.',
       quotaFailed: 'Failed to read quota: {message}',
       quotaUpdatedAt: 'updated {time}',
-      register: 'Register & fill in',
-      registerWorking: 'Registering…',
-      registerOk: 'Registered: provider, key, base URL and model written; applies after the config reload.',
+      register: 'Log in',
+      registerWorking: 'Logging in…',
+      registerOk: 'Logged in: provider, key, base URL and model written; applies after the config reload.',
       registerPartial: 'Key received, but some fields were rejected; please review and save manually.',
-      registerFailed: 'Registration failed: {message}',
+      registerFailed: 'Log in failed: {message}',
       registerDisabled: 'Register service unavailable: {message}',
       registerNoKey: 'The register service returned no key (check the relay configuration).',
       sectionGeneration: 'Generation',
@@ -195,7 +190,6 @@ window.__ModuleLoader__.load({
       mode: 'Continuation',
       modeContinuous: 'Same camera',
       modeCloseup: 'Cut to close-up',
-      resolution: 'Resolution',
       ratio: 'Aspect ratio',
       generateAudio: 'Generate audio',
       watermark: 'Watermark',
@@ -203,7 +197,7 @@ window.__ModuleLoader__.load({
       pollIntervalMs: 'Poll interval (ms)',
       maxWaitMs: 'Max wait (ms)',
       save: 'Save',
-      reset: 'Reset to defaults',
+      reset: 'Reset plugin',
       saving: 'Saving…',
       saved: 'Saved; the Host applies it after the config reload.',
       saveFailed: 'The Host rejected this write; check the field values.',
@@ -226,7 +220,6 @@ window.__ModuleLoader__.load({
     const SELECTS = {
       model: MODEL_OPTIONS,
       mode: ['continuous', 'closeup'],
-      resolution: ['480p', '720p', '1080p'],
       ratio: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
       mergeMode: ['seamless', 'copy', 'reencode'],
     };
@@ -236,7 +229,7 @@ window.__ModuleLoader__.load({
     // 后者默认 15 = 段数最少，调小只会多出接缝。两者都留在配置里（默认 15），
     // 只有「上游对卡满 15 秒的延长段敏感」这种少数情况才需要改成 14。
     const SECTIONS = [
-      { key: 'sectionGeneration', fields: ['model', 'mode', 'resolution', 'ratio', 'generateAudio', 'watermark'] },
+      { key: 'sectionGeneration', fields: ['model', 'mode', 'ratio', 'generateAudio', 'watermark'] },
       { key: 'sectionMerge', fields: ['mergeMode', 'outputDir', 'keepSegments'] },
       { key: 'sectionAdvanced', fields: ['extraParams', 'pollIntervalMs', 'maxWaitMs', 'ffmpegBinary', 'ffprobeBinary'] },
     ];
@@ -244,7 +237,6 @@ window.__ModuleLoader__.load({
       // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
       { key: 'model', kind: 'select', wide: true },
       { key: 'mode', kind: 'select' },
-      { key: 'resolution', kind: 'select' },
       { key: 'ratio', kind: 'select' },
       { key: 'generateAudio', kind: 'switch' },
       { key: 'watermark', kind: 'switch' },
@@ -261,6 +253,12 @@ window.__ModuleLoader__.load({
 
     /** 插件设置页「注册」按钮调用的服务地址：固定这个，不显示也不允许改。 */
     const DEFAULT_REGISTER_API = 'https://video.mybfs.cn';
+    /** 本机「已登出」标记：点过「重置插件」后置上，登录成功时清掉。 */
+    const LOGGED_OUT_KEY = 'metaontic-video.logged-out';
+    /** 插件自己会写进配置的项：重置时兜底一起清，免得宿主没把它们列进 user。 */
+    const PLUGIN_OWNED_KEYS = [
+      'apiKey', 'keyOrigin', 'baseUrl', 'registerEmail', 'deviceId', 'deviceSecret', 'model',
+    ];
     /** 注册接口的握手请求头 X-Register-Token：与服务端 REGISTER_CLIENT_TOKEN 一致。 */
     const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
 
@@ -445,14 +443,19 @@ window.__ModuleLoader__.load({
         const [showAllFfmpeg, setShowAllFfmpeg] = React.useState(false);
         const [copiedFfmpeg, setCopiedFfmpeg] = React.useState('');
 
-        // 打开设置页时，若本机还没配 Key，就先问服务端要回自己那把（设备绑定过就能取回）
+        // 打开设置页时，若本机还没配 Key，就先问服务端要回自己那把（设备绑定过就能取回）；
+        // 但刚点过「重置插件」的不算——那时要保持未登录，等用户自己再点「登录」。
         const restoreTried = React.useRef(false);
         React.useEffect(() => {
           if (restoreTried.current) return;
           restoreTried.current = true;
+          const snap = form.getSnapshot() || {};
+          if (loggedOut()) {
+            setRegisterStatus('idle');
+            return;
+          }
           // 设备凭据同步进配置：主进程要在调用模型前拿它查余额
           syncDeviceIdentity().catch(() => {});
-          const snap = form.getSnapshot() || {};
           if (snap.secrets?.apiKey || (snap.value || {}).apiKey) {
             loadQuota().catch(() => {});
             loadUsage().catch(() => {});
@@ -513,19 +516,68 @@ window.__ModuleLoader__.load({
           else setStatus('failed');
         }
 
+        /**
+         * 重置插件 = 回到「刚装上」的样子：
+         * ① 把配置里这台机器写过的项全部移除（Key、来源标记、上游地址、邮箱、设备凭据、模型…），
+         *    宿主重载配置后就退回插件默认值；
+         * ② 抹掉本机设备凭据，并打上「已登出」标记——否则重开设置页会自动向服务端取回那把 Key，
+         *    看着就像重置没生效（这个标记在下次登录成功时清掉）。
+         */
         async function reset() {
           const overridden = Object.keys(snapshot.user || {});
-          if (!overridden.length) return;
+          if (!overridden.length && !keyReady) return;
           setStatus('saving');
-          for (const key of overridden) await form.unset(key);
+          // 页面自己写过的项 + 兜底清单：宿主没列进 user 的也要清
+          const targets = new Set([...overridden, ...PLUGIN_OWNED_KEYS]);
+          for (const key of targets) await form.unset(key);
+          forgetDevice();
           setDraft({});
-          flashStatus('saved');
+          setRegisterStatus('idle');
+          setRegisterMessage('');
+          setRegisterCode('');
+          setStatus('idle');
         }
 
         /** 服务地址：配置里有就用配置的（老版本固定写死，这里保留兜底）。 */
         function registerApiRoot() {
           const configured = String(value.registerApi || '').trim();
           return (configured || DEFAULT_REGISTER_API).replace(/\/+$/, '');
+        }
+
+        /** 「已登出」标记：重置后置上，登录成功后清掉；期间不自动找回密钥。 */
+        function loggedOut() {
+          try {
+            return window.localStorage.getItem(LOGGED_OUT_KEY) === '1';
+          } catch {
+            return false;
+          }
+        }
+
+        function setLoggedOut() {
+          try {
+            window.localStorage.setItem(LOGGED_OUT_KEY, '1');
+          } catch {
+            // 存不住也不影响本次会话的行为
+          }
+        }
+
+        function clearLoggedOut() {
+          try {
+            window.localStorage.removeItem(LOGGED_OUT_KEY);
+          } catch {
+            // 同上
+          }
+        }
+
+        /** 重置时抹掉本机设备凭据：下次登录会重新生成一对，重新绑定到同一个邮箱。 */
+        function forgetDevice() {
+          try {
+            window.localStorage.removeItem('metaontic-video.device-id');
+            window.localStorage.removeItem('metaontic-video.device-secret');
+          } catch {
+            // 抹不掉只是下次还能取回，不影响重置本身
+          }
+          setLoggedOut();
         }
 
         /** 本机身份：本地持久化的设备标识 + 设备密钥，注册时一起交给服务端做绑定。 */
@@ -649,6 +701,7 @@ window.__ModuleLoader__.load({
         async function applyRegistration(result, fallbackBase, device) {
           // keyOrigin 是给宿主那侧看的标记：只有带这个标记（或早期版本的设备凭据 + 邮箱）
           // 的 Key 才被当成「服务端下发的」，手填的一律拒绝调用。
+          clearLoggedOut();
           const writes = [
             ['apiKey', result.api_key],
             ['keyOrigin', 'register'],
@@ -1047,7 +1100,8 @@ window.__ModuleLoader__.load({
           h('span', { key: 'after', className: 'mov-hint' }, t('ffmpegAfter')),
         ]);
 
-        const quotaBox = h('div', {
+        // 没登录就没有额度可言：整块不渲染（跟使用记录一个规矩）
+        const quotaBox = keyReady ? h('div', {
           key: 'quota',
           'data-field': 'quota',
           className: 'mov-card',
@@ -1084,7 +1138,7 @@ window.__ModuleLoader__.load({
             ? h('span', { key: 'at', className: 'mov-foot-note' }, t('quotaUpdatedAt', { time: quotaAt }))
             : null,
           quotaMessage ? h('span', { key: 'message', className: 'mov-hint' }, quotaMessage) : null,
-        ]);
+        ]) : null;
 
         /** 复制 ffmpeg 安装命令；剪贴板不可用就什么都不做，用户照样能照着敲。 */
         function copyCommand(command) {
