@@ -1,7 +1,7 @@
 {
   "name": "metaontic-video",
-  "version": "2.14.2",
-  "description": "DeepSeek Harness video generation plugin: say what you want and get a finished clip — up to 15 seconds in one shot, longer videos are generated shot by shot and merged seamlessly into a single file with ffmpeg, right on your machine. Extend a clip you already have (forwards or backwards), check/install the ffmpeg it needs, and watch progress by task id. Ships the video_generate / video_extend / video_status / video_setup / video_config tools, an in-app settings page with email login and live quota/usage, and a built-in \"video director\" agent preset (script first, human approval before spending). Works through a New API relay.",
+  "version": "2.15.0",
+  "description": "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
   "license": "MIT",
   "type": "module",
   "keywords": [
@@ -74,5 +74,17 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "~3.18.5"
+  },
+  "releaseNotes": {
+    "version": "2.15.0",
+    "items": [
+      "新增 A 服务端领 Key / B 火山 API Key 直连，保存时清理非当前方式配置。",
+      "按模型映射单次时长：2.0 为15秒、2.5 为30秒；暂隐藏2.5选项，保留兼容逻辑。",
+      "长视频逐段交付预览、确认后续做，永久保留原始分段。",
+      "按官方2.0建议修剪接缝，音视频同步处理并报告实际时长。",
+      "升级导演脚本与官方进阶提示词，长视频按段传递新动作和对白。",
+      "完善火山多图、素材模式校验、任务终态及请求大小处理。",
+      "优化设置页：更多设置默认折叠，统一按钮和额度布局，火山模式隐藏登录、额度及记录。"
+    ]
   }
 }

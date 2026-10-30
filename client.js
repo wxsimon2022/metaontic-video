@@ -1,3 +1,4 @@
+import packageInfo from "../package.json";
 window.__ModuleLoader__.load({
   id: "metaontic-video",
   factory(require2) {
@@ -10,6 +11,15 @@ window.__ModuleLoader__.load({
       summary: "{provider} \xB7 {model}",
       providerNewapi: "New API \u4E2D\u8F6C\u7AD9",
       apiKeyConfigured: "\u5DF2\u914D\u7F6E\uFF0C\u7559\u7A7A\u8868\u793A\u4FDD\u6301\u539F\u503C",
+      connectionMode: "\u63A5\u5165\u65B9\u5F0F",
+      connectionModeHint: "A\uFF1A\u767B\u5F55\u9886\u53D6\u670D\u52A1\u7AEF Key\uFF1BB\uFF1A\u586B\u5199\u81EA\u5DF1\u7684\u706B\u5C71\u5F15\u64CE API Key\u3002\u5207\u6362\u540E\u70B9\u51FB\u4FDD\u5B58\u751F\u6548\u3002",
+      volcengineKeyHint: "\u4ECE\u706B\u5C71\u65B9\u821F\u63A7\u5236\u53F0\u83B7\u53D6 API Key\uFF0C\u586B\u5165\u540E\u4FDD\u5B58\u3002\u8D39\u7528\u7531\u706B\u5C71\u8D26\u6237\u627F\u62C5\uFF0C\u65E0\u9700\u767B\u5F55\u672C\u63D2\u4EF6\u670D\u52A1\u7AEF\u3002",
+      volcengineApiKey: "\u706B\u5C71\u5F15\u64CE API Key",
+      service: "A \xB7 \u670D\u52A1\u7AEF\u4E0B\u53D1 Key",
+      volcengine: "B \xB7 \u706B\u5C71\u5F15\u64CE\u76F4\u8FDE",
+      seamTrimSeconds: "\u63A5\u7F1D\u88C1\u526A\u79D2\u6570\uFF08\u5982 0.5,0\uFF09",
+      modelHiddenCurrent: "\u5F53\u524D\u6A21\u578B\uFF08\u6682\u4E0D\u63D0\u4F9B\u9009\u62E9\uFF09",
+      releaseNotesTitle: "\u66F4\u65B0\u5185\u5BB9",
       model: "\u6A21\u578B",
       modelHint: "mini \u66F4\u7701\uFF08\u9ED8\u8BA4\uFF09\uFF1Bfast \u540C\u4E00\u4EE3\u7684\u52A0\u901F\u7248\uFF0C\u5355\u4EF7\u7EA6 1.6 \u500D\u3002",
       mergeMode: "\u5408\u5E76\u65B9\u5F0F",
@@ -23,7 +33,7 @@ window.__ModuleLoader__.load({
       ffmpegBinary: "ffmpeg \u8DEF\u5F84",
       ffprobeBinary: "ffprobe \u8DEF\u5F84",
       ffmpegTitle: "\u957F\u89C6\u9891\u5408\u5E76\u9700\u8981 ffmpeg",
-      ffmpegBody: "\u89C6\u9891\u8D85\u8FC7 15 \u79D2\u65F6\u4F1A\u62C6\u6210\u51E0\u6BB5\u5206\u522B\u751F\u6210\u3001\u518D\u5728\u672C\u673A\u5408\u5E76\u6210\u4E00\u6761\u2014\u2014\u5408\u5E76\u8FD9\u4E00\u6B65\u7528\u7684\u662F ffmpeg\u3002\u6CA1\u88C5\u4E5F\u80FD\u751F\u6210\uFF0C\u53EA\u662F\u53EA\u7ED9\u5206\u6BB5\u5217\u8868\u3001\u4E0D\u5408\u6210\u6574\u6761\u3002",
+      ffmpegBody: "\u89C6\u9891\u8D85\u8FC7\u6A21\u578B\u5355\u6B21\u4E0A\u9650\uFF082.0 \u4E3A 15 \u79D2\u30012.5 \u4E3A 30 \u79D2\uFF09\u65F6\u4F1A\u62C6\u6210\u51E0\u6BB5\u5206\u522B\u751F\u6210\u3001\u518D\u5728\u672C\u673A\u5408\u5E76\u6210\u4E00\u6761\u2014\u2014\u5408\u5E76\u8FD9\u4E00\u6B65\u7528\u7684\u662F ffmpeg\u3002\u6CA1\u88C5\u4E5F\u80FD\u751F\u6210\uFF0C\u53EA\u662F\u53EA\u7ED9\u5206\u6BB5\u5217\u8868\u3001\u4E0D\u5408\u6210\u6574\u6761\u3002",
       ffmpegInstallFor: "\u6309\u4F60\u7684\u7CFB\u7EDF\u88C5\u4E00\u4E0B\uFF08\u70B9\u53F3\u8FB9\u6309\u94AE\u590D\u5236\u547D\u4EE4\uFF09\uFF1A",
       ffmpegCopy: "\u590D\u5236",
       ffmpegCopied: "\u5DF2\u590D\u5236",
@@ -45,7 +55,7 @@ window.__ModuleLoader__.load({
       registerNeedEmail: "\u5148\u586B\u90AE\u7BB1\uFF0C\u518D\u70B9\u300C\u83B7\u53D6\u9A8C\u8BC1\u7801\u300D\u3002",
       registerNeedCode: "\u5148\u586B\u90AE\u4EF6\u91CC\u6536\u5230\u7684\u9A8C\u8BC1\u7801\u3002",
       registerRestored: "\u5DF2\u627E\u56DE\u672C\u673A\u5BC6\u94A5\uFF1A\u8FD9\u53F0\u8BBE\u5907\u4E4B\u524D\u9886\u8FC7\u7684\u90A3\u628A\u5E2E\u4F60\u586B\u597D\u4E86\uFF0C\u70B9\u300C\u4FDD\u5B58\u300D\u5373\u53EF\u3002",
-      quotaTitle: "\u989D\u5EA6\uFF08\u5F53\u524D\u8FD9\u628A Key\uFF09",
+      quotaTitle: "\u989D\u5EA6",
       quotaRemain: "\u5269\u4F59",
       quotaUsed: "\u5DF2\u7528",
       quotaTotal: "\u603B\u989D\u5EA6",
@@ -95,6 +105,10 @@ window.__ModuleLoader__.load({
       sectionGeneration: "\u751F\u6210\u53C2\u6570",
       sectionMerge: "\u5408\u5E76\u4E0E\u8F93\u51FA",
       sectionAdvanced: "\u9AD8\u7EA7",
+      sectionCombined: "\u66F4\u591A\u8BBE\u7F6E",
+      sectionCombinedHint: "\u8F93\u51FA\u76EE\u5F55\u3001\u63A5\u7F1D\u5904\u7406\u4E0E\u8FD0\u884C\u53C2\u6570",
+      sectionRuntime: "\u8FD0\u884C\u53C2\u6570",
+      segmentsRetained: "\u6240\u6709\u539F\u59CB\u5206\u6BB5\u81EA\u52A8\u4FDD\u7559\uFF0C\u4FBF\u4E8E\u9884\u89C8\u3001\u7EED\u505A\u548C\u91CD\u65B0\u526A\u8F91\u3002",
       register: "\u767B\u5F55",
       registerWorking: "\u767B\u5F55\u4E2D\u2026",
       registerOk: "\u767B\u5F55\u6210\u529F\uFF1A\u4E0A\u6E38 / Key / \u5730\u5740 / \u6A21\u578B\u90FD\u5199\u597D\u4E86\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u914D\u7F6E\u540E\u751F\u6548\u3002",
@@ -127,6 +141,15 @@ window.__ModuleLoader__.load({
       summary: "{provider} \xB7 {model}",
       providerNewapi: "New API relay",
       apiKeyConfigured: "Configured; leave empty to keep it",
+      connectionMode: "Connection",
+      connectionModeHint: "A: sign in for a service key. B: enter your Volcano Engine API key. Save to apply.",
+      volcengineKeyHint: "Enter an API key from the Volcano Ark console and save. Billed to your Volcano account; no plugin service login required.",
+      volcengineApiKey: "Volcano Engine API Key",
+      service: "A \xB7 Service-issued key",
+      volcengine: "B \xB7 Volcano Engine",
+      seamTrimSeconds: "Seam head trims (e.g. 0.5,0)",
+      modelHiddenCurrent: "Current model (selection unavailable)",
+      releaseNotesTitle: "Release notes",
       model: "Model",
       modelHint: "mini is the cheaper default; fast is the faster sibling at about 1.6\xD7 the price.",
       mergeMode: "Merge mode",
@@ -140,7 +163,7 @@ window.__ModuleLoader__.load({
       ffmpegBinary: "ffmpeg path",
       ffprobeBinary: "ffprobe path",
       ffmpegTitle: "Merging long videos needs ffmpeg",
-      ffmpegBody: "Videos longer than 15 seconds are generated as several shots and merged into one file on this machine \u2014 that merge needs ffmpeg. Without it you still get the video, just as separate segments instead of one file.",
+      ffmpegBody: "Videos exceeding the model limit (15s for 2.0, 30s for 2.5) are generated as several shots and merged into one file on this machine \u2014 that merge needs ffmpeg. Without it you still get the video, just as separate segments instead of one file.",
       ffmpegInstallFor: "Install it for your OS (click the button to copy the command):",
       ffmpegCopy: "Copy",
       ffmpegCopied: "Copied",
@@ -162,7 +185,7 @@ window.__ModuleLoader__.load({
       registerNeedEmail: "Type your email before requesting a code.",
       registerNeedCode: "Type the code from the email first.",
       registerRestored: "Restored the key issued to this device; click Save to apply.",
-      quotaTitle: "Quota (current key)",
+      quotaTitle: "Quota",
       quotaRemain: "Remaining",
       quotaUsed: "Used",
       quotaTotal: "Total",
@@ -204,6 +227,10 @@ window.__ModuleLoader__.load({
       sectionGeneration: "Generation",
       sectionMerge: "Merge & output",
       sectionAdvanced: "Advanced",
+      sectionCombined: "More settings",
+      sectionCombinedHint: "Output paths, seams and runtime options",
+      sectionRuntime: "Runtime options",
+      segmentsRetained: "Original segments are always retained for preview, resume and editing.",
       mode: "Continuation",
       modeContinuous: "Same camera",
       modeCloseup: "Cut to close-up",
@@ -229,28 +256,32 @@ window.__ModuleLoader__.load({
       "doubao-seedance-2-0-fast-260128"
     ];
     const SELECTS = {
+      connectionMode: ["service", "volcengine"],
       model: MODEL_OPTIONS,
       mode: ["continuous", "closeup"],
       ratio: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
       mergeMode: ["seamless", "copy", "reencode"]
     };
     const SECTIONS = [
-      { key: "sectionGeneration", fields: ["model", "mode", "ratio", "generateAudio", "watermark"] },
-      { key: "sectionMerge", fields: ["mergeMode", "bgmFadeSeconds", "outputDir", "keepSegments"] },
+      { key: "sectionGeneration", fields: ["connectionMode", "volcengineApiKey", "model", "mode", "ratio", "generateAudio", "watermark"] },
+      { key: "sectionMerge", fields: ["seamTrimSeconds", "mergeMode", "bgmFadeSeconds", "outputDir"] },
       { key: "sectionAdvanced", fields: ["extraParams", "pollIntervalMs", "maxWaitMs", "ffmpegBinary", "ffprobeBinary"] }
     ];
     const FIELDS = [
+      { key: "connectionMode", kind: "select", wide: true },
+      { key: "volcengineApiKey", kind: "text", secret: true, wide: true },
       // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
       { key: "model", kind: "select", wide: true },
       { key: "mode", kind: "select" },
       { key: "ratio", kind: "select" },
       { key: "generateAudio", kind: "switch" },
       { key: "watermark", kind: "switch" },
+      { key: "seamTrimSeconds", kind: "text" },
       { key: "mergeMode", kind: "select" },
       { key: "bgmFadeSeconds", kind: "number" },
-      { key: "outputDir", kind: "text" },
+      { key: "outputDir", kind: "text", wide: true },
       { key: "keepSegments", kind: "switch" },
-      { key: "extraParams", kind: "text" },
+      { key: "extraParams", kind: "text", wide: true },
       { key: "pollIntervalMs", kind: "number" },
       { key: "maxWaitMs", kind: "number" },
       { key: "ffmpegBinary", kind: "text", mono: true },
@@ -260,6 +291,8 @@ window.__ModuleLoader__.load({
     const DEFAULT_REGISTER_API = "https://video.mybfs.cn";
     const LOGGED_OUT_KEY = "metaontic-video.logged-out";
     const PLUGIN_OWNED_KEYS = [
+      "connectionMode",
+      "volcengineApiKey",
       "apiKey",
       "keyOrigin",
       "baseUrl",
@@ -283,7 +316,7 @@ window.__ModuleLoader__.load({
     const UPDATE_ATTEMPTS = 3;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "2.14.2".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "2.15.0".trim().replace(/^v/i, "") : "";
     function currentOs() {
       const nav = window.navigator || {};
       const raw = String(
@@ -390,6 +423,22 @@ window.__ModuleLoader__.load({
       }
       throw new Error(problems.join("\uFF1B"));
     }
+    async function fetchReleaseNotes(version) {
+      const urls = [
+        `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json?ref=v${encodeURIComponent(version)}`,
+        `https://fastly.jsdelivr.net/gh/wxsimon2022/metaontic-video@${encodeURIComponent(version)}/package.json`
+      ];
+      for (const url of urls) {
+        try {
+          const body = await (await fetchUpdateSource(url)).json();
+          const pkg = body.content ? JSON.parse(decodeBase64Text(body.content)) : body;
+          const notes = pkg.releaseNotes;
+          if (notes?.version === version && Array.isArray(notes.items) && notes.items.every((item) => typeof item === "string")) return notes;
+        } catch {
+        }
+      }
+      return null;
+    }
     async function fetchLatestCommit() {
       const body = await (await fetchUpdateSource(UPDATE_COMMIT_API)).json();
       const sha = String((Array.isArray(body) ? body[0]?.sha : "") || "").trim();
@@ -412,12 +461,17 @@ window.__ModuleLoader__.load({
       .mov-page { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; color: ${TOKENS.text}; }
       /* \u5206\u7EC4\u5361\u7247\uFF1A16 \u4E2A\u5B57\u6BB5\u644A\u5728\u4E00\u683C\u91CC\u592A\u7CCA\uFF0C\u6309\u7528\u9014\u5404\u88C5\u4E00\u5F20\u5361 */
       .mov-section { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
+      .mov-advanced { display: block; }
+      .mov-advanced-toggle { cursor: pointer; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
+      .mov-advanced-toggle .mov-hint { display: block; margin: 5px 0 0 16px; font-weight: 400; }
+      .mov-advanced-toggle:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 5px; border-radius: 4px; }
+      .mov-advanced-body { display: flex; flex-direction: column; gap: 16px; border-top: 1px solid ${TOKENS.border}; margin-top: 14px; padding-top: 16px; }
       .mov-section-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       /* \u6807\u9898\u5DE6\u8FB9\u4E00\u9053\u4E3B\u8272\u7AD6\u6761\uFF0C\u4EE3\u66FF\u7EAF\u6587\u5B57\u5206\u7EC4\u6807\u9898 */
       .mov-section-title::before { content: ""; flex: 0 0 auto; width: 3px; height: 13px; border-radius: 2px; background: ${TOKENS.primaryFill}; }
       .mov-section-title::after { content: ""; flex: 1 1 auto; height: 1px; background: ${TOKENS.border}; }
       /* \u4E24\u5217\u81EA\u9002\u5E94\uFF1A\u5355\u5217\u81F3\u5C11 240px\uFF0C\u7A84\u9762\u677F\u81EA\u52A8\u843D\u6210\u4E00\u5217 */
-      .mov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 18px; }
+      .mov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 14px 18px; }
       .mov-field { display: flex; flex-direction: column; min-width: 0; }
       /* \u5F00\u5173\u6CA1\u6709\u6807\u7B7E\u884C\uFF0C\u9760\u5E95\u5BF9\u9F50\u624D\u80FD\u8DDF\u65C1\u8FB9\u8F93\u5165\u6846\u7684\u63A7\u5236\u7EBF\u9F50\u5E73 */
       .mov-field-switch { justify-content: flex-end; }
@@ -435,14 +489,20 @@ window.__ModuleLoader__.load({
       .mov-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
       .mov-card-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       .mov-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.5; }
-      .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 7px 13px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12.5px; line-height: 1.2; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
+      .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; flex: 0 0 120px; width: 120px; min-width: 120px; height: 36px; min-height: 36px; padding: 4px 10px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12px; line-height: 1.2; text-align: center; cursor: pointer; white-space: normal; overflow-wrap: anywhere; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
       .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
       .mov-btn:disabled { opacity: .5; cursor: default; }
       .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
       .mov-btn-primary:hover:not(:disabled) { color: #fff; opacity: .88; }
-      .mov-btn-sm { min-height: 30px; padding: 5px 10px; border-radius: 7px; font-size: 12px; }
       .mov-trailing { margin-left: auto; }
       /* \u989D\u5EA6\uFF1A\u4E09\u4E2A\u6570\u5B57\u5757\uFF0C\u4E00\u773C\u5206\u6E05\u5269\u4F59 / \u5DF2\u7528 / \u603B\u989D\u5EA6 */
+      .mov-quota-compact { padding: 8px 12px; gap: 14px; flex-direction: row; align-items: center; flex-wrap: nowrap; overflow-x: auto; }
+      .mov-quota-compact .mov-card-head { min-height: 24px; flex: 0 0 auto; gap: 8px; }
+      .mov-quota-compact .mov-stats { display: flex; flex: 1 0 auto; gap: 16px; }
+      .mov-quota-compact .mov-stat { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 6px; padding: 0; border: 0; border-radius: 0; white-space: nowrap; }
+      .mov-quota-compact .mov-stat-label { font-size: 11px; white-space: nowrap; }
+      .mov-quota-compact .mov-stat-value { font-size: 14px; }
+      .mov-quota-compact .mov-foot-note { font-size: 10px; white-space: nowrap; flex: 0 0 auto; }
       .mov-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
       .mov-stat { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; border: 1px solid ${TOKENS.border}; }
       .mov-stat-label { font-size: 11.5px; color: ${TOKENS.muted}; }
@@ -477,6 +537,7 @@ window.__ModuleLoader__.load({
       .mov-notice { margin: 0; font-size: 12px; color: ${TOKENS.muted}; line-height: 1.5; }
     `;
     function optionLabel(t, key, option) {
+      if (key === "connectionMode") return t(option);
       if (key === "mode") return option === "closeup" ? t("modeCloseup") : t("modeContinuous");
       if (key === "mergeMode") {
         if (option === "reencode") return t("mergeModeReencode");
@@ -497,6 +558,8 @@ window.__ModuleLoader__.load({
         const snapshot = useSnapshot(form);
         const value = snapshot.value || {};
         const [draft, setDraft] = React.useState({});
+        const selectedMode = draft.connectionMode ?? value.connectionMode ?? "service";
+        const directMode = selectedMode === "volcengine";
         const [status, setStatus] = React.useState("idle");
         const statusTimer = React.useRef(null);
         const [registerStatus, setRegisterStatus] = React.useState("idle");
@@ -522,6 +585,7 @@ window.__ModuleLoader__.load({
         const [updateStatus, setUpdateStatus] = React.useState("idle");
         const [updateMessage, setUpdateMessage] = React.useState("");
         const [updateLatest, setUpdateLatest] = React.useState("");
+        const [releaseNotes, setReleaseNotes] = React.useState(packageInfo.releaseNotes);
         const [updateAt, setUpdateAt] = React.useState("");
         const updateCommit = React.useRef("");
         const [updateConfirm, setUpdateConfirm] = React.useState(false);
@@ -530,6 +594,7 @@ window.__ModuleLoader__.load({
           if (restoreTried.current) return;
           restoreTried.current = true;
           const snap = form.getSnapshot() || {};
+          if ((snap.value || {}).connectionMode === "volcengine") return;
           if (loggedOut()) {
             setRegisterStatus("idle");
             return;
@@ -553,6 +618,12 @@ window.__ModuleLoader__.load({
           const cached = readUpdateCache();
           if (cached.latest) {
             setUpdateLatest(cached.latest);
+            if (cached.latest !== packageInfo.releaseNotes.version) {
+              fetchReleaseNotes(cached.latest).then((notes) => {
+                if (notes) setReleaseNotes(notes);
+              }).catch(() => {
+              });
+            }
             if (cached.at) setUpdateAt(new Date(cached.at).toLocaleTimeString());
             if (cached.commit) updateCommit.current = cached.commit;
             setUpdateStatus("ok");
@@ -592,14 +663,42 @@ window.__ModuleLoader__.load({
         }
         async function save() {
           setStatus("saving");
-          let ok = true;
-          for (const [key, next] of pending) {
-            const accepted = await form.set(key, next);
-            if (accepted) clear(key);
-            else ok = false;
+          const nextMode = draft.connectionMode ?? value.connectionMode ?? "service";
+          const inactiveKeys = nextMode === "volcengine" ? [
+            "apiKey",
+            "keyOrigin",
+            "baseUrl",
+            "submitPath",
+            "queryPath",
+            "registerEmail",
+            "deviceId",
+            "deviceSecret",
+            "registerApi",
+            "registerToken"
+          ] : ["volcengineApiKey"];
+          try {
+            for (const [key, next] of pending) {
+              if (inactiveKeys.includes(key)) continue;
+              const accepted = await form.set(key, next);
+              if (!accepted) throw new Error(`\u4FDD\u5B58 ${key} \u5931\u8D25`);
+            }
+            for (const key of inactiveKeys) {
+              const accepted = await form.unset(key);
+              if (accepted === false) throw new Error(`\u6E05\u7406 ${key} \u5931\u8D25`);
+            }
+            if (nextMode === "volcengine") {
+              forgetDevice();
+              setRegisterEmail("");
+              setRegisterCode("");
+              setRegisterStatus("idle");
+              setRegisterMessage("");
+              setQuota(null);
+            }
+            setDraft({});
+            flashStatus("saved");
+          } catch {
+            setStatus("failed");
           }
-          if (ok) flashStatus("saved");
-          else setStatus("failed");
         }
         async function reset() {
           const overridden = Object.keys(snapshot.user || {});
@@ -882,6 +981,7 @@ window.__ModuleLoader__.load({
           }
         }
         async function loadQuota() {
+          if (directMode) return;
           const device = deviceIdentity();
           setQuotaStatus("working");
           setQuotaMessage("");
@@ -903,6 +1003,7 @@ window.__ModuleLoader__.load({
           }
         }
         async function loadUsage() {
+          if (directMode) return;
           const device = deviceIdentity();
           setUsageStatus("working");
           setUsageMessage("");
@@ -971,6 +1072,10 @@ window.__ModuleLoader__.load({
             } catch {
             }
             setUpdateLatest(latest);
+            fetchReleaseNotes(latest).then((notes) => {
+              if (notes) setReleaseNotes(notes);
+            }).catch(() => {
+            });
             setUpdateAt((/* @__PURE__ */ new Date()).toLocaleTimeString());
             setUpdateStatus("ok");
             rememberUpdateCheck(latest, updateCommit.current);
@@ -1001,7 +1106,8 @@ window.__ModuleLoader__.load({
           }
           if (field.kind === "select") {
             const options = SELECTS[field.key] || [];
-            const list = current && !options.includes(current) ? [...options, current] : options;
+            const hiddenModel = field.key === "model" && /seedance-2(?:-5|\.5)/i.test(String(current || ""));
+            const list = current && !options.includes(current) && !hiddenModel ? [...options, current] : options;
             return h("select", {
               id,
               "data-field": field.key,
@@ -1009,7 +1115,10 @@ window.__ModuleLoader__.load({
               style: inputStyle,
               value: current ?? "",
               onChange: (event) => edit(field.key, event.target.value)
-            }, list.map((option) => h("option", { key: option, value: option }, optionLabel(t, field.key, option))));
+            }, [
+              hiddenModel ? h("option", { key: "hidden-current", value: current, hidden: true }, t("modelHiddenCurrent")) : null,
+              ...list.map((option) => h("option", { key: option, value: option }, optionLabel(t, field.key, option)))
+            ]);
           }
           return h("input", {
             id,
@@ -1018,7 +1127,7 @@ window.__ModuleLoader__.load({
             style: inputStyle,
             type: field.kind === "number" ? "number" : field.secret ? "password" : "text",
             value: current ?? "",
-            placeholder: field.secret && snapshot.secrets?.apiKey ? t("apiKeyConfigured") : "",
+            placeholder: field.secret && (snapshot.secrets?.[field.key] || value[field.key]) ? t("apiKeyConfigured") : "",
             onChange: (event) => edit(
               field.key,
               field.kind === "number" && event.target.value !== "" ? Number(event.target.value) : event.target.value
@@ -1026,6 +1135,8 @@ window.__ModuleLoader__.load({
           });
         }
         const hints = {
+          connectionMode: t("connectionModeHint"),
+          volcengineApiKey: t("volcengineKeyHint"),
           model: t("modelHint"),
           bgmFadeSeconds: t("bgmFadeSecondsHint")
         };
@@ -1039,25 +1150,33 @@ window.__ModuleLoader__.load({
             hints[field.key] ? h("span", { key: "hint", className: "mov-hint", style: { marginTop: 4 } }, hints[field.key]) : null
           ]);
         }
-        const rows = SECTIONS.map((section) => h("div", { key: section.key, className: "mov-section" }, [
-          h("div", { key: "title", className: "mov-section-title" }, t(section.key)),
-          h(
-            "div",
-            { key: "grid", className: "mov-grid" },
-            section.fields.map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
-          )
-        ]));
+        const renderGrid = (section) => h(
+          "div",
+          { key: section.key, className: "mov-grid" },
+          section.fields.filter((key) => key !== "volcengineApiKey" || directMode).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
+        );
+        const rows = [
+          h("div", { key: "generation", className: "mov-section" }, [
+            h("div", { key: "title", className: "mov-section-title" }, t("sectionGeneration")),
+            renderGrid(SECTIONS[0])
+          ]),
+          h("details", { key: "advanced", className: "mov-section mov-advanced" }, [
+            h("summary", { key: "toggle", className: "mov-advanced-toggle" }, [
+              h("span", { key: "title" }, t("sectionCombined")),
+              h("span", { key: "hint", className: "mov-hint" }, t("sectionCombinedHint"))
+            ]),
+            h("div", { key: "body", className: "mov-advanced-body" }, [
+              h("div", { key: "merge-title", className: "mov-section-title" }, t("sectionMerge")),
+              renderGrid(SECTIONS[1]),
+              h("p", { key: "retained", className: "mov-hint", style: { margin: 0 } }, t("segmentsRetained")),
+              h("div", { key: "runtime-title", className: "mov-section-title" }, t("sectionRuntime")),
+              renderGrid(SECTIONS[2])
+            ])
+          ])
+        ];
         const overrides = Object.keys(snapshot.user || {});
         const footerMessage = status === "saved" ? t("saved") : status === "failed" ? t("saveFailed") : pending.length ? t("dirty") : "";
         const footer = pending.length || status !== "idle" ? h("div", { key: "footer", className: "mov-footer" }, [
-          pending.length ? h("button", {
-            key: "save",
-            "data-action": "save",
-            type: "button",
-            className: "mov-btn mov-btn-primary",
-            disabled: status === "saving" || snapshot.writable === false,
-            onClick: save
-          }, status === "saving" ? t("saving") : t("save")) : null,
           footerMessage ? h("span", {
             key: "status",
             style: {
@@ -1066,8 +1185,16 @@ window.__ModuleLoader__.load({
             }
           }, footerMessage) : null
         ]) : null;
-        const resetRow = overrides.length ? h("div", { key: "reset-row", className: "mov-footer mov-reset-row" }, [
+        const resetRow = overrides.length || pending.length ? h("div", { key: "reset-row", className: "mov-footer mov-reset-row" }, [
           h("span", { key: "hint", className: "mov-hint", style: { flex: "1 1 200px" } }, t("resetHint")),
+          pending.length ? h("button", {
+            key: "save",
+            "data-action": "save",
+            type: "button",
+            className: "mov-btn mov-btn-primary",
+            disabled: status === "saving" || snapshot.writable === false,
+            onClick: save
+          }, status === "saving" ? t("saving") : t("save")) : null,
           h("button", {
             key: "reset",
             "data-action": "reset",
@@ -1085,7 +1212,7 @@ window.__ModuleLoader__.load({
           failed: TOKENS.error
         };
         const serverIssuedKey = value.keyOrigin === "register" || Boolean(value.deviceId && value.deviceSecret && value.registerEmail);
-        const keyReady = Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;
+        const keyReady = !directMode && Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;
         const registerText = registerStatus === "ok" ? t("registerOk") : registerStatus === "partial" ? t("registerPartial") : registerStatus === "restored" ? t("registerRestored") : registerMessage;
         const quotaSymbol = quota && quota.currency_symbol ? quota.currency_symbol : "\xA5";
         const money = (field) => `${quotaSymbol}${formatMoney(quota ? quota[field] : 0)}`;
@@ -1101,65 +1228,13 @@ window.__ModuleLoader__.load({
           { key: "used", label: t("quotaUsed"), value: money("used_amount"), color: TOKENS.text },
           { key: "total", label: t("quotaTotal"), value: money("total_amount"), color: TOKENS.muted }
         ] : null;
-        const os = currentOs();
-        const primaryInstall = FFMPEG_INSTALLS[os] || FFMPEG_INSTALLS.macos;
-        const installRows = showAllFfmpeg ? FFMPEG_ALL : [primaryInstall];
-        const ffmpegBox = h("div", {
-          key: "ffmpeg",
-          "data-field": "ffmpeg",
-          className: "mov-card"
-        }, [
-          h("div", { key: "head", className: "mov-card-head" }, [
-            h("span", { key: "title", className: "mov-card-title" }, t("ffmpegTitle")),
-            h("button", {
-              key: "toggle",
-              "data-action": "ffmpeg-systems",
-              type: "button",
-              className: "mov-btn mov-btn-sm mov-trailing",
-              onClick: () => setShowAllFfmpeg((current) => !current)
-            }, showAllFfmpeg ? t("ffmpegLess") : t("ffmpegMore"))
-          ]),
-          h("span", { key: "body", className: "mov-hint" }, t("ffmpegBody")),
-          h("span", { key: "for", className: "mov-hint" }, t("ffmpegInstallFor")),
-          ...installRows.map((item, index) => h("div", {
-            key: `install-${index}`,
-            "data-field": "ffmpegInstall",
-            className: "mov-cmd-row"
-          }, [
-            h("span", { key: "label", className: "mov-tag" }, item.label),
-            h("code", {
-              key: "command",
-              "data-field": "ffmpegCommand",
-              className: "mov-code"
-            }, item.command),
-            h("button", {
-              key: "copy",
-              "data-action": "ffmpeg-copy",
-              type: "button",
-              className: "mov-btn mov-btn-sm",
-              onClick: () => copyCommand(item.command)
-            }, copiedFfmpeg === item.command ? t("ffmpegCopied") : t("ffmpegCopy"))
-          ])),
-          h("span", { key: "after", className: "mov-hint" }, t("ffmpegAfter"))
-        ]);
-        const quotaBox = keyReady ? h("div", {
+        const quotaBox = !directMode && keyReady ? h("div", {
           key: "quota",
           "data-field": "quota",
-          className: "mov-card"
+          className: "mov-card mov-quota-compact"
         }, [
           h("div", { key: "head", className: "mov-card-head" }, [
-            h("span", { key: "title", className: "mov-card-title" }, t("quotaTitle")),
-            keyReady ? h("button", {
-              key: "refresh",
-              "data-action": "quota-refresh",
-              type: "button",
-              className: "mov-btn mov-btn-sm mov-trailing",
-              disabled: quotaStatus === "working",
-              onClick: () => {
-                loadQuota().catch(() => {
-                });
-              }
-            }, t("quotaRefresh")) : null
+            h("span", { key: "title", className: "mov-card-title" }, t("quotaTitle"))
           ]),
           quotaStats ? h(
             "div",
@@ -1178,7 +1253,18 @@ window.__ModuleLoader__.load({
             className: "mov-hint"
           }, quotaFallback),
           quotaReady ? h("span", { key: "at", className: "mov-foot-note" }, t("quotaUpdatedAt", { time: quotaAt })) : null,
-          quotaMessage ? h("span", { key: "message", className: "mov-hint" }, quotaMessage) : null
+          quotaMessage ? h("span", { key: "message", className: "mov-hint" }, quotaMessage) : null,
+          keyReady ? h("button", {
+            key: "refresh",
+            "data-action": "quota-refresh",
+            type: "button",
+            className: "mov-btn mov-btn-sm mov-trailing",
+            disabled: quotaStatus === "working",
+            onClick: () => {
+              loadQuota().catch(() => {
+              });
+            }
+          }, t("quotaRefresh")) : null
         ]) : null;
         function copyText(text, mark) {
           try {
@@ -1311,7 +1397,7 @@ window.__ModuleLoader__.load({
           count: usage.count,
           amount: `${usageSymbol}${formatMoney(usage.amount_sum)}`
         })}${usage.truncated ? ` \xB7 ${t("usageMore", { count: usage.count })}` : ""}` : t("usageEmpty") : usageStatus === "working" ? t("usageLoading") : t("usageKeyMissing");
-        const usageBox = keyReady ? h("div", {
+        const usageBox = !directMode && keyReady ? h("div", {
           key: "usage",
           "data-field": "usage",
           className: "mov-card"
@@ -1418,6 +1504,14 @@ window.__ModuleLoader__.load({
               }
             }, updateStatus === "working" ? t("versionChecking") : t("versionCheck"))
           ]),
+          releaseNotes?.items?.length ? h("div", { key: "release-notes", "data-field": "releaseNotes" }, [
+            h("span", { key: "title", className: "mov-card-title" }, `${releaseNotes.version} \xB7 ${t("releaseNotesTitle")}`),
+            h(
+              "ul",
+              { key: "items", style: { margin: "8px 0 0", paddingLeft: 18, fontSize: 12, lineHeight: 1.7, color: TOKENS.muted } },
+              releaseNotes.items.map((item, index) => h("li", { key: index }, item))
+            )
+          ]) : null,
           updateText ? h("span", {
             key: "state",
             "data-field": "versionState",
@@ -1447,7 +1541,7 @@ window.__ModuleLoader__.load({
           updateAvailable ? h("span", { key: "hint", className: "mov-hint" }, t("versionHint")) : null,
           updateStatus === "ok" && updateAt ? h("span", { key: "at", className: "mov-foot-note" }, t("versionCheckedAt", { time: updateAt })) : null
         ]);
-        const registerBox = keyReady ? null : h("div", {
+        const registerBox = keyReady || directMode ? null : h("div", {
           key: "register",
           className: "mov-card",
           style: { gap: 10 }
@@ -1532,7 +1626,7 @@ window.__ModuleLoader__.load({
         if (snapshot.status === "loading") notice = t("loading");
         else if (snapshot.value === void 0) notice = t("unavailable");
         else if (snapshot.writable === false) notice = t("readOnly");
-        const blobs = notice && !snapshot.value ? [] : [ffmpegBox, registerBox, quotaBox, usageBox, versionBox, footer, resetRow];
+        const blobs = notice && !snapshot.value ? [] : [registerBox, footer, resetRow, ...directMode ? [] : [quotaBox, usageBox], versionBox];
         return h("div", { className: "mov-page" }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
           h("style", { key: "styles" }, PAGE_CSS),

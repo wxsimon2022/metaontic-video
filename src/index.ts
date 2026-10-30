@@ -7,8 +7,8 @@
  * 给已有视频「接长」也是同一套能力（video_extend）。
  *
  * 注册的工具：
- *   - `video_generate`  生成一段完整视频：目标总时长不超过单段上限（默认 15 秒）时一次直出；
- *                       更长时先直出首段，再把剩余时长按 4-15 秒逐段延长续拍，
+ *   - `video_generate`  生成一段完整视频：目标总时长不超过模型单段上限（2.0 为 15 秒、2.5 为 30 秒）时一次直出；
+ *                       更长时先直出首段，再把剩余时长按 4 至模型上限（2.0 为 15、2.5 为 30） 秒逐段延长续拍，
  *                       最后用 ffmpeg 合并成一个本地成片
  *                       （本机没有 ffmpeg 就不合成，只返回分段列表，并附上按系统给的安装命令）
  *   - `video_extend`    以一段公网视频为输入素材，向前或向后延长指定秒数；可一次连续延长多段
@@ -43,6 +43,8 @@ import z from '@deepseek-ai/schemastery';
 export const inject = ['tools'];
 
 export const Config = z.object({
+  connectionMode: z.union(['service', 'volcengine']).default('service').description('接入方式：A 服务端领 Key；B 火山引擎直连').volatile(),
+  volcengineApiKey: z.string().default('').description('B 模式火山引擎 API Key').volatile(),
   entryId: z.string()
     .default('metaontic-video')
     .description('本插件在 profile patch 里的条目 id；配置工具用它把改动写回')
@@ -101,23 +103,15 @@ export const Config = z.object({
     .default(0.8)
     .description('预估费用用的分组折扣（中转站 group_ratio：videosvip=0.8、default=1）')
     .volatile(),
-  duration: z.number().step(1).min(4).max(15)
+  duration: z.number().step(1).min(4).max(30)
     .default(15)
-    .description(
-      '每段延长出来的秒数上限（不含视频1本身），4-15 的整数，默认 15：'
-      + '按上限拆，段数最少（30 秒 → 15+15，而不是 15+5+5+5）；'
-      + '调小它会拆出更多段（25 秒、上限 10 → 15+10，上限 5 → 15+5+5）；'
-      + '如果上游对卡满 15 秒的延长段敏感，可以设成 14。'
-      + '设置页不显示这一项：默认值 15 就是段数最少的解法，调小只会多出接缝。',
-    )
+    .description('兼容旧配置；分段默认按模型上限映射：2.0 为 15 秒、2.5 为 30 秒。需缩短分段时在工具调用中指定。')
     .volatile(),
-  singleMaxSeconds: z.number().step(1).min(4).max(15)
+  singleMaxSeconds: z.number().step(1).min(4).max(30)
     .default(15)
-    .description(
-      '单次直出上限：不超过它就一次生成，超过它就先直出这一段再逐段延长（4-15）。'
-      + '设置页不显示这一项：它就是 Seedance 单段 15 秒的能力值，调小只会把一条视频拆得更碎。',
-    )
+    .description('兼容旧配置；单次直出上限由模型决定：2.0 为 15 秒、2.5 为 30 秒。')
     .volatile(),
+  seamTrimSeconds: z.string().default('').description('2.0 默认每接缝裁前段尾6帧、后段头1帧；填0关闭。覆盖为手动裁剪：逗号分隔秒数，对应第2、3…段开头，0–3秒；默认不裁。先预览确认，避免切断对白。').volatile(),
   mergeMode: z.union(['seamless', 'copy', 'reencode'])
     .default('seamless')
     .description(
@@ -200,7 +194,7 @@ const DEFAULT_MODEL = 'doubao-seedance-2-0-mini-260615';
 const MAX_SEGMENTS = 10;
 const MIN_SECONDS = 4;
 const MIN_SEGMENT_SECONDS = 4;
-/** 单段延长（续拍）的秒数上限：Seedance 原生延长只接受 4-15 秒。 */
+/** 单段延长（续拍）的秒数上限：Seedance 原生延长只接受 4 至模型上限（2.0 为 15、2.5 为 30） 秒。 */
 const MAX_SEGMENT_SECONDS = 15;
 /** Seedance 单段最长 15 秒：不超过它一次直出，超过它才需要延长。 */
 const MAX_DIRECT_SECONDS = 15;
@@ -261,7 +255,7 @@ const RELAY_PRESET = {
 };
 
 const SUCCESS_STATES = new Set(['succeeded', 'success', 'completed', 'complete', 'done', 'finished']);
-const FAILED_STATES = new Set(['failed', 'failure', 'error', 'cancelled', 'canceled']);
+const FAILED_STATES = new Set(['failed', 'failure', 'error', 'cancelled', 'canceled', 'expired']);
 const CANCEL_STATES = new Set(['cancelled', 'canceled']);
 
 const QUOTA_HINTS = ['quota', 'insufficient', 'balance', '预扣费', '剩余额度'];
@@ -322,7 +316,12 @@ function envValue(names) {
   return '';
 }
 
+function isVolcengine(config) {
+  return ref(config, 'connectionMode', 'service') === 'volcengine';
+}
+
 function resolveApiKey(config) {
+  if (isVolcengine(config)) return String(ref(config, 'volcengineApiKey', '')).trim();
   // 只认配置里那一把——它只能由设置页「登录」时服务端下发写入，
   // 不读环境变量、也不认手填，避免用到没绑设备 / 没额度的野 Key。
   return String(ref(config, 'apiKey', '')).trim();
@@ -342,16 +341,19 @@ function isServerIssuedKey(config) {
 }
 
 function resolveBaseUrl(config) {
+  if (isVolcengine(config)) return 'https://ark.cn-beijing.volces.com';
   const preset = relayPreset();
   return (String(ref(config, 'baseUrl', '')).trim() || envValue(preset.baseEnv) || preset.baseUrl)
     .replace(/\/+$/, '');
 }
 
 function resolveSubmitPath(config) {
+  if (isVolcengine(config)) return '/api/v3/contents/generations/tasks';
   return String(ref(config, 'submitPath', '')).trim() || relayPreset().submitPath;
 }
 
 function resolveQueryPath(config, taskId) {
+  if (isVolcengine(config)) return `/api/v3/contents/generations/tasks/${encodeURIComponent(taskId)}`;
   const path = String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath;
   return path.replace('{task_id}', encodeURIComponent(taskId));
 }
@@ -389,6 +391,10 @@ function parseExtraParams(config) {
 }
 
 function assertConfigured(config, apiKey) {
+  if (isVolcengine(config)) {
+    if (!apiKey) throw new Error('请在 B 火山引擎模式中配置火山 API Key。');
+    return;
+  }
   if (!apiKey) {
     throw new Error(
       '未配置 API Key：打开「插件 → 已安装插件 → MetaOnticVideo → 查看」，点「登录」领一把——'
@@ -451,6 +457,9 @@ function buildExtensionPrompt({
       : '本段声音接续视频1结尾，台词只讲后续剧情。')
       + '保持角色音色与环境底噪一致，每句台词完整说完，不复述原台词。'
       + '原视频有配乐时保持曲目与节奏连贯；原视频无配乐时不新增配乐。',
+    forward
+      ? '【输出边界】仅输出新增前置片段；原视频开头只用于衔接，不复制原视频画面或已出现的台词。'
+      : '【输出边界】仅输出新增续拍片段；参考视频末尾只用于理解当前状态，不把末尾几秒再次输出。起始即推进下一动作，不重做拿起、放下、递手机等已完成动作；不重复上一句对白或其尾音。',
     transition,
     '本段明确指定的运镜和切镜优先，上面的衔接建议不得覆盖已确认的镜头安排。',
   ].join('\n');
@@ -482,6 +491,7 @@ interface TaskResult {
 function normalizeReferenceUrl(value) {
   const url = String(value ?? '').trim();
   if (!url) throw new Error('参考视频 URL 不能为空。');
+  if (/^asset:\/\/[A-Za-z0-9_-]+$/.test(url)) return url;
   if (!/^https?:\/\//i.test(url)) {
     throw new Error('参考视频必须是 https:// 或 http:// 开头的公网 URL（不能用本地文件路径）。');
   }
@@ -493,8 +503,8 @@ function buildRequestBody(config, args, referenceVideoUrl) {
   const seconds = clampInteger(
     args.duration,
     MIN_SEGMENT_SECONDS,
-    MAX_SEGMENT_SECONDS,
-    ref(config, 'duration', 5),
+    modelMaxSeconds(config),
+    modelMaxSeconds(config),
   );
   const mode = args.mode || ref(config, 'mode', 'continuous');
   const prompt = String(args.prompt ?? '').trim();
@@ -534,20 +544,19 @@ function buildRequestBody(config, args, referenceVideoUrl) {
 
 /* ---------------- 时长规划：不超上限就直出，超过就延长 ---------------- */
 
-/** 单次直出上限；Seedance 单段最长 15 秒，所以配置只在 4-15 之间生效。 */
-function resolveSingleMax(config) {
-  return clampInteger(
-    ref(config, 'singleMaxSeconds', MAX_DIRECT_SECONDS),
-    MIN_SECONDS,
-    MAX_DIRECT_SECONDS,
-    MAX_DIRECT_SECONDS,
-  );
+/** 模型能力决定单次生成上限，避免旧配置的 15 秒限制影响 2.5。 */
+function modelMaxSeconds(config) {
+  return isOmniExtendModel(resolveModel(config)) ? 30 : 15;
 }
 
-/** 每段延长出来的秒数上限（不含视频1本身）：4-15 的整数，默认吃满 15 秒，段数最少。 */
+function resolveSingleMax(config) {
+  return modelMaxSeconds(config);
+}
+
+/** 默认按模型上限续拍；调用方可显式请求更短的分段。 */
 function resolveSegmentSeconds(config, requested = undefined) {
-  const fallback = ref(config, 'duration', 5);
-  return clampInteger(requested ?? fallback, MIN_SEGMENT_SECONDS, MAX_SEGMENT_SECONDS, fallback);
+  const max = modelMaxSeconds(config);
+  return clampInteger(requested, MIN_SEGMENT_SECONDS, max, max);
 }
 
 /**
@@ -601,13 +610,26 @@ function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
 }
 
 /** 直出用的提示词：和延长不同，这里不引用任何参考视频。 */
-function buildGenerationPrompt({ prompt, seconds }) {
-  return (
-    `生成 ${seconds} 秒视频。${prompt}`
-    + '保持人物面貌、体型、服装和音色一致，场景光线、色调与镜头运动连贯；'
-    + '每句台词完整说完，环境声与背景音乐连续；'
-    + '未明确要求时不添加片头片尾、字幕、水印或背景音乐；动作与出入画按脚本执行。'
-  );
+/** 在提交前验证逐段提示词，防止将全片剧本重复交给模型。 */
+function resolveSegmentPrompts(prompts, planLength) {
+  if (prompts === undefined && planLength === 1) return null;
+  if (!Array.isArray(prompts) || prompts.length !== planLength
+    || prompts.some((value) => typeof value !== 'string' || !value.trim())) {
+    throw new Error(`请按完整生成计划提供 segmentPrompts：${planLength} 条非空的逐段提示词，每条仅含本段动作与对白。先补齐提示词再提交，不要重新生成已完成分段。`);
+  }
+  return prompts.map((value) => value.trim());
+}
+
+function buildGenerationPrompt({ prompt, seconds, model = '' }) {
+  const timing = isOmniExtendModel(model)
+    ? '按本段事件顺序推进；如有时间区间，以本段0秒为起点，区间连续，不遗漏停顿与反应时间。'
+    : '按本段事件顺序自然推进，以镜头序号或先后阶段组织内容，不依赖精确时间戳，不为追逐秒点压缩动作或对白。';
+  return [
+    `生成 ${seconds} 秒视频。`,
+    String(prompt).trim(),
+    timing,
+    '人物身份、服装、场景与光线保持连贯；每句台词完整说完。未明确要求时不新增字幕、水印、片头片尾或配乐。',
+  ].join('\n');
 }
 
 /** 把用户给的剧情描述接成完整句子时补个句号，避免两句粘在一起。 */
@@ -620,6 +642,7 @@ function endWithPunctuation(text) {
 function normalizeImageUrl(value, label) {
   const url = String(value ?? '').trim();
   if (!url) throw new Error(`${label} 不能为空。`);
+  if (/^asset:\/\/[A-Za-z0-9_-]+$/.test(url)) return url;
   if (!/^https?:\/\//i.test(url)) {
     throw new Error(`${label} 必须是 https:// 或 http:// 开头的公网 URL（不能用本地文件路径）。`);
   }
@@ -939,10 +962,24 @@ async function resolveImageInput(value, label, fit = null) {
 /**
  * 直出请求体：文本 + 可选参考图（首帧 / 尾帧 / 人物形象参考），沿用 contents-generation 的原生格式。
  *
- * 图片位与 videoflow-ai 提交视频时的口径一致：首帧、尾帧、人物形象参考各一张，
- * 人物形象参考多给的那几张会被上游静默丢弃（第二张会被当成尾帧），所以这里只发第一张并说明。
+ * 火山直连遵循官方多图与任务互斥限制；服务端模式保留单参考图兼容策略。
  */
+/** 官方图片任务互斥校验在读取或转换素材之前执行。 */
+function validateImageRoles(args, direct, model) {
+  const refs = Array.isArray(args.referenceImages) ? args.referenceImages
+    : (args.referenceImages ? [args.referenceImages] : []);
+  if (args.lastFrameUrl && !args.firstFrameUrl) throw new Error('尾帧必须与首帧一起传入。');
+  if (direct && refs.length && (args.firstFrameUrl || args.lastFrameUrl)) {
+    throw new Error('火山接口的首尾帧与参考图模式互斥，请选择一种；如需组合，用参考图模式并在提示词指定首尾画面。');
+  }
+  const limit = direct ? (isOmniExtendModel(model) ? 30 : 9) : 1;
+  if (direct && refs.length > limit) throw new Error(`当前模型最多支持 ${limit} 张参考图。`);
+  if (refs.some((value) => typeof value !== 'string' || !value.trim())) throw new Error('每张参考图必须是非空字符串。');
+  return { refs, limit };
+}
+
 async function buildGenerationBody(config, args, seconds, options: { signal?: AbortSignal } = {}) {
+  validateImageRoles(args, isVolcengine(config), resolveModel(config));
   const prompt = String(args.prompt ?? '').trim();
   const ratio = args.ratio || ref(config, 'ratio', 'adaptive');
   const canvas = canvasSize(ratio);
@@ -950,13 +987,15 @@ async function buildGenerationBody(config, args, seconds, options: { signal?: Ab
 
   // 文本项 + 可选图片，形状由上游决定，这里只保证顺序与字段名
   const content: Array<Record<string, unknown>> = [
-    { type: 'text', text: buildGenerationPrompt({ prompt, seconds }) },
+    { type: 'text', text: buildGenerationPrompt({ prompt, seconds, model: resolveModel(config) }) },
   ];
   const images = [];
   const notes: string[] = [];
 
   const addImage = async (value, role, label) => {
-    const resolved = await resolveImageInput(value, label, fit);
+    const resolved = isVolcengine(config) && /^asset:\/\//.test(String(value))
+      ? { url: String(value), source: 'asset' }
+      : await resolveImageInput(value, label, fit);
     content.push({
       type: 'image_url',
       image_url: { url: resolved.url },
@@ -979,13 +1018,12 @@ async function buildGenerationBody(config, args, seconds, options: { signal?: Ab
   if (rawReferences.length && !references.length) {
     throw new Error('参考图（referenceImages）不能是空字符串。');
   }
-  if (references.length) {
-    if (references.length > 1) {
-      notes.push(
-        `上游一次只认一张人物形象参考图，本次只用第一张，其余 ${references.length - 1} 张已忽略；`
-        + '要固定多个人物，先把他们合成到一张参考图里再传。',
-      );
+  if (isVolcengine(config)) {
+    for (const [index, reference] of references.entries()) {
+      await addImage(reference, 'reference_image', `参考图 ${index + 1}`);
     }
+  } else if (references.length) {
+    if (references.length > 1) notes.push(`A 模式中转兼容限制：只使用第1张参考图，其余 ${references.length - 1} 张未提交。需要多图时请使用火山直连。`);
     await addImage(references[0], 'reference_image', '参考图 1');
   }
 
@@ -993,7 +1031,7 @@ async function buildGenerationBody(config, args, seconds, options: { signal?: Ab
   body.model = resolveModel(config);
   body.content = content;
   body.duration = seconds;
-  body.ratio = ratio;
+  body.ratio = isOmniExtendModel(body.model) && content.some((item) => item.role === 'first_frame' || item.role === 'last_frame') ? 'adaptive' : ratio;
 
   body.resolution = FIXED_RESOLUTION;
 
@@ -1785,6 +1823,49 @@ async function mergeClips(config, files: string[], outPath: string, { signal }: 
   }
 }
 
+/** 显式接缝裁剪：按各续拍段开头分别设置秒数，默认不裁，不覆盖原始分段。 */
+async function prepareSeamTrims(config, files, outPath, { signal }: RunOptions = {}) {
+  const requested = ref(config, 'seamTrimSeconds', '');
+  const trims = String(requested || '').trim()
+    ? String(requested).split(',').map((value) => Number(value.trim())) : [];
+  if (trims.some((value) => !Number.isFinite(value) || value < 0 || value > 3)) {
+    throw new Error('seamTrimSeconds 必须为逗号分隔的 0–3 秒数值，例如 0.5,0；分别对应第 2、3 段开头。');
+  }
+  const prepared = [...files];
+  const temps = [];
+  const cuts = [];
+  try {
+    for (let index = 0; index < files.length; index++) {
+      // 官方 2.0 接缝建议：前段尾部 6 帧、后段头部 1 帧。2.5 不套用该经验值。
+      const official = !isOmniExtendModel(resolveModel(config)) && files.length > 1 && !trims.length;
+      const secondsRequested = index > 0 ? trims[index - 1] || 0 : 0;
+      if (!official && !secondsRequested) continue;
+      const media = await probeMedia(files[index], config, signal);
+      const duration = Number(media?.videoDurationSeconds || media?.durationSeconds);
+      const fps = Number(media?.fps) || 24;
+      const seconds = official ? (index > 0 ? 1 / fps : 0) : secondsRequested;
+      const tailSeconds = official && index < files.length - 1 ? 6 / fps : 0;
+      const keptSeconds = duration - seconds - tailSeconds;
+      if (!(keptSeconds > 0.5)) throw new Error(`第 ${index + 1} 段裁剪后不足 0.5 秒，已停止合并。`);
+      const temp = `${outPath}.${uniqueSuffix(`cut${index + 1}`)}.mp4`;
+      temps.push(temp);
+      // 输出端 seek 重编码，避免关键帧 seek 保留重复画面；音视频一起裁剪并从零计时。
+      const result = await runProcess(resolveBinary(config, 'ffmpegBinary', 'ffmpeg'), [
+        '-y', '-i', files[index], '-ss', String(seconds), '-t', String(keptSeconds),
+        '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'libx264', '-preset', 'veryfast',
+        '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-movflags', '+faststart', temp,
+      ], { signal });
+      if (result.code !== 0) throw new Error(`第 ${index + 1} 段接缝裁剪失败：${tail(result.stderr)}`);
+      prepared[index] = temp;
+      cuts.push({ index: index + 1, seconds, tailSeconds });
+    }
+    return { files: prepared, temps, cuts };
+  } catch (error) {
+    await cleanupSegmentTemps(temps);
+    throw error;
+  }
+}
+
 /**
  * 下载分段 + 合并成一条成片（video_generate 与 video_extend 共用）。
  * 只负责「把已经生成好的段落盘、再拼成一条」；暂停 / 保留分段 / 写暂停记录这些策略由调用方决定。
@@ -1872,7 +1953,17 @@ async function downloadSegmentsAndMerge(config, {
       await rename(files[0], finalPath);
       return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: 'single', videoPath: finalPath };
     }
-    const merged = await mergeClips(config, files, finalPath, { signal });
+    const prepared = await prepareSeamTrims(config, files, finalPath, { signal });
+    let merged;
+    try {
+      merged = await mergeClips(prepared.cuts.length ? { ...config, mergeMode: 'copy' } : config, prepared.files, finalPath, { signal });
+    } finally {
+      await cleanupSegmentTemps(prepared.temps);
+    }
+    if (prepared.cuts.length) {
+      notes.push(`已按确认的裁剪量移除续拍段开头：${prepared.cuts.map((cut) => `第 ${cut.index} 段：头部 ${cut.seconds.toFixed(3)} 秒、尾部 ${cut.tailSeconds.toFixed(3)} 秒`).join('；')}。原始分段未改动；实际成片会缩短，不补帧凑时长。`);
+    }
+    const actual = await probeMedia(finalPath, config, signal);
     if (merged.trimmed?.length) {
       notes.push(
         `第 ${merged.trimmed.map((item) => item.index).join('、')} 段的音频比视频长`
@@ -1892,7 +1983,7 @@ async function downloadSegmentsAndMerge(config, {
         + `${fixed.length ? `，并已对齐${fixed.join('；')}` : ''}）。`,
       );
     }
-    return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: merged.mode, videoPath: finalPath };
+    return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: merged.mode, videoPath: finalPath, seamCuts: prepared.cuts, actualSeconds: actual?.durationSeconds };
   } catch (failure) {
     if (failure?.code === 'ABORTED') throw failure;
     let reason = `分段已生成，但合并失败：${failure?.message || failure}`;
@@ -2096,11 +2187,11 @@ function estimateRate(model, usesReference) {
 function estimatePlan(config, toolName, args) {
   if (toolName === 'video_extend') {
     const count = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
-    const fallback = ref(config, 'duration', 5);
+    const fallback = modelMaxSeconds(config);
     const seconds = clampInteger(
       args?.duration ?? fallback,
       MIN_SECONDS,
-      MAX_SEGMENT_SECONDS,
+      modelMaxSeconds(config),
       fallback,
     );
     return Array.from({ length: count }, () => ({ kind: 'extend', seconds }));
@@ -2404,7 +2495,7 @@ function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
 /** 续做时要沿用的参数：调用方只传 resume 时，靠这份记录还原上次的口径。 */
 function pickResumeOptions(args) {
   const keys = [
-    'mode', 'ratio', 'generateAudio', 'watermark',
+    'mode', 'ratio', 'generateAudio', 'watermark', 'segmentPrompts',
     // 这几个是 video_extend 的口径（延长方向、提示词写法、整片时间轴位置）
     'direction', 'wording', 'startAt',
   ];
@@ -2447,6 +2538,7 @@ function resumeHint(dir, remainingSeconds, toolName = 'video_generate') {
 
 /** 剩下这几段的预估费用文案（确认框里给用户看钱）。 */
 async function remainingCostText(config, exec, remainingSteps) {
+  if (isVolcengine(config)) return { cost: '火山按实际调用计费，插件不预估费用或判断余额', remain: '' };
   try {
     const estimated = estimateSteps(
       config,
@@ -2530,6 +2622,7 @@ const PLUGIN_VERSION = typeof __PLUGIN_VERSION__ === 'string'
  * 拿不到（没设备凭据、服务不可用）就回 unknown，由调用方决定怎么写进确认框。
  */
 async function fetchDeviceQuota(config, signal) {
+  if (isVolcengine(config)) return { status: 'unknown', reason: '火山直连费用和余额请在火山控制台查看' };
   const api = resolveRegisterApi(config);
   const deviceId = String(ref(config, 'deviceId', '')).trim();
   const deviceSecret = String(ref(config, 'deviceSecret', '')).trim();
@@ -2737,6 +2830,14 @@ async function preflightGate(ctx, config, exec) {
   // 让模型在对话框里问用户「要不要授权我装 ffmpeg」，而不是闷头生成再丢一堆分段。
   const consent = await ffmpegConsentGate(config, exec, args);
   if (consent) return consent;
+  if (isVolcengine(config)) {
+    assertConfigured(config, resolveApiKey(config));
+    return {
+      kind: 'ask',
+      reason: `调用火山引擎 ${resolveModel(config)}，按火山账户实际用量计费。`,
+      displayReason: { zh: '本次将直连火山引擎生成视频，费用从你的火山账户扣除，具体价格和余额以火山控制台为准。确认后开始。', en: 'Generate via Volcano Engine, billed to your Volcano account. Confirm to continue.' },
+    };
+  }
   let estimate = null;
   try {
     estimate = estimateUsage(config, exec.name, await estimateArgsFor(config, exec.name, args));
@@ -2811,6 +2912,10 @@ async function relayRequest(
   const url = `${resolveBaseUrl(config)}${path}`;
   const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  const serialized = body === undefined ? undefined : JSON.stringify(body);
+  if (isVolcengine(config) && serialized && Buffer.byteLength(serialized, 'utf8') > 64 * 1024 * 1024) {
+    throw Object.assign(new Error('火山请求体超过64 MB，请减少内联图片或改用公网 URL / asset:// 素材。'), { code: 'request_too_large' });
+  }
   let response;
   let text: string;
   try {
@@ -2820,7 +2925,7 @@ async function relayRequest(
         Authorization: `Bearer ${resolveApiKey(config)}`,
         'Content-Type': 'application/json',
       },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      ...(serialized !== undefined ? { body: serialized } : {}),
       signal: requestSignal,
     });
     text = await response.text();
@@ -2869,6 +2974,7 @@ function abortError(): CodedError {
 
 function sleep(ms, signal): Promise<void> {
   return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) { reject(abortError()); return; }
     const timer = setTimeout(() => {
       signal?.removeEventListener('abort', onAbort);
       resolve();
@@ -3095,7 +3201,7 @@ function extendTool(config, deps, ctx) {
       + '全程用「视频1」指代输入素材，不要写成「参考视频1」（会被当成参考生视频，不是延长）；'
       + '内容写清延长方向、剧情发展、主体状态、镜头运动和声音延续'
       + '（背景音乐要接着视频1结尾往下走，禁止从头播放/换曲），减少接缝。'
-      + '每段 4-15 秒，默认按 15 秒上限拆、段数最少；上游对卡满 15 秒敏感时再调小。'
+      + '每段 4 至模型上限（2.0 为 15、2.5 为 30） 秒，默认按所选模型上限拆、段数最少；上游对卡满 15 秒敏感时再调小。'
       + '返回每段的任务 ID 和最终视频下载链接（约 24 小时内有效）；生成通常需要几分钟，'
       + '单次调用返回 timeout、或某段返回 unknown（查询失败、任务其实已提交）时，'
       + '都用返回的任务 ID 走 video_status 继续等，不要重复提交同一段。'
@@ -3124,9 +3230,9 @@ function extendTool(config, deps, ctx) {
         duration: {
           type: 'integer',
           minimum: 4,
-          maximum: 15,
+          maximum: modelMaxSeconds(config),
           description:
-            '每段新增的秒数上限，4-15 的整数（如 5/8/10/14，默认 15）；'
+            '每段新增的秒数上限，4 至模型上限（2.0 为 15、2.5 为 30） 的整数（如 5/8/10/14，默认按模型上限）；'
             + '刚好卡 15 秒容易因封装略超被上游拒绝。省略时使用配置默认值。',
         },
         direction: {
@@ -3194,8 +3300,11 @@ function extendTool(config, deps, ctx) {
           status: { type: 'string' },
           videoUrl: { type: 'string' },
           videoPath: { type: 'string' },
+          actualSeconds: { type: 'number' },
+          seamCuts: { type: 'array', items: { type: 'object', properties: { index: { type: 'integer' }, seconds: { type: 'number' }, tailSeconds: { type: 'number' } } } },
           merged: { type: 'boolean' },
-          mergeMode: { type: 'string' },
+          seamTrimSeconds: { type: 'string', description: '预览确认后裁剪各接缝：如 0.5,0 表示仅裁第2段开头0.5秒；默认不裁，音视频同步裁剪，实际时长缩短。' },
+        mergeMode: { type: 'string' },
           segmentsDir: { type: 'string' },
           ffmpegMissing: { type: 'boolean' },
           installHint: { type: 'string' },
@@ -3238,10 +3347,10 @@ function extendTool(config, deps, ctx) {
       const wording = (args?.wording ?? lastOptions.wording) === 'after' ? 'after' : 'extend';
       const requestedSegments = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
       const secondsPerSegment = clampInteger(
-        args?.duration ?? ref(config, 'duration', 5),
+        args?.duration ?? modelMaxSeconds(config),
         MIN_SECONDS,
-        MAX_SEGMENT_SECONDS,
-        ref(config, 'duration', 5),
+        modelMaxSeconds(config),
+        modelMaxSeconds(config),
       );
 
       let referenceUrl = String(args?.videoUrl ?? '').trim();
@@ -3362,32 +3471,12 @@ function extendTool(config, deps, ctx) {
           if (cursor < 0) cursor = null;
         }
 
-        // 循环迭代：每段延长完都先问一次用户要不要继续往下延长
-        const nextStep = plan[offset + 1];
-        if (nextStep) {
-          const verdict = await confirmNextSegment(ctx, config, exec, {
-            done: position + 1,
-            finished: segments,
-            nextSeconds: nextStep.seconds,
-            remainingSteps: plan.slice(offset + 1),
-            toolName: TOOL_NAME,
-          });
-          if (verdict.outcome === 'rejected' || verdict.outcome === 'cancelled') {
-            paused = true;
-            notes.push(
-              `第 ${position + 1} 段（${formatSeconds(seconds)} 秒）延长好之后，`
-              + (verdict.outcome === 'rejected' ? '用户选择先不继续往下延长' : '确认框被取消')
-              + '：先把已经延长好的部分交付，剩下的随时可以接着做。',
-            );
-            break;
-          }
-          if (verdict.outcome === 'unavailable' && !confirmWarned) {
-            confirmWarned = true;
-            notes.push(
-              `这次没能弹「要不要继续」的确认框（${verdict.reason}），`
-              + '后面的分段按已经确认过的计划继续生成。',
-            );
-          }
+        // 先结束本次调用并交付视频，让助手展示成果后再询问是否继续。
+        // 工具内部阻塞在审批框时，宿主尚拿不到输出，无法展示刚完成的分段。
+        if (plan[offset + 1]) {
+          paused = true;
+          notes.push('本段已完成：请先展示本次视频成果，让用户预览；用户确认继续后再用 resume 接着生成下一段。');
+          break;
         }
       }
       } catch (failure) {
@@ -3462,6 +3551,8 @@ function extendTool(config, deps, ctx) {
         result.merged = true;
         result.videoPath = delivery.videoPath;
         result.mergeMode = delivery.mergeMode;
+        if (delivery.actualSeconds) result.actualSeconds = delivery.actualSeconds;
+        if (delivery.seamCuts?.length) result.seamCuts = delivery.seamCuts;
       }
 
       if (paused) {
@@ -3490,11 +3581,8 @@ function extendTool(config, deps, ctx) {
         return result;
       }
 
-      if (args?.keepSegments ?? ref(config, 'keepSegments', false)) {
-        result.segmentsDir = segmentsDir;
-      } else {
-        await rm(segmentsDir, { recursive: true, force: true });
-      }
+      // 所有生成分段永久保留；合并、裁剪仅使用副本。
+      result.segmentsDir = segmentsDir;
       if (notes.length) result.note = notes.join('\n');
       return result;
     },
@@ -3601,10 +3689,10 @@ function videoTool(config, deps, ctx) {
     name: 'video_generate',
     description:
       '生成一段完整视频（视频生成的首选工具），duration 是目标总秒数：'
-      + '不超过单段上限（默认 15 秒）时一次直出；'
+      + '不超过模型单段上限（2.0 为 15 秒、2.5 为 30 秒）时一次直出；'
       + '**硬规则：总时长 ≤ 单段上限的视频必须一次直出，禁止拆成多段 / 多镜 / 多次调用再拼接**'
       + '（例如「15 秒」不许拆成 8+7）；多镜只在用户明确要求多镜时才用。'
-      + `更长时先直出首段，再把剩余时长按 4-15 秒均分逐段续拍（默认吃满上限、段数最少，最长 `
+      + `更长时先直出首段，再把剩余时长按 4 至模型上限（2.0 为 15、2.5 为 30） 秒均分逐段续拍（默认吃满上限、段数最少，最长 `
       + `${MAX_TOTAL_SECONDS} 秒）——`
       + '这是同一个镜头的续拍延长，也不是多镜拼接，'
       + '最后用 ffmpeg 合并成一个本地成片文件，默认落在会话工作目录下的 metaontic-video/，'
@@ -3639,14 +3727,14 @@ function videoTool(config, deps, ctx) {
       properties: {
         prompt: {
           type: 'string',
-          description: '要生成的内容、人物设定与台词；超过单段上限时它同时决定后续每段续拍什么。',
+          description: '精简的本段内容或全片创意概要，不传完整剧本。超过模型上限时必须另传segmentPrompts，每段分别写新动作与对白。',
         },
         duration: {
           type: 'integer',
           minimum: 4,
           maximum: 120,
           description:
-            '目标总时长（秒）。不超过单段上限（默认 15）时就一次直出（整条视频只生成一次，'
+            '目标总时长（秒）。不超过模型单段上限（2.0 为 15、2.5 为 30）时就一次直出（整条视频只生成一次，'
             + '禁止拆成多段/多镜再拼）；超过就先直出上限长度再逐段延长，最后合并。'
             + `单条成片最长 ${MAX_TOTAL_SECONDS} 秒（最多 ${MAX_SEGMENTS} 段），更长的目标按 `
             + `${MAX_TOTAL_SECONDS} 秒执行并在 note 里说明，不要反复重试更大的时长。`,
@@ -3660,6 +3748,10 @@ function videoTool(config, deps, ctx) {
           type: 'string',
           description: '可选：尾帧图，公网 URL、base64 或本机图片路径都行，作为生成的尾帧参考。',
         },
+        segmentPrompts: {
+          type: 'array', items: { type: 'string', minLength: 1 },
+          description: '多段生成必须提供：按完整计划顺序，每段一条独立提示词，含稳定主体标签、动作起止状态、本段新对白和运镜。2.0按事件顺序；2.5可用本段从0秒起的连续时间区间。续做默认沿用原数组，不传整份剧本替代每段。',
+        },
         referenceImages: {
           type: 'array',
           items: { type: 'string' },
@@ -3667,16 +3759,16 @@ function videoTool(config, deps, ctx) {
             '可选：人物形象 / 主体参考图（每项是公网 URL、base64（data URI 或纯 base64）、本机图片路径，'
             + '或 `latest` / `latest:2` 这种「用户最近上传的图片」简写）。'
             + '想把某个人的长相、发型、服装固定下来时用它，图片以 role=reference_image 传给上游。'
-            + '上游一次只认一张，多给的会被忽略（要固定多个人物请先把他们合成到一张图里）。'
+            + 'B火山直连：2.0最多9张、2.5最多30张，不能与首尾帧混用，支持asset://素材。A服务端中转仅提交第一张。'
             + '本地图片单张不超过 8 MB，支持 jpg/jpeg/png/webp/bmp/gif/tiff。',
         },
         segmentSeconds: {
           type: 'integer',
           minimum: 4,
-          maximum: 15,
+          maximum: modelMaxSeconds(config),
           description:
             '仅在超过单段上限时才用：每段延长多少秒，默认用配置里的每段秒数；'
-            + '4-15 的整数（如 5/8/10/14），默认 15：按上限拆、段数最少。',
+            + '4 至模型上限（2.0 为 15、2.5 为 30） 的整数（如 5/8/10/14），默认按模型上限：按上限拆、段数最少。',
         },
         mode: {
           type: 'string',
@@ -3728,8 +3820,11 @@ function videoTool(config, deps, ctx) {
           totalSeconds: { type: 'integer' },
           videoUrl: { type: 'string' },
           videoPath: { type: 'string' },
+          actualSeconds: { type: 'number' },
+          seamCuts: { type: 'array', items: { type: 'object', properties: { index: { type: 'integer' }, seconds: { type: 'number' }, tailSeconds: { type: 'number' } } } },
           merged: { type: 'boolean' },
-          mergeMode: { type: 'string' },
+          seamTrimSeconds: { type: 'string', description: '预览确认后裁剪各接缝：如 0.5,0 表示仅裁第2段开头0.5秒；默认不裁，音视频同步裁剪，实际时长缩短。' },
+        mergeMode: { type: 'string' },
           segmentsDir: { type: 'string' },
           ffmpegMissing: { type: 'boolean' },
           installHint: { type: 'string' },
@@ -3801,7 +3896,7 @@ function videoTool(config, deps, ctx) {
         );
       } else if (!restarted && plannedTotal > total) {
         notes.push(
-          `目标 ${total} 秒拆不出完全等长的分段（每段 4-15 秒），本次按 ${plannedTotal} 秒执行。`,
+          `目标 ${total} 秒拆不出完全等长的分段（每段 4 至模型上限（2.0 为 15、2.5 为 30） 秒），本次按 ${plannedTotal} 秒执行。`,
         );
       }
 
@@ -3831,6 +3926,9 @@ function videoTool(config, deps, ctx) {
       let confirmWarned = false;
       // 上次那轮用的参数（续做时调用方可以只传 resume）
       const resumeOptions = restarted ? (resume.options || {}) : {};
+      const suppliedPrompts = resolveSegmentPrompts(
+        args?.segmentPrompts ?? resumeOptions.segmentPrompts, fullPlan.length,
+      );
 
       // 被用户停止 / 宿主超时时，别把已经生成好的分段丢掉：按「暂停」收尾，留暂停记录给 resume。
       let interrupted = false;
@@ -3839,14 +3937,18 @@ function videoTool(config, deps, ctx) {
         if (exec?.signal?.aborted) throw abortError();
         const position = doneBefore + offset;
 
+        const focusedPrompt = suppliedPrompts
+          ? `【本段内容】${suppliedPrompts[position]}\n`
+            + (step.kind === 'extend' ? '从视频1结束后的下一事件继续，仅输出本段新增动作与对白。' : '')
+          : prompt;
         const stepArgs = {
           ...resumeOptions,
           ...args,
-          prompt,
+          prompt: focusedPrompt,
           duration: step.seconds,
           // 这条流程是「先直出再向后续拍」，分段的拼接顺序固定为向后延长。
           direction: 'backward',
-          startAt: step.kind === 'extend' ? cursor : undefined,
+          startAt: step.kind === 'extend' && isOmniExtendModel(resolveModel(config)) ? cursor : undefined,
         };
         let body;
         let seconds;
@@ -3886,31 +3988,12 @@ function videoTool(config, deps, ctx) {
         referenceUrl = normalizeReferenceUrl(final.videoUrl);
         cursor += seconds;
 
-        // 循环迭代：每段生成完都先问一次用户要不要继续往下生成。
-        const nextStep = plan[offset + 1];
-        if (nextStep) {
-          const verdict = await confirmNextSegment(ctx, config, exec, {
-            done: position + 1,
-            finished: segments,
-            nextSeconds: nextStep.seconds,
-            remainingSteps: plan.slice(offset + 1),
-          });
-          if (verdict.outcome === 'rejected' || verdict.outcome === 'cancelled') {
-            paused = true;
-            notes.push(
-              `第 ${position + 1} 段（${formatSeconds(seconds)} 秒）生成好之后，`
-              + (verdict.outcome === 'rejected' ? '用户选择先不继续往下生成' : '确认框被取消')
-              + '：先把已经生成的部分交付，剩下的随时可以接着做。',
-            );
-            break;
-          }
-          if (verdict.outcome === 'unavailable' && !confirmWarned) {
-            confirmWarned = true;
-            notes.push(
-              `这次没能弹「要不要继续」的确认框（${verdict.reason}），`
-              + '后面的分段按已经确认过的计划继续生成。',
-            );
-          }
+        // 先结束本次调用并交付视频，让助手展示成果后再询问是否继续。
+        // 工具内部阻塞在审批框时，宿主尚拿不到输出，无法展示刚完成的分段。
+        if (plan[offset + 1]) {
+          paused = true;
+          notes.push('本段已完成：请先展示本次视频成果，让用户预览；用户确认继续后再用 resume 接着生成下一段。');
+          break;
         }
       }
       } catch (failure) {
@@ -4038,6 +4121,8 @@ function videoTool(config, deps, ctx) {
         result.merged = true;
         result.videoPath = delivery.videoPath;
         result.mergeMode = delivery.mergeMode;
+        if (delivery.actualSeconds) result.actualSeconds = delivery.actualSeconds;
+        if (delivery.seamCuts?.length) result.seamCuts = delivery.seamCuts;
       }
 
       if (paused) {
@@ -4066,11 +4151,8 @@ function videoTool(config, deps, ctx) {
         return result;
       }
 
-      if (args?.keepSegments ?? ref(config, 'keepSegments', false)) {
-        result.segmentsDir = segmentsDir;
-      } else {
-        await rm(segmentsDir, { recursive: true, force: true });
-      }
+      // 所有生成分段永久保留；合并、裁剪仅使用副本。
+      result.segmentsDir = segmentsDir;
       if (notes.length) result.note = notes.join('\n');
       return result;
     },
@@ -4089,7 +4171,7 @@ function setupTool(config) {
   return {
     name: 'video_setup',
     description:
-      '检查本机有没有 ffmpeg（生成超过 15 秒的视频时，合并成一条要用它），缺了就装。'
+      '检查本机有没有 ffmpeg（生成超过模型单次上限的视频时，合并成一条要用它），缺了就装。'
       + 'install=true 表示「用户已经同意安装」，插件会执行安装命令并验证——'
       + '命令会先拿给用户确认，用户点了允许才执行。'
       + '装不上（例如本机连包管理器都没有）会返回手动安装步骤和一个 nextStep。'
@@ -4133,7 +4215,7 @@ function setupTool(config) {
         } else if (status === 'installed') {
           lines.push('ffmpeg 装好了，长视频现在可以合并成一条。');
         } else if (status === 'missing') {
-          lines.push('本机还没有 ffmpeg：生成超过 15 秒的视频时只能给分段，没法合并成一条。');
+          lines.push('本机还没有 ffmpeg：生成超过模型单次上限的视频时只能给分段，没法合并成一条。');
           lines.push(`装一下就好（${os || '当前系统'}）：${installCommand || ''}`);
           lines.push('用户同意的话，我可以用 video_setup（install=true）直接帮他装。');
         } else if (status === 'failed') {
@@ -4393,11 +4475,11 @@ function taskTool(config) {
 
 /** 用户可在插件内改的配置字段。 */
 const CONFIG_FIELDS = [
-  'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
+  'connectionMode', 'volcengineApiKey', 'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
   'duration', 'singleMaxSeconds', 'mode', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'pollErrorRetries',
-  'mergeMode', 'bgmFadeSeconds', 'outputDir', 'keepSegments', 'resumeLockStaleMinutes',
+  'seamTrimSeconds', 'mergeMode', 'bgmFadeSeconds', 'outputDir', 'keepSegments', 'resumeLockStaleMinutes',
   'ffmpegBinary', 'ffprobeBinary',
   'registerEmail', 'registerApi', 'deviceId', 'estimateGroupRatio',
 ];
@@ -4411,6 +4493,7 @@ const READ_ONLY_CONFIG_FIELDS = new Set(['apiKey', 'keyOrigin', 'deviceId', 'dev
 function maskSecrets(view) {
   return {
     ...view,
+    volcengineApiKey: view.volcengineApiKey ? '（已配置）' : '',
     apiKey: view.apiKey ? '（已配置）' : '',
     deviceSecret: view.deviceSecret ? '（已配置）' : '',
   };
@@ -4423,12 +4506,13 @@ function configView(config) {
   return {
     stored: maskSecrets(stored),
     effective: {
+      connectionMode: isVolcengine(config) ? 'volcengine' : 'service',
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),
       queryPath: String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath,
       model: resolveModel(config),
       // 密钥只有一种合法来源：设置页「登录」时服务端下发
-      apiKeySource: ref(config, 'apiKey', '')
+      apiKeySource: isVolcengine(config) ? (resolveApiKey(config) ? 'volcengine' : 'missing') : ref(config, 'apiKey', '')
         ? (isServerIssuedKey(config) ? 'register' : 'unverified')
         : 'missing',
     },
@@ -4466,7 +4550,7 @@ function configTool(config, settings) {
       + '改动写进 profile 的 cordis.patch.yml，'
       + '宿主重载后生效。'
       + '用户说「把中转站地址/模型/时长改成 X」时用 action=set，看当前值用 action=get；'
-      + 'duration 是每段新增秒数上限（4-15，默认 15、段数最少），singleMaxSeconds 是单次直出上限（默认 15）。',
+      + 'duration 是每段新增秒数上限（4 至模型上限（2.0 为 15、2.5 为 30），默认按模型上限、段数最少），singleMaxSeconds 为兼容旧配置保留，直出上限由模型映射。',
     parameters: {
       type: 'object',
       properties: {
@@ -4475,6 +4559,8 @@ function configTool(config, settings) {
           enum: ['get', 'set'],
           description: 'get=查看当前配置；set=修改配置（至少给一个要改的字段）。',
         },
+        connectionMode: { type: 'string', enum: ['service', 'volcengine'], description: 'A 服务端 / B 火山直连' },
+        volcengineApiKey: { type: 'string', description: 'B 模式火山 API Key' },
         baseUrl: { type: 'string', description: '基础地址，即中转站站址，例如 https://ai.bileego.com。' },
         registerEmail: { type: 'string', description: '领 Key 用的邮箱（账号）；注册要邮箱验证码，一个邮箱只发一把。' },
         registerApi: { type: 'string', description: '插件服务地址（领 Key / 查额度 / 使用记录）；留空用内置域名。' },
@@ -4482,7 +4568,7 @@ function configTool(config, settings) {
         submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
         queryPath: { type: 'string', description: '查询任务路径，{task_id} 会被替换。' },
         model: { type: 'string', description: '模型 ID，例如 doubao-seedance-2-0-mini-260615。' },
-        duration: { type: 'integer', minimum: 4, maximum: 15, description: '每段新增秒数上限（4-15 的整数，默认 15、段数最少）。' },
+        duration: { type: 'integer', minimum: 4, maximum: modelMaxSeconds(config), description: '每段新增秒数上限（4 至模型上限（2.0 为 15、2.5 为 30） 的整数，默认按模型上限、段数最少）。' },
         mode: { type: 'string', enum: ['continuous', 'closeup'], description: '续拍方式。' },
         ratio: {
           type: 'string',
@@ -4504,9 +4590,10 @@ function configTool(config, settings) {
         singleMaxSeconds: {
           type: 'integer',
           minimum: 4,
-          maximum: 15,
+          maximum: modelMaxSeconds(config),
           description: '单次直出上限（秒）：不超过它一次生成，超过它才分段延长。',
         },
+        seamTrimSeconds: { type: 'string', description: '预览确认后裁剪各接缝：如 0.5,0 表示仅裁第2段开头0.5秒；默认不裁，音视频同步裁剪，实际时长缩短。' },
         mergeMode: {
           type: 'string',
           enum: ['seamless', 'copy', 'reencode'],
@@ -4609,6 +4696,8 @@ function buildPromptGuidance(config) {
   const singleMax = resolveSingleMax(config);
   const segmentSeconds = resolveSegmentSeconds(config);
   return [
+    '提示词遵循火山进阶原则：先定义主体的2–3个稳定特征并固定标签，再写有承接关系的动作、场景光线、运镜和音频；少写重复限制。多段时必须准备segmentPrompts，每段仅含新增事件和对白。2.0按事件顺序自然节奏，2.5可用连续秒级区间；完整剧本留在script.md，不直接反复发给模型。',
+    isVolcengine(config) ? '当前为 B 火山直连：使用 volcengineApiKey，无需服务端登录；不查询或判断余额、不套用中转站估价。仅按创建任务与查询任务接口的实际结果报告状态；创建成功不代表视频已生成，必须查询至succeeded且有视频地址。下述服务端领 Key 要求仅适用于 A 模式。' : '当前为 A 服务端模式：在设置页登录领取 Key。',
     'MetaOnticVideo（Seedance 视频生成插件）：需要生成视频、给视频加长时优先用它；'
       + '用户只要说想要多长（duration），超过单段上限的部分插件自己分段续拍再合并，不用用户自己拆任务。',
     '· **生成一条新视频必须先过两道确认，缺一不可**：'
@@ -4623,9 +4712,9 @@ function buildPromptGuidance(config) {
       + '用户明确要求切镜时，在同一次生成的提示词中安排镜头切换。'
       + '超过上限时（如 20 秒）会自动拆成首段 + 若干续拍段再合并——那是同一条视频往下续拍，不是多镜拼接。'
       + '所以「20 秒视频」直接传 duration=20，不用拆成多个任务，也不用跟用户解释「模型一次只能出 15 秒」；'
-      + '**超过单段上限的成片是「循环迭代」的：每段生成完都会弹一次确认框问用户要不要继续，'
+      + '**超过单段上限的成片是「循环迭代」的：每段生成完先返回视频成果供展示，用户预览并确认后再用 resume 继续，'
       + '不要绕过它、也不要自己拆成多次生成**；'
-      + '用户点了「先不继续」时结果里带 paused=true、resumeDir、remainingSeconds——'
+      + '分段交付时结果里带 paused=true、resumeDir、remainingSeconds——'
       + '这时先把已经生成的部分交付给他，等他说「继续」再把 resumeDir 原样传给 video_generate 的 resume 参数'
       + '（插件接着已有的分段往下做，前面几段不重新生成、不重复扣费），不要从头再来一遍；'
       + '同一份暂停进度（resumeDir）同一时间只允许一次 resume 在跑：如果结果说「已经有一次『继续』在跑」，'
@@ -4638,7 +4727,7 @@ function buildPromptGuidance(config) {
     '· 给已有视频接长用 video_extend，输入必须是公网 URL；提示词以「向后延长视频1」或「向前延长视频1」开头，'
       + '全程用「视频1」指代素材，不要写「参考视频1」；写清延长方向、剧情发展、主体状态、镜头运动、'
       + '声音延续（背景音乐接在视频1结尾处、不要从头播放，环境声和对白也要连续）；'
-      + '每段 4-15 秒，默认按上限拆、段数最少；连着延长多段时每段之间会先问用户一次要不要继续，'
+      + '每段 4 至模型上限（2.0 为 15、2.5 为 30） 秒，默认按上限拆、段数最少；连着延长多段时每段完成先交付预览，用户确认后用 resume 继续，'
       + '并默认下载分段在本机合并成一条成片（缺 ffmpeg 会先拦下来问）；'
       + '用户点「拒绝」或中途被停止时，已经延长好的部分照样先交付（paused=true + resumeDir），'
       + '之后把 resumeDir 传给 video_extend 的 resume 参数接着做即可，不重复生成、不重复扣费。',

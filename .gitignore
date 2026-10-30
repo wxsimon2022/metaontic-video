@@ -5,3 +5,6 @@
 segments/
 node_modules/
 dist/
+
+# IDE 配置
+.idea/

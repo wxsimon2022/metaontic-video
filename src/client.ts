@@ -1,3 +1,4 @@
+import packageInfo from '../package.json';
 /**
  * MetaOnticVideo 插件的浏览器半侧：在侧栏「插件」页里给本插件加一张配置卡片，
  * 直接编辑 Host 侧的配置（写进 profile 的 cordis.patch.yml）。
@@ -29,6 +30,15 @@ window.__ModuleLoader__.load({
       summary: '{provider} · {model}',
       providerNewapi: 'New API 中转站',
       apiKeyConfigured: '已配置，留空表示保持原值',
+      connectionMode: '接入方式',
+      connectionModeHint: 'A：登录领取服务端 Key；B：填写自己的火山引擎 API Key。切换后点击保存生效。',
+      volcengineKeyHint: '从火山方舟控制台获取 API Key，填入后保存。费用由火山账户承担，无需登录本插件服务端。',
+      volcengineApiKey: '火山引擎 API Key',
+      service: 'A · 服务端下发 Key',
+      volcengine: 'B · 火山引擎直连',
+      seamTrimSeconds: '接缝裁剪秒数（如 0.5,0）',
+      modelHiddenCurrent: '当前模型（暂不提供选择）',
+      releaseNotesTitle: '更新内容',
       model: '模型',
       modelHint: 'mini 更省（默认）；fast 同一代的加速版，单价约 1.6 倍。',
       mergeMode: '合并方式',
@@ -43,7 +53,7 @@ window.__ModuleLoader__.load({
       ffmpegBinary: 'ffmpeg 路径',
       ffprobeBinary: 'ffprobe 路径',
       ffmpegTitle: '长视频合并需要 ffmpeg',
-      ffmpegBody: '视频超过 15 秒时会拆成几段分别生成、再在本机合并成一条——合并这一步用的是 ffmpeg。'
+      ffmpegBody: '视频超过模型单次上限（2.0 为 15 秒、2.5 为 30 秒）时会拆成几段分别生成、再在本机合并成一条——合并这一步用的是 ffmpeg。'
         + '没装也能生成，只是只给分段列表、不合成整条。',
       ffmpegInstallFor: '按你的系统装一下（点右边按钮复制命令）：',
       ffmpegCopy: '复制',
@@ -69,7 +79,7 @@ window.__ModuleLoader__.load({
       registerNeedEmail: '先填邮箱，再点「获取验证码」。',
       registerNeedCode: '先填邮件里收到的验证码。',
       registerRestored: '已找回本机密钥：这台设备之前领过的那把帮你填好了，点「保存」即可。',
-      quotaTitle: '额度（当前这把 Key）',
+      quotaTitle: '额度',
       quotaRemain: '剩余',
       quotaUsed: '已用',
       quotaTotal: '总额度',
@@ -119,6 +129,10 @@ window.__ModuleLoader__.load({
       sectionGeneration: '生成参数',
       sectionMerge: '合并与输出',
       sectionAdvanced: '高级',
+      sectionCombined: '更多设置',
+      sectionCombinedHint: '输出目录、接缝处理与运行参数',
+      sectionRuntime: '运行参数',
+      segmentsRetained: '所有原始分段自动保留，便于预览、续做和重新剪辑。',
       register: '登录',
       registerWorking: '登录中…',
       registerOk: '登录成功：上游 / Key / 地址 / 模型都写好了，宿主重载配置后生效。',
@@ -151,6 +165,15 @@ window.__ModuleLoader__.load({
       summary: '{provider} · {model}',
       providerNewapi: 'New API relay',
       apiKeyConfigured: 'Configured; leave empty to keep it',
+      connectionMode: 'Connection',
+      connectionModeHint: 'A: sign in for a service key. B: enter your Volcano Engine API key. Save to apply.',
+      volcengineKeyHint: 'Enter an API key from the Volcano Ark console and save. Billed to your Volcano account; no plugin service login required.',
+      volcengineApiKey: 'Volcano Engine API Key',
+      service: 'A · Service-issued key',
+      volcengine: 'B · Volcano Engine',
+      seamTrimSeconds: 'Seam head trims (e.g. 0.5,0)',
+      modelHiddenCurrent: 'Current model (selection unavailable)',
+      releaseNotesTitle: 'Release notes',
       model: 'Model',
       modelHint: 'mini is the cheaper default; fast is the faster sibling at about 1.6× the price.',
       mergeMode: 'Merge mode',
@@ -165,7 +188,7 @@ window.__ModuleLoader__.load({
       ffmpegBinary: 'ffmpeg path',
       ffprobeBinary: 'ffprobe path',
       ffmpegTitle: 'Merging long videos needs ffmpeg',
-      ffmpegBody: 'Videos longer than 15 seconds are generated as several shots and merged into one file on '
+      ffmpegBody: 'Videos exceeding the model limit (15s for 2.0, 30s for 2.5) are generated as several shots and merged into one file on '
         + 'this machine — that merge needs ffmpeg. Without it you still get the video, just as separate '
         + 'segments instead of one file.',
       ffmpegInstallFor: 'Install it for your OS (click the button to copy the command):',
@@ -194,7 +217,7 @@ window.__ModuleLoader__.load({
       registerNeedEmail: 'Type your email before requesting a code.',
       registerNeedCode: 'Type the code from the email first.',
       registerRestored: 'Restored the key issued to this device; click Save to apply.',
-      quotaTitle: 'Quota (current key)',
+      quotaTitle: 'Quota',
       quotaRemain: 'Remaining',
       quotaUsed: 'Used',
       quotaTotal: 'Total',
@@ -236,6 +259,10 @@ window.__ModuleLoader__.load({
       sectionGeneration: 'Generation',
       sectionMerge: 'Merge & output',
       sectionAdvanced: 'Advanced',
+      sectionCombined: 'More settings',
+      sectionCombinedHint: 'Output paths, seams and runtime options',
+      sectionRuntime: 'Runtime options',
+      segmentsRetained: 'Original segments are always retained for preview, resume and editing.',
       mode: 'Continuation',
       modeContinuous: 'Same camera',
       modeCloseup: 'Cut to close-up',
@@ -268,6 +295,7 @@ window.__ModuleLoader__.load({
     ];
     /** 可编辑字段；kind 决定控件，标注 secret 的字段宿主只会告知是否已配置。 */
     const SELECTS = {
+      connectionMode: ['service', 'volcengine'],
       model: MODEL_OPTIONS,
       mode: ['continuous', 'closeup'],
       ratio: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
@@ -279,22 +307,25 @@ window.__ModuleLoader__.load({
     // 后者默认 15 = 段数最少，调小只会多出接缝。两者都留在配置里（默认 15），
     // 只有「上游对卡满 15 秒的延长段敏感」这种少数情况才需要改成 14。
     const SECTIONS = [
-      { key: 'sectionGeneration', fields: ['model', 'mode', 'ratio', 'generateAudio', 'watermark'] },
-      { key: 'sectionMerge', fields: ['mergeMode', 'bgmFadeSeconds', 'outputDir', 'keepSegments'] },
+      { key: 'sectionGeneration', fields: ['connectionMode', 'volcengineApiKey', 'model', 'mode', 'ratio', 'generateAudio', 'watermark'] },
+      { key: 'sectionMerge', fields: ['seamTrimSeconds', 'mergeMode', 'bgmFadeSeconds', 'outputDir'] },
       { key: 'sectionAdvanced', fields: ['extraParams', 'pollIntervalMs', 'maxWaitMs', 'ffmpegBinary', 'ffprobeBinary'] },
     ];
     const FIELDS = [
+      { key: 'connectionMode', kind: 'select', wide: true },
+      { key: 'volcengineApiKey', kind: 'text', secret: true, wide: true },
       // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
       { key: 'model', kind: 'select', wide: true },
       { key: 'mode', kind: 'select' },
       { key: 'ratio', kind: 'select' },
       { key: 'generateAudio', kind: 'switch' },
       { key: 'watermark', kind: 'switch' },
+      { key: 'seamTrimSeconds', kind: 'text' },
       { key: 'mergeMode', kind: 'select' },
       { key: 'bgmFadeSeconds', kind: 'number' },
-      { key: 'outputDir', kind: 'text' },
+      { key: 'outputDir', kind: 'text', wide: true },
       { key: 'keepSegments', kind: 'switch' },
-      { key: 'extraParams', kind: 'text' },
+      { key: 'extraParams', kind: 'text', wide: true },
       { key: 'pollIntervalMs', kind: 'number' },
       { key: 'maxWaitMs', kind: 'number' },
       { key: 'ffmpegBinary', kind: 'text', mono: true },
@@ -308,7 +339,7 @@ window.__ModuleLoader__.load({
     const LOGGED_OUT_KEY = 'metaontic-video.logged-out';
     /** 插件自己会写进配置的项：重置时兜底一起清，免得宿主没把它们列进 user。 */
     const PLUGIN_OWNED_KEYS = [
-      'apiKey', 'keyOrigin', 'baseUrl', 'registerEmail', 'deviceId', 'deviceSecret', 'model',
+      'connectionMode', 'volcengineApiKey', 'apiKey', 'keyOrigin', 'baseUrl', 'registerEmail', 'deviceId', 'deviceSecret', 'model',
     ];
     /** 注册接口的握手请求头 X-Register-Token：与服务端 REGISTER_CLIENT_TOKEN 一致。 */
     const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
@@ -484,6 +515,23 @@ window.__ModuleLoader__.load({
      * 插件就没了。改成带上当前最新提交号，spec 跟已装的永远不同，宿主当新依赖处理、
      * 直接原地覆盖安装，装失败也不会动现有版本。
      */
+    async function fetchReleaseNotes(version) {
+      const urls = [
+        `https://gitee.com/api/v5/repos/${UPDATE_PROJECT}/contents/package.json?ref=v${encodeURIComponent(version)}`,
+        `https://fastly.jsdelivr.net/gh/wxsimon2022/metaontic-video@${encodeURIComponent(version)}/package.json`,
+      ];
+      for (const url of urls) {
+        try {
+          const body = await (await fetchUpdateSource(url)).json();
+          const pkg = body.content ? JSON.parse(decodeBase64Text(body.content)) : body;
+          const notes = pkg.releaseNotes;
+          if (notes?.version === version && Array.isArray(notes.items)
+            && notes.items.every((item) => typeof item === 'string')) return notes;
+        } catch { /* 当前镜像失败继续下一源；不影响更新检测。 */ }
+      }
+      return null;
+    }
+
     async function fetchLatestCommit() {
       const body = await (await fetchUpdateSource(UPDATE_COMMIT_API)).json();
       const sha = String((Array.isArray(body) ? body[0]?.sha : '') || '').trim();
@@ -515,12 +563,17 @@ window.__ModuleLoader__.load({
       .mov-page { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; color: ${TOKENS.text}; }
       /* 分组卡片：16 个字段摊在一格里太糊，按用途各装一张卡 */
       .mov-section { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
+      .mov-advanced { display: block; }
+      .mov-advanced-toggle { cursor: pointer; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
+      .mov-advanced-toggle .mov-hint { display: block; margin: 5px 0 0 16px; font-weight: 400; }
+      .mov-advanced-toggle:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 5px; border-radius: 4px; }
+      .mov-advanced-body { display: flex; flex-direction: column; gap: 16px; border-top: 1px solid ${TOKENS.border}; margin-top: 14px; padding-top: 16px; }
       .mov-section-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       /* 标题左边一道主色竖条，代替纯文字分组标题 */
       .mov-section-title::before { content: ""; flex: 0 0 auto; width: 3px; height: 13px; border-radius: 2px; background: ${TOKENS.primaryFill}; }
       .mov-section-title::after { content: ""; flex: 1 1 auto; height: 1px; background: ${TOKENS.border}; }
       /* 两列自适应：单列至少 240px，窄面板自动落成一列 */
-      .mov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 18px; }
+      .mov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 14px 18px; }
       .mov-field { display: flex; flex-direction: column; min-width: 0; }
       /* 开关没有标签行，靠底对齐才能跟旁边输入框的控制线齐平 */
       .mov-field-switch { justify-content: flex-end; }
@@ -538,14 +591,20 @@ window.__ModuleLoader__.load({
       .mov-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
       .mov-card-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       .mov-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.5; }
-      .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 7px 13px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12.5px; line-height: 1.2; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
+      .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; flex: 0 0 120px; width: 120px; min-width: 120px; height: 36px; min-height: 36px; padding: 4px 10px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12px; line-height: 1.2; text-align: center; cursor: pointer; white-space: normal; overflow-wrap: anywhere; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
       .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
       .mov-btn:disabled { opacity: .5; cursor: default; }
       .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
       .mov-btn-primary:hover:not(:disabled) { color: #fff; opacity: .88; }
-      .mov-btn-sm { min-height: 30px; padding: 5px 10px; border-radius: 7px; font-size: 12px; }
       .mov-trailing { margin-left: auto; }
       /* 额度：三个数字块，一眼分清剩余 / 已用 / 总额度 */
+      .mov-quota-compact { padding: 8px 12px; gap: 14px; flex-direction: row; align-items: center; flex-wrap: nowrap; overflow-x: auto; }
+      .mov-quota-compact .mov-card-head { min-height: 24px; flex: 0 0 auto; gap: 8px; }
+      .mov-quota-compact .mov-stats { display: flex; flex: 1 0 auto; gap: 16px; }
+      .mov-quota-compact .mov-stat { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 6px; padding: 0; border: 0; border-radius: 0; white-space: nowrap; }
+      .mov-quota-compact .mov-stat-label { font-size: 11px; white-space: nowrap; }
+      .mov-quota-compact .mov-stat-value { font-size: 14px; }
+      .mov-quota-compact .mov-foot-note { font-size: 10px; white-space: nowrap; flex: 0 0 auto; }
       .mov-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
       .mov-stat { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; border: 1px solid ${TOKENS.border}; }
       .mov-stat-label { font-size: 11.5px; color: ${TOKENS.muted}; }
@@ -581,6 +640,7 @@ window.__ModuleLoader__.load({
     `;
 
     function optionLabel(t, key, option) {
+      if (key === 'connectionMode') return t(option);
       if (key === 'mode') return option === 'closeup' ? t('modeCloseup') : t('modeContinuous');
       if (key === 'mergeMode') {
         if (option === 'reencode') return t('mergeModeReencode');
@@ -605,6 +665,8 @@ window.__ModuleLoader__.load({
         const snapshot = useSnapshot(form);
         const value = snapshot.value || {};
         const [draft, setDraft] = React.useState({});
+        const selectedMode = draft.connectionMode ?? value.connectionMode ?? 'service';
+        const directMode = selectedMode === 'volcengine';
         const [status, setStatus] = React.useState('idle');
         // 「已保存」这类反馈过几秒自动收起：收起后操作条跟着消失，页面回到「没有改动」的样子
         const statusTimer = React.useRef(null);
@@ -637,6 +699,7 @@ window.__ModuleLoader__.load({
         const [updateStatus, setUpdateStatus] = React.useState('idle');
         const [updateMessage, setUpdateMessage] = React.useState('');
         const [updateLatest, setUpdateLatest] = React.useState('');
+        const [releaseNotes, setReleaseNotes] = React.useState(packageInfo.releaseNotes);
         const [updateAt, setUpdateAt] = React.useState('');
         // 上次看到的默认分支提交号：在线更新拿它当 spec 后缀用（取不到再联网取一次）
         const updateCommit = React.useRef('');
@@ -650,6 +713,7 @@ window.__ModuleLoader__.load({
           if (restoreTried.current) return;
           restoreTried.current = true;
           const snap = form.getSnapshot() || {};
+          if ((snap.value || {}).connectionMode === 'volcengine') return;
           if (loggedOut()) {
             setRegisterStatus('idle');
             return;
@@ -672,6 +736,9 @@ window.__ModuleLoader__.load({
           const cached = readUpdateCache();
           if (cached.latest) {
             setUpdateLatest(cached.latest);
+            if (cached.latest !== packageInfo.releaseNotes.version) {
+              fetchReleaseNotes(cached.latest).then((notes) => { if (notes) setReleaseNotes(notes); }).catch(() => {});
+            }
             if (cached.at) setUpdateAt(new Date(cached.at).toLocaleTimeString());
             if (cached.commit) updateCommit.current = cached.commit;
             setUpdateStatus('ok');
@@ -720,15 +787,36 @@ window.__ModuleLoader__.load({
 
         async function save() {
           setStatus('saving');
-          let ok = true;
-          for (const [key, next] of pending) {
-            const accepted = await form.set(key, next);
-            if (accepted) clear(key);
-            else ok = false;
+          const nextMode = draft.connectionMode ?? value.connectionMode ?? 'service';
+          const inactiveKeys = nextMode === 'volcengine'
+            ? ['apiKey', 'keyOrigin', 'baseUrl', 'submitPath', 'queryPath',
+              'registerEmail', 'deviceId', 'deviceSecret', 'registerApi', 'registerToken']
+            : ['volcengineApiKey'];
+          try {
+            // 先保存当前配置；写入失败时不清理旧接入凭据。
+            for (const [key, next] of pending) {
+              if (inactiveKeys.includes(key)) continue;
+              const accepted = await form.set(key, next);
+              if (!accepted) throw new Error(`保存 ${key} 失败`);
+            }
+            // 仅清除本插件非当前接入方式的字段，不删除宿主 profile 文件。
+            for (const key of inactiveKeys) {
+              const accepted = await form.unset(key);
+              if (accepted === false) throw new Error(`清理 ${key} 失败`);
+            }
+            if (nextMode === 'volcengine') {
+              forgetDevice();
+              setRegisterEmail('');
+              setRegisterCode('');
+              setRegisterStatus('idle');
+              setRegisterMessage('');
+              setQuota(null);
+            }
+            setDraft({});
+            flashStatus('saved');
+          } catch {
+            setStatus('failed');
           }
-          // 失败要留着让人看清原因；成功闪一下就好，操作条随后自动收起
-          if (ok) flashStatus('saved');
-          else setStatus('failed');
         }
 
         /**
@@ -1068,6 +1156,7 @@ window.__ModuleLoader__.load({
          * 只有本机（设备标识 + 设备密钥都对上）才拿得到，展示的必然是自己那把。
          */
         async function loadQuota() {
+          if (directMode) return;
           const device = deviceIdentity();
           setQuotaStatus('working');
           setQuotaMessage('');
@@ -1096,6 +1185,7 @@ window.__ModuleLoader__.load({
          * 再去读它的调用日志（谁什么时候出了片、消耗多少），一次任务只显示一行。
          */
         async function loadUsage() {
+          if (directMode) return;
           const device = deviceIdentity();
           setUsageStatus('working');
           setUsageMessage('');
@@ -1185,6 +1275,7 @@ window.__ModuleLoader__.load({
               // 静默：只用上一次记下的提交号，或者干脆走不带后缀的 spec
             }
             setUpdateLatest(latest);
+            fetchReleaseNotes(latest).then((notes) => { if (notes) setReleaseNotes(notes); }).catch(() => {});
             setUpdateAt(new Date().toLocaleTimeString());
             setUpdateStatus('ok');
             rememberUpdateCheck(latest, updateCommit.current);
@@ -1214,7 +1305,8 @@ window.__ModuleLoader__.load({
           if (field.kind === 'select') {
             const options = SELECTS[field.key] || [];
             // 当前值不在候选表里（例如服务端刚换的型号）就把它补进去，避免下拉里看不到自己现在的取值
-            const list = current && !options.includes(current) ? [...options, current] : options;
+            const hiddenModel = field.key === 'model' && /seedance-2(?:-5|\.5)/i.test(String(current || ''));
+            const list = current && !options.includes(current) && !hiddenModel ? [...options, current] : options;
             return h('select', {
               id,
               'data-field': field.key,
@@ -1222,7 +1314,10 @@ window.__ModuleLoader__.load({
               style: inputStyle,
               value: current ?? '',
               onChange: (event) => edit(field.key, event.target.value),
-            }, list.map((option) => h('option', { key: option, value: option }, optionLabel(t, field.key, option))));
+            }, [
+              hiddenModel ? h('option', { key: 'hidden-current', value: current, hidden: true }, t('modelHiddenCurrent')) : null,
+              ...list.map((option) => h('option', { key: option, value: option }, optionLabel(t, field.key, option))),
+            ]);
           }
           return h('input', {
             id,
@@ -1231,7 +1326,7 @@ window.__ModuleLoader__.load({
             style: inputStyle,
             type: field.kind === 'number' ? 'number' : (field.secret ? 'password' : 'text'),
             value: current ?? '',
-            placeholder: field.secret && snapshot.secrets?.apiKey ? t('apiKeyConfigured') : '',
+            placeholder: field.secret && (snapshot.secrets?.[field.key] || value[field.key]) ? t('apiKeyConfigured') : '',
             onChange: (event) => edit(
               field.key,
               field.kind === 'number' && event.target.value !== ''
@@ -1243,6 +1338,8 @@ window.__ModuleLoader__.load({
 
         // 少数需要解释的字段：模型选哪个（mini 便宜 / fast 贵一些）
         const hints = {
+          connectionMode: t('connectionModeHint'),
+          volcengineApiKey: t('volcengineKeyHint'),
           model: t('modelHint'),
           bgmFadeSeconds: t('bgmFadeSecondsHint'),
         };
@@ -1263,11 +1360,28 @@ window.__ModuleLoader__.load({
         }
 
         // 配置区分成几节，每节一个标题 + 一个自适应网格。
-        const rows = SECTIONS.map((section) => h('div', { key: section.key, className: 'mov-section' }, [
-          h('div', { key: 'title', className: 'mov-section-title' }, t(section.key)),
-          h('div', { key: 'grid', className: 'mov-grid' },
-            section.fields.map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)),
-        ]));
+        const renderGrid = (section) => h('div', { key: section.key, className: 'mov-grid' },
+          section.fields.filter((key) => key !== 'volcengineApiKey' || directMode)
+            .map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean));
+        const rows = [
+          h('div', { key: 'generation', className: 'mov-section' }, [
+            h('div', { key: 'title', className: 'mov-section-title' }, t('sectionGeneration')),
+            renderGrid(SECTIONS[0]),
+          ]),
+          h('details', { key: 'advanced', className: 'mov-section mov-advanced' }, [
+            h('summary', { key: 'toggle', className: 'mov-advanced-toggle' }, [
+              h('span', { key: 'title' }, t('sectionCombined')),
+              h('span', { key: 'hint', className: 'mov-hint' }, t('sectionCombinedHint')),
+            ]),
+            h('div', { key: 'body', className: 'mov-advanced-body' }, [
+              h('div', { key: 'merge-title', className: 'mov-section-title' }, t('sectionMerge')),
+              renderGrid(SECTIONS[1]),
+              h('p', { key: 'retained', className: 'mov-hint', style: { margin: 0 } }, t('segmentsRetained')),
+              h('div', { key: 'runtime-title', className: 'mov-section-title' }, t('sectionRuntime')),
+              renderGrid(SECTIONS[2]),
+            ]),
+          ]),
+        ];
 
         // 操作条只在「有改动 / 正要给反馈」时出现：没有改动就没有「保存」按钮，
         // 页面干干净净，也不会有空点一下的疑问（「重置插件」不在这儿，它沉在页面最底部）。
@@ -1279,16 +1393,6 @@ window.__ModuleLoader__.load({
             : (pending.length ? t('dirty') : ''));
         const footer = (pending.length || status !== 'idle')
           ? h('div', { key: 'footer', className: 'mov-footer' }, [
-            pending.length
-              ? h('button', {
-                key: 'save',
-                'data-action': 'save',
-                type: 'button',
-                className: 'mov-btn mov-btn-primary',
-                disabled: status === 'saving' || snapshot.writable === false,
-                onClick: save,
-              }, status === 'saving' ? t('saving') : t('save'))
-              : null,
             footerMessage
               ? h('span', {
                 key: 'status',
@@ -1301,11 +1405,20 @@ window.__ModuleLoader__.load({
           ])
           : null;
 
-        // 「重置插件」跟「保存」不是一回事（它清的是本机写过的配置、不是这次没保存的改动），
-        // 所以从保存条里拿出来，单独沉到页面最底部——宿主紧接着渲染的就是插件来源那一块。
-        const resetRow = overrides.length
+        // 底部操作区：保存位于重置左侧；即使尚无覆盖配置，有草稿时也显示。
+        const resetRow = overrides.length || pending.length
           ? h('div', { key: 'reset-row', className: 'mov-footer mov-reset-row' }, [
             h('span', { key: 'hint', className: 'mov-hint', style: { flex: '1 1 200px' } }, t('resetHint')),
+            pending.length
+              ? h('button', {
+                key: 'save',
+                'data-action': 'save',
+                type: 'button',
+                className: 'mov-btn mov-btn-primary',
+                disabled: status === 'saving' || snapshot.writable === false,
+                onClick: save,
+              }, status === 'saving' ? t('saving') : t('save'))
+              : null,
             h('button', {
               key: 'reset',
               'data-action': 'reset',
@@ -1329,7 +1442,7 @@ window.__ModuleLoader__.load({
         // 这种情况要把注册区露出来，让用户点「登录」换回自己那把。
         const serverIssuedKey = value.keyOrigin === 'register'
           || Boolean(value.deviceId && value.deviceSecret && value.registerEmail);
-        const keyReady = Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;
+        const keyReady = !directMode && Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;
         // 邮箱是唯一标识，只发一把：已经配好 Key 的（注册过的或手填的）整块注册区直接隐藏，
         // 连「已经领到 Key 了」这类说明也不显示；要换 Key 只能找管理员。
         const registerText = registerStatus === 'ok'
@@ -1358,67 +1471,14 @@ window.__ModuleLoader__.load({
             { key: 'total', label: t('quotaTotal'), value: money('total_amount'), color: TOKENS.muted },
           ]
           : null;
-        // ffmpeg 引导卡片：合并长视频要用它，缺了就照着命令装一个。
-        const os = currentOs();
-        const primaryInstall = FFMPEG_INSTALLS[os] || FFMPEG_INSTALLS.macos;
-        const installRows = showAllFfmpeg ? FFMPEG_ALL : [primaryInstall];
-        const ffmpegBox = h('div', {
-          key: 'ffmpeg',
-          'data-field': 'ffmpeg',
-          className: 'mov-card',
-        }, [
-          h('div', { key: 'head', className: 'mov-card-head' }, [
-            h('span', { key: 'title', className: 'mov-card-title' }, t('ffmpegTitle')),
-            h('button', {
-              key: 'toggle',
-              'data-action': 'ffmpeg-systems',
-              type: 'button',
-              className: 'mov-btn mov-btn-sm mov-trailing',
-              onClick: () => setShowAllFfmpeg((current) => !current),
-            }, showAllFfmpeg ? t('ffmpegLess') : t('ffmpegMore')),
-          ]),
-          h('span', { key: 'body', className: 'mov-hint' }, t('ffmpegBody')),
-          h('span', { key: 'for', className: 'mov-hint' }, t('ffmpegInstallFor')),
-          ...installRows.map((item, index) => h('div', {
-            key: `install-${index}`,
-            'data-field': 'ffmpegInstall',
-            className: 'mov-cmd-row',
-          }, [
-            h('span', { key: 'label', className: 'mov-tag' }, item.label),
-            h('code', {
-              key: 'command',
-              'data-field': 'ffmpegCommand',
-              className: 'mov-code',
-            }, item.command),
-            h('button', {
-              key: 'copy',
-              'data-action': 'ffmpeg-copy',
-              type: 'button',
-              className: 'mov-btn mov-btn-sm',
-              onClick: () => copyCommand(item.command),
-            }, copiedFfmpeg === item.command ? t('ffmpegCopied') : t('ffmpegCopy')),
-          ])),
-          h('span', { key: 'after', className: 'mov-hint' }, t('ffmpegAfter')),
-        ]);
-
         // 没登录就没有额度可言：整块不渲染（跟使用记录一个规矩）
-        const quotaBox = keyReady ? h('div', {
+        const quotaBox = !directMode && keyReady ? h('div', {
           key: 'quota',
           'data-field': 'quota',
-          className: 'mov-card',
+          className: 'mov-card mov-quota-compact',
         }, [
           h('div', { key: 'head', className: 'mov-card-head' }, [
             h('span', { key: 'title', className: 'mov-card-title' }, t('quotaTitle')),
-            keyReady
-              ? h('button', {
-                key: 'refresh',
-                'data-action': 'quota-refresh',
-                type: 'button',
-                className: 'mov-btn mov-btn-sm mov-trailing',
-                disabled: quotaStatus === 'working',
-                onClick: () => { loadQuota().catch(() => {}); },
-              }, t('quotaRefresh'))
-              : null,
           ]),
           quotaStats
             ? h('div', { key: 'text', 'data-field': 'quotaValue', className: 'mov-stats' },
@@ -1439,6 +1499,17 @@ window.__ModuleLoader__.load({
             ? h('span', { key: 'at', className: 'mov-foot-note' }, t('quotaUpdatedAt', { time: quotaAt }))
             : null,
           quotaMessage ? h('span', { key: 'message', className: 'mov-hint' }, quotaMessage) : null,
+            keyReady
+              ? h('button', {
+                key: 'refresh',
+                'data-action': 'quota-refresh',
+                type: 'button',
+                className: 'mov-btn mov-btn-sm mov-trailing',
+                disabled: quotaStatus === 'working',
+                onClick: () => { loadQuota().catch(() => {}); },
+              }, t('quotaRefresh'))
+              : null,
+
         ]) : null;
 
         /** 复制一段文本；剪贴板不可用就什么都不做，用户照样能照着敲。 */
@@ -1625,7 +1696,7 @@ window.__ModuleLoader__.load({
             })}${usage.truncated ? ` · ${t('usageMore', { count: usage.count })}` : ''}`
             : t('usageEmpty'))
           : (usageStatus === 'working' ? t('usageLoading') : t('usageKeyMissing'));
-        const usageBox = keyReady ? h('div', {
+        const usageBox = !directMode && keyReady ? h('div', {
           key: 'usage',
           'data-field': 'usage',
           className: 'mov-card',
@@ -1734,6 +1805,11 @@ window.__ModuleLoader__.load({
               onClick: () => { checkForUpdate(false).catch(() => {}); },
             }, updateStatus === 'working' ? t('versionChecking') : t('versionCheck')),
           ]),
+          releaseNotes?.items?.length ? h('div', { key: 'release-notes', 'data-field': 'releaseNotes' }, [
+            h('span', { key: 'title', className: 'mov-card-title' }, `${releaseNotes.version} · ${t('releaseNotesTitle')}`),
+            h('ul', { key: 'items', style: { margin: '8px 0 0', paddingLeft: 18, fontSize: 12, lineHeight: 1.7, color: TOKENS.muted } },
+              releaseNotes.items.map((item, index) => h('li', { key: index }, item))),
+          ]) : null,
           updateText
             ? h('span', {
               key: 'state',
@@ -1776,7 +1852,7 @@ window.__ModuleLoader__.load({
         ]);
 
         // 有 Key 就整块不渲染（连标题、提示文字都没有），页面上只剩配置项 + 额度卡片。
-        const registerBox = keyReady ? null : h('div', {
+        const registerBox = keyReady || directMode ? null : h('div', {
           key: 'register',
           className: 'mov-card',
           style: { gap: 10 },
@@ -1869,7 +1945,7 @@ window.__ModuleLoader__.load({
         // 配置读不出来（没有表单 / 不可写）时只显示提示，配置项与卡片一律不渲染。
         const blobs = notice && !snapshot.value
           ? []
-          : [ffmpegBox, registerBox, quotaBox, usageBox, versionBox, footer, resetRow];
+          : [registerBox, footer, resetRow, ...(directMode ? [] : [quotaBox, usageBox]), versionBox];
 
         return h('div', { className: 'mov-page' }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
