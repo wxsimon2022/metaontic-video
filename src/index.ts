@@ -168,6 +168,15 @@ export const Config = z.object({
     .default(600000)
     .description('单次调用最长等待时间（毫秒）')
     .volatile(),
+  pollErrorRetries: z.natural().min(1).max(60)
+    .default(5)
+    .description(
+      '轮询期间「查询失败」的容忍次数：网络抖动、中转站限流、Key 中途被判无效都会让查询报错，'
+      + '但任务在上游照常生成——连续失败到这个次数才放弃等待。'
+      + '放弃时任务 ID 仍保留，可用 video_status 事后补查，不会把「查不到」当成「没生成」。'
+      + '设置页不显示这一项：默认值 5 够用。',
+    )
+    .volatile(),
 });
 
 const DEFAULT_MODEL = 'doubao-seedance-2-0-mini-260615';
@@ -652,10 +661,15 @@ async function runTask(config, body, signal): Promise<TaskResult> {
     return { ...final, taskId };
   } catch (failure) {
     if (failure?.code === 'ABORTED') throw failure;
-    if (failure?.code && failure.code !== 'provider_failed') {
-      return { taskId, status: 'failed', error: failure.message, errorCode: failure.code };
-    }
-    return { taskId, status: 'failed', error: failure?.message || String(failure) };
+    // 任务已经建好，这里只说明「查询没拿到结果」，不能说成「这一段没生成」：
+    // 标成 unknown 并保留 taskId，让结果能引导用 video_status 事后补拉。
+    return {
+      taskId,
+      status: 'unknown',
+      errorCode: failure?.code || 'provider_poll_error',
+      error: `任务已提交（${taskId}），但查询状态失败：${failure?.message || String(failure)}。`
+        + '任务可能仍在生成，可用 video_status 按这个 ID 再查，不要重复提交。',
+    };
   }
 }
 
@@ -1907,14 +1921,42 @@ function getTask(config, taskId) {
 /**
  * 轮询直到任务成功、失败、取消，或等待预算耗尽。
  * 中转站的状态字段可能是 success/completed 等别名，这里统一归一化。
+ *
+ * 关键点：**查询失败 ≠ 任务失败**。任务已经建好，网络抖动、中转站限流、
+ * Key 在生成途中被判无效都会让查询报错，但任务在上游照常跑完。所以这里对查询错误
+ * 做有限次重试（`pollErrorRetries`，默认 5）——连续失败到上限才放弃，
+ * 放弃时返回 `unknown`（不是 `failed`），任务 ID 由调用方保留，
+ * 交给 `video_status` 事后补拉，绝不把「没查到」当成「没生成」。
  */
 async function waitForCompletion(config, taskId, signal): Promise<TaskResult> {
   const deadline = Date.now() + ref(config, 'maxWaitMs', 600000);
+  const maxPollErrors = Math.max(1, Math.round(ref(config, 'pollErrorRetries', 5)));
+  let pollErrors = 0;
 
   for (;;) {
     if (signal?.aborted) throw abortError();
 
-    const task = await getTask(config, taskId);
+    let task;
+    try {
+      task = await getTask(config, taskId);
+      pollErrors = 0;
+    } catch (failure) {
+      if (failure?.code === 'ABORTED') throw failure;
+      pollErrors += 1;
+      if (pollErrors >= maxPollErrors || Date.now() > deadline) {
+        return {
+          taskId,
+          status: 'unknown',
+          errorCode: failure?.code || 'provider_poll_error',
+          error: `任务已提交（${taskId}），但连续 ${pollErrors} 次查询状态失败：${
+            failure?.message || failure
+          }。任务可能仍在生成，可用 video_status 按这个 ID 再查，不要重复提交。`,
+        };
+      }
+      await sleep(ref(config, 'pollIntervalMs', 5000), signal);
+      continue;
+    }
+
     const status = extractStatus(task) || 'unknown';
     const model = findKey(task, ['model']) || resolveModel(config);
 
@@ -1982,6 +2024,19 @@ function renderResult(value) {
           `可用 video_status 查询任务 ${
             segments.at(-1)?.taskId || '（未知）'
           } 的状态与视频链接。`,
+        ].join('\n'),
+      },
+    ];
+  }
+  if (status === 'unknown') {
+    return [
+      {
+        type: 'text',
+        text: [
+          '没能确认这段延长任务的状态（查询失败，不是任务失败）。任务已经提交，可能仍在生成；'
+          + '用 video_status 按任务 ID 复查，不要重新提交。',
+          ...lines,
+          `可用 video_status 查询任务 ${segments.at(-1)?.taskId || '（未知）'} 的状态与视频链接。`,
         ].join('\n'),
       },
     ];
@@ -2223,6 +2278,7 @@ const VIDEO_SEGMENT_OUTPUT_SCHEMA = {
 function renderVideoResult(value) {
   const {
     status, mode, segments = [], videoUrl, videoPath, mergeMode, segmentsDir, note, error,
+    pendingTaskId,
   } = value || {};
   const lines = segments.map((segment) => {
     const label = segment.kind === 'extend' ? `延长 +${segment.seconds}s` : `直出 ${segment.seconds}s`;
@@ -2242,6 +2298,11 @@ function renderVideoResult(value) {
       : `视频生成成功：一次直出 ${formatSeconds(segments[0]?.seconds)} 秒，没有超过单段上限，不需要延长。`);
   } else if (status === 'timeout') {
     parts.push('任务仍在生成中（已超出单次等待时间）。');
+  } else if (status === 'unknown') {
+    parts.push(
+      '没能确认任务状态（查询失败，不是任务失败）。任务已经提交，可能仍在生成；'
+      + '用 video_status 按下面的任务 ID 复查，不要重新提交。',
+    );
   } else if (status === 'cancelled') {
     parts.push('任务已取消。');
   } else {
@@ -2265,8 +2326,9 @@ function renderVideoResult(value) {
   }
   if (videoUrl) parts.push(`最后一段上游链接（约 24 小时内有效）：${videoUrl}`);
   if (note) parts.push(note);
-  if (status === 'timeout') {
-    parts.push(`可用 video_status 查询任务 ${segments.at(-1)?.taskId || '（未知）'} 的状态。`);
+  if (status === 'timeout' || status === 'unknown') {
+    const taskId = pendingTaskId || segments.at(-1)?.taskId || '（未知）';
+    parts.push(`可用 video_status 查询任务 ${taskId} 的状态与视频链接。`);
   }
   return [{ type: 'text', text: parts.filter(Boolean).join('\n') }];
 }
@@ -2286,7 +2348,9 @@ function videoTool(config, deps) {
       + '文件名形如 20261027-201530-25s.mp4。20 秒、25 秒这类目标不用拆成多个任务：'
       + '直接传 duration=20 即可（20 秒 → 15+5，25 秒 → 15+10）。'
       + '返回每段任务 ID、上游链接和成片路径。生成通常需要几分钟（每段单独生成），'
-      + '单次调用返回 timeout 时用 video_status 继续等，不要重复提交新任务。'
+      + '单次调用返回 timeout、或某段返回 unknown（查询失败、任务其实已提交）时，'
+      + '都用返回的任务 ID 走 video_status 继续等，不要重复提交新任务——'
+      + '重复提交会重复扣费，查询失败不代表没有生成。'
       + '合并需要本机有 ffmpeg。本机没装 ffmpeg 时，插件会**先把这次调用拦回来（不会调用模型、'
       + '不产生费用）**，返回的说明里带着按系统给的安装命令 ——这时要在对话框里和用户确认：'
       + '问他要不要现在装 ffmpeg（给出他系统的命令，说明装好重跑就会自动合并、分段不用重新生成），'
@@ -2372,6 +2436,8 @@ function videoTool(config, deps) {
           segmentsDir: { type: 'string' },
           ffmpegMissing: { type: 'boolean' },
           installHint: { type: 'string' },
+          partial: { type: 'boolean' },
+          pendingTaskId: { type: 'string' },
           note: { type: 'string' },
           error: { type: 'string' },
           errorCode: { type: 'string' },
@@ -2473,18 +2539,31 @@ function videoTool(config, deps) {
         error,
         errorCode,
       };
-      // 只要有成功的分段就继续：中段 timeout、被审核挡掉这类失败，不该把前面已经花过钱、
-      // 已经生成好的分段一起扔掉——能下载就下载、能合成就合成，status 照旧如实报失败，
-      // 由 note 与 partial 标记说明「这是残片」。
-      if (!completed.length) return result;
 
       const deliveredSeconds = completed.reduce((sum, segment) => sum + segment.seconds, 0);
+      // 没成功的那一段：区分「确实失败」和「只是没查到」。后者任务已经提交、大概率还在生成，
+      // 必须把任务 ID 交给用户/模型，用 video_status 事后补拉，而不是当成没生成。
       if (status !== 'succeeded') {
-        notes.push(
-          `第 ${segments.length} 段没有成功（${status}），已把成功的 ${completed.length} 段`
-          + `（${deliveredSeconds} 秒）下载并合并交付，可作为残片使用。`,
-        );
-        result.partial = true;
+        const last = segments.at(-1) || {};
+        if (status === 'unknown' || status === 'timeout') {
+          result.pendingTaskId = last.taskId;
+          notes.push(
+            `第 ${last.index ?? segments.length} 段的查询没拿到结果（${status}），但任务已提交：`
+            + `${last.taskId || '（无任务 ID）'}。它可能仍在生成——用 video_status 按这个 ID 复查，`
+            + '拿到链接就能补上这一段，不用重新提交、不会重复扣费。',
+          );
+        } else {
+          notes.push(`第 ${last.index ?? segments.length} 段没有成功（${status}）。`);
+        }
+        if (completed.length) {
+          notes.push(
+            `已把成功的 ${completed.length} 段（${deliveredSeconds} 秒）下载并合并交付，可作为残片使用。`,
+          );
+          result.partial = true;
+        } else {
+          result.note = notes.join('\n');
+          return result;
+        }
       }
 
       if (args?.merge === false) {
@@ -2804,8 +2883,9 @@ function taskTool(config) {
     description:
       '按任务 ID 查询 Seedance 视频任务（生成、延长与合并）的状态；'
       + '任务完成（status 为 succeeded）时返回视频下载链接（约 24 小时内有效）。'
-      + 'video_generate / video_extend 返回 timeout 时，用它们给出的 taskId 在这里继续等，'
-      + '不要在同一个会话里重复提交同一段任务。',
+      + 'video_generate / video_extend 返回 timeout 或某段 unknown（查询失败、任务已提交）时，'
+      + '用它们给出的 taskId 在这里继续等——unknown 只表示「没查到」，任务很可能还在生成，'
+      + '不要因此重新提交同一段任务。',
     parameters: {
       type: 'object',
       properties: {
@@ -2846,6 +2926,16 @@ function taskTool(config) {
         if (status === 'failed') {
           return [{ type: 'text', text: `延长任务失败（任务 ${taskId}）：${error || '未知错误'}` }];
         }
+        if (status === 'unknown') {
+          const detail = String(error || '查询失败').replace(/。+$/, '');
+          return [
+            {
+              type: 'text',
+              text: `任务 ${taskId} 这次没查到状态：${detail}。`
+                + '这不代表任务没有生成——稍后重试，或检查 Key / 额度后再查一次，不要重新提交。',
+            },
+          ];
+        }
         return [{ type: 'text', text: `任务 ${taskId} 当前状态：${status || '未知'}。` }];
       },
     },
@@ -2860,7 +2950,19 @@ function taskTool(config) {
       const taskId = String(args?.taskId ?? '').trim();
       if (!taskId) throw new Error('taskId 不能为空。');
 
-      const task = await getTask(config, taskId);
+      // 查询失败（401、限流、网络抖动）只说明「这次没查到」，不代表任务没生成：
+      // 返回 unknown + 提示，让用户/模型稍后重试，而不是弹一个看起来像「任务失败」的报错。
+      let task;
+      try {
+        task = await getTask(config, taskId);
+      } catch (failure) {
+        return {
+          taskId,
+          status: 'unknown',
+          errorCode: failure?.code || 'provider_poll_error',
+          error: `查询失败：${failure?.message || failure}`,
+        };
+      }
       const status = extractStatus(task) || 'unknown';
       const model = findKey(task, ['model']) || resolveModel(config);
       const videoUrl = extractVideoUrl(task);
@@ -2895,6 +2997,7 @@ const CONFIG_FIELDS = [
   'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
   'duration', 'singleMaxSeconds', 'mode', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
+  'pollErrorRetries',
   'mergeMode', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary',
   'registerEmail', 'registerApi', 'deviceId', 'estimateGroupRatio',
 ];
