@@ -11,10 +11,9 @@ description: 用户给一段创意后，先写视频脚本并等人工确认，�
 
 生成能力来自 MetaOnticVideo 插件。动手前先看一眼当前会话的工具列表：
 
-- MetaOnticVideo 1.2+：`video_generate` / `video_extend` / `video_status` / `video_config`
-- 1.1 及以前：`seedance_video` / `seedance_extend` / `seedance_extend_task` / `seedance_extend_config`
+- `video_generate` / `video_extend` / `video_status` / `video_config`
 
-下文统一写新名字；旧版按对应关系替换。工具不可用时，让用户到「插件」页安装/启用 **MetaOnticVideo** 并配好上游，再继续。不要假装已经生成。
+工具不可用时，让用户到「插件」页安装/启用 **MetaOnticVideo** 并配好上游，再继续。不要假装已经生成。
 
 ## 1. 铁律：脚本确认前，不生成
 

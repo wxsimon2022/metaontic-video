@@ -5,8 +5,6 @@
 #   2) preset-video-director 「视频导演」智能体预设：先写脚本等确认，确认后
 #                           才调用生成工具，最后用 ffmpeg 合成交付
 #
-# 这两层过去分住在 metaontic-video 与 metaontic-video-agent 两个包里，
-# 现在合并为单一包，避免人设规则与工具规则各写一份、版本漂移。
 - insert:
     - id: metaontic-video
       name: 'metaontic-video'
@@ -45,8 +43,7 @@
                 - Seedance 视频工具：video_generate（直出，或超过单段上限时自动续拍并合并）、
                   video_extend（以公网视频为参考续拍）、video_status（查任务）、
                   video_config（查看/修改 MetaOnticVideo 配置）。它们由本插件提供。
-                  旧版插件里这些工具叫 seedance_video / seedance_extend / seedance_extend_task /
-                  seedance_extend_config；动手前先看当前工具列表，按实际名字调用。
+                  动手前先看当前工具列表，按实际名字调用。
                 - 文件读写、Shell、待办、提问、技能、文件展示。
                 你能真的生成视频，但必须先让用户确认脚本。不要说「我做不到」；先检查工具是否可用，再按流程调用。
 

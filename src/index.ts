@@ -17,12 +17,12 @@
  *                             写进 profile 的 cordis.patch.yml；配置字段都是 .volatile()，
  *                             宿主重载后立即生效，不必手改 YAML）
  *
- * 接口与火山方舟 contents-generation 任务一致，既可直接用官方地址，也可走 New API 中转站：
+ * 走 New API 中转站（接口沿用 contents-generation 任务格式）：
  *   POST {baseUrl}{submitPath}
  *   GET  {baseUrl}{queryPath}
- * 只走 New API 中转站（火山官方接口已移除）：baseUrl 填中转站站址，路径按中转站的模型分流走。
+ * baseUrl 填中转站站址，路径按中转站的模型分流走。
  *
- * 请求体沿用火山方舟 contents-generation 的原生延长语义：
+ * 请求体沿用 contents-generation 的原生延长语义：
  *   - 提示词以「向后延长视频1」/「向前延长视频1」开头，用「视频1」指代输入素材，
  *     并写清延长方向、剧情发展、主体状态、镜头运动、声音延续
  *   - content 传入 {"type":"video_url","video_url":{"url":...},"role":"reference_video"}
@@ -75,10 +75,6 @@ export const Config = z.object({
   model: z.string()
     .default('')
     .description('视频生成用的模型 ID（seedance 2.0 / 2.5 系列）；留空读 NEWAPI_VIDEO_MODEL 或内置默认值')
-    .volatile(),
-  registerUser: z.string()
-    .default('')
-    .description('（已废弃）历史上注册时填的用户名；现在领 Key 用邮箱验证码，见 registerEmail')
     .volatile(),
   registerEmail: z.string()
     .default('')
@@ -283,7 +279,7 @@ function ref(config, key, fallback) {
 }
 
 function relayPreset() {
-  // 只走 New API 中转站（火山官方已移除），路径/模型都取这一份预设。
+  // 只走 New API 中转站，路径/模型都取这一份预设。
   return RELAY_PRESET;
 }
 
@@ -587,7 +583,7 @@ function normalizeImageUrl(value, label) {
   return url;
 }
 
-/** 直出请求体：文本 + 可选首帧/尾帧图，沿用火山 contents-generation 的原生格式。 */
+/** 直出请求体：文本 + 可选首帧/尾帧图，沿用 contents-generation 的原生格式。 */
 function buildGenerationBody(config, args, seconds) {
   const prompt = String(args.prompt ?? '').trim();
   // 文本项 + 可选的首帧 / 尾帧图，形状由上游决定，这里只保证顺序与字段名
@@ -1325,7 +1321,7 @@ async function resolveOutputDir(config, exec, deps) {
   return path.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
 }
 
-/* ---------------- 响应解析：兼容官方与中转站的不同形状 ---------------- */
+/* ---------------- 响应解析：兼容中转站的不同响应形状 ---------------- */
 
 function findKey(payload, keys) {
   if (payload && typeof payload === 'object') {
@@ -2854,7 +2850,7 @@ const CONFIG_FIELDS = [
   'duration', 'singleMaxSeconds', 'mode', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'mergeMode', 'outputDir', 'keepSegments', 'ffmpegBinary', 'ffprobeBinary',
-  'registerUser', 'registerEmail', 'registerApi', 'deviceId', 'estimateGroupRatio',
+  'registerEmail', 'registerApi', 'deviceId', 'estimateGroupRatio',
 ];
 
 /**
@@ -2929,7 +2925,7 @@ function configTool(config, settings) {
           enum: ['get', 'set'],
           description: 'get=查看当前配置；set=修改配置（至少给一个要改的字段）。',
         },
-        baseUrl: { type: 'string', description: '基础地址，例如 https://ai.bileego.com（中转站）或官方地址。' },
+        baseUrl: { type: 'string', description: '基础地址，即中转站站址，例如 https://ai.bileego.com。' },
         registerEmail: { type: 'string', description: '领 Key 用的邮箱（账号）；注册要邮箱验证码，一个邮箱只发一把。' },
         registerApi: { type: 'string', description: '插件服务地址（领 Key / 查额度 / 使用记录）；留空用内置域名。' },
         estimateGroupRatio: { type: 'number', description: '预估费用用的分组折扣（中转站 group_ratio：默认 0.8）。' },

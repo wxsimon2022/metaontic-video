@@ -247,7 +247,7 @@ window.__ModuleLoader__.load({
     const UPDATE_COMMAND = 'dsh plugin --profile desktop remove metaontic-video && dsh plugin --profile desktop add "git+https://gitee.com/hackloop/metaontic-video.git"';
     const UPDATE_CACHE_KEY = "metaontic-video.update-check";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "2.7.1".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "2.7.2".trim().replace(/^v/i, "") : "";
     function currentOs() {
       const nav = window.navigator || {};
       const raw = String(
@@ -427,7 +427,7 @@ window.__ModuleLoader__.load({
         const [registerMessage, setRegisterMessage] = React.useState("");
         const [registerEmail, setRegisterEmail] = React.useState(() => {
           const saved = form.getSnapshot().value || {};
-          return String(saved.registerEmail || saved.registerUser || "");
+          return String(saved.registerEmail || "");
         });
         const [registerCode, setRegisterCode] = React.useState("");
         const [codeStatus, setCodeStatus] = React.useState("idle");

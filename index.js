@@ -18,7 +18,6 @@ const Config = z.object({
   submitPath: z.string().default("").description("\u521B\u5EFA\u4EFB\u52A1\u8DEF\u5F84\uFF1B\u7559\u7A7A\u7528\u4E2D\u8F6C\u7AD9\u9ED8\u8BA4\u503C /doubao/api/v3/contents/generations/tasks").volatile(),
   queryPath: z.string().default("").description("\u67E5\u8BE2\u4EFB\u52A1\u8DEF\u5F84\uFF0C{task_id} \u4F1A\u88AB\u4EFB\u52A1 ID \u66FF\u6362\uFF1B\u7559\u7A7A\u7528\u4E2D\u8F6C\u7AD9\u9ED8\u8BA4\u503C").volatile(),
   model: z.string().default("").description("\u89C6\u9891\u751F\u6210\u7528\u7684\u6A21\u578B ID\uFF08seedance 2.0 / 2.5 \u7CFB\u5217\uFF09\uFF1B\u7559\u7A7A\u8BFB NEWAPI_VIDEO_MODEL \u6216\u5185\u7F6E\u9ED8\u8BA4\u503C").volatile(),
-  registerUser: z.string().default("").description("\uFF08\u5DF2\u5E9F\u5F03\uFF09\u5386\u53F2\u4E0A\u6CE8\u518C\u65F6\u586B\u7684\u7528\u6237\u540D\uFF1B\u73B0\u5728\u9886 Key \u7528\u90AE\u7BB1\u9A8C\u8BC1\u7801\uFF0C\u89C1 registerEmail").volatile(),
   registerEmail: z.string().default("").description("\u9886 Key \u7528\u7684\u90AE\u7BB1\uFF08\u8D26\u53F7\uFF09\uFF1A\u4E2D\u8F6C\u7AD9\u91CC\u7684\u5BC6\u94A5\u540D\u7531\u670D\u52A1\u7AEF\u751F\u6210\u552F\u4E00\u4E32\uFF0C\u4E0E\u8FD9\u4E2A\u90AE\u7BB1\u7ED1\u5B9A").volatile(),
   registerToken: z.string().default("metaontic-video-register-v1").description("\u6CE8\u518C\u8BF7\u6C42\u5934 X-Register-Token \u7684\u503C\uFF0C\u8981\u4E0E\u670D\u52A1\u7AEF REGISTER_CLIENT_TOKEN \u4E00\u81F4\uFF1B\u9875\u9762\u4E0D\u663E\u793A").volatile(),
   registerApi: z.string().default("").description("\u63D2\u4EF6\u670D\u52A1\u5730\u5740\uFF08\u9886 Key / \u67E5\u989D\u5EA6 / \u4F7F\u7528\u8BB0\u5F55\uFF09\uFF1B\u7559\u7A7A\u7528\u5185\u7F6E\u7684\u89C6\u9891\u670D\u52A1\u57DF\u540D").volatile(),
@@ -1132,7 +1131,7 @@ function estimateUsage(config, toolName, args) {
 function resolveRegisterApi(config) {
   return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-const PLUGIN_VERSION = true ? "2.7.1".trim().replace(/^v/i, "") : "";
+const PLUGIN_VERSION = true ? "2.7.2".trim().replace(/^v/i, "") : "";
 async function fetchDeviceQuota(config, signal) {
   const api = resolveRegisterApi(config);
   const deviceId = String(ref(config, "deviceId", "")).trim();
@@ -2177,7 +2176,6 @@ const CONFIG_FIELDS = [
   "keepSegments",
   "ffmpegBinary",
   "ffprobeBinary",
-  "registerUser",
   "registerEmail",
   "registerApi",
   "deviceId",
@@ -2234,7 +2232,7 @@ function configTool(config, settings) {
           enum: ["get", "set"],
           description: "get=\u67E5\u770B\u5F53\u524D\u914D\u7F6E\uFF1Bset=\u4FEE\u6539\u914D\u7F6E\uFF08\u81F3\u5C11\u7ED9\u4E00\u4E2A\u8981\u6539\u7684\u5B57\u6BB5\uFF09\u3002"
         },
-        baseUrl: { type: "string", description: "\u57FA\u7840\u5730\u5740\uFF0C\u4F8B\u5982 https://ai.bileego.com\uFF08\u4E2D\u8F6C\u7AD9\uFF09\u6216\u5B98\u65B9\u5730\u5740\u3002" },
+        baseUrl: { type: "string", description: "\u57FA\u7840\u5730\u5740\uFF0C\u5373\u4E2D\u8F6C\u7AD9\u7AD9\u5740\uFF0C\u4F8B\u5982 https://ai.bileego.com\u3002" },
         registerEmail: { type: "string", description: "\u9886 Key \u7528\u7684\u90AE\u7BB1\uFF08\u8D26\u53F7\uFF09\uFF1B\u6CE8\u518C\u8981\u90AE\u7BB1\u9A8C\u8BC1\u7801\uFF0C\u4E00\u4E2A\u90AE\u7BB1\u53EA\u53D1\u4E00\u628A\u3002" },
         registerApi: { type: "string", description: "\u63D2\u4EF6\u670D\u52A1\u5730\u5740\uFF08\u9886 Key / \u67E5\u989D\u5EA6 / \u4F7F\u7528\u8BB0\u5F55\uFF09\uFF1B\u7559\u7A7A\u7528\u5185\u7F6E\u57DF\u540D\u3002" },
         estimateGroupRatio: { type: "number", description: "\u9884\u4F30\u8D39\u7528\u7528\u7684\u5206\u7EC4\u6298\u6263\uFF08\u4E2D\u8F6C\u7AD9 group_ratio\uFF1A\u9ED8\u8BA4 0.8\uFF09\u3002" },

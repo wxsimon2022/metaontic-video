@@ -509,7 +509,7 @@ window.__ModuleLoader__.load({
         // 注册用「邮箱（账号）+ 邮件验证码」：邮箱一次只发一把 Key
         const [registerEmail, setRegisterEmail] = React.useState(() => {
           const saved = form.getSnapshot().value || {};
-          return String(saved.registerEmail || saved.registerUser || '');
+          return String(saved.registerEmail || '');
         });
         const [registerCode, setRegisterCode] = React.useState('');
         const [codeStatus, setCodeStatus] = React.useState('idle');
