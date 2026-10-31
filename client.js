@@ -43,6 +43,7 @@
       "icon.svg",
       "logo.svg",
       "README.md",
+      "\u64CD\u4F5C\u6307\u5357\u8BF4\u660E\u4E66.md",
       "CHANGELOG.md",
       "LICENSE"
     ],
