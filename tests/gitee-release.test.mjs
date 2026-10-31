@@ -13,6 +13,7 @@ test('Gitee creates a release, uploads its archive, verifies it and is safe to r
     const request = async (url, options) => {
       const path = url.pathname;
       if (options.method === 'PATCH') {
+        assert.equal(options.body.get('tag_name'), 'v3.3.0');
         release = { ...release, body: options.body.get('body') };
         return { ok: true, json: async () => release };
       }
