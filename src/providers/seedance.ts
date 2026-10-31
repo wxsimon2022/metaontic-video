@@ -1,15 +1,15 @@
 /** providers/seedance：从宿主入口拆出的独立职责模块。 */
-import { resolveModel, parseExtraParams, isOmniExtendModel, isVolcengine } from './connection.js';
+import { resolveModel, parseExtraParams, isOmniExtendModel, isVolcengine, snapshotConfig, resolveSubmitPath } from './connection.js';
 import { clampInteger } from '../utils/validation.js';
-import { MIN_SEGMENT_SECONDS, ref, FIXED_RESOLUTION } from '../config.js';
+import { MIN_SEGMENT_SECONDS, ref, resolveResolution } from '../config.js';
 import { modelMaxSeconds } from '../workflow/planning.js';
 import { buildExtensionPrompt, buildGenerationPrompt } from '../prompts/generation.js';
 import { validateImageRoles, canvasSize, resolveImageInput } from '../media/references.js';
 import { type TaskResult } from './types.js';
 import { createTask, waitForCompletion } from './transport.js';
 import { extractTaskId } from './response.js';
-import { recoverRealPersonImages } from '../workflow/real-person.js';
-import { isRealPersonRejection } from '../utils/errors.js';
+import { guardedSubmit, finishSubmission } from './submissions.js';
+import { recoverRealPersonImages, setReferenceReview } from '../workflow/real-person.js';
 import { appendRequestLog } from '../utils/logging.js';
 
 /** 中转站要能直接拉取参考视频，本地路径与内网地址没有意义。 */
@@ -48,7 +48,7 @@ export function buildRequestBody(config, args, referenceVideoUrl) {
   body.duration = seconds;
   body.ratio = args.ratio || ref(config, 'ratio', 'adaptive');
 
-  body.resolution = FIXED_RESOLUTION;
+  body.resolution = resolveResolution(config, args);
 
   const generateAudio = args.generateAudio ?? ref(config, 'generateAudio', true);
   if (typeof generateAudio === 'boolean') body.generate_audio = generateAudio;
@@ -110,7 +110,7 @@ export async function buildGenerationBody(config, args, seconds, options: { sign
   body.duration = seconds;
   body.ratio = isOmniExtendModel(body.model) && content.some((item) => item.role === 'first_frame' || item.role === 'last_frame') ? 'adaptive' : ratio;
 
-  body.resolution = FIXED_RESOLUTION;
+  body.resolution = resolveResolution(config, args);
 
   const generateAudio = args.generateAudio ?? ref(config, 'generateAudio', true);
   if (typeof generateAudio === 'boolean') body.generate_audio = generateAudio;
@@ -126,14 +126,15 @@ export async function buildGenerationBody(config, args, seconds, options: { sign
 }
 
 /** 创建任务并等到结束；超时、取消、失败都归一化成同一形状。 */
-async function runTaskOnce(config, body, signal, progress: { taskId?: string; onCreated?: (taskId: string) => Promise<void> } = {}): Promise<TaskResult> {
-  const created = progress.taskId ? null : await createTask(config, body, signal);
+async function runTaskOnce(config, body, signal, progress: { taskId?: string; onCreated?: (taskId: string) => Promise<void>; scope?: string } = {}): Promise<TaskResult> {
+  const created = progress.taskId ? null : await guardedSubmit(config, resolveSubmitPath(config), body, signal, progress.scope);
   const taskId = progress.taskId || extractTaskId(created);
   await appendRequestLog({ event: 'task_created', taskId, model: body?.model, duration: body?.duration });
   if (!taskId) throw new Error('创建任务失败：响应中缺少任务 ID。');
   try {
     await progress.onCreated?.(taskId);
     const final = await waitForCompletion(config, taskId, signal);
+    if (['succeeded', 'failed', 'cancelled'].includes(final.status)) await finishSubmission(config, resolveSubmitPath(config), body);
     await appendRequestLog({ event: 'task_finished', taskId, status: final.status, errorCode: final.errorCode });
     return { ...final, taskId };
   } catch (failure) {
@@ -151,24 +152,69 @@ async function runTaskOnce(config, body, signal, progress: { taskId?: string; on
 }
 
 
-/** 只对明确的真人拒绝恢复一次，未知状态、网络异常和其他审核错误不重提。 */
-export async function runTask(config, body, signal, progress: {
-  taskId?: string;
-  onCreated?: (taskId: string) => Promise<void>;
-  ctx?: any;
-  exec?: any;
+/** 恢复状态随段落断点保存，跨调用最多一次视频重试；图片核对单独暂停。 */
+export async function runTask(liveConfig, body, signal, progress: {
+  taskId?: string; onCreated?: (taskId: string) => Promise<void>;
+  ctx?: any; exec?: any; state?: any; saveState?: () => Promise<void>;
+  referenceImagesReviewed?: boolean; scope?: string;
 } = {}): Promise<TaskResult> {
-  let final: TaskResult;
-  try {
-    final = await runTaskOnce(config, body, signal, progress);
-  } catch (error) {
-    if (error?.code !== 'real_person_rejected' && !isRealPersonRejection(error?.message)) throw error;
-    final = { status: 'failed', errorCode: 'real_person_rejected', error: error.message };
+  const config = snapshotConfig(liveConfig);
+  const state = progress.state || {};
+  const save = progress.saveState || (async () => {});
+  if (!state.originalBody) { state.originalBody = body; await save(); }
+  body = state.originalBody;
+  const onCreated = (kind) => async (taskId) => {
+    state[kind] = taskId;
+    await save();
+    await progress.onCreated?.(taskId);
+  };
+  const failed = (error): TaskResult => ({ status: error?.code === 'submission_unknown' ? 'submission_unknown' : 'failed', submissionId: error?.submissionId, errorCode: error?.code || 'provider_failed', error: error?.message || String(error) });
+  if (state.phase === 'review') {
+    if (!progress.referenceImagesReviewed) { const result = failed(new Error('等待图片核对')); setReferenceReview(result, state); return result; }
+    // 必须在独立一次调用中核对，首次调用提前传 true 不能跳过预览。
+    if (!state.convertedBody) throw new Error('缺少转换结果，不能重试视频。');
+    state.phase = 'retry'; state.retryUsed = true;
+    await save();
+  }
+  if (state.retryUsed) {
+    if (state.retryResult) return state.retryResult;
+    try {
+      const result = await runTaskOnce(config, state.convertedBody, signal, {
+        taskId: state.retryTaskId,
+        scope: progress.scope,
+        onCreated: onCreated('retryTaskId'),
+      });
+      if (['succeeded', 'failed', 'cancelled'].includes(result.status)) { state.retryResult = result; await save(); }
+      return result;
+    } catch (error) {
+      // 未收到 taskId 的提交被本机防重记录保护；不重新转换，也不无限重试。
+      const result = failed(error);
+      if (error?.code !== 'submission_unknown') { state.retryResult = result; await save(); }
+      return result;
+    }
+  }
+  // 普通已失败段允许用户下一次明确续做重试，但沿用已保存的原始请求；真人恢复另受 retryUsed 限制。
+  if (state.originalResult?.status === 'failed' && state.originalResult.errorCode !== 'real_person_rejected') {
+    delete state.originalResult; delete state.originalTaskId; await save();
+  }
+  let final: TaskResult = state.originalResult;
+  if (!final) {
+    try {
+      final = await runTaskOnce(config, body, signal, {
+        taskId: state.originalTaskId || progress.taskId,
+        scope: progress.scope,
+        onCreated: onCreated('originalTaskId'),
+      });
+    } catch (error) {
+      // 只处理明确的真人拒绝；鉴权、额度、限流或网络失败不被文案中的“真人”误触发。
+      if (error?.code === 'submission_unknown') return failed(error);
+      final = failed(error);
+    }
+    if (['succeeded', 'failed', 'cancelled'].includes(final.status)) { state.originalResult = { ...final }; await save(); }
   }
   if (isVolcengine(config) || final.status !== 'failed'
-    || (final.errorCode !== 'real_person_rejected' && !isRealPersonRejection(final.error))) return final;
-  const recovered = await recoverRealPersonImages(config, body, progress.ctx, progress.exec, final);
-  if (!recovered) return final;
-  // 不复用已失败 taskId；新任务仍通过 onCreated 写入断点，取消/超时可继续查询。
-  return runTaskOnce(config, recovered, signal, { onCreated: progress.onCreated });
+    || final.errorCode !== 'real_person_rejected') return final;
+  final = { ...final };
+  await recoverRealPersonImages(config, body, progress.ctx, progress.exec, final, state, save);
+  return final;
 }

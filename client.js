@@ -31,6 +31,11 @@
       .mov-section-title::before { content: ""; flex: 0 0 auto; width: 3px; height: 13px; border-radius: 2px; background: ${TOKENS.primaryFill}; }
       .mov-section-title::after { content: ""; flex: 1 1 auto; height: 1px; background: ${TOKENS.border}; }
       /* \u4E24\u5217\u81EA\u9002\u5E94\uFF1A\u5355\u5217\u81F3\u5C11 240px\uFF0C\u7A84\u9762\u677F\u81EA\u52A8\u843D\u6210\u4E00\u5217 */
+      .mov-parameter-group { container-type: inline-size; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+      .mov-parameter-group + .mov-parameter-group { border-top: 1px solid ${TOKENS.border}; padding-top: 16px; }
+      .mov-parameter-heading { font-size: 12px; font-weight: 600; color: ${TOKENS.muted}; }
+      .mov-parameter-group .mov-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+      @container (max-width: 480px) { .mov-parameter-group .mov-grid { grid-template-columns: minmax(0, 1fr); } }
       .mov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 14px 18px; }
       .mov-field { display: flex; flex-direction: column; min-width: 0; }
       /* \u5F00\u5173\u6CA1\u6709\u6807\u7B7E\u884C\uFF0C\u9760\u5E95\u5BF9\u9F50\u624D\u80FD\u8DDF\u65C1\u8FB9\u8F93\u5165\u6846\u7684\u63A7\u5236\u7EBF\u9F50\u5E73 */
@@ -274,15 +279,20 @@
       mergeMode: ["copy", "reencode"]
     };
     const SECTIONS = [
-      { key: "sectionGeneration", fields: ["connectionMode", "metaonticApiKey", "volcengineApiKey", "model", "imageModel", "mode", "ratio", "generateAudio"] }
+      { key: "sectionConnection", fields: ["connectionMode"] },
+      { key: "sectionModels", fields: ["imageUseVideoKey", "model", "metaonticApiKey", "volcengineApiKey", "imageModel", "imageApiKey"] },
+      { key: "sectionVideo", fields: ["mode", "ratio", "generateAudio"] }
     ];
     const FIELDS = [
       { key: "connectionMode", kind: "select", wide: true },
+      { key: "apiKey", kind: "text", secret: true, wide: true },
       { key: "metaonticApiKey", kind: "text", secret: true, wide: true },
       { key: "volcengineApiKey", kind: "text", secret: true, wide: true },
       // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
       { key: "model", kind: "select", wide: true },
       { key: "imageModel", kind: "select", wide: true },
+      { key: "imageUseVideoKey", kind: "switch", wide: true },
+      { key: "imageApiKey", kind: "text", secret: true, wide: true },
       { key: "mode", kind: "select" },
       { key: "ratio", kind: "select" },
       { key: "generateAudio", kind: "switch" },
@@ -308,7 +318,9 @@
       "deviceId",
       "deviceSecret",
       "model",
-      "imageModel"
+      "imageModel",
+      "imageUseVideoKey",
+      "imageApiKey"
     ];
     const DEFAULT_REGISTER_TOKEN = "metaontic-video-register-v1";
     function currentOs() {
@@ -363,7 +375,7 @@
       apiKeyConfigured: "\u5DF2\u914D\u7F6E\uFF0C\u7559\u7A7A\u4FDD\u7559\u73B0\u6709\u5BC6\u94A5",
       connectionMode: "\u63A5\u5165\u65B9\u5F0F",
       connectionModeHint: "\u90AE\u7BB1\u767B\u5F55\u9886\u53D6\u5BC6\u94A5\uFF0C\u6216\u4F7F\u7528\u81EA\u5DF1\u7684 MetaOntic AI\u3001\u706B\u5C71\u5F15\u64CE\u5BC6\u94A5\u3002\u5207\u6362\u540E\u4FDD\u5B58\u751F\u6548\u3002",
-      volcengineKeyHint: "\u586B\u5199\u706B\u5C71\u65B9\u821F\u63A7\u5236\u53F0\u7684 API Key \u540E\u4FDD\u5B58\uFF0C\u65E0\u9700\u90AE\u7BB1\u767B\u5F55\u3002\u8D39\u7528\u7531\u706B\u5C71\u5F15\u64CE\u8D26\u6237\u627F\u62C5\u3002",
+      volcengineKeyHint: "\u586B\u5199\u706B\u5C71\u65B9\u821F\u63A7\u5236\u53F0\u7684 API Key \u540E\u4FDD\u5B58\uFF0C\u8D39\u7528\u7531\u706B\u5C71\u5F15\u64CE\u8D26\u6237\u627F\u62C5\u3002\u9700\u8981\u81EA\u884C\u6838\u5BF9\u597D Key \u7684\u6A21\u578B\u80FD\u529B\u3002",
       metaontic: "B \xB7 MetaOntic AI",
       metaonticApiKey: "MetaOntic AI API Key",
       showKey: "\u663E\u793A\u5BC6\u94A5",
@@ -378,6 +390,13 @@
       resetConfirm: "\u786E\u5B9A\u91CD\u7F6E\u63D2\u4EF6\u5417\uFF1F\u8FD9\u4F1A\u6E05\u9664\u672C\u63D2\u4EF6\u4FDD\u5B58\u7684\u914D\u7F6E\u3001API Key \u548C\u767B\u5F55\u72B6\u6001\uFF0C\u9700\u8981\u91CD\u65B0\u914D\u7F6E\u3002\u5DF2\u751F\u6210\u7684\u89C6\u9891\u4E0D\u4F1A\u5220\u9664\u3002",
       model: "\u89C6\u9891\u6A21\u578B",
       imageModel: "\u56FE\u7247\u6A21\u578B",
+      imageUseVideoKey: "\u56FE\u7247\u6A21\u578B\u4E0E\u89C6\u9891\u6A21\u578B\u5171\u7528 Key",
+      sharedModelKey: "\u5171\u7528 Key",
+      serviceKeyConfigured: "\u5DF2\u914D\u7F6E\uFF08\u767B\u5F55\u4E0B\u53D1\uFF09",
+      serviceKeyMissing: "\u8BF7\u5148\u767B\u5F55\u83B7\u53D6 Key",
+      videoModelKey: "\u89C6\u9891\u6A21\u578B Key",
+      imageApiKey: "\u56FE\u7247\u6A21\u578B Key",
+      resolution: "\u89C6\u9891\u6E05\u6670\u5EA6",
       imageModelHint: "\u771F\u4EBA\u53C2\u8003\u56FE\u5148\u7528 Seedream \u8F6C\u4E3A\u975E\u771F\u4EBA\u98CE\u683C\uFF0C\u56FE\u7247\u8C03\u7528\u53E6\u884C\u8BA1\u8D39\u3002",
       modelHint: "mini \u4FA7\u91CD\u6210\u672C\uFF0Cfast \u4FA7\u91CD\u751F\u6210\u901F\u5EA6\u3002\u5B9E\u9645\u4EF7\u683C\u4EE5\u6240\u9009\u6E20\u9053\u4E3A\u51C6\u3002",
       mergeMode: "\u5408\u5E76\u65B9\u5F0F",
@@ -460,6 +479,9 @@
       versionHint: "\u53EF\u5728\u6B64\u68C0\u67E5\u5E76\u5B89\u88C5\u65B0\u7248\u672C\uFF0C\u73B0\u6709\u914D\u7F6E\u4E0E\u5BC6\u94A5\u4F1A\u4FDD\u7559\u3002",
       versionCheckedAt: "\u68C0\u67E5\u4E8E {time}",
       sectionGeneration: "\u751F\u6210\u53C2\u6570",
+      sectionConnection: "\u63A5\u5165\u4E0E\u5BC6\u94A5",
+      sectionVideo: "\u753B\u9762\u4E0E\u58F0\u97F3",
+      sectionModels: "\u6A21\u578B\u914D\u7F6E",
       sectionCombined: "\u66F4\u591A\u8BBE\u7F6E",
       sectionCombinedHint: "\u753B\u9762 \xB7 \u5408\u5E76 \xB7 \u7B49\u5F85 \xB7 \u672C\u5730\u5DE5\u5177",
       toolsHint: "\u901A\u5E38\u65E0\u9700\u586B\u5199\uFF1B\u5DF2\u5B89\u88C5\u4F46\u65E0\u6CD5\u81EA\u52A8\u8BC6\u522B\u65F6\uFF0C\u53EF\u6307\u5B9A\u53EF\u6267\u884C\u6587\u4EF6\u8DEF\u5F84\u3002",
@@ -506,7 +528,7 @@
       apiKeyConfigured: "Configured; leave blank to keep the current key",
       connectionMode: "Connection",
       connectionModeHint: "Log in by email to receive a key, or use your own MetaOntic AI or Volcano Engine key. Save to apply a change.",
-      volcengineKeyHint: "Enter an API key from the Volcano Ark console and save. No email login required. Billed to your Volcano Engine account.",
+      volcengineKeyHint: "Enter an API key from the Volcano Ark console and save. No email login required. Billed to your Volcano Engine account. Check which models your key can access.",
       metaontic: "B \xB7 MetaOntic AI",
       metaonticApiKey: "MetaOntic AI API Key",
       showKey: "Show key",
@@ -521,6 +543,13 @@
       resetConfirm: "Reset this plugin? Saved settings, API keys and login state will be cleared. Generated videos will be kept.",
       model: "Video model",
       imageModel: "Image model",
+      imageUseVideoKey: "Use video API key for images",
+      sharedModelKey: "Shared key",
+      serviceKeyConfigured: "Configured (provided at sign-in)",
+      serviceKeyMissing: "Sign in to obtain a key",
+      videoModelKey: "Video model key",
+      imageApiKey: "Image model key",
+      resolution: "Video resolution",
       imageModelHint: "Seedream stylizes real-person references before video generation; image calls are billed separately.",
       modelHint: "mini focuses on cost; fast focuses on generation speed. Actual prices depend on your provider.",
       mergeMode: "Merge mode",
@@ -595,6 +624,9 @@
       registerDisabled: "Login service unavailable: {message}",
       registerNoKey: "The login service returned no key. Try again later or contact an administrator.",
       sectionGeneration: "Generation",
+      sectionConnection: "Connection & credentials",
+      sectionVideo: "Picture & audio",
+      sectionModels: "Models",
       sectionCombined: "More settings",
       sectionCombinedHint: "Appearance, merging, runtime and local tools",
       toolsHint: "Usually leave blank. Set executable paths only if installed tools are not detected.",
@@ -695,7 +727,7 @@
     const UPDATE_ATTEMPTS = 3;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "3.6.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.7.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const match = /(\d+)\.(\d+)\.(\d+)/.exec(String(text || ""));
@@ -1341,7 +1373,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.6.0",
+    version: "3.7.0",
     description: "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
     license: "MIT",
     type: "module",
@@ -1384,7 +1416,8 @@
       "README.md",
       "\u64CD\u4F5C\u6307\u5357\u8BF4\u660E\u4E66.md",
       "CHANGELOG.md",
-      "LICENSE"
+      "LICENSE",
+      "docs/guide/*.svg"
     ],
     engines: {
       node: ">=20"
@@ -1425,13 +1458,17 @@
       hyperframes: "0.8.223"
     },
     releaseNotes: {
-      version: "3.6.0",
+      version: "3.7.0",
       items: [
-        "\u65B0\u589E\uFF1AA\u3001B \u6A21\u5F0F\u65B0\u589E\u72EC\u7ACB\u56FE\u7247\u6A21\u578B\u914D\u7F6E\uFF0C\u652F\u6301 doubao-seedream-5-0-260128 \u548C doubao-seedream-5-0-pro-260628\uFF0C\u5E76\u63D0\u4F9B\u771F\u4EBA\u53C2\u8003\u56FE\u8F6C\u975E\u771F\u4EBA\u98CE\u683C\u5DE5\u5177\u3002",
-        "\u65B0\u589E\uFF1A\u89C6\u9891\u63D0\u4EA4\u6216\u67E5\u8BE2\u7EC8\u6001\u8FD4\u56DE\u771F\u4EBA\u9650\u5236\u65F6\uFF0C\u5355\u72EC\u5F81\u6C42\u7528\u6237\u540C\u610F\uFF0C\u518D\u8F6C\u6362\u672C\u6B21\u53C2\u8003\u56FE\u5E76\u91CD\u8BD5\u89C6\u9891\u4E00\u6B21\uFF1B\u56FE\u7247\u5904\u7406\u4E0E\u89C6\u9891\u91CD\u8BD5\u5206\u522B\u8BA1\u8D39\u3002",
-        "\u4F18\u5316\uFF1A\u56FE\u7247\u91C7\u7528\u5F02\u6B65\u63D0\u4EA4\u3001\u8F6E\u8BE2\u4E0E\u53D6\u4EF6\u63A5\u53E3\uFF0C\u652F\u6301\u51ED\u56FE\u7247\u4EFB\u52A1 ID \u7EE7\u7EED\u67E5\u8BE2\uFF1B\u4E0D\u4F7F\u7528\u540C\u6B65\u5907\u9009\uFF0C\u4E0D\u81EA\u52A8\u91CD\u590D\u51FA\u56FE\u3002",
-        "\u4F18\u5316\uFF1A\u8F6C\u6362\u524D\u660E\u786E\u98CE\u683C\u4E0E\u8D39\u7528\uFF1B\u62D2\u7EDD\u3001\u53D6\u6D88\u3001\u65E0\u6CD5\u786E\u8BA4\u6216\u8F6C\u6362\u5931\u8D25\u65F6\u505C\u6B62\uFF0C\u4FDD\u7559\u539F\u6709\u9996\u5C3E\u5E27\u4E0E\u53C2\u8003\u56FE\u89D2\u8272\uFF0C\u5E76\u540C\u6B65\u4E2D\u82F1\u6587\u8BBE\u7F6E\u3001README\u548C\u64CD\u4F5C\u6307\u5357\u3002",
-        "\u4FEE\u590D\uFF1A\u6B63\u786E\u8BC6\u522B\u542B\u9519\u8BEF\u8BE6\u60C5\u7684\u5931\u8D25\u4EFB\u52A1\u7EC8\u6001\uFF0C\u4FDD\u7559\u771F\u4EBA\u9650\u5236\u9519\u8BEF\u7801\uFF1B\u666E\u901A\u5BA1\u6838\u3001\u7F51\u7EDC\u5F02\u5E38\u548C\u72B6\u6001\u672A\u77E5\u4E0D\u89E6\u53D1\u8F6C\u6362\u91CD\u8BD5\u3002"
+        "\u65B0\u589E\uFF1A\u89C6\u9891\u652F\u6301 480P\u3001720P\uFF0C\u5728\u811A\u672C\u9636\u6BB5\u7531\u7528\u6237\u660E\u786E\u786E\u8BA4\uFF0C\u8D39\u7528\u9884\u4F30\u4E0E\u751F\u6210\u53C2\u6570\u540C\u6B65\uFF1B\u6E05\u6670\u5EA6\u4E0D\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u914D\u7F6E\u3002",
+        "\u65B0\u589E\uFF1AB \u63A5\u5165\u652F\u6301\u56FE\u7247\u4E0E\u89C6\u9891\u5171\u7528\u6216\u5206\u522B\u914D\u7F6E Key\uFF1BA \u56FA\u5B9A\u4F7F\u7528\u767B\u5F55\u4E0B\u53D1\u7684 Key\uFF0C\u6A21\u578B\u533A\u57DF\u9690\u85CF Key \u914D\u7F6E\u3002",
+        "\u65B0\u589E\uFF1A\u63D0\u4EA4\u9632\u91CD\u4E0E media_submission \u6838\u5BF9\u5DE5\u5177\uFF0C\u63D0\u4EA4\u7ED3\u679C\u4E0D\u660E\u65F6\u505C\u6B62\u91CD\u53D1\uFF0C\u7ECF\u6E20\u9053\u6838\u5BF9\u540E\u5173\u8054\u539F\u4EFB\u52A1\u6216\u786E\u8BA4\u672A\u521B\u5EFA\u540E\u89E3\u9501\u3002",
+        "\u4F18\u5316\uFF1A\u751F\u6210\u53C2\u6570\u6309\u63A5\u5165\u3001\u6A21\u578B\u3001\u753B\u9762\u4E0E\u58F0\u97F3\u5206\u7EC4\uFF1BB \u5171\u7528\u65F6 Key \u4F4D\u4E8E\u4E24\u4E2A\u6A21\u578B\u4E0A\u65B9\uFF0C\u4E0D\u5171\u7528\u65F6\u5404\u6A21\u578B\u4E0B\u65B9\u663E\u793A\u5BF9\u5E94 Key\u3002",
+        "\u4F18\u5316\uFF1A\u771F\u4EBA\u53C2\u8003\u56FE\u7ECF\u540C\u610F\u8F6C\u6362\u540E\u5C55\u793A\u5168\u90E8\u7ED3\u679C\uFF0C\u7528\u6237\u6838\u5BF9\u786E\u8BA4\u540E\u624D\u91CD\u8BD5\u89C6\u9891\uFF1B\u8F6C\u6362\u3001\u56FE\u7247\u4EFB\u52A1\u548C\u89C6\u9891\u91CD\u8BD5\u8FDB\u5EA6\u9010\u9879\u4FDD\u5B58\u3002",
+        "\u4F18\u5316\uFF1A\u706B\u5C71\u76F4\u8FDE\u589E\u52A0\u81EA\u884C\u6838\u5BF9 Key \u6A21\u578B\u80FD\u529B\u63D0\u793A\uFF1B\u91CD\u5199\u56FE\u6587\u64CD\u4F5C\u6307\u5357\uFF0C\u7A81\u51FA\u63D2\u4EF6\u5B89\u88C5\u3001ai.bileego.com \u6CE8\u518C\u83B7\u53D6 Key \u53CA A/B \u914D\u7F6E\uFF0C\u968F\u5305\u63D0\u4F9B\u793A\u610F\u56FE\uFF0C\u5E76\u6C89\u6DC0\u7EF4\u62A4\u7ECF\u9A8C\u3002",
+        "\u4FEE\u590D\uFF1A\u9996\u6B21\u5931\u8D25\u6062\u590D\u4FDD\u7559\u53C2\u8003\u56FE\u3001\u9996\u5C3E\u5E27\u53CA\u6E05\u6670\u5EA6\u7B49\u539F\u8BF7\u6C42\u53C2\u6570\uFF0C\u590D\u7528\u5DF2\u5B8C\u6210\u56FE\u7247\uFF0C\u907F\u514D\u91CD\u590D\u8F6C\u6362\u6536\u8D39\u6216\u6062\u590D\u540E\u91CD\u7F6E\u5355\u6B21\u89C6\u9891\u91CD\u8BD5\u989D\u5EA6\u3002",
+        "\u4FEE\u590D\uFF1A\u56FE\u7247\u3001\u89C6\u9891\u53CA\u72B6\u6001\u67E5\u8BE2\u56FA\u5B9A\u672C\u6B21\u8FDE\u63A5\u914D\u7F6E\uFF0C\u907F\u514D\u8BBE\u7F6E\u53D8\u5316\u9020\u6210\u5730\u5740\u6216 Key \u6DF7\u7528\uFF1B\u7F3A\u5C11\u5BF9\u5E94 Key \u65F6\u505C\u6B62\uFF0C\u4E0D\u56DE\u9000\u4F7F\u7528\u5176\u4ED6\u6A21\u578B Key\u3002",
+        "\u4FEE\u590D\uFF1A\u53D1\u5E03\u6D41\u7A0B\u4FDD\u7559\u9644\u6CE8\u6807\u7B7E\u5B8C\u6574\u8BF4\u660E\uFF0C\u5E76\u8865\u9F50 Gitee \u66F4\u65B0 Release \u6240\u9700\u53C2\u6570\uFF0C\u6838\u5BF9\u53CC\u4ED3\u8BF4\u660E\u4E0E\u9644\u4EF6\u3002"
       ]
     }
   };
@@ -1787,7 +1824,8 @@
           }
         }
         function control(field) {
-          const current = draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0);
+          if (field.key === "apiKey") return h("input", { id: "metaontic-video-apiKey", className: "mov-input", style: inputStyle, type: "text", readOnly: true, value: snapshot.secrets?.apiKey || value.apiKey ? t("serviceKeyConfigured") : t("serviceKeyMissing") });
+          const current = draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (field.key === "imageUseVideoKey" ? true : field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0);
           const secondsField = field.key === "pollIntervalMs" || field.key === "maxWaitMs";
           const displayed = secondsField && current !== void 0 && current !== "" ? Number(current) / 1e3 : current;
           const id = `metaontic-video-${field.key}`;
@@ -1822,7 +1860,7 @@
               ...list.map((option) => h("option", { key: option, value: option }, optionLabel(t, field.key, option)))
             ]);
           }
-          const canReveal = field.key === "metaonticApiKey" || field.key === "volcengineApiKey";
+          const canReveal = field.key === "metaonticApiKey" || field.key === "volcengineApiKey" || field.key === "imageApiKey";
           const revealed = canReveal && visibleKey === field.key;
           const input = h("input", {
             id,
@@ -1872,20 +1910,28 @@
           if (field.kind === "switch") classes.push("mov-field-switch");
           if (field.wide) classes.push("mov-field-wide");
           return h("div", { key: field.key, className: classes.join(" ") }, [
-            field.kind === "switch" ? null : h("label", { key: "label", className: "mov-label", htmlFor: `metaontic-video-${field.key}` }, t(field.key)),
+            field.kind === "switch" ? null : h("label", { key: "label", className: "mov-label", htmlFor: `metaontic-video-${field.key}` }, t(["apiKey", "metaonticApiKey", "volcengineApiKey"].includes(field.key) ? !directMode && (serviceMode || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false) ? "sharedModelKey" : "videoModelKey" : field.key)),
             control(field),
             hints[field.key] ? h("span", { key: "hint", className: "mov-hint", style: { marginTop: 4 } }, hints[field.key]) : null
           ]);
         }
-        const renderGrid = (section) => h(
-          "div",
-          { key: section.key, className: "mov-grid" },
-          section.fields.filter((key) => (key !== "volcengineApiKey" || directMode) && (key !== "imageModel" || !directMode) && (key !== "metaonticApiKey" || selectedMode === "metaontic")).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
-        );
+        const renderGrid = (section) => {
+          const shared = serviceMode || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
+          const videoKey = directMode ? "volcengineApiKey" : serviceMode ? "apiKey" : "metaonticApiKey";
+          const fields = section.key === "sectionModels" ? directMode ? ["model", videoKey] : serviceMode ? ["model", "imageModel"] : shared ? ["imageUseVideoKey", videoKey, "model", "imageModel"] : ["imageUseVideoKey", "model", videoKey, "imageModel", "imageApiKey"] : section.fields;
+          return h(
+            "div",
+            { key: section.key, className: "mov-grid" },
+            fields.filter((key) => (key !== "volcengineApiKey" || directMode) && (!["imageModel", "imageUseVideoKey", "imageApiKey"].includes(key) || !directMode) && (key !== "imageApiKey" || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) === false) && (key !== "metaonticApiKey" || selectedMode === "metaontic")).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
+          );
+        };
         const rows = [
           h("div", { key: "generation", className: "mov-section" }, [
             h("div", { key: "title", className: "mov-section-title" }, t("sectionGeneration")),
-            renderGrid(SECTIONS[0])
+            ...SECTIONS.map((section) => h("div", { key: section.key, className: "mov-parameter-group" }, [
+              h("div", { key: "heading", className: "mov-parameter-heading" }, t(section.key)),
+              renderGrid(section)
+            ]))
           ]),
           h("details", { key: "advanced", className: "mov-section mov-advanced" }, [
             h("summary", { key: "toggle", className: "mov-advanced-toggle" }, [

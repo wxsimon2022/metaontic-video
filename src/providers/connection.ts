@@ -120,3 +120,24 @@ export function assertConfigured(config, apiKey) {
 export function resolveRegisterApi(config) {
   return (String(ref(config, 'registerApi', '')).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, '');
 }
+
+/** 一次调用固定连接和模型；引用更新只影响下一次调用，密钥不写进断点。 */
+export function snapshotConfig(config) {
+  const snapshot: Record<string, any> = {};
+  for (const key of Object.keys(config || {})) snapshot[key] = ref(config, key, undefined);
+  snapshot.connectionMode = isVolcengine(config) ? 'volcengine' : isMetaontic(config) ? 'metaontic' : 'service';
+  snapshot.baseUrl = resolveBaseUrl(config);
+  snapshot.model = resolveModel(config);
+  snapshot.submitPath = resolveSubmitPath(config);
+  snapshot.queryPath = isVolcengine(config) ? '/api/v3/contents/generations/tasks/{task_id}' : String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath;
+  return Object.freeze(snapshot);
+}
+
+/** 图片沿用当前地址，独立 Key 仅替换本次图片连接快照。 */
+export function imageConfig(config) {
+  const snapshot = snapshotConfig(config);
+  if (!isMetaontic(snapshot) || ref(snapshot, 'imageUseVideoKey', true) !== false) return snapshot;
+  const key = String(ref(snapshot, 'imageApiKey', '')).trim();
+  if (!key) throw new Error('已关闭图片与视频共用 Key，请单独填写图片模型 API Key。');
+  return Object.freeze({ ...snapshot, [isMetaontic(snapshot) ? 'metaonticApiKey' : 'apiKey']: key });
+}

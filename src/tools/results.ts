@@ -16,7 +16,16 @@ function recoveryInstruction(value, toolName) {
   return '';
 }
 
+function referenceReview(value, toolName) {
+  return [{ type: 'text', text: [
+    '【下一步：展示转换图片并等待用户确认，尚未重试视频】',
+    ...(value.convertedReferences || []).map((item, index) => `图片${index + 1}（${item.role}）：${item.imageUrl}`),
+    `先使用 present/图片展示工具逐张展示，确认是非真人且符合风格要求；用户明确同意后再调用 ${toolName}，传 resume="${value.resumeDir}"、referenceImagesReviewed:true。首次转换授权不等于结果确认。图片仍像真人或不满意时停止，不自动再次出图。视频重试另外计费。`,
+  ].join('\n') }];
+}
+
 export function renderResult(value) {
+  if (value?.status === 'review_required') return referenceReview(value, 'video_extend');
   const {
     status, segments = [], videoUrl, error, videoPath, mergeMode, segmentsDir,
     paused, resumeDir, remainingSeconds, note,
@@ -141,6 +150,7 @@ export function mergeModeLabel(mergeMode) {
 }
 
 export function renderVideoResult(value) {
+  if (value?.status === 'review_required') return referenceReview(value, 'video_generate');
   const {
     status, mode, segments = [], videoUrl, videoPath, mergeMode, segmentsDir, note, error,
     pendingTaskId, paused, resumeDir, remainingSeconds,

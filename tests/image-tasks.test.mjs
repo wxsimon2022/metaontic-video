@@ -1,76 +1,206 @@
-// Run with: node --test tests/image-tasks.test.mjs. Uses mocked fetch; no paid calls.
+// Mocked API integration tests: no network or paid generation.
 import assert from 'node:assert/strict';
+import { test, after } from 'node:test';
 import { build } from 'esbuild';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 const temp = await mkdtemp(path.join(tmpdir(), 'metaontic-image-test-'));
-const previousHome = process.env.DSH_HOME;
-process.env.DSH_HOME = temp;
-try {
-  const outfile = path.join(temp, 'plugin.mjs');
-  await build({ stdin: { contents: "export {runTask} from './src/providers/seedance.ts'; export {prepareImageTool} from './src/tools/video-prepare-image.ts';", resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', outfile });
-  const { runTask, prepareImageTool } = await import(pathToFileURL(outfile).href);
-  const config = (mode = 'metaontic', baseUrl = 'https://relay.example') => ({ connectionMode: mode, baseUrl, apiKey: 'a', keyOrigin: 'register', metaonticApiKey: 'b' });
-  const videoBody = {model:'video',content:[{type:'text',text:'test'},{type:'image_url',image_url:{url:'https://example.com/original.png'},role:'first_frame'}]};
-  async function scenario({mode='metaontic',allow='allowed-once',terminal=false,imageFailure=false,repeat=false,otherError=false,noApproval=false}={}) {
-    let calls=[], asks=0, videoQueries=0;
-    globalThis.fetch = async (url, options) => {
-      const body = options.body ? JSON.parse(options.body) : null;
-      calls.push({url,body,key:options.headers.Authorization});
-      let data;
-      if (url.endsWith('/v1/tasks/doubao')) data = {task_id:'image-task',status:'queued'};
-      else if (url.endsWith('/v1/tasks/image-task/artifacts')) data = {artifacts:[{type:'text',content_url:'https://example.com/text'},{type:'image',content_url:'https://example.com/cartoon.png'}]};
-      else if (url.endsWith('/v1/tasks/image-task')) data = imageFailure ? {status:'FAILED',fail_reason:'sensitive image'} : {status:'SUCCESS'};
-      else if (body) {
-        const count = calls.filter(c=>c.body?.model==='video').length;
-        if ((count===1&&!terminal)||repeat) return new Response(JSON.stringify({error:{code:otherError?'ContentRejected':'InputImageSensitiveContentDetected.HumanFace',message:'rejected'}}),{status:400});
-        data={id:'video-'+count};
-      } else {
-        videoQueries++;
-        data=terminal&&videoQueries===1 ? {status:'failed',error:{code:'InputImageSensitiveContentDetected.HumanFace',message:'rejected'}} : {status:'succeeded',content:{video_url:'https://example.com/video.mp4'}};
-      }
-      return new Response(JSON.stringify(data),{status:200});
-    };
-    const ctx={get:()=>noApproval?undefined:{request:async()=>{asks++;return allow;}}};
-    let result;
-    try { result=await runTask(config(mode),structuredClone(videoBody),undefined,{ctx,exec:{agent:{}}}); }
-    catch(error) {result={status:'failed',errorCode:error.code};}
-    return {result,asks,calls,images:calls.filter(c=>c.url.endsWith('/tasks/doubao')),videos:calls.filter(c=>c.body?.model==='video')};
-  }
-  for(const mode of ['service','metaontic']) for(const terminal of [false,true]) {
-    const x=await scenario({mode,terminal});
-    assert.equal(x.result.status,'succeeded'); assert.equal(x.asks,1); assert.equal(x.images.length,1); assert.equal(x.videos.length,2);
-    assert.deepEqual(x.images[0].body.image,['https://example.com/original.png']);
-    assert.equal(x.images[0].body.size,'2048x2048'); assert.equal(x.images[0].body.n,1);
-    assert.equal(x.images[0].key,mode==='service'?'Bearer a':'Bearer b');
-    assert.equal(x.videos[1].body.content[1].image_url.url,'https://example.com/cartoon.png');
-    assert.equal(x.videos[1].body.content[1].role,'first_frame');
-    assert.ok(x.calls.every(c=>!c.url.includes('/images/generations')&&!c.url.includes('/tasks/doubao/')));
-  }
-  for(const options of [{allow:'rejected'},{allow:'cancelled'},{noApproval:true},{mode:'volcengine'},{otherError:true}]) {
-    const x=await scenario(options); assert.equal(x.images.length,0); assert.equal(x.videos.length,1);
-  }
-  assert.equal((await scenario({imageFailure:true})).videos.length,1);
-  const twice=await scenario({repeat:true}); assert.equal(twice.images.length,1); assert.equal(twice.videos.length,2);
-  for(const model of ['doubao-seedream-5-0-260128','doubao-seedream-5-0-pro-260628']) {
-    let urls=[];
-    globalThis.fetch=async(url,options)=>{
-      urls.push(url);
-      if(options.body) {assert.equal(JSON.parse(options.body).model,model); return new Response(JSON.stringify({task_id:'saved'}));}
-      return new Response(JSON.stringify(url.endsWith('/artifacts')?{artifacts:[{type:'image',content_url:'https://example.com/done.png'}]}:{status:'SUCCESS'}));
-    };
-    const tool=prepareImageTool({...config('metaontic','https://relay.example/v1'),imageModel:model});
-    assert.equal((await tool.execute({image:'https://example.com/ref.png',style:'动画'},{})).taskId,'saved');
-    assert.deepEqual(urls,['https://relay.example/v1/tasks/doubao','https://relay.example/v1/tasks/saved','https://relay.example/v1/tasks/saved/artifacts']);
-    urls=[];
-    await tool.execute({taskId:'saved'},{}); assert.equal(urls.length,2);
-    globalThis.fetch=async()=>{throw new Error('network failed');};
-    await assert.rejects(()=>tool.execute({taskId:'saved'},{}),/task_id=saved/);
-    globalThis.fetch=async()=>new Response(JSON.stringify({status:'PROCESSING'}));
-    const controller=new AbortController(); controller.abort();
-    await assert.rejects(()=>tool.execute({taskId:'saved'},{signal:controller.signal}),/task_id=saved/);
-  }
-  console.log('PASS: async image protocol, models, A/B auth, base URL, resume/cancel/errors, explicit consent and bounded video retry');
-} finally { if (previousHome === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = previousHome; await rm(temp,{recursive:true,force:true}); }
+await build({stdin:{contents:`
+export {apply} from './src/index.ts';
+export {runTask,buildGenerationBody,buildRequestBody} from './src/providers/seedance.ts';
+export {prepareImageTool} from './src/tools/video-prepare-image.ts';
+export {estimateUsage} from './src/workflow/costs.ts';
+export {pickResumeOptions} from './src/workflow/resume.ts';
+export {reconcileSubmission} from './src/providers/submissions.ts';
+`,resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',outfile:path.join(temp,'plugin.mjs')});
+const api=await import(pathToFileURL(path.join(temp,'plugin.mjs')));
+after(()=>rm(temp,{recursive:true,force:true}));
+async function fixture(run) {
+ const dir=await mkdtemp(path.join(temp,'case-'));
+ const oldFetch=globalThis.fetch, oldHome=process.env.DSH_HOME;
+ process.env.DSH_HOME=dir;
+ const config={connectionMode:'metaontic',baseUrl:'https://relay.example',metaonticApiKey:'b',apiKey:'a',keyOrigin:'register',model:'video',outputDir:dir,ffmpegBinary:'/missing',ffprobeBinary:'/missing',pollIntervalMs:1,pollErrorRetries:1};
+ const calls=[],tools=new Map(); let imageCount=0,videoCount=0;
+ const flags={allow:'allowed-once',videoReject:true,imageFailAt:0,queryFailure:false,rejectRetry:false};
+ let asks=0;
+ const ctx={get:()=>({request:async()=>{asks++;return flags.allow;}}),tools:{register(t){tools.set(t.name,t);return ()=>{};}},inject(){},on(){return ()=>{};}};
+ api.apply(ctx,config);
+ globalThis.fetch=async(url,options={})=>{
+  const body=options.body?JSON.parse(options.body):undefined;calls.push({url,body,key:options.headers?.Authorization});
+  if(url.endsWith('/tasks/doubao'))return Response.json({task_id:'image-'+(++imageCount)});
+  if(/\/v1\/tasks\/image-\d+\/artifacts$/.test(url))return Response.json({artifacts:[{type:'text',content_url:'https://example.com/text'},{type:'image',content_url:'https://example.com/cartoon-'+url.match(/image-(\d+)/)[1]+'.png'}]});
+  if(/\/v1\/tasks\/image-\d+$/.test(url))return Response.json(Number(url.match(/image-(\d+)/)[1])===flags.imageFailAt?{status:'FAILED',fail_reason:'test failed'}:{status:'SUCCESS'});
+  if(body){videoCount++;return Response.json({id:'video-'+videoCount});}
+  if(flags.queryFailure)return Response.json({error:{message:'query failed'}},{status:400});
+  return Response.json((url.endsWith('/video-1')&&flags.videoReject)||flags.rejectRetry?{status:'failed',error:{code:'InputImageSensitiveContentDetected.HumanFace',message:'rejected'}}:{status:'succeeded',content:{video_url:'https://example.com/video.mp4'}});
+ };
+ const body={model:'video',resolution:'720p',content:[{type:'text',text:'test'},{type:'image_url',image_url:{url:'https://example.com/original.png'},role:'first_frame'}]};
+ const h={dir,config,calls,tools,ctx,flags,body,get asks(){return asks;},get images(){return imageCount;},get videos(){return videoCount;},exec:{agent:{}},read:async d=>JSON.parse(await readFile(path.join(d,'paused-plan.json'),'utf8'))};
+ try {await run(h);} finally {globalThis.fetch=oldFetch;if(oldHome===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=oldHome;}
+}
+for(const mode of ['service','metaontic']) test(`${mode}: convert, pause for review, then one durable video retry`,()=>fixture(async h=>{
+ h.config.connectionMode=mode;
+ const state={}; const saved=[];
+ const progress={state,saveState:async()=>saved.push(JSON.parse(JSON.stringify(state))),ctx:h.ctx,exec:h.exec};
+ const review=await api.runTask(h.config,h.body,undefined,progress);
+ assert.equal(review.status,'review_required');assert.equal(h.videos,1);assert.equal(h.images,1);assert.equal(h.asks,1);
+ assert.equal((await api.runTask(h.config,h.body,undefined,progress)).status,'review_required');assert.equal(h.videos,1);
+ const completed=await api.runTask(h.config,h.body,undefined,{...progress,referenceImagesReviewed:true});
+ assert.equal(completed.status,'succeeded');assert.equal(h.videos,2);
+ await api.runTask(h.config,h.body,undefined,progress);assert.equal(h.videos,2);assert.equal(h.images,1);
+ const imagePost=h.calls.find(c=>c.url.endsWith('/tasks/doubao'));
+ assert.deepEqual(imagePost.body.image,['https://example.com/original.png']);assert.equal(imagePost.body.size,'2048x2048');assert.equal(imagePost.body.n,1);
+ assert.equal(imagePost.key,mode==='service'?'Bearer a':'Bearer b');
+ const retried=h.calls.filter(c=>c.body?.model==='video')[1].body;
+ assert.equal(retried.content[1].role,'first_frame');assert.match(retried.content[1].image_url.url,/cartoon/);
+ assert.ok(saved.some(s=>s.images&&Object.values(s.images).some(i=>i.taskId&&!i.imageUrl)));
+ assert.ok(h.calls.every(c=>!c.url.includes('/images/generations')&&!c.url.includes('/tasks/doubao/')));
+}));
+for(const outcome of ['rejected','cancelled','unavailable']) test(`conversion ${outcome} never generates images or retries video`,()=>fixture(async h=>{
+ h.flags.allow=outcome;const result=await api.runTask(h.config,h.body,undefined,{ctx:h.ctx,exec:h.exec});assert.equal(result.status,'failed');assert.equal(h.images,0);assert.equal(h.videos,1);
+}));
+test('partial conversion resumes existing image task and never redraws a completed image',()=>fixture(async h=>{
+ h.body.content.push({type:'image_url',image_url:{url:'https://example.com/two.png'},role:'reference_image'});
+ const originalFetch=globalThis.fetch;let secondQueries=0;
+ globalThis.fetch=async(url,options)=>{
+  if(url.endsWith('/tasks/image-2')&&++secondQueries===1)throw new Error('network');
+  return originalFetch(url,options);
+ };
+ const state={},p={state,ctx:h.ctx,exec:h.exec,saveState:async()=>{}};
+ const first=await api.runTask(h.config,h.body,undefined,p);assert.equal(first.status,'failed');assert.equal(h.images,2);
+ assert.ok(Object.values(state.images).some(i=>i.imageUrl));assert.ok(Object.values(state.images).some(i=>i.taskId&&!i.imageUrl));
+ assert.equal((await api.runTask(h.config,h.body,undefined,p)).status,'review_required');assert.equal(h.images,2);assert.equal(h.asks,1);
+}));
+test('known failed image stops across resume, and rejected video retry cannot convert again',()=>fixture(async h=>{
+ const state={};h.flags.imageFailAt=1;const p={state,ctx:h.ctx,exec:h.exec,saveState:async()=>{}};
+ await api.runTask(h.config,h.body,undefined,p);await api.runTask(h.config,h.body,undefined,p);assert.equal(h.images,1);
+}));
+test('video retry pending task resumes by query and never repeats conversion',()=>fixture(async h=>{
+ const state={},p={state,ctx:h.ctx,exec:h.exec,saveState:async()=>{}};
+ await api.runTask(h.config,h.body,undefined,p);h.flags.queryFailure=true;
+ assert.equal((await api.runTask(h.config,h.body,undefined,{...p,referenceImagesReviewed:true})).status,'unknown');
+ h.flags.queryFailure=false;h.flags.rejectRetry=true;
+ assert.equal((await api.runTask(h.config,h.body,undefined,p)).status,'failed');
+ await api.runTask(h.config,h.body,undefined,p);assert.equal(h.videos,2);assert.equal(h.images,1);
+}));
+test('full tool resume persists reference inputs and reviewed conversion state',()=>fixture(async h=>{
+ const tool=h.tools.get('video_generate');
+ const png=path.join(h.dir,'original.png');await writeFile(png,Buffer.from('89504e470d0a1a0a0000000000000000','hex'));
+ const first=await tool.execute({prompt:'story',duration:5,firstFrameUrl:png,merge:false,resolution:'480p'},h.exec);
+ assert.equal(first.status,'review_required');assert.equal(first.convertedReferences.length,1);
+ const record=await h.read(first.resumeDir);assert.equal(record.options.firstFrameUrl,png);assert.equal(record.options.resolution,'480p');assert.equal(record.operationState[0].phase,'review');
+ assert.ok(record.operationState[0].originalBody.content[1].image_url.url.startsWith('data:'));
+ assert.ok(!JSON.stringify(record).includes('metaonticApiKey'));
+ await rm(png);
+ const again=await tool.execute({resume:first.resumeDir},h.exec);assert.equal(again.status,'review_required');assert.equal(h.videos,1);
+ const completed=await tool.execute({resume:first.resumeDir,referenceImagesReviewed:true},h.exec);assert.equal(completed.status,'succeeded');assert.equal(h.videos,2);
+ assert.equal(h.calls.filter(c=>c.body?.model==='video')[1].body.resolution,'480p');
+}));
+test('ordinary failed first segment resumes with original resolved references',()=>fixture(async h=>{
+ h.flags.videoReject=false;const base=globalThis.fetch;
+ globalThis.fetch=async(url,options)=>url.endsWith('/video-1')?Response.json({status:'failed',error:{message:'temporary generation failure'}}):base(url,options);
+ const tool=h.tools.get('video_generate');
+ const first=await tool.execute({prompt:'story',duration:5,referenceImages:['https://example.com/reference.png'],merge:false},h.exec);assert.equal(first.status,'failed');
+ const second=await tool.execute({resume:first.resumeDir},h.exec);assert.equal(second.status,'succeeded');
+ const last=h.calls.filter(c=>c.body?.model==='video').at(-1).body;assert.equal(last.content[1].image_url.url,'https://example.com/reference.png');
+}));
+test('uncertain image submission blocks duplicate POST and can link original task',()=>fixture(async h=>{
+ let posts=0;const base=globalThis.fetch;
+ globalThis.fetch=async(url,options)=>{if(options.method==='POST'){posts++;throw new Error('response lost');}return base(url,options);};
+ const tool=api.prepareImageTool(h.config),args={image:'https://example.com/ref.png',style:'动画'};
+ let submissionId;
+ await assert.rejects(()=>tool.execute(args,{}),e=>{submissionId=e.submissionId;return e.code==='submission_unknown';});
+ await assert.rejects(()=>tool.execute(args,{}),e=>e.code==='submission_unknown');assert.equal(posts,1);
+ await api.reconcileSubmission(h.config,submissionId,'image-9',false);
+ assert.equal((await tool.execute(args,{})).taskId,'image-9');assert.equal(posts,1);
+}));
+test('uncertain video POST is persisted and blocks a second charged submission',()=>fixture(async h=>{
+ let posts=0;globalThis.fetch=async()=>{posts++;throw new Error('response lost');};
+ const tool=h.tools.get('video_generate');
+ const first=await tool.execute({prompt:'story',duration:5,merge:false},h.exec);assert.equal(first.status,'submission_unknown');assert.ok(first.submissionId);assert.ok(first.resumeDir);
+ const second=await tool.execute({resume:first.resumeDir},h.exec);assert.equal(second.status,'submission_unknown');assert.equal(posts,1);
+}));
+test('connection and model changes during image task affect only the next call',()=>fixture(async h=>{
+ const original=globalThis.fetch;
+ globalThis.fetch=async(url,options)=>{const result=await original(url,options);if(options.method==='POST'){h.config.baseUrl='https://other.example';h.config.metaonticApiKey='changed';h.config.imageModel='doubao-seedream-5-0-pro-260628';}return result;};
+ await api.prepareImageTool(h.config).execute({image:'https://example.com/ref.png',style:'动画'},{});
+ assert.ok(h.calls.every(c=>c.url.startsWith('https://relay.example')&&c.key==='Bearer b'));
+}));
+test('480P/720P requests, estimates, defaults and validation agree',()=>fixture(async h=>{
+ for(const resolution of ['480p','720p']){
+  const g=await api.buildGenerationBody(h.config,{prompt:'test',resolution},5);
+  const e=api.buildRequestBody(h.config,{prompt:'test',duration:5,resolution},'https://example.com/source.mp4');
+  assert.equal(g.body.resolution,resolution);assert.equal(e.body.resolution,resolution);
+  assert.equal(api.estimateUsage(h.config,'video_generate',{duration:5,resolution}).resolution,resolution);
+ }
+ assert.ok(api.estimateUsage(h.config,'video_generate',{duration:5,resolution:'480p'}).tokens<api.estimateUsage(h.config,'video_generate',{duration:5,resolution:'720p'}).tokens);
+ h.config.resolution='480p';assert.equal((await api.buildGenerationBody(h.config,{prompt:'test'},5)).body.resolution,'720p');
+ await assert.rejects(()=>api.buildGenerationBody(h.config,{prompt:'test',resolution:'1080p'},5),/480P/);
+}));
+
+for (const mode of ['metaontic']) test(`${mode}: independent image key covers submission, polling and artifacts without changing video key`,()=>fixture(async h=>{
+ h.config.connectionMode=mode;h.config.imageUseVideoKey=false;h.config.imageApiKey='image-only';
+ await api.prepareImageTool(h.config).execute({image:'https://example.com/ref.png',style:'动画'},{});
+ assert.equal(h.calls.length,3);assert.ok(h.calls.every(c=>c.key==='Bearer image-only'));
+ h.calls.length=0;h.flags.videoReject=false;
+ await api.runTask(h.config,h.body,undefined,{state:{},saveState:async()=>{}});
+ assert.ok(h.calls.length>=2);assert.ok(h.calls.every(c=>c.key===`Bearer ${mode==='service'?'a':'b'}`));
+}));
+test('missing independent image key stops before network and shared mode ignores stored image key',()=>fixture(async h=>{
+ h.config.imageUseVideoKey=false;
+ await assert.rejects(()=>api.prepareImageTool(h.config).execute({image:'https://example.com/ref.png',style:'动画'},{}),/单独填写/);
+ assert.equal(h.calls.length,0);
+ h.config.imageUseVideoKey=true;h.config.imageApiKey='unused';
+ await api.prepareImageTool(h.config).execute({image:'https://example.com/ref.png',style:'动画'},{});
+ assert.ok(h.calls.every(c=>c.key==='Bearer b'));
+}));
+
+test('A always shares issued key even when legacy independent image configuration remains',()=>fixture(async h=>{
+ h.config.connectionMode='service';h.config.imageUseVideoKey=false;h.config.imageApiKey='ignored';
+ await api.prepareImageTool(h.config).execute({image:'https://example.com/ref.png',style:'动画'},{});
+ assert.ok(h.calls.every(c=>c.key==='Bearer a'));
+}));
+
+test('B recovery uses image key only for image traffic and video key for original/retry/status',()=>fixture(async h=>{
+ h.config.imageUseVideoKey=false;h.config.imageApiKey='image-secret';h.config.volcengineApiKey='wrong-c';
+ const progress={state:{},saveState:async()=>{},ctx:h.ctx,exec:h.exec};
+ assert.equal((await api.runTask(h.config,h.body,undefined,progress)).status,'review_required');
+ assert.equal((await api.runTask(h.config,h.body,undefined,{...progress,referenceImagesReviewed:true})).status,'succeeded');
+ await h.tools.get('video_status').execute({taskId:'video-2'},h.exec);
+ for(const c of h.calls) assert.equal(c.key,c.url.includes('/v1/tasks/')?'Bearer image-secret':'Bearer b');
+}));
+test('independent image task query and uncertain submission reconciliation retain image key',()=>fixture(async h=>{
+ h.config.imageUseVideoKey=false;h.config.imageApiKey='image-secret';
+ const original=globalThis.fetch;
+ globalThis.fetch=async(url,opts)=>{if(opts.method==='POST')throw new Error('response lost');return original(url,opts);};
+ let id;
+ await assert.rejects(()=>api.prepareImageTool(h.config).execute({image:'https://example.com/ref.png',style:'动画'},{}),e=>{id=e.submissionId;return !!id;});
+ await h.tools.get('media_submission').execute({action:'get',submissionId:id});
+ h.config.imageApiKey='wrong';
+ await assert.rejects(()=>h.tools.get('media_submission').execute({action:'reconcile',submissionId:id,taskId:'image-9'}),/原接入|原连接/);
+ h.config.imageApiKey='image-secret';
+ await h.tools.get('media_submission').execute({action:'reconcile',submissionId:id,taskId:'image-9'});
+ await api.prepareImageTool(h.config).execute({taskId:'image-9'},{});
+ assert.ok(h.calls.length>=3);assert.ok(h.calls.every(c=>c.key==='Bearer image-secret'));
+}));
+test('C video submission, polling and status use only Volcano key',()=>fixture(async h=>{
+ h.config.connectionMode='volcengine';h.config.volcengineApiKey='volcano-only';h.config.imageApiKey='wrong-image';h.config.imageUseVideoKey=false;h.flags.videoReject=false;
+ assert.equal((await api.runTask(h.config,h.body,undefined,{})).status,'succeeded');
+ await h.tools.get('video_status').execute({taskId:'video-1'},h.exec);
+ assert.ok(h.calls.every(c=>c.key==='Bearer volcano-only'&&c.url.startsWith('https://ark.cn-beijing.volces.com/')));
+ await assert.rejects(()=>api.prepareImageTool(h.config).execute({taskId:'image-1'},{}),/A、B/);
+}));
+test('B independent image key snapshot survives settings edits during submission',()=>fixture(async h=>{
+ h.config.imageUseVideoKey=false;h.config.imageApiKey='original-image';const original=globalThis.fetch;
+ globalThis.fetch=async(url,opts)=>{const result=await original(url,opts);if(opts.method==='POST'){h.config.imageApiKey='changed';h.config.imageUseVideoKey=true;h.config.metaonticApiKey='changed-video';}return result;};
+ await api.prepareImageTool(h.config).execute({image:'https://example.com/ref.png',style:'动画'},{});
+ assert.ok(h.calls.every(c=>c.key==='Bearer original-image'));
+}));
+for(const mode of ['service','metaontic','volcengine']) test(`${mode}: missing video key never falls back to another model key`,()=>fixture(async h=>{
+ h.config.connectionMode=mode;h.config.imageApiKey='not-video';
+ h.config[mode==='service'?'apiKey':mode==='metaontic'?'metaonticApiKey':'volcengineApiKey']='';
+ await assert.rejects(()=>h.tools.get('video_generate').execute({prompt:'test',duration:5,merge:false},h.exec),/Key/);
+ assert.equal(h.calls.length,0);
+}));

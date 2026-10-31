@@ -190,12 +190,12 @@ export function withResumeLock(tool, toolName, config) {
 }
 
 export async function writePauseFile(dir, data) {
-  await mkdir(dir, { recursive: true });
+  await mkdir(dir, { recursive: true, mode: 0o700 });
   const file = path.join(dir, PAUSE_FILE);
   // 先写唯一的临时文件、再原子 rename 顶上：并发读（另一次 resume）不会读到写到一半的 JSON。
   const temp = `${file}.${uniqueSuffix('part')}`;
   try {
-    await writeFile(temp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+    await writeFile(temp, `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
     await rename(temp, file);
   } catch (failure) {
     await rm(temp, { force: true }).catch(() => {});
@@ -231,6 +231,7 @@ export function pickResumeOptions(args) {
     'mode', 'ratio', 'generateAudio', 'watermark', 'segmentPrompts', 'merge',
     // 这几个是 video_extend 的口径（延长方向、提示词写法、整片时间轴位置）
     'direction', 'wording', 'startAt',
+    'firstFrameUrl', 'lastFrameUrl', 'referenceImages', 'resolution', 'seed', 'user', 'returnLastFrame',
   ];
   const options = {};
   for (const key of keys) {
@@ -281,7 +282,7 @@ export function progressConnection(config) {
 export function assertResumeConnection(data, config, args) {
   if (!data?.connection) return; // Old records predate connection snapshots.
   if (JSON.stringify(data.connection) === JSON.stringify(progressConnection(config))) return;
-  if (data.pendingTask) throw new Error('这份进度还有已提交的任务，请恢复原模型和接入渠道后查询，不能切换渠道重复提交。');
+  if (data.pendingTask || Object.values(data.operationState || {}).some((state: any) => state.phase === 'converting' || state.phase === 'review' || (state.retryUsed && !state.retryResult))) throw new Error('这份进度还有已提交的任务，请恢复原模型和接入渠道后查询，不能切换渠道重复提交。');
   if (args?.resumeWithCurrentConfig === true) {
     if (data.plan.slice(Number(data.done) || 0).some(step => step.seconds > modelMaxSeconds(config))) {
       throw new Error('原进度中的分段超过当前模型单段上限，请恢复原模型后继续，不自动缩短已审核分段。');
@@ -292,13 +293,13 @@ export function assertResumeConnection(data, config, args) {
 }
 
 /** Persist before delivery, including pending task IDs and the final completed cursor. */
-export async function saveProgress(dir, { config, toolName, stamp, prompt, fullPlan, cursor, referenceUrl, options, segments, pendingTask }) {
+export async function saveProgress(dir, { config, toolName, stamp, prompt, fullPlan, cursor, referenceUrl, options, segments, pendingTask, operationState = {} }) {
   const completed = segments.filter(step => step.status === 'succeeded' && step.videoUrl);
   const record = pauseRecordAt({ stamp, prompt, fullPlan, done: completed.length, cursor,
     lastVideoUrl: referenceUrl, options, segments: completed });
   Object.assign(record, { toolName, connection: progressConnection(config),
     deliveryPending: !pendingTask && completed.length > 0,
     state: pendingTask ? 'pending' : completed.length >= fullPlan.length ? 'completed' : 'paused',
-    pendingTask: pendingTask || null });
+    pendingTask: pendingTask || null, operationState });
   await writePauseFile(dir, record);
 }

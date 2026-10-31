@@ -281,7 +281,8 @@ function makePage({ form, t, manager }) {
         }
 
         function control(field) {
-          const current = draft[field.key] !== undefined ? draft[field.key] : value[field.key] ?? (field.key === 'pollIntervalMs' ? 5000 : field.key === 'maxWaitMs' ? 600000 : undefined);
+          if (field.key === 'apiKey') return h('input', { id: 'metaontic-video-apiKey', className: 'mov-input', style: inputStyle, type: 'text', readOnly: true, value: (snapshot.secrets?.apiKey || value.apiKey) ? t('serviceKeyConfigured') : t('serviceKeyMissing') });
+          const current = draft[field.key] !== undefined ? draft[field.key] : value[field.key] ?? (field.key === 'imageUseVideoKey' ? true : field.key === 'pollIntervalMs' ? 5000 : field.key === 'maxWaitMs' ? 600000 : undefined);
           const secondsField = field.key === 'pollIntervalMs' || field.key === 'maxWaitMs';
           const displayed = secondsField && current !== undefined && current !== '' ? Number(current) / 1000 : current;
           const id = `metaontic-video-${field.key}`;
@@ -314,7 +315,7 @@ function makePage({ form, t, manager }) {
               ...list.map((option) => h('option', { key: option, value: option }, optionLabel(t, field.key, option))),
             ]);
           }
-          const canReveal = field.key === 'metaonticApiKey' || field.key === 'volcengineApiKey';
+          const canReveal = field.key === 'metaonticApiKey' || field.key === 'volcengineApiKey' || field.key === 'imageApiKey';
           const revealed = canReveal && visibleKey === field.key;
           const input = h('input', {
             id,
@@ -371,22 +372,37 @@ function makePage({ form, t, manager }) {
           return h('div', { key: field.key, className: classes.join(' ') }, [
             field.kind === 'switch'
               ? null
-              : h('label', { key: 'label', className: 'mov-label', htmlFor: `metaontic-video-${field.key}` }, t(field.key)),
+              : h('label', { key: 'label', className: 'mov-label', htmlFor: `metaontic-video-${field.key}` }, t(['apiKey', 'metaonticApiKey', 'volcengineApiKey'].includes(field.key) ? (!directMode && (serviceMode || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false) ? 'sharedModelKey' : 'videoModelKey') : field.key)),
             control(field),
             hints[field.key] ? h('span', { key: 'hint', className: 'mov-hint', style: { marginTop: 4 } }, hints[field.key]) : null,
           ]);
         }
 
         // 配置区分成几节，每节一个标题 + 一个自适应网格。
-        const renderGrid = (section) => h('div', { key: section.key, className: 'mov-grid' },
-          section.fields.filter((key) => (key !== 'volcengineApiKey' || directMode)
-            && (key !== 'imageModel' || !directMode)
+        const renderGrid = (section) => {
+          const shared = serviceMode || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
+          const videoKey = directMode ? 'volcengineApiKey' : serviceMode ? 'apiKey' : 'metaonticApiKey';
+          const fields = section.key === 'sectionModels'
+            ? directMode ? ['model', videoKey]
+              : serviceMode ? ['model', 'imageModel']
+              : shared ? ['imageUseVideoKey', videoKey, 'model', 'imageModel']
+                : ['imageUseVideoKey', 'model', videoKey, 'imageModel', 'imageApiKey']
+            : section.fields;
+          return h('div', { key: section.key, className: 'mov-grid' },
+          fields.filter((key) => (key !== 'volcengineApiKey' || directMode)
+            && (!['imageModel', 'imageUseVideoKey', 'imageApiKey'].includes(key) || !directMode)
+            && (key !== 'imageApiKey' || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) === false)
             && (key !== 'metaonticApiKey' || selectedMode === 'metaontic'))
             .map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean));
+        };
         const rows = [
           h('div', { key: 'generation', className: 'mov-section' }, [
             h('div', { key: 'title', className: 'mov-section-title' }, t('sectionGeneration')),
-            renderGrid(SECTIONS[0]),
+            ...SECTIONS.map(section =>
+              h('div', { key: section.key, className: 'mov-parameter-group' }, [
+                h('div', { key: 'heading', className: 'mov-parameter-heading' }, t(section.key)),
+                renderGrid(section),
+              ])),
           ]),
           h('details', { key: 'advanced', className: 'mov-section mov-advanced' }, [
             h('summary', { key: 'toggle', className: 'mov-advanced-toggle' }, [

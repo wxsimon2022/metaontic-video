@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="492" viewBox="0 0 1040 492" role="img" aria-labelledby="title desc">
+<title id="title">B 方式：共用 Key 与分别配置</title><desc id="desc">布局示意图 · 示例中的圆点是占位符，不是真实 Key</desc>
+<style>text{font-family:"PingFang SC","Microsoft YaHei",Arial,sans-serif} .h{font-size:28px;font-weight:700;fill:#172033}.sub{font-size:17px;fill:#52627a}.label{font-size:20px;font-weight:600;fill:#172033}.line{font-size:18px;fill:#46556e}</style>
+<rect width="1040" height="492" rx="18" fill="#f3f6fb"/>
+<text x="32" y="48" class="h">B 方式：共用 Key 与分别配置</text>
+<text x="32" y="80" class="sub">布局示意图 · 示例中的圆点是占位符，不是真实 Key</text>
+<rect x="32" y="108" width="472" height="340" rx="12" fill="white" stroke="#ccd7e7"/>
+<rect x="32" y="108" width="5" height="340" rx="2" fill="#5277dc"/>
+<text x="54" y="142" class="label">共用：开启共用 Key</text>
+<text x="54" y="177" class="line">☑ 图片模型与视频模型共用 Key</text>
+<text x="54" y="206" class="line">共用 Key：••••••••••••</text>
+<text x="54" y="235" class="line">视频模型：Seedance</text>
+<text x="54" y="264" class="line">图片模型：Seedream</text>
+<text x="54" y="293" class="line">两个模型都使用上方这把 Key</text>
+<text x="54" y="322" class="line">填写完成后保存</text>
+<rect x="524" y="108" width="484" height="340" rx="12" fill="white" stroke="#ccd7e7"/>
+<rect x="524" y="108" width="5" height="340" rx="2" fill="#5277dc"/>
+<text x="546" y="142" class="label">分别配置：关闭共用 Key</text>
+<text x="546" y="177" class="line">□ 图片模型与视频模型共用 Key</text>
+<text x="546" y="206" class="line">视频模型：Seedance</text>
+<text x="546" y="235" class="line">视频模型 Key：••••••••</text>
+<text x="546" y="264" class="line">图片模型：Seedream</text>
+<text x="546" y="293" class="line">图片模型 Key：••••••••</text>
+<text x="546" y="322" class="line">各自填写，完成后保存</text>
+</svg>

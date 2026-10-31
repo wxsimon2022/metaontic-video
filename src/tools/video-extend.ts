@@ -1,10 +1,10 @@
 /** tools/video-extend：从宿主入口拆出的独立职责模块。 */
 import { modelMaxSeconds } from '../workflow/planning.js';
 import { SEGMENT_OUTPUT_SCHEMA, renderResult } from './results.js';
-import { resolveApiKey, assertConfigured } from '../providers/connection.js';
+import { snapshotConfig, resolveApiKey, assertConfigured } from '../providers/connection.js';
 import { assertResumeConnection, saveProgress, resumeDirOf, readPauseFile, pickResumeOptions, resumeHint } from '../workflow/resume.js';
 import { clampInteger } from '../utils/validation.js';
-import { MAX_SEGMENTS, MIN_SECONDS, CONTENT_REJECTION_HINT } from '../config.js';
+import { MAX_SEGMENTS, MIN_SECONDS, CONTENT_REJECTION_HINT, resolveResolution } from '../config.js';
 import { getTask } from '../providers/transport.js';
 import { extractVideoUrl, extractStatus } from '../providers/response.js';
 import { normalizeReferenceUrl, buildRequestBody, runTask } from '../providers/seedance.js';
@@ -13,7 +13,8 @@ import { formatSeconds, resolveOutputDir, fileStamp, allocateStamp } from '../ut
 import { downloadSegmentsAndMerge } from '../media/merge.js';
 import { appendRequestLog } from '../utils/logging.js';
 
-export function extendTool(config, deps, ctx) {
+export function extendTool(liveConfig, deps, ctx) {
+  const config = liveConfig;
   const TOOL_NAME = 'video_extend';
   return {
     name: 'video_extend',
@@ -104,6 +105,8 @@ export function extendTool(config, deps, ctx) {
           description: '是否添加水印，默认 false。',
         },
         merge: { type: 'boolean', description: '默认true：下载分段并在本机合并；false只返回上游链接。续做默认沿用原设置。' },
+        resolution: { type: 'string', enum: ['480p', '720p'], description: '视频清晰度，可选 480P 或 720P；默认按插件设置，未配置时为 720P。' },
+        referenceImagesReviewed: { type: 'boolean', description: '仅当上一轮返回 review_required，已实际展示所有转换图片且用户明确确认非真人效果并同意视频重试后传 true；首次调用不得预先设置。' },
         resumeWithCurrentConfig: { type: 'boolean', description: '仅在用户明确确认更换原进度的模型或接入渠道后设为true；有待查询任务时必须恢复原渠道。' },
         resume: {
           type: 'string',
@@ -145,6 +148,8 @@ export function extendTool(config, deps, ctx) {
           error: { type: 'string' },
           errorCode: { type: 'string' },
           note: { type: 'string' },
+          submissionId: { type: 'string' },
+          convertedReferences: { type: 'array', items: { type: 'object', properties: { role: { type: 'string' }, imageUrl: { type: 'string' } } } },
           segments: { type: 'array', items: SEGMENT_OUTPUT_SCHEMA },
         },
       },
@@ -157,6 +162,7 @@ export function extendTool(config, deps, ctx) {
       return true;
     },
     async execute(args, exec) {
+      const config = snapshotConfig(liveConfig);
       const apiKey = resolveApiKey(config);
       assertConfigured(config, apiKey);
 
@@ -166,6 +172,7 @@ export function extendTool(config, deps, ctx) {
       assertResumeConnection(resume, config, args);
       if (resume?.toolName && resume.toolName !== TOOL_NAME) throw new Error(`这份进度请使用 ${resume.toolName} 继续。`);
       args = { ...(resume?.options || {}), ...args };
+      args.resolution = resolveResolution(config, args);
 
       const prompt = String(args?.prompt ?? '').trim() || String(resume?.prompt ?? '').trim();
       if (!prompt) {
@@ -245,6 +252,8 @@ export function extendTool(config, deps, ctx) {
           });
         }
       }
+      let submissionId;
+      let convertedReferences;
       let status = 'succeeded';
       let error;
       let errorCode;
@@ -257,9 +266,10 @@ export function extendTool(config, deps, ctx) {
         ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir }
         : await allocateStamp(outDir, fileStamp());
       let pendingTask = resume?.pendingTask || null;
+      const operationState = resume?.operationState || {};
       const checkpoint = async () => saveProgress(segmentsDir, {
         config, toolName: TOOL_NAME, stamp, prompt, fullPlan, cursor, referenceUrl,
-        options: { ...pickResumeOptions(args), direction, wording, startAt: cursor }, segments, pendingTask,
+        options: { ...pickResumeOptions(args), direction, wording, startAt: cursor }, segments, pendingTask, operationState,
       });
       if (resume?.deliveryPending) await checkpoint();
       let interrupted = false;
@@ -283,12 +293,18 @@ export function extendTool(config, deps, ctx) {
         );
         const final = await runTask(config, body, exec?.signal, {
           ctx, exec,
+          state: operationState[position] ||= {},
+          saveState: checkpoint,
+          scope: `${segmentsDir}:${position}`,
+          referenceImagesReviewed: args?.referenceImagesReviewed === true,
           taskId: pendingTask?.taskId,
           onCreated: async (taskId) => {
             pendingTask = { taskId, index: position + 1, kind: step.kind, seconds };
             await checkpoint();
           },
         });
+        if (final.submissionId) submissionId = final.submissionId;
+        if (final.convertedReferences) convertedReferences = final.convertedReferences;
         pendingTask = ['unknown', 'timeout'].includes(final.status)
           ? { taskId: final.taskId, index: position + 1, kind: step.kind, seconds } : null;
         const taskId = final.taskId;
@@ -349,6 +365,9 @@ export function extendTool(config, deps, ctx) {
         status,
         error,
         errorCode,
+        submissionId,
+        convertedReferences,
+        ...(convertedReferences ? { nextAction: 'present_reference_images_then_wait_for_user' } : {}),
         segments,
         videoUrl: completed.at(-1)?.videoUrl,
         totalSeconds: deliveredSeconds,

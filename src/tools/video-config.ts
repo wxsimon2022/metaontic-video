@@ -5,7 +5,7 @@ import { modelMaxSeconds } from '../workflow/planning.js';
 
 /** 用户可在插件内改的配置字段。 */
 export const CONFIG_FIELDS = [
-  'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel',
+  'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel', 'imageUseVideoKey', 'imageApiKey',
   'duration', 'singleMaxSeconds', 'mode', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'pollErrorRetries',
@@ -25,6 +25,7 @@ export function maskSecrets(view) {
     ...view,
     metaonticApiKey: view.metaonticApiKey ? '（已配置）' : '',
     volcengineApiKey: view.volcengineApiKey ? '（已配置）' : '',
+    imageApiKey: view.imageApiKey ? '（已配置）' : '',
     apiKey: view.apiKey ? '（已配置）' : '',
     deviceSecret: view.deviceSecret ? '（已配置）' : '',
   };
@@ -42,6 +43,7 @@ export function configView(config) {
       submitPath: resolveSubmitPath(config),
       queryPath: isVolcengine(config) ? '/api/v3/contents/generations/tasks/{task_id}' : String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath,
       model: resolveModel(config),
+      imageUseVideoKey: !isMetaontic(config) || ref(config, 'imageUseVideoKey', true),
       imageModel: ref(config, 'imageModel', 'doubao-seedream-5-0-260128'),
       // 密钥只有一种合法来源：设置页「登录」时服务端下发
       apiKeySource: isMetaontic(config) ? (resolveApiKey(config) ? 'metaontic' : 'missing') : isVolcengine(config) ? (resolveApiKey(config) ? 'volcengine' : 'missing') : ref(config, 'apiKey', '')
@@ -86,7 +88,7 @@ export function configTool(config, settings) {
   return {
     name: 'video_config',
     description:
-      '读取或修改 MetaOnticVideo 插件自己的配置（baseUrl、submitPath、queryPath、model、'
+      '读取或修改 MetaOnticVideo 插件自己的配置（baseUrl、submitPath、queryPath、model、imageModel、'
       + 'duration、singleMaxSeconds、mode、ratio、generateAudio、'
       + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、'
       + 'outputDir、resumeLockStaleMinutes、'
@@ -114,6 +116,8 @@ export function configTool(config, settings) {
         estimateGroupRatio: { type: 'number', description: '预估费用用的分组折扣（中转站 group_ratio：默认 0.8）。' },
         submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
         queryPath: { type: 'string', description: '查询任务路径，{task_id} 会被替换。' },
+        imageUseVideoKey: { type: 'boolean', description: '仅 B 方式可选择是否共用 Key，默认 true；A 固定共用登录下发的 Key' },
+        imageApiKey: { type: 'string', description: '关闭共用时必须填写的图片模型 Key，地址仍沿用当前 A/B 连接' },
         imageModel: { type: 'string', enum: ['doubao-seedream-5-0-260128', 'doubao-seedream-5-0-pro-260628'], description: 'A/B 真人参考图非真人化模型' },
         model: { type: 'string', description: '模型 ID，例如 doubao-seedance-2-0-mini-260615。' },
         duration: { type: 'integer', minimum: 4, maximum: modelMaxSeconds(config), description: '每段新增秒数上限（4 至模型上限（2.0 为 15、2.5 为 30） 的整数，默认按模型上限、段数最少）。' },

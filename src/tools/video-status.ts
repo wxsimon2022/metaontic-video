@@ -1,11 +1,11 @@
 /** tools/video-status：从宿主入口拆出的独立职责模块。 */
-import { resolveApiKey, assertConfigured, resolveModel } from '../providers/connection.js';
+import { resolveApiKey, assertConfigured, resolveModel, snapshotConfig } from '../providers/connection.js';
 import { getTask } from '../providers/transport.js';
 import { extractStatus, findKey, extractVideoUrl, extractImageUrl } from '../providers/response.js';
 import { SUCCESS_STATES, FAILED_STATES, CONTENT_REJECTION_HINT } from '../config.js';
 import { classifyError, isContentRejection } from '../utils/errors.js';
 
-export function taskTool(config) {
+export function taskTool(liveConfig) {
   return {
     name: 'video_status',
     description:
@@ -72,6 +72,7 @@ export function taskTool(config) {
       return true;
     },
     async execute(args, exec) {
+      const config = snapshotConfig(liveConfig);
       const apiKey = resolveApiKey(config);
       assertConfigured(config, apiKey);
 

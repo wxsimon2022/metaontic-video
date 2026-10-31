@@ -2,13 +2,15 @@ import { sourceOf } from './source.mjs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-const source = sourceOf('providers/connection', 'workflow/approval');
+const source = sourceOf('config', 'providers/connection', 'workflow/approval');
 function harness() {
   const context = vm.createContext({
     ref: (config, key, fallback) => config[key] ?? fallback,
     envValue: () => '',
     relayPreset: () => ({ baseUrl: 'https://ai.bileego.com', submitPath: '/doubao/api/v3/contents/generations/tasks', queryPath: '/doubao/api/v3/contents/generations/tasks/{task_id}' }),
     resumeDirOf: value => value || '',
+    readPauseFile: async () => ({ operationState: {} }),
+    FIXED_RESOLUTION: '720p',
     estimateArgsFor: async (_config, _tool, args) => ({ ...args, remainingPlan: [{ kind: 'extend', seconds: 5 }] }),
     approvalPolicy: () => 'ask', ffmpegConsentGate: async () => null,
     resolveModel: () => 'seedance',
@@ -16,7 +18,7 @@ function harness() {
     resolveRegisterApi: () => { throw new Error('must not query service'); },
     isServerIssuedKey: () => false,
   });
-  for (const name of ['isVolcengine', 'isMetaontic', 'isManualKey', 'connectionLabel', 'resolveApiKey', 'resolveBaseUrl', 'resolveSubmitPath', 'resolveQueryPath', 'assertConfigured', 'fetchDeviceQuota', 'remainingCostText', 'preflightGate']) {
+  for (const name of ['resolveResolution', 'isVolcengine', 'isMetaontic', 'isManualKey', 'connectionLabel', 'resolveApiKey', 'resolveBaseUrl', 'resolveSubmitPath', 'resolveQueryPath', 'assertConfigured', 'fetchDeviceQuota', 'remainingCostText', 'preflightGate']) {
     const start = source.search(new RegExp(`(?:async )?function ${name}\\(`));
     assert.ok(start >= 0, name);
     vm.runInContext(source.slice(start, source.indexOf('\n}', start) + 2), context);

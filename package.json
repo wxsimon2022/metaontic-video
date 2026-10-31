@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "3.6.0",
+  "version": "3.7.0",
   "description": "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
   "license": "MIT",
   "type": "module",
@@ -43,7 +43,8 @@
     "README.md",
     "操作指南说明书.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "docs/guide/*.svg"
   ],
   "engines": {
     "node": ">=20"
@@ -84,13 +85,17 @@
     "hyperframes": "0.8.223"
   },
   "releaseNotes": {
-    "version": "3.6.0",
+    "version": "3.7.0",
     "items": [
-      "新增：A、B 模式新增独立图片模型配置，支持 doubao-seedream-5-0-260128 和 doubao-seedream-5-0-pro-260628，并提供真人参考图转非真人风格工具。",
-      "新增：视频提交或查询终态返回真人限制时，单独征求用户同意，再转换本次参考图并重试视频一次；图片处理与视频重试分别计费。",
-      "优化：图片采用异步提交、轮询与取件接口，支持凭图片任务 ID 继续查询；不使用同步备选，不自动重复出图。",
-      "优化：转换前明确风格与费用；拒绝、取消、无法确认或转换失败时停止，保留原有首尾帧与参考图角色，并同步中英文设置、README和操作指南。",
-      "修复：正确识别含错误详情的失败任务终态，保留真人限制错误码；普通审核、网络异常和状态未知不触发转换重试。"
+      "新增：视频支持 480P、720P，在脚本阶段由用户明确确认，费用预估与生成参数同步；清晰度不在插件设置页配置。",
+      "新增：B 接入支持图片与视频共用或分别配置 Key；A 固定使用登录下发的 Key，模型区域隐藏 Key 配置。",
+      "新增：提交防重与 media_submission 核对工具，提交结果不明时停止重发，经渠道核对后关联原任务或确认未创建后解锁。",
+      "优化：生成参数按接入、模型、画面与声音分组；B 共用时 Key 位于两个模型上方，不共用时各模型下方显示对应 Key。",
+      "优化：真人参考图经同意转换后展示全部结果，用户核对确认后才重试视频；转换、图片任务和视频重试进度逐项保存。",
+      "优化：火山直连增加自行核对 Key 模型能力提示；重写图文操作指南，突出插件安装、ai.bileego.com 注册获取 Key 及 A/B 配置，随包提供示意图，并沉淀维护经验。",
+      "修复：首次失败恢复保留参考图、首尾帧及清晰度等原请求参数，复用已完成图片，避免重复转换收费或恢复后重置单次视频重试额度。",
+      "修复：图片、视频及状态查询固定本次连接配置，避免设置变化造成地址或 Key 混用；缺少对应 Key 时停止，不回退使用其他模型 Key。",
+      "修复：发布流程保留附注标签完整说明，并补齐 Gitee 更新 Release 所需参数，核对双仓说明与附件。"
     ]
   }
 }

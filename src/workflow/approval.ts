@@ -2,7 +2,7 @@
 import { isManualKey, connectionLabel, resolveRegisterApi, assertConfigured, resolveApiKey, resolveModel } from '../providers/connection.js';
 import { estimateSteps, formatMoney, estimatePlan, estimateUsage } from './costs.js';
 import { finiteNumber, clampInteger } from '../utils/validation.js';
-import { ref, DEFAULT_USD_EXCHANGE_RATE, DEFAULT_REGISTER_TOKEN, PLUGIN_VERSION, MIN_SECONDS, MAX_SEGMENTS, DEFAULT_QUOTA_PER_UNIT, FIXED_RESOLUTION } from '../config.js';
+import { ref, DEFAULT_USD_EXCHANGE_RATE, DEFAULT_REGISTER_TOKEN, PLUGIN_VERSION, MIN_SECONDS, MAX_SEGMENTS, DEFAULT_QUOTA_PER_UNIT, resolveResolution } from '../config.js';
 import { sumStepSeconds, resolveSegmentSeconds, modelMaxSeconds } from './planning.js';
 import { ffmpegInstallOptions, hasFfmpeg, resolveBinary } from '../media/ffmpeg.js';
 import { resumeDirOf, readPauseFile, resumePlanFrom, assertResumeConnection } from './resume.js';
@@ -276,15 +276,20 @@ export async function estimateArgsFor(config, toolName, args) {
     plan = fullPlan.slice(Number(data.done) || 0);
   }
   return { ...merged, remainingPlan: data.pendingTask || data.deliveryPending ? [] : plan,
-    duration: sumStepSeconds(plan), referenceImages: [] };
+    duration: sumStepSeconds(plan) };
 }
 
 export async function preflightGate(ctx, config, exec) {
   // 装环境：只有真要装的时候才拦（让用户先看到命令）；纯检查放行。
   if (exec.name === 'video_setup') return setupGate(ctx, exec);
 
+  if (exec.name === 'media_submission') {
+    if (exec.arguments?.action === 'get') return { kind: 'allow' };
+    if (approvalPolicy(ctx, exec) === 'never') return { kind: 'deny', reason: '需要用户确认原提交的核对结果。' };
+    return { kind: 'ask', reason: exec.arguments?.taskId ? '确认将防重记录关联到渠道侧核对出的原任务 ID，不重新生成。' : '请确认已经在渠道侧核对：原请求没有创建任务。解锁后再生成会产生新费用；若原任务实际存在，可能重复扣费。' };
+  }
   if (exec.name === 'video_prepare_image') {
-    if (exec.arguments?.taskId) return { kind: 'allow' }; // 只查询和取件，不创建新的付费任务。
+    if (String(exec.arguments?.taskId || '').trim()) return { kind: 'allow' }; // 只查询和取件，不创建新的付费任务。
     if (approvalPolicy(ctx, exec) === 'never') return { kind: 'deny', reason: '当前权限模式无法进行图片调用确认。' };
     return { kind: 'ask', reason: '调用 Seedream 将真人参考图转为非真人风格；图片生成单独按实际调用计费，视频费用另计。', displayReason: { zh: '将调用 Seedream 处理参考图，图片调用单独计费，视频费用另计。确认后开始处理。', en: 'Use Seedream to stylize the reference. Image calls are billed separately from video. Confirm to proceed.' } };
   }
@@ -292,6 +297,13 @@ export async function preflightGate(ctx, config, exec) {
   const rawArgs = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : {};
   if (resumeDirOf(rawArgs.resume)) {
     try {
+      const saved = await readPauseFile(resumeDirOf(rawArgs.resume));
+      if (Object.values(saved.operationState || {}).some((state: any) => state.phase === 'review')) {
+        if (rawArgs.referenceImagesReviewed !== true) return { kind: 'allow' }; // 只返回图片预览，不能提交视频。
+        if (approvalPolicy(ctx, exec) === 'never') return { kind: 'deny', reason: '需要确认转换图片效果与视频重试。' };
+        return { kind: 'ask', reason: '请确认已看过转换后的全部图片，图片已呈现非真人风格且符合要求，并同意使用这些图片重试视频一次。视频重试按实际调用计费；图片不合适请拒绝，插件不会自动重画。' };
+      }
+
       const prepared = await estimateArgsFor(config, exec.name, rawArgs);
       if (prepared.remainingPlan?.length === 0) return { kind: 'allow' };
     } catch (error) { return { kind: 'deny', reason: error?.message || String(error) }; }
@@ -315,8 +327,8 @@ export async function preflightGate(ctx, config, exec) {
     assertConfigured(config, resolveApiKey(config));
     return {
       kind: 'ask',
-      reason: `调用${connectionLabel(config)} ${resolveModel(config)}，按渠道账户实际用量计费。`,
-      displayReason: { zh: `本次将通过${connectionLabel(config)}生成视频，按渠道账户实际用量计费。确认后开始。`, en: `Generate via ${connectionLabel(config)}, billed to your channel account. Confirm to continue.` },
+      reason: `调用${connectionLabel(config)} ${resolveModel(config)} · ${resolveResolution(config, args)}，按渠道账户实际用量计费。`,
+      displayReason: { zh: `本次将通过${connectionLabel(config)}生成 ${resolveResolution(config, args)} 视频，按渠道账户实际用量计费。确认后开始。`, en: `Generate via ${connectionLabel(config)}, billed to your channel account. Confirm to continue.` },
     };
   }
   let estimate = null;
@@ -362,7 +374,7 @@ export async function preflightGate(ctx, config, exec) {
 
   const total = estimate
     ? `${estimate.model} · ${estimate.resolution} · ${planSummary(estimate)}`
-    : `${resolveModel(config)} · ${FIXED_RESOLUTION}`;
+    : `${resolveModel(config)} · ${resolveResolution(config, args)}`;
   // 审计那条（模型看）保留 token / 额度这类内部口径，方便对着中转站日志核对
   const auditTax = estimate
     ? `预估消耗 ${estimate.tokens.toLocaleString('en-US')} token ≈ ${needMoney ?? '无法预估'}`

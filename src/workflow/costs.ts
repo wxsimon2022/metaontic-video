@@ -1,5 +1,5 @@
 /** workflow/costs：从宿主入口拆出的独立职责模块。 */
-import { ESTIMATE_RATES, MAX_SEGMENTS, MIN_SECONDS, FIXED_RESOLUTION, ESTIMATE_PIXELS, ESTIMATE_FPS, ESTIMATE_TOKEN_DIVISOR, ref } from '../config.js';
+import { ESTIMATE_RATES, MAX_SEGMENTS, MIN_SECONDS, FIXED_RESOLUTION, resolveResolution, ESTIMATE_PIXELS, ESTIMATE_FPS, ESTIMATE_TOKEN_DIVISOR, ref } from '../config.js';
 import { clampInteger, finiteNumber } from '../utils/validation.js';
 import { modelMaxSeconds, resolveTargetPlan } from './planning.js';
 import { resolveModel } from '../providers/connection.js';
@@ -47,8 +47,8 @@ export function estimatePlan(config, toolName, args) {
  * 两边算出来的数字才不会打架。
  * @param steps - 每段要有 seconds / kind，以及 usesReference（是否带参考素材）。
  */
-export function estimateSteps(config, steps) {
-  const resolution = FIXED_RESOLUTION;
+export function estimateSteps(config, steps, selectedResolution = undefined) {
+  const resolution = resolveResolution(config, { resolution: selectedResolution });
   const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS[FIXED_RESOLUTION];
   const tokensPerSecond = (pixels[0] * pixels[1] * ESTIMATE_FPS) / ESTIMATE_TOKEN_DIVISOR;
   const model = resolveModel(config);
@@ -90,6 +90,7 @@ export function estimateUsage(config, toolName, args, actualPlan = undefined) {
   const { model, resolution, segments } = estimateSteps(
     config,
     plan.map((step) => ({ ...step, usesReference: step.kind === 'extend' || hasFrame })),
+    resolveResolution(config, args),
   );
   const usd = segments.reduce((sum, item) => sum + item.usd, 0) * groupRatio;
   return {

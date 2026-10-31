@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="552" viewBox="0 0 1040 552" role="img" aria-labelledby="title desc">
+<title id="title">安装插件：从添加到打开</title><desc id="desc">操作示意图 · 菜单名称以当前 Harness 版本为准</desc>
+<style>text{font-family:"PingFang SC","Microsoft YaHei",Arial,sans-serif} .h{font-size:28px;font-weight:700;fill:#172033}.sub{font-size:17px;fill:#52627a}.label{font-size:20px;font-weight:600;fill:#172033}.line{font-size:18px;fill:#46556e}</style>
+<rect width="1040" height="552" rx="18" fill="#f3f6fb"/>
+<text x="32" y="48" class="h">安装插件：从添加到打开</text>
+<text x="32" y="80" class="sub">操作示意图 · 菜单名称以当前 Harness 版本为准</text>
+<rect x="32" y="108" width="976" height="110" rx="12" fill="white" stroke="#ccd7e7"/>
+<rect x="32" y="108" width="5" height="110" rx="2" fill="#5277dc"/>
+<text x="54" y="142" class="label">① 打开 Harness → 插件 → 添加插件</text>
+<text x="54" y="177" class="line">粘贴下方任一安装地址，按宿主提示完成安装。</text>
+<rect x="32" y="238" width="976" height="140" rx="12" fill="white" stroke="#ccd7e7"/>
+<rect x="32" y="238" width="5" height="140" rx="2" fill="#5277dc"/>
+<text x="54" y="272" class="label">② 选择一个安装来源</text>
+<text x="54" y="307" class="line">git+https://gitee.com/hackloop/metaontic-video.git</text>
+<text x="54" y="336" class="line">git+https://github.com/wxsimon2022/metaontic-video.git</text>
+<rect x="32" y="398" width="976" height="110" rx="12" fill="white" stroke="#ccd7e7"/>
+<rect x="32" y="398" width="5" height="110" rx="2" fill="#5277dc"/>
+<text x="54" y="432" class="label">③ 已安装插件 → MetaOnticVideo → 查看</text>
+<text x="54" y="467" class="line">进入设置页，选择接入方式；配置后选择“视频创作助手”开始。</text>
+</svg>

@@ -1,8 +1,8 @@
 /** tools/video-generate：从宿主入口拆出的独立职责模块。 */
-import { MAX_TOTAL_SECONDS, MAX_SEGMENTS, CONTENT_REJECTION_HINT } from '../config.js';
+import { MAX_TOTAL_SECONDS, MAX_SEGMENTS, CONTENT_REJECTION_HINT, resolveResolution } from '../config.js';
 import { modelMaxSeconds, resolveTargetPlan, resolveSegmentPrompts } from '../workflow/planning.js';
 import { VIDEO_SEGMENT_OUTPUT_SCHEMA, renderVideoResult } from './results.js';
-import { resolveApiKey, assertConfigured, isOmniExtendModel, resolveModel } from '../providers/connection.js';
+import { snapshotConfig, resolveApiKey, assertConfigured, isOmniExtendModel, resolveModel } from '../providers/connection.js';
 import { assertResumeConnection, saveProgress, resumeDirOf, readPauseFile, resumePlanFrom, pickResumeOptions, resumeHint } from '../workflow/resume.js';
 import { abortError } from '../utils/errors.js';
 import { buildSegmentExecutionPrompt } from '../prompts/generation.js';
@@ -11,7 +11,8 @@ import { resolveOutputDir, allocateStamp, fileStamp } from '../utils/files.js';
 import { appendRequestLog } from '../utils/logging.js';
 import { downloadSegmentsAndMerge } from '../media/merge.js';
 
-export function videoTool(config, deps, ctx) {
+export function videoTool(liveConfig, deps, ctx) {
+  const config = liveConfig;
   // 结果里的「接着做要调哪个工具」和确认框里的工具名都用它
   const TOOL_NAME = 'video_generate';
   return {
@@ -117,6 +118,8 @@ export function videoTool(config, deps, ctx) {
           type: 'boolean',
           description: '是否添加水印，默认 false。',
         },
+        resolution: { type: 'string', enum: ['480p', '720p'], description: '视频清晰度，可选 480P 或 720P；默认按插件设置，未配置时为 720P。' },
+        referenceImagesReviewed: { type: 'boolean', description: '仅当上一轮返回 review_required，已实际展示所有转换图片且用户明确确认非真人效果并同意视频重试后传 true；首次调用不得预先设置。' },
         resumeWithCurrentConfig: { type: 'boolean', description: '仅在用户明确确认更换原进度的模型或接入渠道后设为true；有待查询任务时必须恢复原渠道。' },
         resume: {
           type: 'string',
@@ -170,6 +173,8 @@ export function videoTool(config, deps, ctx) {
           note: { type: 'string' },
           error: { type: 'string' },
           errorCode: { type: 'string' },
+          submissionId: { type: 'string' },
+          convertedReferences: { type: 'array', items: { type: 'object', properties: { role: { type: 'string' }, imageUrl: { type: 'string' } } } },
           segments: { type: 'array', items: VIDEO_SEGMENT_OUTPUT_SCHEMA },
         },
       },
@@ -182,6 +187,7 @@ export function videoTool(config, deps, ctx) {
       return true;
     },
     async execute(args, exec) {
+      const config = snapshotConfig(liveConfig);
       const apiKey = resolveApiKey(config);
       assertConfigured(config, apiKey);
 
@@ -191,6 +197,7 @@ export function videoTool(config, deps, ctx) {
       assertResumeConnection(resume, config, args);
       if (resume?.toolName && resume.toolName !== TOOL_NAME) throw new Error(`这份进度请使用 ${resume.toolName} 继续。`);
       args = { ...(resume?.options || {}), ...args };
+      args.resolution = resolveResolution(config, args);
 
       const prompt = String(args?.prompt ?? '').trim() || String(resume?.prompt ?? '').trim();
       if (!prompt) {
@@ -252,6 +259,8 @@ export function videoTool(config, deps, ctx) {
         }
       }
       const resultImages = [];
+      let submissionId;
+      let convertedReferences;
       let status = 'succeeded';
       let error;
       let errorCode;
@@ -271,9 +280,10 @@ export function videoTool(config, deps, ctx) {
         ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir }
         : await allocateStamp(outDir, fileStamp());
       let pendingTask = resume?.pendingTask || null;
+      const operationState = resume?.operationState || {};
       const checkpoint = async () => saveProgress(segmentsDir, {
         config, toolName: TOOL_NAME, stamp, prompt, fullPlan, cursor, referenceUrl,
-        options: pickResumeOptions(args), segments, pendingTask,
+        options: pickResumeOptions(args), segments, pendingTask, operationState,
       });
       if (resume?.deliveryPending) await checkpoint();
       let interrupted = false;
@@ -296,7 +306,10 @@ export function videoTool(config, deps, ctx) {
         };
         let body;
         let seconds;
-        if (step.kind === 'generate') {
+        if (operationState[position]?.originalBody) {
+          body = operationState[position].originalBody;
+          seconds = step.seconds;
+        } else if (step.kind === 'generate') {
           const generated = await buildGenerationBody(config, stepArgs, step.seconds, {
             signal: exec?.signal,
           });
@@ -310,12 +323,18 @@ export function videoTool(config, deps, ctx) {
 
         const final = await runTask(config, body, exec?.signal, {
           ctx, exec,
+          state: operationState[position] ||= {},
+          saveState: checkpoint,
+          scope: `${segmentsDir}:${position}`,
+          referenceImagesReviewed: args?.referenceImagesReviewed === true,
           taskId: pendingTask?.taskId,
           onCreated: async (taskId) => {
             pendingTask = { taskId, index: position + 1, kind: step.kind, seconds };
             await checkpoint();
           },
         });
+        if (final.submissionId) submissionId = final.submissionId;
+        if (final.convertedReferences) convertedReferences = final.convertedReferences;
         pendingTask = ['unknown', 'timeout'].includes(final.status)
           ? { taskId: final.taskId, index: position + 1, kind: step.kind, seconds } : null;
         const detail = final.errorCode === 'content_rejected'
@@ -375,6 +394,9 @@ export function videoTool(config, deps, ctx) {
         videoUrl: completed.at(-1)?.videoUrl,
         error,
         errorCode,
+        submissionId,
+        convertedReferences,
+        ...(convertedReferences ? { nextAction: 'present_reference_images_then_wait_for_user' } : {}),
       };
       if (resume?.deliveryPending && doneBefore < fullPlan.length) paused = true;
       if (paused) {

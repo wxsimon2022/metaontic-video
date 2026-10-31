@@ -19,7 +19,7 @@ function harness() {
       return { url: value, source: 'test' };
     },
   });
-  for (const name of ['isOmniExtendModel', 'validateImageRoles', 'buildGenerationBody']) {
+  for (const name of ['resolveResolution', 'isOmniExtendModel', 'validateImageRoles', 'buildGenerationBody']) {
     const marker = name === 'buildGenerationBody' ? 'async function' : 'function';
     const start = source.indexOf(`${marker} ${name}(`);
     assert.ok(start >= 0, name);

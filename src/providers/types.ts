@@ -16,9 +16,11 @@ export interface RunOptions {
 /** 一次任务跑完的结果（上游是动态 JSON，这里只声明我们会读的字段）。 */
 export interface TaskResult {
   taskId?: string;
+  submissionId?: string;
   status: string;
   videoUrl?: string;
   error?: string;
   errorCode?: string;
   model?: string;
+  convertedReferences?: Array<{ role: string; imageUrl: string }>;
 }
