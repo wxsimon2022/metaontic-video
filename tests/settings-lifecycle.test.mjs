@@ -145,3 +145,24 @@ test('online updates report hot application, required restart and inactive insta
     assert.equal(messages.at(-1), message, application);
   }
 });
+
+test('first Save waits for background device synchronization instead of silently returning', async () => {
+  const h = setup();
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  h.ctx.connectionBusy.current = true; h.ctx.connectionBusy.pending = pending;
+  h.ctx.saveInFlight = { current: false };
+  h.ctx.draft = { connectionMode: 'metaontic', metaonticApiKey: 'video-key' };
+  h.ctx.same = (a,b) => a === b;
+  h.ctx.form.getSnapshot = () => ({ value: { ...h.state } });
+  vm.runInContext(extract('save'), h.ctx);
+  const first = h.ctx.save();
+  await h.ctx.save(); // double click while waiting cannot queue a second save
+  assert.equal(h.calls(), 0);
+  h.ctx.connectionBusy.current = false; h.ctx.connectionBusy.pending = null; release();
+  await first;
+  assert.equal(h.calls(), 1); assert.equal(h.state.connectionMode, 'metaontic');
+  assert.equal(h.state.metaonticApiKey, 'video-key'); assert.equal(h.state.apiKey, '');
+  assert.equal(h.ctx.saveInFlight.current, false);
+  assert.ok(h.events.some(e => Array.isArray(e) && e[0] === 'flash' && e[1] === 'saved'));
+});

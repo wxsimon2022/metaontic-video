@@ -23,3 +23,45 @@ test('rejected atomic writes report failure without falling back to partial writ
   assert.equal(calls, 1);
   await assert.rejects(context.persistConnection({}, [], 'metaontic'), /atomicUnsupported/);
 });
+
+test('stale revision recovers and saves the full connection in one user action', async () => {
+  const disk = { connectionMode: 'service', apiKey: 'issued', model: 'video' };
+  let revision = 'old', calls = 0;
+  const seen = [];
+  const form = {
+    getSnapshot() { return { status: 'ready', writable: true, revision, value: { ...disk }, user: { ...disk } }; },
+    async mutate(ops) {
+      calls++; seen.push(JSON.stringify(ops));
+      if (calls === 1) { revision = 'recovered'; return false; }
+      for (const op of ops) disk[op.path[0]] = op.value;
+      return true;
+    },
+  };
+  await context.persistConnection(form, [['connectionMode', 'metaontic'], ['metaonticApiKey', 'new-key']], 'metaontic');
+  assert.equal(calls, 2); assert.equal(seen[0], seen[1]);
+  assert.equal(disk.connectionMode, 'metaontic'); assert.equal(disk.metaonticApiKey, 'new-key'); assert.equal(disk.apiKey, '');
+});
+for (const variant of ['same-revision', 'changed-field', 'read-only', 'loading', 'second-rejected']) test(`atomic recovery stops safely: ${variant}`, async () => {
+  const state = { status: 'ready', writable: true, revision: 1, value: { connectionMode: 'service' } };
+  let calls = 0;
+  const form = {
+    getSnapshot: () => state,
+    async mutate() {
+      calls++;
+      if (variant !== 'same-revision') state.revision++;
+      if (variant === 'changed-field') state.value.connectionMode = 'volcengine';
+      if (variant === 'read-only') state.writable = false;
+      if (variant === 'loading') state.status = 'loading';
+      return false;
+    },
+  };
+  await assert.rejects(context.persistConnection(form, [['connectionMode', 'metaontic']], 'metaontic'), /atomicRejected/);
+  assert.equal(calls, variant === 'second-rejected' ? 2 : 1);
+});
+test('accepted write never reads a disposed controller after success', async () => {
+  let disposed = false;
+  await context.persistBatch({
+    getSnapshot() { if (disposed) throw new Error('disposed'); return { status: 'ready', revision: 1, value: {} }; },
+    async mutate() { disposed = true; return true; },
+  }, [{ op: 'set', path: ['ratio'], value: '9:16' }]);
+});

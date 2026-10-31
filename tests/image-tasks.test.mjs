@@ -12,6 +12,7 @@ export {apply} from './src/index.ts';
 export {runTask,buildGenerationBody,buildRequestBody} from './src/providers/seedance.ts';
 export {prepareImageTool} from './src/tools/video-prepare-image.ts';
 export {estimateUsage} from './src/workflow/costs.ts';
+export {preflightGate,estimateArgsFor} from './src/workflow/approval.ts';
 export {pickResumeOptions} from './src/workflow/resume.ts';
 export {reconcileSubmission} from './src/providers/submissions.ts';
 `,resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',outfile:path.join(temp,'plugin.mjs')});
@@ -203,4 +204,43 @@ for(const mode of ['service','metaontic','volcengine']) test(`${mode}: missing v
  h.config[mode==='service'?'apiKey':mode==='metaontic'?'metaonticApiKey':'volcengineApiKey']='';
  await assert.rejects(()=>h.tools.get('video_generate').execute({prompt:'test',duration:5,merge:false},h.exec),/Key/);
  assert.equal(h.calls.length,0);
+}));
+
+for (const toolName of ['video_generate', 'video_extend']) test(`${toolName}: 30s resume approval, estimate and both requests retain 480p`,()=>fixture(async h=>{
+ h.flags.videoReject=false;
+ const tool=h.tools.get(toolName);
+ const initial={prompt:'story',segmentPrompts:['first scene','second scene'],merge:false,resolution:'480p'};
+ const first=await tool.execute(toolName==='video_generate'?{...initial,duration:30}:{...initial,videoUrl:'https://example.com/source.mp4',duration:15,segments:2},h.exec);
+ assert.equal(first.paused,true);
+ assert.equal(h.videos,1);
+ const args={resume:first.resumeDir};
+ const gate=await api.preflightGate(h.ctx,h.config,{...h.exec,name:toolName,arguments:args});
+ assert.equal(gate.kind,'ask');
+ for(const text of [gate.reason,gate.displayReason.zh,gate.displayReason.en]) {
+  assert.match(text,/480p/i);assert.doesNotMatch(text,/720p/i);
+ }
+ const prepared=await api.estimateArgsFor(h.config,toolName,args);
+ assert.equal(prepared.resolution,'480p');
+ assert.equal(api.estimateUsage(h.config,toolName,prepared,prepared.remainingPlan.slice(0,1)).resolution,'480p');
+ const second=await h.tools.get(toolName).execute(args,h.exec);
+ assert.equal(second.status,'succeeded');
+ assert.equal(h.videos,2);
+ assert.deepEqual(h.calls.filter(c=>c.body?.model==='video').map(c=>c.body.resolution),['480p','480p']);
+}));
+
+test('speech instructions reach generation and both extension directions without rewriting reviewed dialogue',()=>fixture(async h=>{
+ const prompt='女孩用普通话说{欢迎来到吃龙山。}字幕为〖欢迎来到螭龙山。〗';
+ const args={prompt,resolution:'480p',duration:5};
+ const generated=await api.buildGenerationBody(h.config,args,5);
+ for(const result of [generated,...['forward','backward'].map(direction=>api.buildRequestBody(h.config,{...args,direction},'https://example.com/source.mp4'))]) {
+  const text=result.body.content.find(c=>c.type==='text').text;
+  assert.ok(text.includes(prompt));
+  assert.match(text,/一人说完另一人再接/);
+  assert.match(text,/不为赶时长加速、吞字或截断/);
+  assert.match(text,/展示原文只用于已要求的字幕/);
+ }
+ assert.equal(args.prompt,prompt);
+ const silent=await api.buildGenerationBody(h.config,{prompt:'风景空镜，无对白',generateAudio:false},5);
+ assert.equal(silent.body.generate_audio,false);
+ assert.match(silent.body.content[0].text,/无对白时不新增人声/);
 }));

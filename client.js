@@ -680,16 +680,36 @@
   // src/client/state.ts
   function createSettingsState({ React }) {
     function useSnapshot(form) {
-      const [revision, bump] = React.useState(0);
-      React.useEffect(() => form.subscribe(() => bump((value) => value + 1)), [form, revision]);
-      return form.getSnapshot();
+      const subscribe = React.useCallback((listener) => form.subscribe(listener), [form]);
+      const getSnapshot = React.useCallback(() => form.getSnapshot(), [form]);
+      return React.useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
     }
     function same(a, b) {
       return a === b || a === void 0 && b === "" || a === "" && b === void 0;
     }
     async function persistBatch(form, ops) {
       if (typeof form.mutate !== "function") throw new Error("atomicUnsupported");
-      if (!await form.mutate(ops)) throw new Error("atomicRejected");
+      function checkpoint() {
+        try {
+          const snapshot = form.getSnapshot?.();
+          if (!snapshot || snapshot.status !== "ready" || snapshot.writable === false || snapshot.revision == null) return null;
+          const fields = ops.map(({ path }) => ["value", "user", "base", "secrets"].map((source) => {
+            let current = snapshot[source];
+            for (const key of path) current = current?.[key];
+            return current;
+          }));
+          return { revision: snapshot.revision, fields: JSON.stringify(fields) };
+        } catch {
+          return null;
+        }
+      }
+      const before = checkpoint();
+      if (await form.mutate(ops)) return;
+      const after = checkpoint();
+      if (before && after && before.revision !== after.revision && before.fields === after.fields) {
+        if (await form.mutate(ops)) return;
+      }
+      throw new Error("atomicRejected");
     }
     function validateSettings(values) {
       const interval = Number(values.pollIntervalMs ?? 5e3);
@@ -741,7 +761,7 @@
     const UPDATE_ATTEMPTS = 3;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "3.8.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.8.1".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const match = /(\d+)\.(\d+)\.(\d+)/.exec(String(text || ""));
@@ -1131,12 +1151,15 @@
         return;
       context.connectionBusy.current = true;
       try {
-        await context.persistBatch(context.form, writes.map(([key, next]) => ({ op: "set", path: [key], value: next })));
+        const pending = context.persistBatch(context.form, writes.map(([key, next]) => ({ op: "set", path: [key], value: next })));
+        context.connectionBusy.pending = pending;
+        await pending;
         for (const [key] of writes)
           context.clear(key);
       } catch {
       } finally {
         context.connectionBusy.current = false;
+        context.connectionBusy.pending = null;
       }
     }
     async function callRegister(url, init = {}) {
@@ -1387,7 +1410,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.8.0",
+    version: "3.8.1",
     description: "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
     license: "MIT",
     type: "module",
@@ -1473,12 +1496,13 @@
       hyperframes: "0.8.223"
     },
     releaseNotes: {
-      version: "3.8.0",
+      version: "3.8.1",
       items: [
-        "\u65B0\u589E\uFF1A\u989D\u5EA6\u5361\u7247\u7684\u201C\u5237\u65B0\u989D\u5EA6\u201D\u53F3\u4FA7\u589E\u52A0\u201C\u4EBA\u5DE5\u5145\u503C\u201D\uFF0C\u70B9\u51FB\u52A0\u8F7D\u4F01\u4E1A\u5FAE\u4FE1\u5BA2\u670D\u4E8C\u7EF4\u7801\u9875\u9762\uFF0C\u652F\u6301\u5173\u95ED\u3001Esc \u9000\u51FA\u53CA\u76F4\u63A5\u6253\u5F00\u5BA2\u670D\u9875\u3002",
-        "\u4F18\u5316\uFF1A\u64CD\u4F5C\u6307\u5357\u53EA\u4ECB\u7ECD MetaOntic AI \u914D\u7F6E\u8DEF\u7EBF\uFF0C\u8BF4\u660E ai.bileego.com \u6CE8\u518C\u83B7\u53D6 Key\u3001\u5171\u7528\u6216\u5206\u522B\u586B\u5199\u89C6\u9891\u4E0E\u56FE\u7247 Key\uFF0C\u53BB\u6389\u63A5\u5165\u65B9\u5F0F\u5B57\u6BCD\u6807\u8BB0\u53CA\u5176\u4ED6\u63A5\u5165\u6D41\u7A0B\u3002",
-        "\u4F18\u5316\uFF1A\u8865\u5145 DeepSeek Harness \u65B0\u5EFA\u4F1A\u8BDD\u3001\u5C06\u6A21\u5F0F\u5207\u6362\u4E3A\u201C\u89C6\u9891\u521B\u4F5C\u52A9\u624B\u201D\u5E76\u53D1\u9001\u9700\u6C42\u7684\u6B65\u9AA4\u4E0E\u793A\u610F\u56FE\u3002",
-        "\u4F18\u5316\uFF1AKey \u914D\u7F6E\u91C7\u7528\u771F\u5B9E\u63D2\u4EF6\u7EC4\u4EF6\u7684\u9884\u89C8\u622A\u56FE\uFF0C\u4F7F\u7528\u6A21\u62DF\u6570\u636E\u5E76\u9690\u85CF\u5BC6\u94A5\uFF1B\u540C\u6B65\u5176\u4F59\u6D41\u7A0B\u56FE\u914D\u8272\u3001\u56FE\u7247\u6253\u5305\u6E05\u5355\u53CA\u6587\u6863\u7EF4\u62A4\u7ECF\u9A8C\u3002"
+        "\u4F18\u5316\uFF1A\u811A\u672C\u5BA1\u6838\u524D\u6821\u5BF9\u6613\u8BEF\u8BFB\u8BCD\u3001\u6570\u5B57\u548C\u7F29\u5199\uFF0C\u533A\u5206\u53D1\u97F3\u6587\u672C\u4E0E\u811A\u672C\u3001\u5B57\u5E55\u539F\u6587\uFF0C\u4E13\u540D\u8BFB\u97F3\u4E0D\u660E\u65F6\u5148\u6F84\u6E05\u3002",
+        "\u4F18\u5316\uFF1A\u751F\u6210\u548C\u524D\u540E\u7EED\u62CD\u63D0\u793A\u8BCD\u660E\u786E\u8BF4\u8BDD\u987A\u5E8F\u3001\u5B8C\u6574\u53E5\u8FB9\u754C\u3001\u505C\u987F\u4E0E\u6536\u5C3E\uFF0C\u51CF\u5C11\u62A2\u8BDD\u3001\u541E\u5B57\u548C\u622A\u65AD\uFF0C\u4FDD\u7559\u65E0\u5BF9\u767D\u53CA\u5173\u95ED\u97F3\u9891\u7684\u9009\u62E9\u3002",
+        "\u4F18\u5316\uFF1A\u8865\u5145\u8BD5\u542C\u9A8C\u6536\u4E0E\u8BEF\u8BFB\u4FEE\u6B63\u6D41\u7A0B\uFF0C\u4ED8\u8D39\u91CD\u505A\u987B\u7ECF\u540C\u610F\uFF1B\u540C\u6B65\u64CD\u4F5C\u6307\u5357\u3001\u811A\u672C\u6A21\u677F\u53CA\u7EF4\u62A4\u7ECF\u9A8C\uFF0C\u4FEE\u6B63\u65E7\u7684\u56FA\u5B9A 720P \u8BF4\u660E\u3002",
+        "\u4FEE\u590D\uFF1A\u5207\u6362\u63A5\u5165\u65B9\u5F0F\u540E\u9996\u6B21\u4FDD\u5B58\u65E0\u6548\uFF1A\u7B49\u5F85\u540E\u53F0\u540C\u6B65\uFF0C\u5B89\u5168\u5904\u7406\u914D\u7F6E\u4FEE\u8BA2\u51B2\u7A81\u5E76\u9632\u6B62\u91CD\u590D\u70B9\u51FB\uFF0C\u5931\u8D25\u65F6\u4FDD\u7559\u8349\u7A3F\u3002",
+        "\u4FEE\u590D\uFF1A\u957F\u89C6\u9891\u7B2C\u4E8C\u6BB5\u786E\u8BA4\u6846\u8BEF\u663E\u793A 720P\uFF1A\u7EED\u505A\u786E\u8BA4\u3001\u8D39\u7528\u9884\u4F30\u4E0E\u5B9E\u9645\u8BF7\u6C42\u6CBF\u7528\u539F\u6E05\u6670\u5EA6\uFF0C\u4F8B\u5982 30 \u79D2 480P \u5206\u6BB5\u6D41\u7A0B\u3002"
       ]
     }
   };
@@ -1509,6 +1533,7 @@
         const [saveError, setSaveError] = React.useState("");
         const statusTimer = React.useRef(null);
         const connectionBusy = React.useRef(false);
+        const saveInFlight = React.useRef(false);
         function serviceActive() {
           return !connectionBusy.current && (form.getSnapshot().value?.connectionMode || "service") === "service";
         }
@@ -1791,14 +1816,20 @@
           return ["unknownConnection", "atomicUnsupported", "atomicRejected", "invalidWait", "invalidSeam"].includes(message) ? t(message) : message;
         }
         async function save() {
-          if (connectionBusy.current) return;
-          connectionBusy.current = true;
+          if (saveInFlight.current) return;
+          if (connectionBusy.current && !connectionBusy.pending) return;
+          saveInFlight.current = true;
           setSaveError("");
           setStatus("saving");
-          const nextMode = draft.connectionMode ?? value.connectionMode ?? "service";
           try {
-            validateSettings({ ...value, ...draft });
-            await persistConnection(form, pending, nextMode);
+            if (connectionBusy.pending) await connectionBusy.pending.catch(() => {
+            });
+            connectionBusy.current = true;
+            const latest = form.getSnapshot().value || {};
+            const nextMode = draft.connectionMode ?? latest.connectionMode ?? "service";
+            const changes = Object.entries(draft).filter(([key, next]) => !same(latest[key], next));
+            validateSettings({ ...latest, ...draft });
+            await persistConnection(form, changes, nextMode);
             if (nextMode !== "service") {
               forgetDevice();
               setRegisterEmail("");
@@ -1814,6 +1845,7 @@
             setStatus("failed");
           } finally {
             connectionBusy.current = false;
+            saveInFlight.current = false;
           }
         }
         async function reset() {

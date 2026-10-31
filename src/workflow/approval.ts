@@ -295,6 +295,7 @@ export async function preflightGate(ctx, config, exec) {
   }
 
   const rawArgs = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : {};
+  let effectiveArgs = rawArgs;
   if (resumeDirOf(rawArgs.resume)) {
     try {
       const saved = await readPauseFile(resumeDirOf(rawArgs.resume));
@@ -304,8 +305,8 @@ export async function preflightGate(ctx, config, exec) {
         return { kind: 'ask', reason: '请确认已看过转换后的全部图片，图片已呈现非真人风格且符合要求，并同意使用这些图片重试视频一次。视频重试按实际调用计费；图片不合适请拒绝，插件不会自动重画。' };
       }
 
-      const prepared = await estimateArgsFor(config, exec.name, rawArgs);
-      if (prepared.remainingPlan?.length === 0) return { kind: 'allow' };
+      effectiveArgs = await estimateArgsFor(config, exec.name, rawArgs);
+      if (effectiveArgs.remainingPlan?.length === 0) return { kind: 'allow' };
     } catch (error) { return { kind: 'deny', reason: error?.message || String(error) }; }
   }
 
@@ -327,8 +328,8 @@ export async function preflightGate(ctx, config, exec) {
     assertConfigured(config, resolveApiKey(config));
     return {
       kind: 'ask',
-      reason: `调用${connectionLabel(config)} ${resolveModel(config)} · ${resolveResolution(config, args)}，按渠道账户实际用量计费。`,
-      displayReason: { zh: `本次将通过${connectionLabel(config)}生成 ${resolveResolution(config, args)} 视频，按渠道账户实际用量计费。确认后开始。`, en: `Generate via ${connectionLabel(config)}, billed to your channel account. Confirm to continue.` },
+      reason: `调用${connectionLabel(config)} ${resolveModel(config)} · ${resolveResolution(config, effectiveArgs)}，按渠道账户实际用量计费。`,
+      displayReason: { zh: `本次将通过${connectionLabel(config)}生成 ${resolveResolution(config, effectiveArgs)} 视频，按渠道账户实际用量计费。确认后开始。`, en: `Generate ${resolveResolution(config, effectiveArgs)} video via ${connectionLabel(config)}, billed to your channel account. Confirm to continue.` },
     };
   }
   let estimate = null;
@@ -374,7 +375,7 @@ export async function preflightGate(ctx, config, exec) {
 
   const total = estimate
     ? `${estimate.model} · ${estimate.resolution} · ${planSummary(estimate)}`
-    : `${resolveModel(config)} · ${resolveResolution(config, args)}`;
+    : `${resolveModel(config)} · ${resolveResolution(config, effectiveArgs)}`;
   // 审计那条（模型看）保留 token / 额度这类内部口径，方便对着中转站日志核对
   const auditTax = estimate
     ? `预估消耗 ${estimate.tokens.toLocaleString('en-US')} token ≈ ${needMoney ?? '无法预估'}`

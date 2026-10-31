@@ -2,6 +2,11 @@
 import { FORWARD_TRANSITION, CLOSEUP_TRANSITION, CONTINUOUS_TRANSITION } from '../config.js';
 import { isOmniExtendModel } from '../providers/connection.js';
 
+/** 只约束声音执行，不自动改写已审核台词或给无对白镜头添加人声。 */
+const SPEECH_EXECUTION = '【对白执行】仅在本段已指定对白时发声，按指定语言、说话人和先后顺序清晰自然地说出本段台词；一人说完另一人再接，不抢话、不串台。'
+  + '台词以{}、音效以<>、音乐以()区分；如有发音文本映射，{}内为实际朗读文本，展示原文只用于已要求的字幕，不把映射说明读出来。'
+  + '每句完整说完，保留句内停顿、人物反应及结尾留白，不为赶时长加速、吞字或截断，不复述上一段。无对白时不新增人声；未要求字幕时不生成字幕。';
+
 /**
  * 延长提示词。开头用「向后延长视频1」/「向前延长视频1」这类显式说法，
  * 并用「视频1」指代输入素材——写成「参考视频1」容易被上游当成「参考生视频」而不是延长。
@@ -47,6 +52,7 @@ export function buildExtensionPrompt({
     forward
       ? '【输出边界】仅输出新增前置片段；原视频开头只用于衔接，不复制原视频画面或已出现的台词。'
       : '【输出边界】仅输出新增续拍片段；参考视频末尾只用于理解当前状态，不把末尾几秒再次输出。起始即推进下一动作，不重做拿起、放下、递手机等已完成动作；不重复上一句对白或其尾音。',
+    SPEECH_EXECUTION,
     transition,
     '本段明确指定的运镜和切镜优先，上面的衔接建议不得覆盖已确认的镜头安排。',
   ].join('\n');
@@ -75,6 +81,7 @@ export function buildGenerationPrompt({ prompt, seconds, model = '' }) {
     `生成 ${seconds} 秒视频。`,
     String(prompt).trim(),
     timing,
+    SPEECH_EXECUTION,
     '人物身份、服装、场景与光线保持连贯；每句台词完整说完。未明确要求时不新增字幕、水印、片头片尾或配乐。',
   ].join('\n');
 }

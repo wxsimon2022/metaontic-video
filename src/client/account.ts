@@ -132,7 +132,9 @@ async function syncDeviceIdentity() {
         return;
     context.connectionBusy.current = true;
     try {
-        await context.persistBatch(context.form, writes.map(([key, next]) => ({ op: 'set', path: [key], value: next })));
+        const pending = context.persistBatch(context.form, writes.map(([key, next]) => ({ op: 'set', path: [key], value: next })));
+        context.connectionBusy.pending = pending;
+        await pending;
         for (const [key] of writes)
             context.clear(key);
     }
@@ -141,6 +143,7 @@ async function syncDeviceIdentity() {
     }
     finally {
         context.connectionBusy.current = false;
+        context.connectionBusy.pending = null;
     }
 }
 

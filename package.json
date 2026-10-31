@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "3.8.0",
+  "version": "3.8.1",
   "description": "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
   "license": "MIT",
   "type": "module",
@@ -86,12 +86,13 @@
     "hyperframes": "0.8.223"
   },
   "releaseNotes": {
-    "version": "3.8.0",
+    "version": "3.8.1",
     "items": [
-      "新增：额度卡片的“刷新额度”右侧增加“人工充值”，点击加载企业微信客服二维码页面，支持关闭、Esc 退出及直接打开客服页。",
-      "优化：操作指南只介绍 MetaOntic AI 配置路线，说明 ai.bileego.com 注册获取 Key、共用或分别填写视频与图片 Key，去掉接入方式字母标记及其他接入流程。",
-      "优化：补充 DeepSeek Harness 新建会话、将模式切换为“视频创作助手”并发送需求的步骤与示意图。",
-      "优化：Key 配置采用真实插件组件的预览截图，使用模拟数据并隐藏密钥；同步其余流程图配色、图片打包清单及文档维护经验。"
+      "优化：脚本审核前校对易误读词、数字和缩写，区分发音文本与脚本、字幕原文，专名读音不明时先澄清。",
+      "优化：生成和前后续拍提示词明确说话顺序、完整句边界、停顿与收尾，减少抢话、吞字和截断，保留无对白及关闭音频的选择。",
+      "优化：补充试听验收与误读修正流程，付费重做须经同意；同步操作指南、脚本模板及维护经验，修正旧的固定 720P 说明。",
+      "修复：切换接入方式后首次保存无效：等待后台同步，安全处理配置修订冲突并防止重复点击，失败时保留草稿。",
+      "修复：长视频第二段确认框误显示 720P：续做确认、费用预估与实际请求沿用原清晰度，例如 30 秒 480P 分段流程。"
     ]
   }
 }

@@ -2,9 +2,9 @@
 export function createSettingsState({ React }: any) {
 /** 订阅表单快照：宿主每次推送新值都会重渲染。 */
     function useSnapshot(form) {
-      const [revision, bump] = React.useState(0);
-      React.useEffect(() => form.subscribe(() => bump((value) => value + 1)), [form, revision]);
-      return form.getSnapshot();
+      const subscribe = React.useCallback((listener) => form.subscribe(listener), [form]);
+      const getSnapshot = React.useCallback(() => form.getSnapshot(), [form]);
+      return React.useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
     }
 
     function same(a, b) {
@@ -13,7 +13,26 @@ export function createSettingsState({ React }: any) {
 
     async function persistBatch(form, ops) {
       if (typeof form.mutate !== 'function') throw new Error('atomicUnsupported');
-      if (!await form.mutate(ops)) throw new Error('atomicRejected');
+      // 宿主遇到修订冲突会先恢复快照再返回 false。仅在待写字段未变化时重试一次。
+      function checkpoint() {
+        try {
+          const snapshot = form.getSnapshot?.();
+          if (!snapshot || snapshot.status !== 'ready' || snapshot.writable === false || snapshot.revision == null) return null;
+          const fields = ops.map(({ path }) => ['value', 'user', 'base', 'secrets'].map((source) => {
+            let current = snapshot[source];
+            for (const key of path) current = current?.[key];
+            return current;
+          }));
+          return { revision: snapshot.revision, fields: JSON.stringify(fields) };
+        } catch { return null; }
+      }
+      const before = checkpoint();
+      if (await form.mutate(ops)) return;
+      const after = checkpoint();
+      if (before && after && before.revision !== after.revision && before.fields === after.fields) {
+        if (await form.mutate(ops)) return;
+      }
+      throw new Error('atomicRejected');
     }
 
     function validateSettings(values) {

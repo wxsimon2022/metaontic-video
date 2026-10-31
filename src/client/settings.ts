@@ -24,6 +24,7 @@ function makePage({ form, t, manager }) {
         // 「已保存」这类反馈过几秒自动收起：收起后操作条跟着消失，页面回到「没有改动」的样子
         const statusTimer = React.useRef(null);
         const connectionBusy = React.useRef(false);
+        const saveInFlight = React.useRef(false);
         function serviceActive() {
           return !connectionBusy.current && (form.getSnapshot().value?.connectionMode || 'service') === 'service';
         }
@@ -227,14 +228,19 @@ function makePage({ form, t, manager }) {
         }
 
         async function save() {
-          if (connectionBusy.current) return;
-          connectionBusy.current = true;
+          if (saveInFlight.current) return;
+          if (connectionBusy.current && !connectionBusy.pending) return;
+          saveInFlight.current = true;
           setSaveError('');
           setStatus('saving');
-          const nextMode = draft.connectionMode ?? value.connectionMode ?? 'service';
           try {
-            validateSettings({ ...value, ...draft });
-            await persistConnection(form, pending, nextMode);
+            if (connectionBusy.pending) await connectionBusy.pending.catch(() => {});
+            connectionBusy.current = true;
+            const latest = form.getSnapshot().value || {};
+            const nextMode = draft.connectionMode ?? latest.connectionMode ?? 'service';
+            const changes = Object.entries(draft).filter(([key, next]) => !same(latest[key], next));
+            validateSettings({ ...latest, ...draft });
+            await persistConnection(form, changes, nextMode);
             if (nextMode !== 'service') {
               forgetDevice();
               setRegisterEmail('');
@@ -250,6 +256,7 @@ function makePage({ form, t, manager }) {
             setStatus('failed');
           } finally {
             connectionBusy.current = false;
+            saveInFlight.current = false;
           }
         }
 

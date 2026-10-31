@@ -105,7 +105,7 @@ export function extendTool(liveConfig, deps, ctx) {
           description: '是否添加水印，默认 false。',
         },
         merge: { type: 'boolean', description: '默认true：下载分段并在本机合并；false只返回上游链接。续做默认沿用原设置。' },
-        resolution: { type: 'string', enum: ['480p', '720p'], description: '视频清晰度，可选 480P 或 720P；默认按插件设置，未配置时为 720P。' },
+        resolution: { type: 'string', enum: ['480p', '720p'], description: '视频清晰度，可选 480P 或 720P；按用户确认的脚本显式传入，续做未指定时沿用原清晰度。' },
         referenceImagesReviewed: { type: 'boolean', description: '仅当上一轮返回 review_required，已实际展示所有转换图片且用户明确确认非真人效果并同意视频重试后传 true；首次调用不得预先设置。' },
         resumeWithCurrentConfig: { type: 'boolean', description: '仅在用户明确确认更换原进度的模型或接入渠道后设为true；有待查询任务时必须恢复原渠道。' },
         resume: {

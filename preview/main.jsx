@@ -19,8 +19,12 @@ function preset(mode) {
   else localStorage.removeItem('metaontic-video.logged-out');
   user = { ...value }; emit();
 }
+let cachedSnapshot;
 const form = {
-  getSnapshot: () => ({ status: 'ready', value: { ...value }, user: { ...user }, writable: true, revision }),
+  getSnapshot() {
+    if (!cachedSnapshot || cachedSnapshot.revision !== revision) cachedSnapshot = { status: 'ready', value: { ...value }, user: { ...user }, writable: true, revision };
+    return cachedSnapshot;
+  },
   subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
   async mutate(ops) {
     if (reject) return false;
