@@ -91,7 +91,9 @@ export async function relayRequestCore(
   }
 
   const upstreamError = data && typeof data === 'object' && data.error;
-  if (!response.ok || upstreamError) {
+  // 查询终态失败任务时 error 是任务详情，交给 waitForCompletion 归类，不能当作查询失败。
+  const failedTaskResponse = method === 'GET' && FAILED_STATES.has(extractStatus(data));
+  if (!response.ok || (upstreamError && !failedTaskResponse)) {
     const httpStatus = response.status >= 400 ? response.status : 400;
     const classified = classifyError(
       httpStatus,

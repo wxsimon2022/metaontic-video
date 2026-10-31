@@ -11,3 +11,6 @@ dist/
 
 # Browser preview build
 preview/.build/
+
+# 本机真实调用验证产物
+.local/

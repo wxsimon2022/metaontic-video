@@ -5,7 +5,7 @@ import { modelMaxSeconds } from '../workflow/planning.js';
 
 /** 用户可在插件内改的配置字段。 */
 export const CONFIG_FIELDS = [
-  'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
+  'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel',
   'duration', 'singleMaxSeconds', 'mode', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'pollErrorRetries',
@@ -42,6 +42,7 @@ export function configView(config) {
       submitPath: resolveSubmitPath(config),
       queryPath: isVolcengine(config) ? '/api/v3/contents/generations/tasks/{task_id}' : String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath,
       model: resolveModel(config),
+      imageModel: ref(config, 'imageModel', 'doubao-seedream-5-0-260128'),
       // 密钥只有一种合法来源：设置页「登录」时服务端下发
       apiKeySource: isMetaontic(config) ? (resolveApiKey(config) ? 'metaontic' : 'missing') : isVolcengine(config) ? (resolveApiKey(config) ? 'volcengine' : 'missing') : ref(config, 'apiKey', '')
         ? (isServerIssuedKey(config) ? 'register' : 'unverified')
@@ -113,6 +114,7 @@ export function configTool(config, settings) {
         estimateGroupRatio: { type: 'number', description: '预估费用用的分组折扣（中转站 group_ratio：默认 0.8）。' },
         submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
         queryPath: { type: 'string', description: '查询任务路径，{task_id} 会被替换。' },
+        imageModel: { type: 'string', enum: ['doubao-seedream-5-0-260128', 'doubao-seedream-5-0-pro-260628'], description: 'A/B 真人参考图非真人化模型' },
         model: { type: 'string', description: '模型 ID，例如 doubao-seedance-2-0-mini-260615。' },
         duration: { type: 'integer', minimum: 4, maximum: modelMaxSeconds(config), description: '每段新增秒数上限（4 至模型上限（2.0 为 15、2.5 为 30） 的整数，默认按模型上限、段数最少）。' },
         mode: { type: 'string', enum: ['continuous', 'closeup'], description: '续拍方式。' },

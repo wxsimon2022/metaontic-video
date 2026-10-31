@@ -357,6 +357,7 @@ function makePage({ form, t, manager }) {
           metaonticApiKey: t('metaonticKeyHint'),
           volcengineApiKey: t('volcengineKeyHint'),
           model: t('modelHint'),
+          imageModel: t('imageModelHint'),
           seamTrimSeconds: t('seamTrimSecondsHint'),
           maxWaitMs: t('waitSecondsHint'),
         };
@@ -379,6 +380,7 @@ function makePage({ form, t, manager }) {
         // 配置区分成几节，每节一个标题 + 一个自适应网格。
         const renderGrid = (section) => h('div', { key: section.key, className: 'mov-grid' },
           section.fields.filter((key) => (key !== 'volcengineApiKey' || directMode)
+            && (key !== 'imageModel' || !directMode)
             && (key !== 'metaonticApiKey' || selectedMode === 'metaontic'))
             .map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean));
         const rows = [

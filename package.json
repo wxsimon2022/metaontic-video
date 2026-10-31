@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "3.5.0",
+  "version": "3.6.0",
   "description": "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
   "license": "MIT",
   "type": "module",
@@ -84,12 +84,13 @@
     "hyperframes": "0.8.223"
   },
   "releaseNotes": {
-    "version": "3.5.0",
+    "version": "3.6.0",
     "items": [
-      "新增：设置页顶部显示普通更新提示，提供“立即更新”和“稍后再说”，由用户自行决定是否升级。",
-      "优化：记住稍后处理的版本，同一版本不重复显示顶部提醒，底部版本卡片仍可更新；手动检查或出现更高版本时重新提示，不影响继续使用。",
-      "优化：同步中英文更新提示、README与操作指南，说明提醒、稍后处理及安装确认流程。",
-      "修复：在线安装入口增加明确确认校验，检查更新和稍后处理不会自动安装插件。"
+      "新增：A、B 模式新增独立图片模型配置，支持 doubao-seedream-5-0-260128 和 doubao-seedream-5-0-pro-260628，并提供真人参考图转非真人风格工具。",
+      "新增：视频提交或查询终态返回真人限制时，单独征求用户同意，再转换本次参考图并重试视频一次；图片处理与视频重试分别计费。",
+      "优化：图片采用异步提交、轮询与取件接口，支持凭图片任务 ID 继续查询；不使用同步备选，不自动重复出图。",
+      "优化：转换前明确风格与费用；拒绝、取消、无法确认或转换失败时停止，保留原有首尾帧与参考图角色，并同步中英文设置、README和操作指南。",
+      "修复：正确识别含错误详情的失败任务终态，保留真人限制错误码；普通审核、网络异常和状态未知不触发转换重试。"
     ]
   }
 }

@@ -18,6 +18,7 @@ export function createClientConfig() {
     const SELECTS = {
       connectionMode: ['service', 'metaontic', 'volcengine'],
       model: MODEL_OPTIONS,
+      imageModel: ['doubao-seedream-5-0-260128', 'doubao-seedream-5-0-pro-260628'],
       mode: ['continuous', 'closeup'],
       ratio: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
       mergeMode: ['copy', 'reencode'],
@@ -28,7 +29,7 @@ export function createClientConfig() {
     // 后者默认按模型上限规划，段数最少，调小只会多出接缝。两者都作为旧配置保留，
     // 只有「上游对卡满 15 秒的延长段敏感」这种少数情况才需要改成 14。
     const SECTIONS = [
-      { key: 'sectionGeneration', fields: ['connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'model', 'mode', 'ratio', 'generateAudio'] },
+      { key: 'sectionGeneration', fields: ['connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'model', 'imageModel', 'mode', 'ratio', 'generateAudio'] },
     ];
     const FIELDS = [
       { key: 'connectionMode', kind: 'select', wide: true },
@@ -36,6 +37,7 @@ export function createClientConfig() {
       { key: 'volcengineApiKey', kind: 'text', secret: true, wide: true },
       // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
       { key: 'model', kind: 'select', wide: true },
+      { key: 'imageModel', kind: 'select', wide: true },
       { key: 'mode', kind: 'select' },
       { key: 'ratio', kind: 'select' },
       { key: 'generateAudio', kind: 'switch' },
@@ -55,7 +57,7 @@ export function createClientConfig() {
     const LOGGED_OUT_KEY = 'metaontic-video.logged-out';
     /** 插件自己会写进配置的项：重置时兜底一起清，免得宿主没把它们列进 user。 */
     const PLUGIN_OWNED_KEYS = [
-      'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'apiKey', 'keyOrigin', 'baseUrl', 'registerEmail', 'deviceId', 'deviceSecret', 'model',
+      'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'apiKey', 'keyOrigin', 'baseUrl', 'registerEmail', 'deviceId', 'deviceSecret', 'model', 'imageModel',
     ];
     /** 注册接口的握手请求头 X-Register-Token：与服务端 REGISTER_CLIENT_TOKEN 一致。 */
     const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';

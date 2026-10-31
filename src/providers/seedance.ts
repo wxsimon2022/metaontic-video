@@ -8,6 +8,8 @@ import { validateImageRoles, canvasSize, resolveImageInput } from '../media/refe
 import { type TaskResult } from './types.js';
 import { createTask, waitForCompletion } from './transport.js';
 import { extractTaskId } from './response.js';
+import { recoverRealPersonImages } from '../workflow/real-person.js';
+import { isRealPersonRejection } from '../utils/errors.js';
 import { appendRequestLog } from '../utils/logging.js';
 
 /** 中转站要能直接拉取参考视频，本地路径与内网地址没有意义。 */
@@ -124,7 +126,7 @@ export async function buildGenerationBody(config, args, seconds, options: { sign
 }
 
 /** 创建任务并等到结束；超时、取消、失败都归一化成同一形状。 */
-export async function runTask(config, body, signal, progress: { taskId?: string; onCreated?: (taskId: string) => Promise<void> } = {}): Promise<TaskResult> {
+async function runTaskOnce(config, body, signal, progress: { taskId?: string; onCreated?: (taskId: string) => Promise<void> } = {}): Promise<TaskResult> {
   const created = progress.taskId ? null : await createTask(config, body, signal);
   const taskId = progress.taskId || extractTaskId(created);
   await appendRequestLog({ event: 'task_created', taskId, model: body?.model, duration: body?.duration });
@@ -146,4 +148,27 @@ export async function runTask(config, body, signal, progress: { taskId?: string;
         + '任务可能仍在生成，可用 video_status 按这个 ID 再查，不要重复提交。',
     };
   }
+}
+
+
+/** 只对明确的真人拒绝恢复一次，未知状态、网络异常和其他审核错误不重提。 */
+export async function runTask(config, body, signal, progress: {
+  taskId?: string;
+  onCreated?: (taskId: string) => Promise<void>;
+  ctx?: any;
+  exec?: any;
+} = {}): Promise<TaskResult> {
+  let final: TaskResult;
+  try {
+    final = await runTaskOnce(config, body, signal, progress);
+  } catch (error) {
+    if (error?.code !== 'real_person_rejected' && !isRealPersonRejection(error?.message)) throw error;
+    final = { status: 'failed', errorCode: 'real_person_rejected', error: error.message };
+  }
+  if (isVolcengine(config) || final.status !== 'failed'
+    || (final.errorCode !== 'real_person_rejected' && !isRealPersonRejection(final.error))) return final;
+  const recovered = await recoverRealPersonImages(config, body, progress.ctx, progress.exec, final);
+  if (!recovered) return final;
+  // 不复用已失败 taskId；新任务仍通过 onCreated 写入断点，取消/超时可继续查询。
+  return runTaskOnce(config, recovered, signal, { onCreated: progress.onCreated });
 }

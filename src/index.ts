@@ -2,6 +2,7 @@
 import { withVideoExecution } from './workflow/execution.js';
 import { withResumeLock } from './workflow/resume.js';
 import { jsonSafeTool } from './utils/json.js';
+import { prepareImageTool } from './tools/video-prepare-image.js';
 import { videoTool } from './tools/video-generate.js';
 import { extendTool } from './tools/video-extend.js';
 import { taskTool } from './tools/video-status.js';
@@ -30,6 +31,7 @@ export function apply(ctx: DshContext, config: any = {}) {
   // 可选服务的宿主对象（会话工作目录等），拿到就放进来
   const deps: Record<string, any> = {};
   const disposers = [
+    ctx.tools.register(jsonSafeTool(prepareImageTool(config))),
     ctx.tools.register(withVideoExecution(withResumeLock(jsonSafeTool(videoTool(config, deps, ctx)), 'video_generate', config))),
     ctx.tools.register(withVideoExecution(withResumeLock(jsonSafeTool(extendTool(config, deps, ctx)), 'video_extend', config))),
     ctx.tools.register(withVideoExecution(jsonSafeTool(taskTool(config)))),

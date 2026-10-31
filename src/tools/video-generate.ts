@@ -309,6 +309,7 @@ export function videoTool(config, deps, ctx) {
         }
 
         const final = await runTask(config, body, exec?.signal, {
+          ctx, exec,
           taskId: pendingTask?.taskId,
           onCreated: async (taskId) => {
             pendingTask = { taskId, index: position + 1, kind: step.kind, seconds };

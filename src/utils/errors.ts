@@ -13,7 +13,7 @@ export function upstreamMessage(data) {
     }
     for (const key of ['message', 'detail', 'msg', 'fail_reason']) {
       const value = data[key];
-      if (typeof value === 'string' && value.trim()) return value.trim();
+      if (typeof value === 'string' && value.trim()) return data.code ? `${value.trim()}（${data.code}）` : value.trim();
     }
   }
   const text = typeof data === 'string' ? data : JSON.stringify(data ?? {});
@@ -27,6 +27,12 @@ export function quotaDetail(text) {
   if (remain) parts.push(`剩余 ${remain[1]}`);
   if (need) parts.push(`需要 ${need[1]}`);
   return parts.length ? `（${parts.join('，')}）` : '';
+}
+
+/** 仅匹配明确的真人/人脸限制，普通内容审核失败不触发改图。 */
+export function isRealPersonRejection(value) {
+  const text = String(value || '');
+  return /真人|real[ _-]?person|real[ _-]?human|photorealistic[ _-]?(?:person|human)|human[ _.-]?face|realperson|humanface/i.test(text);
 }
 
 /** 把上游报错（HTTP 错误或任务失败详情）归类成可读的 code + message。 */
@@ -49,6 +55,7 @@ export function classifyError(statusCode, data) {
   if (statusCode === 429) {
     return { code: 'provider_rate_limited', message: `中转站限流（429）：${raw}` };
   }
+  if (isRealPersonRejection(raw)) return { code: 'real_person_rejected', message: raw };
   if (CONTENT_HINTS.some((hint) => lowered.includes(hint))) {
     return { code: 'content_rejected', message: raw };
   }

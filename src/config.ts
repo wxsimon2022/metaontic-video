@@ -35,6 +35,7 @@ export const Config = z.object({
     .default('')
     .description('查询任务路径，{task_id} 会被任务 ID 替换；留空用中转站默认值')
     .volatile(),
+  imageModel: z.union(['doubao-seedream-5-0-260128', 'doubao-seedream-5-0-pro-260628']).default('doubao-seedream-5-0-260128').description('A/B 真人参考图非真人化使用的图片模型').volatile(),
   model: z.string()
     .default('')
     .description('视频生成用的模型 ID（seedance 2.0 / 2.5 系列）；留空读 NEWAPI_VIDEO_MODEL 或内置默认值')
@@ -193,7 +194,7 @@ export const DEFAULT_QUOTA_PER_UNIT = 500000;
 export const DEFAULT_USD_EXCHANGE_RATE = 7.3;
 
 /** 会真正调用视频模型、因而必须人工确认的工具。 */
-export const GATED_TOOLS = ['video_generate', 'video_extend', 'video_setup'];
+export const GATED_TOOLS = ['video_generate', 'video_extend', 'video_setup', 'video_prepare_image'];
 
 /**
  * 预估费用的价目表：照抄中转站 /api/pricing 里 seedance 的 billing_expr。

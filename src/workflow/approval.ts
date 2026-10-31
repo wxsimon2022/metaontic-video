@@ -283,6 +283,12 @@ export async function preflightGate(ctx, config, exec) {
   // 装环境：只有真要装的时候才拦（让用户先看到命令）；纯检查放行。
   if (exec.name === 'video_setup') return setupGate(ctx, exec);
 
+  if (exec.name === 'video_prepare_image') {
+    if (exec.arguments?.taskId) return { kind: 'allow' }; // 只查询和取件，不创建新的付费任务。
+    if (approvalPolicy(ctx, exec) === 'never') return { kind: 'deny', reason: '当前权限模式无法进行图片调用确认。' };
+    return { kind: 'ask', reason: '调用 Seedream 将真人参考图转为非真人风格；图片生成单独按实际调用计费，视频费用另计。', displayReason: { zh: '将调用 Seedream 处理参考图，图片调用单独计费，视频费用另计。确认后开始处理。', en: 'Use Seedream to stylize the reference. Image calls are billed separately from video. Confirm to proceed.' } };
+  }
+
   const rawArgs = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : {};
   if (resumeDirOf(rawArgs.resume)) {
     try {

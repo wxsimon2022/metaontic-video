@@ -268,12 +268,13 @@
     const SELECTS = {
       connectionMode: ["service", "metaontic", "volcengine"],
       model: MODEL_OPTIONS,
+      imageModel: ["doubao-seedream-5-0-260128", "doubao-seedream-5-0-pro-260628"],
       mode: ["continuous", "closeup"],
       ratio: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
       mergeMode: ["copy", "reencode"]
     };
     const SECTIONS = [
-      { key: "sectionGeneration", fields: ["connectionMode", "metaonticApiKey", "volcengineApiKey", "model", "mode", "ratio", "generateAudio"] }
+      { key: "sectionGeneration", fields: ["connectionMode", "metaonticApiKey", "volcengineApiKey", "model", "imageModel", "mode", "ratio", "generateAudio"] }
     ];
     const FIELDS = [
       { key: "connectionMode", kind: "select", wide: true },
@@ -281,6 +282,7 @@
       { key: "volcengineApiKey", kind: "text", secret: true, wide: true },
       // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
       { key: "model", kind: "select", wide: true },
+      { key: "imageModel", kind: "select", wide: true },
       { key: "mode", kind: "select" },
       { key: "ratio", kind: "select" },
       { key: "generateAudio", kind: "switch" },
@@ -305,7 +307,8 @@
       "registerEmail",
       "deviceId",
       "deviceSecret",
-      "model"
+      "model",
+      "imageModel"
     ];
     const DEFAULT_REGISTER_TOKEN = "metaontic-video-register-v1";
     function currentOs() {
@@ -373,7 +376,9 @@
       modelHiddenCurrent: "\u5F53\u524D\u6A21\u578B\uFF08\u6682\u4E0D\u63D0\u4F9B\u9009\u62E9\uFF09",
       releaseNotesTitle: "\u66F4\u65B0\u5185\u5BB9",
       resetConfirm: "\u786E\u5B9A\u91CD\u7F6E\u63D2\u4EF6\u5417\uFF1F\u8FD9\u4F1A\u6E05\u9664\u672C\u63D2\u4EF6\u4FDD\u5B58\u7684\u914D\u7F6E\u3001API Key \u548C\u767B\u5F55\u72B6\u6001\uFF0C\u9700\u8981\u91CD\u65B0\u914D\u7F6E\u3002\u5DF2\u751F\u6210\u7684\u89C6\u9891\u4E0D\u4F1A\u5220\u9664\u3002",
-      model: "\u6A21\u578B",
+      model: "\u89C6\u9891\u6A21\u578B",
+      imageModel: "\u56FE\u7247\u6A21\u578B",
+      imageModelHint: "\u771F\u4EBA\u53C2\u8003\u56FE\u5148\u7528 Seedream \u8F6C\u4E3A\u975E\u771F\u4EBA\u98CE\u683C\uFF0C\u56FE\u7247\u8C03\u7528\u53E6\u884C\u8BA1\u8D39\u3002",
       modelHint: "mini \u4FA7\u91CD\u6210\u672C\uFF0Cfast \u4FA7\u91CD\u751F\u6210\u901F\u5EA6\u3002\u5B9E\u9645\u4EF7\u683C\u4EE5\u6240\u9009\u6E20\u9053\u4E3A\u51C6\u3002",
       mergeMode: "\u5408\u5E76\u65B9\u5F0F",
       mergeModeSeamless: "\u76F4\u63A5\u62FC\u63A5\uFF08\u65E7\u914D\u7F6E\u517C\u5BB9\uFF09",
@@ -514,7 +519,9 @@
       modelHiddenCurrent: "Current model (selection unavailable)",
       releaseNotesTitle: "Release notes",
       resetConfirm: "Reset this plugin? Saved settings, API keys and login state will be cleared. Generated videos will be kept.",
-      model: "Model",
+      model: "Video model",
+      imageModel: "Image model",
+      imageModelHint: "Seedream stylizes real-person references before video generation; image calls are billed separately.",
       modelHint: "mini focuses on cost; fast focuses on generation speed. Actual prices depend on your provider.",
       mergeMode: "Merge mode",
       mergeModeSeamless: "Direct concat (legacy setting)",
@@ -688,7 +695,7 @@
     const UPDATE_ATTEMPTS = 3;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "3.5.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.6.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const match = /(\d+)\.(\d+)\.(\d+)/.exec(String(text || ""));
@@ -1334,7 +1341,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.5.0",
+    version: "3.6.0",
     description: "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
     license: "MIT",
     type: "module",
@@ -1418,12 +1425,13 @@
       hyperframes: "0.8.223"
     },
     releaseNotes: {
-      version: "3.5.0",
+      version: "3.6.0",
       items: [
-        "\u65B0\u589E\uFF1A\u8BBE\u7F6E\u9875\u9876\u90E8\u663E\u793A\u666E\u901A\u66F4\u65B0\u63D0\u793A\uFF0C\u63D0\u4F9B\u201C\u7ACB\u5373\u66F4\u65B0\u201D\u548C\u201C\u7A0D\u540E\u518D\u8BF4\u201D\uFF0C\u7531\u7528\u6237\u81EA\u884C\u51B3\u5B9A\u662F\u5426\u5347\u7EA7\u3002",
-        "\u4F18\u5316\uFF1A\u8BB0\u4F4F\u7A0D\u540E\u5904\u7406\u7684\u7248\u672C\uFF0C\u540C\u4E00\u7248\u672C\u4E0D\u91CD\u590D\u663E\u793A\u9876\u90E8\u63D0\u9192\uFF0C\u5E95\u90E8\u7248\u672C\u5361\u7247\u4ECD\u53EF\u66F4\u65B0\uFF1B\u624B\u52A8\u68C0\u67E5\u6216\u51FA\u73B0\u66F4\u9AD8\u7248\u672C\u65F6\u91CD\u65B0\u63D0\u793A\uFF0C\u4E0D\u5F71\u54CD\u7EE7\u7EED\u4F7F\u7528\u3002",
-        "\u4F18\u5316\uFF1A\u540C\u6B65\u4E2D\u82F1\u6587\u66F4\u65B0\u63D0\u793A\u3001README\u4E0E\u64CD\u4F5C\u6307\u5357\uFF0C\u8BF4\u660E\u63D0\u9192\u3001\u7A0D\u540E\u5904\u7406\u53CA\u5B89\u88C5\u786E\u8BA4\u6D41\u7A0B\u3002",
-        "\u4FEE\u590D\uFF1A\u5728\u7EBF\u5B89\u88C5\u5165\u53E3\u589E\u52A0\u660E\u786E\u786E\u8BA4\u6821\u9A8C\uFF0C\u68C0\u67E5\u66F4\u65B0\u548C\u7A0D\u540E\u5904\u7406\u4E0D\u4F1A\u81EA\u52A8\u5B89\u88C5\u63D2\u4EF6\u3002"
+        "\u65B0\u589E\uFF1AA\u3001B \u6A21\u5F0F\u65B0\u589E\u72EC\u7ACB\u56FE\u7247\u6A21\u578B\u914D\u7F6E\uFF0C\u652F\u6301 doubao-seedream-5-0-260128 \u548C doubao-seedream-5-0-pro-260628\uFF0C\u5E76\u63D0\u4F9B\u771F\u4EBA\u53C2\u8003\u56FE\u8F6C\u975E\u771F\u4EBA\u98CE\u683C\u5DE5\u5177\u3002",
+        "\u65B0\u589E\uFF1A\u89C6\u9891\u63D0\u4EA4\u6216\u67E5\u8BE2\u7EC8\u6001\u8FD4\u56DE\u771F\u4EBA\u9650\u5236\u65F6\uFF0C\u5355\u72EC\u5F81\u6C42\u7528\u6237\u540C\u610F\uFF0C\u518D\u8F6C\u6362\u672C\u6B21\u53C2\u8003\u56FE\u5E76\u91CD\u8BD5\u89C6\u9891\u4E00\u6B21\uFF1B\u56FE\u7247\u5904\u7406\u4E0E\u89C6\u9891\u91CD\u8BD5\u5206\u522B\u8BA1\u8D39\u3002",
+        "\u4F18\u5316\uFF1A\u56FE\u7247\u91C7\u7528\u5F02\u6B65\u63D0\u4EA4\u3001\u8F6E\u8BE2\u4E0E\u53D6\u4EF6\u63A5\u53E3\uFF0C\u652F\u6301\u51ED\u56FE\u7247\u4EFB\u52A1 ID \u7EE7\u7EED\u67E5\u8BE2\uFF1B\u4E0D\u4F7F\u7528\u540C\u6B65\u5907\u9009\uFF0C\u4E0D\u81EA\u52A8\u91CD\u590D\u51FA\u56FE\u3002",
+        "\u4F18\u5316\uFF1A\u8F6C\u6362\u524D\u660E\u786E\u98CE\u683C\u4E0E\u8D39\u7528\uFF1B\u62D2\u7EDD\u3001\u53D6\u6D88\u3001\u65E0\u6CD5\u786E\u8BA4\u6216\u8F6C\u6362\u5931\u8D25\u65F6\u505C\u6B62\uFF0C\u4FDD\u7559\u539F\u6709\u9996\u5C3E\u5E27\u4E0E\u53C2\u8003\u56FE\u89D2\u8272\uFF0C\u5E76\u540C\u6B65\u4E2D\u82F1\u6587\u8BBE\u7F6E\u3001README\u548C\u64CD\u4F5C\u6307\u5357\u3002",
+        "\u4FEE\u590D\uFF1A\u6B63\u786E\u8BC6\u522B\u542B\u9519\u8BEF\u8BE6\u60C5\u7684\u5931\u8D25\u4EFB\u52A1\u7EC8\u6001\uFF0C\u4FDD\u7559\u771F\u4EBA\u9650\u5236\u9519\u8BEF\u7801\uFF1B\u666E\u901A\u5BA1\u6838\u3001\u7F51\u7EDC\u5F02\u5E38\u548C\u72B6\u6001\u672A\u77E5\u4E0D\u89E6\u53D1\u8F6C\u6362\u91CD\u8BD5\u3002"
       ]
     }
   };
@@ -1855,6 +1863,7 @@
           metaonticApiKey: t("metaonticKeyHint"),
           volcengineApiKey: t("volcengineKeyHint"),
           model: t("modelHint"),
+          imageModel: t("imageModelHint"),
           seamTrimSeconds: t("seamTrimSecondsHint"),
           maxWaitMs: t("waitSecondsHint")
         };
@@ -1871,7 +1880,7 @@
         const renderGrid = (section) => h(
           "div",
           { key: section.key, className: "mov-grid" },
-          section.fields.filter((key) => (key !== "volcengineApiKey" || directMode) && (key !== "metaonticApiKey" || selectedMode === "metaontic")).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
+          section.fields.filter((key) => (key !== "volcengineApiKey" || directMode) && (key !== "imageModel" || !directMode) && (key !== "metaonticApiKey" || selectedMode === "metaontic")).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
         );
         const rows = [
           h("div", { key: "generation", className: "mov-section" }, [
