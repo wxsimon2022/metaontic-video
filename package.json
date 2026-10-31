@@ -57,6 +57,8 @@
       "inject": [
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-tool",
+        "@deepseek-ai/dsh-client-ui-session",
         "@deepseek-ai/dsh-client-ui-plugin-manager",
         "@deepseek-ai/dsh-api-remotes"
       ]
@@ -72,13 +74,14 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "build:locale": "esbuild scripts/build-locale.ts --format=esm --platform=node --packages=external --outfile=node_modules/.cache/build-locale.mjs --log-level=warning && node node_modules/.cache/build-locale.mjs",
-    "build:host": "esbuild src/index.ts --format=esm --platform=node --target=node20 --packages=external --define:__PLUGIN_VERSION__=$(node -p 'JSON.stringify(require(\"./package.json\").version)') --outfile=index.js",
+    "build:host": "esbuild src/index.ts --bundle --format=esm --platform=node --target=node20 --packages=external --define:__PLUGIN_VERSION__=$(node -p 'JSON.stringify(require(\"./package.json\").version)') --outfile=index.js",
     "build:client": "esbuild src/client.ts --bundle --format=iife --platform=browser --target=es2022 --define:__PLUGIN_VERSION__=$(node -p 'JSON.stringify(require(\"./package.json\").version)') --outfile=client.js",
     "build": "npm run typecheck && npm run build:locale && npm run build:host && npm run build:client",
     "preview": "node scripts/preview.mjs"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "~3.18.5"
+    "@deepseek-ai/schemastery": "~3.18.5",
+    "hyperframes": "0.8.223"
   },
   "releaseNotes": {
     "version": "3.3.2",

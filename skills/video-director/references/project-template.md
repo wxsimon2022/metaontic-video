@@ -25,11 +25,12 @@
 
 ```markdown
 ---
-status: draft            # draft | reviewed（脚本审核通过）| approved（制作确认后）
-reviewed_at:             # 脚本审核通过后填本地时间
-reviewed_by: user
-approved_at:             # 用户确认制作后填本地时间
-approved_by: user
+版本: 第1版
+状态: 草稿            # 草稿 | 已审核 | 已确认制作
+审核时间:             # 脚本审核通过后填本地时间
+审核人:
+制作确认时间:             # 用户确认制作后填本地时间
+制作确认人:
 ---
 
 # 脚本

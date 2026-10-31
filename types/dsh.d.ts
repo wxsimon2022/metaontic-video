@@ -88,7 +88,7 @@ interface DshContext {
   };
   /** 系统提示词服务：注册一段随对话带上的插件说明。 */
   systemPrompt?: {
-    section(section: { name: string; order: number; text: string }): unknown;
+    section(section: { name: string; order: number; text: string | ((context: unknown) => string) }): unknown;
   };
   /** 会话工作目录服务：成片默认落盘的位置由它决定。 */
   workingDirectory?: {

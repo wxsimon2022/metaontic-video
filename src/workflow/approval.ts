@@ -1,0 +1,361 @@
+/** workflow/approval：从宿主入口拆出的独立职责模块。 */
+import { isManualKey, connectionLabel, resolveRegisterApi, assertConfigured, resolveApiKey, resolveModel } from '../providers/connection.js';
+import { estimateSteps, formatMoney, estimatePlan, estimateUsage } from './costs.js';
+import { finiteNumber, clampInteger } from '../utils/validation.js';
+import { ref, DEFAULT_USD_EXCHANGE_RATE, DEFAULT_REGISTER_TOKEN, PLUGIN_VERSION, MIN_SECONDS, DEFAULT_QUOTA_PER_UNIT, FIXED_RESOLUTION } from '../config.js';
+import { sumStepSeconds, resolveSegmentSeconds } from './planning.js';
+import { ffmpegInstallOptions, hasFfmpeg, resolveBinary } from '../media/ffmpeg.js';
+import { resumeDirOf, readPauseFile, resumePlanFrom } from './resume.js';
+
+/** 剩下这几段的预估费用文案（确认框里给用户看钱）。 */
+export async function remainingCostText(config, exec, remainingSteps) {
+  if (isManualKey(config)) return { cost: `${connectionLabel(config)}按实际调用计费`, remain: '' };
+  try {
+    const estimated = estimateSteps(
+      config,
+      remainingSteps.map((step) => ({ ...step, usesReference: true })),
+    );
+    const groupRatio = finiteNumber(ref(config, 'estimateGroupRatio', 0.8)) ?? 1;
+    const usd = estimated.segments.reduce((sum, item) => sum + item.usd, 0) * groupRatio;
+    const quota = await fetchDeviceQuota(config, exec?.signal);
+    const data = quota.status === 'ok' ? quota.data : {};
+    const symbol = String(data.currency_symbol || '¥');
+    const exchange = finiteNumber(data.usd_exchange_rate) ?? DEFAULT_USD_EXCHANGE_RATE;
+    const remainAmount = finiteNumber(data.remain_amount);
+    return {
+      cost: `预估 ${formatMoney(usd * exchange, symbol)}`,
+      remain: remainAmount === null ? '' : `本机 Key 剩余 ${formatMoney(remainAmount, symbol)}`,
+    };
+  } catch (error) {
+    return { cost: `预估费用没算出来（${error?.message || error}）`, remain: '' };
+  }
+}
+
+/**
+ * 分段之间的人工确认：拿到第 N 段的结果后，先问用户要不要继续生成第 N+1 段。
+ * 结果口径：
+ *   allowed-once —— 用户同意，继续生成；
+ *   rejected / cancelled —— 用户先不继续：停下来，把已经生成的部分交付，之后可以 resume；
+ *   unavailable —— 没有可用的确认通道（没有审批服务 / 没有会话 / 提问失败）：
+ *     这次调用在动手前已经确认过费用，就不把生成堵在这里，按继续处理并在 note 里说明。
+ */
+export async function confirmNextSegment(ctx, config, exec, {
+  done, finished, nextSeconds, remainingSteps, toolName = 'video_generate',
+}) {
+  const approval = ctx?.get?.('approval');
+  const agent = exec?.agent;
+  if (!approval || typeof approval.request !== 'function' || !agent) {
+    return { outcome: 'unavailable', reason: '没有可用的审批服务' };
+  }
+  if (approvalPolicy(ctx, exec) === 'never') {
+    return { outcome: 'unavailable', reason: '当前权限模式关闭了审批提示' };
+  }
+  const rest = sumStepSeconds(remainingSteps);
+  const { cost, remain } = await remainingCostText(config, exec, remainingSteps);
+  const lastSeconds = finished?.[done - 1]?.seconds ?? 0;
+  const alreadyDone = `第 ${done} 段（${lastSeconds} 秒）已经生成好`;
+  try {
+    const outcome = await approval.request({
+      agent,
+      toolName,
+      ...(exec?.callId ? { callId: exec.callId } : {}),
+      ...(exec?.signal ? { signal: exec.signal } : {}),
+      reason: `人工确认：继续生成第 ${done + 1} 段视频（${nextSeconds} 秒）。`
+        + `${alreadyDone}，整条还差 ${rest} 秒（${cost}${remain ? `；${remain}` : ''}）。`,
+      displayReason: {
+        zh: `${alreadyDone}。接下来生成第 ${done + 1} 段（${nextSeconds} 秒），整条还差 ${rest} 秒，`
+          + `${cost}${remain ? `，${remain}` : ''}。`
+          + '点「允许」继续往下生成；点「拒绝」就先把已经生成的部分交付给你，之后随时可以接着做（不用重头再来）。',
+        en: `Segment ${done} (${lastSeconds}s) is ready. Next up: segment ${done + 1} `
+          + `(${nextSeconds}s); ${rest}s left in total, ${cost}${remain ? `, ${remain}` : ''}. `
+          + 'Allow to keep generating; reject to receive what is already done and continue later.',
+      },
+    });
+    return { outcome: String(outcome) };
+  } catch (error) {
+    return { outcome: 'unavailable', reason: error?.message || String(error) };
+  }
+}
+
+/**
+ * 问插件服务要「本机这把 Key 还剩多少额度」。
+ * 服务端按设备凭据去中转站读密钥详情，只回剩余 / 已用额度。
+ * 拿不到（没设备凭据、服务不可用）就回 unknown，由调用方决定怎么写进确认框。
+ */
+export async function fetchDeviceQuota(config, signal) {
+  if (isManualKey(config)) return { status: 'unknown', reason: `${connectionLabel(config)}费用和余额请在渠道控制台查看` };
+  const api = resolveRegisterApi(config);
+  const deviceId = String(ref(config, 'deviceId', '')).trim();
+  const deviceSecret = String(ref(config, 'deviceSecret', '')).trim();
+  if (!deviceId || !deviceSecret) {
+    return {
+      status: 'unknown',
+      reason: '插件里没有本机设备凭据（在设置页点一次「登录」会写进来，之后就能自动校验额度）',
+    };
+  }
+  const timeout = AbortSignal.timeout(15000);
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  try {
+    const response = await fetch(`${api}/api/v1/register/quota`, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'X-Register-Token': String(ref(config, 'registerToken', '')).trim() || DEFAULT_REGISTER_TOKEN,
+        ...(PLUGIN_VERSION ? { 'X-Plugin-Version': PLUGIN_VERSION } : {}),
+      },
+      body: JSON.stringify({ device_id: deviceId, device_secret: deviceSecret }),
+      signal: requestSignal,
+    });
+    const text = await response.text();
+    let body: any = {};
+    if (text) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = { message: text.slice(0, 200) };
+      }
+    }
+    if (!response.ok || (body && typeof body === 'object' && body.code)) {
+      return {
+        status: 'unknown',
+        reason: (body && (body.message || body.detail)) || `HTTP ${response.status}`,
+      };
+    }
+    return { status: 'ok', data: (body && body.data) || body || {} };
+  } catch (error) {
+    return { status: 'unknown', reason: error?.message || String(error) };
+  }
+}
+
+/** 宿主当前的审批策略：never 表示「审批提示被关掉」，这时候没法人工确认。 */
+export function approvalPolicy(ctx, exec) {
+  try {
+    const approval = ctx.get('approval');
+    if (!approval) return 'missing';
+    const session = exec?.agent?.session;
+    const override = session && typeof approval.overrideOf === 'function'
+      ? approval.overrideOf(session)
+      : undefined;
+    return override || approval.config?.policy || 'ask';
+  } catch {
+    return 'ask';
+  }
+}
+
+/** 把秒数列表写成「15s + 5s」这样的紧凑形式，确认框只有一行文字，不能换行。 */
+export function planSummary(estimate) {
+  if (!estimate) return '时长未知';
+  const sizes = estimate.segments.map((item) => `${item.seconds}s`).join(' + ');
+  return `${estimate.segments.length} 段（${sizes}）共 ${estimate.seconds} 秒`;
+}
+
+/**
+ * 装 ffmpeg 前的确认：安装命令要在本机跑，必须让用户先看清楚是什么、再决定装不装。
+ * （只检查不安装的调用直接放行，不用打扰用户。）
+ */
+export function setupGate(ctx, exec) {
+  const args = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : {};
+  if (args?.install !== true) return { kind: 'allow' };
+
+  const { os, installs, bootstrap } = ffmpegInstallOptions();
+  const command = String(args?.target || 'ffmpeg') === 'package-manager' && bootstrap
+    ? bootstrap.command
+    : installs[0].command;
+
+  if (approvalPolicy(ctx, exec) === 'never') {
+    return {
+      kind: 'deny',
+      reason: '当前权限模式关闭了审批提示（完全访问），装环境这种会在本机跑命令的操作没法确认，已停止。'
+        + '把权限切到「工作区写入」或「只读」后再让我装；也可以照着这条命令自己在终端执行：'
+        + `${command}（${os}）。`,
+    };
+  }
+
+  return {
+    kind: 'ask',
+    reason: `人工确认：在 ${os} 上执行安装命令「${command}」。`,
+    displayReason: {
+      zh: `准备在这台电脑上装 ffmpeg：${command}（${os}）。`
+        + '点了「允许」才会执行，装完会自动接着把视频生成出来。',
+      en: `About to install ffmpeg on this machine: ${command} (${os}). `
+        + 'It runs only after you allow it; the video generation continues right after.',
+    },
+  };
+}
+
+/**
+ * 要合并的长视频遇上「本机没有 ffmpeg」：不往下走，把这次调用退回去，
+ * 让模型在对话框里和用户确认「要不要现在装 ffmpeg」——同意就装（宿主会弹审批），
+ * 不想装就带 merge:false 重发，只拿分段列表。
+ *
+ * 返回 null 表示不用拦（不需要合并、或本机已经能跑 ffmpeg）。
+ */
+export async function ffmpegConsentGate(config, exec, args) {
+  if (exec.name !== 'video_generate' && exec.name !== 'video_extend') return null;
+  // 用户已经明确说要「只返回分段」，就别再拦了。
+  if (args?.merge === false) return null;
+
+  let plan = null;
+  // 续做时：合并的文件数 = 已经生成好的段 + 这次要跑的段，所以两边都要算进来。
+  let doneSteps = [];
+  try {
+    const gateArgs = await estimateArgsFor(config, exec.name, args);
+    plan = estimatePlan(config, exec.name, gateArgs);
+    const dir = resumeDirOf(args?.resume);
+    if (dir) {
+      const data = await readPauseFile(dir);
+      doneSteps = (data.steps || []).map((step) => ({ kind: step.kind, seconds: step.seconds }));
+    }
+  } catch {
+    plan = null;
+  }
+  const allSteps = [...doneSteps, ...(plan || [])];
+  if (!plan || allSteps.length < 2) return null;
+  if (await hasFfmpeg(config, exec.signal)) return null;
+
+  const { os, installs } = ffmpegInstallOptions();
+  const command = installs[0].command;
+  const sizes = allSteps.map((step) => `${step.seconds}s`).join(' + ');
+  const binary = resolveBinary(config, 'ffmpegBinary', 'ffmpeg');
+  const lines = [
+    `本机没有 ${binary}，这条成片是 ${allSteps.reduce((sum, step) => sum + step.seconds, 0)} 秒`
+      + `（会拆成 ${allSteps.length} 段：${sizes}），没有 ffmpeg 就没法合并成一条，所以先停下来了，`
+      + '还没有调用模型、没有产生费用。',
+    '请在对话框里先和用户确认，不要自己绕过这一步：',
+    `1) 问用户要不要现在装 ffmpeg —— 说清他的系统（${os}）和命令：${command}`,
+    '   （装好后重跑这次生成就会自动合并成一条，分段不用重新生成）。',
+    '2) 用户同意安装：调用 video_setup（install:true）——插件会执行上面的命令，'
+      + '宿主会先把这条命令拿给用户确认；装完它会自己验证，成功后你按原 duration 重新调用 '
+      + 'video_generate 继续生成即可（一般是先装包管理器：本机连 brew 都没有时，'
+      + 'video_setup 会返回 nextStep，用 target:"package-manager" 再装一次）。',
+    '3) 用户不想装、或者装不了：带 `merge:false` 重新调用 video_generate，'
+      + '插件就只生成并返回分段列表（每段链接 + 本地文件），这次不会再拦。',
+    '已经装过但不在默认位置的话，把绝对路径填进插件设置里的「ffmpeg 路径」也一样管用；'
+      + '安装包自带 ffprobe，分段时长探测会一起解决。',
+  ];
+  return {
+    kind: 'deny',
+    reason: lines.join('\n'),
+    info: { ffmpegMissing: true, os, command, segments: allSteps.length },
+  };
+}
+
+/**
+ * 真正调用模型前的卡口：先人工确认，再确认额度够不够。
+ *
+ * - 审批提示被关掉（完全访问模式）：拒绝，并说明怎么打开；
+ * - 预估费用超过这把 Key 的剩余额度：直接拒绝，不去调用（避免白扣 / 报错）；
+ * - 读不到剩余额度：照常弹确认框，但把「读不到额度」的原因写清楚；
+ * - 其余情况：返回 ask，宿主弹审批面板给用户看预估费用，点「允许」才会执行。
+ */
+/**
+ * 确认框要估的是「这次真会花的钱」。接着上一次暂停继续时只生成剩下的几段，
+ * 所以按暂停记录里剩下的计划估算，而不是按 args.duration（续做时可能压根没传）。
+ */
+export async function estimateArgsFor(config, toolName, args) {
+  if (toolName !== 'video_generate') return args;
+  const dir = resumeDirOf(args?.resume);
+  if (!dir) return args;
+  try {
+    const data = await readPauseFile(dir);
+    const restarted = resumePlanFrom(data, {
+      askedTotal: args?.duration == null
+        ? null
+        : clampInteger(args.duration, MIN_SECONDS, Number.MAX_SAFE_INTEGER, 0),
+      segmentSeconds: resolveSegmentSeconds(config, args?.segmentSeconds),
+    });
+    const seconds = sumStepSeconds(restarted.plan);
+    if (!(seconds > 0)) return args;
+    return { ...args, duration: seconds, referenceImages: [] };
+  } catch {
+    return args;
+  }
+}
+
+export async function preflightGate(ctx, config, exec) {
+  // 装环境：只有真要装的时候才拦（让用户先看到命令）；纯检查放行。
+  if (exec.name === 'video_setup') return setupGate(ctx, exec);
+
+  if (approvalPolicy(ctx, exec) === 'never') {
+    return {
+      kind: 'deny',
+      reason: '当前权限模式关闭了审批提示（完全访问），无法做人工确认，已停止调用。'
+        + '把权限切到「工作区写入」或「只读」后再生成视频。',
+    };
+  }
+
+  const args = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : {};
+
+  // 长视频要在本机合并，缺 ffmpeg 就先停下来：把这次调用退回去，
+  // 让模型在对话框里问用户「要不要授权我装 ffmpeg」，而不是闷头生成再丢一堆分段。
+  const consent = await ffmpegConsentGate(config, exec, args);
+  if (consent) return consent;
+  if (isManualKey(config)) {
+    assertConfigured(config, resolveApiKey(config));
+    return {
+      kind: 'ask',
+      reason: `调用${connectionLabel(config)} ${resolveModel(config)}，按渠道账户实际用量计费。`,
+      displayReason: { zh: `本次将通过${connectionLabel(config)}生成视频，按渠道账户实际用量计费。确认后开始。`, en: `Generate via ${connectionLabel(config)}, billed to your channel account. Confirm to continue.` },
+    };
+  }
+  let estimate = null;
+  try {
+    estimate = estimateUsage(config, exec.name, await estimateArgsFor(config, exec.name, args));
+  } catch {
+    estimate = null;
+  }
+
+  const quota = await fetchDeviceQuota(config, exec.signal);
+  const data = quota.status === 'ok' ? quota.data : {};
+  const symbol = String(data.currency_symbol || '¥');
+  const perUnit = finiteNumber(data.quota_per_unit) ?? DEFAULT_QUOTA_PER_UNIT;
+  const exchange = finiteNumber(data.usd_exchange_rate) ?? DEFAULT_USD_EXCHANGE_RATE;
+
+  const needQuota = estimate ? Math.round(estimate.usd * perUnit) : null;
+  const needMoney = estimate ? formatMoney(estimate.usd * exchange, symbol) : null;
+
+  const remainQuota = finiteNumber(data.remain_quota);
+  const remainAmount = finiteNumber(data.remain_amount);
+
+  // 用户看到的只有钱：额度数字（「约 65.7 万额度」这种）是内部口径，确认框里不显示。
+  const costText = needMoney === null ? '这次调用的费用没法预估' : `预估 ${needMoney}`;
+  const remainMoneyText = `${formatMoney(remainAmount === null ? 0 : remainAmount, symbol)}`;
+  // 用户看的只有钱；额度数字只留在下面那条审计文本里
+  const remainZh = remainQuota === null
+    ? `本机 Key 的额度读不到（${quota.reason || '服务端没回额度'}）`
+    : `本机 Key 剩余 ${remainMoneyText}`;
+  const remainEn = remainQuota === null
+    ? `this key's quota could not be read (${quota.reason || 'the service returned none'})`
+    : `this key has ${remainMoneyText} left`;
+
+  // 额度不够就别调用：中转站也会拒，但那样只会白等一轮还看不到原因。
+  if (needQuota !== null && remainQuota !== null && remainQuota < needQuota) {
+    return {
+      kind: 'deny',
+      reason: `额度不足，已停止调用：本次预估需要 ${needMoney ?? '无法预估'}，这把 Key 只剩 `
+        + `${remainMoneyText}。请充值或找管理员换一把额度够的 Key 后重试。`,
+    };
+  }
+
+  const total = estimate
+    ? `${estimate.model} · ${estimate.resolution} · ${planSummary(estimate)}`
+    : `${resolveModel(config)} · ${FIXED_RESOLUTION}`;
+  // 审计那条（模型看）保留 token / 额度这类内部口径，方便对着中转站日志核对
+  const auditTax = estimate
+    ? `预估消耗 ${estimate.tokens.toLocaleString('en-US')} token ≈ ${needMoney ?? '无法预估'}`
+      + `（${needQuota === null ? '额度未知' : `${needQuota.toLocaleString('en-US')} 额度`}）`
+    : '这次调用的费用无法预估';
+  return {
+    kind: 'ask',
+    reason: `人工确认：调用视频模型（${total}）。${auditTax}；本机 Key 剩余 `
+      + `${remainQuota === null ? '额度读不到' : `${remainMoneyText} / `
+        + `${remainQuota.toLocaleString('en-US')} 额度`}。`,
+    displayReason: {
+      zh: `本次会调用视频模型：${total}；${costText}，${remainZh}。点了「允许」才会真正调用。`,
+      en: `This will call the video model: ${total}. Estimated cost `
+        + `${needMoney === null ? 'unknown' : needMoney}; ${remainEn}. `
+        + 'The call runs only after you allow it.',
+    },
+  };
+}

@@ -1,14 +1,42 @@
-import { AsyncLocalStorage } from "node:async_hooks";
-import { spawn } from "node:child_process";
-import { createWriteStream } from "node:fs";
-import { appendFile, copyFile, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import os from "node:os";
+// src/workflow/execution.ts
+import { createRequire } from "node:module";
 import path from "node:path";
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
+import { fileURLToPath, pathToFileURL } from "node:url";
+var progressRecordModule;
+async function appendVideoExecution(exec, phase) {
+  if (!exec?.agent?.session || !exec.callId) return;
+  try {
+    const resolver = createRequire(import.meta.url);
+    const modulePath = resolver.resolve("@deepseek-ai/dsh-session", {
+      paths: [path.dirname(process.argv[1] || process.execPath), path.dirname(fileURLToPath(import.meta.url))]
+    });
+    progressRecordModule ??= import(pathToFileURL(modulePath).href);
+    const { appendPluginRecord } = await progressRecordModule;
+    appendPluginRecord(exec.agent.session, "plugin:metaontic-video/execution", { callId: exec.callId, phase });
+  } catch {
+  }
+}
+function withVideoExecution(tool) {
+  return {
+    ...tool,
+    async execute(args, exec) {
+      await appendVideoExecution(exec, "start");
+      try {
+        return await tool.execute(args, exec);
+      } finally {
+        await appendVideoExecution(exec, "end");
+      }
+    }
+  };
+}
+
+// src/workflow/resume.ts
+import path5 from "node:path";
+import { readFile as readFile2, open as open2, rm as rm2, mkdir as mkdir4, writeFile, rename as rename2 } from "node:fs/promises";
+
+// src/config.ts
 import z from "@deepseek-ai/schemastery";
-const inject = ["tools"];
-const Config = z.object({
+var Config = z.object({
   connectionMode: z.union(["service", "metaontic", "volcengine"]).default("service").description("\u63A5\u5165\u65B9\u5F0F\uFF1AA \u670D\u52A1\u7AEF\u9886 Key\uFF1BB MetaOntic AI\uFF1BC \u706B\u5C71\u5F15\u64CE\u76F4\u8FDE").volatile(),
   metaonticApiKey: z.string().default("").description("MetaOntic AI API Key").volatile(),
   volcengineApiKey: z.string().default("").description("C \u6A21\u5F0F\u706B\u5C71\u5F15\u64CE API Key").volatile(),
@@ -54,31 +82,30 @@ const Config = z.object({
     "\u8F6E\u8BE2\u671F\u95F4\u300C\u67E5\u8BE2\u5931\u8D25\u300D\u7684\u5BB9\u5FCD\u6B21\u6570\uFF1A\u7F51\u7EDC\u6296\u52A8\u3001\u4E2D\u8F6C\u7AD9\u9650\u6D41\u3001Key \u4E2D\u9014\u88AB\u5224\u65E0\u6548\u90FD\u4F1A\u8BA9\u67E5\u8BE2\u62A5\u9519\uFF0C\u4F46\u4EFB\u52A1\u5728\u4E0A\u6E38\u7167\u5E38\u751F\u6210\u2014\u2014\u8FDE\u7EED\u5931\u8D25\u5230\u8FD9\u4E2A\u6B21\u6570\u624D\u653E\u5F03\u7B49\u5F85\u3002\u653E\u5F03\u65F6\u4EFB\u52A1 ID \u4ECD\u4FDD\u7559\uFF0C\u53EF\u7528 video_status \u4E8B\u540E\u8865\u67E5\uFF0C\u4E0D\u4F1A\u628A\u300C\u67E5\u4E0D\u5230\u300D\u5F53\u6210\u300C\u6CA1\u751F\u6210\u300D\u3002\u8BBE\u7F6E\u9875\u4E0D\u663E\u793A\u8FD9\u4E00\u9879\uFF1A\u9ED8\u8BA4\u503C 5 \u591F\u7528\u3002"
   ).volatile()
 });
-const DEFAULT_MODEL = "doubao-seedance-2-0-mini-260615";
-const MAX_SEGMENTS = 10;
-const MIN_SECONDS = 4;
-const MIN_SEGMENT_SECONDS = 4;
-const MAX_SEGMENT_SECONDS = 15;
-const MAX_DIRECT_SECONDS = 15;
-const MAX_TOTAL_SECONDS = 120;
-const FIXED_RESOLUTION = "720p";
-const DEFAULT_OUTPUT_DIR = "metaontic-video";
-const CUMULATIVE_TOLERANCE_RATIO = 0.25;
-const CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5;
-const DEFAULT_REGISTER_API = "https://video.mybfs.cn";
-const DEFAULT_REGISTER_TOKEN = "metaontic-video-register-v1";
-const KEY_ORIGIN_REGISTER = "register";
-const DEFAULT_QUOTA_PER_UNIT = 5e5;
-const DEFAULT_USD_EXCHANGE_RATE = 7.3;
-const GATED_TOOLS = ["video_generate", "video_extend", "video_setup"];
-const ESTIMATE_PIXELS = { "480p": [854, 480], "720p": [1280, 720], "1080p": [1920, 1080] };
-const ESTIMATE_FPS = 24;
-const ESTIMATE_TOKEN_DIVISOR = 1024;
-const ESTIMATE_RATES = [
+var DEFAULT_MODEL = "doubao-seedance-2-0-mini-260615";
+var MAX_SEGMENTS = 10;
+var MIN_SECONDS = 4;
+var MIN_SEGMENT_SECONDS = 4;
+var MAX_SEGMENT_SECONDS = 15;
+var MAX_TOTAL_SECONDS = 120;
+var FIXED_RESOLUTION = "720p";
+var DEFAULT_OUTPUT_DIR = "metaontic-video";
+var CUMULATIVE_TOLERANCE_RATIO = 0.25;
+var CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5;
+var DEFAULT_REGISTER_API = "https://video.mybfs.cn";
+var DEFAULT_REGISTER_TOKEN = "metaontic-video-register-v1";
+var KEY_ORIGIN_REGISTER = "register";
+var DEFAULT_QUOTA_PER_UNIT = 5e5;
+var DEFAULT_USD_EXCHANGE_RATE = 7.3;
+var GATED_TOOLS = ["video_generate", "video_extend", "video_setup"];
+var ESTIMATE_PIXELS = { "480p": [854, 480], "720p": [1280, 720], "1080p": [1920, 1080] };
+var ESTIMATE_FPS = 24;
+var ESTIMATE_TOKEN_DIVISOR = 1024;
+var ESTIMATE_RATES = [
   ["doubao-seedance-2-0-mini", { none: 3.150684931507, video: 1.917808219178 }],
   ["doubao-seedance-2-0-fast", { none: 5.068493150685, video: 3.013698630137 }]
 ];
-const RELAY_PRESET = {
+var RELAY_PRESET = {
   baseUrl: "",
   submitPath: "/doubao/api/v3/contents/generations/tasks",
   queryPath: "/doubao/api/v3/contents/generations/tasks/{task_id}",
@@ -86,12 +113,12 @@ const RELAY_PRESET = {
   baseEnv: ["NEWAPI_VIDEO_BASE_URL", "NEWAPI_BASE_URL"],
   modelEnv: ["NEWAPI_VIDEO_MODEL"]
 };
-const SUCCESS_STATES = /* @__PURE__ */ new Set(["succeeded", "success", "completed", "complete", "done", "finished"]);
-const FAILED_STATES = /* @__PURE__ */ new Set(["failed", "failure", "error", "cancelled", "canceled", "expired"]);
-const CANCEL_STATES = /* @__PURE__ */ new Set(["cancelled", "canceled"]);
-const QUOTA_HINTS = ["quota", "insufficient", "balance", "\u9884\u6263\u8D39", "\u5269\u4F59\u989D\u5EA6"];
-const PRICE_HINTS = ["model_price_error", "\u9636\u68AF\u8BA1\u4EF7", 'u("input_images")'];
-const CONTENT_HINTS = [
+var SUCCESS_STATES = /* @__PURE__ */ new Set(["succeeded", "success", "completed", "complete", "done", "finished"]);
+var FAILED_STATES = /* @__PURE__ */ new Set(["failed", "failure", "error", "cancelled", "canceled", "expired"]);
+var CANCEL_STATES = /* @__PURE__ */ new Set(["cancelled", "canceled"]);
+var QUOTA_HINTS = ["quota", "insufficient", "balance", "\u9884\u6263\u8D39", "\u5269\u4F59\u989D\u5EA6"];
+var PRICE_HINTS = ["model_price_error", "\u9636\u68AF\u8BA1\u4EF7", 'u("input_images")'];
+var CONTENT_HINTS = [
   "real person",
   "privacyinformation",
   "privacy information",
@@ -105,7 +132,7 @@ const CONTENT_HINTS = [
   "\u654F\u611F",
   "\u6D89\u653F"
 ];
-const VIDEO_URL_KEYS = [
+var VIDEO_URL_KEYS = [
   "video_url",
   "videourl",
   "download_url",
@@ -113,20 +140,17 @@ const VIDEO_URL_KEYS = [
   "result_url",
   "output_url"
 ];
-const GENERIC_URL_KEYS = /* @__PURE__ */ new Set(["url", "output", "video", "file"]);
-const IMAGE_KEY_TOKENS = ["cover", "image", "thumb", "poster", "frame", "snapshot", "preview"];
-const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"];
-const CONTINUOUS_TRANSITION = "\u672C\u6BB5\u7B2C\u4E00\u5E27\u5FC5\u987B\u7D27\u63A5\u89C6\u98911\u6700\u540E\u4E00\u5E27\uFF0C\u4FDD\u6301\u540C\u4E00\u6784\u56FE\u3001\u4EBA\u7269\u5927\u5C0F\u3001\u5DE6\u53F3\u4F4D\u7F6E\u3001\u5934\u90E8\u671D\u5411\u3001\u89C6\u7EBF\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\u3002\u52A8\u4F5C\u4FDD\u6301\u539F\u6709\u65B9\u5411\u548C\u901F\u5EA6\uFF0C\u4E0D\u91CD\u590D\u524D\u6BB5\u52A8\u4F5C\u3001\u4E0D\u5B9A\u683C\u7B49\u5F85\u3001\u4E0D\u4ECE\u753B\u9762\u53E6\u4E00\u4FA7\u91CD\u65B0\u5165\u573A\uFF1B\u4E0D\u64C5\u81EA\u5207\u955C\u6216\u91CD\u65B0\u5C45\u4E2D\u3002";
-const FORWARD_TRANSITION = "\u5411\u524D\u5EF6\u957F\u65F6\uFF0C\u672C\u6BB5\u6700\u540E\u4E00\u5E27\u5FC5\u987B\u7D27\u63A5\u89C6\u98911\u7B2C\u4E00\u5E27\uFF0C\u4FDD\u6301\u540C\u4E00\u6784\u56FE\u3001\u4EBA\u7269\u5927\u5C0F\u3001\u5DE6\u53F3\u4F4D\u7F6E\u3001\u5934\u90E8\u671D\u5411\u3001\u89C6\u7EBF\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\u3002\u52A8\u4F5C\u671D\u5411\u89C6\u98911\u7684\u5F00\u573A\u52A8\u4F5C\u53D1\u5C55\uFF0C\u4E0D\u91CD\u590D\u524D\u6BB5\u52A8\u4F5C\u3001\u4E0D\u5B9A\u683C\u7B49\u5F85\u3001\u4E0D\u4ECE\u753B\u9762\u53E6\u4E00\u4FA7\u91CD\u65B0\u5165\u573A\uFF1B\u4E0D\u64C5\u81EA\u5207\u955C\u6216\u91CD\u65B0\u5C45\u4E2D\u3002";
-const CLOSEUP_TRANSITION = "\u955C\u5934\u8854\u63A5\u5EFA\u8BAE\uFF08\u4EC5\u5728\u672C\u6BB5\u672A\u660E\u786E\u6307\u5B9A\u8FD0\u955C\u6216\u5207\u955C\u5B89\u6392\u65F6\u91C7\u7528\uFF09\uFF1A\u5728\u5B8C\u6574\u53F0\u8BCD\u7ED3\u675F\u5904\u81EA\u7136\u5207\u5230\u4E0B\u4E00\u4F4D\u8BF4\u8BDD\u4EBA\u7684\u8FD1\u666F\u6216\u542C\u8BDD\u4EBA\u7684\u53CD\u5E94\u8FD1\u666F\uFF0C\u518D\u7EE7\u7EED\u672C\u6BB5\u5267\u60C5\u3002\u4FDD\u6301\u8F74\u7EBF\u3001\u89C6\u7EBF\u65B9\u5411\u3001\u5DE6\u53F3\u4EBA\u7269\u5173\u7CFB\u3001\u670D\u88C5\u548C\u97F3\u8272\uFF0C\u4E0D\u4EA4\u6362\u89D2\u8272\uFF1B\u53EA\u6539\u53D8\u666F\u522B\uFF0C\u4E0D\u65B0\u589E\u573A\u666F\u3002";
-const CONTENT_REJECTION_HINT = "\u53C2\u8003\u89C6\u9891\u88AB\u4E0A\u6E38\u5185\u5BB9\u5BA1\u6838\u62D2\u7EDD\uFF0C\u5EF6\u957F\u5DF2\u505C\u6B62\u3002Seedance \u542B\u4EBA\u8138\u7EED\u62CD\u9700\u4F7F\u7528\u540C\u4E00\u4E0A\u6E38\u8D26\u53F7\u7684\u53D7\u4FE1\u539F\u59CB\u89C6\u9891\u6216\u6388\u6743\u7D20\u6750\uFF1B\u8BF7\u786E\u8BA4\u4E2D\u8F6C\u7AD9\u900F\u4F20\u4E86\u539F\u59CB video_url \u4E0E reference_video\uFF0C\u4E14\u524D\u540E\u8BF7\u6C42\u4F7F\u7528\u540C\u4E00\u4E0A\u6E38\u8D26\u53F7\u3002\u4E0D\u4F1A\u81EA\u52A8\u53BB\u6389\u53C2\u8003\u89C6\u9891\u751F\u6210\uFF0C\u4EE5\u514D\u4EBA\u7269\u4E0D\u4E00\u81F4\u3002";
+var GENERIC_URL_KEYS = /* @__PURE__ */ new Set(["url", "output", "video", "file"]);
+var IMAGE_KEY_TOKENS = ["cover", "image", "thumb", "poster", "frame", "snapshot", "preview"];
+var IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"];
+var CONTINUOUS_TRANSITION = "\u672C\u6BB5\u7B2C\u4E00\u5E27\u5FC5\u987B\u7D27\u63A5\u89C6\u98911\u6700\u540E\u4E00\u5E27\uFF0C\u4FDD\u6301\u540C\u4E00\u6784\u56FE\u3001\u4EBA\u7269\u5927\u5C0F\u3001\u5DE6\u53F3\u4F4D\u7F6E\u3001\u5934\u90E8\u671D\u5411\u3001\u89C6\u7EBF\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\u3002\u52A8\u4F5C\u4FDD\u6301\u539F\u6709\u65B9\u5411\u548C\u901F\u5EA6\uFF0C\u4E0D\u91CD\u590D\u524D\u6BB5\u52A8\u4F5C\u3001\u4E0D\u5B9A\u683C\u7B49\u5F85\u3001\u4E0D\u4ECE\u753B\u9762\u53E6\u4E00\u4FA7\u91CD\u65B0\u5165\u573A\uFF1B\u4E0D\u64C5\u81EA\u5207\u955C\u6216\u91CD\u65B0\u5C45\u4E2D\u3002";
+var FORWARD_TRANSITION = "\u5411\u524D\u5EF6\u957F\u65F6\uFF0C\u672C\u6BB5\u6700\u540E\u4E00\u5E27\u5FC5\u987B\u7D27\u63A5\u89C6\u98911\u7B2C\u4E00\u5E27\uFF0C\u4FDD\u6301\u540C\u4E00\u6784\u56FE\u3001\u4EBA\u7269\u5927\u5C0F\u3001\u5DE6\u53F3\u4F4D\u7F6E\u3001\u5934\u90E8\u671D\u5411\u3001\u89C6\u7EBF\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\u3002\u52A8\u4F5C\u671D\u5411\u89C6\u98911\u7684\u5F00\u573A\u52A8\u4F5C\u53D1\u5C55\uFF0C\u4E0D\u91CD\u590D\u524D\u6BB5\u52A8\u4F5C\u3001\u4E0D\u5B9A\u683C\u7B49\u5F85\u3001\u4E0D\u4ECE\u753B\u9762\u53E6\u4E00\u4FA7\u91CD\u65B0\u5165\u573A\uFF1B\u4E0D\u64C5\u81EA\u5207\u955C\u6216\u91CD\u65B0\u5C45\u4E2D\u3002";
+var CLOSEUP_TRANSITION = "\u955C\u5934\u8854\u63A5\u5EFA\u8BAE\uFF08\u4EC5\u5728\u672C\u6BB5\u672A\u660E\u786E\u6307\u5B9A\u8FD0\u955C\u6216\u5207\u955C\u5B89\u6392\u65F6\u91C7\u7528\uFF09\uFF1A\u5728\u5B8C\u6574\u53F0\u8BCD\u7ED3\u675F\u5904\u81EA\u7136\u5207\u5230\u4E0B\u4E00\u4F4D\u8BF4\u8BDD\u4EBA\u7684\u8FD1\u666F\u6216\u542C\u8BDD\u4EBA\u7684\u53CD\u5E94\u8FD1\u666F\uFF0C\u518D\u7EE7\u7EED\u672C\u6BB5\u5267\u60C5\u3002\u4FDD\u6301\u8F74\u7EBF\u3001\u89C6\u7EBF\u65B9\u5411\u3001\u5DE6\u53F3\u4EBA\u7269\u5173\u7CFB\u3001\u670D\u88C5\u548C\u97F3\u8272\uFF0C\u4E0D\u4EA4\u6362\u89D2\u8272\uFF1B\u53EA\u6539\u53D8\u666F\u522B\uFF0C\u4E0D\u65B0\u589E\u573A\u666F\u3002";
+var CONTENT_REJECTION_HINT = "\u53C2\u8003\u89C6\u9891\u88AB\u4E0A\u6E38\u5185\u5BB9\u5BA1\u6838\u62D2\u7EDD\uFF0C\u5EF6\u957F\u5DF2\u505C\u6B62\u3002Seedance \u542B\u4EBA\u8138\u7EED\u62CD\u9700\u4F7F\u7528\u540C\u4E00\u4E0A\u6E38\u8D26\u53F7\u7684\u53D7\u4FE1\u539F\u59CB\u89C6\u9891\u6216\u6388\u6743\u7D20\u6750\uFF1B\u8BF7\u786E\u8BA4\u4E2D\u8F6C\u7AD9\u900F\u4F20\u4E86\u539F\u59CB video_url \u4E0E reference_video\uFF0C\u4E14\u524D\u540E\u8BF7\u6C42\u4F7F\u7528\u540C\u4E00\u4E0A\u6E38\u8D26\u53F7\u3002\u4E0D\u4F1A\u81EA\u52A8\u53BB\u6389\u53C2\u8003\u89C6\u9891\u751F\u6210\uFF0C\u4EE5\u514D\u4EBA\u7269\u4E0D\u4E00\u81F4\u3002";
 function ref(config, key, fallback) {
   const raw = config?.[key];
   const value = raw && typeof raw.get === "function" ? raw.get() : raw;
   return value === void 0 || value === null || value === "" ? fallback : value;
-}
-function relayPreset() {
-  return RELAY_PRESET;
 }
 function envValue(names) {
   for (const name of names) {
@@ -135,542 +159,11 @@ function envValue(names) {
   }
   return "";
 }
-function isVolcengine(config) {
-  return ref(config, "connectionMode", "service") === "volcengine";
-}
-function isMetaontic(config) {
-  return ref(config, "connectionMode", "service") === "metaontic";
-}
-function isManualKey(config) {
-  return isVolcengine(config) || isMetaontic(config);
-}
-function connectionLabel(config) {
-  return isMetaontic(config) ? "MetaOntic AI" : "\u706B\u5C71\u5F15\u64CE";
-}
-function resolveApiKey(config) {
-  if (isMetaontic(config)) return String(ref(config, "metaonticApiKey", "")).trim();
-  if (isVolcengine(config)) return String(ref(config, "volcengineApiKey", "")).trim();
-  return String(ref(config, "apiKey", "")).trim();
-}
-function isServerIssuedKey(config) {
-  if (String(ref(config, "keyOrigin", "")).trim() === KEY_ORIGIN_REGISTER) return true;
-  return Boolean(String(ref(config, "deviceId", "")).trim()) && Boolean(String(ref(config, "deviceSecret", "")).trim()) && Boolean(String(ref(config, "registerEmail", "")).trim());
-}
-function resolveBaseUrl(config) {
-  if (isVolcengine(config)) return "https://ark.cn-beijing.volces.com";
-  const preset = relayPreset();
-  return (String(ref(config, "baseUrl", "")).trim() || envValue(preset.baseEnv) || preset.baseUrl).replace(/\/+$/, "");
-}
-function resolveSubmitPath(config) {
-  if (isVolcengine(config)) return "/api/v3/contents/generations/tasks";
-  return String(ref(config, "submitPath", "")).trim() || relayPreset().submitPath;
-}
-function resolveQueryPath(config, taskId) {
-  if (isVolcengine(config)) return `/api/v3/contents/generations/tasks/${encodeURIComponent(taskId)}`;
-  const path2 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
-  return path2.replace("{task_id}", encodeURIComponent(taskId));
-}
-function resolveModel(config) {
-  const preset = relayPreset();
-  return String(ref(config, "model", "")).trim() || envValue(preset.modelEnv) || preset.model;
-}
-function clampInteger(value, min, max, fallback) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(number)));
-}
-function isOmniExtendModel(model) {
-  const lowered = String(model).toLowerCase();
-  return lowered.includes("seedance-2-5") || lowered.includes("seedance-2.5");
-}
-function parseExtraParams(config) {
-  const raw = String(ref(config, "extraParams", "")).trim();
-  if (!raw) return {};
-  let value;
-  try {
-    value = JSON.parse(raw);
-  } catch {
-    throw new Error("\u914D\u7F6E extraParams \u4E0D\u662F\u5408\u6CD5 JSON \u5BF9\u8C61\u5B57\u7B26\u4E32\u3002");
-  }
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("\u914D\u7F6E extraParams \u5FC5\u987B\u662F JSON \u5BF9\u8C61\u3002");
-  }
-  return value;
-}
-function assertConfigured(config, apiKey) {
-  if (isMetaontic(config)) {
-    if (!apiKey) throw new Error("\u8BF7\u5728 MetaOntic AI \u6A21\u5F0F\u4E2D\u914D\u7F6E API Key\u3002");
-    return;
-  }
-  if (isVolcengine(config)) {
-    if (!apiKey) throw new Error("\u8BF7\u5728 C \u706B\u5C71\u5F15\u64CE\u6A21\u5F0F\u4E2D\u914D\u7F6E\u706B\u5C71 API Key\u3002");
-    return;
-  }
-  if (!apiKey) {
-    throw new Error(
-      "\u672A\u914D\u7F6E API Key\uFF1A\u6253\u5F00\u300C\u63D2\u4EF6 \u2192 \u5DF2\u5B89\u88C5\u63D2\u4EF6 \u2192 MetaOnticVideo \u2192 \u67E5\u770B\u300D\uFF0C\u70B9\u300C\u767B\u5F55\u300D\u9886\u4E00\u628A\u2014\u2014\u670D\u52A1\u7AEF\u4F1A\u628A Key\u3001\u4E0A\u6E38\u5730\u5740\u548C\u6A21\u578B\u76F4\u63A5\u5199\u8FDB\u914D\u7F6E\uFF0C\u4E0D\u7528\u624B\u586B\u3002"
-    );
-  }
-  if (!isServerIssuedKey(config)) {
-    throw new Error(
-      "\u5F53\u524D apiKey \u4E0D\u662F\u670D\u52A1\u7AEF\u4E0B\u53D1\u7684\uFF0C\u63D2\u4EF6\u62D2\u7EDD\u8C03\u7528\uFF1A\u5BC6\u94A5\u53EA\u80FD\u5728\u63D2\u4EF6\u8BE6\u60C5\u9875\u70B9\u300C\u767B\u5F55\u300D\u7531\u670D\u52A1\u7AEF\u4E0B\u53D1\u3002\u540C\u4E00\u4E2A\u90AE\u7BB1\u518D\u767B\u5F55\u4E00\u6B21\u4F1A\u628A\u539F\u6765\u90A3\u628A\u8FD8\u7ED9\u4F60\uFF0C\u4E0D\u4F1A\u591A\u5F00\u4E00\u628A\u3002"
-    );
-  }
-  if (!resolveBaseUrl(config)) {
-    throw new Error(
-      "\u672A\u914D\u7F6E baseUrl\uFF1A\u6B63\u5E38\u7531\u300C\u767B\u5F55\u300D\u65F6\u670D\u52A1\u7AEF\u4E0B\u53D1\u4E2D\u8F6C\u7AD9\u5730\u5740\uFF1B\u7F3A\u5931\u65F6\u8BF7\u91CD\u65B0\u767B\u5F55\uFF0C\u6216\u68C0\u67E5\u8BBE\u7F6E\u9875\u91CC\u7684\u4E0A\u6E38\u5730\u5740\u3002"
-    );
-  }
-}
-function buildExtensionPrompt({
-  prompt,
-  seconds,
-  startAt,
-  mode,
-  direction = "backward",
-  wording = "extend"
-}) {
-  const forward = direction === "forward";
-  const head = forward ? "\u5411\u524D\u5EF6\u957F\u89C6\u98911\u3002" : wording === "after" ? "\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A" : "\u5411\u540E\u5EF6\u957F\u89C6\u98911\u3002";
-  const span = forward ? startAt == null ? `\u751F\u6210 ${seconds} \u79D2\u524D\u7F6E\u753B\u9762\uFF0C\u63A5\u5728\u89C6\u98911\u7B2C\u4E00\u5E27\u4E4B\u524D\u3002` : `\u751F\u6210 ${seconds} \u79D2\u524D\u7F6E\u753B\u9762\uFF0C\u5BF9\u5E94\u6574\u7247\u7B2C ${Math.max(0, startAt - seconds)}\u2013${startAt} \u79D2\uFF0C\u7D27\u63A5\u5728\u89C6\u98911\u4E4B\u524D\u3002` : startAt == null ? `\u751F\u6210 ${seconds} \u79D2\u7EED\u62CD\u753B\u9762\uFF0C\u63A5\u5728\u89C6\u98911\u6700\u540E\u4E00\u5E27\u4E4B\u540E\u3002` : `\u751F\u6210 ${seconds} \u79D2\u7EED\u62CD\u753B\u9762\uFF0C\u5BF9\u5E94\u6574\u7247\u7B2C ${startAt}\u2013${startAt + seconds} \u79D2\uFF0C\u63A5\u5728\u89C6\u98911\u4E4B\u540E\u3002`;
-  const transition = forward ? FORWARD_TRANSITION : mode === "closeup" ? CLOSEUP_TRANSITION : CONTINUOUS_TRANSITION;
-  return [
-    `${head}${span}`,
-    `\u3010\u5EF6\u957F\u65B9\u5411\u3011${forward ? "\u5411\u524D\u5EF6\u957F\uFF08\u524D\u7F6E\u5267\u60C5\uFF0C\u653E\u5728\u89C6\u98911\u4E4B\u524D\uFF09" : "\u5411\u540E\u5EF6\u957F\uFF08\u7EED\u62CD\u5267\u60C5\uFF0C\u63A5\u5728\u89C6\u98911\u4E4B\u540E\uFF09"}\u3002`,
-    `\u3010\u5267\u60C5\u53D1\u5C55\u3011${endWithPunctuation(prompt)}${forward ? "\u53EA\u6F14\u89C6\u98911\u4E4B\u524D\u53D1\u751F\u7684\u524D\u7F6E\u5267\u60C5\uFF0C\u4E0D\u590D\u8FF0\u89C6\u98911\u91CC\u7684\u60C5\u8282\u3002" : "\u53EA\u6F14\u89C6\u98911\u4E4B\u540E\u53D1\u751F\u7684\u65B0\u5267\u60C5\uFF0C\u4E0D\u91CD\u590D\u89C6\u98911\u91CC\u7684\u60C5\u8282\u3001\u4E0D\u91CD\u65B0\u5F00\u573A\u3002"}`,
-    "\u3010\u4E3B\u4F53\u72B6\u6001\u3011" + (forward ? "\u672C\u6BB5\u6536\u5C3E\u7684\u4EBA\u7269\u9762\u8C8C\u3001\u4F53\u578B\u3001\u670D\u88C5\u3001\u59FF\u6001\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\u5FC5\u987B\u80FD\u76F4\u63A5\u63A5\u5230\u89C6\u98911\u7B2C\u4E00\u5E27\uFF1B" : "\u6CBF\u7528\u89C6\u98911\u7ED3\u5C3E\u7684\u4EBA\u7269\u9762\u8C8C\u3001\u4F53\u578B\u3001\u670D\u88C5\u3001\u59FF\u6001\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\uFF1B") + "\u540C\u4E00\u89D2\u8272\u4FDD\u6301\u97F3\u8272\u3001\u53E3\u97F3\u3001\u8BED\u901F\u548C\u5F53\u524D\u60C5\u7EEA\uFF0C\u4E0D\u6362\u4EBA\u3001\u4E0D\u6362\u88C5\uFF0C\u4E0D\u6539\u53D8\u5E74\u9F84\u4E0E\u5916\u8C8C\u7279\u5F81\u3002",
-    "\u3010\u955C\u5934\u8FD0\u52A8\u3011\u5728\u63A5\u7F1D\u5904\u5339\u914D\u89C6\u98911" + (forward ? "\u5F00\u5934\u7684" : "\u7ED3\u5C3E\u7684") + "\u673A\u4F4D\u3001\u666F\u522B\u3001\u7126\u6BB5\u3001\u8FD0\u955C\u65B9\u5411\u4E0E\u901F\u5EA6\uFF1B\u63A5\u7F1D\u4E4B\u5916\u6309\u672C\u6BB5\u811A\u672C\u81EA\u7136\u8FD0\u955C\u6216\u5207\u955C\u3002\u4FDD\u6301\u66DD\u5149\u3001\u767D\u5E73\u8861\u3001\u5149\u6E90\u65B9\u5411\u548C\u573A\u666F\u5E03\u5C40\u8FDE\u8D2F\uFF0C\u907F\u514D\u65E0\u5267\u60C5\u4F9D\u636E\u7684\u4EAE\u5EA6\u8DF3\u53D8\u6216\u80CC\u666F\u91CD\u5EFA\uFF1B\u6574\u6BB5\u4EAE\u5EA6\u4E0E\u8272\u8C03\u5FC5\u987B\u4E0E\u89C6\u98911" + (forward ? "\u5F00\u5934" : "\u7ED3\u5C3E") + "\u4E00\u81F4\uFF0C\u4E0D\u8981\u6574\u4F53\u538B\u6697\u6216\u504F\u8272\u3002",
-    "\u3010\u58F0\u97F3\u5EF6\u7EED\u3011" + (forward ? "\u672C\u6BB5\u58F0\u97F3\u5728\u7ED3\u5C3E\u81EA\u7136\u8854\u63A5\u89C6\u98911\u5F00\u5934\uFF0C\u53F0\u8BCD\u53EA\u8BB2\u524D\u7F6E\u5267\u60C5\u3002" : "\u672C\u6BB5\u58F0\u97F3\u63A5\u7EED\u89C6\u98911\u7ED3\u5C3E\uFF0C\u53F0\u8BCD\u53EA\u8BB2\u540E\u7EED\u5267\u60C5\u3002") + "\u4FDD\u6301\u89D2\u8272\u97F3\u8272\u4E0E\u73AF\u5883\u5E95\u566A\u4E00\u81F4\uFF0C\u6BCF\u53E5\u53F0\u8BCD\u5B8C\u6574\u8BF4\u5B8C\uFF0C\u4E0D\u590D\u8FF0\u539F\u53F0\u8BCD\u3002\u539F\u89C6\u9891\u6709\u914D\u4E50\u65F6\u4FDD\u6301\u66F2\u76EE\u4E0E\u8282\u594F\u8FDE\u8D2F\uFF1B\u539F\u89C6\u9891\u65E0\u914D\u4E50\u65F6\u4E0D\u65B0\u589E\u914D\u4E50\u3002",
-    forward ? "\u3010\u8F93\u51FA\u8FB9\u754C\u3011\u4EC5\u8F93\u51FA\u65B0\u589E\u524D\u7F6E\u7247\u6BB5\uFF1B\u539F\u89C6\u9891\u5F00\u5934\u53EA\u7528\u4E8E\u8854\u63A5\uFF0C\u4E0D\u590D\u5236\u539F\u89C6\u9891\u753B\u9762\u6216\u5DF2\u51FA\u73B0\u7684\u53F0\u8BCD\u3002" : "\u3010\u8F93\u51FA\u8FB9\u754C\u3011\u4EC5\u8F93\u51FA\u65B0\u589E\u7EED\u62CD\u7247\u6BB5\uFF1B\u53C2\u8003\u89C6\u9891\u672B\u5C3E\u53EA\u7528\u4E8E\u7406\u89E3\u5F53\u524D\u72B6\u6001\uFF0C\u4E0D\u628A\u672B\u5C3E\u51E0\u79D2\u518D\u6B21\u8F93\u51FA\u3002\u8D77\u59CB\u5373\u63A8\u8FDB\u4E0B\u4E00\u52A8\u4F5C\uFF0C\u4E0D\u91CD\u505A\u62FF\u8D77\u3001\u653E\u4E0B\u3001\u9012\u624B\u673A\u7B49\u5DF2\u5B8C\u6210\u52A8\u4F5C\uFF1B\u4E0D\u91CD\u590D\u4E0A\u4E00\u53E5\u5BF9\u767D\u6216\u5176\u5C3E\u97F3\u3002",
-    transition,
-    "\u672C\u6BB5\u660E\u786E\u6307\u5B9A\u7684\u8FD0\u955C\u548C\u5207\u955C\u4F18\u5148\uFF0C\u4E0A\u9762\u7684\u8854\u63A5\u5EFA\u8BAE\u4E0D\u5F97\u8986\u76D6\u5DF2\u786E\u8BA4\u7684\u955C\u5934\u5B89\u6392\u3002"
-  ].join("\n");
-}
-function normalizeReferenceUrl(value) {
-  const url = String(value ?? "").trim();
-  if (!url) throw new Error("\u53C2\u8003\u89C6\u9891 URL \u4E0D\u80FD\u4E3A\u7A7A\u3002");
-  if (/^asset:\/\/[A-Za-z0-9_-]+$/.test(url)) return url;
-  if (!/^https?:\/\//i.test(url)) {
-    throw new Error("\u53C2\u8003\u89C6\u9891\u5FC5\u987B\u662F https:// \u6216 http:// \u5F00\u5934\u7684\u516C\u7F51 URL\uFF08\u4E0D\u80FD\u7528\u672C\u5730\u6587\u4EF6\u8DEF\u5F84\uFF09\u3002");
-  }
-  return url;
-}
-function buildRequestBody(config, args, referenceVideoUrl) {
-  const model = resolveModel(config);
-  const seconds = clampInteger(
-    args.duration,
-    MIN_SEGMENT_SECONDS,
-    modelMaxSeconds(config),
-    modelMaxSeconds(config)
-  );
-  const mode = args.mode || ref(config, "mode", "continuous");
-  const prompt = String(args.prompt ?? "").trim();
-  const startAt = args.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
-  const direction = args.direction === "forward" ? "forward" : "backward";
-  const wording = args.wording === "after" ? "after" : "extend";
-  const content = [
-    { type: "text", text: buildExtensionPrompt({ prompt, seconds, startAt, mode, direction, wording }) },
-    { type: "video_url", video_url: { url: referenceVideoUrl }, role: "reference_video" }
-  ];
-  const body = { ...parseExtraParams(config) };
-  body.model = model;
-  body.content = content;
-  body.duration = seconds;
-  body.ratio = args.ratio || ref(config, "ratio", "adaptive");
-  body.resolution = FIXED_RESOLUTION;
-  const generateAudio = args.generateAudio ?? ref(config, "generateAudio", true);
-  if (typeof generateAudio === "boolean") body.generate_audio = generateAudio;
-  const watermark = args.watermark ?? ref(config, "watermark", false);
-  if (typeof watermark === "boolean") body.watermark = watermark;
-  if (args.user) body.safety_identifier = String(args.user);
-  if (typeof args.returnLastFrame === "boolean") body.return_last_frame = args.returnLastFrame;
-  if (args.seed != null && Number.isFinite(Number(args.seed))) body.seed = Number(args.seed);
-  if (isOmniExtendModel(model)) {
-    body.ratio = "adaptive";
-    body.omni_reference_task_type = "extend";
-  }
-  return { body, seconds };
-}
-function modelMaxSeconds(config) {
-  return isOmniExtendModel(resolveModel(config)) ? 30 : 15;
-}
-function resolveSingleMax(config) {
-  return modelMaxSeconds(config);
-}
-function resolveSegmentSeconds(config, requested = void 0) {
-  const max = modelMaxSeconds(config);
-  return clampInteger(requested, MIN_SEGMENT_SECONDS, max, max);
-}
-function maxTargetSeconds(singleMax, segmentSeconds) {
-  return Math.min(MAX_TOTAL_SECONDS, singleMax + (MAX_SEGMENTS - 1) * segmentSeconds);
-}
-function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
-  if (totalSeconds <= singleMax) return [{ kind: "generate", seconds: totalSeconds }];
-  let base = singleMax;
-  let remaining = totalSeconds - base;
-  if (remaining < MIN_SEGMENT_SECONDS) {
-    const trimmed = MIN_SEGMENT_SECONDS - remaining;
-    if (base - trimmed >= MIN_SEGMENT_SECONDS) {
-      base -= trimmed;
-      remaining = totalSeconds - base;
-    }
-  }
-  const slots = MAX_SEGMENTS - 1;
-  const count = Math.min(slots, Math.max(1, Math.ceil(remaining / segmentSeconds)));
-  const sizes = [];
-  let left = remaining;
-  for (let index = count; index > 0 && left > 0; index -= 1) {
-    let size = Math.min(segmentSeconds, Math.ceil(left / index));
-    if (size < MIN_SEGMENT_SECONDS) size = Math.min(segmentSeconds, MIN_SEGMENT_SECONDS);
-    sizes.push(size);
-    left -= size;
-  }
-  const plan = [{ kind: "generate", seconds: base }];
-  for (const seconds of sizes) {
-    if (plan.length >= MAX_SEGMENTS) break;
-    plan.push({ kind: "extend", seconds });
-  }
-  return plan;
-}
-function resolveSegmentPrompts(prompts, planLength) {
-  if (prompts === void 0 && planLength === 1) return null;
-  if (!Array.isArray(prompts) || prompts.length !== planLength || prompts.some((value) => typeof value !== "string" || !value.trim())) {
-    throw new Error(`\u8BF7\u6309\u5B8C\u6574\u751F\u6210\u8BA1\u5212\u63D0\u4F9B segmentPrompts\uFF1A${planLength} \u6761\u975E\u7A7A\u7684\u9010\u6BB5\u63D0\u793A\u8BCD\uFF0C\u6BCF\u6761\u4EC5\u542B\u672C\u6BB5\u52A8\u4F5C\u4E0E\u5BF9\u767D\u3002\u5148\u8865\u9F50\u63D0\u793A\u8BCD\u518D\u63D0\u4EA4\uFF0C\u4E0D\u8981\u91CD\u65B0\u751F\u6210\u5DF2\u5B8C\u6210\u5206\u6BB5\u3002`);
-  }
-  return prompts.map((value) => value.trim());
-}
-function buildSegmentExecutionPrompt({ prompt, kind, index, count }) {
-  const boundary = kind === "generate" ? "\u8FD9\u662F\u9996\u6BB5\uFF1A\u53EA\u6F14\u672C\u6BB5\u4E8B\u4EF6\uFF0C\u7ED3\u5C3E\u505C\u5728\u672C\u6BB5\u6307\u5B9A\u72B6\u6001\uFF0C\u4E0D\u62A2\u6F14\u540E\u6BB5\u5267\u60C5\uFF0C\u4E0D\u505A\u6574\u7247\u7ED3\u675F\u5F0F\u6536\u5C3E\u3002" : "\u8FD9\u662F\u7EED\u62CD\u6BB5\uFF1A\u89C6\u98911\u63D0\u4F9B\u4E0A\u4E00\u6BB5\u7ED3\u675F\u72B6\u6001\uFF0C\u4ECE\u5176\u540E\u7684\u65B0\u4E8B\u4EF6\u7EE7\u7EED\u3002\u4E0D\u8981\u91CD\u6F14\u8FDB\u573A\u3001\u9012\u63A5\u7269\u54C1\u6216\u5DF2\u8BF4\u53F0\u8BCD\u3002";
-  return [
-    `\u3010\u751F\u6210\u6BB5 ${index + 1}/${count}\u3011\u751F\u6210\u6BB5\u7F16\u53F7\u4E0D\u662F\u5207\u955C\u6307\u4EE4\uFF1B\u955C\u5934\u662F\u5426\u5207\u6362\u4EE5\u811A\u672C\u4E3A\u51C6\u3002`,
-    "\u3010\u6267\u884C\u5185\u5BB9\u3011" + String(prompt).trim(),
-    boundary,
-    index < count - 1 ? "\u5728\u5B8C\u6574\u53E5\u7ED3\u675F\u3001\u52A8\u4F5C\u5B8C\u6210\u6216\u81EA\u7136\u53CD\u5E94\u5904\u4EA4\u63A5\uFF0C\u4FDD\u7559\u4EBA\u7269\u4F4D\u7F6E\u3001\u89C6\u7EBF\u3001\u6301\u7269\u624B\u548C\u955C\u5934\u8FD0\u52A8\u72B6\u6001\uFF0C\u4E0D\u7528\u5B9A\u683C\u7B49\u5F85\u586B\u6EE1\u65F6\u957F\u3002" : "\u5B8C\u6210\u672C\u6BB5\u7684\u6545\u4E8B\u53D8\u5316\uFF0C\u518D\u7528\u81EA\u7136\u53CD\u5E94\u6216\u753B\u9762\u6536\u675F\uFF1B\u4E0D\u91CD\u8FF0\u524D\u60C5\u3002"
-  ].join("\n");
-}
-function buildGenerationPrompt({ prompt, seconds, model = "" }) {
-  const timing = isOmniExtendModel(model) ? "\u6309\u672C\u6BB5\u4E8B\u4EF6\u987A\u5E8F\u63A8\u8FDB\uFF1B\u5982\u6709\u65F6\u95F4\u533A\u95F4\uFF0C\u4EE5\u672C\u6BB50\u79D2\u4E3A\u8D77\u70B9\uFF0C\u533A\u95F4\u8FDE\u7EED\uFF0C\u4E0D\u9057\u6F0F\u505C\u987F\u4E0E\u53CD\u5E94\u65F6\u95F4\u3002" : "\u6309\u672C\u6BB5\u4E8B\u4EF6\u987A\u5E8F\u81EA\u7136\u63A8\u8FDB\uFF0C\u4EE5\u955C\u5934\u5E8F\u53F7\u6216\u5148\u540E\u9636\u6BB5\u7EC4\u7EC7\u5185\u5BB9\uFF0C\u4E0D\u4F9D\u8D56\u7CBE\u786E\u65F6\u95F4\u6233\uFF0C\u4E0D\u4E3A\u8FFD\u9010\u79D2\u70B9\u538B\u7F29\u52A8\u4F5C\u6216\u5BF9\u767D\u3002";
-  return [
-    `\u751F\u6210 ${seconds} \u79D2\u89C6\u9891\u3002`,
-    String(prompt).trim(),
-    timing,
-    "\u4EBA\u7269\u8EAB\u4EFD\u3001\u670D\u88C5\u3001\u573A\u666F\u4E0E\u5149\u7EBF\u4FDD\u6301\u8FDE\u8D2F\uFF1B\u6BCF\u53E5\u53F0\u8BCD\u5B8C\u6574\u8BF4\u5B8C\u3002\u672A\u660E\u786E\u8981\u6C42\u65F6\u4E0D\u65B0\u589E\u5B57\u5E55\u3001\u6C34\u5370\u3001\u7247\u5934\u7247\u5C3E\u6216\u914D\u4E50\u3002"
-  ].join("\n");
-}
-function endWithPunctuation(text) {
-  const value = String(text ?? "").trim();
-  if (!value) return "";
-  return /[。．.!！?？;；~～:：,，]$/.test(value) ? value : `${value}\u3002`;
-}
-function normalizeImageUrl(value, label) {
-  const url = String(value ?? "").trim();
-  if (!url) throw new Error(`${label} \u4E0D\u80FD\u4E3A\u7A7A\u3002`);
-  if (/^asset:\/\/[A-Za-z0-9_-]+$/.test(url)) return url;
-  if (!/^https?:\/\//i.test(url)) {
-    throw new Error(`${label} \u5FC5\u987B\u662F https:// \u6216 http:// \u5F00\u5934\u7684\u516C\u7F51 URL\uFF08\u4E0D\u80FD\u7528\u672C\u5730\u6587\u4EF6\u8DEF\u5F84\uFF09\u3002`);
-  }
-  return url;
-}
-const IMAGE_EXT_TO_MIME = {
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".png": "image/png",
-  ".webp": "image/webp",
-  ".bmp": "image/bmp",
-  ".gif": "image/gif",
-  ".tif": "image/tiff",
-  ".tiff": "image/tiff"
-};
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-function sniffImageMime(buffer) {
-  if (buffer.length >= 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) return "image/jpeg";
-  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "image/png";
-  if (buffer.length >= 6 && (buffer.subarray(0, 6).toString("latin1") === "GIF87a" || buffer.subarray(0, 6).toString("latin1") === "GIF89a")) return "image/gif";
-  if (buffer.length >= 2 && buffer[0] === 66 && buffer[1] === 77) return "image/bmp";
-  if (buffer.length >= 12 && buffer.subarray(0, 4).toString("latin1") === "RIFF" && buffer.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
-  if (buffer.length >= 4 && (buffer[0] === 73 && buffer[1] === 73 && buffer[2] === 42 || buffer[0] === 77 && buffer[1] === 77 && buffer[2] === 0)) return "image/tiff";
-  return null;
-}
-const CANVAS_SIZES = {
-  "16:9": [1280, 720],
-  "9:16": [720, 1280],
-  "4:3": [960, 720],
-  "3:4": [720, 960],
-  "1:1": [720, 720]
-};
-function canvasSize(ratio) {
-  return CANVAS_SIZES[String(ratio ?? "").trim()] || null;
-}
-function referenceCacheDir() {
-  return path.join(os.tmpdir(), "metaontic-video-reference");
-}
-async function isUsableFit(dest, width, height, config, signal) {
-  const info = await stat(dest).catch(() => null);
-  if (!info?.isFile() || info.size <= 0) return false;
-  const media = await probeMedia(dest, config, signal);
-  if (!media?.width || !media?.height) return true;
-  return media.width === width && media.height === height;
-}
-const fitInFlight = /* @__PURE__ */ new Map();
-async function fitImageToCanvas(absPath, size, config, signal) {
-  const [width, height] = size;
-  const media = await probeMedia(absPath, config, signal);
-  if (media?.width === width && media?.height === height) return absPath;
-  const info = await stat(absPath).catch(() => null);
-  const key = `${path.basename(absPath, path.extname(absPath))}-${info?.size ?? 0}-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`;
-  const dest = path.join(referenceCacheDir(), key);
-  if (await isUsableFit(dest, width, height, config, signal)) return dest;
-  const running = fitInFlight.get(dest);
-  if (running) {
-    await running.catch(() => {
-    });
-    if (await isUsableFit(dest, width, height, config, signal)) return dest;
-    if (signal?.aborted) return absPath;
-  }
-  const task = (async () => {
-    await mkdir(referenceCacheDir(), { recursive: true });
-    const graph = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},gblur=sigma=24[bg];[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1`;
-    const temp = `${dest.replace(/\.jpg$/, "")}.${uniqueSuffix("fit")}.jpg`;
-    try {
-      const { code } = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
-        "-y",
-        "-i",
-        absPath,
-        "-filter_complex",
-        graph,
-        "-frames:v",
-        "1",
-        "-q:v",
-        "2",
-        temp
-      ], { signal, timeoutMs: 12e4 });
-      if (code !== 0) return;
-      const fitted = await probeMedia(temp, config, signal);
-      if (fitted?.width === width && fitted?.height === height) await rename(temp, dest);
-    } catch {
-    } finally {
-      await rm(temp, { force: true }).catch(() => {
-      });
-    }
-  })();
-  fitInFlight.set(dest, task);
-  try {
-    await task;
-  } finally {
-    fitInFlight.delete(dest);
-  }
-  return await isUsableFit(dest, width, height, config, signal) ? dest : absPath;
-}
-const UPLOAD_ALIAS_PATTERN = /^(?:latest|newest|recent|最近上传(?:的图片)?|最新上传(?:的图片)?|刚上传(?:的图片)?|最新图片|刚拖进来的图片)$/i;
-const UPLOAD_WINDOW_MS = 2 * 60 * 60 * 1e3;
-function dshHome() {
-  const fromEnv = String(typeof process !== "undefined" && process.env?.DSH_HOME || "").trim();
-  return fromEnv || path.join(os.homedir(), ".dsh");
-}
-function attachmentObjectsDir() {
-  return path.join(dshHome(), "attachments", "v1", "objects");
-}
-async function sniffFileImage(file) {
-  let handle;
-  try {
-    handle = await open(file, "r");
-    const head = Buffer.alloc(32);
-    const { bytesRead } = await handle.read(head, 0, head.length, 0);
-    return sniffImageMime(head.subarray(0, bytesRead));
-  } catch {
-    return null;
-  } finally {
-    await handle?.close().catch(() => {
-    });
-  }
-}
-async function findRecentUploadedImages(windowMs = UPLOAD_WINDOW_MS) {
-  const root = attachmentObjectsDir();
-  const shards = await readdir(root, { withFileTypes: true }).catch(() => []);
-  const cutoff = Date.now() - windowMs;
-  const found = [];
-  for (const shard of shards) {
-    if (!shard.isDirectory()) continue;
-    const dir = path.join(root, shard.name);
-    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-    for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      const abs = path.join(dir, entry.name);
-      const info = await stat(abs).catch(() => null);
-      if (!info || info.mtimeMs < cutoff) continue;
-      const mime = await sniffFileImage(abs);
-      if (mime) found.push({ abs, mime, bytes: info.size, mtimeMs: info.mtimeMs });
-    }
-  }
-  return found.sort((a, b) => b.mtimeMs - a.mtimeMs);
-}
-function brief(value, limit = 80) {
-  const text = String(value ?? "");
-  return text.length > limit ? `${text.slice(0, limit)}\u2026\uFF08\u5171 ${text.length} \u5B57\u7B26\uFF09` : text;
-}
-function inlineBase64Image(raw, label) {
-  const compact = String(raw ?? "").replace(/\s+/g, "");
-  if (compact.length < 64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return null;
-  const buffer = Buffer.from(compact, "base64");
-  if (buffer.length > MAX_IMAGE_BYTES) {
-    throw new Error(
-      `${label} \u89E3\u51FA\u6765\u6709 ${(buffer.length / 1048576).toFixed(1)} MB\uFF0C\u8BF7\u538B\u5230 ${MAX_IMAGE_BYTES / 1048576} MB \u4EE5\u5185\u518D\u4F20\u3002`
-    );
-  }
-  const mime = sniffImageMime(buffer);
-  if (mime) return { url: `data:${mime};base64,${compact}`, source: "inline", bytes: buffer.length };
-  if (compact.length >= 256) {
-    throw new Error(
-      `${label} \u770B\u7740\u662F base64\uFF0C\u4F46\u89E3\u51FA\u6765\u7684\u5185\u5BB9\u4E0D\u662F\u56FE\u7247\uFF08\u53EA\u8BA4 jpg/png/webp/bmp/gif/tiff \u7684\u6587\u4EF6\u5934\uFF09\u3002`
-    );
-  }
-  return null;
-}
-async function resolveImageInput(value, label, fit = null) {
-  const raw = String(value ?? "").trim().replace(/^@/, "");
-  if (!raw) throw new Error(`${label} \u4E0D\u80FD\u4E3A\u7A7A\u3002`);
-  if (/^https?:\/\//i.test(raw)) return { url: raw, source: "url" };
-  if (/^data:image\//i.test(raw)) return { url: raw, source: "inline" };
-  const inlined = inlineBase64Image(raw, label);
-  if (inlined) return inlined;
-  let abs;
-  let info;
-  let upload = null;
-  const aliasParts = /^([^\s:]+)(?::(\d+))?$/.exec(raw);
-  const aliasName = aliasParts ? aliasParts[1] : "";
-  const uploadIndex = aliasParts && aliasParts[2] ? Math.max(1, Number(aliasParts[2])) : 1;
-  if (UPLOAD_ALIAS_PATTERN.test(aliasName)) {
-    const index = uploadIndex;
-    const uploads = await findRecentUploadedImages();
-    const picked = uploads[index - 1];
-    if (!picked) {
-      throw new Error(
-        `${label} \u5199\u7684\u662F\u300C\u6700\u8FD1\u4E0A\u4F20\u7684\u56FE\u7247\u300D${index > 1 ? `\uFF08\u7B2C ${index} \u65B0\uFF09` : ""}\uFF0C\u4F46 Harness \u9644\u4EF6\u5E93\u91CC\u6700\u8FD1 ${UPLOAD_WINDOW_MS / 36e5} \u5C0F\u65F6\u53EA\u6709 ${uploads.length} \u5F20\u56FE\u7247\uFF0C\u53D6\u4E0D\u5230\u3002\u8BF7\u76F4\u63A5\u628A\u56FE\u7247\u8DEF\u5F84\u6216\u516C\u7F51 URL \u53D1\u8FC7\u6765\u3002`
-      );
-    }
-    abs = picked.abs;
-    info = { size: picked.bytes };
-    upload = {
-      uploadedAt: new Date(picked.mtimeMs).toISOString(),
-      recentUploads: uploads.length,
-      uploadIndex: index
-    };
-  } else {
-    abs = path.resolve(raw.startsWith("~/") || raw === "~" ? path.join(os.homedir(), raw.slice(1)) : raw);
-    const ext = path.extname(abs).toLowerCase();
-    if (!IMAGE_EXT_TO_MIME[ext]) {
-      throw new Error(
-        `${label} \u65E2\u4E0D\u662F http(s) \u94FE\u63A5\u3001base64\uFF0C\u4E5F\u4E0D\u662F\u652F\u6301\u7684\u56FE\u7247\u6587\u4EF6\uFF1A${brief(raw)}\u3002\u672C\u673A\u56FE\u7247\u8BF7\u7528 ${Object.keys(IMAGE_EXT_TO_MIME).join(" / ")} \u4E4B\u4E00\uFF0C\u7528\u6237\u521A\u5728\u5BF9\u8BDD\u91CC\u4E0A\u4F20\u7684\u56FE\u76F4\u63A5\u5199 latest\u3002`
-      );
-    }
-    info = await stat(abs).catch(() => null);
-    if (!info?.isFile()) {
-      throw new Error(`${label} \u627E\u4E0D\u5230\u6587\u4EF6\uFF1A${abs}\uFF08\u7528\u6237\u521A\u5728\u5BF9\u8BDD\u91CC\u4E0A\u4F20\u7684\u56FE\u53EF\u4EE5\u76F4\u63A5\u5199 latest\uFF09`);
-    }
-  }
-  const submitPath = fit?.size ? await fitImageToCanvas(abs, fit.size, fit.config, fit.signal) : abs;
-  let size = info.size;
-  if (submitPath !== abs) {
-    const fittedInfo = await stat(submitPath).catch(() => null);
-    if (!fittedInfo?.isFile()) throw new Error(`${label} \u8BFB\u4E0D\u51FA\u6765\uFF1A${abs}`);
-    size = fittedInfo.size;
-  }
-  if (size > MAX_IMAGE_BYTES) {
-    throw new Error(
-      `${label} \u592A\u5927\uFF08${(size / 1048576).toFixed(1)} MB\uFF09\uFF0C\u8BF7\u538B\u5230 ${MAX_IMAGE_BYTES / 1048576} MB \u4EE5\u5185\u518D\u4F20\uFF1A${abs}`
-    );
-  }
-  const buffer = await readFile(submitPath);
-  const mime = sniffImageMime(buffer);
-  if (!mime) throw new Error(`${label} \u4E0D\u662F\u6709\u6548\u7684\u56FE\u7247\u6587\u4EF6\uFF08\u8BFB\u5230\u7684\u5185\u5BB9\u4E0D\u662F jpg/png/webp/bmp/gif/tiff\uFF09\uFF1A${abs}`);
-  const resolved = {
-    url: `data:${mime};base64,${buffer.toString("base64")}`,
-    source: upload ? "upload" : "file",
-    localPath: submitPath,
-    bytes: buffer.length,
-    ...upload || {}
-  };
-  if (submitPath !== abs) {
-    resolved.originalPath = abs;
-    resolved.fittedTo = `${fit.size[0]}x${fit.size[1]}`;
-  }
-  return resolved;
-}
-function validateImageRoles(args, model) {
-  const refs = Array.isArray(args.referenceImages) ? args.referenceImages : args.referenceImages ? [args.referenceImages] : [];
-  if (args.lastFrameUrl && !args.firstFrameUrl) throw new Error("\u5C3E\u5E27\u5FC5\u987B\u4E0E\u9996\u5E27\u4E00\u8D77\u4F20\u5165\u3002");
-  if (refs.length && (args.firstFrameUrl || args.lastFrameUrl)) {
-    throw new Error("\u9996\u5C3E\u5E27\u4E0E\u53C2\u8003\u56FE\u6A21\u5F0F\u4E92\u65A5\uFF0C\u8BF7\u9009\u62E9\u4E00\u79CD\uFF1B\u5982\u9700\u7EC4\u5408\uFF0C\u7528\u53C2\u8003\u56FE\u6A21\u5F0F\u5E76\u5728\u63D0\u793A\u8BCD\u6307\u5B9A\u9996\u5C3E\u753B\u9762\u3002");
-  }
-  const limit = isOmniExtendModel(model) ? 30 : 9;
-  if (refs.length > limit) throw new Error(`\u5F53\u524D\u6A21\u578B\u6700\u591A\u652F\u6301 ${limit} \u5F20\u53C2\u8003\u56FE\u3002`);
-  if (refs.some((value) => typeof value !== "string" || !value.trim())) throw new Error("\u6BCF\u5F20\u53C2\u8003\u56FE\u5FC5\u987B\u662F\u975E\u7A7A\u5B57\u7B26\u4E32\u3002");
-  return { refs, limit };
-}
-async function buildGenerationBody(config, args, seconds, options = {}) {
-  const { refs } = validateImageRoles(args, resolveModel(config));
-  const prompt = String(args.prompt ?? "").trim();
-  const ratio = args.ratio || ref(config, "ratio", "adaptive");
-  const canvas = canvasSize(ratio);
-  const fit = canvas ? { size: canvas, config, signal: options.signal } : null;
-  const content = [
-    { type: "text", text: buildGenerationPrompt({ prompt, seconds, model: resolveModel(config) }) }
-  ];
-  const images = [];
-  const notes = [];
-  const addImage = async (value, role, label) => {
-    const resolved = isVolcengine(config) && /^asset:\/\//.test(String(value)) ? { url: String(value), source: "asset" } : await resolveImageInput(value, label, fit);
-    content.push({
-      type: "image_url",
-      image_url: { url: resolved.url },
-      role
-    });
-    images.push({ role, ...resolved });
-  };
-  const firstFrame = String(args.firstFrameUrl ?? "").trim();
-  if (firstFrame) await addImage(firstFrame, "first_frame", "\u9996\u5E27\u56FE");
-  const lastFrame = String(args.lastFrameUrl ?? "").trim();
-  if (lastFrame) await addImage(lastFrame, "last_frame", "\u5C3E\u5E27\u56FE");
-  for (const [index, reference] of refs.entries()) {
-    await addImage(reference.trim(), "reference_image", `\u53C2\u8003\u56FE ${index + 1}`);
-  }
-  const body = { ...parseExtraParams(config) };
-  body.model = resolveModel(config);
-  body.content = content;
-  body.duration = seconds;
-  body.ratio = isOmniExtendModel(body.model) && content.some((item) => item.role === "first_frame" || item.role === "last_frame") ? "adaptive" : ratio;
-  body.resolution = FIXED_RESOLUTION;
-  const generateAudio = args.generateAudio ?? ref(config, "generateAudio", true);
-  if (typeof generateAudio === "boolean") body.generate_audio = generateAudio;
-  const watermark = args.watermark ?? ref(config, "watermark", false);
-  if (typeof watermark === "boolean") body.watermark = watermark;
-  if (args.user) body.safety_identifier = String(args.user);
-  if (typeof args.returnLastFrame === "boolean") body.return_last_frame = args.returnLastFrame;
-  if (args.seed != null && Number.isFinite(Number(args.seed))) body.seed = Number(args.seed);
-  return { body, seconds, images, notes };
-}
-async function runTask(config, body, signal) {
-  const created = await createTask(config, body, signal);
-  const taskId = extractTaskId(created);
-  await appendRequestLog({ event: "task_created", taskId, model: body?.model, duration: body?.duration });
-  if (!taskId) throw new Error("\u521B\u5EFA\u4EFB\u52A1\u5931\u8D25\uFF1A\u54CD\u5E94\u4E2D\u7F3A\u5C11\u4EFB\u52A1 ID\u3002");
-  try {
-    const final = await waitForCompletion(config, taskId, signal);
-    await appendRequestLog({ event: "task_finished", taskId, status: final.status, errorCode: final.errorCode });
-    return { ...final, taskId };
-  } catch (failure) {
-    if (failure?.code === "ABORTED") throw failure;
-    return {
-      taskId,
-      status: "unknown",
-      errorCode: failure?.code || "provider_poll_error",
-      error: `\u4EFB\u52A1\u5DF2\u63D0\u4EA4\uFF08${taskId}\uFF09\uFF0C\u4F46\u67E5\u8BE2\u72B6\u6001\u5931\u8D25\uFF1A${failure?.message || String(failure)}\u3002\u4EFB\u52A1\u53EF\u80FD\u4ECD\u5728\u751F\u6210\uFF0C\u53EF\u7528 video_status \u6309\u8FD9\u4E2A ID \u518D\u67E5\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u3002`
-    };
-  }
-}
-function resolveBinary(config, key, fallback) {
-  return String(ref(config, key, "")).trim() || fallback;
-}
+var PLUGIN_VERSION = true ? "3.3.2".trim().replace(/^v/i, "") : "";
+
+// src/utils/files.ts
+import path2 from "node:path";
+import { mkdir, stat } from "node:fs/promises";
 function tail(text, limit = 600) {
   const clean = String(text || "").trim();
   return clean.length > limit ? `\u2026${clean.slice(-limit)}` : clean;
@@ -680,7 +173,7 @@ function formatSeconds(value) {
   if (!Number.isFinite(number)) return String(value ?? "");
   return Number.isInteger(number) ? String(number) : number.toFixed(1);
 }
-let tempSequence = 0;
+var tempSequence = 0;
 function uniqueSuffix(prefix = "tmp") {
   tempSequence = (tempSequence + 1) % 1e9;
   return `${prefix}-${process.pid}-${tempSequence}-${Math.random().toString(36).slice(2, 8)}`;
@@ -690,11 +183,11 @@ function fileStamp(date = /* @__PURE__ */ new Date()) {
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
 }
 async function allocateStamp(outDir, base) {
-  const parent = path.join(outDir, "segments");
+  const parent = path2.join(outDir, "segments");
   await mkdir(parent, { recursive: true });
   for (let attempt = 1; attempt <= 100; attempt += 1) {
     const stamp = attempt === 1 ? base : `${base}-${attempt}`;
-    const dir = path.join(parent, stamp);
+    const dir = path2.join(parent, stamp);
     try {
       await mkdir(dir);
       return { stamp, segmentsDir: dir };
@@ -704,43 +197,6 @@ async function allocateStamp(outDir, base) {
   }
   throw new Error(`\u65E0\u6CD5\u5728 ${parent} \u4E0B\u5206\u914D\u552F\u4E00\u7684\u5206\u6BB5\u76EE\u5F55\uFF08\u540C\u540D\u592A\u591A\uFF09\u3002`);
 }
-function toJsonSafe(value, seen = /* @__PURE__ */ new Set()) {
-  if (value === null) return null;
-  const type = typeof value;
-  if (type === "string" || type === "boolean") return value;
-  if (type === "number") {
-    return Number.isFinite(value) && !Object.is(value, -0) ? value : String(value);
-  }
-  if (type === "bigint") return value.toString();
-  if (type === "undefined" || type === "function" || type === "symbol") return void 0;
-  if (value instanceof Date) return value.toISOString();
-  if (value instanceof Error) return value.message ? `${value.name}: ${value.message}` : value.name;
-  if (seen.has(value)) return "[circular]";
-  seen.add(value);
-  try {
-    if (Array.isArray(value)) {
-      return Array.from(value, (item) => toJsonSafe(item, seen) ?? null);
-    }
-    const prototype = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) return String(value);
-    const plain = {};
-    for (const [key, item] of Object.entries(value)) {
-      const safe = toJsonSafe(item, seen);
-      if (safe !== void 0) plain[key] = safe;
-    }
-    return plain;
-  } finally {
-    seen.delete(value);
-  }
-}
-function jsonSafeTool(tool) {
-  return {
-    ...tool,
-    async execute(...args) {
-      return toJsonSafe(await tool.execute(...args));
-    }
-  };
-}
 async function exists(file) {
   try {
     await stat(file);
@@ -748,6 +204,109 @@ async function exists(file) {
   } catch {
     return false;
   }
+}
+async function resolveOutputDir(config, exec, deps) {
+  const configured = String(ref(config, "outputDir", "")).trim();
+  if (configured) return path2.resolve(configured);
+  let cwd = "";
+  if (deps?.workdir && exec?.agent) {
+    try {
+      cwd = await deps.workdir.ensure(exec.agent, exec.signal) || "";
+    } catch {
+      cwd = "";
+    }
+  }
+  return path2.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
+}
+
+// src/workflow/resume.ts
+import os2 from "node:os";
+
+// src/utils/logging.ts
+import { AsyncLocalStorage } from "node:async_hooks";
+import path4 from "node:path";
+
+// src/media/references.ts
+import path3 from "node:path";
+import os from "node:os";
+import { stat as stat2, mkdir as mkdir2, rename, rm, open, readdir, readFile } from "node:fs/promises";
+
+// src/media/ffmpeg.ts
+import { spawn } from "node:child_process";
+
+// src/utils/errors.ts
+function upstreamMessage(data) {
+  if (data && typeof data === "object") {
+    const error = data.error;
+    if (error && typeof error === "object") {
+      const message = String(error.message || "").trim();
+      const code = String(error.code || "").trim();
+      if (message) return code ? `${message}\uFF08${code}\uFF09` : message;
+    } else if (typeof error === "string" && error.trim()) {
+      return error.trim();
+    }
+    for (const key of ["message", "detail", "msg", "fail_reason"]) {
+      const value = data[key];
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+  }
+  const text = typeof data === "string" ? data : JSON.stringify(data ?? {});
+  return text || "\u4E0A\u6E38\u672A\u8FD4\u56DE\u9519\u8BEF\u8BE6\u60C5";
+}
+function quotaDetail(text) {
+  const parts = [];
+  const remain = /(?:remain(?:ing)? quota|剩余额度)\D{0,6}([¥$]?\d[\d.,]*)/i.exec(text);
+  const need = /(?:need quota|需要预扣费额度|需要额度)\D{0,6}([¥$]?\d[\d.,]*)/i.exec(text);
+  if (remain) parts.push(`\u5269\u4F59 ${remain[1]}`);
+  if (need) parts.push(`\u9700\u8981 ${need[1]}`);
+  return parts.length ? `\uFF08${parts.join("\uFF0C")}\uFF09` : "";
+}
+function classifyError(statusCode, data) {
+  const raw = upstreamMessage(data);
+  const lowered = raw.toLowerCase();
+  if (statusCode === 402 || QUOTA_HINTS.some((hint) => lowered.includes(hint)) || lowered.includes("quota_exceeded")) {
+    return {
+      code: "provider_quota_exceeded",
+      message: `\u4E2D\u8F6C\u7AD9\u989D\u5EA6\u4E0D\u8DB3${quotaDetail(raw)}\uFF0C\u8BF7\u5145\u503C\u540E\u518D\u8BD5\uFF1A${raw}`
+    };
+  }
+  if (statusCode === 401 || statusCode === 403) {
+    return { code: "provider_auth", message: `\u4E2D\u8F6C\u7AD9\u9274\u6743\u5931\u8D25\uFF08${statusCode}\uFF09\uFF1A${raw}` };
+  }
+  if (statusCode === 429) {
+    return { code: "provider_rate_limited", message: `\u4E2D\u8F6C\u7AD9\u9650\u6D41\uFF08429\uFF09\uFF1A${raw}` };
+  }
+  if (CONTENT_HINTS.some((hint) => lowered.includes(hint))) {
+    return { code: "content_rejected", message: raw };
+  }
+  if (PRICE_HINTS.some((hint) => lowered.includes(hint))) {
+    return {
+      code: "provider_price_config_error",
+      message: `\u4E2D\u8F6C\u7AD9\u8BE5\u6A21\u578B\u7684\u8BA1\u4EF7\u914D\u7F6E\u5F02\u5E38\uFF0C\u4E0E\u672C\u6B21\u8BF7\u6C42\u53C2\u6570\u65E0\u5173\uFF0C\u91CD\u8BD5\u4E5F\u4E0D\u4F1A\u6210\u529F\uFF1A${raw}\u3002\u8BF7\u5728\u63D2\u4EF6 config \u91CC\u6362\u7528\u5176\u5B83\u53EF\u7528\u6A21\u578B\u3002`
+    };
+  }
+  return { code: "provider_failed", message: raw };
+}
+function isContentRejection(text) {
+  const lowered = String(text || "").toLowerCase();
+  return CONTENT_HINTS.some((hint) => lowered.includes(hint));
+}
+function abortError() {
+  const error = new Error("\u5DF2\u53D6\u6D88");
+  error.code = "ABORTED";
+  return error;
+}
+function isRetryablePollError(failure) {
+  if (!failure || failure.code === "ABORTED") return false;
+  const status = Number(failure.status);
+  if (!Number.isFinite(status)) return true;
+  if (status >= 500) return true;
+  return status === 401 || status === 403 || status === 408 || status === 429;
+}
+
+// src/media/ffmpeg.ts
+function resolveBinary(config, key, fallback) {
+  return String(ref(config, key, "")).trim() || fallback;
 }
 async function runProcess(binary, args, { signal, timeoutMs = 18e5, shell = false } = {}) {
   return new Promise((resolve, reject) => {
@@ -816,7 +375,7 @@ function currentPlatform() {
     return "linux";
   }
 }
-const HOMEBREW_BOOTSTRAP = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"';
+var HOMEBREW_BOOTSTRAP = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"';
 function ffmpegInstallOptions(platform = currentPlatform()) {
   if (platform === "darwin") {
     return {
@@ -877,16 +436,16 @@ async function findInstalledFfmpeg(signal) {
 }
 function ffmpegInstallHint(config) {
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  const { os: os2, installs } = ffmpegInstallOptions();
+  const { os: os3, installs } = ffmpegInstallOptions();
   const lines = [
     `\u672C\u673A\u6CA1\u6709\u627E\u5230\u53EF\u7528\u7684 ffmpeg\uFF08${binary}\uFF09\uFF0C\u6240\u4EE5\u300C\u628A\u591A\u6BB5\u5408\u5E76\u6210\u4E00\u6761\u300D\u8FD9\u6B65\u6682\u65F6\u6CA1\u505A\uFF0C\u5206\u6BB5\u6587\u4EF6\u90FD\u5728\uFF0C\u4E00\u6761\u90FD\u4E0D\u5C11\u3002`,
-    `\u88C5\u4E00\u4E0B ffmpeg \u5C31\u80FD\u5408\u5E76\uFF08\u4F60\u5F53\u524D\u662F ${os2}\uFF09\uFF1A`,
+    `\u88C5\u4E00\u4E0B ffmpeg \u5C31\u80FD\u5408\u5E76\uFF08\u4F60\u5F53\u524D\u662F ${os3}\uFF09\uFF1A`,
     ...installs.map((item) => `  \xB7 ${item.label}\uFF1A${item.command}`),
     "\u88C5\u597D\u540E\u91CD\u8DD1\u8FD9\u6B21\u751F\u6210\uFF0C\u5206\u6BB5\u4F1A\u81EA\u52A8\u5408\u5E76\u6210\u4E00\u6761\uFF0C\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF1B\u5982\u679C ffmpeg \u5DF2\u7ECF\u88C5\u4E86\u4F46\u4E0D\u5728\u9ED8\u8BA4\u4F4D\u7F6E\uFF0C\u628A\u5B83\u7684\u7EDD\u5BF9\u8DEF\u5F84\u586B\u5230\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\u4E5F\u4E00\u6837\u7BA1\u7528\u3002",
     "ffmpeg \u7684\u5B89\u88C5\u5305\u91CC\u81EA\u5E26 ffprobe\uFF0C\u88C5\u5B8C\u5206\u6BB5\u63A2\u6D4B\u4E5F\u4E00\u8D77\u597D\u4E86\u3002",
     "\u60F3\u8BA9\u6211\u6765\u88C5\u5C31\u8BF4\u4E00\u58F0 \u2014\u2014 \u6211\u4F1A\u7528 video_setup \u6267\u884C\u5B89\u88C5\uFF08\u6267\u884C\u524D\u5BBF\u4E3B\u4F1A\u5148\u8BA9\u4F60\u786E\u8BA4\u547D\u4EE4\uFF09\u3002"
   ];
-  return { binary, os: os2, installs, hint: lines.join("\n") };
+  return { binary, os: os3, installs, hint: lines.join("\n") };
 }
 async function probeMedia(file, config, signal) {
   try {
@@ -921,538 +480,411 @@ async function probeMedia(file, config, signal) {
     return null;
   }
 }
-const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1e3;
-async function downloadFile(url, destPath, { signal } = {}) {
-  await mkdir(path.dirname(destPath), { recursive: true });
-  const partial = `${destPath}.${uniqueSuffix("part")}`;
-  const timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
-  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+
+// src/providers/connection.ts
+function relayPreset() {
+  return RELAY_PRESET;
+}
+function isVolcengine(config) {
+  return ref(config, "connectionMode", "service") === "volcengine";
+}
+function isMetaontic(config) {
+  return ref(config, "connectionMode", "service") === "metaontic";
+}
+function isManualKey(config) {
+  return isVolcengine(config) || isMetaontic(config);
+}
+function connectionLabel(config) {
+  return isMetaontic(config) ? "MetaOntic AI" : "\u706B\u5C71\u5F15\u64CE";
+}
+function resolveApiKey(config) {
+  if (isMetaontic(config)) return String(ref(config, "metaonticApiKey", "")).trim();
+  if (isVolcengine(config)) return String(ref(config, "volcengineApiKey", "")).trim();
+  return String(ref(config, "apiKey", "")).trim();
+}
+function isServerIssuedKey(config) {
+  if (String(ref(config, "keyOrigin", "")).trim() === KEY_ORIGIN_REGISTER) return true;
+  return Boolean(String(ref(config, "deviceId", "")).trim()) && Boolean(String(ref(config, "deviceSecret", "")).trim()) && Boolean(String(ref(config, "registerEmail", "")).trim());
+}
+function resolveBaseUrl(config) {
+  if (isVolcengine(config)) return "https://ark.cn-beijing.volces.com";
+  const preset = relayPreset();
+  return (String(ref(config, "baseUrl", "")).trim() || envValue(preset.baseEnv) || preset.baseUrl).replace(/\/+$/, "");
+}
+function resolveSubmitPath(config) {
+  if (isVolcengine(config)) return "/api/v3/contents/generations/tasks";
+  return String(ref(config, "submitPath", "")).trim() || relayPreset().submitPath;
+}
+function resolveQueryPath(config, taskId) {
+  if (isVolcengine(config)) return `/api/v3/contents/generations/tasks/${encodeURIComponent(taskId)}`;
+  const path9 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
+  return path9.replace("{task_id}", encodeURIComponent(taskId));
+}
+function resolveModel(config) {
+  const preset = relayPreset();
+  return String(ref(config, "model", "")).trim() || envValue(preset.modelEnv) || preset.model;
+}
+function isOmniExtendModel(model) {
+  const lowered = String(model).toLowerCase();
+  return lowered.includes("seedance-2-5") || lowered.includes("seedance-2.5");
+}
+function parseExtraParams(config) {
+  const raw = String(ref(config, "extraParams", "")).trim();
+  if (!raw) return {};
+  let value;
   try {
-    const response = await fetch(url, { signal: requestSignal });
-    if (!response.ok) {
-      throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF08HTTP ${response.status}\uFF09\uFF1A${url}`), {
-        code: "download_failed"
-      });
-    }
-    if (!response.body) {
-      throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF1A\u54CD\u5E94\u6CA1\u6709\u5185\u5BB9\uFF08${url}\uFF09\u3002`), {
-        code: "download_failed"
-      });
-    }
-    await pipeline(Readable.fromWeb(response.body), createWriteStream(partial));
-    await rename(partial, destPath);
-    return destPath;
-  } catch (error) {
-    await rm(partial, { force: true }).catch(() => {
-    });
-    if (error?.code === "download_failed") throw error;
-    if (signal?.aborted) throw abortError();
-    throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF1A${error?.message || error}\uFF08${url}\uFF09`), {
-      code: "download_failed"
-    });
+    value = JSON.parse(raw);
+  } catch {
+    throw new Error("\u914D\u7F6E extraParams \u4E0D\u662F\u5408\u6CD5 JSON \u5BF9\u8C61\u5B57\u7B26\u4E32\u3002");
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("\u914D\u7F6E extraParams \u5FC5\u987B\u662F JSON \u5BF9\u8C61\u3002");
+  }
+  return value;
+}
+function assertConfigured(config, apiKey) {
+  if (isMetaontic(config)) {
+    if (!apiKey) throw new Error("\u8BF7\u5728 MetaOntic AI \u6A21\u5F0F\u4E2D\u914D\u7F6E API Key\u3002");
+    return;
+  }
+  if (isVolcengine(config)) {
+    if (!apiKey) throw new Error("\u8BF7\u5728 C \u706B\u5C71\u5F15\u64CE\u6A21\u5F0F\u4E2D\u914D\u7F6E\u706B\u5C71 API Key\u3002");
+    return;
+  }
+  if (!apiKey) {
+    throw new Error(
+      "\u672A\u914D\u7F6E API Key\uFF1A\u6253\u5F00\u300C\u63D2\u4EF6 \u2192 \u5DF2\u5B89\u88C5\u63D2\u4EF6 \u2192 MetaOnticVideo \u2192 \u67E5\u770B\u300D\uFF0C\u70B9\u300C\u767B\u5F55\u300D\u9886\u4E00\u628A\u2014\u2014\u670D\u52A1\u7AEF\u4F1A\u628A Key\u3001\u4E0A\u6E38\u5730\u5740\u548C\u6A21\u578B\u76F4\u63A5\u5199\u8FDB\u914D\u7F6E\uFF0C\u4E0D\u7528\u624B\u586B\u3002"
+    );
+  }
+  if (!isServerIssuedKey(config)) {
+    throw new Error(
+      "\u5F53\u524D apiKey \u4E0D\u662F\u670D\u52A1\u7AEF\u4E0B\u53D1\u7684\uFF0C\u63D2\u4EF6\u62D2\u7EDD\u8C03\u7528\uFF1A\u5BC6\u94A5\u53EA\u80FD\u5728\u63D2\u4EF6\u8BE6\u60C5\u9875\u70B9\u300C\u767B\u5F55\u300D\u7531\u670D\u52A1\u7AEF\u4E0B\u53D1\u3002\u540C\u4E00\u4E2A\u90AE\u7BB1\u518D\u767B\u5F55\u4E00\u6B21\u4F1A\u628A\u539F\u6765\u90A3\u628A\u8FD8\u7ED9\u4F60\uFF0C\u4E0D\u4F1A\u591A\u5F00\u4E00\u628A\u3002"
+    );
+  }
+  if (!resolveBaseUrl(config)) {
+    throw new Error(
+      "\u672A\u914D\u7F6E baseUrl\uFF1A\u6B63\u5E38\u7531\u300C\u767B\u5F55\u300D\u65F6\u670D\u52A1\u7AEF\u4E0B\u53D1\u4E2D\u8F6C\u7AD9\u5730\u5740\uFF1B\u7F3A\u5931\u65F6\u8BF7\u91CD\u65B0\u767B\u5F55\uFF0C\u6216\u68C0\u67E5\u8BBE\u7F6E\u9875\u91CC\u7684\u4E0A\u6E38\u5730\u5740\u3002"
+    );
   }
 }
-function evenNumber(value, fallback) {
-  const number = Number(value);
-  if (!Number.isFinite(number) || number <= 0) return fallback;
-  const rounded = Math.round(number);
-  const even = rounded % 2 === 0 ? rounded : rounded - 1;
-  return even >= 2 ? even : 2;
+function resolveRegisterApi(config) {
+  return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-const AUDIO_PADDING_TOLERANCE_FRAMES = 1;
-async function alignSegmentAudio(config, files, probed, outPath, { signal, binary } = {}) {
-  const temps = [];
-  const trimmed = [];
-  const aligned = [];
-  for (const [index, file] of files.entries()) {
-    const media = probed?.[index];
-    const fps = Math.max(1, Math.round(media?.fps || 30));
-    const videoSeconds = Number(media?.videoDurationSeconds) || 0;
-    const audioSeconds = Number(media?.audioDurationSeconds) || 0;
-    const padding = audioSeconds - videoSeconds;
-    const isLast = index === files.length - 1;
-    if (isLast || !media?.hasAudio || videoSeconds <= 0 || padding <= AUDIO_PADDING_TOLERANCE_FRAMES / fps) {
-      aligned.push(file);
-      continue;
-    }
-    const temp = `${outPath}.${uniqueSuffix(`align${index + 1}`)}.mp4`;
-    const { code } = await runProcess(
-      binary || resolveBinary(config, "ffmpegBinary", "ffmpeg"),
-      [
+
+// src/media/references.ts
+var IMAGE_EXT_TO_MIME = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+  ".gif": "image/gif",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff"
+};
+var MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+function sniffImageMime(buffer) {
+  if (buffer.length >= 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) return "image/jpeg";
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "image/png";
+  if (buffer.length >= 6 && (buffer.subarray(0, 6).toString("latin1") === "GIF87a" || buffer.subarray(0, 6).toString("latin1") === "GIF89a")) return "image/gif";
+  if (buffer.length >= 2 && buffer[0] === 66 && buffer[1] === 77) return "image/bmp";
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString("latin1") === "RIFF" && buffer.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
+  if (buffer.length >= 4 && (buffer[0] === 73 && buffer[1] === 73 && buffer[2] === 42 || buffer[0] === 77 && buffer[1] === 77 && buffer[2] === 0)) return "image/tiff";
+  return null;
+}
+var CANVAS_SIZES = {
+  "16:9": [1280, 720],
+  "9:16": [720, 1280],
+  "4:3": [960, 720],
+  "3:4": [720, 960],
+  "1:1": [720, 720]
+};
+function canvasSize(ratio) {
+  return CANVAS_SIZES[String(ratio ?? "").trim()] || null;
+}
+function referenceCacheDir() {
+  return path3.join(os.tmpdir(), "metaontic-video-reference");
+}
+async function isUsableFit(dest, width, height, config, signal) {
+  const info = await stat2(dest).catch(() => null);
+  if (!info?.isFile() || info.size <= 0) return false;
+  const media = await probeMedia(dest, config, signal);
+  if (!media?.width || !media?.height) return true;
+  return media.width === width && media.height === height;
+}
+var fitInFlight = /* @__PURE__ */ new Map();
+async function fitImageToCanvas(absPath, size, config, signal) {
+  const [width, height] = size;
+  const media = await probeMedia(absPath, config, signal);
+  if (media?.width === width && media?.height === height) return absPath;
+  const info = await stat2(absPath).catch(() => null);
+  const key = `${path3.basename(absPath, path3.extname(absPath))}-${info?.size ?? 0}-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`;
+  const dest = path3.join(referenceCacheDir(), key);
+  if (await isUsableFit(dest, width, height, config, signal)) return dest;
+  const running = fitInFlight.get(dest);
+  if (running) {
+    await running.catch(() => {
+    });
+    if (await isUsableFit(dest, width, height, config, signal)) return dest;
+    if (signal?.aborted) return absPath;
+  }
+  const task = (async () => {
+    await mkdir2(referenceCacheDir(), { recursive: true });
+    const graph = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},gblur=sigma=24[bg];[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1`;
+    const temp = `${dest.replace(/\.jpg$/, "")}.${uniqueSuffix("fit")}.jpg`;
+    try {
+      const { code } = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
         "-y",
         "-i",
-        file,
-        "-map",
-        "0:v",
-        "-map",
-        "0:a",
-        "-c:v",
-        "copy",
-        "-c:a",
-        "aac",
-        "-af",
-        `atrim=0:${videoSeconds.toFixed(3)}`,
-        "-movflags",
-        "+faststart",
+        absPath,
+        "-filter_complex",
+        graph,
+        "-frames:v",
+        "1",
+        "-q:v",
+        "2",
         temp
-      ],
-      { signal }
-    );
-    if (code === 0 && await exists(temp)) {
-      temps.push(temp);
-      trimmed.push({ index: index + 1, paddingSeconds: Number(padding.toFixed(3)) });
-      aligned.push(temp);
-    } else {
-      await rm(temp, { force: true });
-      aligned.push(file);
-    }
-  }
-  return { files: aligned, temps, trimmed };
-}
-async function cleanupSegmentTemps(temps) {
-  for (const temp of temps || []) await rm(temp, { force: true });
-}
-async function mergeClips(config, files, outPath, { signal } = {}) {
-  const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  await mkdir(path.dirname(outPath), { recursive: true });
-  await rm(outPath, { force: true });
-  const work = `${outPath}.${uniqueSuffix("work")}.mp4`;
-  let copyError = "";
-  let audioError = "";
-  const probed = [];
-  for (const file of files) probed.push(await probeMedia(file, config, signal));
-  const videos = probed.filter((media) => media && media.width && media.height);
-  const paramsMatch = videos.length !== probed.length || videos.every((media) => media.width === videos[0].width && media.height === videos[0].height);
-  const { files: aligned, temps, trimmed } = await alignSegmentAudio(
-    config,
-    files,
-    probed,
-    work,
-    { signal, binary }
-  );
-  files = aligned;
-  try {
-    const mergeMode = ref(config, "mergeMode", "copy");
-    if (mergeMode !== "reencode" && paramsMatch) {
-      const listPath = `${work}.concat.txt`;
-      const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
-      await writeFile(listPath, `${lines}
-`, "utf8");
-      try {
-        const { code: code2, stderr: stderr2 } = await runProcess(binary, [
-          "-y",
-          "-f",
-          "concat",
-          "-safe",
-          "0",
-          "-i",
-          listPath,
-          "-c",
-          "copy",
-          "-movflags",
-          "+faststart",
-          work
-        ], { signal });
-        if (code2 === 0 && await exists(work)) {
-          await rename(work, outPath);
-          return { path: outPath, mode: "copy", trimmed };
-        }
-        copyError = stderr2.trim().slice(-400);
-      } finally {
-        await rm(listPath, { force: true });
-      }
-    } else if (!paramsMatch) {
-      copyError = "\u5206\u6BB5\u5206\u8FA8\u7387\u4E0D\u4E00\u81F4\uFF0C\u8DF3\u8FC7\u65E0\u635F\u62FC\u63A5\u3002";
-    }
-    const first = probed.find((media) => media && media.width && media.height) || {};
-    const width = evenNumber(first.width, 1280);
-    const height = evenNumber(first.height, 720);
-    const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
-    const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
-    const videoParts = files.map((_, index) => `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${index}]`);
-    const videoInputs = files.map((_, index) => `[v${index}]`).join("");
-    async function encode(filter2, maps, withAudioTrack) {
-      await rm(work, { force: true });
-      const args = ["-y"];
-      for (const file of files) args.push("-i", file);
-      args.push("-filter_complex", filter2, ...maps, "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p");
-      if (withAudioTrack) args.push("-c:a", "aac", "-b:a", "192k");
-      args.push("-movflags", "+faststart", work);
-      return runProcess(binary, args, { signal });
-    }
-    if (withAudio) {
-      const audioParts = files.map((_, index) => `[${index}:a]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a${index}]`);
-      const pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join("");
-      const filter2 = [
-        ...videoParts,
-        ...audioParts,
-        `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`
-      ].join(";");
-      const { code: code2, stderr: stderr2 } = await encode(filter2, ["-map", "[v]", "-map", "[a]"], true);
-      if (code2 === 0 && await exists(work)) {
-        await rename(work, outPath);
-        return { path: outPath, mode: "reencode", trimmed };
-      }
-      audioError = stderr2.trim().slice(-400);
-    }
-    const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(";");
-    const { code, stderr } = await encode(filter, ["-map", "[v]"], false);
-    if (code === 0 && await exists(work)) {
-      await rename(work, outPath);
-      return { path: outPath, mode: withAudio ? "reencode-video-only" : "reencode", trimmed };
-    }
-    const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
-    throw Object.assign(new Error(`ffmpeg \u5408\u5E76\u5931\u8D25\uFF1A${detail || "\u672A\u77E5\u9519\u8BEF"}`), { code: "ffmpeg_failed" });
-  } finally {
-    await cleanupSegmentTemps([...temps, work]);
-  }
-}
-async function prepareSeamTrims(config, files, outPath, { signal } = {}) {
-  const requested = ref(config, "seamTrimSeconds", "");
-  const trims = String(requested || "").trim() ? String(requested).split(",").map((value) => Number(value.trim())) : [];
-  if (trims.some((value) => !Number.isFinite(value) || value < 0 || value > 3)) {
-    throw new Error("seamTrimSeconds \u5FC5\u987B\u4E3A\u9017\u53F7\u5206\u9694\u7684 0\u20133 \u79D2\u6570\u503C\uFF0C\u4F8B\u5982 0.5,0\uFF1B\u5206\u522B\u5BF9\u5E94\u7B2C 2\u30013 \u6BB5\u5F00\u5934\u3002");
-  }
-  const prepared = [...files];
-  const temps = [];
-  const cuts = [];
-  try {
-    for (let index = 0; index < files.length; index++) {
-      const official = !isOmniExtendModel(resolveModel(config)) && files.length > 1 && !trims.length;
-      const secondsRequested = index > 0 ? trims[index - 1] || 0 : 0;
-      if (!official && !secondsRequested) continue;
-      const media = await probeMedia(files[index], config, signal);
-      const duration = Number(media?.videoDurationSeconds || media?.durationSeconds);
-      const fps = Number(media?.fps) || 24;
-      const seconds = official ? index > 0 ? 1 / fps : 0 : secondsRequested;
-      const tailSeconds = official && index < files.length - 1 ? 6 / fps : 0;
-      const keptSeconds = duration - seconds - tailSeconds;
-      if (!(keptSeconds > 0.5)) throw new Error(`\u7B2C ${index + 1} \u6BB5\u88C1\u526A\u540E\u4E0D\u8DB3 0.5 \u79D2\uFF0C\u5DF2\u505C\u6B62\u5408\u5E76\u3002`);
-      const temp = `${outPath}.${uniqueSuffix(`cut${index + 1}`)}.mp4`;
-      temps.push(temp);
-      const result = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
-        "-y",
-        "-i",
-        files[index],
-        "-ss",
-        String(seconds),
-        "-t",
-        String(keptSeconds),
-        "-map",
-        "0:v:0",
-        "-map",
-        "0:a:0?",
-        "-c:v",
-        "libx264",
-        "-preset",
-        "veryfast",
-        "-pix_fmt",
-        "yuv420p",
-        "-c:a",
-        "aac",
-        "-movflags",
-        "+faststart",
-        temp
-      ], { signal });
-      if (result.code !== 0) throw new Error(`\u7B2C ${index + 1} \u6BB5\u63A5\u7F1D\u88C1\u526A\u5931\u8D25\uFF1A${tail(result.stderr)}`);
-      prepared[index] = temp;
-      cuts.push({ index: index + 1, seconds, tailSeconds });
-    }
-    return { files: prepared, temps, cuts };
-  } catch (error) {
-    await cleanupSegmentTemps(temps);
-    throw error;
-  }
-}
-async function downloadSegmentsAndMerge(config, {
-  segments,
-  segmentsDir,
-  outDir,
-  stamp,
-  notes = [],
-  keepSingleFile = false,
-  signal
-}) {
-  const files = [];
-  const deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0);
-  const ffmpegReady = segments.length > 1 ? await hasFfmpeg(config, signal) : true;
-  let probeWarned = false;
-  for (const [index, segment] of segments.entries()) {
-    const dest = path.join(
-      segmentsDir,
-      `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`
-    );
-    try {
-      if (!await exists(dest)) {
-        await downloadFile(segment.videoUrl, dest, { signal });
-      }
-    } catch (failure) {
-      if (failure?.code === "ABORTED") throw failure;
-      const reason = `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u4E0B\u8F7D\u5931\u8D25\uFF1A${failure?.message || failure}`;
-      notes.push(reason);
-      return { files, segmentsDir, deliveredSeconds, error: reason };
-    }
-    segment.localPath = dest;
-    await appendRequestLog({
-      event: "segment_saved",
-      index: segment.index,
-      taskId: segment.taskId,
-      path: dest,
-      bytes: (await stat(dest)).size
-    });
-    const media = await probeMedia(dest, config, signal);
-    if (media?.durationSeconds) {
-      segment.durationSeconds = Number(media.durationSeconds.toFixed(2));
-      const cumulative = segments.slice(0, index + 1).reduce((sum, item) => sum + (item.seconds || 0), 0);
-      const tolerance = Math.max(
-        CUMULATIVE_TOLERANCE_MIN_SECONDS,
-        cumulative * CUMULATIVE_TOLERANCE_RATIO
-      );
-      const looksCumulative = files.length > 0 && Math.abs(media.durationSeconds - cumulative) <= tolerance && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
-      if (looksCumulative) {
-        await appendRequestLog({ event: "cumulative_output_detected", index: segment.index, duration: media.durationSeconds, plannedCumulative: cumulative });
-        files.length = 0;
-        notes.push(
-          `\u7B2C ${segment.index} \u6BB5\u5B9E\u6D4B ${formatSeconds(media.durationSeconds)} \u79D2\uFF0C\u63A5\u8FD1\u7D2F\u8BA1\u65F6\u957F ${cumulative} \u79D2\uFF0C\u6309\u300C\u4E0A\u6E38\u8FD4\u56DE\u7684\u662F\u7D2F\u8BA1\u6210\u7247\u300D\u5904\u7406\u3002`
-        );
-      }
-    } else if (!probeWarned) {
-      probeWarned = true;
-      notes.push("\u6CA1\u6709\u53EF\u7528\u7684 ffprobe\uFF0C\u65E0\u6CD5\u63A2\u6D4B\u5206\u6BB5\u65F6\u957F\uFF0C\u6309\u300C\u6BCF\u6BB5\u90FD\u662F\u589E\u91CF\u7247\u6BB5\u300D\u76F4\u63A5\u62FC\u63A5\u3002");
-    }
-    files.push(dest);
-  }
-  if (!files.length) return { files, segmentsDir, deliveredSeconds };
-  if (!ffmpegReady && files.length > 1) {
-    const guide = ffmpegInstallHint(config);
-    notes.push(`\u5206\u6BB5\u6587\u4EF6\u90FD\u5DF2\u4E0B\u8F7D\u5230 ${segmentsDir}\u3002`);
-    notes.push(guide.hint);
-    return {
-      files,
-      segmentsDir,
-      deliveredSeconds,
-      merged: false,
-      ffmpegMissing: true,
-      installHint: guide.hint
-    };
-  }
-  const finalPath = path.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
-  try {
-    if (files.length === 1 && keepSingleFile) {
-      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "segment", videoPath: files[0] };
-    }
-    if (files.length === 1) {
-      await mkdir(path.dirname(finalPath), { recursive: true });
-      await rm(finalPath, { force: true });
-      await copyFile(files[0], finalPath);
-      await appendRequestLog({ event: "delivery_copied", sourcePath: files[0], videoPath: finalPath });
-      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "single", videoPath: finalPath };
-    }
-    await appendRequestLog({ event: "merge_started", inputPaths: files, videoPath: finalPath });
-    const prepared = await prepareSeamTrims(config, files, finalPath, { signal });
-    await appendRequestLog({ event: "seam_trims_prepared", cuts: prepared.cuts });
-    let merged;
-    try {
-      merged = await mergeClips(config, prepared.files, finalPath, { signal });
-    } finally {
-      await cleanupSegmentTemps(prepared.temps);
-    }
-    if (prepared.cuts.length) {
-      notes.push(`\u5DF2\u6309${String(ref(config, "seamTrimSeconds", "")).trim() ? "\u624B\u52A8\u8BBE\u7F6E" : "\u6A21\u578B\u9ED8\u8BA4\u7B56\u7565"}\u88C1\u526A\u63A5\u7F1D\uFF1A${prepared.cuts.map((cut) => `\u7B2C ${cut.index} \u6BB5\uFF1A\u5934\u90E8 ${cut.seconds.toFixed(3)} \u79D2\u3001\u5C3E\u90E8 ${cut.tailSeconds.toFixed(3)} \u79D2`).join("\uFF1B")}\u3002\u539F\u59CB\u5206\u6BB5\u672A\u6539\u52A8\uFF1B\u5B9E\u9645\u6210\u7247\u4F1A\u7F29\u77ED\uFF0C\u4E0D\u8865\u5E27\u51D1\u65F6\u957F\u3002`);
-    }
-    const actual = await probeMedia(finalPath, config, signal);
-    await appendRequestLog({
-      event: "merge_completed",
-      videoPath: finalPath,
-      mode: merged.mode,
-      actualSeconds: actual?.durationSeconds,
-      sourceCount: segments.length
-    });
-    if (merged.trimmed?.length) {
-      notes.push(
-        `\u7B2C ${merged.trimmed.map((item) => item.index).join("\u3001")} \u6BB5\u7684\u97F3\u9891\u6BD4\u89C6\u9891\u957F\uFF08\u6700\u957F ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} \u79D2\uFF09\uFF0C\u5DF2\u88C1\u9F50\u540E\u518D\u62FC\u63A5\uFF0C\u907F\u514D\u63A5\u7F1D\u5904\u7F3A\u4E00\u5C0F\u6BB5\u753B\u9762\u3002`
-      );
-    }
-    return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: merged.mode, videoPath: finalPath, seamCuts: prepared.cuts, actualSeconds: actual?.durationSeconds };
-  } catch (failure) {
-    if (failure?.code === "ABORTED") throw failure;
-    let reason = `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u5408\u5E76\u5931\u8D25\uFF1A${failure?.message || failure}`;
-    let installHint;
-    if (failure?.code === "ffmpeg_missing") {
-      const guide = ffmpegInstallHint(config);
-      installHint = guide.hint;
-      reason = guide.hint;
-    }
-    notes.push(reason);
-    await appendRequestLog({ event: "merge_failed", errorCode: String(failure?.code || "merge_error"), segmentsDir });
-    return { files, segmentsDir, deliveredSeconds, error: reason, ffmpegMissing: Boolean(installHint), installHint };
-  }
-}
-async function resolveOutputDir(config, exec, deps) {
-  const configured = String(ref(config, "outputDir", "")).trim();
-  if (configured) return path.resolve(configured);
-  let cwd = "";
-  if (deps?.workdir && exec?.agent) {
-    try {
-      cwd = await deps.workdir.ensure(exec.agent, exec.signal) || "";
+      ], { signal, timeoutMs: 12e4 });
+      if (code !== 0) return;
+      const fitted = await probeMedia(temp, config, signal);
+      if (fitted?.width === width && fitted?.height === height) await rename(temp, dest);
     } catch {
-      cwd = "";
+    } finally {
+      await rm(temp, { force: true }).catch(() => {
+      });
+    }
+  })();
+  fitInFlight.set(dest, task);
+  try {
+    await task;
+  } finally {
+    fitInFlight.delete(dest);
+  }
+  return await isUsableFit(dest, width, height, config, signal) ? dest : absPath;
+}
+var UPLOAD_ALIAS_PATTERN = /^(?:latest|newest|recent|最近上传(?:的图片)?|最新上传(?:的图片)?|刚上传(?:的图片)?|最新图片|刚拖进来的图片)$/i;
+var UPLOAD_WINDOW_MS = 2 * 60 * 60 * 1e3;
+function dshHome() {
+  const fromEnv = String(typeof process !== "undefined" && process.env?.DSH_HOME || "").trim();
+  return fromEnv || path3.join(os.homedir(), ".dsh");
+}
+function attachmentObjectsDir() {
+  return path3.join(dshHome(), "attachments", "v1", "objects");
+}
+async function sniffFileImage(file) {
+  let handle;
+  try {
+    handle = await open(file, "r");
+    const head = Buffer.alloc(32);
+    const { bytesRead } = await handle.read(head, 0, head.length, 0);
+    return sniffImageMime(head.subarray(0, bytesRead));
+  } catch {
+    return null;
+  } finally {
+    await handle?.close().catch(() => {
+    });
+  }
+}
+async function findRecentUploadedImages(windowMs = UPLOAD_WINDOW_MS) {
+  const root = attachmentObjectsDir();
+  const shards = await readdir(root, { withFileTypes: true }).catch(() => []);
+  const cutoff = Date.now() - windowMs;
+  const found = [];
+  for (const shard of shards) {
+    if (!shard.isDirectory()) continue;
+    const dir = path3.join(root, shard.name);
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      const abs = path3.join(dir, entry.name);
+      const info = await stat2(abs).catch(() => null);
+      if (!info || info.mtimeMs < cutoff) continue;
+      const mime = await sniffFileImage(abs);
+      if (mime) found.push({ abs, mime, bytes: info.size, mtimeMs: info.mtimeMs });
     }
   }
-  return path.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
+  return found.sort((a, b) => b.mtimeMs - a.mtimeMs);
 }
-function findKey(payload, keys, depth = Infinity) {
-  if (payload && typeof payload === "object") {
-    if (!Array.isArray(payload)) {
-      for (const key of keys) {
-        const value = payload[key];
-        if (value !== void 0 && value !== null && value !== "") return value;
-      }
-    }
-    if (depth <= 0) return void 0;
-    for (const value of Array.isArray(payload) ? payload : Object.values(payload)) {
-      const found = findKey(value, keys, depth - 1);
-      if (found !== void 0 && found !== null && found !== "") return found;
-    }
+function brief(value, limit = 80) {
+  const text = String(value ?? "");
+  return text.length > limit ? `${text.slice(0, limit)}\u2026\uFF08\u5171 ${text.length} \u5B57\u7B26\uFF09` : text;
+}
+function inlineBase64Image(raw, label) {
+  const compact = String(raw ?? "").replace(/\s+/g, "");
+  if (compact.length < 64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return null;
+  const buffer = Buffer.from(compact, "base64");
+  if (buffer.length > MAX_IMAGE_BYTES) {
+    throw new Error(
+      `${label} \u89E3\u51FA\u6765\u6709 ${(buffer.length / 1048576).toFixed(1)} MB\uFF0C\u8BF7\u538B\u5230 ${MAX_IMAGE_BYTES / 1048576} MB \u4EE5\u5185\u518D\u4F20\u3002`
+    );
   }
-  return void 0;
-}
-function collectUrls(payload, path2 = [], found = []) {
-  if (typeof payload === "string") {
-    if (/^https?:\/\//i.test(payload)) found.push([path2, payload]);
-  } else if (Array.isArray(payload)) {
-    for (const item of payload) collectUrls(item, path2, found);
-  } else if (payload && typeof payload === "object") {
-    for (const [key, value] of Object.entries(payload)) {
-      collectUrls(value, [...path2, key], found);
-    }
+  const mime = sniffImageMime(buffer);
+  if (mime) return { url: `data:${mime};base64,${compact}`, source: "inline", bytes: buffer.length };
+  if (compact.length >= 256) {
+    throw new Error(
+      `${label} \u770B\u7740\u662F base64\uFF0C\u4F46\u89E3\u51FA\u6765\u7684\u5185\u5BB9\u4E0D\u662F\u56FE\u7247\uFF08\u53EA\u8BA4 jpg/png/webp/bmp/gif/tiff \u7684\u6587\u4EF6\u5934\uFF09\u3002`
+    );
   }
-  return found;
+  return null;
 }
-function isImageKey(key) {
-  const lowered = String(key || "").toLowerCase();
-  return IMAGE_KEY_TOKENS.some((token) => lowered.includes(token));
-}
-function looksLikeImageUrl(url) {
-  return IMAGE_EXTENSIONS.some((ext) => url.split("?")[0].toLowerCase().endsWith(ext));
-}
-function extractTaskId(payload) {
-  const value = findKey(payload, ["id", "task_id", "taskId", "request_id"], 4);
-  return typeof value === "string" && value ? value : void 0;
-}
-function extractVideoUrl(payload) {
-  const candidates = collectUrls(payload).filter(
-    ([path2, url]) => !looksLikeImageUrl(url) && !path2.some(isImageKey)
-  );
-  if (!candidates.length) return void 0;
-  for (const wanted of VIDEO_URL_KEYS) {
-    for (const [path2, url] of candidates) {
-      if (path2.length && String(path2.at(-1)).toLowerCase() === wanted) return url;
+async function resolveImageInput(value, label, fit = null) {
+  const raw = String(value ?? "").trim().replace(/^@/, "");
+  if (!raw) throw new Error(`${label} \u4E0D\u80FD\u4E3A\u7A7A\u3002`);
+  if (/^https?:\/\//i.test(raw)) return { url: raw, source: "url" };
+  if (/^data:image\//i.test(raw)) return { url: raw, source: "inline" };
+  const inlined = inlineBase64Image(raw, label);
+  if (inlined) return inlined;
+  let abs;
+  let info;
+  let upload = null;
+  const aliasParts = /^([^\s:]+)(?::(\d+))?$/.exec(raw);
+  const aliasName = aliasParts ? aliasParts[1] : "";
+  const uploadIndex = aliasParts && aliasParts[2] ? Math.max(1, Number(aliasParts[2])) : 1;
+  if (UPLOAD_ALIAS_PATTERN.test(aliasName)) {
+    const index = uploadIndex;
+    const uploads = await findRecentUploadedImages();
+    const picked = uploads[index - 1];
+    if (!picked) {
+      throw new Error(
+        `${label} \u5199\u7684\u662F\u300C\u6700\u8FD1\u4E0A\u4F20\u7684\u56FE\u7247\u300D${index > 1 ? `\uFF08\u7B2C ${index} \u65B0\uFF09` : ""}\uFF0C\u4F46 Harness \u9644\u4EF6\u5E93\u91CC\u6700\u8FD1 ${UPLOAD_WINDOW_MS / 36e5} \u5C0F\u65F6\u53EA\u6709 ${uploads.length} \u5F20\u56FE\u7247\uFF0C\u53D6\u4E0D\u5230\u3002\u8BF7\u76F4\u63A5\u628A\u56FE\u7247\u8DEF\u5F84\u6216\u516C\u7F51 URL \u53D1\u8FC7\u6765\u3002`
+      );
     }
-  }
-  for (const [path2, url] of candidates) {
-    if (path2.length && GENERIC_URL_KEYS.has(String(path2.at(-1)).toLowerCase())) return url;
-  }
-  return candidates[0][1];
-}
-function extractImageUrl(payload) {
-  const found = collectUrls(payload).find(
-    ([path2, url]) => looksLikeImageUrl(url) || path2.some(isImageKey)
-  );
-  return found?.[1];
-}
-function extractStatus(payload) {
-  const value = findKey(payload, ["status", "state", "task_status"]);
-  return typeof value === "string" ? value.toLowerCase() : void 0;
-}
-function upstreamMessage(data) {
-  if (data && typeof data === "object") {
-    const error = data.error;
-    if (error && typeof error === "object") {
-      const message = String(error.message || "").trim();
-      const code = String(error.code || "").trim();
-      if (message) return code ? `${message}\uFF08${code}\uFF09` : message;
-    } else if (typeof error === "string" && error.trim()) {
-      return error.trim();
-    }
-    for (const key of ["message", "detail", "msg", "fail_reason"]) {
-      const value = data[key];
-      if (typeof value === "string" && value.trim()) return value.trim();
-    }
-  }
-  const text = typeof data === "string" ? data : JSON.stringify(data ?? {});
-  return text || "\u4E0A\u6E38\u672A\u8FD4\u56DE\u9519\u8BEF\u8BE6\u60C5";
-}
-function quotaDetail(text) {
-  const parts = [];
-  const remain = /(?:remain(?:ing)? quota|剩余额度)\D{0,6}([¥$]?\d[\d.,]*)/i.exec(text);
-  const need = /(?:need quota|需要预扣费额度|需要额度)\D{0,6}([¥$]?\d[\d.,]*)/i.exec(text);
-  if (remain) parts.push(`\u5269\u4F59 ${remain[1]}`);
-  if (need) parts.push(`\u9700\u8981 ${need[1]}`);
-  return parts.length ? `\uFF08${parts.join("\uFF0C")}\uFF09` : "";
-}
-function classifyError(statusCode, data) {
-  const raw = upstreamMessage(data);
-  const lowered = raw.toLowerCase();
-  if (statusCode === 402 || QUOTA_HINTS.some((hint) => lowered.includes(hint)) || lowered.includes("quota_exceeded")) {
-    return {
-      code: "provider_quota_exceeded",
-      message: `\u4E2D\u8F6C\u7AD9\u989D\u5EA6\u4E0D\u8DB3${quotaDetail(raw)}\uFF0C\u8BF7\u5145\u503C\u540E\u518D\u8BD5\uFF1A${raw}`
+    abs = picked.abs;
+    info = { size: picked.bytes };
+    upload = {
+      uploadedAt: new Date(picked.mtimeMs).toISOString(),
+      recentUploads: uploads.length,
+      uploadIndex: index
     };
+  } else {
+    abs = path3.resolve(raw.startsWith("~/") || raw === "~" ? path3.join(os.homedir(), raw.slice(1)) : raw);
+    const ext = path3.extname(abs).toLowerCase();
+    if (!IMAGE_EXT_TO_MIME[ext]) {
+      throw new Error(
+        `${label} \u65E2\u4E0D\u662F http(s) \u94FE\u63A5\u3001base64\uFF0C\u4E5F\u4E0D\u662F\u652F\u6301\u7684\u56FE\u7247\u6587\u4EF6\uFF1A${brief(raw)}\u3002\u672C\u673A\u56FE\u7247\u8BF7\u7528 ${Object.keys(IMAGE_EXT_TO_MIME).join(" / ")} \u4E4B\u4E00\uFF0C\u7528\u6237\u521A\u5728\u5BF9\u8BDD\u91CC\u4E0A\u4F20\u7684\u56FE\u76F4\u63A5\u5199 latest\u3002`
+      );
+    }
+    info = await stat2(abs).catch(() => null);
+    if (!info?.isFile()) {
+      throw new Error(`${label} \u627E\u4E0D\u5230\u6587\u4EF6\uFF1A${abs}\uFF08\u7528\u6237\u521A\u5728\u5BF9\u8BDD\u91CC\u4E0A\u4F20\u7684\u56FE\u53EF\u4EE5\u76F4\u63A5\u5199 latest\uFF09`);
+    }
   }
-  if (statusCode === 401 || statusCode === 403) {
-    return { code: "provider_auth", message: `\u4E2D\u8F6C\u7AD9\u9274\u6743\u5931\u8D25\uFF08${statusCode}\uFF09\uFF1A${raw}` };
+  const submitPath = fit?.size ? await fitImageToCanvas(abs, fit.size, fit.config, fit.signal) : abs;
+  let size = info.size;
+  if (submitPath !== abs) {
+    const fittedInfo = await stat2(submitPath).catch(() => null);
+    if (!fittedInfo?.isFile()) throw new Error(`${label} \u8BFB\u4E0D\u51FA\u6765\uFF1A${abs}`);
+    size = fittedInfo.size;
   }
-  if (statusCode === 429) {
-    return { code: "provider_rate_limited", message: `\u4E2D\u8F6C\u7AD9\u9650\u6D41\uFF08429\uFF09\uFF1A${raw}` };
+  if (size > MAX_IMAGE_BYTES) {
+    throw new Error(
+      `${label} \u592A\u5927\uFF08${(size / 1048576).toFixed(1)} MB\uFF09\uFF0C\u8BF7\u538B\u5230 ${MAX_IMAGE_BYTES / 1048576} MB \u4EE5\u5185\u518D\u4F20\uFF1A${abs}`
+    );
   }
-  if (CONTENT_HINTS.some((hint) => lowered.includes(hint))) {
-    return { code: "content_rejected", message: raw };
+  const buffer = await readFile(submitPath);
+  const mime = sniffImageMime(buffer);
+  if (!mime) throw new Error(`${label} \u4E0D\u662F\u6709\u6548\u7684\u56FE\u7247\u6587\u4EF6\uFF08\u8BFB\u5230\u7684\u5185\u5BB9\u4E0D\u662F jpg/png/webp/bmp/gif/tiff\uFF09\uFF1A${abs}`);
+  const resolved = {
+    url: `data:${mime};base64,${buffer.toString("base64")}`,
+    source: upload ? "upload" : "file",
+    localPath: submitPath,
+    bytes: buffer.length,
+    ...upload || {}
+  };
+  if (submitPath !== abs) {
+    resolved.originalPath = abs;
+    resolved.fittedTo = `${fit.size[0]}x${fit.size[1]}`;
   }
-  if (PRICE_HINTS.some((hint) => lowered.includes(hint))) {
-    return {
-      code: "provider_price_config_error",
-      message: `\u4E2D\u8F6C\u7AD9\u8BE5\u6A21\u578B\u7684\u8BA1\u4EF7\u914D\u7F6E\u5F02\u5E38\uFF0C\u4E0E\u672C\u6B21\u8BF7\u6C42\u53C2\u6570\u65E0\u5173\uFF0C\u91CD\u8BD5\u4E5F\u4E0D\u4F1A\u6210\u529F\uFF1A${raw}\u3002\u8BF7\u5728\u63D2\u4EF6 config \u91CC\u6362\u7528\u5176\u5B83\u53EF\u7528\u6A21\u578B\u3002`
-    };
-  }
-  return { code: "provider_failed", message: raw };
+  return resolved;
 }
-function isContentRejection(text) {
-  const lowered = String(text || "").toLowerCase();
-  return CONTENT_HINTS.some((hint) => lowered.includes(hint));
+function validateImageRoles(args, model) {
+  const refs = Array.isArray(args.referenceImages) ? args.referenceImages : args.referenceImages ? [args.referenceImages] : [];
+  if (args.lastFrameUrl && !args.firstFrameUrl) throw new Error("\u5C3E\u5E27\u5FC5\u987B\u4E0E\u9996\u5E27\u4E00\u8D77\u4F20\u5165\u3002");
+  if (refs.length && (args.firstFrameUrl || args.lastFrameUrl)) {
+    throw new Error("\u9996\u5C3E\u5E27\u4E0E\u53C2\u8003\u56FE\u6A21\u5F0F\u4E92\u65A5\uFF0C\u8BF7\u9009\u62E9\u4E00\u79CD\uFF1B\u5982\u9700\u7EC4\u5408\uFF0C\u7528\u53C2\u8003\u56FE\u6A21\u5F0F\u5E76\u5728\u63D0\u793A\u8BCD\u6307\u5B9A\u9996\u5C3E\u753B\u9762\u3002");
+  }
+  const limit = isOmniExtendModel(model) ? 30 : 9;
+  if (refs.length > limit) throw new Error(`\u5F53\u524D\u6A21\u578B\u6700\u591A\u652F\u6301 ${limit} \u5F20\u53C2\u8003\u56FE\u3002`);
+  if (refs.some((value) => typeof value !== "string" || !value.trim())) throw new Error("\u6BCF\u5F20\u53C2\u8003\u56FE\u5FC5\u987B\u662F\u975E\u7A7A\u5B57\u7B26\u4E32\u3002");
+  return { refs, limit };
 }
-function formatAmount(value) {
+
+// src/utils/logging.ts
+import { mkdir as mkdir3, appendFile } from "node:fs/promises";
+var requestLogContext = new AsyncLocalStorage();
+function requestLogPath() {
+  const now = /* @__PURE__ */ new Date();
+  const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  return path4.join(dshHome(), "logs", "metaontic-video", date, "requests.jsonl");
+}
+async function appendRequestLog(record) {
+  try {
+    const file = requestLogPath();
+    await mkdir3(path4.dirname(file), { recursive: true, mode: 448 });
+    await appendFile(file, JSON.stringify({ time: (/* @__PURE__ */ new Date()).toISOString(), pluginVersion: PLUGIN_VERSION, ...requestLogContext.getStore(), ...record }) + "\n", { mode: 384 });
+  } catch {
+  }
+}
+
+// src/utils/validation.ts
+function clampInteger(value, min, max, fallback) {
   const number = Number(value);
-  if (!Number.isFinite(number)) return "0";
-  const text = number.toFixed(Math.abs(number) >= 1 ? 2 : 4);
-  return text.includes(".") ? text.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "") : text;
-}
-function formatMoney(value, symbol = "\xA5") {
-  return `${symbol}${formatAmount(value)}`;
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(number)));
 }
 function finiteNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
-function estimateRate(model, usesReference) {
-  const id = String(model || "").toLowerCase();
-  const hit = ESTIMATE_RATES.find(([prefix]) => id.startsWith(prefix));
-  const table = hit ? hit[1] : ESTIMATE_RATES[0][1];
-  return usesReference ? table.video : table.none;
+
+// src/workflow/planning.ts
+function modelMaxSeconds(config) {
+  return isOmniExtendModel(resolveModel(config)) ? 30 : 15;
 }
-function estimatePlan(config, toolName, args) {
-  if (toolName === "video_extend") {
-    const count = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
-    const fallback = modelMaxSeconds(config);
-    const seconds = clampInteger(
-      args?.duration ?? fallback,
-      MIN_SECONDS,
-      modelMaxSeconds(config),
-      fallback
-    );
-    return Array.from({ length: count }, () => ({ kind: "extend", seconds }));
+function resolveSingleMax(config) {
+  return modelMaxSeconds(config);
+}
+function resolveSegmentSeconds(config, requested = void 0) {
+  const max = modelMaxSeconds(config);
+  return clampInteger(requested, MIN_SEGMENT_SECONDS, max, max);
+}
+function maxTargetSeconds(singleMax, segmentSeconds) {
+  return Math.min(MAX_TOTAL_SECONDS, singleMax + (MAX_SEGMENTS - 1) * segmentSeconds);
+}
+function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
+  if (totalSeconds <= singleMax) return [{ kind: "generate", seconds: totalSeconds }];
+  let base = singleMax;
+  let remaining = totalSeconds - base;
+  if (remaining < MIN_SEGMENT_SECONDS) {
+    const trimmed = MIN_SEGMENT_SECONDS - remaining;
+    if (base - trimmed >= MIN_SEGMENT_SECONDS) {
+      base -= trimmed;
+      remaining = totalSeconds - base;
+    }
   }
-  return resolveTargetPlan(config, args).plan;
+  const slots = MAX_SEGMENTS - 1;
+  const count = Math.min(slots, Math.max(1, Math.ceil(remaining / segmentSeconds)));
+  const sizes = [];
+  let left = remaining;
+  for (let index = count; index > 0 && left > 0; index -= 1) {
+    let size = Math.min(segmentSeconds, Math.ceil(left / index));
+    if (size < MIN_SEGMENT_SECONDS) size = Math.min(segmentSeconds, MIN_SEGMENT_SECONDS);
+    sizes.push(size);
+    left -= size;
+  }
+  const plan = [{ kind: "generate", seconds: base }];
+  for (const seconds of sizes) {
+    if (plan.length >= MAX_SEGMENTS) break;
+    plan.push({ kind: "extend", seconds });
+  }
+  return plan;
+}
+function resolveSegmentPrompts(prompts, planLength) {
+  if (prompts === void 0 && planLength === 1) return null;
+  if (!Array.isArray(prompts) || prompts.length !== planLength || prompts.some((value) => typeof value !== "string" || !value.trim())) {
+    throw new Error(`\u8BF7\u6309\u5B8C\u6574\u751F\u6210\u8BA1\u5212\u63D0\u4F9B segmentPrompts\uFF1A${planLength} \u6761\u975E\u7A7A\u7684\u9010\u6BB5\u63D0\u793A\u8BCD\uFF0C\u6BCF\u6761\u4EC5\u542B\u672C\u6BB5\u52A8\u4F5C\u4E0E\u5BF9\u767D\u3002\u5148\u8865\u9F50\u63D0\u793A\u8BCD\u518D\u63D0\u4EA4\uFF0C\u4E0D\u8981\u91CD\u65B0\u751F\u6210\u5DF2\u5B8C\u6210\u5206\u6BB5\u3002`);
+  }
+  return prompts.map((value) => value.trim());
 }
 function resolveTargetPlan(config, args) {
   const singleMax = resolveSingleMax(config);
@@ -1474,60 +906,22 @@ function resolveTargetPlan(config, args) {
     total
   };
 }
-function estimateSteps(config, steps) {
-  const resolution = FIXED_RESOLUTION;
-  const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS[FIXED_RESOLUTION];
-  const tokensPerSecond = pixels[0] * pixels[1] * ESTIMATE_FPS / ESTIMATE_TOKEN_DIVISOR;
-  const model = resolveModel(config);
-  return {
-    model,
-    resolution,
-    segments: steps.map((step, index) => {
-      const usesReference = step.usesReference === true;
-      const tokens = Math.round(tokensPerSecond * step.seconds);
-      return {
-        index: index + 1,
-        kind: step.kind,
-        seconds: step.seconds,
-        tokens,
-        usesReference,
-        usd: tokens * estimateRate(model, usesReference) / 1e6
-      };
-    })
-  };
+function sumStepSeconds(steps) {
+  return (steps || []).reduce((sum, step) => sum + (Number(step?.seconds) || 0), 0);
 }
-function estimateUsage(config, toolName, args) {
-  const plan = estimatePlan(config, toolName, args);
-  const referenceImages = Array.isArray(args?.referenceImages) ? args.referenceImages : args?.referenceImages ? [args.referenceImages] : [];
-  const hasFrame = Boolean(
-    String(args?.firstFrameUrl ?? "").trim() || String(args?.lastFrameUrl ?? "").trim() || referenceImages.length
-  );
-  const groupRatio = finiteNumber(ref(config, "estimateGroupRatio", 0.8)) ?? 1;
-  const { model, resolution, segments } = estimateSteps(
-    config,
-    plan.map((step) => ({ ...step, usesReference: step.kind === "extend" || hasFrame }))
-  );
-  const usd = segments.reduce((sum, item) => sum + item.usd, 0) * groupRatio;
-  return {
-    model,
-    resolution,
-    segments,
-    seconds: segments.reduce((sum, item) => sum + item.seconds, 0),
-    tokens: segments.reduce((sum, item) => sum + item.tokens, 0),
-    usd: Math.round(usd * 1e6) / 1e6
-  };
-}
-const PAUSE_FILE = "paused-plan.json";
+
+// src/workflow/resume.ts
+var PAUSE_FILE = "paused-plan.json";
 function resumeDirOf(value) {
   const raw = typeof value === "string" ? value : value?.dir ?? value?.path ?? value?.resumeDir ?? value?.token ?? "";
   const dir = String(raw ?? "").trim();
-  return dir ? path.resolve(dir) : "";
+  return dir ? path5.resolve(dir) : "";
 }
 async function readPauseFile(dir) {
-  const file = path.join(dir, PAUSE_FILE);
+  const file = path5.join(dir, PAUSE_FILE);
   let text;
   try {
-    text = await readFile(file, "utf8");
+    text = await readFile2(file, "utf8");
   } catch {
     throw new Error(
       `\u6CA1\u6709\u627E\u5230\u6682\u505C\u8BB0\u5F55\uFF1A${file}\u3002resume \u8981\u4F20\u4E0A\u4E00\u6B21\u7ED3\u679C\u91CC\u7684 resumeDir\uFF08\u7528\u6237\u9009\u62E9\u5148\u4E0D\u7EE7\u7EED\u65F6\uFF0C\u7ED3\u679C\u91CC\u7ED9\u7684\u90A3\u4E2A\u5206\u6BB5\u76EE\u5F55\uFF09\uFF0C\u4E0D\u8981\u81EA\u5DF1\u62FC\u8DEF\u5F84\u3002`
@@ -1544,14 +938,14 @@ async function readPauseFile(dir) {
   }
   return data;
 }
-const RESUME_LOCK = "resume.lock";
+var RESUME_LOCK = "resume.lock";
 function resumeLockStaleMs(config) {
   const minutes = Number(ref(config, "resumeLockStaleMinutes", 60));
   if (!Number.isFinite(minutes) || minutes <= 0) return 0;
   return minutes * 60 * 1e3;
 }
 async function resumeLockExpired(file, staleMs) {
-  const raw = await readFile(file, "utf8").catch(() => null);
+  const raw = await readFile2(file, "utf8").catch(() => null);
   if (raw === null) return true;
   let data;
   try {
@@ -1565,7 +959,7 @@ async function resumeLockExpired(file, staleMs) {
   return Date.now() - started > staleMs;
 }
 async function describeResumeLock(file) {
-  const raw = await readFile(file, "utf8").catch(() => null);
+  const raw = await readFile2(file, "utf8").catch(() => null);
   if (!raw) return "";
   try {
     const data = JSON.parse(raw);
@@ -1578,19 +972,19 @@ async function describeResumeLock(file) {
 async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
   const empty = { file: null, async release() {
   } };
-  const file = path.join(dir, RESUME_LOCK);
+  const file = path5.join(dir, RESUME_LOCK);
   const token = uniqueSuffix("lock");
   const record = {
     tool: toolName,
     callId: callId || null,
     pid: process.pid,
-    host: os.hostname(),
+    host: os2.hostname(),
     startedAt: (/* @__PURE__ */ new Date()).toISOString(),
     token
   };
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const handle = await open(file, "wx");
+      const handle = await open2(file, "wx");
       try {
         await handle.writeFile(`${JSON.stringify(record, null, 2)}
 `, "utf8");
@@ -1600,7 +994,7 @@ async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
       return {
         file,
         async release() {
-          const raw = await readFile(file, "utf8").catch(() => null);
+          const raw = await readFile2(file, "utf8").catch(() => null);
           if (raw) {
             try {
               if (JSON.parse(raw)?.token !== token) return;
@@ -1608,7 +1002,7 @@ async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
               return;
             }
           }
-          await rm(file, { force: true }).catch(() => {
+          await rm2(file, { force: true }).catch(() => {
           });
         }
       };
@@ -1616,7 +1010,7 @@ async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
       if (failure?.code === "ENOENT") return empty;
       if (failure?.code !== "EEXIST") throw failure;
       if (attempt === 0 && await resumeLockExpired(file, staleMs)) {
-        await rm(file, { force: true }).catch(() => {
+        await rm2(file, { force: true }).catch(() => {
         });
         continue;
       }
@@ -1678,21 +1072,18 @@ function withResumeLock(tool, toolName, config) {
   };
 }
 async function writePauseFile(dir, data) {
-  await mkdir(dir, { recursive: true });
-  const file = path.join(dir, PAUSE_FILE);
+  await mkdir4(dir, { recursive: true });
+  const file = path5.join(dir, PAUSE_FILE);
   const temp = `${file}.${uniqueSuffix("part")}`;
   try {
     await writeFile(temp, `${JSON.stringify(data, null, 2)}
 `, "utf8");
-    await rename(temp, file);
+    await rename2(temp, file);
   } catch (failure) {
-    await rm(temp, { force: true }).catch(() => {
+    await rm2(temp, { force: true }).catch(() => {
     });
     throw failure;
   }
-}
-function sumStepSeconds(steps) {
-  return (steps || []).reduce((sum, step) => sum + (Number(step?.seconds) || 0), 0);
 }
 function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
   const done = Number(data.done) || 0;
@@ -1753,468 +1144,47 @@ function pauseRecordAt({ stamp, prompt, fullPlan, done, cursor, lastVideoUrl, op
 function resumeHint(dir, remainingSeconds, toolName = "video_generate") {
   return `\u8981\u63A5\u7740\u505A\u5C31\u628A resume="${dir}" \u518D\u8C03\u4E00\u6B21 ${toolName}\uFF08prompt \u53EF\u4EE5\u7701\u7565\uFF0C\u5176\u4F59\u53C2\u6570\u7167\u65E7\uFF09\uFF1A\u63D2\u4EF6\u4F1A\u63A5\u7740\u5DF2\u7ECF\u751F\u6210\u7684\u5206\u6BB5\u7EE7\u7EED\uFF0C\u5269\u4E0B\u7684 ${remainingSeconds} \u79D2\u4E0D\u7528\u91CD\u5934\u751F\u6210\u3001\u4E0D\u4F1A\u91CD\u590D\u6263\u8D39\u3002`;
 }
-async function remainingCostText(config, exec, remainingSteps) {
-  if (isManualKey(config)) return { cost: `${connectionLabel(config)}\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39`, remain: "" };
+
+// src/utils/json.ts
+function toJsonSafe(value, seen = /* @__PURE__ */ new Set()) {
+  if (value === null) return null;
+  const type = typeof value;
+  if (type === "string" || type === "boolean") return value;
+  if (type === "number") {
+    return Number.isFinite(value) && !Object.is(value, -0) ? value : String(value);
+  }
+  if (type === "bigint") return value.toString();
+  if (type === "undefined" || type === "function" || type === "symbol") return void 0;
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Error) return value.message ? `${value.name}: ${value.message}` : value.name;
+  if (seen.has(value)) return "[circular]";
+  seen.add(value);
   try {
-    const estimated = estimateSteps(
-      config,
-      remainingSteps.map((step) => ({ ...step, usesReference: true }))
-    );
-    const groupRatio = finiteNumber(ref(config, "estimateGroupRatio", 0.8)) ?? 1;
-    const usd = estimated.segments.reduce((sum, item) => sum + item.usd, 0) * groupRatio;
-    const quota = await fetchDeviceQuota(config, exec?.signal);
-    const data = quota.status === "ok" ? quota.data : {};
-    const symbol = String(data.currency_symbol || "\xA5");
-    const exchange = finiteNumber(data.usd_exchange_rate) ?? DEFAULT_USD_EXCHANGE_RATE;
-    const remainAmount = finiteNumber(data.remain_amount);
-    return {
-      cost: `\u9884\u4F30 ${formatMoney(usd * exchange, symbol)}`,
-      remain: remainAmount === null ? "" : `\u672C\u673A Key \u5269\u4F59 ${formatMoney(remainAmount, symbol)}`
-    };
-  } catch (error) {
-    return { cost: `\u9884\u4F30\u8D39\u7528\u6CA1\u7B97\u51FA\u6765\uFF08${error?.message || error}\uFF09`, remain: "" };
-  }
-}
-async function confirmNextSegment(ctx, config, exec, {
-  done,
-  finished,
-  nextSeconds,
-  remainingSteps,
-  toolName = "video_generate"
-}) {
-  const approval = ctx?.get?.("approval");
-  const agent = exec?.agent;
-  if (!approval || typeof approval.request !== "function" || !agent) {
-    return { outcome: "unavailable", reason: "\u6CA1\u6709\u53EF\u7528\u7684\u5BA1\u6279\u670D\u52A1" };
-  }
-  if (approvalPolicy(ctx, exec) === "never") {
-    return { outcome: "unavailable", reason: "\u5F53\u524D\u6743\u9650\u6A21\u5F0F\u5173\u95ED\u4E86\u5BA1\u6279\u63D0\u793A" };
-  }
-  const rest = sumStepSeconds(remainingSteps);
-  const { cost, remain } = await remainingCostText(config, exec, remainingSteps);
-  const lastSeconds = finished?.[done - 1]?.seconds ?? 0;
-  const alreadyDone = `\u7B2C ${done} \u6BB5\uFF08${lastSeconds} \u79D2\uFF09\u5DF2\u7ECF\u751F\u6210\u597D`;
-  try {
-    const outcome = await approval.request({
-      agent,
-      toolName,
-      ...exec?.callId ? { callId: exec.callId } : {},
-      ...exec?.signal ? { signal: exec.signal } : {},
-      reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u7EE7\u7EED\u751F\u6210\u7B2C ${done + 1} \u6BB5\u89C6\u9891\uFF08${nextSeconds} \u79D2\uFF09\u3002${alreadyDone}\uFF0C\u6574\u6761\u8FD8\u5DEE ${rest} \u79D2\uFF08${cost}${remain ? `\uFF1B${remain}` : ""}\uFF09\u3002`,
-      displayReason: {
-        zh: `${alreadyDone}\u3002\u63A5\u4E0B\u6765\u751F\u6210\u7B2C ${done + 1} \u6BB5\uFF08${nextSeconds} \u79D2\uFF09\uFF0C\u6574\u6761\u8FD8\u5DEE ${rest} \u79D2\uFF0C${cost}${remain ? `\uFF0C${remain}` : ""}\u3002\u70B9\u300C\u5141\u8BB8\u300D\u7EE7\u7EED\u5F80\u4E0B\u751F\u6210\uFF1B\u70B9\u300C\u62D2\u7EDD\u300D\u5C31\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\u7ED9\u4F60\uFF0C\u4E4B\u540E\u968F\u65F6\u53EF\u4EE5\u63A5\u7740\u505A\uFF08\u4E0D\u7528\u91CD\u5934\u518D\u6765\uFF09\u3002`,
-        en: `Segment ${done} (${lastSeconds}s) is ready. Next up: segment ${done + 1} (${nextSeconds}s); ${rest}s left in total, ${cost}${remain ? `, ${remain}` : ""}. Allow to keep generating; reject to receive what is already done and continue later.`
-      }
-    });
-    return { outcome: String(outcome) };
-  } catch (error) {
-    return { outcome: "unavailable", reason: error?.message || String(error) };
-  }
-}
-function resolveRegisterApi(config) {
-  return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
-}
-const PLUGIN_VERSION = true ? "3.3.2".trim().replace(/^v/i, "") : "";
-async function fetchDeviceQuota(config, signal) {
-  if (isManualKey(config)) return { status: "unknown", reason: `${connectionLabel(config)}\u8D39\u7528\u548C\u4F59\u989D\u8BF7\u5728\u6E20\u9053\u63A7\u5236\u53F0\u67E5\u770B` };
-  const api = resolveRegisterApi(config);
-  const deviceId = String(ref(config, "deviceId", "")).trim();
-  const deviceSecret = String(ref(config, "deviceSecret", "")).trim();
-  if (!deviceId || !deviceSecret) {
-    return {
-      status: "unknown",
-      reason: "\u63D2\u4EF6\u91CC\u6CA1\u6709\u672C\u673A\u8BBE\u5907\u51ED\u636E\uFF08\u5728\u8BBE\u7F6E\u9875\u70B9\u4E00\u6B21\u300C\u767B\u5F55\u300D\u4F1A\u5199\u8FDB\u6765\uFF0C\u4E4B\u540E\u5C31\u80FD\u81EA\u52A8\u6821\u9A8C\u989D\u5EA6\uFF09"
-    };
-  }
-  const timeout = AbortSignal.timeout(15e3);
-  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
-  try {
-    const response = await fetch(`${api}/api/v1/register/quota`, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-        "X-Register-Token": String(ref(config, "registerToken", "")).trim() || DEFAULT_REGISTER_TOKEN,
-        ...PLUGIN_VERSION ? { "X-Plugin-Version": PLUGIN_VERSION } : {}
-      },
-      body: JSON.stringify({ device_id: deviceId, device_secret: deviceSecret }),
-      signal: requestSignal
-    });
-    const text = await response.text();
-    let body = {};
-    if (text) {
-      try {
-        body = JSON.parse(text);
-      } catch {
-        body = { message: text.slice(0, 200) };
-      }
+    if (Array.isArray(value)) {
+      return Array.from(value, (item) => toJsonSafe(item, seen) ?? null);
     }
-    if (!response.ok || body && typeof body === "object" && body.code) {
-      return {
-        status: "unknown",
-        reason: body && (body.message || body.detail) || `HTTP ${response.status}`
-      };
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return String(value);
+    const plain = {};
+    for (const [key, item] of Object.entries(value)) {
+      const safe = toJsonSafe(item, seen);
+      if (safe !== void 0) plain[key] = safe;
     }
-    return { status: "ok", data: body && body.data || body || {} };
-  } catch (error) {
-    return { status: "unknown", reason: error?.message || String(error) };
+    return plain;
+  } finally {
+    seen.delete(value);
   }
 }
-function approvalPolicy(ctx, exec) {
-  try {
-    const approval = ctx.get("approval");
-    if (!approval) return "missing";
-    const session = exec?.agent?.session;
-    const override = session && typeof approval.overrideOf === "function" ? approval.overrideOf(session) : void 0;
-    return override || approval.config?.policy || "ask";
-  } catch {
-    return "ask";
-  }
-}
-function planSummary(estimate) {
-  if (!estimate) return "\u65F6\u957F\u672A\u77E5";
-  const sizes = estimate.segments.map((item) => `${item.seconds}s`).join(" + ");
-  return `${estimate.segments.length} \u6BB5\uFF08${sizes}\uFF09\u5171 ${estimate.seconds} \u79D2`;
-}
-function setupGate(ctx, exec) {
-  const args = exec.arguments && typeof exec.arguments === "object" ? exec.arguments : {};
-  if (args?.install !== true) return { kind: "allow" };
-  const { os: os2, installs, bootstrap } = ffmpegInstallOptions();
-  const command = String(args?.target || "ffmpeg") === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
-  if (approvalPolicy(ctx, exec) === "never") {
-    return {
-      kind: "deny",
-      reason: `\u5F53\u524D\u6743\u9650\u6A21\u5F0F\u5173\u95ED\u4E86\u5BA1\u6279\u63D0\u793A\uFF08\u5B8C\u5168\u8BBF\u95EE\uFF09\uFF0C\u88C5\u73AF\u5883\u8FD9\u79CD\u4F1A\u5728\u672C\u673A\u8DD1\u547D\u4EE4\u7684\u64CD\u4F5C\u6CA1\u6CD5\u786E\u8BA4\uFF0C\u5DF2\u505C\u6B62\u3002\u628A\u6743\u9650\u5207\u5230\u300C\u5DE5\u4F5C\u533A\u5199\u5165\u300D\u6216\u300C\u53EA\u8BFB\u300D\u540E\u518D\u8BA9\u6211\u88C5\uFF1B\u4E5F\u53EF\u4EE5\u7167\u7740\u8FD9\u6761\u547D\u4EE4\u81EA\u5DF1\u5728\u7EC8\u7AEF\u6267\u884C\uFF1A${command}\uFF08${os2}\uFF09\u3002`
-    };
-  }
+function jsonSafeTool(tool) {
   return {
-    kind: "ask",
-    reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u5728 ${os2} \u4E0A\u6267\u884C\u5B89\u88C5\u547D\u4EE4\u300C${command}\u300D\u3002`,
-    displayReason: {
-      zh: `\u51C6\u5907\u5728\u8FD9\u53F0\u7535\u8111\u4E0A\u88C5 ffmpeg\uFF1A${command}\uFF08${os2}\uFF09\u3002\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u6267\u884C\uFF0C\u88C5\u5B8C\u4F1A\u81EA\u52A8\u63A5\u7740\u628A\u89C6\u9891\u751F\u6210\u51FA\u6765\u3002`,
-      en: `About to install ffmpeg on this machine: ${command} (${os2}). It runs only after you allow it; the video generation continues right after.`
+    ...tool,
+    async execute(...args) {
+      return toJsonSafe(await tool.execute(...args));
     }
   };
 }
-async function ffmpegConsentGate(config, exec, args) {
-  if (exec.name !== "video_generate" && exec.name !== "video_extend") return null;
-  if (args?.merge === false) return null;
-  let plan = null;
-  let doneSteps = [];
-  try {
-    const gateArgs = await estimateArgsFor(config, exec.name, args);
-    plan = estimatePlan(config, exec.name, gateArgs);
-    const dir = resumeDirOf(args?.resume);
-    if (dir) {
-      const data = await readPauseFile(dir);
-      doneSteps = (data.steps || []).map((step) => ({ kind: step.kind, seconds: step.seconds }));
-    }
-  } catch {
-    plan = null;
-  }
-  const allSteps = [...doneSteps, ...plan || []];
-  if (!plan || allSteps.length < 2) return null;
-  if (await hasFfmpeg(config, exec.signal)) return null;
-  const { os: os2, installs } = ffmpegInstallOptions();
-  const command = installs[0].command;
-  const sizes = allSteps.map((step) => `${step.seconds}s`).join(" + ");
-  const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  const lines = [
-    `\u672C\u673A\u6CA1\u6709 ${binary}\uFF0C\u8FD9\u6761\u6210\u7247\u662F ${allSteps.reduce((sum, step) => sum + step.seconds, 0)} \u79D2\uFF08\u4F1A\u62C6\u6210 ${allSteps.length} \u6BB5\uFF1A${sizes}\uFF09\uFF0C\u6CA1\u6709 ffmpeg \u5C31\u6CA1\u6CD5\u5408\u5E76\u6210\u4E00\u6761\uFF0C\u6240\u4EE5\u5148\u505C\u4E0B\u6765\u4E86\uFF0C\u8FD8\u6CA1\u6709\u8C03\u7528\u6A21\u578B\u3001\u6CA1\u6709\u4EA7\u751F\u8D39\u7528\u3002`,
-    "\u8BF7\u5728\u5BF9\u8BDD\u6846\u91CC\u5148\u548C\u7528\u6237\u786E\u8BA4\uFF0C\u4E0D\u8981\u81EA\u5DF1\u7ED5\u8FC7\u8FD9\u4E00\u6B65\uFF1A",
-    `1) \u95EE\u7528\u6237\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg \u2014\u2014 \u8BF4\u6E05\u4ED6\u7684\u7CFB\u7EDF\uFF08${os2}\uFF09\u548C\u547D\u4EE4\uFF1A${command}`,
-    "   \uFF08\u88C5\u597D\u540E\u91CD\u8DD1\u8FD9\u6B21\u751F\u6210\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\u6210\u4E00\u6761\uFF0C\u5206\u6BB5\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\u3002",
-    '2) \u7528\u6237\u540C\u610F\u5B89\u88C5\uFF1A\u8C03\u7528 video_setup\uFF08install:true\uFF09\u2014\u2014\u63D2\u4EF6\u4F1A\u6267\u884C\u4E0A\u9762\u7684\u547D\u4EE4\uFF0C\u5BBF\u4E3B\u4F1A\u5148\u628A\u8FD9\u6761\u547D\u4EE4\u62FF\u7ED9\u7528\u6237\u786E\u8BA4\uFF1B\u88C5\u5B8C\u5B83\u4F1A\u81EA\u5DF1\u9A8C\u8BC1\uFF0C\u6210\u529F\u540E\u4F60\u6309\u539F duration \u91CD\u65B0\u8C03\u7528 video_generate \u7EE7\u7EED\u751F\u6210\u5373\u53EF\uFF08\u4E00\u822C\u662F\u5148\u88C5\u5305\u7BA1\u7406\u5668\uFF1A\u672C\u673A\u8FDE brew \u90FD\u6CA1\u6709\u65F6\uFF0Cvideo_setup \u4F1A\u8FD4\u56DE nextStep\uFF0C\u7528 target:"package-manager" \u518D\u88C5\u4E00\u6B21\uFF09\u3002',
-    "3) \u7528\u6237\u4E0D\u60F3\u88C5\u3001\u6216\u8005\u88C5\u4E0D\u4E86\uFF1A\u5E26 `merge:false` \u91CD\u65B0\u8C03\u7528 video_generate\uFF0C\u63D2\u4EF6\u5C31\u53EA\u751F\u6210\u5E76\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u94FE\u63A5 + \u672C\u5730\u6587\u4EF6\uFF09\uFF0C\u8FD9\u6B21\u4E0D\u4F1A\u518D\u62E6\u3002",
-    "\u5DF2\u7ECF\u88C5\u8FC7\u4F46\u4E0D\u5728\u9ED8\u8BA4\u4F4D\u7F6E\u7684\u8BDD\uFF0C\u628A\u7EDD\u5BF9\u8DEF\u5F84\u586B\u8FDB\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\u4E5F\u4E00\u6837\u7BA1\u7528\uFF1B\u5B89\u88C5\u5305\u81EA\u5E26 ffprobe\uFF0C\u5206\u6BB5\u65F6\u957F\u63A2\u6D4B\u4F1A\u4E00\u8D77\u89E3\u51B3\u3002"
-  ];
-  return {
-    kind: "deny",
-    reason: lines.join("\n"),
-    info: { ffmpegMissing: true, os: os2, command, segments: allSteps.length }
-  };
-}
-async function estimateArgsFor(config, toolName, args) {
-  if (toolName !== "video_generate") return args;
-  const dir = resumeDirOf(args?.resume);
-  if (!dir) return args;
-  try {
-    const data = await readPauseFile(dir);
-    const restarted = resumePlanFrom(data, {
-      askedTotal: args?.duration == null ? null : clampInteger(args.duration, MIN_SECONDS, Number.MAX_SAFE_INTEGER, 0),
-      segmentSeconds: resolveSegmentSeconds(config, args?.segmentSeconds)
-    });
-    const seconds = sumStepSeconds(restarted.plan);
-    if (!(seconds > 0)) return args;
-    return { ...args, duration: seconds, referenceImages: [] };
-  } catch {
-    return args;
-  }
-}
-async function preflightGate(ctx, config, exec) {
-  if (exec.name === "video_setup") return setupGate(ctx, exec);
-  if (approvalPolicy(ctx, exec) === "never") {
-    return {
-      kind: "deny",
-      reason: "\u5F53\u524D\u6743\u9650\u6A21\u5F0F\u5173\u95ED\u4E86\u5BA1\u6279\u63D0\u793A\uFF08\u5B8C\u5168\u8BBF\u95EE\uFF09\uFF0C\u65E0\u6CD5\u505A\u4EBA\u5DE5\u786E\u8BA4\uFF0C\u5DF2\u505C\u6B62\u8C03\u7528\u3002\u628A\u6743\u9650\u5207\u5230\u300C\u5DE5\u4F5C\u533A\u5199\u5165\u300D\u6216\u300C\u53EA\u8BFB\u300D\u540E\u518D\u751F\u6210\u89C6\u9891\u3002"
-    };
-  }
-  const args = exec.arguments && typeof exec.arguments === "object" ? exec.arguments : {};
-  const consent = await ffmpegConsentGate(config, exec, args);
-  if (consent) return consent;
-  if (isManualKey(config)) {
-    assertConfigured(config, resolveApiKey(config));
-    return {
-      kind: "ask",
-      reason: `\u8C03\u7528${connectionLabel(config)} ${resolveModel(config)}\uFF0C\u6309\u6E20\u9053\u8D26\u6237\u5B9E\u9645\u7528\u91CF\u8BA1\u8D39\u3002`,
-      displayReason: { zh: `\u672C\u6B21\u5C06\u901A\u8FC7${connectionLabel(config)}\u751F\u6210\u89C6\u9891\uFF0C\u6309\u6E20\u9053\u8D26\u6237\u5B9E\u9645\u7528\u91CF\u8BA1\u8D39\u3002\u786E\u8BA4\u540E\u5F00\u59CB\u3002`, en: `Generate via ${connectionLabel(config)}, billed to your channel account. Confirm to continue.` }
-    };
-  }
-  let estimate = null;
-  try {
-    estimate = estimateUsage(config, exec.name, await estimateArgsFor(config, exec.name, args));
-  } catch {
-    estimate = null;
-  }
-  const quota = await fetchDeviceQuota(config, exec.signal);
-  const data = quota.status === "ok" ? quota.data : {};
-  const symbol = String(data.currency_symbol || "\xA5");
-  const perUnit = finiteNumber(data.quota_per_unit) ?? DEFAULT_QUOTA_PER_UNIT;
-  const exchange = finiteNumber(data.usd_exchange_rate) ?? DEFAULT_USD_EXCHANGE_RATE;
-  const needQuota = estimate ? Math.round(estimate.usd * perUnit) : null;
-  const needMoney = estimate ? formatMoney(estimate.usd * exchange, symbol) : null;
-  const remainQuota = finiteNumber(data.remain_quota);
-  const remainAmount = finiteNumber(data.remain_amount);
-  const costText = needMoney === null ? "\u8FD9\u6B21\u8C03\u7528\u7684\u8D39\u7528\u6CA1\u6CD5\u9884\u4F30" : `\u9884\u4F30 ${needMoney}`;
-  const remainMoneyText = `${formatMoney(remainAmount === null ? 0 : remainAmount, symbol)}`;
-  const remainZh = remainQuota === null ? `\u672C\u673A Key \u7684\u989D\u5EA6\u8BFB\u4E0D\u5230\uFF08${quota.reason || "\u670D\u52A1\u7AEF\u6CA1\u56DE\u989D\u5EA6"}\uFF09` : `\u672C\u673A Key \u5269\u4F59 ${remainMoneyText}`;
-  const remainEn = remainQuota === null ? `this key's quota could not be read (${quota.reason || "the service returned none"})` : `this key has ${remainMoneyText} left`;
-  if (needQuota !== null && remainQuota !== null && remainQuota < needQuota) {
-    return {
-      kind: "deny",
-      reason: `\u989D\u5EA6\u4E0D\u8DB3\uFF0C\u5DF2\u505C\u6B62\u8C03\u7528\uFF1A\u672C\u6B21\u9884\u4F30\u9700\u8981 ${needMoney ?? "\u65E0\u6CD5\u9884\u4F30"}\uFF0C\u8FD9\u628A Key \u53EA\u5269 ${remainMoneyText}\u3002\u8BF7\u5145\u503C\u6216\u627E\u7BA1\u7406\u5458\u6362\u4E00\u628A\u989D\u5EA6\u591F\u7684 Key \u540E\u91CD\u8BD5\u3002`
-    };
-  }
-  const total = estimate ? `${estimate.model} \xB7 ${estimate.resolution} \xB7 ${planSummary(estimate)}` : `${resolveModel(config)} \xB7 ${FIXED_RESOLUTION}`;
-  const auditTax = estimate ? `\u9884\u4F30\u6D88\u8017 ${estimate.tokens.toLocaleString("en-US")} token \u2248 ${needMoney ?? "\u65E0\u6CD5\u9884\u4F30"}\uFF08${needQuota === null ? "\u989D\u5EA6\u672A\u77E5" : `${needQuota.toLocaleString("en-US")} \u989D\u5EA6`}\uFF09` : "\u8FD9\u6B21\u8C03\u7528\u7684\u8D39\u7528\u65E0\u6CD5\u9884\u4F30";
-  return {
-    kind: "ask",
-    reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u8C03\u7528\u89C6\u9891\u6A21\u578B\uFF08${total}\uFF09\u3002${auditTax}\uFF1B\u672C\u673A Key \u5269\u4F59 ${remainQuota === null ? "\u989D\u5EA6\u8BFB\u4E0D\u5230" : `${remainMoneyText} / ${remainQuota.toLocaleString("en-US")} \u989D\u5EA6`}\u3002`,
-    displayReason: {
-      zh: `\u672C\u6B21\u4F1A\u8C03\u7528\u89C6\u9891\u6A21\u578B\uFF1A${total}\uFF1B${costText}\uFF0C${remainZh}\u3002\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u771F\u6B63\u8C03\u7528\u3002`,
-      en: `This will call the video model: ${total}. Estimated cost ${needMoney === null ? "unknown" : needMoney}; ${remainEn}. The call runs only after you allow it.`
-    }
-  };
-}
-const RELAY_TIMEOUT_MS = 12e4;
-const requestLogContext = new AsyncLocalStorage();
-function requestLogPath() {
-  const now = /* @__PURE__ */ new Date();
-  const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-  return path.join(dshHome(), "logs", "metaontic-video", date, "requests.jsonl");
-}
-async function appendRequestLog(record) {
-  try {
-    const file = requestLogPath();
-    await mkdir(path.dirname(file), { recursive: true, mode: 448 });
-    await appendFile(file, JSON.stringify({ time: (/* @__PURE__ */ new Date()).toISOString(), pluginVersion: PLUGIN_VERSION, ...requestLogContext.getStore(), ...record }) + "\n", { mode: 384 });
-  } catch {
-  }
-}
-async function relayRequest(config, requestPath, options = {}) {
-  const method = options.method || "GET";
-  const requestId = uniqueSuffix("request");
-  const started = Date.now();
-  const trace = {};
-  const body = options.body;
-  const operation = method === "POST" ? "create_task" : "query_task";
-  const info = {
-    requestId,
-    operation,
-    method,
-    provider: isMetaontic(config) ? "metaontic" : isVolcengine(config) ? "volcengine" : "service",
-    model: body?.model || resolveModel(config),
-    ...method === "POST" ? {
-      duration: body?.duration,
-      resolution: body?.resolution,
-      imageCount: Array.isArray(body?.content) ? body.content.filter((item) => item.type === "image_url").length : 0,
-      videoCount: Array.isArray(body?.content) ? body.content.filter((item) => item.type === "video_url").length : 0
-    } : { taskId: String(requestPath).split("?")[0].split("/").at(-1) }
-  };
-  await appendRequestLog({ ...info, event: "request_started" });
-  try {
-    const data = await relayRequestCore(config, requestPath, options, trace);
-    await appendRequestLog({
-      ...info,
-      ...trace,
-      event: "request_completed",
-      elapsedMs: Date.now() - started,
-      taskId: extractTaskId(data) || info.taskId,
-      taskStatus: extractStatus(data),
-      completionTokens: finiteNumber(data?.usage?.completion_tokens)
-    });
-    return data;
-  } catch (error) {
-    await appendRequestLog({
-      ...info,
-      ...trace,
-      event: "request_failed",
-      elapsedMs: Date.now() - started,
-      errorCode: String(error?.code || "request_error"),
-      cancelled: Boolean(options.signal?.aborted)
-    });
-    throw error;
-  }
-}
-async function relayRequestCore(config, path2, { method = "GET", body, signal } = {}, trace = {}) {
-  const url = `${resolveBaseUrl(config)}${path2}`;
-  const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
-  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
-  const serialized = body === void 0 ? void 0 : JSON.stringify(body);
-  if (serialized && Buffer.byteLength(serialized, "utf8") > 64 * 1024 * 1024) {
-    throw Object.assign(new Error("\u89C6\u9891\u8BF7\u6C42\u4F53\u8D85\u8FC764 MB\uFF0C\u8BF7\u51CF\u5C11\u5185\u8054\u56FE\u7247\u6216\u6539\u7528\u516C\u7F51 URL\uFF1B\u706B\u5C71\u76F4\u8FDE\u4E5F\u53EF\u4F7F\u7528 asset:// \u7D20\u6750\u3002"), { code: "request_too_large" });
-  }
-  let response;
-  let text;
-  try {
-    response = await fetch(url, {
-      method,
-      headers: {
-        Authorization: `Bearer ${resolveApiKey(config)}`,
-        "Content-Type": "application/json"
-      },
-      ...serialized !== void 0 ? { body: serialized } : {},
-      signal: requestSignal
-    });
-    trace.httpStatus = response.status;
-    trace.upstreamRequestId = response.headers.get("x-request-id") || response.headers.get("x-tt-logid") || void 0;
-    text = await response.text();
-  } catch (error) {
-    if (signal?.aborted) throw abortError();
-    throw Object.assign(new Error(`\u4E2D\u8F6C\u7AD9\u8BF7\u6C42\u5931\u8D25\uFF1A${error?.message || error}`), {
-      code: "provider_network_error"
-    });
-  }
-  let data = {};
-  if (text) {
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = { raw: text };
-    }
-  }
-  const upstreamError = data && typeof data === "object" && data.error;
-  if (!response.ok || upstreamError) {
-    const httpStatus = response.status >= 400 ? response.status : 400;
-    const classified = classifyError(
-      httpStatus,
-      data
-    );
-    throw Object.assign(new Error(classified.message), {
-      code: classified.code,
-      status: httpStatus
-    });
-  }
-  return data;
-}
-function abortError() {
-  const error = new Error("\u5DF2\u53D6\u6D88");
-  error.code = "ABORTED";
-  return error;
-}
-function sleep(ms, signal) {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(abortError());
-      return;
-    }
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-    function onAbort() {
-      clearTimeout(timer);
-      reject(abortError());
-    }
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-}
-function createTask(config, body, signal) {
-  return relayRequest(config, resolveSubmitPath(config), { method: "POST", body, signal });
-}
-function getTask(config, taskId, signal) {
-  return relayRequest(config, resolveQueryPath(config, taskId), { signal });
-}
-function isRetryablePollError(failure) {
-  if (!failure || failure.code === "ABORTED") return false;
-  const status = Number(failure.status);
-  if (!Number.isFinite(status)) return true;
-  if (status >= 500) return true;
-  return status === 401 || status === 403 || status === 408 || status === 429;
-}
-async function waitForCompletion(config, taskId, signal) {
-  const deadline = Date.now() + ref(config, "maxWaitMs", 6e5);
-  const maxPollErrors = Math.max(1, Math.round(ref(config, "pollErrorRetries", 5)));
-  let pollErrors = 0;
-  for (; ; ) {
-    if (signal?.aborted) throw abortError();
-    let task;
-    try {
-      task = await getTask(config, taskId, signal);
-      pollErrors = 0;
-    } catch (failure) {
-      if (failure?.code === "ABORTED") throw failure;
-      if (!isRetryablePollError(failure)) {
-        return {
-          taskId,
-          status: "unknown",
-          errorCode: failure?.code || "provider_poll_error",
-          error: `\u4EFB\u52A1\u5DF2\u63D0\u4EA4\uFF08${taskId}\uFF09\uFF0C\u67E5\u8BE2\u8FD4\u56DE\u5931\u8D25\uFF1A${failure?.message || failure}\u3002\u53EF\u7528 video_status \u6309\u8FD9\u4E2A ID \u590D\u67E5\u786E\u8BA4\u3002`
-        };
-      }
-      pollErrors += 1;
-      if (pollErrors >= maxPollErrors || Date.now() > deadline) {
-        return {
-          taskId,
-          status: "unknown",
-          errorCode: failure?.code || "provider_poll_error",
-          error: `\u4EFB\u52A1\u5DF2\u63D0\u4EA4\uFF08${taskId}\uFF09\uFF0C\u4F46\u8FDE\u7EED ${pollErrors} \u6B21\u67E5\u8BE2\u72B6\u6001\u5931\u8D25\uFF1A${failure?.message || failure}\u3002\u4EFB\u52A1\u53EF\u80FD\u4ECD\u5728\u751F\u6210\uFF0C\u53EF\u7528 video_status \u6309\u8FD9\u4E2A ID \u518D\u67E5\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u3002`
-        };
-      }
-      await sleep(ref(config, "pollIntervalMs", 5e3), signal);
-      continue;
-    }
-    const status = extractStatus(task) || "unknown";
-    const model = findKey(task, ["model"]) || resolveModel(config);
-    if (SUCCESS_STATES.has(status)) {
-      const videoUrl = extractVideoUrl(task);
-      if (videoUrl) return { taskId, status: "succeeded", model, videoUrl };
-      const imageUrl = extractImageUrl(task);
-      return {
-        taskId,
-        status: "failed",
-        model,
-        errorCode: "provider_bad_response",
-        error: imageUrl ? `\u4E0A\u6E38\u8FD4\u56DE\u7684\u662F\u56FE\u7247\u800C\u4E0D\u662F\u89C6\u9891\uFF08${imageUrl.split("?")[0].slice(-60)}\uFF09\uFF0C\u53EF\u80FD\u662F\u4E2D\u8F6C\u7AD9\u628A\u89C6\u9891\u8BF7\u6C42\u8DEF\u7531\u5230\u4E86\u56FE\u7247\u6E20\u9053\u3002` : "\u4E0A\u6E38\u62A5\u544A\u6210\u529F\u4F46\u6CA1\u6709\u8FD4\u56DE\u89C6\u9891\u5730\u5740\u3002"
-      };
-    }
-    if (FAILED_STATES.has(status)) {
-      const data = findKey(task, ["error", "fail_reason", "message", "detail"]);
-      const classified = classifyError(400, typeof data === "string" ? { message: data } : data || task);
-      return {
-        taskId,
-        status: CANCEL_STATES.has(status) ? "cancelled" : "failed",
-        model,
-        errorCode: classified.code,
-        error: classified.message
-      };
-    }
-    if (Date.now() > deadline) {
-      return { taskId, status: "timeout" };
-    }
-    await sleep(ref(config, "pollIntervalMs", 5e3), signal);
-  }
-}
+
+// src/tools/results.ts
 function previewInstruction(value) {
   const latest = (value?.segments || []).filter((segment) => segment.status === "succeeded").at(-1);
   const target = latest?.localPath || value?.videoPath || latest?.videoUrl || value?.videoUrl;
@@ -2305,7 +1275,7 @@ ${lines.join("\n")}` }];
     }
   ];
 }
-const SEGMENT_OUTPUT_SCHEMA = {
+var SEGMENT_OUTPUT_SCHEMA = {
   type: "object",
   properties: {
     index: { type: "integer" },
@@ -2319,335 +1289,7 @@ const SEGMENT_OUTPUT_SCHEMA = {
     error: { type: "string" }
   }
 };
-function extendTool(config, deps, ctx) {
-  const TOOL_NAME = "video_extend";
-  return {
-    name: "video_extend",
-    description: "\u628A\u4E00\u6BB5\u5DF2\u6709\u7684\u89C6\u9891\u5411\u524D\u6216\u5411\u540E\u5EF6\u957F\uFF1A\u4EE5\u516C\u7F51\u89C6\u9891 URL \u4F5C\u4E3A\u8F93\u5165\u7D20\u6750\uFF0C\u8C03\u7528 Seedance \u751F\u6210\u8854\u63A5\u7247\u6BB5\uFF0C\u4FDD\u6301\u4EBA\u7269\u3001\u670D\u88C5\u3001\u573A\u666F\u5149\u7EBF\u548C\u58F0\u97F3\u8FDE\u7EED\uFF1B\u53EF\u4E00\u6B21\u8FDE\u7EED\u5EF6\u957F\u591A\u6BB5\uFF0C\u6BCF\u6BB5\u90FD\u7528\u4E0A\u4E00\u6BB5\u7684\u7ED3\u679C\u7EE7\u7EED\u5EF6\u957F\u3002\u63D0\u793A\u8BCD\u89C4\u5219\uFF1A\u4EE5\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D\u6216\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\u5F00\u5934\uFF08\u4E5F\u53EF\u5199\u300C\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A\u300D\uFF09\uFF0C\u5168\u7A0B\u7528\u300C\u89C6\u98911\u300D\u6307\u4EE3\u8F93\u5165\u7D20\u6750\uFF0C\u4E0D\u8981\u5199\u6210\u300C\u53C2\u8003\u89C6\u98911\u300D\uFF08\u4F1A\u88AB\u5F53\u6210\u53C2\u8003\u751F\u89C6\u9891\uFF0C\u4E0D\u662F\u5EF6\u957F\uFF09\uFF1B\u5185\u5BB9\u5199\u6E05\u5EF6\u957F\u65B9\u5411\u3001\u5267\u60C5\u53D1\u5C55\u3001\u4E3B\u4F53\u72B6\u6001\u3001\u955C\u5934\u8FD0\u52A8\u548C\u58F0\u97F3\u5EF6\u7EED\uFF08\u80CC\u666F\u97F3\u4E50\u8981\u63A5\u7740\u89C6\u98911\u7ED3\u5C3E\u5F80\u4E0B\u8D70\uFF0C\u7981\u6B62\u4ECE\u5934\u64AD\u653E/\u6362\u66F2\uFF09\uFF0C\u51CF\u5C11\u63A5\u7F1D\u3002\u6BCF\u6BB5 4 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09 \u79D2\uFF0C\u9ED8\u8BA4\u6309\u6240\u9009\u6A21\u578B\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\uFF1B\u4E0A\u6E38\u5BF9\u5361\u6EE1 15 \u79D2\u654F\u611F\u65F6\u518D\u8C03\u5C0F\u3002\u8FD4\u56DE\u6BCF\u6BB5\u7684\u4EFB\u52A1 ID \u548C\u6700\u7EC8\u89C6\u9891\u4E0B\u8F7D\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF1B\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout\u3001\u6216\u67D0\u6BB5\u8FD4\u56DE unknown\uFF08\u67E5\u8BE2\u5931\u8D25\u3001\u4EFB\u52A1\u5176\u5B9E\u5DF2\u63D0\u4EA4\uFF09\u65F6\uFF0C\u90FD\u7528\u8FD4\u56DE\u7684\u4EFB\u52A1 ID \u8D70 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u540C\u4E00\u6BB5\u3002\u6BCF\u6BB5\u5EF6\u957F\u5B8C\u90FD\u4F1A\u5148\u5F39\u4E00\u6B21\u786E\u8BA4\u6846\u95EE\u7528\u6237\u8981\u4E0D\u8981\u7EE7\u7EED\uFF1A\u70B9\u300C\u62D2\u7EDD\u300D\u5C31\u5148\u4EA4\u4ED8\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u90E8\u5206\uFF0C\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir\u3001remainingSeconds\uFF1B\u4E4B\u540E\u7528\u6237\u8BF4\u300C\u7EE7\u7EED\u300D\u65F6\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_extend \u7684 resume \u53C2\u6570\u63A5\u7740\u505A\uFF08\u524D\u9762\u51E0\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\u3001\u4E0D\u91CD\u590D\u6263\u8D39\uFF09\u3002\u591A\u6BB5\u9ED8\u8BA4\u4F1A\u4E0B\u8F7D\u5206\u6BB5\u5E76\u5728\u672C\u673A\u5408\u5E76\u6210\u4E00\u6761\u6210\u7247\uFF08\u9700\u8981 ffmpeg\uFF09\uFF1A\u6CA1\u6709 ffmpeg \u65F6\u4F1A\u5148\u62E6\u4E0B\u6765\u95EE\u7528\u6237\uFF0C\u7ED3\u679C\u91CC\u4E5F\u4F1A\u5E26 ffmpegMissing \u4E0E\u5B89\u88C5\u5F15\u5BFC\u3002\u4E2D\u9014\u88AB\u505C\u6B62 / \u7B49\u8D85\u65F6\u540C\u7406\uFF1A\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u6BB5\u5148\u4EA4\u4ED8\uFF0C\u5269\u4E0B\u7684\u7528 resume \u63A5\u7740\u505A\u3002",
-    parameters: {
-      type: "object",
-      properties: {
-        prompt: {
-          type: "string",
-          description: "\u672C\u6BB5\u8981\u7EED\u62CD\u7684\u5267\u60C5\u5185\u5BB9\u4E0E\u4EBA\u7269\u8BBE\u5B9A\uFF1B\u4E0D\u8981\u5728\u63D0\u793A\u8BCD\u91CC\u91CD\u590D\u5DF2\u53D1\u751F\u7684\u60C5\u8282\u3002"
-        },
-        videoUrl: {
-          type: "string",
-          description: "\u53C2\u8003\u89C6\u9891\u7684\u516C\u7F51 URL\uFF08https:// \u6216 http://\uFF09\u3002\u4E0E taskId \u4E8C\u9009\u4E00\u3002"
-        },
-        taskId: {
-          type: "string",
-          description: "\u5DF2\u6709\u7684 video_generate / video_extend \u4EFB\u52A1 ID\uFF0C\u7528\u5B83\u7684\u6210\u7247\u4F5C\u4E3A\u8F93\u5165\u7D20\u6750\u3002\u4E0E videoUrl \u4E8C\u9009\u4E00\u3002"
-        },
-        duration: {
-          type: "integer",
-          minimum: 4,
-          maximum: modelMaxSeconds(config),
-          description: "\u6BCF\u6BB5\u65B0\u589E\u7684\u79D2\u6570\u4E0A\u9650\uFF0C4 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09 \u7684\u6574\u6570\uFF08\u5982 5/8/10/14\uFF0C\u9ED8\u8BA4\u6309\u6A21\u578B\u4E0A\u9650\uFF09\uFF1B\u521A\u597D\u5361 15 \u79D2\u5BB9\u6613\u56E0\u5C01\u88C5\u7565\u8D85\u88AB\u4E0A\u6E38\u62D2\u7EDD\u3002\u7701\u7565\u65F6\u4F7F\u7528\u914D\u7F6E\u9ED8\u8BA4\u503C\u3002"
-        },
-        direction: {
-          type: "string",
-          enum: ["backward", "forward"],
-          description: "backward=\u5411\u540E\u5EF6\u957F\uFF0C\u7EED\u62CD\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF08\u9ED8\u8BA4\uFF09\uFF1Bforward=\u5411\u524D\u5EF6\u957F\uFF0C\u751F\u6210\u89C6\u98911\u4E4B\u524D\u7684\u524D\u7F6E\u5267\u60C5\u3002"
-        },
-        wording: {
-          type: "string",
-          enum: ["extend", "after"],
-          description: "\u63D0\u793A\u8BCD\u5F00\u5934\u5199\u6CD5\uFF1Aextend=\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D/\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\uFF08\u9ED8\u8BA4\uFF09\uFF1Bafter=\u300C\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A\u300D\uFF08\u4EC5\u5411\u540E\u5EF6\u957F\uFF09\u3002"
-        },
-        segments: {
-          type: "integer",
-          minimum: 1,
-          maximum: 10,
-          description: "\u8FDE\u7EED\u5EF6\u957F\u51E0\u6BB5\uFF0C\u9ED8\u8BA4 1\uFF1B\u6BCF\u6BB5\u90FD\u5F15\u7528\u4E0A\u4E00\u6BB5\u7684\u7ED3\u679C\uFF0C\u9002\u5408\u505A\u51FA\u66F4\u957F\u7684\u6210\u7247\u3002"
-        },
-        mode: {
-          type: "string",
-          enum: ["continuous", "closeup"],
-          description: "continuous=\u540C\u673A\u4F4D\u8FDE\u7EED\u7EED\u62CD\uFF08\u9ED8\u8BA4\uFF09\uFF1Bcloseup=\u5728\u5B8C\u6574\u53F0\u8BCD\u7ED3\u675F\u5904\u81EA\u7136\u5207\u5230\u8FD1\u666F\u6216\u53CD\u5E94\u955C\u5934\u3002"
-        },
-        startAt: {
-          type: "number",
-          minimum: 0,
-          description: "\u89C6\u98911\u5DF2\u6709\u7684\u79D2\u6570\uFF1B\u7ED9\u4E86\u5C31\u6309\u300C\u6574\u7247\u7B2C X\u2013Y \u79D2\u300D\u63CF\u8FF0\u672C\u6BB5\u3002\u5411\u540E\u5EF6\u957F\u65F6\u9010\u6BB5\u7D2F\u52A0\uFF0C\u5411\u524D\u5EF6\u957F\u65F6\u9010\u6BB5\u524D\u79FB\u3002"
-        },
-        ratio: {
-          type: "string",
-          enum: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
-          description: "\u753B\u9762\u6BD4\u4F8B\uFF1Bseedance 2.5 \u5EF6\u957F\u65F6\u4F1A\u81EA\u52A8\u6539\u7528 adaptive\u3002"
-        },
-        generateAudio: {
-          type: "boolean",
-          description: "\u662F\u5426\u751F\u6210\u97F3\u9891\uFF0C\u9ED8\u8BA4 true\u3002"
-        },
-        watermark: {
-          type: "boolean",
-          description: "\u662F\u5426\u6DFB\u52A0\u6C34\u5370\uFF0C\u9ED8\u8BA4 false\u3002"
-        },
-        resume: {
-          type: "string",
-          description: "\u63A5\u7740\u4E0A\u4E00\u6B21\u6682\u505C\u7684\u5EF6\u957F\u7EE7\u7EED\uFF1A\u4F20\u4E0A\u4E00\u6B21\u7ED3\u679C\u91CC\u7684 resumeDir\u3002\u63D2\u4EF6\u4F1A\u6CBF\u7528\u6682\u505C\u8BB0\u5F55\u91CC\u7684\u63D0\u793A\u8BCD\u3001\u5EF6\u957F\u65B9\u5411\u548C\u5269\u4E0B\u7684\u6BB5\u6570\uFF0C\u53EA\u628A\u6CA1\u505A\u7684\u90E8\u5206\u751F\u6210\u5B8C\u518D\u5408\u5E76\uFF1Bprompt / videoUrl / direction \u90FD\u53EF\u4EE5\u7701\u7565\u3002\u60F3\u987A\u624B\u591A\u5EF6\u957F\u51E0\u6BB5\u5C31\u518D\u4F20 segments\uFF08\u8868\u793A\u5728\u5269\u4E0B\u7684\u57FA\u7840\u4E0A\u300C\u518D\u52A0\u300D\u51E0\u6BB5\uFF09\u3002\u540C\u4E00\u4EFD\u6682\u505C\u8FDB\u5EA6\u540C\u65F6\u53EA\u5141\u8BB8\u4E00\u6B21 resume \u5728\u8DD1\uFF1A\u5DF2\u7ECF\u6709\u522B\u7684\u8C03\u7528\u5728\u7EED\u505A\u65F6\u4F1A\u76F4\u63A5\u62A5\u9519\uFF0C\u7B49\u5B83\u8DD1\u5B8C\u518D\u7EE7\u7EED\uFF0C\u522B\u91CD\u590D\u53D1\uFF08\u91CD\u590D\u4F1A\u628A\u5269\u4E0B\u7684\u6BB5\u63D0\u4EA4\u4E24\u904D\u3001\u91CD\u590D\u6263\u8D39\uFF09\u3002"
-        }
-      },
-      required: ["prompt"]
-    },
-    output: {
-      schema: {
-        type: "object",
-        properties: {
-          status: { type: "string" },
-          videoUrl: { type: "string" },
-          videoPath: { type: "string" },
-          actualSeconds: { type: "number" },
-          seamCuts: { type: "array", items: { type: "object", properties: { index: { type: "integer" }, seconds: { type: "number" }, tailSeconds: { type: "number" } } } },
-          merged: { type: "boolean" },
-          seamTrimSeconds: { type: "string", description: "\u9884\u89C8\u786E\u8BA4\u540E\u88C1\u526A\u5404\u63A5\u7F1D\uFF1A\u5982 0.5,0 \u8868\u793A\u4EC5\u88C1\u7B2C2\u6BB5\u5F00\u59340.5\u79D2\uFF1B\u7559\u7A7A\u65F62.0\u88C1\u524D\u6BB5\u5C3E6\u5E27\u548C\u540E\u6BB5\u59341\u5E27\uFF0C2.5\u4E0D\u88C1\uFF1B\u586B0\u5173\u95ED\u3002\u97F3\u89C6\u9891\u540C\u6B65\u88C1\u526A\uFF0C\u5B9E\u9645\u65F6\u957F\u7F29\u77ED\u3002" },
-          mergeMode: { type: "string" },
-          segmentsDir: { type: "string" },
-          ffmpegMissing: { type: "boolean" },
-          installHint: { type: "string" },
-          partial: { type: "boolean" },
-          paused: { type: "boolean" },
-          nextAction: { type: "string" },
-          previewPath: { type: "string" },
-          resumeDir: { type: "string" },
-          remainingSeconds: { type: "integer" },
-          totalSeconds: { type: "integer" },
-          error: { type: "string" },
-          errorCode: { type: "string" },
-          note: { type: "string" },
-          segments: { type: "array", items: SEGMENT_OUTPUT_SCHEMA }
-        }
-      },
-      render(_args, value) {
-        return renderResult(value);
-      }
-    },
-    timeoutMs: 18e5,
-    isConcurrencySafe() {
-      return true;
-    },
-    async execute(args, exec) {
-      const apiKey = resolveApiKey(config);
-      assertConfigured(config, apiKey);
-      const resumeDir = resumeDirOf(args?.resume);
-      const resume = resumeDir ? await readPauseFile(resumeDir) : null;
-      const prompt = String(args?.prompt ?? "").trim() || String(resume?.prompt ?? "").trim();
-      if (!prompt) {
-        throw new Error(resumeDir ? "\u8FD9\u6B21\u662F\u63A5\u7740\u4E0A\u4E00\u6B21\u6682\u505C\u7684\u5EF6\u957F\u7EE7\u7EED\uFF0C\u4F46\u6682\u505C\u8BB0\u5F55\u91CC\u6CA1\u6709\u63D0\u793A\u8BCD\uFF1A\u8BF7\u628A prompt \u8865\u4E0A\u3002" : "\u63D0\u793A\u8BCD prompt \u4E0D\u80FD\u4E3A\u7A7A\u3002");
-      }
-      const lastOptions = resume ? resume.options || {} : {};
-      const direction = (args?.direction ?? lastOptions.direction) === "forward" ? "forward" : "backward";
-      const wording = (args?.wording ?? lastOptions.wording) === "after" ? "after" : "extend";
-      const requestedSegments = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
-      const secondsPerSegment = clampInteger(
-        args?.duration ?? modelMaxSeconds(config),
-        MIN_SECONDS,
-        modelMaxSeconds(config),
-        modelMaxSeconds(config)
-      );
-      let referenceUrl = String(args?.videoUrl ?? "").trim();
-      if (!referenceUrl && args?.taskId) {
-        const sourceId = String(args.taskId).trim();
-        let source;
-        try {
-          source = await getTask(config, sourceId, exec?.signal);
-        } catch (failure) {
-          if (failure?.code === "ABORTED") throw failure;
-          throw new Error(
-            `\u8BFB\u53D6\u53C2\u8003\u89C6\u9891\u4EFB\u52A1 ${sourceId} \u5931\u8D25\uFF1A${failure?.message || failure}\u3002\u8FD9\u4E0D\u4EE3\u8868\u8BE5\u4EFB\u52A1\u6CA1\u6709\u751F\u6210\u2014\u2014\u7A0D\u540E\u91CD\u8BD5\uFF0C\u6216\u76F4\u63A5\u628A\u6210\u7247\u7684\u516C\u7F51\u94FE\u63A5\u7528 videoUrl \u4F20\u8FDB\u6765\u3002`
-          );
-        }
-        referenceUrl = extractVideoUrl(source) || "";
-        if (!referenceUrl) {
-          throw new Error(
-            `\u4EFB\u52A1 ${args.taskId} \u6CA1\u6709\u53EF\u7528\u7684\u89C6\u9891\u94FE\u63A5\uFF08\u72B6\u6001\uFF1A${extractStatus(source) || "\u672A\u77E5"}\uFF09\u3002`
-          );
-        }
-      }
-      if (!referenceUrl && resume) referenceUrl = String(resume.lastVideoUrl ?? "").trim();
-      referenceUrl = normalizeReferenceUrl(referenceUrl);
-      const doneBefore = resume ? Number(resume.done) || 0 : 0;
-      const fullPlan = resume ? (resume.plan || []).map((step) => ({ ...step })) : [];
-      if (!resume) {
-        for (let index = 0; index < requestedSegments; index += 1) {
-          fullPlan.push({ kind: "extend", seconds: secondsPerSegment });
-        }
-      } else if (args?.segments != null) {
-        for (let index = 0; index < requestedSegments && fullPlan.length < MAX_SEGMENTS; index += 1) {
-          fullPlan.push({ kind: "extend", seconds: secondsPerSegment });
-        }
-      }
-      const plan = fullPlan.slice(doneBefore);
-      const plannedSeconds = plan.reduce((sum, step) => sum + step.seconds, 0);
-      let cursor = resume ? resume.cursor ?? null : args?.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
-      const notes = [];
-      const segments = [];
-      if (resume) {
-        for (const step of resume.steps || []) {
-          segments.push({
-            index: step.index,
-            kind: "extend",
-            seconds: step.seconds,
-            taskId: step.taskId,
-            status: "succeeded",
-            videoUrl: step.videoUrl
-          });
-        }
-      }
-      let status = "succeeded";
-      let error;
-      let errorCode;
-      let paused = false;
-      let confirmWarned = false;
-      let interrupted = false;
-      try {
-        for (const [offset, step] of plan.entries()) {
-          if (exec?.signal?.aborted) throw abortError();
-          const position = doneBefore + offset;
-          const { body, seconds } = buildRequestBody(
-            config,
-            {
-              ...lastOptions,
-              ...args,
-              prompt,
-              duration: step.seconds,
-              startAt: cursor,
-              direction,
-              wording
-            },
-            referenceUrl
-          );
-          const final = await runTask(config, body, exec?.signal);
-          const taskId = final.taskId;
-          segments.push({
-            index: position + 1,
-            kind: "extend",
-            seconds,
-            taskId,
-            status: final.status,
-            videoUrl: final.videoUrl,
-            error: final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error
-          });
-          if (final.status !== "succeeded" || !final.videoUrl) {
-            status = final.status;
-            errorCode = final.errorCode;
-            error = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error;
-            break;
-          }
-          referenceUrl = normalizeReferenceUrl(final.videoUrl);
-          if (cursor != null) {
-            cursor = direction === "forward" ? cursor - seconds : cursor + seconds;
-            if (cursor < 0) cursor = null;
-          }
-          if (plan[offset + 1]) {
-            paused = true;
-            notes.push("\u672C\u6BB5\u5DF2\u5B8C\u6210\uFF1A\u8BF7\u5148\u5C55\u793A\u672C\u6B21\u89C6\u9891\u6210\u679C\uFF0C\u8BA9\u7528\u6237\u9884\u89C8\uFF1B\u7528\u6237\u786E\u8BA4\u7EE7\u7EED\u540E\u518D\u7528 resume \u63A5\u7740\u751F\u6210\u4E0B\u4E00\u6BB5\u3002");
-            break;
-          }
-        }
-      } catch (failure) {
-        const doneYet = segments.some((segment) => segment.status === "succeeded" && segment.videoUrl);
-        if (failure?.code !== "ABORTED" || !doneYet) throw failure;
-        interrupted = true;
-        paused = true;
-        notes.push(
-          "\u8FD9\u6B21\u8C03\u7528\u88AB\u4E2D\u65AD\u4E86\uFF08\u7528\u6237\u70B9\u4E86\u505C\u6B62\uFF0C\u6216\u8005\u7B49\u8D85\u65F6\u4E86\uFF09\uFF1A\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u90E8\u5206\u4F1A\u5148\u4E0B\u8F7D\u3001\u5408\u5E76\u3001\u4EA4\u4ED8\uFF0C\u5269\u4E0B\u7684\u6BB5\u4E0D\u7528\u91CD\u5934\u518D\u6765\u2014\u2014\u7528 resume \u5C31\u80FD\u63A5\u7740\u505A\u3002"
-        );
-      }
-      const completed = segments.filter((segment) => segment.status === "succeeded" && segment.videoUrl);
-      const deliveredSeconds = completed.reduce((sum, segment) => sum + (segment.seconds || 0), 0);
-      const result = {
-        status,
-        error,
-        errorCode,
-        segments,
-        videoUrl: completed.at(-1)?.videoUrl,
-        totalSeconds: deliveredSeconds
-      };
-      if (!completed.length) {
-        if (notes.length) result.note = notes.join("\n");
-        return result;
-      }
-      if (status !== "succeeded") {
-        notes.push(`\u5DF2\u628A\u6210\u529F\u7684 ${completed.length} \u6BB5\uFF08${deliveredSeconds} \u79D2\uFF09\u4EA4\u4ED8\uFF0C\u53EF\u4F5C\u4E3A\u6B8B\u7247\u4F7F\u7528\u3002`);
-        result.partial = true;
-      }
-      if (resume) {
-        notes.push(
-          `\u63A5\u7740\u4E0A\u4E00\u6B21\u6682\u505C\u7684\u8FDB\u5EA6\u7EE7\u7EED\uFF1A\u524D\u9762 ${doneBefore} \u6BB5\uFF08${formatSeconds(resume.cursor ?? 0)}\uFF09\u4E0D\u91CD\u65B0\u751F\u6210\uFF0C\u8FD9\u6B21\u8FD8\u8981\u5EF6\u957F ${plan.length} \u6BB5\u5171 ${plannedSeconds} \u79D2\u3002`
-        );
-      }
-      const outDir = await resolveOutputDir(config, exec, deps);
-      const { stamp, segmentsDir } = resume ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir } : await allocateStamp(outDir, fileStamp());
-      const delivery = await downloadSegmentsAndMerge(config, {
-        segments: completed,
-        segmentsDir,
-        outDir,
-        stamp,
-        notes,
-        keepSingleFile: paused,
-        // 被中断时请求信号已经 abort：收尾（下载 + 合并）不能被它打断，否则等于白生成。
-        signal: interrupted ? void 0 : exec?.signal
-      });
-      if (delivery.error) {
-        result.segmentsDir = delivery.segmentsDir;
-        result.note = notes.join("\n");
-        return result;
-      }
-      if (delivery.ffmpegMissing) {
-        result.segmentsDir = delivery.segmentsDir;
-        result.merged = false;
-        result.ffmpegMissing = true;
-        result.installHint = delivery.installHint;
-        result.note = notes.join("\n");
-        return result;
-      }
-      if (!delivery.files.length) {
-        result.note = notes.join("\n");
-        return result;
-      }
-      if (delivery.merged) {
-        result.merged = true;
-        result.videoPath = delivery.videoPath;
-        result.mergeMode = delivery.mergeMode;
-        if (delivery.actualSeconds) result.actualSeconds = delivery.actualSeconds;
-        if (delivery.seamCuts?.length) result.seamCuts = delivery.seamCuts;
-      }
-      if (paused) {
-        result.segmentsDir = segmentsDir;
-        result.resumeDir = segmentsDir;
-        result.paused = true;
-        result.nextAction = "present_video_then_wait_for_user";
-        result.previewPath = completed.at(-1)?.localPath || result.videoPath;
-        await appendRequestLog({ event: "preview_required", previewPath: result.previewPath, resumeDir: result.resumeDir });
-        result.remainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - deliveredSeconds);
-        try {
-          await writePauseFile(segmentsDir, pauseRecordAt({
-            stamp,
-            prompt,
-            fullPlan,
-            done: segments.length,
-            cursor,
-            lastVideoUrl: referenceUrl,
-            options: { ...pickResumeOptions(args), direction, wording, startAt: cursor },
-            segments
-          }));
-        } catch (failure) {
-          notes.push(`\u6682\u505C\u8BB0\u5F55\u6CA1\u5199\u6210\uFF08${failure?.message || failure}\uFF09\uFF1A\u8981\u63A5\u7740\u505A\u53EA\u80FD\u7528\u4E0A\u9762\u7684\u94FE\u63A5\u91CD\u65B0\u5EF6\u957F\u3002`);
-        }
-        notes.push(`\u5DF2\u4EA4\u4ED8\u7684\u6210\u7247\u662F\u5230\u7B2C ${segments.length} \u6BB5\uFF0C\u5206\u6BB5\u4ECD\u4FDD\u7559\u5728 ${segmentsDir}\u3002`);
-        notes.push(resumeHint(segmentsDir, result.remainingSeconds, TOOL_NAME));
-        result.note = notes.join("\n");
-        return result;
-      }
-      result.segmentsDir = segmentsDir;
-      if (notes.length) result.note = notes.join("\n");
-      return result;
-    }
-  };
-}
-const VIDEO_SEGMENT_OUTPUT_SCHEMA = {
+var VIDEO_SEGMENT_OUTPUT_SCHEMA = {
   type: "object",
   properties: {
     index: { type: "integer" },
@@ -2738,6 +1380,796 @@ function renderVideoResult(value) {
   }
   return [{ type: "text", text: parts.filter(Boolean).join("\n") }];
 }
+
+// src/prompts/generation.ts
+function buildExtensionPrompt({
+  prompt,
+  seconds,
+  startAt,
+  mode,
+  direction = "backward",
+  wording = "extend"
+}) {
+  const forward = direction === "forward";
+  const head = forward ? "\u5411\u524D\u5EF6\u957F\u89C6\u98911\u3002" : wording === "after" ? "\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A" : "\u5411\u540E\u5EF6\u957F\u89C6\u98911\u3002";
+  const span = forward ? startAt == null ? `\u751F\u6210 ${seconds} \u79D2\u524D\u7F6E\u753B\u9762\uFF0C\u63A5\u5728\u89C6\u98911\u7B2C\u4E00\u5E27\u4E4B\u524D\u3002` : `\u751F\u6210 ${seconds} \u79D2\u524D\u7F6E\u753B\u9762\uFF0C\u5BF9\u5E94\u6574\u7247\u7B2C ${Math.max(0, startAt - seconds)}\u2013${startAt} \u79D2\uFF0C\u7D27\u63A5\u5728\u89C6\u98911\u4E4B\u524D\u3002` : startAt == null ? `\u751F\u6210 ${seconds} \u79D2\u7EED\u62CD\u753B\u9762\uFF0C\u63A5\u5728\u89C6\u98911\u6700\u540E\u4E00\u5E27\u4E4B\u540E\u3002` : `\u751F\u6210 ${seconds} \u79D2\u7EED\u62CD\u753B\u9762\uFF0C\u5BF9\u5E94\u6574\u7247\u7B2C ${startAt}\u2013${startAt + seconds} \u79D2\uFF0C\u63A5\u5728\u89C6\u98911\u4E4B\u540E\u3002`;
+  const transition = forward ? FORWARD_TRANSITION : mode === "closeup" ? CLOSEUP_TRANSITION : CONTINUOUS_TRANSITION;
+  return [
+    `${head}${span}`,
+    `\u3010\u5EF6\u957F\u65B9\u5411\u3011${forward ? "\u5411\u524D\u5EF6\u957F\uFF08\u524D\u7F6E\u5267\u60C5\uFF0C\u653E\u5728\u89C6\u98911\u4E4B\u524D\uFF09" : "\u5411\u540E\u5EF6\u957F\uFF08\u7EED\u62CD\u5267\u60C5\uFF0C\u63A5\u5728\u89C6\u98911\u4E4B\u540E\uFF09"}\u3002`,
+    `\u3010\u5267\u60C5\u53D1\u5C55\u3011${endWithPunctuation(prompt)}${forward ? "\u53EA\u6F14\u89C6\u98911\u4E4B\u524D\u53D1\u751F\u7684\u524D\u7F6E\u5267\u60C5\uFF0C\u4E0D\u590D\u8FF0\u89C6\u98911\u91CC\u7684\u60C5\u8282\u3002" : "\u53EA\u6F14\u89C6\u98911\u4E4B\u540E\u53D1\u751F\u7684\u65B0\u5267\u60C5\uFF0C\u4E0D\u91CD\u590D\u89C6\u98911\u91CC\u7684\u60C5\u8282\u3001\u4E0D\u91CD\u65B0\u5F00\u573A\u3002"}`,
+    "\u3010\u4E3B\u4F53\u72B6\u6001\u3011" + (forward ? "\u672C\u6BB5\u6536\u5C3E\u7684\u4EBA\u7269\u9762\u8C8C\u3001\u4F53\u578B\u3001\u670D\u88C5\u3001\u59FF\u6001\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\u5FC5\u987B\u80FD\u76F4\u63A5\u63A5\u5230\u89C6\u98911\u7B2C\u4E00\u5E27\uFF1B" : "\u6CBF\u7528\u89C6\u98911\u7ED3\u5C3E\u7684\u4EBA\u7269\u9762\u8C8C\u3001\u4F53\u578B\u3001\u670D\u88C5\u3001\u59FF\u6001\u3001\u624B\u90E8\u4F4D\u7F6E\u548C\u52A8\u4F5C\u9636\u6BB5\uFF1B") + "\u540C\u4E00\u89D2\u8272\u4FDD\u6301\u97F3\u8272\u3001\u53E3\u97F3\u3001\u8BED\u901F\u548C\u5F53\u524D\u60C5\u7EEA\uFF0C\u4E0D\u6362\u4EBA\u3001\u4E0D\u6362\u88C5\uFF0C\u4E0D\u6539\u53D8\u5E74\u9F84\u4E0E\u5916\u8C8C\u7279\u5F81\u3002",
+    "\u3010\u955C\u5934\u8FD0\u52A8\u3011\u5728\u63A5\u7F1D\u5904\u5339\u914D\u89C6\u98911" + (forward ? "\u5F00\u5934\u7684" : "\u7ED3\u5C3E\u7684") + "\u673A\u4F4D\u3001\u666F\u522B\u3001\u7126\u6BB5\u3001\u8FD0\u955C\u65B9\u5411\u4E0E\u901F\u5EA6\uFF1B\u63A5\u7F1D\u4E4B\u5916\u6309\u672C\u6BB5\u811A\u672C\u81EA\u7136\u8FD0\u955C\u6216\u5207\u955C\u3002\u4FDD\u6301\u66DD\u5149\u3001\u767D\u5E73\u8861\u3001\u5149\u6E90\u65B9\u5411\u548C\u573A\u666F\u5E03\u5C40\u8FDE\u8D2F\uFF0C\u907F\u514D\u65E0\u5267\u60C5\u4F9D\u636E\u7684\u4EAE\u5EA6\u8DF3\u53D8\u6216\u80CC\u666F\u91CD\u5EFA\uFF1B\u6574\u6BB5\u4EAE\u5EA6\u4E0E\u8272\u8C03\u5FC5\u987B\u4E0E\u89C6\u98911" + (forward ? "\u5F00\u5934" : "\u7ED3\u5C3E") + "\u4E00\u81F4\uFF0C\u4E0D\u8981\u6574\u4F53\u538B\u6697\u6216\u504F\u8272\u3002",
+    "\u3010\u58F0\u97F3\u5EF6\u7EED\u3011" + (forward ? "\u672C\u6BB5\u58F0\u97F3\u5728\u7ED3\u5C3E\u81EA\u7136\u8854\u63A5\u89C6\u98911\u5F00\u5934\uFF0C\u53F0\u8BCD\u53EA\u8BB2\u524D\u7F6E\u5267\u60C5\u3002" : "\u672C\u6BB5\u58F0\u97F3\u63A5\u7EED\u89C6\u98911\u7ED3\u5C3E\uFF0C\u53F0\u8BCD\u53EA\u8BB2\u540E\u7EED\u5267\u60C5\u3002") + "\u4FDD\u6301\u89D2\u8272\u97F3\u8272\u4E0E\u73AF\u5883\u5E95\u566A\u4E00\u81F4\uFF0C\u6BCF\u53E5\u53F0\u8BCD\u5B8C\u6574\u8BF4\u5B8C\uFF0C\u4E0D\u590D\u8FF0\u539F\u53F0\u8BCD\u3002\u539F\u89C6\u9891\u6709\u914D\u4E50\u65F6\u4FDD\u6301\u66F2\u76EE\u4E0E\u8282\u594F\u8FDE\u8D2F\uFF1B\u539F\u89C6\u9891\u65E0\u914D\u4E50\u65F6\u4E0D\u65B0\u589E\u914D\u4E50\u3002",
+    forward ? "\u3010\u8F93\u51FA\u8FB9\u754C\u3011\u4EC5\u8F93\u51FA\u65B0\u589E\u524D\u7F6E\u7247\u6BB5\uFF1B\u539F\u89C6\u9891\u5F00\u5934\u53EA\u7528\u4E8E\u8854\u63A5\uFF0C\u4E0D\u590D\u5236\u539F\u89C6\u9891\u753B\u9762\u6216\u5DF2\u51FA\u73B0\u7684\u53F0\u8BCD\u3002" : "\u3010\u8F93\u51FA\u8FB9\u754C\u3011\u4EC5\u8F93\u51FA\u65B0\u589E\u7EED\u62CD\u7247\u6BB5\uFF1B\u53C2\u8003\u89C6\u9891\u672B\u5C3E\u53EA\u7528\u4E8E\u7406\u89E3\u5F53\u524D\u72B6\u6001\uFF0C\u4E0D\u628A\u672B\u5C3E\u51E0\u79D2\u518D\u6B21\u8F93\u51FA\u3002\u8D77\u59CB\u5373\u63A8\u8FDB\u4E0B\u4E00\u52A8\u4F5C\uFF0C\u4E0D\u91CD\u505A\u62FF\u8D77\u3001\u653E\u4E0B\u3001\u9012\u624B\u673A\u7B49\u5DF2\u5B8C\u6210\u52A8\u4F5C\uFF1B\u4E0D\u91CD\u590D\u4E0A\u4E00\u53E5\u5BF9\u767D\u6216\u5176\u5C3E\u97F3\u3002",
+    transition,
+    "\u672C\u6BB5\u660E\u786E\u6307\u5B9A\u7684\u8FD0\u955C\u548C\u5207\u955C\u4F18\u5148\uFF0C\u4E0A\u9762\u7684\u8854\u63A5\u5EFA\u8BAE\u4E0D\u5F97\u8986\u76D6\u5DF2\u786E\u8BA4\u7684\u955C\u5934\u5B89\u6392\u3002"
+  ].join("\n");
+}
+function buildSegmentExecutionPrompt({ prompt, kind, index, count }) {
+  const boundary = kind === "generate" ? "\u8FD9\u662F\u9996\u6BB5\uFF1A\u53EA\u6F14\u672C\u6BB5\u4E8B\u4EF6\uFF0C\u7ED3\u5C3E\u505C\u5728\u672C\u6BB5\u6307\u5B9A\u72B6\u6001\uFF0C\u4E0D\u62A2\u6F14\u540E\u6BB5\u5267\u60C5\uFF0C\u4E0D\u505A\u6574\u7247\u7ED3\u675F\u5F0F\u6536\u5C3E\u3002" : "\u8FD9\u662F\u7EED\u62CD\u6BB5\uFF1A\u89C6\u98911\u63D0\u4F9B\u4E0A\u4E00\u6BB5\u7ED3\u675F\u72B6\u6001\uFF0C\u4ECE\u5176\u540E\u7684\u65B0\u4E8B\u4EF6\u7EE7\u7EED\u3002\u4E0D\u8981\u91CD\u6F14\u8FDB\u573A\u3001\u9012\u63A5\u7269\u54C1\u6216\u5DF2\u8BF4\u53F0\u8BCD\u3002";
+  return [
+    `\u3010\u751F\u6210\u6BB5 ${index + 1}/${count}\u3011\u751F\u6210\u6BB5\u7F16\u53F7\u4E0D\u662F\u5207\u955C\u6307\u4EE4\uFF1B\u955C\u5934\u662F\u5426\u5207\u6362\u4EE5\u811A\u672C\u4E3A\u51C6\u3002`,
+    "\u3010\u6267\u884C\u5185\u5BB9\u3011" + String(prompt).trim(),
+    boundary,
+    index < count - 1 ? "\u5728\u5B8C\u6574\u53E5\u7ED3\u675F\u3001\u52A8\u4F5C\u5B8C\u6210\u6216\u81EA\u7136\u53CD\u5E94\u5904\u4EA4\u63A5\uFF0C\u4FDD\u7559\u4EBA\u7269\u4F4D\u7F6E\u3001\u89C6\u7EBF\u3001\u6301\u7269\u624B\u548C\u955C\u5934\u8FD0\u52A8\u72B6\u6001\uFF0C\u4E0D\u7528\u5B9A\u683C\u7B49\u5F85\u586B\u6EE1\u65F6\u957F\u3002" : "\u5B8C\u6210\u672C\u6BB5\u7684\u6545\u4E8B\u53D8\u5316\uFF0C\u518D\u7528\u81EA\u7136\u53CD\u5E94\u6216\u753B\u9762\u6536\u675F\uFF1B\u4E0D\u91CD\u8FF0\u524D\u60C5\u3002"
+  ].join("\n");
+}
+function buildGenerationPrompt({ prompt, seconds, model = "" }) {
+  const timing = isOmniExtendModel(model) ? "\u6309\u672C\u6BB5\u4E8B\u4EF6\u987A\u5E8F\u63A8\u8FDB\uFF1B\u5982\u6709\u65F6\u95F4\u533A\u95F4\uFF0C\u4EE5\u672C\u6BB50\u79D2\u4E3A\u8D77\u70B9\uFF0C\u533A\u95F4\u8FDE\u7EED\uFF0C\u4E0D\u9057\u6F0F\u505C\u987F\u4E0E\u53CD\u5E94\u65F6\u95F4\u3002" : "\u6309\u672C\u6BB5\u4E8B\u4EF6\u987A\u5E8F\u81EA\u7136\u63A8\u8FDB\uFF0C\u4EE5\u955C\u5934\u5E8F\u53F7\u6216\u5148\u540E\u9636\u6BB5\u7EC4\u7EC7\u5185\u5BB9\uFF0C\u4E0D\u4F9D\u8D56\u7CBE\u786E\u65F6\u95F4\u6233\uFF0C\u4E0D\u4E3A\u8FFD\u9010\u79D2\u70B9\u538B\u7F29\u52A8\u4F5C\u6216\u5BF9\u767D\u3002";
+  return [
+    `\u751F\u6210 ${seconds} \u79D2\u89C6\u9891\u3002`,
+    String(prompt).trim(),
+    timing,
+    "\u4EBA\u7269\u8EAB\u4EFD\u3001\u670D\u88C5\u3001\u573A\u666F\u4E0E\u5149\u7EBF\u4FDD\u6301\u8FDE\u8D2F\uFF1B\u6BCF\u53E5\u53F0\u8BCD\u5B8C\u6574\u8BF4\u5B8C\u3002\u672A\u660E\u786E\u8981\u6C42\u65F6\u4E0D\u65B0\u589E\u5B57\u5E55\u3001\u6C34\u5370\u3001\u7247\u5934\u7247\u5C3E\u6216\u914D\u4E50\u3002"
+  ].join("\n");
+}
+function endWithPunctuation(text) {
+  const value = String(text ?? "").trim();
+  if (!value) return "";
+  return /[。．.!！?？;；~～:：,，]$/.test(value) ? value : `${value}\u3002`;
+}
+
+// src/providers/response.ts
+function findKey(payload, keys, depth = Infinity) {
+  if (payload && typeof payload === "object") {
+    if (!Array.isArray(payload)) {
+      for (const key of keys) {
+        const value = payload[key];
+        if (value !== void 0 && value !== null && value !== "") return value;
+      }
+    }
+    if (depth <= 0) return void 0;
+    for (const value of Array.isArray(payload) ? payload : Object.values(payload)) {
+      const found = findKey(value, keys, depth - 1);
+      if (found !== void 0 && found !== null && found !== "") return found;
+    }
+  }
+  return void 0;
+}
+function collectUrls(payload, path9 = [], found = []) {
+  if (typeof payload === "string") {
+    if (/^https?:\/\//i.test(payload)) found.push([path9, payload]);
+  } else if (Array.isArray(payload)) {
+    for (const item of payload) collectUrls(item, path9, found);
+  } else if (payload && typeof payload === "object") {
+    for (const [key, value] of Object.entries(payload)) {
+      collectUrls(value, [...path9, key], found);
+    }
+  }
+  return found;
+}
+function isImageKey(key) {
+  const lowered = String(key || "").toLowerCase();
+  return IMAGE_KEY_TOKENS.some((token) => lowered.includes(token));
+}
+function looksLikeImageUrl(url) {
+  return IMAGE_EXTENSIONS.some((ext) => url.split("?")[0].toLowerCase().endsWith(ext));
+}
+function extractTaskId(payload) {
+  const value = findKey(payload, ["id", "task_id", "taskId", "request_id"], 4);
+  return typeof value === "string" && value ? value : void 0;
+}
+function extractVideoUrl(payload) {
+  const candidates = collectUrls(payload).filter(
+    ([path9, url]) => !looksLikeImageUrl(url) && !path9.some(isImageKey)
+  );
+  if (!candidates.length) return void 0;
+  for (const wanted of VIDEO_URL_KEYS) {
+    for (const [path9, url] of candidates) {
+      if (path9.length && String(path9.at(-1)).toLowerCase() === wanted) return url;
+    }
+  }
+  for (const [path9, url] of candidates) {
+    if (path9.length && GENERIC_URL_KEYS.has(String(path9.at(-1)).toLowerCase())) return url;
+  }
+  return candidates[0][1];
+}
+function extractImageUrl(payload) {
+  const found = collectUrls(payload).find(
+    ([path9, url]) => looksLikeImageUrl(url) || path9.some(isImageKey)
+  );
+  return found?.[1];
+}
+function extractStatus(payload) {
+  const value = findKey(payload, ["status", "state", "task_status"]);
+  return typeof value === "string" ? value.toLowerCase() : void 0;
+}
+
+// src/providers/transport.ts
+var RELAY_TIMEOUT_MS = 12e4;
+async function relayRequest(config, requestPath, options = {}) {
+  const method = options.method || "GET";
+  const requestId = uniqueSuffix("request");
+  const started = Date.now();
+  const trace = {};
+  const body = options.body;
+  const operation = method === "POST" ? "create_task" : "query_task";
+  const info = {
+    requestId,
+    operation,
+    method,
+    provider: isMetaontic(config) ? "metaontic" : isVolcengine(config) ? "volcengine" : "service",
+    model: body?.model || resolveModel(config),
+    ...method === "POST" ? {
+      duration: body?.duration,
+      resolution: body?.resolution,
+      imageCount: Array.isArray(body?.content) ? body.content.filter((item) => item.type === "image_url").length : 0,
+      videoCount: Array.isArray(body?.content) ? body.content.filter((item) => item.type === "video_url").length : 0
+    } : { taskId: String(requestPath).split("?")[0].split("/").at(-1) }
+  };
+  await appendRequestLog({ ...info, event: "request_started" });
+  try {
+    const data = await relayRequestCore(config, requestPath, options, trace);
+    await appendRequestLog({
+      ...info,
+      ...trace,
+      event: "request_completed",
+      elapsedMs: Date.now() - started,
+      taskId: extractTaskId(data) || info.taskId,
+      taskStatus: extractStatus(data),
+      completionTokens: finiteNumber(data?.usage?.completion_tokens)
+    });
+    return data;
+  } catch (error) {
+    await appendRequestLog({
+      ...info,
+      ...trace,
+      event: "request_failed",
+      elapsedMs: Date.now() - started,
+      errorCode: String(error?.code || "request_error"),
+      cancelled: Boolean(options.signal?.aborted)
+    });
+    throw error;
+  }
+}
+async function relayRequestCore(config, path9, { method = "GET", body, signal } = {}, trace = {}) {
+  const url = `${resolveBaseUrl(config)}${path9}`;
+  const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  const serialized = body === void 0 ? void 0 : JSON.stringify(body);
+  if (serialized && Buffer.byteLength(serialized, "utf8") > 64 * 1024 * 1024) {
+    throw Object.assign(new Error("\u89C6\u9891\u8BF7\u6C42\u4F53\u8D85\u8FC764 MB\uFF0C\u8BF7\u51CF\u5C11\u5185\u8054\u56FE\u7247\u6216\u6539\u7528\u516C\u7F51 URL\uFF1B\u706B\u5C71\u76F4\u8FDE\u4E5F\u53EF\u4F7F\u7528 asset:// \u7D20\u6750\u3002"), { code: "request_too_large" });
+  }
+  let response;
+  let text;
+  try {
+    response = await fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${resolveApiKey(config)}`,
+        "Content-Type": "application/json"
+      },
+      ...serialized !== void 0 ? { body: serialized } : {},
+      signal: requestSignal
+    });
+    trace.httpStatus = response.status;
+    trace.upstreamRequestId = response.headers.get("x-request-id") || response.headers.get("x-tt-logid") || void 0;
+    text = await response.text();
+  } catch (error) {
+    if (signal?.aborted) throw abortError();
+    throw Object.assign(new Error(`\u4E2D\u8F6C\u7AD9\u8BF7\u6C42\u5931\u8D25\uFF1A${error?.message || error}`), {
+      code: "provider_network_error"
+    });
+  }
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text };
+    }
+  }
+  const upstreamError = data && typeof data === "object" && data.error;
+  if (!response.ok || upstreamError) {
+    const httpStatus = response.status >= 400 ? response.status : 400;
+    const classified = classifyError(
+      httpStatus,
+      data
+    );
+    throw Object.assign(new Error(classified.message), {
+      code: classified.code,
+      status: httpStatus
+    });
+  }
+  return data;
+}
+function sleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError());
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      reject(abortError());
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+function createTask(config, body, signal) {
+  return relayRequest(config, resolveSubmitPath(config), { method: "POST", body, signal });
+}
+function getTask(config, taskId, signal) {
+  return relayRequest(config, resolveQueryPath(config, taskId), { signal });
+}
+async function waitForCompletion(config, taskId, signal) {
+  const deadline = Date.now() + ref(config, "maxWaitMs", 6e5);
+  const maxPollErrors = Math.max(1, Math.round(ref(config, "pollErrorRetries", 5)));
+  let pollErrors = 0;
+  for (; ; ) {
+    if (signal?.aborted) throw abortError();
+    let task;
+    try {
+      task = await getTask(config, taskId, signal);
+      pollErrors = 0;
+    } catch (failure) {
+      if (failure?.code === "ABORTED") throw failure;
+      if (!isRetryablePollError(failure)) {
+        return {
+          taskId,
+          status: "unknown",
+          errorCode: failure?.code || "provider_poll_error",
+          error: `\u4EFB\u52A1\u5DF2\u63D0\u4EA4\uFF08${taskId}\uFF09\uFF0C\u67E5\u8BE2\u8FD4\u56DE\u5931\u8D25\uFF1A${failure?.message || failure}\u3002\u53EF\u7528 video_status \u6309\u8FD9\u4E2A ID \u590D\u67E5\u786E\u8BA4\u3002`
+        };
+      }
+      pollErrors += 1;
+      if (pollErrors >= maxPollErrors || Date.now() > deadline) {
+        return {
+          taskId,
+          status: "unknown",
+          errorCode: failure?.code || "provider_poll_error",
+          error: `\u4EFB\u52A1\u5DF2\u63D0\u4EA4\uFF08${taskId}\uFF09\uFF0C\u4F46\u8FDE\u7EED ${pollErrors} \u6B21\u67E5\u8BE2\u72B6\u6001\u5931\u8D25\uFF1A${failure?.message || failure}\u3002\u4EFB\u52A1\u53EF\u80FD\u4ECD\u5728\u751F\u6210\uFF0C\u53EF\u7528 video_status \u6309\u8FD9\u4E2A ID \u518D\u67E5\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u3002`
+        };
+      }
+      await sleep(ref(config, "pollIntervalMs", 5e3), signal);
+      continue;
+    }
+    const status = extractStatus(task) || "unknown";
+    const model = findKey(task, ["model"]) || resolveModel(config);
+    if (SUCCESS_STATES.has(status)) {
+      const videoUrl = extractVideoUrl(task);
+      if (videoUrl) return { taskId, status: "succeeded", model, videoUrl };
+      const imageUrl = extractImageUrl(task);
+      return {
+        taskId,
+        status: "failed",
+        model,
+        errorCode: "provider_bad_response",
+        error: imageUrl ? `\u4E0A\u6E38\u8FD4\u56DE\u7684\u662F\u56FE\u7247\u800C\u4E0D\u662F\u89C6\u9891\uFF08${imageUrl.split("?")[0].slice(-60)}\uFF09\uFF0C\u53EF\u80FD\u662F\u4E2D\u8F6C\u7AD9\u628A\u89C6\u9891\u8BF7\u6C42\u8DEF\u7531\u5230\u4E86\u56FE\u7247\u6E20\u9053\u3002` : "\u4E0A\u6E38\u62A5\u544A\u6210\u529F\u4F46\u6CA1\u6709\u8FD4\u56DE\u89C6\u9891\u5730\u5740\u3002"
+      };
+    }
+    if (FAILED_STATES.has(status)) {
+      const data = findKey(task, ["error", "fail_reason", "message", "detail"]);
+      const classified = classifyError(400, typeof data === "string" ? { message: data } : data || task);
+      return {
+        taskId,
+        status: CANCEL_STATES.has(status) ? "cancelled" : "failed",
+        model,
+        errorCode: classified.code,
+        error: classified.message
+      };
+    }
+    if (Date.now() > deadline) {
+      return { taskId, status: "timeout" };
+    }
+    await sleep(ref(config, "pollIntervalMs", 5e3), signal);
+  }
+}
+
+// src/providers/seedance.ts
+function normalizeReferenceUrl(value) {
+  const url = String(value ?? "").trim();
+  if (!url) throw new Error("\u53C2\u8003\u89C6\u9891 URL \u4E0D\u80FD\u4E3A\u7A7A\u3002");
+  if (/^asset:\/\/[A-Za-z0-9_-]+$/.test(url)) return url;
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error("\u53C2\u8003\u89C6\u9891\u5FC5\u987B\u662F https:// \u6216 http:// \u5F00\u5934\u7684\u516C\u7F51 URL\uFF08\u4E0D\u80FD\u7528\u672C\u5730\u6587\u4EF6\u8DEF\u5F84\uFF09\u3002");
+  }
+  return url;
+}
+function buildRequestBody(config, args, referenceVideoUrl) {
+  const model = resolveModel(config);
+  const seconds = clampInteger(
+    args.duration,
+    MIN_SEGMENT_SECONDS,
+    modelMaxSeconds(config),
+    modelMaxSeconds(config)
+  );
+  const mode = args.mode || ref(config, "mode", "continuous");
+  const prompt = String(args.prompt ?? "").trim();
+  const startAt = args.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
+  const direction = args.direction === "forward" ? "forward" : "backward";
+  const wording = args.wording === "after" ? "after" : "extend";
+  const content = [
+    { type: "text", text: buildExtensionPrompt({ prompt, seconds, startAt, mode, direction, wording }) },
+    { type: "video_url", video_url: { url: referenceVideoUrl }, role: "reference_video" }
+  ];
+  const body = { ...parseExtraParams(config) };
+  body.model = model;
+  body.content = content;
+  body.duration = seconds;
+  body.ratio = args.ratio || ref(config, "ratio", "adaptive");
+  body.resolution = FIXED_RESOLUTION;
+  const generateAudio = args.generateAudio ?? ref(config, "generateAudio", true);
+  if (typeof generateAudio === "boolean") body.generate_audio = generateAudio;
+  const watermark = args.watermark ?? ref(config, "watermark", false);
+  if (typeof watermark === "boolean") body.watermark = watermark;
+  if (args.user) body.safety_identifier = String(args.user);
+  if (typeof args.returnLastFrame === "boolean") body.return_last_frame = args.returnLastFrame;
+  if (args.seed != null && Number.isFinite(Number(args.seed))) body.seed = Number(args.seed);
+  if (isOmniExtendModel(model)) {
+    body.ratio = "adaptive";
+    body.omni_reference_task_type = "extend";
+  }
+  return { body, seconds };
+}
+async function buildGenerationBody(config, args, seconds, options = {}) {
+  const { refs } = validateImageRoles(args, resolveModel(config));
+  const prompt = String(args.prompt ?? "").trim();
+  const ratio = args.ratio || ref(config, "ratio", "adaptive");
+  const canvas = canvasSize(ratio);
+  const fit = canvas ? { size: canvas, config, signal: options.signal } : null;
+  const content = [
+    { type: "text", text: buildGenerationPrompt({ prompt, seconds, model: resolveModel(config) }) }
+  ];
+  const images = [];
+  const notes = [];
+  const addImage = async (value, role, label) => {
+    const resolved = isVolcengine(config) && /^asset:\/\//.test(String(value)) ? { url: String(value), source: "asset" } : await resolveImageInput(value, label, fit);
+    content.push({
+      type: "image_url",
+      image_url: { url: resolved.url },
+      role
+    });
+    images.push({ role, ...resolved });
+  };
+  const firstFrame = String(args.firstFrameUrl ?? "").trim();
+  if (firstFrame) await addImage(firstFrame, "first_frame", "\u9996\u5E27\u56FE");
+  const lastFrame = String(args.lastFrameUrl ?? "").trim();
+  if (lastFrame) await addImage(lastFrame, "last_frame", "\u5C3E\u5E27\u56FE");
+  for (const [index, reference] of refs.entries()) {
+    await addImage(reference.trim(), "reference_image", `\u53C2\u8003\u56FE ${index + 1}`);
+  }
+  const body = { ...parseExtraParams(config) };
+  body.model = resolveModel(config);
+  body.content = content;
+  body.duration = seconds;
+  body.ratio = isOmniExtendModel(body.model) && content.some((item) => item.role === "first_frame" || item.role === "last_frame") ? "adaptive" : ratio;
+  body.resolution = FIXED_RESOLUTION;
+  const generateAudio = args.generateAudio ?? ref(config, "generateAudio", true);
+  if (typeof generateAudio === "boolean") body.generate_audio = generateAudio;
+  const watermark = args.watermark ?? ref(config, "watermark", false);
+  if (typeof watermark === "boolean") body.watermark = watermark;
+  if (args.user) body.safety_identifier = String(args.user);
+  if (typeof args.returnLastFrame === "boolean") body.return_last_frame = args.returnLastFrame;
+  if (args.seed != null && Number.isFinite(Number(args.seed))) body.seed = Number(args.seed);
+  return { body, seconds, images, notes };
+}
+async function runTask(config, body, signal) {
+  const created = await createTask(config, body, signal);
+  const taskId = extractTaskId(created);
+  await appendRequestLog({ event: "task_created", taskId, model: body?.model, duration: body?.duration });
+  if (!taskId) throw new Error("\u521B\u5EFA\u4EFB\u52A1\u5931\u8D25\uFF1A\u54CD\u5E94\u4E2D\u7F3A\u5C11\u4EFB\u52A1 ID\u3002");
+  try {
+    const final = await waitForCompletion(config, taskId, signal);
+    await appendRequestLog({ event: "task_finished", taskId, status: final.status, errorCode: final.errorCode });
+    return { ...final, taskId };
+  } catch (failure) {
+    if (failure?.code === "ABORTED") throw failure;
+    return {
+      taskId,
+      status: "unknown",
+      errorCode: failure?.code || "provider_poll_error",
+      error: `\u4EFB\u52A1\u5DF2\u63D0\u4EA4\uFF08${taskId}\uFF09\uFF0C\u4F46\u67E5\u8BE2\u72B6\u6001\u5931\u8D25\uFF1A${failure?.message || String(failure)}\u3002\u4EFB\u52A1\u53EF\u80FD\u4ECD\u5728\u751F\u6210\uFF0C\u53EF\u7528 video_status \u6309\u8FD9\u4E2A ID \u518D\u67E5\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u3002`
+    };
+  }
+}
+
+// src/media/merge.ts
+import { rm as rm4, mkdir as mkdir6, writeFile as writeFile2, rename as rename4, stat as stat3, copyFile } from "node:fs/promises";
+import path7 from "node:path";
+
+// src/media/download.ts
+import { mkdir as mkdir5, rename as rename3, rm as rm3 } from "node:fs/promises";
+import path6 from "node:path";
+import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
+import { createWriteStream } from "node:fs";
+var DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1e3;
+async function downloadFile(url, destPath, { signal } = {}) {
+  await mkdir5(path6.dirname(destPath), { recursive: true });
+  const partial = `${destPath}.${uniqueSuffix("part")}`;
+  const timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  try {
+    const response = await fetch(url, { signal: requestSignal });
+    if (!response.ok) {
+      throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF08HTTP ${response.status}\uFF09\uFF1A${url}`), {
+        code: "download_failed"
+      });
+    }
+    if (!response.body) {
+      throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF1A\u54CD\u5E94\u6CA1\u6709\u5185\u5BB9\uFF08${url}\uFF09\u3002`), {
+        code: "download_failed"
+      });
+    }
+    await pipeline(Readable.fromWeb(response.body), createWriteStream(partial));
+    await rename3(partial, destPath);
+    return destPath;
+  } catch (error) {
+    await rm3(partial, { force: true }).catch(() => {
+    });
+    if (error?.code === "download_failed") throw error;
+    if (signal?.aborted) throw abortError();
+    throw Object.assign(new Error(`\u4E0B\u8F7D\u5206\u6BB5\u5931\u8D25\uFF1A${error?.message || error}\uFF08${url}\uFF09`), {
+      code: "download_failed"
+    });
+  }
+}
+
+// src/media/merge.ts
+function evenNumber(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return fallback;
+  const rounded = Math.round(number);
+  const even = rounded % 2 === 0 ? rounded : rounded - 1;
+  return even >= 2 ? even : 2;
+}
+var AUDIO_PADDING_TOLERANCE_FRAMES = 1;
+async function alignSegmentAudio(config, files, probed, outPath, { signal, binary } = {}) {
+  const temps = [];
+  const trimmed = [];
+  const aligned = [];
+  for (const [index, file] of files.entries()) {
+    const media = probed?.[index];
+    const fps = Math.max(1, Math.round(media?.fps || 30));
+    const videoSeconds = Number(media?.videoDurationSeconds) || 0;
+    const audioSeconds = Number(media?.audioDurationSeconds) || 0;
+    const padding = audioSeconds - videoSeconds;
+    const isLast = index === files.length - 1;
+    if (isLast || !media?.hasAudio || videoSeconds <= 0 || padding <= AUDIO_PADDING_TOLERANCE_FRAMES / fps) {
+      aligned.push(file);
+      continue;
+    }
+    const temp = `${outPath}.${uniqueSuffix(`align${index + 1}`)}.mp4`;
+    const { code } = await runProcess(
+      binary || resolveBinary(config, "ffmpegBinary", "ffmpeg"),
+      [
+        "-y",
+        "-i",
+        file,
+        "-map",
+        "0:v",
+        "-map",
+        "0:a",
+        "-c:v",
+        "copy",
+        "-c:a",
+        "aac",
+        "-af",
+        `atrim=0:${videoSeconds.toFixed(3)}`,
+        "-movflags",
+        "+faststart",
+        temp
+      ],
+      { signal }
+    );
+    if (code === 0 && await exists(temp)) {
+      temps.push(temp);
+      trimmed.push({ index: index + 1, paddingSeconds: Number(padding.toFixed(3)) });
+      aligned.push(temp);
+    } else {
+      await rm4(temp, { force: true });
+      aligned.push(file);
+    }
+  }
+  return { files: aligned, temps, trimmed };
+}
+async function cleanupSegmentTemps(temps) {
+  for (const temp of temps || []) await rm4(temp, { force: true });
+}
+async function mergeClips(config, files, outPath, { signal } = {}) {
+  const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
+  await mkdir6(path7.dirname(outPath), { recursive: true });
+  await rm4(outPath, { force: true });
+  const work = `${outPath}.${uniqueSuffix("work")}.mp4`;
+  let copyError = "";
+  let audioError = "";
+  const probed = [];
+  for (const file of files) probed.push(await probeMedia(file, config, signal));
+  const videos = probed.filter((media) => media && media.width && media.height);
+  const paramsMatch = videos.length !== probed.length || videos.every((media) => media.width === videos[0].width && media.height === videos[0].height);
+  const { files: aligned, temps, trimmed } = await alignSegmentAudio(
+    config,
+    files,
+    probed,
+    work,
+    { signal, binary }
+  );
+  files = aligned;
+  try {
+    const mergeMode = ref(config, "mergeMode", "copy");
+    if (mergeMode !== "reencode" && paramsMatch) {
+      const listPath = `${work}.concat.txt`;
+      const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
+      await writeFile2(listPath, `${lines}
+`, "utf8");
+      try {
+        const { code: code2, stderr: stderr2 } = await runProcess(binary, [
+          "-y",
+          "-f",
+          "concat",
+          "-safe",
+          "0",
+          "-i",
+          listPath,
+          "-c",
+          "copy",
+          "-movflags",
+          "+faststart",
+          work
+        ], { signal });
+        if (code2 === 0 && await exists(work)) {
+          await rename4(work, outPath);
+          return { path: outPath, mode: "copy", trimmed };
+        }
+        copyError = stderr2.trim().slice(-400);
+      } finally {
+        await rm4(listPath, { force: true });
+      }
+    } else if (!paramsMatch) {
+      copyError = "\u5206\u6BB5\u5206\u8FA8\u7387\u4E0D\u4E00\u81F4\uFF0C\u8DF3\u8FC7\u65E0\u635F\u62FC\u63A5\u3002";
+    }
+    const first = probed.find((media) => media && media.width && media.height) || {};
+    const width = evenNumber(first.width, 1280);
+    const height = evenNumber(first.height, 720);
+    const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
+    const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
+    const videoParts = files.map((_, index) => `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${index}]`);
+    const videoInputs = files.map((_, index) => `[v${index}]`).join("");
+    async function encode(filter2, maps, withAudioTrack) {
+      await rm4(work, { force: true });
+      const args = ["-y"];
+      for (const file of files) args.push("-i", file);
+      args.push("-filter_complex", filter2, ...maps, "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p");
+      if (withAudioTrack) args.push("-c:a", "aac", "-b:a", "192k");
+      args.push("-movflags", "+faststart", work);
+      return runProcess(binary, args, { signal });
+    }
+    if (withAudio) {
+      const audioParts = files.map((_, index) => `[${index}:a]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a${index}]`);
+      const pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join("");
+      const filter2 = [
+        ...videoParts,
+        ...audioParts,
+        `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`
+      ].join(";");
+      const { code: code2, stderr: stderr2 } = await encode(filter2, ["-map", "[v]", "-map", "[a]"], true);
+      if (code2 === 0 && await exists(work)) {
+        await rename4(work, outPath);
+        return { path: outPath, mode: "reencode", trimmed };
+      }
+      audioError = stderr2.trim().slice(-400);
+    }
+    const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(";");
+    const { code, stderr } = await encode(filter, ["-map", "[v]"], false);
+    if (code === 0 && await exists(work)) {
+      await rename4(work, outPath);
+      return { path: outPath, mode: withAudio ? "reencode-video-only" : "reencode", trimmed };
+    }
+    const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
+    throw Object.assign(new Error(`ffmpeg \u5408\u5E76\u5931\u8D25\uFF1A${detail || "\u672A\u77E5\u9519\u8BEF"}`), { code: "ffmpeg_failed" });
+  } finally {
+    await cleanupSegmentTemps([...temps, work]);
+  }
+}
+async function prepareSeamTrims(config, files, outPath, { signal } = {}) {
+  const requested = ref(config, "seamTrimSeconds", "");
+  const trims = String(requested || "").trim() ? String(requested).split(",").map((value) => Number(value.trim())) : [];
+  if (trims.some((value) => !Number.isFinite(value) || value < 0 || value > 3)) {
+    throw new Error("seamTrimSeconds \u5FC5\u987B\u4E3A\u9017\u53F7\u5206\u9694\u7684 0\u20133 \u79D2\u6570\u503C\uFF0C\u4F8B\u5982 0.5,0\uFF1B\u5206\u522B\u5BF9\u5E94\u7B2C 2\u30013 \u6BB5\u5F00\u5934\u3002");
+  }
+  const prepared = [...files];
+  const temps = [];
+  const cuts = [];
+  try {
+    for (let index = 0; index < files.length; index++) {
+      const official = !isOmniExtendModel(resolveModel(config)) && files.length > 1 && !trims.length;
+      const secondsRequested = index > 0 ? trims[index - 1] || 0 : 0;
+      if (!official && !secondsRequested) continue;
+      const media = await probeMedia(files[index], config, signal);
+      const duration = Number(media?.videoDurationSeconds || media?.durationSeconds);
+      const fps = Number(media?.fps) || 24;
+      const seconds = official ? index > 0 ? 1 / fps : 0 : secondsRequested;
+      const tailSeconds = official && index < files.length - 1 ? 6 / fps : 0;
+      const keptSeconds = duration - seconds - tailSeconds;
+      if (!(keptSeconds > 0.5)) throw new Error(`\u7B2C ${index + 1} \u6BB5\u88C1\u526A\u540E\u4E0D\u8DB3 0.5 \u79D2\uFF0C\u5DF2\u505C\u6B62\u5408\u5E76\u3002`);
+      const temp = `${outPath}.${uniqueSuffix(`cut${index + 1}`)}.mp4`;
+      temps.push(temp);
+      const result = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
+        "-y",
+        "-i",
+        files[index],
+        "-ss",
+        String(seconds),
+        "-t",
+        String(keptSeconds),
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a:0?",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-movflags",
+        "+faststart",
+        temp
+      ], { signal });
+      if (result.code !== 0) throw new Error(`\u7B2C ${index + 1} \u6BB5\u63A5\u7F1D\u88C1\u526A\u5931\u8D25\uFF1A${tail(result.stderr)}`);
+      prepared[index] = temp;
+      cuts.push({ index: index + 1, seconds, tailSeconds });
+    }
+    return { files: prepared, temps, cuts };
+  } catch (error) {
+    await cleanupSegmentTemps(temps);
+    throw error;
+  }
+}
+async function downloadSegmentsAndMerge(config, {
+  segments,
+  segmentsDir,
+  outDir,
+  stamp,
+  notes = [],
+  keepSingleFile = false,
+  signal
+}) {
+  const files = [];
+  const deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0);
+  const ffmpegReady = segments.length > 1 ? await hasFfmpeg(config, signal) : true;
+  let probeWarned = false;
+  for (const [index, segment] of segments.entries()) {
+    const dest = path7.join(
+      segmentsDir,
+      `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`
+    );
+    try {
+      if (!await exists(dest)) {
+        await downloadFile(segment.videoUrl, dest, { signal });
+      }
+    } catch (failure) {
+      if (failure?.code === "ABORTED") throw failure;
+      const reason = `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u4E0B\u8F7D\u5931\u8D25\uFF1A${failure?.message || failure}`;
+      notes.push(reason);
+      return { files, segmentsDir, deliveredSeconds, error: reason };
+    }
+    segment.localPath = dest;
+    await appendRequestLog({
+      event: "segment_saved",
+      index: segment.index,
+      taskId: segment.taskId,
+      path: dest,
+      bytes: (await stat3(dest)).size
+    });
+    const media = await probeMedia(dest, config, signal);
+    if (media?.durationSeconds) {
+      segment.durationSeconds = Number(media.durationSeconds.toFixed(2));
+      const cumulative = segments.slice(0, index + 1).reduce((sum, item) => sum + (item.seconds || 0), 0);
+      const tolerance = Math.max(
+        CUMULATIVE_TOLERANCE_MIN_SECONDS,
+        cumulative * CUMULATIVE_TOLERANCE_RATIO
+      );
+      const looksCumulative = files.length > 0 && Math.abs(media.durationSeconds - cumulative) <= tolerance && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
+      if (looksCumulative) {
+        await appendRequestLog({ event: "cumulative_output_detected", index: segment.index, duration: media.durationSeconds, plannedCumulative: cumulative });
+        files.length = 0;
+        notes.push(
+          `\u7B2C ${segment.index} \u6BB5\u5B9E\u6D4B ${formatSeconds(media.durationSeconds)} \u79D2\uFF0C\u63A5\u8FD1\u7D2F\u8BA1\u65F6\u957F ${cumulative} \u79D2\uFF0C\u6309\u300C\u4E0A\u6E38\u8FD4\u56DE\u7684\u662F\u7D2F\u8BA1\u6210\u7247\u300D\u5904\u7406\u3002`
+        );
+      }
+    } else if (!probeWarned) {
+      probeWarned = true;
+      notes.push("\u6CA1\u6709\u53EF\u7528\u7684 ffprobe\uFF0C\u65E0\u6CD5\u63A2\u6D4B\u5206\u6BB5\u65F6\u957F\uFF0C\u6309\u300C\u6BCF\u6BB5\u90FD\u662F\u589E\u91CF\u7247\u6BB5\u300D\u76F4\u63A5\u62FC\u63A5\u3002");
+    }
+    files.push(dest);
+  }
+  if (!files.length) return { files, segmentsDir, deliveredSeconds };
+  if (!ffmpegReady && files.length > 1) {
+    const guide = ffmpegInstallHint(config);
+    notes.push(`\u5206\u6BB5\u6587\u4EF6\u90FD\u5DF2\u4E0B\u8F7D\u5230 ${segmentsDir}\u3002`);
+    notes.push(guide.hint);
+    return {
+      files,
+      segmentsDir,
+      deliveredSeconds,
+      merged: false,
+      ffmpegMissing: true,
+      installHint: guide.hint
+    };
+  }
+  const finalPath = path7.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
+  try {
+    if (files.length === 1 && keepSingleFile) {
+      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "segment", videoPath: files[0] };
+    }
+    if (files.length === 1) {
+      await mkdir6(path7.dirname(finalPath), { recursive: true });
+      await rm4(finalPath, { force: true });
+      await copyFile(files[0], finalPath);
+      await appendRequestLog({ event: "delivery_copied", sourcePath: files[0], videoPath: finalPath });
+      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "single", videoPath: finalPath };
+    }
+    await appendRequestLog({ event: "merge_started", inputPaths: files, videoPath: finalPath });
+    const prepared = await prepareSeamTrims(config, files, finalPath, { signal });
+    await appendRequestLog({ event: "seam_trims_prepared", cuts: prepared.cuts });
+    let merged;
+    try {
+      merged = await mergeClips(config, prepared.files, finalPath, { signal });
+    } finally {
+      await cleanupSegmentTemps(prepared.temps);
+    }
+    if (prepared.cuts.length) {
+      notes.push(`\u5DF2\u6309${String(ref(config, "seamTrimSeconds", "")).trim() ? "\u624B\u52A8\u8BBE\u7F6E" : "\u6A21\u578B\u9ED8\u8BA4\u7B56\u7565"}\u88C1\u526A\u63A5\u7F1D\uFF1A${prepared.cuts.map((cut) => `\u7B2C ${cut.index} \u6BB5\uFF1A\u5934\u90E8 ${cut.seconds.toFixed(3)} \u79D2\u3001\u5C3E\u90E8 ${cut.tailSeconds.toFixed(3)} \u79D2`).join("\uFF1B")}\u3002\u539F\u59CB\u5206\u6BB5\u672A\u6539\u52A8\uFF1B\u5B9E\u9645\u6210\u7247\u4F1A\u7F29\u77ED\uFF0C\u4E0D\u8865\u5E27\u51D1\u65F6\u957F\u3002`);
+    }
+    const actual = await probeMedia(finalPath, config, signal);
+    await appendRequestLog({
+      event: "merge_completed",
+      videoPath: finalPath,
+      mode: merged.mode,
+      actualSeconds: actual?.durationSeconds,
+      sourceCount: segments.length
+    });
+    if (merged.trimmed?.length) {
+      notes.push(
+        `\u7B2C ${merged.trimmed.map((item) => item.index).join("\u3001")} \u6BB5\u7684\u97F3\u9891\u6BD4\u89C6\u9891\u957F\uFF08\u6700\u957F ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} \u79D2\uFF09\uFF0C\u5DF2\u88C1\u9F50\u540E\u518D\u62FC\u63A5\uFF0C\u907F\u514D\u63A5\u7F1D\u5904\u7F3A\u4E00\u5C0F\u6BB5\u753B\u9762\u3002`
+      );
+    }
+    return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: merged.mode, videoPath: finalPath, seamCuts: prepared.cuts, actualSeconds: actual?.durationSeconds };
+  } catch (failure) {
+    if (failure?.code === "ABORTED") throw failure;
+    let reason = `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u5408\u5E76\u5931\u8D25\uFF1A${failure?.message || failure}`;
+    let installHint;
+    if (failure?.code === "ffmpeg_missing") {
+      const guide = ffmpegInstallHint(config);
+      installHint = guide.hint;
+      reason = guide.hint;
+    }
+    notes.push(reason);
+    await appendRequestLog({ event: "merge_failed", errorCode: String(failure?.code || "merge_error"), segmentsDir });
+    return { files, segmentsDir, deliveredSeconds, error: reason, ffmpegMissing: Boolean(installHint), installHint };
+  }
+}
+
+// src/tools/video-generate.ts
 function videoTool(config, deps, ctx) {
   const TOOL_NAME = "video_generate";
   return {
@@ -3118,157 +2550,338 @@ function videoTool(config, deps, ctx) {
     }
   };
 }
-function setupTool(config) {
+
+// src/tools/video-extend.ts
+function extendTool(config, deps, ctx) {
+  const TOOL_NAME = "video_extend";
   return {
-    name: "video_setup",
-    description: "\u68C0\u67E5\u672C\u673A\u6709\u6CA1\u6709 ffmpeg\uFF08\u751F\u6210\u8D85\u8FC7\u6A21\u578B\u5355\u6B21\u4E0A\u9650\u7684\u89C6\u9891\u65F6\uFF0C\u5408\u5E76\u6210\u4E00\u6761\u8981\u7528\u5B83\uFF09\uFF0C\u7F3A\u4E86\u5C31\u88C5\u3002install=true \u8868\u793A\u300C\u7528\u6237\u5DF2\u7ECF\u540C\u610F\u5B89\u88C5\u300D\uFF0C\u63D2\u4EF6\u4F1A\u6267\u884C\u5B89\u88C5\u547D\u4EE4\u5E76\u9A8C\u8BC1\u2014\u2014\u547D\u4EE4\u4F1A\u5148\u62FF\u7ED9\u7528\u6237\u786E\u8BA4\uFF0C\u7528\u6237\u70B9\u4E86\u5141\u8BB8\u624D\u6267\u884C\u3002\u88C5\u4E0D\u4E0A\uFF08\u4F8B\u5982\u672C\u673A\u8FDE\u5305\u7BA1\u7406\u5668\u90FD\u6CA1\u6709\uFF09\u4F1A\u8FD4\u56DE\u624B\u52A8\u5B89\u88C5\u6B65\u9AA4\u548C\u4E00\u4E2A nextStep\u3002\u7528\u6237\u8BF4\u300C\u5E2E\u6211\u88C5 ffmpeg\u300D\u300C\u68C0\u67E5\u4E00\u4E0B\u73AF\u5883\u300D\u65F6\u7528\u5B83\uFF1B\u53EA\u6709\u786E\u5B9E\u8981\u88C5\u624D\u4F20 install=true\u3002",
+    name: "video_extend",
+    description: "\u628A\u4E00\u6BB5\u5DF2\u6709\u7684\u89C6\u9891\u5411\u524D\u6216\u5411\u540E\u5EF6\u957F\uFF1A\u4EE5\u516C\u7F51\u89C6\u9891 URL \u4F5C\u4E3A\u8F93\u5165\u7D20\u6750\uFF0C\u8C03\u7528 Seedance \u751F\u6210\u8854\u63A5\u7247\u6BB5\uFF0C\u4FDD\u6301\u4EBA\u7269\u3001\u670D\u88C5\u3001\u573A\u666F\u5149\u7EBF\u548C\u58F0\u97F3\u8FDE\u7EED\uFF1B\u53EF\u4E00\u6B21\u8FDE\u7EED\u5EF6\u957F\u591A\u6BB5\uFF0C\u6BCF\u6BB5\u90FD\u7528\u4E0A\u4E00\u6BB5\u7684\u7ED3\u679C\u7EE7\u7EED\u5EF6\u957F\u3002\u63D0\u793A\u8BCD\u89C4\u5219\uFF1A\u4EE5\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D\u6216\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\u5F00\u5934\uFF08\u4E5F\u53EF\u5199\u300C\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A\u300D\uFF09\uFF0C\u5168\u7A0B\u7528\u300C\u89C6\u98911\u300D\u6307\u4EE3\u8F93\u5165\u7D20\u6750\uFF0C\u4E0D\u8981\u5199\u6210\u300C\u53C2\u8003\u89C6\u98911\u300D\uFF08\u4F1A\u88AB\u5F53\u6210\u53C2\u8003\u751F\u89C6\u9891\uFF0C\u4E0D\u662F\u5EF6\u957F\uFF09\uFF1B\u5185\u5BB9\u5199\u6E05\u5EF6\u957F\u65B9\u5411\u3001\u5267\u60C5\u53D1\u5C55\u3001\u4E3B\u4F53\u72B6\u6001\u3001\u955C\u5934\u8FD0\u52A8\u548C\u58F0\u97F3\u5EF6\u7EED\uFF08\u80CC\u666F\u97F3\u4E50\u8981\u63A5\u7740\u89C6\u98911\u7ED3\u5C3E\u5F80\u4E0B\u8D70\uFF0C\u7981\u6B62\u4ECE\u5934\u64AD\u653E/\u6362\u66F2\uFF09\uFF0C\u51CF\u5C11\u63A5\u7F1D\u3002\u6BCF\u6BB5 4 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09 \u79D2\uFF0C\u9ED8\u8BA4\u6309\u6240\u9009\u6A21\u578B\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\uFF1B\u4E0A\u6E38\u5BF9\u5361\u6EE1 15 \u79D2\u654F\u611F\u65F6\u518D\u8C03\u5C0F\u3002\u8FD4\u56DE\u6BCF\u6BB5\u7684\u4EFB\u52A1 ID \u548C\u6700\u7EC8\u89C6\u9891\u4E0B\u8F7D\u94FE\u63A5\uFF08\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF1B\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout\u3001\u6216\u67D0\u6BB5\u8FD4\u56DE unknown\uFF08\u67E5\u8BE2\u5931\u8D25\u3001\u4EFB\u52A1\u5176\u5B9E\u5DF2\u63D0\u4EA4\uFF09\u65F6\uFF0C\u90FD\u7528\u8FD4\u56DE\u7684\u4EFB\u52A1 ID \u8D70 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u540C\u4E00\u6BB5\u3002\u6BCF\u6BB5\u5EF6\u957F\u5B8C\u90FD\u4F1A\u5148\u5F39\u4E00\u6B21\u786E\u8BA4\u6846\u95EE\u7528\u6237\u8981\u4E0D\u8981\u7EE7\u7EED\uFF1A\u70B9\u300C\u62D2\u7EDD\u300D\u5C31\u5148\u4EA4\u4ED8\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u90E8\u5206\uFF0C\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir\u3001remainingSeconds\uFF1B\u4E4B\u540E\u7528\u6237\u8BF4\u300C\u7EE7\u7EED\u300D\u65F6\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_extend \u7684 resume \u53C2\u6570\u63A5\u7740\u505A\uFF08\u524D\u9762\u51E0\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\u3001\u4E0D\u91CD\u590D\u6263\u8D39\uFF09\u3002\u591A\u6BB5\u9ED8\u8BA4\u4F1A\u4E0B\u8F7D\u5206\u6BB5\u5E76\u5728\u672C\u673A\u5408\u5E76\u6210\u4E00\u6761\u6210\u7247\uFF08\u9700\u8981 ffmpeg\uFF09\uFF1A\u6CA1\u6709 ffmpeg \u65F6\u4F1A\u5148\u62E6\u4E0B\u6765\u95EE\u7528\u6237\uFF0C\u7ED3\u679C\u91CC\u4E5F\u4F1A\u5E26 ffmpegMissing \u4E0E\u5B89\u88C5\u5F15\u5BFC\u3002\u4E2D\u9014\u88AB\u505C\u6B62 / \u7B49\u8D85\u65F6\u540C\u7406\uFF1A\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u6BB5\u5148\u4EA4\u4ED8\uFF0C\u5269\u4E0B\u7684\u7528 resume \u63A5\u7740\u505A\u3002",
     parameters: {
       type: "object",
       properties: {
-        install: {
-          type: "boolean",
-          description: "\u662F\u5426\u6267\u884C\u5B89\u88C5\uFF0C\u9ED8\u8BA4 false\uFF08\u53EA\u68C0\u67E5\u3001\u53EA\u6C47\u62A5\uFF0C\u4E0D\u52A8\u672C\u673A\uFF09\u3002"
-        },
-        target: {
+        prompt: {
           type: "string",
-          enum: ["ffmpeg", "package-manager"],
-          description: "install=true \u65F6\u88C5\u4EC0\u4E48\uFF1Affmpeg\uFF08\u9ED8\u8BA4\uFF09\u6216\u5148\u88C5\u5305\u7BA1\u7406\u5668\uFF08macOS \u7684 Homebrew\uFF09\u3002"
+          description: "\u672C\u6BB5\u8981\u7EED\u62CD\u7684\u5267\u60C5\u5185\u5BB9\u4E0E\u4EBA\u7269\u8BBE\u5B9A\uFF1B\u4E0D\u8981\u5728\u63D0\u793A\u8BCD\u91CC\u91CD\u590D\u5DF2\u53D1\u751F\u7684\u60C5\u8282\u3002"
+        },
+        videoUrl: {
+          type: "string",
+          description: "\u53C2\u8003\u89C6\u9891\u7684\u516C\u7F51 URL\uFF08https:// \u6216 http://\uFF09\u3002\u4E0E taskId \u4E8C\u9009\u4E00\u3002"
+        },
+        taskId: {
+          type: "string",
+          description: "\u5DF2\u6709\u7684 video_generate / video_extend \u4EFB\u52A1 ID\uFF0C\u7528\u5B83\u7684\u6210\u7247\u4F5C\u4E3A\u8F93\u5165\u7D20\u6750\u3002\u4E0E videoUrl \u4E8C\u9009\u4E00\u3002"
+        },
+        duration: {
+          type: "integer",
+          minimum: 4,
+          maximum: modelMaxSeconds(config),
+          description: "\u6BCF\u6BB5\u65B0\u589E\u7684\u79D2\u6570\u4E0A\u9650\uFF0C4 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09 \u7684\u6574\u6570\uFF08\u5982 5/8/10/14\uFF0C\u9ED8\u8BA4\u6309\u6A21\u578B\u4E0A\u9650\uFF09\uFF1B\u521A\u597D\u5361 15 \u79D2\u5BB9\u6613\u56E0\u5C01\u88C5\u7565\u8D85\u88AB\u4E0A\u6E38\u62D2\u7EDD\u3002\u7701\u7565\u65F6\u4F7F\u7528\u914D\u7F6E\u9ED8\u8BA4\u503C\u3002"
+        },
+        direction: {
+          type: "string",
+          enum: ["backward", "forward"],
+          description: "backward=\u5411\u540E\u5EF6\u957F\uFF0C\u7EED\u62CD\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF08\u9ED8\u8BA4\uFF09\uFF1Bforward=\u5411\u524D\u5EF6\u957F\uFF0C\u751F\u6210\u89C6\u98911\u4E4B\u524D\u7684\u524D\u7F6E\u5267\u60C5\u3002"
+        },
+        wording: {
+          type: "string",
+          enum: ["extend", "after"],
+          description: "\u63D0\u793A\u8BCD\u5F00\u5934\u5199\u6CD5\uFF1Aextend=\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D/\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\uFF08\u9ED8\u8BA4\uFF09\uFF1Bafter=\u300C\u751F\u6210\u89C6\u98911\u4E4B\u540E\u7684\u5185\u5BB9\uFF1A\u300D\uFF08\u4EC5\u5411\u540E\u5EF6\u957F\uFF09\u3002"
+        },
+        segments: {
+          type: "integer",
+          minimum: 1,
+          maximum: 10,
+          description: "\u8FDE\u7EED\u5EF6\u957F\u51E0\u6BB5\uFF0C\u9ED8\u8BA4 1\uFF1B\u6BCF\u6BB5\u90FD\u5F15\u7528\u4E0A\u4E00\u6BB5\u7684\u7ED3\u679C\uFF0C\u9002\u5408\u505A\u51FA\u66F4\u957F\u7684\u6210\u7247\u3002"
+        },
+        mode: {
+          type: "string",
+          enum: ["continuous", "closeup"],
+          description: "continuous=\u540C\u673A\u4F4D\u8FDE\u7EED\u7EED\u62CD\uFF08\u9ED8\u8BA4\uFF09\uFF1Bcloseup=\u5728\u5B8C\u6574\u53F0\u8BCD\u7ED3\u675F\u5904\u81EA\u7136\u5207\u5230\u8FD1\u666F\u6216\u53CD\u5E94\u955C\u5934\u3002"
+        },
+        startAt: {
+          type: "number",
+          minimum: 0,
+          description: "\u89C6\u98911\u5DF2\u6709\u7684\u79D2\u6570\uFF1B\u7ED9\u4E86\u5C31\u6309\u300C\u6574\u7247\u7B2C X\u2013Y \u79D2\u300D\u63CF\u8FF0\u672C\u6BB5\u3002\u5411\u540E\u5EF6\u957F\u65F6\u9010\u6BB5\u7D2F\u52A0\uFF0C\u5411\u524D\u5EF6\u957F\u65F6\u9010\u6BB5\u524D\u79FB\u3002"
+        },
+        ratio: {
+          type: "string",
+          enum: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
+          description: "\u753B\u9762\u6BD4\u4F8B\uFF1Bseedance 2.5 \u5EF6\u957F\u65F6\u4F1A\u81EA\u52A8\u6539\u7528 adaptive\u3002"
+        },
+        generateAudio: {
+          type: "boolean",
+          description: "\u662F\u5426\u751F\u6210\u97F3\u9891\uFF0C\u9ED8\u8BA4 true\u3002"
+        },
+        watermark: {
+          type: "boolean",
+          description: "\u662F\u5426\u6DFB\u52A0\u6C34\u5370\uFF0C\u9ED8\u8BA4 false\u3002"
+        },
+        resume: {
+          type: "string",
+          description: "\u63A5\u7740\u4E0A\u4E00\u6B21\u6682\u505C\u7684\u5EF6\u957F\u7EE7\u7EED\uFF1A\u4F20\u4E0A\u4E00\u6B21\u7ED3\u679C\u91CC\u7684 resumeDir\u3002\u63D2\u4EF6\u4F1A\u6CBF\u7528\u6682\u505C\u8BB0\u5F55\u91CC\u7684\u63D0\u793A\u8BCD\u3001\u5EF6\u957F\u65B9\u5411\u548C\u5269\u4E0B\u7684\u6BB5\u6570\uFF0C\u53EA\u628A\u6CA1\u505A\u7684\u90E8\u5206\u751F\u6210\u5B8C\u518D\u5408\u5E76\uFF1Bprompt / videoUrl / direction \u90FD\u53EF\u4EE5\u7701\u7565\u3002\u60F3\u987A\u624B\u591A\u5EF6\u957F\u51E0\u6BB5\u5C31\u518D\u4F20 segments\uFF08\u8868\u793A\u5728\u5269\u4E0B\u7684\u57FA\u7840\u4E0A\u300C\u518D\u52A0\u300D\u51E0\u6BB5\uFF09\u3002\u540C\u4E00\u4EFD\u6682\u505C\u8FDB\u5EA6\u540C\u65F6\u53EA\u5141\u8BB8\u4E00\u6B21 resume \u5728\u8DD1\uFF1A\u5DF2\u7ECF\u6709\u522B\u7684\u8C03\u7528\u5728\u7EED\u505A\u65F6\u4F1A\u76F4\u63A5\u62A5\u9519\uFF0C\u7B49\u5B83\u8DD1\u5B8C\u518D\u7EE7\u7EED\uFF0C\u522B\u91CD\u590D\u53D1\uFF08\u91CD\u590D\u4F1A\u628A\u5269\u4E0B\u7684\u6BB5\u63D0\u4EA4\u4E24\u904D\u3001\u91CD\u590D\u6263\u8D39\uFF09\u3002"
         }
-      }
+      },
+      required: ["prompt"]
     },
     output: {
       schema: {
         type: "object",
         properties: {
           status: { type: "string" },
-          os: { type: "string" },
-          ffmpegVersion: { type: "string" },
-          ffmpegPath: { type: "string" },
-          ffprobeVersion: { type: "string" },
-          installCommand: { type: "string" },
-          manualSteps: { type: "array", items: { type: "string" } },
-          output: { type: "string" },
-          note: { type: "string" }
+          videoUrl: { type: "string" },
+          videoPath: { type: "string" },
+          actualSeconds: { type: "number" },
+          seamCuts: { type: "array", items: { type: "object", properties: { index: { type: "integer" }, seconds: { type: "number" }, tailSeconds: { type: "number" } } } },
+          merged: { type: "boolean" },
+          seamTrimSeconds: { type: "string", description: "\u9884\u89C8\u786E\u8BA4\u540E\u88C1\u526A\u5404\u63A5\u7F1D\uFF1A\u5982 0.5,0 \u8868\u793A\u4EC5\u88C1\u7B2C2\u6BB5\u5F00\u59340.5\u79D2\uFF1B\u7559\u7A7A\u65F62.0\u88C1\u524D\u6BB5\u5C3E6\u5E27\u548C\u540E\u6BB5\u59341\u5E27\uFF0C2.5\u4E0D\u88C1\uFF1B\u586B0\u5173\u95ED\u3002\u97F3\u89C6\u9891\u540C\u6B65\u88C1\u526A\uFF0C\u5B9E\u9645\u65F6\u957F\u7F29\u77ED\u3002" },
+          mergeMode: { type: "string" },
+          segmentsDir: { type: "string" },
+          ffmpegMissing: { type: "boolean" },
+          installHint: { type: "string" },
+          partial: { type: "boolean" },
+          paused: { type: "boolean" },
+          nextAction: { type: "string" },
+          previewPath: { type: "string" },
+          resumeDir: { type: "string" },
+          remainingSeconds: { type: "integer" },
+          totalSeconds: { type: "integer" },
+          error: { type: "string" },
+          errorCode: { type: "string" },
+          note: { type: "string" },
+          segments: { type: "array", items: SEGMENT_OUTPUT_SCHEMA }
         }
       },
       render(_args, value) {
-        const {
-          status,
-          os: os2,
-          ffmpegVersion,
-          ffmpegPath,
-          ffprobeVersion,
-          installCommand,
-          output,
-          note
-        } = value || {};
-        const lines = [];
-        if (status === "ready") {
-          lines.push("\u672C\u673A\u73AF\u5883\u6CA1\u95EE\u9898\uFF1Affmpeg \u5DF2\u7ECF\u80FD\u7528\u4E86\uFF0C\u957F\u89C6\u9891\u53EF\u4EE5\u76F4\u63A5\u5408\u5E76\u6210\u4E00\u6761\u3002");
-        } else if (status === "installed") {
-          lines.push("ffmpeg \u88C5\u597D\u4E86\uFF0C\u957F\u89C6\u9891\u73B0\u5728\u53EF\u4EE5\u5408\u5E76\u6210\u4E00\u6761\u3002");
-        } else if (status === "missing") {
-          lines.push("\u672C\u673A\u8FD8\u6CA1\u6709 ffmpeg\uFF1A\u751F\u6210\u8D85\u8FC7\u6A21\u578B\u5355\u6B21\u4E0A\u9650\u7684\u89C6\u9891\u65F6\u53EA\u80FD\u7ED9\u5206\u6BB5\uFF0C\u6CA1\u6CD5\u5408\u5E76\u6210\u4E00\u6761\u3002");
-          lines.push(`\u88C5\u4E00\u4E0B\u5C31\u597D\uFF08${os2 || "\u5F53\u524D\u7CFB\u7EDF"}\uFF09\uFF1A${installCommand || ""}`);
-          lines.push("\u7528\u6237\u540C\u610F\u7684\u8BDD\uFF0C\u6211\u53EF\u4EE5\u7528 video_setup\uFF08install=true\uFF09\u76F4\u63A5\u5E2E\u4ED6\u88C5\u3002");
-        } else if (status === "failed") {
-          lines.push("ffmpeg \u6CA1\u88C5\u6210\u529F\uFF0C\u5F97\u624B\u52A8\u88C5\u4E00\u4E0B\u3002");
-          lines.push(`\u624B\u52A8\u6B65\u9AA4\uFF1A${note || installCommand || ""}`);
-        } else {
-          lines.push(`\u73AF\u5883\u68C0\u67E5\u7ED3\u679C\uFF1A${status || "\u672A\u77E5"}\u3002`);
-        }
-        if (ffmpegVersion) lines.push(`ffmpeg\uFF1A${ffmpegVersion}`);
-        if (ffmpegPath) lines.push(`ffmpeg \u8DEF\u5F84\uFF1A${ffmpegPath}\uFF08\u53EF\u4EE5\u586B\u8FDB\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\uFF09`);
-        if (ffprobeVersion) lines.push(`ffprobe\uFF1A${ffprobeVersion}`);
-        if (status !== "ready" && status !== "installed" && installCommand && status === "failed") {
-          lines.push(`\u547D\u4EE4\uFF1A${installCommand}`);
-        }
-        if (output) lines.push(`\u5B89\u88C5\u8F93\u51FA\uFF08\u672B\u5C3E\uFF09\uFF1A${output}`);
-        if (note) lines.push(note);
-        return [{ type: "text", text: lines.filter(Boolean).join("\n") }];
+        return renderResult(value);
       }
     },
-    // 装 ffmpeg 可能要下载几十 MB，给足时间；装完还要再验证一次。
-    timeoutMs: 20 * 60 * 1e3,
+    timeoutMs: 18e5,
     isConcurrencySafe() {
-      return false;
+      return true;
     },
     async execute(args, exec) {
-      const signal = exec?.signal;
-      const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-      const probeBinary = resolveBinary(config, "ffprobeBinary", "ffprobe");
-      const { os: os2, installs, bootstrap } = ffmpegInstallOptions();
-      const wantsInstall = args?.install === true;
-      const target = String(args?.target || "ffmpeg");
-      const manualSteps = installs.map((item) => `${item.label}\uFF1A${item.command}`);
-      const installCommand = target === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
-      const ffmpegVersion = await probeBinaryVersion(binary, signal);
-      const ffprobeVersion = await probeBinaryVersion(probeBinary, signal);
-      const base = { os: os2, installCommand, manualSteps, ffmpegVersion, ffprobeVersion };
-      if (ffmpegVersion) {
-        const note = ffprobeVersion ? "ffmpeg \u4E0E ffprobe \u90FD\u53EF\u7528\uFF0C\u957F\u89C6\u9891\u4F1A\u6B63\u5E38\u5408\u5E76\u6210\u4E00\u6761\u3002" : "ffmpeg \u53EF\u7528\uFF1B\u6CA1\u6709 ffprobe\uFF0C\u5206\u6BB5\u65F6\u957F\u63A2\u6D4B\u4F1A\u88AB\u8DF3\u8FC7\uFF08\u4E0D\u5F71\u54CD\u5408\u5E76\uFF09\u3002";
-        return { status: "ready", ...base, ffmpegPath: binary, note };
+      const apiKey = resolveApiKey(config);
+      assertConfigured(config, apiKey);
+      const resumeDir = resumeDirOf(args?.resume);
+      const resume = resumeDir ? await readPauseFile(resumeDir) : null;
+      const prompt = String(args?.prompt ?? "").trim() || String(resume?.prompt ?? "").trim();
+      if (!prompt) {
+        throw new Error(resumeDir ? "\u8FD9\u6B21\u662F\u63A5\u7740\u4E0A\u4E00\u6B21\u6682\u505C\u7684\u5EF6\u957F\u7EE7\u7EED\uFF0C\u4F46\u6682\u505C\u8BB0\u5F55\u91CC\u6CA1\u6709\u63D0\u793A\u8BCD\uFF1A\u8BF7\u628A prompt \u8865\u4E0A\u3002" : "\u63D0\u793A\u8BCD prompt \u4E0D\u80FD\u4E3A\u7A7A\u3002");
       }
-      if (!wantsInstall) {
-        return {
-          status: "missing",
-          ...base,
-          note: `\u672C\u673A ${binary} \u8DD1\u4E0D\u8D77\u6765\u3002\u7528\u6237\u540C\u610F\u540E\u53EF\u4EE5 install=true \u8BA9\u6211\u6765\u88C5\uFF1B\u4E5F\u6709\u53EF\u80FD\u662F\u8DEF\u5F84\u4E0D\u5BF9\uFF1A\u5DF2\u7ECF\u88C5\u8FC7\u5C31\u628A\u7EDD\u5BF9\u8DEF\u5F84\u586B\u8FDB\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\u3002`
-        };
-      }
-      let output = "";
-      try {
-        const shellCommand = target === "package-manager" && bootstrap ? bootstrap.command : target === "package-manager" && !bootstrap ? null : installs[0].command;
-        if (!shellCommand) {
-          return {
-            status: "failed",
-            ...base,
-            note: `${os2} \u4E0D\u9700\u8981\u53E6\u5916\u88C5\u5305\u7BA1\u7406\u5668\uFF0C\u76F4\u63A5\u7528\u7CFB\u7EDF\u81EA\u5E26\u7684\u5305\u7BA1\u7406\u5668\u88C5 ffmpeg \u5C31\u884C\u3002`
-          };
+      const lastOptions = resume ? resume.options || {} : {};
+      const direction = (args?.direction ?? lastOptions.direction) === "forward" ? "forward" : "backward";
+      const wording = (args?.wording ?? lastOptions.wording) === "after" ? "after" : "extend";
+      const requestedSegments = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
+      const secondsPerSegment = clampInteger(
+        args?.duration ?? modelMaxSeconds(config),
+        MIN_SECONDS,
+        modelMaxSeconds(config),
+        modelMaxSeconds(config)
+      );
+      let referenceUrl = String(args?.videoUrl ?? "").trim();
+      if (!referenceUrl && args?.taskId) {
+        const sourceId = String(args.taskId).trim();
+        let source;
+        try {
+          source = await getTask(config, sourceId, exec?.signal);
+        } catch (failure) {
+          if (failure?.code === "ABORTED") throw failure;
+          throw new Error(
+            `\u8BFB\u53D6\u53C2\u8003\u89C6\u9891\u4EFB\u52A1 ${sourceId} \u5931\u8D25\uFF1A${failure?.message || failure}\u3002\u8FD9\u4E0D\u4EE3\u8868\u8BE5\u4EFB\u52A1\u6CA1\u6709\u751F\u6210\u2014\u2014\u7A0D\u540E\u91CD\u8BD5\uFF0C\u6216\u76F4\u63A5\u628A\u6210\u7247\u7684\u516C\u7F51\u94FE\u63A5\u7528 videoUrl \u4F20\u8FDB\u6765\u3002`
+          );
         }
-        const result = await runProcess(shellCommand, [], {
-          signal,
-          shell: true,
-          timeoutMs: 18 * 60 * 1e3
-        });
-        output = tail(String(result.stdout || "") + String(result.stderr || ""), 800);
-      } catch (error) {
-        output = tail(error?.message || String(error), 800);
+        referenceUrl = extractVideoUrl(source) || "";
+        if (!referenceUrl) {
+          throw new Error(
+            `\u4EFB\u52A1 ${args.taskId} \u6CA1\u6709\u53EF\u7528\u7684\u89C6\u9891\u94FE\u63A5\uFF08\u72B6\u6001\uFF1A${extractStatus(source) || "\u672A\u77E5"}\uFF09\u3002`
+          );
+        }
       }
-      const afterVersion = await probeBinaryVersion(binary, signal);
-      if (afterVersion) {
-        return {
-          status: "installed",
-          ...base,
-          ffmpegVersion: afterVersion,
-          ffmpegPath: binary,
-          output,
-          note: "\u88C5\u597D\u4E86\uFF1A\u76F4\u63A5\u91CD\u8DD1\u521A\u624D\u90A3\u6B21\u751F\u6210\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\u6210\u4E00\u6761\uFF08\u5206\u6BB5\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\u3002"
-        };
+      if (!referenceUrl && resume) referenceUrl = String(resume.lastVideoUrl ?? "").trim();
+      referenceUrl = normalizeReferenceUrl(referenceUrl);
+      const doneBefore = resume ? Number(resume.done) || 0 : 0;
+      const fullPlan = resume ? (resume.plan || []).map((step) => ({ ...step })) : [];
+      if (!resume) {
+        for (let index = 0; index < requestedSegments; index += 1) {
+          fullPlan.push({ kind: "extend", seconds: secondsPerSegment });
+        }
+      } else if (args?.segments != null) {
+        for (let index = 0; index < requestedSegments && fullPlan.length < MAX_SEGMENTS; index += 1) {
+          fullPlan.push({ kind: "extend", seconds: secondsPerSegment });
+        }
       }
-      const found = await findInstalledFfmpeg(signal);
-      if (found) {
-        return {
-          status: "installed",
-          ...base,
-          ffmpegVersion: await probeBinaryVersion(found, signal),
-          ffmpegPath: found,
-          output,
-          note: `\u88C5\u597D\u4E86\uFF0C\u4F46\u6CA1\u8FDB PATH\uFF1A\u628A ${found} \u586B\u8FDB\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\uFF08\u6216\u8005\u91CD\u5F00\u4E00\u4E2A\u7EC8\u7AEF\u518D\u91CD\u8DD1\u4E00\u6B21\u751F\u6210\uFF09\u3002`
-        };
+      const plan = fullPlan.slice(doneBefore);
+      const plannedSeconds = plan.reduce((sum, step) => sum + step.seconds, 0);
+      let cursor = resume ? resume.cursor ?? null : args?.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
+      const notes = [];
+      const segments = [];
+      if (resume) {
+        for (const step of resume.steps || []) {
+          segments.push({
+            index: step.index,
+            kind: "extend",
+            seconds: step.seconds,
+            taskId: step.taskId,
+            status: "succeeded",
+            videoUrl: step.videoUrl
+          });
+        }
       }
-      const needsBootstrap = Boolean(bootstrap) && !ffmpegVersion && /command not found|not found|不是内部或外部命令|未找到/i.test(output);
-      return {
-        status: "failed",
-        ...base,
-        installCommand: needsBootstrap ? bootstrap.command : installs[0].command,
-        manualSteps: needsBootstrap ? [`\u5148\u88C5\u5305\u7BA1\u7406\u5668\uFF1A${bootstrap.command}`, ...manualSteps] : manualSteps,
-        output,
-        note: needsBootstrap ? `\u672C\u673A\u6CA1\u6709 ${os2} \u7684\u5305\u7BA1\u7406\u5668\uFF0C\u5F97\u5148\u88C5\u5B83\uFF1A${bootstrap.command}\uFF1B\u88C5\u597D\u4E4B\u540E\u518D\u88C5 ffmpeg\u3002\u8FD9\u4E24\u6B65\u90FD\u53EF\u4EE5\u8BA9\u6211\u6765\u505A \u2014\u2014 \u8BF4\u4E00\u58F0\u5C31\u884C\u3002` : "\u5B89\u88C5\u547D\u4EE4\u6CA1\u6210\u529F\uFF08\u53EF\u80FD\u662F\u6CA1\u6743\u9650\u3001\u6CA1\u8054\u7F51\u6216\u88AB\u5B89\u5168\u7B56\u7565\u62E6\u4E0B\uFF09\u3002\u4E0A\u9762\u662F\u624B\u52A8\u6B65\u9AA4\uFF0C\u7167\u7740\u5728\u7EC8\u7AEF\u91CC\u8DD1\u4E00\u904D\u5373\u53EF\u3002"
+      let status = "succeeded";
+      let error;
+      let errorCode;
+      let paused = false;
+      let confirmWarned = false;
+      let interrupted = false;
+      try {
+        for (const [offset, step] of plan.entries()) {
+          if (exec?.signal?.aborted) throw abortError();
+          const position = doneBefore + offset;
+          const { body, seconds } = buildRequestBody(
+            config,
+            {
+              ...lastOptions,
+              ...args,
+              prompt,
+              duration: step.seconds,
+              startAt: cursor,
+              direction,
+              wording
+            },
+            referenceUrl
+          );
+          const final = await runTask(config, body, exec?.signal);
+          const taskId = final.taskId;
+          segments.push({
+            index: position + 1,
+            kind: "extend",
+            seconds,
+            taskId,
+            status: final.status,
+            videoUrl: final.videoUrl,
+            error: final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error
+          });
+          if (final.status !== "succeeded" || !final.videoUrl) {
+            status = final.status;
+            errorCode = final.errorCode;
+            error = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error;
+            break;
+          }
+          referenceUrl = normalizeReferenceUrl(final.videoUrl);
+          if (cursor != null) {
+            cursor = direction === "forward" ? cursor - seconds : cursor + seconds;
+            if (cursor < 0) cursor = null;
+          }
+          if (plan[offset + 1]) {
+            paused = true;
+            notes.push("\u672C\u6BB5\u5DF2\u5B8C\u6210\uFF1A\u8BF7\u5148\u5C55\u793A\u672C\u6B21\u89C6\u9891\u6210\u679C\uFF0C\u8BA9\u7528\u6237\u9884\u89C8\uFF1B\u7528\u6237\u786E\u8BA4\u7EE7\u7EED\u540E\u518D\u7528 resume \u63A5\u7740\u751F\u6210\u4E0B\u4E00\u6BB5\u3002");
+            break;
+          }
+        }
+      } catch (failure) {
+        const doneYet = segments.some((segment) => segment.status === "succeeded" && segment.videoUrl);
+        if (failure?.code !== "ABORTED" || !doneYet) throw failure;
+        interrupted = true;
+        paused = true;
+        notes.push(
+          "\u8FD9\u6B21\u8C03\u7528\u88AB\u4E2D\u65AD\u4E86\uFF08\u7528\u6237\u70B9\u4E86\u505C\u6B62\uFF0C\u6216\u8005\u7B49\u8D85\u65F6\u4E86\uFF09\uFF1A\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u90E8\u5206\u4F1A\u5148\u4E0B\u8F7D\u3001\u5408\u5E76\u3001\u4EA4\u4ED8\uFF0C\u5269\u4E0B\u7684\u6BB5\u4E0D\u7528\u91CD\u5934\u518D\u6765\u2014\u2014\u7528 resume \u5C31\u80FD\u63A5\u7740\u505A\u3002"
+        );
+      }
+      const completed = segments.filter((segment) => segment.status === "succeeded" && segment.videoUrl);
+      const deliveredSeconds = completed.reduce((sum, segment) => sum + (segment.seconds || 0), 0);
+      const result = {
+        status,
+        error,
+        errorCode,
+        segments,
+        videoUrl: completed.at(-1)?.videoUrl,
+        totalSeconds: deliveredSeconds
       };
+      if (!completed.length) {
+        if (notes.length) result.note = notes.join("\n");
+        return result;
+      }
+      if (status !== "succeeded") {
+        notes.push(`\u5DF2\u628A\u6210\u529F\u7684 ${completed.length} \u6BB5\uFF08${deliveredSeconds} \u79D2\uFF09\u4EA4\u4ED8\uFF0C\u53EF\u4F5C\u4E3A\u6B8B\u7247\u4F7F\u7528\u3002`);
+        result.partial = true;
+      }
+      if (resume) {
+        notes.push(
+          `\u63A5\u7740\u4E0A\u4E00\u6B21\u6682\u505C\u7684\u8FDB\u5EA6\u7EE7\u7EED\uFF1A\u524D\u9762 ${doneBefore} \u6BB5\uFF08${formatSeconds(resume.cursor ?? 0)}\uFF09\u4E0D\u91CD\u65B0\u751F\u6210\uFF0C\u8FD9\u6B21\u8FD8\u8981\u5EF6\u957F ${plan.length} \u6BB5\u5171 ${plannedSeconds} \u79D2\u3002`
+        );
+      }
+      const outDir = await resolveOutputDir(config, exec, deps);
+      const { stamp, segmentsDir } = resume ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir } : await allocateStamp(outDir, fileStamp());
+      const delivery = await downloadSegmentsAndMerge(config, {
+        segments: completed,
+        segmentsDir,
+        outDir,
+        stamp,
+        notes,
+        keepSingleFile: paused,
+        // 被中断时请求信号已经 abort：收尾（下载 + 合并）不能被它打断，否则等于白生成。
+        signal: interrupted ? void 0 : exec?.signal
+      });
+      if (delivery.error) {
+        result.segmentsDir = delivery.segmentsDir;
+        result.note = notes.join("\n");
+        return result;
+      }
+      if (delivery.ffmpegMissing) {
+        result.segmentsDir = delivery.segmentsDir;
+        result.merged = false;
+        result.ffmpegMissing = true;
+        result.installHint = delivery.installHint;
+        result.note = notes.join("\n");
+        return result;
+      }
+      if (!delivery.files.length) {
+        result.note = notes.join("\n");
+        return result;
+      }
+      if (delivery.merged) {
+        result.merged = true;
+        result.videoPath = delivery.videoPath;
+        result.mergeMode = delivery.mergeMode;
+        if (delivery.actualSeconds) result.actualSeconds = delivery.actualSeconds;
+        if (delivery.seamCuts?.length) result.seamCuts = delivery.seamCuts;
+      }
+      if (paused) {
+        result.segmentsDir = segmentsDir;
+        result.resumeDir = segmentsDir;
+        result.paused = true;
+        result.nextAction = "present_video_then_wait_for_user";
+        result.previewPath = completed.at(-1)?.localPath || result.videoPath;
+        await appendRequestLog({ event: "preview_required", previewPath: result.previewPath, resumeDir: result.resumeDir });
+        result.remainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - deliveredSeconds);
+        try {
+          await writePauseFile(segmentsDir, pauseRecordAt({
+            stamp,
+            prompt,
+            fullPlan,
+            done: segments.length,
+            cursor,
+            lastVideoUrl: referenceUrl,
+            options: { ...pickResumeOptions(args), direction, wording, startAt: cursor },
+            segments
+          }));
+        } catch (failure) {
+          notes.push(`\u6682\u505C\u8BB0\u5F55\u6CA1\u5199\u6210\uFF08${failure?.message || failure}\uFF09\uFF1A\u8981\u63A5\u7740\u505A\u53EA\u80FD\u7528\u4E0A\u9762\u7684\u94FE\u63A5\u91CD\u65B0\u5EF6\u957F\u3002`);
+        }
+        notes.push(`\u5DF2\u4EA4\u4ED8\u7684\u6210\u7247\u662F\u5230\u7B2C ${segments.length} \u6BB5\uFF0C\u5206\u6BB5\u4ECD\u4FDD\u7559\u5728 ${segmentsDir}\u3002`);
+        notes.push(resumeHint(segmentsDir, result.remainingSeconds, TOOL_NAME));
+        result.note = notes.join("\n");
+        return result;
+      }
+      result.segmentsDir = segmentsDir;
+      if (notes.length) result.note = notes.join("\n");
+      return result;
     }
   };
 }
+
+// src/tools/video-status.ts
 function taskTool(config) {
   return {
     name: "video_status",
@@ -3380,7 +2993,300 @@ function taskTool(config) {
     }
   };
 }
-const CONFIG_FIELDS = [
+
+// src/tools/video-setup.ts
+function setupTool(config) {
+  return {
+    name: "video_setup",
+    description: "\u68C0\u67E5\u672C\u673A\u6709\u6CA1\u6709 ffmpeg\uFF08\u751F\u6210\u8D85\u8FC7\u6A21\u578B\u5355\u6B21\u4E0A\u9650\u7684\u89C6\u9891\u65F6\uFF0C\u5408\u5E76\u6210\u4E00\u6761\u8981\u7528\u5B83\uFF09\uFF0C\u7F3A\u4E86\u5C31\u88C5\u3002install=true \u8868\u793A\u300C\u7528\u6237\u5DF2\u7ECF\u540C\u610F\u5B89\u88C5\u300D\uFF0C\u63D2\u4EF6\u4F1A\u6267\u884C\u5B89\u88C5\u547D\u4EE4\u5E76\u9A8C\u8BC1\u2014\u2014\u547D\u4EE4\u4F1A\u5148\u62FF\u7ED9\u7528\u6237\u786E\u8BA4\uFF0C\u7528\u6237\u70B9\u4E86\u5141\u8BB8\u624D\u6267\u884C\u3002\u88C5\u4E0D\u4E0A\uFF08\u4F8B\u5982\u672C\u673A\u8FDE\u5305\u7BA1\u7406\u5668\u90FD\u6CA1\u6709\uFF09\u4F1A\u8FD4\u56DE\u624B\u52A8\u5B89\u88C5\u6B65\u9AA4\u548C\u4E00\u4E2A nextStep\u3002\u7528\u6237\u8BF4\u300C\u5E2E\u6211\u88C5 ffmpeg\u300D\u300C\u68C0\u67E5\u4E00\u4E0B\u73AF\u5883\u300D\u65F6\u7528\u5B83\uFF1B\u53EA\u6709\u786E\u5B9E\u8981\u88C5\u624D\u4F20 install=true\u3002",
+    parameters: {
+      type: "object",
+      properties: {
+        install: {
+          type: "boolean",
+          description: "\u662F\u5426\u6267\u884C\u5B89\u88C5\uFF0C\u9ED8\u8BA4 false\uFF08\u53EA\u68C0\u67E5\u3001\u53EA\u6C47\u62A5\uFF0C\u4E0D\u52A8\u672C\u673A\uFF09\u3002"
+        },
+        target: {
+          type: "string",
+          enum: ["ffmpeg", "package-manager"],
+          description: "install=true \u65F6\u88C5\u4EC0\u4E48\uFF1Affmpeg\uFF08\u9ED8\u8BA4\uFF09\u6216\u5148\u88C5\u5305\u7BA1\u7406\u5668\uFF08macOS \u7684 Homebrew\uFF09\u3002"
+        }
+      }
+    },
+    output: {
+      schema: {
+        type: "object",
+        properties: {
+          status: { type: "string" },
+          os: { type: "string" },
+          ffmpegVersion: { type: "string" },
+          ffmpegPath: { type: "string" },
+          ffprobeVersion: { type: "string" },
+          installCommand: { type: "string" },
+          manualSteps: { type: "array", items: { type: "string" } },
+          output: { type: "string" },
+          note: { type: "string" }
+        }
+      },
+      render(_args, value) {
+        const {
+          status,
+          os: os3,
+          ffmpegVersion,
+          ffmpegPath,
+          ffprobeVersion,
+          installCommand,
+          output,
+          note
+        } = value || {};
+        const lines = [];
+        if (status === "ready") {
+          lines.push("\u672C\u673A\u73AF\u5883\u6CA1\u95EE\u9898\uFF1Affmpeg \u5DF2\u7ECF\u80FD\u7528\u4E86\uFF0C\u957F\u89C6\u9891\u53EF\u4EE5\u76F4\u63A5\u5408\u5E76\u6210\u4E00\u6761\u3002");
+        } else if (status === "installed") {
+          lines.push("ffmpeg \u88C5\u597D\u4E86\uFF0C\u957F\u89C6\u9891\u73B0\u5728\u53EF\u4EE5\u5408\u5E76\u6210\u4E00\u6761\u3002");
+        } else if (status === "missing") {
+          lines.push("\u672C\u673A\u8FD8\u6CA1\u6709 ffmpeg\uFF1A\u751F\u6210\u8D85\u8FC7\u6A21\u578B\u5355\u6B21\u4E0A\u9650\u7684\u89C6\u9891\u65F6\u53EA\u80FD\u7ED9\u5206\u6BB5\uFF0C\u6CA1\u6CD5\u5408\u5E76\u6210\u4E00\u6761\u3002");
+          lines.push(`\u88C5\u4E00\u4E0B\u5C31\u597D\uFF08${os3 || "\u5F53\u524D\u7CFB\u7EDF"}\uFF09\uFF1A${installCommand || ""}`);
+          lines.push("\u7528\u6237\u540C\u610F\u7684\u8BDD\uFF0C\u6211\u53EF\u4EE5\u7528 video_setup\uFF08install=true\uFF09\u76F4\u63A5\u5E2E\u4ED6\u88C5\u3002");
+        } else if (status === "failed") {
+          lines.push("ffmpeg \u6CA1\u88C5\u6210\u529F\uFF0C\u5F97\u624B\u52A8\u88C5\u4E00\u4E0B\u3002");
+          lines.push(`\u624B\u52A8\u6B65\u9AA4\uFF1A${note || installCommand || ""}`);
+        } else {
+          lines.push(`\u73AF\u5883\u68C0\u67E5\u7ED3\u679C\uFF1A${status || "\u672A\u77E5"}\u3002`);
+        }
+        if (ffmpegVersion) lines.push(`ffmpeg\uFF1A${ffmpegVersion}`);
+        if (ffmpegPath) lines.push(`ffmpeg \u8DEF\u5F84\uFF1A${ffmpegPath}\uFF08\u53EF\u4EE5\u586B\u8FDB\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\uFF09`);
+        if (ffprobeVersion) lines.push(`ffprobe\uFF1A${ffprobeVersion}`);
+        if (status !== "ready" && status !== "installed" && installCommand && status === "failed") {
+          lines.push(`\u547D\u4EE4\uFF1A${installCommand}`);
+        }
+        if (output) lines.push(`\u5B89\u88C5\u8F93\u51FA\uFF08\u672B\u5C3E\uFF09\uFF1A${output}`);
+        if (note) lines.push(note);
+        return [{ type: "text", text: lines.filter(Boolean).join("\n") }];
+      }
+    },
+    // 装 ffmpeg 可能要下载几十 MB，给足时间；装完还要再验证一次。
+    timeoutMs: 20 * 60 * 1e3,
+    isConcurrencySafe() {
+      return false;
+    },
+    async execute(args, exec) {
+      const signal = exec?.signal;
+      const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
+      const probeBinary = resolveBinary(config, "ffprobeBinary", "ffprobe");
+      const { os: os3, installs, bootstrap } = ffmpegInstallOptions();
+      const wantsInstall = args?.install === true;
+      const target = String(args?.target || "ffmpeg");
+      const manualSteps = installs.map((item) => `${item.label}\uFF1A${item.command}`);
+      const installCommand = target === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
+      const ffmpegVersion = await probeBinaryVersion(binary, signal);
+      const ffprobeVersion = await probeBinaryVersion(probeBinary, signal);
+      const base = { os: os3, installCommand, manualSteps, ffmpegVersion, ffprobeVersion };
+      if (ffmpegVersion) {
+        const note = ffprobeVersion ? "ffmpeg \u4E0E ffprobe \u90FD\u53EF\u7528\uFF0C\u957F\u89C6\u9891\u4F1A\u6B63\u5E38\u5408\u5E76\u6210\u4E00\u6761\u3002" : "ffmpeg \u53EF\u7528\uFF1B\u6CA1\u6709 ffprobe\uFF0C\u5206\u6BB5\u65F6\u957F\u63A2\u6D4B\u4F1A\u88AB\u8DF3\u8FC7\uFF08\u4E0D\u5F71\u54CD\u5408\u5E76\uFF09\u3002";
+        return { status: "ready", ...base, ffmpegPath: binary, note };
+      }
+      if (!wantsInstall) {
+        return {
+          status: "missing",
+          ...base,
+          note: `\u672C\u673A ${binary} \u8DD1\u4E0D\u8D77\u6765\u3002\u7528\u6237\u540C\u610F\u540E\u53EF\u4EE5 install=true \u8BA9\u6211\u6765\u88C5\uFF1B\u4E5F\u6709\u53EF\u80FD\u662F\u8DEF\u5F84\u4E0D\u5BF9\uFF1A\u5DF2\u7ECF\u88C5\u8FC7\u5C31\u628A\u7EDD\u5BF9\u8DEF\u5F84\u586B\u8FDB\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\u3002`
+        };
+      }
+      let output = "";
+      try {
+        const shellCommand = target === "package-manager" && bootstrap ? bootstrap.command : target === "package-manager" && !bootstrap ? null : installs[0].command;
+        if (!shellCommand) {
+          return {
+            status: "failed",
+            ...base,
+            note: `${os3} \u4E0D\u9700\u8981\u53E6\u5916\u88C5\u5305\u7BA1\u7406\u5668\uFF0C\u76F4\u63A5\u7528\u7CFB\u7EDF\u81EA\u5E26\u7684\u5305\u7BA1\u7406\u5668\u88C5 ffmpeg \u5C31\u884C\u3002`
+          };
+        }
+        const result = await runProcess(shellCommand, [], {
+          signal,
+          shell: true,
+          timeoutMs: 18 * 60 * 1e3
+        });
+        output = tail(String(result.stdout || "") + String(result.stderr || ""), 800);
+      } catch (error) {
+        output = tail(error?.message || String(error), 800);
+      }
+      const afterVersion = await probeBinaryVersion(binary, signal);
+      if (afterVersion) {
+        return {
+          status: "installed",
+          ...base,
+          ffmpegVersion: afterVersion,
+          ffmpegPath: binary,
+          output,
+          note: "\u88C5\u597D\u4E86\uFF1A\u76F4\u63A5\u91CD\u8DD1\u521A\u624D\u90A3\u6B21\u751F\u6210\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\u6210\u4E00\u6761\uFF08\u5206\u6BB5\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\u3002"
+        };
+      }
+      const found = await findInstalledFfmpeg(signal);
+      if (found) {
+        return {
+          status: "installed",
+          ...base,
+          ffmpegVersion: await probeBinaryVersion(found, signal),
+          ffmpegPath: found,
+          output,
+          note: `\u88C5\u597D\u4E86\uFF0C\u4F46\u6CA1\u8FDB PATH\uFF1A\u628A ${found} \u586B\u8FDB\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\uFF08\u6216\u8005\u91CD\u5F00\u4E00\u4E2A\u7EC8\u7AEF\u518D\u91CD\u8DD1\u4E00\u6B21\u751F\u6210\uFF09\u3002`
+        };
+      }
+      const needsBootstrap = Boolean(bootstrap) && !ffmpegVersion && /command not found|not found|不是内部或外部命令|未找到/i.test(output);
+      return {
+        status: "failed",
+        ...base,
+        installCommand: needsBootstrap ? bootstrap.command : installs[0].command,
+        manualSteps: needsBootstrap ? [`\u5148\u88C5\u5305\u7BA1\u7406\u5668\uFF1A${bootstrap.command}`, ...manualSteps] : manualSteps,
+        output,
+        note: needsBootstrap ? `\u672C\u673A\u6CA1\u6709 ${os3} \u7684\u5305\u7BA1\u7406\u5668\uFF0C\u5F97\u5148\u88C5\u5B83\uFF1A${bootstrap.command}\uFF1B\u88C5\u597D\u4E4B\u540E\u518D\u88C5 ffmpeg\u3002\u8FD9\u4E24\u6B65\u90FD\u53EF\u4EE5\u8BA9\u6211\u6765\u505A \u2014\u2014 \u8BF4\u4E00\u58F0\u5C31\u884C\u3002` : "\u5B89\u88C5\u547D\u4EE4\u6CA1\u6210\u529F\uFF08\u53EF\u80FD\u662F\u6CA1\u6743\u9650\u3001\u6CA1\u8054\u7F51\u6216\u88AB\u5B89\u5168\u7B56\u7565\u62E6\u4E0B\uFF09\u3002\u4E0A\u9762\u662F\u624B\u52A8\u6B65\u9AA4\uFF0C\u7167\u7740\u5728\u7EC8\u7AEF\u91CC\u8DD1\u4E00\u904D\u5373\u53EF\u3002"
+      };
+    }
+  };
+}
+
+// src/internal/hyperframes.ts
+import { spawn as spawn2 } from "node:child_process";
+import path8 from "node:path";
+import { createRequire as createRequire2 } from "node:module";
+import { stat as stat4, mkdir as mkdir7 } from "node:fs/promises";
+function runHyperframes(cli, args, cwd, config, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error("Hyperframes \u5DF2\u53D6\u6D88\u3002"));
+    let output = "";
+    const child = spawn2(process.execPath, [cli, ...args], {
+      cwd,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: "1",
+        CI: "1",
+        HYPERFRAMES_NO_TELEMETRY: "1",
+        ...Object.fromEntries([
+          ["HYPERFRAMES_FFMPEG_PATH", resolveBinary(config, "ffmpegBinary", "ffmpeg")],
+          ["HYPERFRAMES_FFPROBE_PATH", resolveBinary(config, "ffprobeBinary", "ffprobe")]
+        ].filter(([, binary]) => path8.isAbsolute(binary)))
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true
+    });
+    const collect = (data) => {
+      output = (output + data.toString()).slice(-24e3);
+    };
+    child.stdout.on("data", collect);
+    child.stderr.on("data", collect);
+    let stopped;
+    let forceKill;
+    const stop = (reason) => {
+      if (stopped) return;
+      stopped = new Error(reason);
+      child.kill("SIGTERM");
+      forceKill = setTimeout(() => child.kill("SIGKILL"), 5e3);
+      forceKill.unref();
+    };
+    const abort = () => stop("Hyperframes \u5DF2\u53D6\u6D88\u3002");
+    const timer = setTimeout(() => stop("Hyperframes \u6267\u884C\u8D85\u8FC7 20 \u5206\u949F\uFF0C\u5DF2\u505C\u6B62\u3002"), 20 * 60 * 1e3);
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (forceKill) clearTimeout(forceKill);
+      signal?.removeEventListener("abort", abort);
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+    child.once("error", (error) => {
+      cleanup();
+      reject(error);
+    });
+    child.once("close", (code) => {
+      cleanup();
+      if (stopped) reject(stopped);
+      else resolve({ code: code ?? 1, output });
+    });
+  });
+}
+function hyperframesTool(config, deps) {
+  return {
+    name: "video_hyperframes",
+    description: "\u7528 Hyperframes \u5C06\u672C\u5730 HTML/CSS \u52A8\u753B\u3001\u5B57\u5E55\u548C\u7D20\u6750\u6E32\u67D3\u6210 MP4\u3002action=check \u68C0\u67E5\u73AF\u5883\uFF1Blint \u6821\u9A8C\u9879\u76EE\uFF1Brender \u51FA\u7247\u3002\u9879\u76EE\u76EE\u5F55\u987B\u5305\u542B index.html\uFF1B\u5148\u4FDD\u5B58\u5E76\u5C55\u793A\u5B8C\u6574\u811A\u672C\u3001\u901A\u8FC7\u811A\u672C\u5BA1\u6838\u4E0E\u5236\u4F5C\u786E\u8BA4\uFF0C\u518D render\u3002\u52A8\u753B\u987B\u53EF\u6309\u65F6\u95F4\u5B9A\u4F4D\uFF0C\u4E0D\u80FD\u7528\u5B9E\u65F6\u65F6\u949F\u9A71\u52A8\u3002\u590D\u7528\u5BBF\u4E3B Node \u8FD0\u884C\u65F6\uFF0C\u65E0\u9700\u5BA2\u6237\u8FD0\u884C npm/npx\u3002\u9996\u6B21\u6E32\u67D3\u53EF\u80FD\u4E0B\u8F7D Chromium\uFF0C\u9700\u8981\u7F51\u7EDC\u3002\u5B83\u4E0D\u4EE3\u66FF Seedance \u7684\u5B9E\u62CD\u753B\u9762\u751F\u6210\uFF0C\u4E0D\u8C03\u7528\u4ED8\u8D39\u89C6\u9891 API\u3002",
+    parameters: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["check", "lint", "render"], description: "\u9ED8\u8BA4 check\u3002" },
+        projectDir: { type: "string", description: "\u5DF2\u6709 Hyperframes \u9879\u76EE\u76EE\u5F55\uFF0C\u7EDD\u5BF9\u8DEF\u5F84\u6216\u76F8\u5BF9\u5F53\u524D\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\uFF1Blint/render \u5FC5\u586B\u3002" },
+        output: { type: "string", description: "\u76F8\u5BF9\u9879\u76EE\u76EE\u5F55\u7684 MP4 \u8F93\u51FA\u8DEF\u5F84\uFF1B\u9ED8\u8BA4 renders/output-\u65F6\u95F4\u6233.mp4\uFF0C\u5DF2\u5B58\u5728\u65F6\u62D2\u7EDD\u8986\u76D6\u3002" },
+        fps: { type: "integer", enum: [24, 25, 30, 50, 60], description: "\u9ED8\u8BA4 30\u3002" }
+      }
+    },
+    output: {
+      schema: { type: "object", properties: {
+        status: { type: "string" },
+        action: { type: "string" },
+        output: { type: "string" },
+        videoPath: { type: "string" },
+        nodeVersion: { type: "string" },
+        note: { type: "string" }
+      } },
+      render(_args, value) {
+        return [{ type: "text", text: JSON.stringify(value, null, 2) }];
+      }
+    },
+    timeoutMs: 21 * 60 * 1e3,
+    isConcurrencySafe() {
+      return false;
+    },
+    async execute(args, exec) {
+      const action = args.action || "check";
+      if (!["check", "lint", "render"].includes(action)) throw new Error("\u4E0D\u652F\u6301\u7684 Hyperframes \u64CD\u4F5C\u3002");
+      const [major, minor] = process.versions.node.split(".").map(Number);
+      if (major < 22 || major === 22 && minor < 12) return {
+        status: "runtime_unsupported",
+        nodeVersion: process.versions.node,
+        note: "Hyperframes \u53CA\u5176\u6D4F\u89C8\u5668\u4F9D\u8D56\u9700\u8981 Node 22.12+\u3002\u8BF7\u5347\u7EA7\u5230\u63D0\u4F9B\u517C\u5BB9\u8FD0\u884C\u65F6\u7684 Harness \u684C\u9762\u7AEF\uFF1B\u63D2\u4EF6\u4E0D\u4F1A\u8C03\u7528\u7CFB\u7EDF node \u6216\u81EA\u52A8\u5B89\u88C5 Node\u3002"
+      };
+      let cli;
+      try {
+        const require2 = createRequire2(import.meta.url);
+        cli = path8.join(path8.dirname(require2.resolve("hyperframes/package.json")), "bin/hyperframes.mjs");
+      } catch {
+        return { status: "dependency_missing", note: "\u63D2\u4EF6\u7684 Hyperframes \u4F9D\u8D56\u7F3A\u5931\uFF0C\u8BF7\u91CD\u65B0\u5B89\u88C5\u5F53\u524D\u63D2\u4EF6\u53CA\u5176\u4F9D\u8D56\u3002" };
+      }
+      let cwd = process.cwd();
+      if (deps.workdir && exec?.agent) cwd = await deps.workdir.ensure(exec.agent, exec.signal) || cwd;
+      const project = path8.resolve(cwd, args.projectDir || ".");
+      if (action !== "check") {
+        if (!args.projectDir) throw new Error("lint/render \u5FC5\u987B\u6307\u5B9A projectDir\u3002");
+        if (!(await stat4(path8.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
+      }
+      let videoPath;
+      let command = ["doctor", "--json"];
+      if (action === "lint") command = ["lint", project, "--json"];
+      if (action === "render") {
+        if (args.fps !== void 0 && ![24, 25, 30, 50, 60].includes(args.fps)) throw new Error("\u4E0D\u652F\u6301\u7684\u5E27\u7387\u3002");
+        const output = args.output || `renders/output-${Date.now()}.mp4`;
+        videoPath = path8.resolve(project, output);
+        const relative = path8.relative(project, videoPath);
+        if (!relative || relative === ".." || relative.startsWith(`..${path8.sep}`) || path8.isAbsolute(relative) || path8.extname(videoPath).toLowerCase() !== ".mp4") {
+          throw new Error("\u8F93\u51FA\u5FC5\u987B\u662F\u9879\u76EE\u76EE\u5F55\u5185\u7684 .mp4 \u6587\u4EF6\u3002");
+        }
+        try {
+          await stat4(videoPath);
+          throw new Error("\u8F93\u51FA\u6587\u4EF6\u5DF2\u5B58\u5728\uFF0C\u8BF7\u6362\u4E00\u4E2A\u6587\u4EF6\u540D\u3002");
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error;
+        }
+        await mkdir7(path8.dirname(videoPath), { recursive: true });
+        command = ["render", project, "--output", videoPath, "--fps", String(args.fps || 30), "--workers", "1", "--strict"];
+      }
+      const result = await runHyperframes(cli, command, action === "check" ? cwd : project, config, exec?.signal);
+      if (result.code !== 0) return { status: "failed", action, output: result.output, note: "\u68C0\u67E5\u8F93\u51FA\u4E2D\u7684\u73AF\u5883\u6216\u9879\u76EE\u9519\u8BEF\u540E\u91CD\u8BD5\uFF1B\u4E0D\u4F1A\u91CD\u590D\u63D0\u4EA4 Seedance \u4EFB\u52A1\u3002" };
+      if (videoPath && !(await stat4(videoPath)).size) throw new Error("Hyperframes \u672A\u751F\u6210\u6709\u6548\u7684 MP4 \u6587\u4EF6\u3002");
+      return { status: action === "render" ? "succeeded" : "checked", action, output: result.output, ...videoPath ? { videoPath } : {} };
+    }
+  };
+}
+
+// src/tools/video-config.ts
+var CONFIG_FIELDS = [
   "connectionMode",
   "metaonticApiKey",
   "volcengineApiKey",
@@ -3410,7 +3316,7 @@ const CONFIG_FIELDS = [
   "deviceId",
   "estimateGroupRatio"
 ];
-const READ_ONLY_CONFIG_FIELDS = /* @__PURE__ */ new Set(["apiKey", "keyOrigin", "deviceId", "deviceSecret"]);
+var READ_ONLY_CONFIG_FIELDS = /* @__PURE__ */ new Set(["apiKey", "keyOrigin", "deviceId", "deviceSecret"]);
 function maskSecrets(view) {
   return {
     ...view,
@@ -3597,18 +3503,25 @@ function configTool(config, settings) {
     }
   };
 }
+
+// src/prompts/guidance.ts
 function buildPromptGuidance(config) {
   const singleMax = resolveSingleMax(config);
   const segmentSeconds = resolveSegmentSeconds(config);
   return [
+    "\u672C\u6BB5\u662FMetaOnticVideo\u5F53\u524D\u751F\u6548\u7684\u64CD\u4F5C\u89C4\u5219\uFF0C\u70ED\u52A0\u8F7D\u540E\u73B0\u6709\u5BF9\u8BDD\u4ECE\u4E0B\u4E00\u8F6E\u6309\u672C\u6BB5\u6267\u884C\uFF1B\u6B64\u524D\u5BF9\u8BDD\u6216\u65E7\u7248\u63D2\u4EF6\u9884\u8BBE\u4E2D\u7684\u8FC7\u65F6\u4EA4\u4E92\u8BF4\u660E\u4EE5\u672C\u6BB5\u4E3A\u51C6\uFF0C\u4ECD\u9075\u5B88\u7528\u6237\u5F53\u524D\u660E\u786E\u8981\u6C42\u3002\u65E0\u9700\u4E3A\u4E86\u5E94\u7528\u8FD9\u4E9B\u89C4\u5219\u65B0\u5EFA\u5BF9\u8BDD\u3002\u4FDD\u7559\u65E2\u6709\u811A\u672C\u3001\u6587\u4EF6\u4E0E\u4EFB\u52A1ID\uFF0C\u4E0D\u91CD\u65B0\u751F\u6210\u5DF2\u5B8C\u6210\u7684\u89C6\u9891\uFF1B\u5DF2\u6253\u5F00\u7684\u65E7\u786E\u8BA4\u7A97\u53E3\u4E0D\u4F1A\u81EA\u52A8\u6539\u5199\uFF0C\u7528\u6237\u8981\u6C42\u91CD\u5F00\u6216\u6539\u7A3F\u65F6\u5148\u91CD\u65B0\u5C55\u793A\u5F53\u524D\u7248\u6750\u6599\u5E76\u53D1\u8D77\u65B0\u95EE\u9898\uFF0C\u4E0D\u6CBF\u7528\u65E7\u95EE\u9898\u7684\u7B54\u590D\u3002",
     "\u63D0\u793A\u8BCD\u9075\u5FAA\u706B\u5C71\u8FDB\u9636\u539F\u5219\uFF1A\u5148\u5B9A\u4E49\u4E3B\u4F53\u76842\u20133\u4E2A\u7A33\u5B9A\u7279\u5F81\u5E76\u56FA\u5B9A\u6807\u7B7E\uFF0C\u518D\u5199\u6709\u627F\u63A5\u5173\u7CFB\u7684\u52A8\u4F5C\u3001\u573A\u666F\u5149\u7EBF\u3001\u8FD0\u955C\u548C\u97F3\u9891\uFF1B\u5C11\u5199\u91CD\u590D\u9650\u5236\u3002\u591A\u6BB5\u65F6\u5FC5\u987B\u51C6\u5907segmentPrompts\uFF0C\u6BCF\u6BB5\u4EC5\u542B\u65B0\u589E\u4E8B\u4EF6\u548C\u5BF9\u767D\u30022.0\u6309\u4E8B\u4EF6\u987A\u5E8F\u81EA\u7136\u8282\u594F\uFF0C2.5\u53EF\u7528\u8FDE\u7EED\u79D2\u7EA7\u533A\u95F4\uFF1B\u5B8C\u6574\u5267\u672C\u7559\u5728script.md\uFF0C\u4E0D\u76F4\u63A5\u53CD\u590D\u53D1\u7ED9\u6A21\u578B\u3002",
     isMetaontic(config) ? "\u5F53\u524D\u4E3A B MetaOntic AI\uFF1A\u4F7F\u7528 metaonticApiKey \u548C\u670D\u52A1\u7AEF\u6A21\u5F0F\u76F8\u540C\u7684\u4E2D\u8F6C\u5730\u5740\uFF0C\u65E0\u9700\u767B\u5F55\uFF1B\u5185\u90E8\u903B\u8F91\u4E0D\u6267\u884C\u8D39\u7528\u9884\u4F30\u3001\u989D\u5EA6\u6216\u4F7F\u7528\u8BB0\u5F55\u67E5\u8BE2\uFF1B\u8FD9\u4E9B\u5185\u90E8\u89C4\u5219\u4E0D\u5199\u8FDB\u7528\u6237\u8D39\u7528\u8BF4\u660E\u3002\u5236\u4F5C\u524D\u5BF9\u7528\u6237\u4EC5\u8BF4\u660E\u201C\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39\u201D\u5E76\u8BE2\u95EE\u662F\u5426\u5F00\u59CB\uFF1B\u521B\u5EFA\u6210\u529F\u4E0D\u4EE3\u8868\u751F\u6210\u6210\u529F\uFF0C\u5FC5\u987B\u67E5\u8BE2\u81F3succeeded\u4E14\u6709\u89C6\u9891\u5730\u5740\u3002\u4E0B\u8FF0\u767B\u5F55\u9886 Key \u89C4\u5219\u4EC5\u9002\u7528\u4E8E A \u670D\u52A1\u7AEF\u6A21\u5F0F\u3002" : isVolcengine(config) ? "\u5F53\u524D\u4E3A C \u706B\u5C71\u76F4\u8FDE\uFF1A\u4F7F\u7528 volcengineApiKey\uFF0C\u65E0\u9700\u670D\u52A1\u7AEF\u767B\u5F55\uFF1B\u5BF9\u7528\u6237\u4EC5\u8BF4\u660E\u201C\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39\u201D\uFF1B\u5185\u90E8\u4E0D\u67E5\u8BE2\u4F59\u989D\u3001\u4E0D\u5957\u7528\u4E2D\u8F6C\u4F30\u4EF7\uFF0C\u4E0D\u628A\u8FD9\u4E9B\u5185\u90E8\u89C4\u5219\u5199\u8FDB\u7528\u6237\u8D39\u7528\u8BF4\u660E\u3002\u4EC5\u6309\u521B\u5EFA\u4EFB\u52A1\u4E0E\u67E5\u8BE2\u4EFB\u52A1\u63A5\u53E3\u7684\u5B9E\u9645\u7ED3\u679C\u62A5\u544A\u72B6\u6001\uFF1B\u521B\u5EFA\u6210\u529F\u4E0D\u4EE3\u8868\u89C6\u9891\u5DF2\u751F\u6210\uFF0C\u5FC5\u987B\u67E5\u8BE2\u81F3succeeded\u4E14\u6709\u89C6\u9891\u5730\u5740\u3002\u4E0B\u8FF0\u670D\u52A1\u7AEF\u9886 Key \u8981\u6C42\u4EC5\u9002\u7528\u4E8E A \u6A21\u5F0F\u3002" : "\u5F53\u524D\u4E3A A \u670D\u52A1\u7AEF\u6A21\u5F0F\uFF1A\u5728\u8BBE\u7F6E\u9875\u767B\u5F55\u9886\u53D6 Key\u3002",
     "MetaOnticVideo\uFF08Seedance \u89C6\u9891\u751F\u6210\u63D2\u4EF6\uFF09\uFF1A\u9700\u8981\u751F\u6210\u89C6\u9891\u3001\u7ED9\u89C6\u9891\u52A0\u957F\u65F6\u4F18\u5148\u7528\u5B83\uFF1B\u7528\u6237\u53EA\u8981\u8BF4\u60F3\u8981\u591A\u957F\uFF08duration\uFF09\uFF0C\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\u7684\u90E8\u5206\u63D2\u4EF6\u81EA\u5DF1\u5206\u6BB5\u7EED\u62CD\u518D\u5408\u5E76\uFF0C\u4E0D\u7528\u7528\u6237\u81EA\u5DF1\u62C6\u4EFB\u52A1\u3002",
     "\xB7 \u5148\u8BC4\u4F30\u7528\u6237\u65B9\u6848\u5B8C\u6574\u5EA6\uFF1A\u4E3B\u9898/\u76EE\u6807\u3001\u4E3B\u4F53\u3001\u4E3B\u8981\u5185\u5BB9\u4E0E\u53D1\u5C55\u3001\u7ED3\u5C3E\u6216\u5C55\u793A\u7ED3\u679C\u53CA\u660E\u786E\u7EA6\u675F\u662F\u5426\u8DB3\u4EE5\u5199\u811A\u672C\uFF1B\u98CE\u666F\u4E0E\u5C55\u793A\u4E0D\u5F3A\u6C42\u51B2\u7A81\uFF0C\u7F3A\u65F6\u957F\u6216\u753B\u5E45\u53EF\u7528\u9ED8\u8BA4\u503C\uFF0C\u4E0D\u56E0\u6B64\u5224\u4E3A\u4E0D\u5B8C\u5584\u3002\u4E0D\u5B8C\u5584\u4E14\u5C1A\u672A\u6388\u6743\u65F6\uFF0C\u7B80\u77ED\u6307\u51FA\u5173\u952E\u7F3A\u53E3\uFF0C\u5148\u95EE\u201C\u8981\u4E0D\u8981\u6211\u5E2E\u4F60\u5B8C\u5584\u65B9\u6848\uFF1F\u201D\uFF0C\u63D0\u4F9B\u201C\u5E2E\u6211\u5B8C\u5584 / \u4FDD\u7559\u539F\u65B9\u6848\u201D\uFF0C\u7B49\u5F85\u660E\u786E\u7B54\u590D\uFF0C\u4E0D\u64C5\u81EA\u6269\u5199\u5267\u60C5\u3002\u5DF2\u6709\u201C\u4F60\u53D1\u6325\u201D\u201C\u5E2E\u6211\u5B8C\u5584\u201D\u7B49\u6388\u6743\u5219\u76F4\u63A5\u6267\u884C\uFF0C\u4E0D\u91CD\u590D\u95EE\u3002\u5B8C\u6574\u65B9\u6848\u4FDD\u7559\u4E3B\u9898\u3001\u89D2\u8272\u5173\u7CFB\u3001\u60C5\u8282\u987A\u5E8F\u3001\u7ED3\u5C3E\u3001\u5173\u952E\u5BF9\u767D\u3001\u98CE\u683C\u548C\u9650\u5236\uFF0C\u53EA\u6DA6\u8272\u63AA\u8F9E\u3001\u6574\u7406\u683C\u5F0F\u548C\u8F6C\u6210\u5206\u955C\uFF0C\u4E0D\u64C5\u81EA\u589E\u5220\u89D2\u8272/\u4E8B\u4EF6/\u53CD\u8F6C\u3002\u5185\u5BB9\u53D6\u820D\u3001\u65F6\u957F\u538B\u7F29\u6216\u5267\u60C5\u7ED3\u5C3E\u8C03\u6574\u987B\u5148\u5F81\u5F97\u540C\u610F\u3002\u7528\u6237\u9009\u62E9\u4FDD\u7559\u65F6\u5FE0\u4E8E\u539F\u610F\u6574\u7406\uFF0C\u4EC5\u6F84\u6E05\u65E0\u6CD5\u6267\u884C\u7684\u5FC5\u8981\u4FE1\u606F\u3002\u662F\u5426\u5B8C\u5584\u4E0D\u4EE3\u66FF\u811A\u672C\u5BA1\u6838\u6216\u5236\u4F5C\u6388\u6743\uFF1B\u5B8C\u6574\u65B9\u6848\u4E0D\u589E\u52A0\u5B8C\u5584\u8BE2\u95EE\u3002\u9ED8\u8BA415\u79D2\u30019:16\u3001720p\uFF0C\u7528\u6237\u6307\u5B9A\u4F18\u5148\uFF1B\u6309\u539F\u65B9\u6848\u786E\u5B9A\u98CE\u683C\u4E0E\u58F0\u97F3\uFF0C\u65E0\u5FC5\u8981\u4E0D\u52A0\u5BF9\u767D\uFF0C\u5B57\u5E55\u672A\u6307\u5B9A\u4E0D\u52A0\u3002\u6574\u7406\u540E\u5148\u5B8C\u6574\u5C55\u793A\u6545\u4E8B\u3001\u89C4\u683C/\u98CE\u683C/\u58F0\u97F3\u3001\u4EBA\u7269\u6216\u4E3B\u4F53\u548C\u65F6\u95F4/\u753B\u9762/\u5B8C\u6574\u5BF9\u767D\u8868\uFF0C\u518D\u5BA1\u6838\uFF1B\u6BCF\u6B21\u6539\u7A3F\u4FDD\u7559\u6EE1\u610F\u90E8\u5206\uFF0C\u4E0D\u8BA9\u7528\u6237\u6539\u6A21\u578B\u63D0\u793A\u8BCD\u3002\u63A5\u5165\u65B9\u5F0F\u4EC5\u7528\u4E8E\u8FDE\u63A5\u4E0E\u8D39\u7528\u5224\u65AD\uFF0C\u4E0D\u5F53\u4F5C\u521B\u4F5C\u80FD\u529B\u5199\u8FDB\u5BA3\u4F20\u89C6\u9891\uFF0C\u9664\u975E\u7528\u6237\u660E\u786E\u8981\u63A5\u5165\u6559\u7A0B\u3002",
     "\xB7 **\u751F\u6210\u4E00\u6761\u65B0\u89C6\u9891\u5FC5\u987B\u5148\u8FC7\u4E24\u9053\u786E\u8BA4\uFF0C\u7F3A\u4E00\u4E0D\u53EF**\uFF1A\u2460 \u5148\u628A**\u89C6\u9891\u811A\u672C**\u5199\u51FA\u6765\u4EA4\u7ED9\u7528\u6237**\u5BA1\u6838**\uFF08\u811A\u672C\u8981\u542B\uFF1A\u753B\u9762\u98CE\u683C\u3001\u4EBA\u7269\u5F62\u8C61\u3001\u5206\u955C\u2014\u2014\u9010\u955C\u7684\u955C\u5934 / \u65F6\u95F4 / \u753B\u9762\u3001\u5BF9\u767D\u2014\u2014\u6709\u5BF9\u8BDD\u5C31\u9010\u53E5\u5199\u6E05\u8C01\u5728\u51E0\u79D2\u8BF4\u4EC0\u4E48\uFF09\uFF1B\u2461 \u811A\u672C\u5BA1\u6838\u901A\u8FC7\u540E\uFF0C**\u518D\u5355\u72EC\u95EE\u4E00\u6B21\u8981\u4E0D\u8981\u5F00\u59CB\u505A**\uFF08\u4EC5 A \u670D\u52A1\u7AEF\u6A21\u5F0F\u8BF4\u660E\u989D\u5EA6\u4E0E\u9884\u4F30\u8D39\u7528\uFF1B\u706B\u5C71\u76F4\u8FDE\u548C MetaOntic AI \u53EA\u8BF4\u660E\u201C\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39\u201D\uFF09\uFF0C\u7528\u6237\u70B9\u5934\u4E86\u624D\u8C03\u7528 video_generate\u3002\u811A\u672C\u4E00\u6539\uFF0C\u4E24\u9053\u786E\u8BA4\u5168\u90E8\u4F5C\u5E9F\uFF0C\u8981\u91CD\u65B0\u8D70\u3002\u7528\u6237\u8BF4\u300C\u76F4\u63A5\u751F\u6210\u300D\u4E5F\u8981\u5148\u8D70\u8FD9\u4E24\u6B65\uFF0C\u4E0D\u8981\u8DF3\u8FC7\u3002\u7ED9\u5DF2\u6709\u89C6\u9891\u63A5\u957F\uFF08video_extend\uFF09\u4E0D\u9700\u8981\u811A\u672C\uFF0C\u4F46\u540C\u6837\u8981\u5148\u786E\u8BA4\u518D\u8C03\u7528\u3002",
-    "\xB7 \u9700\u8981\u62C6\u5206\u751F\u6210\u65F6\uFF0C\u5148\u8BFB\u53D6video-director\u7684references/segment-storyboard.md\uFF0C\u5728\u5BA1\u6838\u524D\u5C55\u793A\u5206\u6BB5\u8868\uFF08\u6BB5\u53F7\u3001\u5168\u7247\u65F6\u95F4\u3001\u751F\u6210\u65F6\u957F\u3001\u751F\u6210/\u7EED\u62CD\u3001\u4E3B\u8981\u753B\u9762\u4E0E\u65B0\u5BF9\u767D\u3001\u8D77\u6B62\u72B6\u6001\u53CA\u4EA4\u63A5\uFF09\u3002\u6309\u5F53\u524D\u6A21\u578B\u548C\u5B9E\u9645\u5206\u6BB5\u89C4\u5219\u6838\u5BF9\uFF0C\u4E0D\u8C03\u7528\u751F\u6210\u5DE5\u5177\u8BD5\u7B97\uFF0C\u4E0D\u6309\u5206\u955C\u6570\u589E\u52A0\u4ED8\u8D39\u8C03\u7528\u3002\u7528\u672C\u5730HTML/SVG\u753B\u5E76present\u672C\u7248\u6784\u56FE\u4E0E\u52A8\u4F5C\u793A\u610F\u56FE\uFF0C\u660E\u786E\u6807\u6CE8\u201C\u793A\u610F\uFF0C\u975E\u5B9E\u9645\u751F\u6210\u753B\u9762\u201D\uFF0C\u518D\u5F39\u811A\u672C\u5BA1\u6838\u7A97\u3002\u6539\u7A3F\u540C\u6B65\u66F4\u65B0\u56FE\u8868\uFF0C\u4E0D\u589E\u52A0\u7B2C\u4E09\u9053\u786E\u8BA4\uFF1B\u793A\u610F\u56FE\u4E0D\u80FD\u4EE3\u66FF\u771F\u5B9E\u9010\u6BB5\u9884\u89C8\u3002\u9ED8\u8BA4\u4E0D\u8C03\u7528\u4ED8\u8D39\u51FA\u56FE\u6A21\u578B\uFF0C\u7528\u6237\u9700\u8981AI\u6548\u679C\u56FE\u65F6\u5148\u786E\u8BA4\u53EF\u7528\u5DE5\u5177\u548C\u8D39\u7528\uFF0C\u4E0D\u5047\u79F0\u63D2\u4EF6\u5DF2\u6709\u6587\u751F\u56FE\u80FD\u529B\u3002",
-    "\xB7 \u811A\u672C\u5C55\u793A\u662F\u5BA1\u6838\u7684\u5F3A\u5236\u524D\u7F6E\uFF1A\u9996\u6B21\u548C\u6BCF\u6B21\u6539\u7A3F\u5148\u4FDD\u5B58\u672C\u7248\u5B8C\u6574script.md\uFF08draft\u3001\u6CE8\u660E\u7248\u672C\uFF09\uFF0C\u518D\u5728\u7528\u6237\u53EF\u89C1\u6B63\u6587\u5C55\u793A\u6545\u4E8B\u3001\u89C4\u683C/\u98CE\u683C\u3001\u4EBA\u7269\u6216\u4E3B\u4F53\u3001\u5206\u955C\u65F6\u95F4\u8868\u3001\u5B8C\u6574\u5BF9\u767D/\u58F0\u97F3\u4E0E\u7ED3\u5C3E\uFF1B\u53EA\u5199\u6587\u4EF6\u3001\u7ED9\u8DEF\u5F84\u3001\u6458\u8981\u3001\u4FEE\u6539\u70B9\u6216\u793A\u610F\u56FE\u4E0D\u7B97\u5C55\u793A\u3002\u6709present/\u6587\u4EF6\u5C55\u793A\u5DE5\u5177\u65F6\u53E6\u884C\u5C55\u793A\u672C\u7248script.md\uFF0C\u7B49\u5F85\u8C03\u7528\u5B8C\u6210\u540E\u624D\u8C03\u7528\u5BA1\u6838\u63D0\u95EE\u5DE5\u5177\uFF0C\u7981\u6B62\u5E76\u884C\u6216\u540C\u4E00\u5DE5\u5177\u6279\u6B21\u540C\u65F6\u53D1\u51FA\u3002\u5C55\u793A\u5931\u8D25\u3001\u4E0D\u652F\u6301Markdown\u6216\u5DE5\u5177\u7F3A\u5931\u65F6\uFF0C\u5148\u5728\u6B63\u6587\u5B8C\u6574\u8D34\u51FA\u811A\u672C\uFF0C\u518D\u63D0\u95EE\u3002\u82E5\u5BA1\u6838\u5F39\u7A97\u906E\u6321\u6B63\u6587\uFF0C\u987B\u628A\u5B8C\u6574\u811A\u672C\u653E\u5165\u63D0\u95EE\u5DE5\u5177\u652F\u6301\u7684\u63CF\u8FF0/\u6B63\u6587\uFF0C\u786E\u4FDD\u7528\u6237\u80FD\u5148\u8BFB\u540E\u9009\u3002\u5DF2\u5F39\u7A97\u5374\u6F0F\u5C55\u793A\u65F6\uFF0C\u5148\u8865\u5B8C\u6574\u811A\u672C\u5E76\u91CD\u65B0\u5BA1\u6838\uFF0C\u4E0D\u6CBF\u7528\u8BE5\u6B21\u7B54\u590D\uFF0C\u4E0D\u8FDB\u5165\u5236\u4F5C\u786E\u8BA4\u6216\u751F\u6210\u3002",
-    "\xB7 \u811A\u672C\u5BA1\u6838\u4E0E\u5236\u4F5C\u786E\u8BA4\u5728\u63D0\u95EE\u5DE5\u5177\u53EF\u7528\u65F6\u5FC5\u987B\u5B9E\u9645\u8C03\u7528 ask_user_question\uFF08\u6309\u4F1A\u8BDD\u5B9E\u9645\u540D\u79F0\uFF09\u5F39\u51FA\u4EA4\u4E92\u7A97\u53E3\uFF0C\u6B63\u6587\u95EE\u53E5\u4E0D\u80FD\u4EE3\u66FF\u3002\u9996\u6B21\u53CA\u6BCF\u6B21\u6539\u7A3F\u90FD\u8981\uFF1A\u9000\u56DEdraft\u5E76\u6E05\u7A7A\u65E7\u5BA1\u6838/\u5236\u4F5C\u540C\u610F \u2192 \u4FEE\u6539\u5E76\u5C55\u793A\u4FEE\u6539\u70B9\u4E0E\u5B8C\u6574\u5F53\u524D\u7248\u811A\u672C \u2192 \u540C\u4E00\u8F6E\u91CD\u65B0\u8C03\u7528\u63D0\u95EE\u5DE5\u5177\uFF0C\u521B\u5EFA\u201C\u7B2CN\u7248\u811A\u672C\u5BA1\u6838\u201D\u65B0\u95EE\u9898\uFF08\u5982script_review_v2\uFF09\uFF0C\u9009\u9879\u201C\u8FD9\u7248\u811A\u672C\u53EF\u4EE5\uFF0C\u8FDB\u5165\u4E0B\u4E00\u6B65 / \u5148\u6539\u4E00\u4E0B\uFF0C\u6211\u518D\u770B\u770B\u201D\u3002\u4E0D\u590D\u7528\u65E7\u7B54\u6848\uFF0C\u4E0D\u56E0\u6539\u52A8\u5C0F\u3001\u5DF2\u5F39\u8FC7\u4E00\u6B21\u6216\u7528\u6237\u5728\u804A\u5929\u63D0\u4FEE\u6539\u610F\u89C1\u800C\u7701\u7565\u7A97\u53E3\u3002\u5F53\u524D\u7248\u660E\u786E\u901A\u8FC7\u540E\u624D\u5355\u72EC\u5F39\u8D39\u7528\u4E0E\u5236\u4F5C\u786E\u8BA4\uFF1B\u4FEE\u6539\u610F\u89C1\u3001\u65E7\u7248\u901A\u8FC7\u3001\u672A\u7B54\u3001\u8DF3\u8FC7\u3001\u53D6\u6D88\u3001\u8D85\u65F6\u3001pending\u90FD\u4E0D\u662F\u901A\u8FC7\u3002\u5DE5\u5177\u652F\u6301timeout\u65F6\u7528-1\u7B49\u5F85\u660E\u786E\u56DE\u7B54\u3002\u53EA\u6709\u63D0\u95EE\u5DE5\u5177\u786E\u5B9E\u4E0D\u5B58\u5728\u6216\u660E\u786E\u62A5\u9519\u4E0D\u53EF\u7528\u624D\u56DE\u9000\u6587\u5B57\u5BA1\u6838\uFF0C\u7ED3\u675F\u672C\u8F6E\u7B49\u56DE\u590D\u3002",
+    "\xB7 \u6BCF\u6B21\u65B0\u811A\u672C\u53CA\u6539\u7A3F\u5BA1\u6838\u524D\uFF0C\u65E0\u8BBA\u5355\u6BB5\u8FD8\u662F\u591A\u6BB5\uFF0C\u90FD\u5148\u8BFB\u53D6video-director\u7684references/segment-storyboard.md\u5E76\u5B9E\u9645\u5C55\u793A\u5F53\u524D\u7248\u955C\u5934\u53C2\u8003\u793A\u610F\u56FE\uFF1B\u4E00\u955C\u5230\u5E95\u4E5F\u5C55\u793A\u5173\u952E\u6784\u56FE\u4E0E\u52A8\u4F5C\u3002\u9700\u8981\u62C6\u5206\u751F\u6210\u65F6\u53E6\u5C55\u793A\u5206\u6BB5\u8868\uFF08\u6BB5\u53F7\u3001\u5168\u7247\u65F6\u95F4\u3001\u751F\u6210\u65F6\u957F\u3001\u751F\u6210/\u7EED\u62CD\u3001\u4E3B\u8981\u753B\u9762\u4E0E\u65B0\u5BF9\u767D\u3001\u8D77\u6B62\u72B6\u6001\u53CA\u4EA4\u63A5\uFF09\u3002\u6309\u5F53\u524D\u6A21\u578B\u548C\u5B9E\u9645\u5206\u6BB5\u89C4\u5219\u6838\u5BF9\uFF0C\u4E0D\u8C03\u7528\u751F\u6210\u5DE5\u5177\u8BD5\u7B97\uFF0C\u4E0D\u6309\u5206\u955C\u6570\u589E\u52A0\u4ED8\u8D39\u8C03\u7528\u3002\u7528\u672C\u5730HTML/SVG\u753B\u5E76present\u672C\u7248\u6784\u56FE\u4E0E\u52A8\u4F5C\u793A\u610F\u56FE\uFF0C\u660E\u786E\u6807\u6CE8\u201C\u793A\u610F\uFF0C\u975E\u5B9E\u9645\u751F\u6210\u753B\u9762\u201D\uFF0C\u518D\u5F39\u811A\u672C\u5BA1\u6838\u7A97\u3002\u6539\u7A3F\u540C\u6B65\u66F4\u65B0\u56FE\u8868\uFF0C\u4E0D\u589E\u52A0\u7B2C\u4E09\u9053\u786E\u8BA4\uFF1B\u793A\u610F\u56FE\u4E0D\u80FD\u4EE3\u66FF\u771F\u5B9E\u9010\u6BB5\u9884\u89C8\u3002\u9ED8\u8BA4\u4E0D\u8C03\u7528\u4ED8\u8D39\u51FA\u56FE\u6A21\u578B\uFF0C\u7528\u6237\u9700\u8981AI\u6548\u679C\u56FE\u65F6\u5148\u786E\u8BA4\u53EF\u7528\u5DE5\u5177\u548C\u8D39\u7528\uFF0C\u4E0D\u5047\u79F0\u63D2\u4EF6\u5DF2\u6709\u6587\u751F\u56FE\u80FD\u529B\u3002",
+    "\xB7 \u811A\u672C\u5C55\u793A\u662F\u5BA1\u6838\u7684\u5F3A\u5236\u524D\u7F6E\uFF1A\u9996\u6B21\u548C\u6BCF\u6B21\u6539\u7A3F\u5148\u4FDD\u5B58\u672C\u7248\u5B8C\u6574script.md\uFF08\u72B6\u6001\u4E3A\u8349\u7A3F\u3001\u6CE8\u660E\u7248\u672C\uFF09\uFF0C\u518D\u5728\u7528\u6237\u53EF\u89C1\u6B63\u6587\u5C55\u793A\u6545\u4E8B\u3001\u89C4\u683C/\u98CE\u683C\u3001\u4EBA\u7269\u6216\u4E3B\u4F53\u3001\u5206\u955C\u65F6\u95F4\u8868\u3001\u5B8C\u6574\u5BF9\u767D/\u58F0\u97F3\u4E0E\u7ED3\u5C3E\uFF1B\u53EA\u5199\u6587\u4EF6\u3001\u7ED9\u8DEF\u5F84\u3001\u6458\u8981\u3001\u4FEE\u6539\u70B9\u6216\u793A\u610F\u56FE\u4E0D\u7B97\u5C55\u793A\u3002\u6709present/\u6587\u4EF6\u5C55\u793A\u5DE5\u5177\u65F6\u53E6\u884C\u5C55\u793A\u672C\u7248script.md\uFF0C\u7B49\u5F85\u8C03\u7528\u5B8C\u6210\u540E\u624D\u8C03\u7528\u5BA1\u6838\u63D0\u95EE\u5DE5\u5177\uFF0C\u7981\u6B62\u5E76\u884C\u6216\u540C\u4E00\u5DE5\u5177\u6279\u6B21\u540C\u65F6\u53D1\u51FA\u3002\u5C55\u793A\u5931\u8D25\u3001\u4E0D\u652F\u6301Markdown\u6216\u5DE5\u5177\u7F3A\u5931\u65F6\uFF0C\u5148\u5728\u6B63\u6587\u5B8C\u6574\u8D34\u51FA\u811A\u672C\uFF0C\u518D\u63D0\u95EE\u3002\u5BA1\u6838\u7A97\u53E3\u53EA\u7528\u4E8E\u7B80\u77ED\u786E\u8BA4\uFF0C\u7981\u6B62\u628A\u5B8C\u6574\u811A\u672C\u653E\u5165question\u3001header\u3001\u9009\u9879\u6216\u9009\u9879\u63CF\u8FF0\uFF1B\u811A\u672C\u4E0E\u793A\u610F\u56FE\u5148\u5728\u7A97\u53E3\u5916\u5B8C\u6574\u5C55\u793A\uFF0C\u7B49\u5F85\u5B8C\u6210\u518D\u63D0\u95EE\u3002\u5DF2\u5F39\u7A97\u5374\u6F0F\u5C55\u793A\u65F6\uFF0C\u5148\u8865\u5B8C\u6574\u811A\u672C\u5E76\u91CD\u65B0\u5BA1\u6838\uFF0C\u4E0D\u6CBF\u7528\u8BE5\u6B21\u7B54\u590D\uFF0C\u4E0D\u8FDB\u5165\u5236\u4F5C\u786E\u8BA4\u6216\u751F\u6210\u3002",
+    "\xB7 \u811A\u672Cscript.md\u7684\u5143\u4FE1\u606F\u7EDF\u4E00\u7528\u4E2D\u6587\uFF1A\u7248\u672C\uFF08\u7B2C1\u7248\u3001\u7B2C2\u7248\uFF09\u3001\u72B6\u6001\uFF08\u8349\u7A3F/\u5DF2\u5BA1\u6838/\u5DF2\u786E\u8BA4\u5236\u4F5C\uFF09\u3001\u5BA1\u6838\u65F6\u95F4\u3001\u5BA1\u6838\u4EBA\u3001\u5236\u4F5C\u786E\u8BA4\u65F6\u95F4\u3001\u5236\u4F5C\u786E\u8BA4\u4EBA\uFF1B\u786E\u8BA4\u4EBA\u586B\u201C\u7528\u6237\u201D\uFF0C\u672A\u786E\u8BA4\u7684\u65F6\u95F4\u548C\u4EBA\u5458\u7559\u7A7A\u3002\u6539\u7A3F\u9000\u56DE\u8349\u7A3F\uFF0C\u6E05\u7A7A\u5BA1\u6838\u4E0E\u5236\u4F5C\u786E\u8BA4\u7684\u65F6\u95F4\u53CA\u4EBA\u5458\u3002\u8BFB\u53D6\u65E7\u811A\u672C\u65F6\u8BC6\u522B\u539F\u82F1\u6587\u5143\u4FE1\u606F\u5E76\u5728\u4E0B\u6B21\u4FDD\u5B58\u65F6\u8F6C\u6362\u4E3A\u4E2D\u6587\uFF0C\u4E0D\u6539\u53D8\u65E2\u6709\u786E\u8BA4\u4E8B\u5B9E\u3002\u6B64\u7EA6\u5B9A\u4EC5\u7528\u4E8E\u7528\u6237\u53EF\u89C1\u811A\u672C\uFF0C\u4E0D\u4FEE\u6539\u5DE5\u5177\u6216\u63A5\u53E3\u7684JSON\u5B57\u6BB5\u3002",
+    "\xB7 \u811A\u672C\u5BA1\u6838\u6807\u9898\u987B\u6982\u62EC\u5F53\u524D\u811A\u672C\u4E3B\u9898\uFF0C\u5728\u7A97\u53E3\u5916\u4F7F\u7528\u7B80\u77ED\u4E3B\u9898\u540D\uFF1B\u7A97\u53E3header\u4E0D\u8D85\u8FC712\u4E2A\u6C49\u5B57\uFF0C\u4F8B\u5982\u201C\u96E8\u591C\u91CD\u9022\xB7\u7B2C2\u7248\u201D\uFF1B\u7981\u6B62\u76F4\u63A5\u4F7F\u7528\u6216\u62FC\u63A5\u7528\u6237\u8F93\u5165\u7684\u5B8C\u6574\u5185\u5BB9\u3002\u6807\u9898\u4EC5\u4F5C\u6982\u62EC\uFF0C\u4E0D\u6539\u52A8\u65B9\u6848\uFF1B\u5B8C\u6574\u811A\u672C\u653E\u5728\u7A97\u53E3\u5916\u7684\u4F1A\u8BDD\u6B63\u6587\u548C\u72EC\u7ACB\u6587\u4EF6\u4E2D\uFF0C\u4ECD\u987B\u5148\u5B8C\u6574\u5C55\u793A\u518D\u5BA1\u6838\u3002\u63D0\u95EE\u5DE5\u5177\u6807\u9898\u957F\u5EA6\u53D7\u9650\u65F6\uFF0C\u7F29\u77ED\u4E3B\u9898\u6216\u4F7F\u7528\u201C\u7B2CN\u7248\u811A\u672C\u5BA1\u6838\u201D\uFF0C\u4E0D\u8981\u622A\u53D6\u957F\u8F93\u5165\u5145\u5F53\u6807\u9898\u3002",
+    "\xB7 \u5BA1\u6838\u63D0\u95EE\u6BCF\u6B21\u4EC5\u521B\u5EFA\u4E00\u4E2A\u95EE\u9898\uFF0Cheader\u4E0D\u8D85\u8FC712\u4E2A\u6C49\u5B57\uFF08\u5982\u201C\u9E66\u9E49\u5B66\u95E8\u94C3\xB7\u7B2C1\u7248\u201D\uFF0C\u8FC7\u957F\u5C31\u7528\u201C\u7B2C1\u7248\u811A\u672C\u5BA1\u6838\u201D\uFF09\uFF1Bquestion\u53EA\u5199\u4E00\u53E5\u201C\u8FD9\u7248\u811A\u672C\u53EF\u4EE5\u5417\uFF1F\u901A\u8FC7\u540E\u518D\u786E\u8BA4\u662F\u5426\u5236\u4F5C\u3002\u201D\uFF0C\u4E0D\u8D85\u8FC760\u5B57\u3002\u4E24\u4E2A\u9009\u9879\u4E3A\u201C\u8FD9\u7248\u53EF\u4EE5\uFF0C\u8FDB\u5165\u4E0B\u4E00\u6B65\u201D\u548C\u201C\u5148\u4FEE\u6539\uFF0C\u518D\u5BA1\u6838\u201D\uFF0C\u9009\u9879\u63CF\u8FF0\u5982\u9700\u586B\u5199\u4EC5\u7528\u7B80\u77ED\u8BF4\u660E\u3002\u4E0D\u5F97\u628A\u6545\u4E8B\u3001\u89C4\u683C\u3001\u5206\u955C\u3001\u53F0\u8BCD\u62C6\u6210\u591A\u4E2A\u5BA1\u6838\u95EE\u9898\uFF1B\u4E0D\u5F97\u62FC\u63A5\u6574\u7BC7\u811A\u672C\u6216\u7528\u5B57\u9762\u53CD\u659C\u6760n\u4EE3\u66FF\u6B63\u6587\u771F\u5B9E\u6362\u884C\u3002\u4E3B\u9898\u6982\u62EC\u653E\u5728\u7A97\u53E3\u5916\u7684\u811A\u672C\u6807\u9898\u4E2D\u3002\u5236\u4F5C\u786E\u8BA4\u53E6\u8D77\u4E00\u6B21\u63D0\u95EE\uFF0C\u4ECD\u4FDD\u7559\u4E24\u9053\u786E\u8BA4\u3002",
+    "\xB7 \u4FEE\u6539\u65B9\u5411\u786E\u8BA4\uFF1A\u7528\u6237\u5DF2\u660E\u786E\u8BF4\u51FA\u4FEE\u6539\u8981\u6C42\u65F6\u76F4\u63A5\u6309\u8981\u6C42\u6539\u7A3F\uFF0C\u4E0D\u518D\u5F39\u65B9\u5411\u9009\u62E9\u3002\u4EC5\u201C\u4FEE\u6539\u4E00\u4E0B\u201D\u7B49\u65B9\u5411\u4E0D\u660E\u786E\u65F6\uFF0C\u624D\u95EE\u4E00\u4E2A\u7B80\u77ED\u95EE\u9898\uFF0C\u9ED8\u8BA4\u63D0\u4F9B2\u20133\u4E2A\u4E92\u65A5\u7684\u5355\u9009\u65B9\u5411\uFF08multi_select\u4E3Afalse\u6216\u7701\u7565\uFF09\uFF0C\u9009\u9879\u6807\u7B7E\u4E0D\u8D85\u8FC712\u4E2A\u6C49\u5B57\u3001\u63CF\u8FF0\u4E0D\u8D85\u8FC7\u4E00\u884C\uFF1B\u4E0D\u9ED8\u8BA4\u7ED9\u51FA5\u9879\u591A\u9009\uFF0C\u4E0D\u6DFB\u52A0\u201C\u6211\u81EA\u5DF1\u8BF4\u201D\u7B49\u7A7A\u64CD\u4F5C\u9009\u9879\uFF0C\u81EA\u7531\u8F93\u5165\u7531\u5BBF\u4E3B\u63D0\u4F9B\u3002\u63D0\u95EE\u4E2D\u7B80\u77ED\u63D0\u793A\u201C\u9009\u597D\u540E\u70B9\u51FB\u63D0\u4EA4\uFF0C\u4E5F\u53EF\u76F4\u63A5\u8F93\u5165\u4FEE\u6539\u8981\u6C42\u201D\u3002\u53EA\u6709\u7528\u6237\u660E\u786E\u8981\u7EC4\u5408\u591A\u4E2A\u65B9\u5411\u65F6\u624D\u4F7F\u7528\u591A\u9009\uFF0C\u5E76\u8BF4\u660E\u201C\u53EF\u591A\u9009\uFF0C\u9009\u5B8C\u70B9\u51FB\u63D0\u4EA4\u201D\uFF1B\u65B9\u5411\u7B54\u590D\u53EA\u662F\u6539\u7A3F\u8981\u6C42\uFF0C\u4E0D\u7B49\u4E8E\u811A\u672C\u5BA1\u6838\u6216\u5236\u4F5C\u6388\u6743\u3002",
+    "\xB7 \u811A\u672C\u5BA1\u6838\u4E0E\u5236\u4F5C\u786E\u8BA4\u5728\u63D0\u95EE\u5DE5\u5177\u53EF\u7528\u65F6\u5FC5\u987B\u5B9E\u9645\u8C03\u7528 ask_user_question\uFF08\u6309\u4F1A\u8BDD\u5B9E\u9645\u540D\u79F0\uFF09\u5F39\u51FA\u4EA4\u4E92\u7A97\u53E3\uFF0C\u6B63\u6587\u95EE\u53E5\u4E0D\u80FD\u4EE3\u66FF\u3002\u9996\u6B21\u53CA\u6BCF\u6B21\u6539\u7A3F\u90FD\u8981\uFF1A\u9000\u56DE\u8349\u7A3F\u5E76\u6E05\u7A7A\u65E7\u5BA1\u6838/\u5236\u4F5C\u540C\u610F \u2192 \u4FEE\u6539\u5E76\u5C55\u793A\u4FEE\u6539\u70B9\u4E0E\u5B8C\u6574\u5F53\u524D\u7248\u811A\u672C \u2192 \u540C\u4E00\u8F6E\u91CD\u65B0\u8C03\u7528\u63D0\u95EE\u5DE5\u5177\uFF0C\u521B\u5EFA\u201C\u7B2CN\u7248\u811A\u672C\u5BA1\u6838\u201D\u65B0\u95EE\u9898\uFF08\u5982script_review_v2\uFF09\uFF0C\u9009\u9879\u201C\u8FD9\u7248\u811A\u672C\u53EF\u4EE5\uFF0C\u8FDB\u5165\u4E0B\u4E00\u6B65 / \u5148\u6539\u4E00\u4E0B\uFF0C\u6211\u518D\u770B\u770B\u201D\u3002\u4E0D\u590D\u7528\u65E7\u7B54\u6848\uFF0C\u4E0D\u56E0\u6539\u52A8\u5C0F\u3001\u5DF2\u5F39\u8FC7\u4E00\u6B21\u6216\u7528\u6237\u5728\u804A\u5929\u63D0\u4FEE\u6539\u610F\u89C1\u800C\u7701\u7565\u7A97\u53E3\u3002\u5F53\u524D\u7248\u660E\u786E\u901A\u8FC7\u540E\u624D\u5355\u72EC\u5F39\u8D39\u7528\u4E0E\u5236\u4F5C\u786E\u8BA4\uFF1B\u4FEE\u6539\u610F\u89C1\u3001\u65E7\u7248\u901A\u8FC7\u3001\u672A\u7B54\u3001\u8DF3\u8FC7\u3001\u53D6\u6D88\u3001\u8D85\u65F6\u3001pending\u90FD\u4E0D\u662F\u901A\u8FC7\u3002\u5DE5\u5177\u652F\u6301timeout\u65F6\u7528-1\u7B49\u5F85\u660E\u786E\u56DE\u7B54\u3002\u53EA\u6709\u63D0\u95EE\u5DE5\u5177\u786E\u5B9E\u4E0D\u5B58\u5728\u6216\u660E\u786E\u62A5\u9519\u4E0D\u53EF\u7528\u624D\u56DE\u9000\u6587\u5B57\u5BA1\u6838\uFF0C\u7ED3\u675F\u672C\u8F6E\u7B49\u56DE\u590D\u3002",
     `\xB7 \u65B0\u89C6\u9891\u7528 video_generate\uFF0Cduration \u4F20\u76EE\u6807\u603B\u79D2\u6570\u3002**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 ${singleMax} \u79D2\uFF08\u5355\u6BB5\u4E0A\u9650\uFF09\u7684\u6574\u6761\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u6309\u53D9\u4E8B\u955C\u5934\u62C6\u6210\u591A\u6B21 video_generate \u518D\u62FC\u63A5**\u2014\u2014\u4F8B\u5982\u300C15 \u79D2\u300D\u5C31\u662F\u4E00\u6B21 15 \u79D2\uFF0C\u4E0D\u8BB8\u62C6\u6210 8+7\uFF1B\u6309\u6545\u4E8B\u9009\u62E9\u4E00\u955C\u5230\u5E95\u6216\u5C11\u91CF\u6709\u52A8\u673A\u7684\u5207\u955C\uFF0C\u955C\u5934\u65B9\u6848\u5148\u5199\u8FDB\u5F85\u5BA1\u6838\u811A\u672C\uFF0C\u5DF2\u5BA1\u6838\u7684\u5207\u955C\u5728\u540C\u4E00\u6B21\u751F\u6210\u63D0\u793A\u8BCD\u4E2D\u5B89\u6392\uFF1B\u7528\u6237\u6307\u5B9A\u7684\u955C\u5934\u5F62\u5F0F\u4F18\u5148\u3002\u8D85\u8FC7\u4E0A\u9650\u65F6\uFF08\u5982 20 \u79D2\uFF09\u4F1A\u81EA\u52A8\u62C6\u6210\u9996\u6BB5 + \u82E5\u5E72\u7EED\u62CD\u6BB5\u518D\u5408\u5E76\u2014\u2014\u90A3\u662F\u540C\u4E00\u6761\u89C6\u9891\u5F80\u4E0B\u7EED\u62CD\uFF0C\u4E0D\u662F\u591A\u955C\u62FC\u63A5\u3002\u6240\u4EE5\u300C20 \u79D2\u89C6\u9891\u300D\u76F4\u63A5\u4F20 duration=20\uFF0C\u4E0D\u7528\u62C6\u6210\u591A\u4E2A\u4EFB\u52A1\uFF0C\u4E5F\u4E0D\u7528\u8DDF\u7528\u6237\u89E3\u91CA\u300C\u6A21\u578B\u4E00\u6B21\u53EA\u80FD\u51FA 15 \u79D2\u300D\uFF1B**\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\u7684\u6210\u7247\u662F\u300C\u5FAA\u73AF\u8FED\u4EE3\u300D\u7684\uFF1A\u6BCF\u6BB5\u751F\u6210\u5B8C\u5148\u8FD4\u56DE\u89C6\u9891\u6210\u679C\u4F9B\u5C55\u793A\uFF0C\u7528\u6237\u9884\u89C8\u5E76\u786E\u8BA4\u540E\u518D\u7528 resume \u7EE7\u7EED\uFF0C\u4E0D\u8981\u7ED5\u8FC7\u5B83\u3001\u4E5F\u4E0D\u8981\u81EA\u5DF1\u62C6\u6210\u591A\u6B21\u751F\u6210**\uFF1B\u5206\u6BB5\u4EA4\u4ED8\u65F6\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir\u3001remainingSeconds\u2014\u2014\u8FD9\u65F6\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\u7ED9\u4ED6\uFF0C\u7B49\u4ED6\u8BF4\u300C\u7EE7\u7EED\u300D\u518D\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_generate \u7684 resume \u53C2\u6570\uFF08\u63D2\u4EF6\u63A5\u7740\u5DF2\u6709\u7684\u5206\u6BB5\u5F80\u4E0B\u505A\uFF0C\u524D\u9762\u51E0\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\u3001\u4E0D\u91CD\u590D\u6263\u8D39\uFF09\uFF0C\u4E0D\u8981\u4ECE\u5934\u518D\u6765\u4E00\u904D\uFF1B\u540C\u4E00\u4EFD\u6682\u505C\u8FDB\u5EA6\uFF08resumeDir\uFF09\u540C\u4E00\u65F6\u95F4\u53EA\u5141\u8BB8\u4E00\u6B21 resume \u5728\u8DD1\uFF1A\u5982\u679C\u7ED3\u679C\u8BF4\u300C\u5DF2\u7ECF\u6709\u4E00\u6B21\u300E\u7EE7\u7EED\u300F\u5728\u8DD1\u300D\uFF0C\u5C31\u8BA9\u7528\u6237\u7B49\u90A3\u4E00\u6B21\u8DD1\u5B8C\uFF08\u6216\u786E\u8BA4\u5B83\u5DF2\u4E2D\u65AD\u3001\u9501\u8FC7\u671F\uFF09\u518D\u7EE7\u7EED\uFF0C\u4E0D\u8981\u91CD\u590D\u53D1 resume\u2014\u2014\u91CD\u590D\u4F1A\u628A\u5269\u4E0B\u7684\u6BB5\u63D0\u4EA4\u4E24\u904D\u3001\u91CD\u590D\u6263\u8D39\uFF1B\u7528\u6237\u4E2D\u9014\u70B9\u4E86\u300C\u505C\u6B62\u300D\u6216\u8FD9\u4E00\u8F6E\u7B49\u8D85\u65F6\u4E5F\u4E00\u6837\uFF1A\u5DF2\u7ECF\u751F\u6210\u597D\u7684\u6BB5\u4F1A\u5148\u4E0B\u8F7D\u3001\u5408\u5E76\u3001\u4EA4\u4ED8\uFF08\u7ED3\u679C\u91CC\u540C\u6837\u662F paused=true + \u6210\u7247 + resumeDir\uFF09\uFF0C\u4E0D\u8981\u628A\u90A3\u51E0\u6BB5\u4E22\u6389\u91CD\u6765\uFF1B\u5355\u6761\u6210\u7247\u6700\u957F ${MAX_TOTAL_SECONDS} \u79D2\uFF08\u6700\u591A ${MAX_SEGMENTS} \u6BB5\uFF09\uFF0C\u7528\u6237\u8981\u66F4\u957F\u7684\u5C31\u6309 ${MAX_TOTAL_SECONDS} \u79D2\u751F\u6210\u5E76\u8BF4\u660E\u8FD9\u662F\u63D2\u4EF6\u5F53\u524D\u7684\u4E0A\u9650\uFF0C\u4E0D\u8981\u53CD\u590D\u52A0\u5927 duration\uFF1B\u6210\u7247\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\u3002`,
     "\xB7 \u7ED9\u5DF2\u6709\u89C6\u9891\u63A5\u957F\u7528 video_extend\uFF0C\u8F93\u5165\u5FC5\u987B\u662F\u516C\u7F51 URL\uFF1B\u63D0\u793A\u8BCD\u4EE5\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D\u6216\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\u5F00\u5934\uFF0C\u5168\u7A0B\u7528\u300C\u89C6\u98911\u300D\u6307\u4EE3\u7D20\u6750\uFF0C\u4E0D\u8981\u5199\u300C\u53C2\u8003\u89C6\u98911\u300D\uFF1B\u5199\u6E05\u5EF6\u957F\u65B9\u5411\u3001\u5267\u60C5\u53D1\u5C55\u3001\u4E3B\u4F53\u72B6\u6001\u3001\u955C\u5934\u8FD0\u52A8\u3001\u58F0\u97F3\u5EF6\u7EED\uFF08\u80CC\u666F\u97F3\u4E50\u63A5\u5728\u89C6\u98911\u7ED3\u5C3E\u5904\u3001\u4E0D\u8981\u4ECE\u5934\u64AD\u653E\uFF0C\u73AF\u5883\u58F0\u548C\u5BF9\u767D\u4E5F\u8981\u8FDE\u7EED\uFF09\uFF1B\u6BCF\u6BB5 4 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09 \u79D2\uFF0C\u9ED8\u8BA4\u6309\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\uFF1B\u8FDE\u7740\u5EF6\u957F\u591A\u6BB5\u65F6\u6BCF\u6BB5\u5B8C\u6210\u5148\u4EA4\u4ED8\u9884\u89C8\uFF0C\u7528\u6237\u786E\u8BA4\u540E\u7528 resume \u7EE7\u7EED\uFF0C\u5E76\u9ED8\u8BA4\u4E0B\u8F7D\u5206\u6BB5\u5728\u672C\u673A\u5408\u5E76\u6210\u4E00\u6761\u6210\u7247\uFF08\u7F3A ffmpeg \u4F1A\u5148\u62E6\u4E0B\u6765\u95EE\uFF09\uFF1B\u7528\u6237\u70B9\u300C\u62D2\u7EDD\u300D\u6216\u4E2D\u9014\u88AB\u505C\u6B62\u65F6\uFF0C\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u90E8\u5206\u7167\u6837\u5148\u4EA4\u4ED8\uFF08paused=true + resumeDir\uFF09\uFF0C\u4E4B\u540E\u628A resumeDir \u4F20\u7ED9 video_extend \u7684 resume \u53C2\u6570\u63A5\u7740\u505A\u5373\u53EF\uFF0C\u4E0D\u91CD\u590D\u751F\u6210\u3001\u4E0D\u91CD\u590D\u6263\u8D39\u3002",
     "\xB7 \u751F\u6210\u901A\u5E38\u8981\u51E0\u5206\u949F\uFF1A\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout \u4E0D\u7B49\u4E8E\u5931\u8D25\uFF0C\u7528 video_status \u52A0 taskId \u7EE7\u7EED\u67E5\uFF08\u4E0A\u6E38\u94FE\u63A5\u7EA6 24 \u5C0F\u65F6\u5185\u6709\u6548\uFF09\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u540C\u4E00\u6BB5\u3002",
@@ -3618,17 +3531,290 @@ function buildPromptGuidance(config) {
     "\xB7 \u4EC5 A \u670D\u52A1\u7AEF\u6A21\u5F0F\u6CA1\u6709 API Key \u65F6\uFF1A\u8BA9\u7528\u6237\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u70B9\u300C\u767B\u5F55\u300D\uFF0C\u7528\u90AE\u7BB1\u6536\u9A8C\u8BC1\u7801\u9886\u4E00\u628A\uFF08\u4E00\u4E2A\u90AE\u7BB1\u53EA\u53D1\u4E00\u628A\uFF0C\u9ED8\u8BA4\u989D\u5EA6 \xA50.01\uFF09\uFF0C\u6210\u529F\u540E\u4E0A\u6E38 / Key / \u5730\u5740 / \u6A21\u578B\u4F1A\u81EA\u52A8\u586B\u597D\uFF1B\u8BBE\u7F6E\u9875\u8FD8\u80FD\u770B\u5230\u8FD9\u628A Key \u7684\u5269\u4F59 / \u5DF2\u7528\u989D\u5EA6\u548C\u6700\u8FD1\u51E0\u6B21\u51FA\u7247\u7684\u4F7F\u7528\u8BB0\u5F55\u3002"
   ].join("\n");
 }
+
+// src/workflow/costs.ts
+function formatAmount(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "0";
+  const text = number.toFixed(Math.abs(number) >= 1 ? 2 : 4);
+  return text.includes(".") ? text.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "") : text;
+}
+function formatMoney(value, symbol = "\xA5") {
+  return `${symbol}${formatAmount(value)}`;
+}
+function estimateRate(model, usesReference) {
+  const id = String(model || "").toLowerCase();
+  const hit = ESTIMATE_RATES.find(([prefix]) => id.startsWith(prefix));
+  const table = hit ? hit[1] : ESTIMATE_RATES[0][1];
+  return usesReference ? table.video : table.none;
+}
+function estimatePlan(config, toolName, args) {
+  if (toolName === "video_extend") {
+    const count = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
+    const fallback = modelMaxSeconds(config);
+    const seconds = clampInteger(
+      args?.duration ?? fallback,
+      MIN_SECONDS,
+      modelMaxSeconds(config),
+      fallback
+    );
+    return Array.from({ length: count }, () => ({ kind: "extend", seconds }));
+  }
+  return resolveTargetPlan(config, args).plan;
+}
+function estimateSteps(config, steps) {
+  const resolution = FIXED_RESOLUTION;
+  const pixels = ESTIMATE_PIXELS[resolution] || ESTIMATE_PIXELS[FIXED_RESOLUTION];
+  const tokensPerSecond = pixels[0] * pixels[1] * ESTIMATE_FPS / ESTIMATE_TOKEN_DIVISOR;
+  const model = resolveModel(config);
+  return {
+    model,
+    resolution,
+    segments: steps.map((step, index) => {
+      const usesReference = step.usesReference === true;
+      const tokens = Math.round(tokensPerSecond * step.seconds);
+      return {
+        index: index + 1,
+        kind: step.kind,
+        seconds: step.seconds,
+        tokens,
+        usesReference,
+        usd: tokens * estimateRate(model, usesReference) / 1e6
+      };
+    })
+  };
+}
+function estimateUsage(config, toolName, args) {
+  const plan = estimatePlan(config, toolName, args);
+  const referenceImages = Array.isArray(args?.referenceImages) ? args.referenceImages : args?.referenceImages ? [args.referenceImages] : [];
+  const hasFrame = Boolean(
+    String(args?.firstFrameUrl ?? "").trim() || String(args?.lastFrameUrl ?? "").trim() || referenceImages.length
+  );
+  const groupRatio = finiteNumber(ref(config, "estimateGroupRatio", 0.8)) ?? 1;
+  const { model, resolution, segments } = estimateSteps(
+    config,
+    plan.map((step) => ({ ...step, usesReference: step.kind === "extend" || hasFrame }))
+  );
+  const usd = segments.reduce((sum, item) => sum + item.usd, 0) * groupRatio;
+  return {
+    model,
+    resolution,
+    segments,
+    seconds: segments.reduce((sum, item) => sum + item.seconds, 0),
+    tokens: segments.reduce((sum, item) => sum + item.tokens, 0),
+    usd: Math.round(usd * 1e6) / 1e6
+  };
+}
+
+// src/workflow/approval.ts
+async function fetchDeviceQuota(config, signal) {
+  if (isManualKey(config)) return { status: "unknown", reason: `${connectionLabel(config)}\u8D39\u7528\u548C\u4F59\u989D\u8BF7\u5728\u6E20\u9053\u63A7\u5236\u53F0\u67E5\u770B` };
+  const api = resolveRegisterApi(config);
+  const deviceId = String(ref(config, "deviceId", "")).trim();
+  const deviceSecret = String(ref(config, "deviceSecret", "")).trim();
+  if (!deviceId || !deviceSecret) {
+    return {
+      status: "unknown",
+      reason: "\u63D2\u4EF6\u91CC\u6CA1\u6709\u672C\u673A\u8BBE\u5907\u51ED\u636E\uFF08\u5728\u8BBE\u7F6E\u9875\u70B9\u4E00\u6B21\u300C\u767B\u5F55\u300D\u4F1A\u5199\u8FDB\u6765\uFF0C\u4E4B\u540E\u5C31\u80FD\u81EA\u52A8\u6821\u9A8C\u989D\u5EA6\uFF09"
+    };
+  }
+  const timeout = AbortSignal.timeout(15e3);
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  try {
+    const response = await fetch(`${api}/api/v1/register/quota`, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "X-Register-Token": String(ref(config, "registerToken", "")).trim() || DEFAULT_REGISTER_TOKEN,
+        ...PLUGIN_VERSION ? { "X-Plugin-Version": PLUGIN_VERSION } : {}
+      },
+      body: JSON.stringify({ device_id: deviceId, device_secret: deviceSecret }),
+      signal: requestSignal
+    });
+    const text = await response.text();
+    let body = {};
+    if (text) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = { message: text.slice(0, 200) };
+      }
+    }
+    if (!response.ok || body && typeof body === "object" && body.code) {
+      return {
+        status: "unknown",
+        reason: body && (body.message || body.detail) || `HTTP ${response.status}`
+      };
+    }
+    return { status: "ok", data: body && body.data || body || {} };
+  } catch (error) {
+    return { status: "unknown", reason: error?.message || String(error) };
+  }
+}
+function approvalPolicy(ctx, exec) {
+  try {
+    const approval = ctx.get("approval");
+    if (!approval) return "missing";
+    const session = exec?.agent?.session;
+    const override = session && typeof approval.overrideOf === "function" ? approval.overrideOf(session) : void 0;
+    return override || approval.config?.policy || "ask";
+  } catch {
+    return "ask";
+  }
+}
+function planSummary(estimate) {
+  if (!estimate) return "\u65F6\u957F\u672A\u77E5";
+  const sizes = estimate.segments.map((item) => `${item.seconds}s`).join(" + ");
+  return `${estimate.segments.length} \u6BB5\uFF08${sizes}\uFF09\u5171 ${estimate.seconds} \u79D2`;
+}
+function setupGate(ctx, exec) {
+  const args = exec.arguments && typeof exec.arguments === "object" ? exec.arguments : {};
+  if (args?.install !== true) return { kind: "allow" };
+  const { os: os3, installs, bootstrap } = ffmpegInstallOptions();
+  const command = String(args?.target || "ffmpeg") === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
+  if (approvalPolicy(ctx, exec) === "never") {
+    return {
+      kind: "deny",
+      reason: `\u5F53\u524D\u6743\u9650\u6A21\u5F0F\u5173\u95ED\u4E86\u5BA1\u6279\u63D0\u793A\uFF08\u5B8C\u5168\u8BBF\u95EE\uFF09\uFF0C\u88C5\u73AF\u5883\u8FD9\u79CD\u4F1A\u5728\u672C\u673A\u8DD1\u547D\u4EE4\u7684\u64CD\u4F5C\u6CA1\u6CD5\u786E\u8BA4\uFF0C\u5DF2\u505C\u6B62\u3002\u628A\u6743\u9650\u5207\u5230\u300C\u5DE5\u4F5C\u533A\u5199\u5165\u300D\u6216\u300C\u53EA\u8BFB\u300D\u540E\u518D\u8BA9\u6211\u88C5\uFF1B\u4E5F\u53EF\u4EE5\u7167\u7740\u8FD9\u6761\u547D\u4EE4\u81EA\u5DF1\u5728\u7EC8\u7AEF\u6267\u884C\uFF1A${command}\uFF08${os3}\uFF09\u3002`
+    };
+  }
+  return {
+    kind: "ask",
+    reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u5728 ${os3} \u4E0A\u6267\u884C\u5B89\u88C5\u547D\u4EE4\u300C${command}\u300D\u3002`,
+    displayReason: {
+      zh: `\u51C6\u5907\u5728\u8FD9\u53F0\u7535\u8111\u4E0A\u88C5 ffmpeg\uFF1A${command}\uFF08${os3}\uFF09\u3002\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u6267\u884C\uFF0C\u88C5\u5B8C\u4F1A\u81EA\u52A8\u63A5\u7740\u628A\u89C6\u9891\u751F\u6210\u51FA\u6765\u3002`,
+      en: `About to install ffmpeg on this machine: ${command} (${os3}). It runs only after you allow it; the video generation continues right after.`
+    }
+  };
+}
+async function ffmpegConsentGate(config, exec, args) {
+  if (exec.name !== "video_generate" && exec.name !== "video_extend") return null;
+  if (args?.merge === false) return null;
+  let plan = null;
+  let doneSteps = [];
+  try {
+    const gateArgs = await estimateArgsFor(config, exec.name, args);
+    plan = estimatePlan(config, exec.name, gateArgs);
+    const dir = resumeDirOf(args?.resume);
+    if (dir) {
+      const data = await readPauseFile(dir);
+      doneSteps = (data.steps || []).map((step) => ({ kind: step.kind, seconds: step.seconds }));
+    }
+  } catch {
+    plan = null;
+  }
+  const allSteps = [...doneSteps, ...plan || []];
+  if (!plan || allSteps.length < 2) return null;
+  if (await hasFfmpeg(config, exec.signal)) return null;
+  const { os: os3, installs } = ffmpegInstallOptions();
+  const command = installs[0].command;
+  const sizes = allSteps.map((step) => `${step.seconds}s`).join(" + ");
+  const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
+  const lines = [
+    `\u672C\u673A\u6CA1\u6709 ${binary}\uFF0C\u8FD9\u6761\u6210\u7247\u662F ${allSteps.reduce((sum, step) => sum + step.seconds, 0)} \u79D2\uFF08\u4F1A\u62C6\u6210 ${allSteps.length} \u6BB5\uFF1A${sizes}\uFF09\uFF0C\u6CA1\u6709 ffmpeg \u5C31\u6CA1\u6CD5\u5408\u5E76\u6210\u4E00\u6761\uFF0C\u6240\u4EE5\u5148\u505C\u4E0B\u6765\u4E86\uFF0C\u8FD8\u6CA1\u6709\u8C03\u7528\u6A21\u578B\u3001\u6CA1\u6709\u4EA7\u751F\u8D39\u7528\u3002`,
+    "\u8BF7\u5728\u5BF9\u8BDD\u6846\u91CC\u5148\u548C\u7528\u6237\u786E\u8BA4\uFF0C\u4E0D\u8981\u81EA\u5DF1\u7ED5\u8FC7\u8FD9\u4E00\u6B65\uFF1A",
+    `1) \u95EE\u7528\u6237\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg \u2014\u2014 \u8BF4\u6E05\u4ED6\u7684\u7CFB\u7EDF\uFF08${os3}\uFF09\u548C\u547D\u4EE4\uFF1A${command}`,
+    "   \uFF08\u88C5\u597D\u540E\u91CD\u8DD1\u8FD9\u6B21\u751F\u6210\u5C31\u4F1A\u81EA\u52A8\u5408\u5E76\u6210\u4E00\u6761\uFF0C\u5206\u6BB5\u4E0D\u7528\u91CD\u65B0\u751F\u6210\uFF09\u3002",
+    '2) \u7528\u6237\u540C\u610F\u5B89\u88C5\uFF1A\u8C03\u7528 video_setup\uFF08install:true\uFF09\u2014\u2014\u63D2\u4EF6\u4F1A\u6267\u884C\u4E0A\u9762\u7684\u547D\u4EE4\uFF0C\u5BBF\u4E3B\u4F1A\u5148\u628A\u8FD9\u6761\u547D\u4EE4\u62FF\u7ED9\u7528\u6237\u786E\u8BA4\uFF1B\u88C5\u5B8C\u5B83\u4F1A\u81EA\u5DF1\u9A8C\u8BC1\uFF0C\u6210\u529F\u540E\u4F60\u6309\u539F duration \u91CD\u65B0\u8C03\u7528 video_generate \u7EE7\u7EED\u751F\u6210\u5373\u53EF\uFF08\u4E00\u822C\u662F\u5148\u88C5\u5305\u7BA1\u7406\u5668\uFF1A\u672C\u673A\u8FDE brew \u90FD\u6CA1\u6709\u65F6\uFF0Cvideo_setup \u4F1A\u8FD4\u56DE nextStep\uFF0C\u7528 target:"package-manager" \u518D\u88C5\u4E00\u6B21\uFF09\u3002',
+    "3) \u7528\u6237\u4E0D\u60F3\u88C5\u3001\u6216\u8005\u88C5\u4E0D\u4E86\uFF1A\u5E26 `merge:false` \u91CD\u65B0\u8C03\u7528 video_generate\uFF0C\u63D2\u4EF6\u5C31\u53EA\u751F\u6210\u5E76\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u94FE\u63A5 + \u672C\u5730\u6587\u4EF6\uFF09\uFF0C\u8FD9\u6B21\u4E0D\u4F1A\u518D\u62E6\u3002",
+    "\u5DF2\u7ECF\u88C5\u8FC7\u4F46\u4E0D\u5728\u9ED8\u8BA4\u4F4D\u7F6E\u7684\u8BDD\uFF0C\u628A\u7EDD\u5BF9\u8DEF\u5F84\u586B\u8FDB\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\u4E5F\u4E00\u6837\u7BA1\u7528\uFF1B\u5B89\u88C5\u5305\u81EA\u5E26 ffprobe\uFF0C\u5206\u6BB5\u65F6\u957F\u63A2\u6D4B\u4F1A\u4E00\u8D77\u89E3\u51B3\u3002"
+  ];
+  return {
+    kind: "deny",
+    reason: lines.join("\n"),
+    info: { ffmpegMissing: true, os: os3, command, segments: allSteps.length }
+  };
+}
+async function estimateArgsFor(config, toolName, args) {
+  if (toolName !== "video_generate") return args;
+  const dir = resumeDirOf(args?.resume);
+  if (!dir) return args;
+  try {
+    const data = await readPauseFile(dir);
+    const restarted = resumePlanFrom(data, {
+      askedTotal: args?.duration == null ? null : clampInteger(args.duration, MIN_SECONDS, Number.MAX_SAFE_INTEGER, 0),
+      segmentSeconds: resolveSegmentSeconds(config, args?.segmentSeconds)
+    });
+    const seconds = sumStepSeconds(restarted.plan);
+    if (!(seconds > 0)) return args;
+    return { ...args, duration: seconds, referenceImages: [] };
+  } catch {
+    return args;
+  }
+}
+async function preflightGate(ctx, config, exec) {
+  if (exec.name === "video_setup") return setupGate(ctx, exec);
+  if (approvalPolicy(ctx, exec) === "never") {
+    return {
+      kind: "deny",
+      reason: "\u5F53\u524D\u6743\u9650\u6A21\u5F0F\u5173\u95ED\u4E86\u5BA1\u6279\u63D0\u793A\uFF08\u5B8C\u5168\u8BBF\u95EE\uFF09\uFF0C\u65E0\u6CD5\u505A\u4EBA\u5DE5\u786E\u8BA4\uFF0C\u5DF2\u505C\u6B62\u8C03\u7528\u3002\u628A\u6743\u9650\u5207\u5230\u300C\u5DE5\u4F5C\u533A\u5199\u5165\u300D\u6216\u300C\u53EA\u8BFB\u300D\u540E\u518D\u751F\u6210\u89C6\u9891\u3002"
+    };
+  }
+  const args = exec.arguments && typeof exec.arguments === "object" ? exec.arguments : {};
+  const consent = await ffmpegConsentGate(config, exec, args);
+  if (consent) return consent;
+  if (isManualKey(config)) {
+    assertConfigured(config, resolveApiKey(config));
+    return {
+      kind: "ask",
+      reason: `\u8C03\u7528${connectionLabel(config)} ${resolveModel(config)}\uFF0C\u6309\u6E20\u9053\u8D26\u6237\u5B9E\u9645\u7528\u91CF\u8BA1\u8D39\u3002`,
+      displayReason: { zh: `\u672C\u6B21\u5C06\u901A\u8FC7${connectionLabel(config)}\u751F\u6210\u89C6\u9891\uFF0C\u6309\u6E20\u9053\u8D26\u6237\u5B9E\u9645\u7528\u91CF\u8BA1\u8D39\u3002\u786E\u8BA4\u540E\u5F00\u59CB\u3002`, en: `Generate via ${connectionLabel(config)}, billed to your channel account. Confirm to continue.` }
+    };
+  }
+  let estimate = null;
+  try {
+    estimate = estimateUsage(config, exec.name, await estimateArgsFor(config, exec.name, args));
+  } catch {
+    estimate = null;
+  }
+  const quota = await fetchDeviceQuota(config, exec.signal);
+  const data = quota.status === "ok" ? quota.data : {};
+  const symbol = String(data.currency_symbol || "\xA5");
+  const perUnit = finiteNumber(data.quota_per_unit) ?? DEFAULT_QUOTA_PER_UNIT;
+  const exchange = finiteNumber(data.usd_exchange_rate) ?? DEFAULT_USD_EXCHANGE_RATE;
+  const needQuota = estimate ? Math.round(estimate.usd * perUnit) : null;
+  const needMoney = estimate ? formatMoney(estimate.usd * exchange, symbol) : null;
+  const remainQuota = finiteNumber(data.remain_quota);
+  const remainAmount = finiteNumber(data.remain_amount);
+  const costText = needMoney === null ? "\u8FD9\u6B21\u8C03\u7528\u7684\u8D39\u7528\u6CA1\u6CD5\u9884\u4F30" : `\u9884\u4F30 ${needMoney}`;
+  const remainMoneyText = `${formatMoney(remainAmount === null ? 0 : remainAmount, symbol)}`;
+  const remainZh = remainQuota === null ? `\u672C\u673A Key \u7684\u989D\u5EA6\u8BFB\u4E0D\u5230\uFF08${quota.reason || "\u670D\u52A1\u7AEF\u6CA1\u56DE\u989D\u5EA6"}\uFF09` : `\u672C\u673A Key \u5269\u4F59 ${remainMoneyText}`;
+  const remainEn = remainQuota === null ? `this key's quota could not be read (${quota.reason || "the service returned none"})` : `this key has ${remainMoneyText} left`;
+  if (needQuota !== null && remainQuota !== null && remainQuota < needQuota) {
+    return {
+      kind: "deny",
+      reason: `\u989D\u5EA6\u4E0D\u8DB3\uFF0C\u5DF2\u505C\u6B62\u8C03\u7528\uFF1A\u672C\u6B21\u9884\u4F30\u9700\u8981 ${needMoney ?? "\u65E0\u6CD5\u9884\u4F30"}\uFF0C\u8FD9\u628A Key \u53EA\u5269 ${remainMoneyText}\u3002\u8BF7\u5145\u503C\u6216\u627E\u7BA1\u7406\u5458\u6362\u4E00\u628A\u989D\u5EA6\u591F\u7684 Key \u540E\u91CD\u8BD5\u3002`
+    };
+  }
+  const total = estimate ? `${estimate.model} \xB7 ${estimate.resolution} \xB7 ${planSummary(estimate)}` : `${resolveModel(config)} \xB7 ${FIXED_RESOLUTION}`;
+  const auditTax = estimate ? `\u9884\u4F30\u6D88\u8017 ${estimate.tokens.toLocaleString("en-US")} token \u2248 ${needMoney ?? "\u65E0\u6CD5\u9884\u4F30"}\uFF08${needQuota === null ? "\u989D\u5EA6\u672A\u77E5" : `${needQuota.toLocaleString("en-US")} \u989D\u5EA6`}\uFF09` : "\u8FD9\u6B21\u8C03\u7528\u7684\u8D39\u7528\u65E0\u6CD5\u9884\u4F30";
+  return {
+    kind: "ask",
+    reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u8C03\u7528\u89C6\u9891\u6A21\u578B\uFF08${total}\uFF09\u3002${auditTax}\uFF1B\u672C\u673A Key \u5269\u4F59 ${remainQuota === null ? "\u989D\u5EA6\u8BFB\u4E0D\u5230" : `${remainMoneyText} / ${remainQuota.toLocaleString("en-US")} \u989D\u5EA6`}\u3002`,
+    displayReason: {
+      zh: `\u672C\u6B21\u4F1A\u8C03\u7528\u89C6\u9891\u6A21\u578B\uFF1A${total}\uFF1B${costText}\uFF0C${remainZh}\u3002\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u771F\u6B63\u8C03\u7528\u3002`,
+      en: `This will call the video model: ${total}. Estimated cost ${needMoney === null ? "unknown" : needMoney}; ${remainEn}. The call runs only after you allow it.`
+    }
+  };
+}
+
+// src/index.ts
+var inject = ["tools"];
 function asDisposer(value) {
   return typeof value === "function" ? value : void 0;
 }
 function apply(ctx, config = {}) {
   const deps = {};
   const disposers = [
-    ctx.tools.register(withResumeLock(jsonSafeTool(videoTool(config, deps, ctx)), "video_generate", config)),
-    ctx.tools.register(withResumeLock(jsonSafeTool(extendTool(config, deps, ctx)), "video_extend", config)),
-    ctx.tools.register(jsonSafeTool(taskTool(config))),
+    ctx.tools.register(withVideoExecution(withResumeLock(jsonSafeTool(videoTool(config, deps, ctx)), "video_generate", config))),
+    ctx.tools.register(withVideoExecution(withResumeLock(jsonSafeTool(extendTool(config, deps, ctx)), "video_extend", config))),
+    ctx.tools.register(withVideoExecution(jsonSafeTool(taskTool(config)))),
     ctx.tools.register(jsonSafeTool(setupTool(config)))
   ];
+  if (process.env.METAONTIC_VIDEO_INTERNAL_HYPERFRAMES === "1") {
+    disposers.push(ctx.tools.register(jsonSafeTool(hyperframesTool(config, deps))));
+  }
   const cleanup = ctx.inject(["settings"], (settingsCtx) => {
     disposers.push(settingsCtx.tools.register(jsonSafeTool(configTool(config, settingsCtx.settings))));
   });
@@ -3636,7 +3822,7 @@ function apply(ctx, config = {}) {
   const promptCleanup = ctx.inject(["systemPrompt"], (promptCtx) => promptCtx.systemPrompt.section({
     name: "plugin:metaontic-video",
     order: 5200,
-    text: buildPromptGuidance(config)
+    text: () => buildPromptGuidance(config)
   }));
   for (const dispose of [asDisposer(promptCleanup)]) if (dispose) disposers.push(dispose);
   const workdirCleanup = ctx.inject(["workingDirectory"], (workdirCtx) => {

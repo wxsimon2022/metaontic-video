@@ -1,8 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { sourceOf } from './source.mjs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-const source = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
+const source = sourceOf('providers/connection', 'workflow/approval');
 function harness() {
   const context = vm.createContext({
     ref: (config, key, fallback) => config[key] ?? fallback,

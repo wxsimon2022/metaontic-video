@@ -1,15 +1,15 @@
-import { readFileSync } from 'node:fs';
+import { sourceOf } from './source.mjs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-const source = readFileSync(new URL('../client.js', import.meta.url), 'utf8');
+const source = sourceOf('client/state', 'client/settings', 'client/account', 'client/updates');
 function extract(name) {
   const start = source.search(new RegExp(`(?:async )?function ${name}\\(`));
   assert.ok(start >= 0, name);
   // Bundled functions end at the same indentation as their declaration.
   const indent = source.slice(source.lastIndexOf('\n', start) + 1, start);
   const end = source.indexOf('\n' + indent + '}', start);
-  return source.slice(start, end + indent.length + 2);
+  return 'var context = globalThis;\n' + source.slice(start, end + indent.length + 2);
 }
 function setup(fail = false) {
   const state = { connectionMode: 'service', apiKey: 'previous', deviceSecret: 'device', model: 'model' };
@@ -122,4 +122,26 @@ test('all update sources failing rejects cleanly; an older successful source sti
   for (const name of ['isNewerVersion', 'versionFromFile', 'versionFromTags', 'fetchLatestVersion']) vm.runInContext(extract(name), ctx);
   await assert.rejects(ctx.fetchLatestVersion(), /offline/);
   failed = false; assert.equal(await ctx.fetchLatestVersion(), '3.2.2');
+});
+
+test('online updates report hot application, required restart and inactive installation separately', async () => {
+  for (const [application, status, message] of [
+    ['applied', 'applied', 'versionUpdateDone'],
+    ['restart-required', 'restart', 'versionUpdateRestart'],
+    ['overridden', 'applied', 'versionUpdatePending'],
+    ['cancelled', 'ok', 'versionUpdateCancelled'],
+  ]) {
+    const states = [], messages = [];
+    const ctx = vm.createContext({
+      setUpdateConfirm() {}, setUpdateStatus: value => states.push(value), setUpdateMessage: value => messages.push(value),
+      manager: () => ({ manager: { installBundle: async () => ({ ok: true, value: { application, version: '3.4.0' } }) } }),
+      PLUGIN_PACKAGE: 'metaontic-video', UPDATE_SPEC: 'git+https://example.invalid/plugin.git', UPDATE_ATTEMPTS: 2,
+      updateCommit: { current: '' }, updateLatest: '3.4.0', setUpdateLatest() {}, forgetUpdateCheck() {},
+      t: key => key,
+    });
+    vm.runInContext(extract('runOnlineUpdate'), ctx);
+    await ctx.runOnlineUpdate();
+    assert.equal(states.at(-1), status, application);
+    assert.equal(messages.at(-1), message, application);
+  }
 });

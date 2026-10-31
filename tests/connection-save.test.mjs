@@ -1,11 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { sourceOf } from './source.mjs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-const source = readFileSync(new URL('../src/client.ts', import.meta.url), 'utf8');
-const start = source.indexOf('    async function persistBatch(');
+const source = sourceOf('client/state');
 const context = vm.createContext({});
-vm.runInContext(source.slice(start, source.indexOf('\n    function makePage(', start)), context);
+vm.runInContext(source + '\nObject.assign(globalThis, createSettingsState({}));', context);
 const modes = ['service', 'metaontic', 'volcengine'];
 const keyFor = { service: 'apiKey', metaontic: 'metaonticApiKey', volcengine: 'volcengineApiKey' };
 for (const from of modes) for (const to of modes) test(`atomic save ${from} -> ${to} clears inherited credentials`, async () => {

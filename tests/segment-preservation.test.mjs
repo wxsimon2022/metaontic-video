@@ -4,6 +4,7 @@ import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import vm from 'node:vm';
+import { sourceOf } from './source.mjs';
 
 for (const cumulative of [false, true]) for (const cuts of [false, true]) {
   test(`delivery retains both source segments (${cumulative ? 'cumulative output' : 'incremental output'}, cuts=${cuts})`, async () => {
@@ -14,7 +15,7 @@ for (const cumulative of [false, true]) for (const cuts of [false, true]) {
       const originals = ['01-generate.mp4', '02-extend.mp4'].map(name => path.join(segmentsDir, name));
       await fs.writeFile(originals[0], 'first-source');
       await fs.writeFile(originals[1], 'second-source');
-      const source = await fs.readFile(new URL('../index.js', import.meta.url), 'utf8');
+      const source = sourceOf('media/merge');
       const context = vm.createContext({
         ref: (config, key, fallback) => config[key] ?? fallback,
         path, ...fs, appendRequestLog: async () => {}, exists: async file => { try { await fs.stat(file); return true; } catch { return false; } },
@@ -31,7 +32,7 @@ for (const cumulative of [false, true]) for (const cuts of [false, true]) {
         },
       });
       const start = source.indexOf('async function downloadSegmentsAndMerge(');
-      vm.runInContext(source.slice(start, source.indexOf('async function resolveOutputDir', start)), context);
+      vm.runInContext(source.slice(start), context);
       const result = await context.downloadSegmentsAndMerge({ mergeMode: 'reencode', keepSegments: false, seamTrimSeconds: cuts ? '0.5' : '0' }, {
         segments: [{index:1,kind:'generate',seconds:15},{index:2,kind:'extend',seconds:15}],
         segmentsDir, outDir:dir, stamp:'test',
