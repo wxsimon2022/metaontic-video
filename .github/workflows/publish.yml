@@ -34,12 +34,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          RELEASE_FLAGS=()
+          if [ "$(node -p "Boolean(require('./package.json').releaseNotes.prerelease)")" = "true" ]; then
+            RELEASE_FLAGS+=(--prerelease)
+          fi
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" dist/*.tgz --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/*.tgz --verify-tag --title "MetaOnticVideo $GITHUB_REF_NAME" --notes-file dist/release-notes.txt
+            gh release create "$GITHUB_REF_NAME" dist/*.tgz --verify-tag --title "MetaOnticVideo $GITHUB_REF_NAME" --notes-file dist/release-notes.txt "${RELEASE_FLAGS[@]}"
           fi
       - name: Upload Gitee release package
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-        run: node scripts/publish-gitee.mjs "$GITHUB_REF_NAME" dist/*.tgz dist/release-notes.txt
+        run: |
+          export GITEE_PRERELEASE=$(node -p "Boolean(require('./package.json').releaseNotes.prerelease)")
+          node scripts/publish-gitee.mjs "$GITHUB_REF_NAME" dist/*.tgz dist/release-notes.txt

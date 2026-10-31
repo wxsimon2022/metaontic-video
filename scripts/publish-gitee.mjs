@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export async function publishGitee({ token, tag, archive, notes, request = fetch }) {
+export async function publishGitee({ token, tag, archive, notes, prerelease = false, request = fetch }) {
   if (!token) throw new Error('Missing GITEE_TOKEN. Add it to GitHub Actions repository secrets.');
   if (!/^v\d+\.\d+\.\d+$/.test(tag)) throw new Error('A version tag is required.');
   const base = 'https://gitee.com/api/v5/repos/hackloop/metaontic-video';
@@ -24,7 +24,7 @@ export async function publishGitee({ token, tag, archive, notes, request = fetch
   }
   let release = await api(`/releases/tags/${tag}`, { allow404: true });
   if (!release) release = await api('/releases', { method: 'POST', data: {
-    tag_name: tag, name: `MetaOnticVideo ${tag}`, body: notes, target_commitish: 'master', prerelease: 'false',
+    tag_name: tag, name: `MetaOnticVideo ${tag}`, body: notes, target_commitish: 'master', prerelease: String(prerelease),
   } });
   if (!release?.id) throw new Error('Gitee did not return a release ID.');
   const path = `/releases/${release.id}/attach_files`;
@@ -45,7 +45,7 @@ export async function publishGitee({ token, tag, archive, notes, request = fetch
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [tag, archive, notesFile] = process.argv.slice(2);
   try {
-    const url = await publishGitee({ token: process.env.GITEE_TOKEN, tag, archive, notes: await readFile(notesFile, 'utf8') });
+    const url = await publishGitee({ token: process.env.GITEE_TOKEN, prerelease: process.env.GITEE_PRERELEASE === 'true', tag, archive, notes: await readFile(notesFile, 'utf8') });
     console.log(`Gitee Release verified: ${url}`);
   } catch (error) {
     console.error(error.message);
