@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>MetaOnticVideo · 样式预览</title>
+<style>
+:root { color-scheme:light; --dsw-alias-label-primary:#20242d; --dsw-alias-label-caption:#737b8b; --dsw-alias-border-l2:#dfe3eb; --dsw-alias-settings-card-fill:#fff; --dsw-specific-input-major:#f7f8fb; --dsw-alias-button-primary-fill:#247bbf; --dsw-alias-state-error-primary:#d9534f; --dsw-alias-state-success-primary:#2e9e5b; --page:#f1f3f7; }
+:root[data-theme=dark] { color-scheme:dark; --dsw-alias-label-primary:#e5e8ef; --dsw-alias-label-caption:#98a1b4; --dsw-alias-border-l2:#343b4c; --dsw-alias-settings-card-fill:#1d2330; --dsw-specific-input-major:#151a24; --page:#10141d; }
+* { box-sizing:border-box; } body { margin:0; background:var(--page); color:var(--dsw-alias-label-primary); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.preview-bar { position:sticky; top:0; z-index:10; background:var(--dsw-alias-settings-card-fill); border-bottom:1px solid var(--dsw-alias-border-l2); padding:14px 24px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.preview-bar strong { margin-right:auto; } .preview-bar select,.preview-bar button { font:inherit; border:1px solid var(--dsw-alias-border-l2); border-radius:7px; padding:6px 10px; color:inherit; background:var(--dsw-specific-input-major); }
+.preview-note { max-width:1080px; margin:18px auto; padding:0 24px; font-size:12px; color:var(--dsw-alias-label-caption); }
+.preview-content { width:min(100%,1080px); margin:0 auto 60px; padding:0 24px; transition:width .15s; } .preview-content.narrow { width:420px; max-width:100%; }
+.preview-tabs { display:flex; gap:8px; margin-bottom:16px; } .preview-tabs button { cursor:pointer; padding:7px 14px; border:1px solid var(--dsw-alias-border-l2); border-radius:8px; background:var(--dsw-alias-settings-card-fill); color:inherit; } .preview-tabs button[aria-pressed=true] { border-color:#247bbf; color:#247bbf; }
+.preview-inspect { margin-top:20px; padding:12px; border:1px solid var(--dsw-alias-border-l2); border-radius:8px; } pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+</style></head><body><div id="root"></div><script type="module" src="/.build/main.js"></script></body></html>

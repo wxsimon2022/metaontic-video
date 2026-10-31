@@ -37,11 +37,11 @@ test('segment prompts reject missing or incomplete multi-segment input before su
 test('official image limits and mutually exclusive input roles', () => {
   const start = source.indexOf('function validateImageRoles(');
   vm.runInContext(source.slice(start, source.indexOf('\n}', start) + 2), context);
-  assert.throws(() => context.validateImageRoles({lastFrameUrl:'last'}, true, 'seedance-2-0'));
-  assert.throws(() => context.validateImageRoles({firstFrameUrl:'first', referenceImages:['ref']}, true, 'seedance-2-0'));
+  assert.throws(() => context.validateImageRoles({lastFrameUrl:'last'}, 'seedance-2-0'));
+  assert.throws(() => context.validateImageRoles({firstFrameUrl:'first', referenceImages:['ref']}, 'seedance-2-0'));
   const refs = Array.from({length:10}, (_,i)=>`image-${i}`);
-  assert.throws(() => context.validateImageRoles({referenceImages:refs}, true, 'seedance-2-0'));
-  assert.equal(context.validateImageRoles({referenceImages:refs}, true, 'seedance-2-5').refs.length, 10);
-  assert.equal(context.validateImageRoles({referenceImages:refs}, false, 'seedance-2-0').limit, 1);
-  assert.throws(() => context.validateImageRoles({referenceImages:['']}, true, 'seedance-2-0'));
+  assert.throws(() => context.validateImageRoles({referenceImages:refs}, 'seedance-2-0'));
+  assert.equal(context.validateImageRoles({referenceImages:refs}, 'seedance-2-5').refs.length, 10);
+  assert.equal(context.validateImageRoles({referenceImages:refs.slice(0, 9)}, 'seedance-2-0').limit, 9);
+  assert.throws(() => context.validateImageRoles({referenceImages:['']}, 'seedance-2-0'));
 });

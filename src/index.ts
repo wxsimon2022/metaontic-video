@@ -44,8 +44,9 @@ import z from '@deepseek-ai/schemastery';
 export const inject = ['tools'];
 
 export const Config = z.object({
-  connectionMode: z.union(['service', 'volcengine']).default('service').description('接入方式：A 服务端领 Key；B 火山引擎直连').volatile(),
-  volcengineApiKey: z.string().default('').description('B 模式火山引擎 API Key').volatile(),
+  connectionMode: z.union(['service', 'metaontic', 'volcengine']).default('service').description('接入方式：A 服务端领 Key；B MetaOntic AI；C 火山引擎直连').volatile(),
+  metaonticApiKey: z.string().default('').description('MetaOntic AI API Key').volatile(),
+  volcengineApiKey: z.string().default('').description('C 模式火山引擎 API Key').volatile(),
   entryId: z.string()
     .default('metaontic-video')
     .description('本插件在 profile patch 里的条目 id；配置工具用它把改动写回')
@@ -320,7 +321,20 @@ function isVolcengine(config) {
   return ref(config, 'connectionMode', 'service') === 'volcengine';
 }
 
+function isMetaontic(config) {
+  return ref(config, 'connectionMode', 'service') === 'metaontic';
+}
+
+function isManualKey(config) {
+  return isVolcengine(config) || isMetaontic(config);
+}
+
+function connectionLabel(config) {
+  return isMetaontic(config) ? 'MetaOntic AI' : '火山引擎';
+}
+
 function resolveApiKey(config) {
+  if (isMetaontic(config)) return String(ref(config, 'metaonticApiKey', '')).trim();
   if (isVolcengine(config)) return String(ref(config, 'volcengineApiKey', '')).trim();
   // 只认配置里那一把——它只能由设置页「登录」时服务端下发写入，
   // 不读环境变量、也不认手填，避免用到没绑设备 / 没额度的野 Key。
@@ -391,8 +405,12 @@ function parseExtraParams(config) {
 }
 
 function assertConfigured(config, apiKey) {
+  if (isMetaontic(config)) {
+    if (!apiKey) throw new Error('请在 MetaOntic AI 模式中配置 API Key。');
+    return;
+  }
   if (isVolcengine(config)) {
-    if (!apiKey) throw new Error('请在 B 火山引擎模式中配置火山 API Key。');
+    if (!apiKey) throw new Error('请在 C 火山引擎模式中配置火山 API Key。');
     return;
   }
   if (!apiKey) {
@@ -977,24 +995,24 @@ async function resolveImageInput(value, label, fit = null) {
 /**
  * 直出请求体：文本 + 可选参考图（首帧 / 尾帧 / 人物形象参考），沿用 contents-generation 的原生格式。
  *
- * 火山直连遵循官方多图与任务互斥限制；服务端模式保留单参考图兼容策略。
+ * 三种接入方式都按模型限制提交全部参考图，保持输入顺序与角色标记。
  */
 /** 官方图片任务互斥校验在读取或转换素材之前执行。 */
-function validateImageRoles(args, direct, model) {
+function validateImageRoles(args, model) {
   const refs = Array.isArray(args.referenceImages) ? args.referenceImages
     : (args.referenceImages ? [args.referenceImages] : []);
   if (args.lastFrameUrl && !args.firstFrameUrl) throw new Error('尾帧必须与首帧一起传入。');
-  if (direct && refs.length && (args.firstFrameUrl || args.lastFrameUrl)) {
-    throw new Error('火山接口的首尾帧与参考图模式互斥，请选择一种；如需组合，用参考图模式并在提示词指定首尾画面。');
+  if (refs.length && (args.firstFrameUrl || args.lastFrameUrl)) {
+    throw new Error('首尾帧与参考图模式互斥，请选择一种；如需组合，用参考图模式并在提示词指定首尾画面。');
   }
-  const limit = direct ? (isOmniExtendModel(model) ? 30 : 9) : 1;
-  if (direct && refs.length > limit) throw new Error(`当前模型最多支持 ${limit} 张参考图。`);
+  const limit = isOmniExtendModel(model) ? 30 : 9;
+  if (refs.length > limit) throw new Error(`当前模型最多支持 ${limit} 张参考图。`);
   if (refs.some((value) => typeof value !== 'string' || !value.trim())) throw new Error('每张参考图必须是非空字符串。');
   return { refs, limit };
 }
 
 async function buildGenerationBody(config, args, seconds, options: { signal?: AbortSignal } = {}) {
-  validateImageRoles(args, isVolcengine(config), resolveModel(config));
+  const { refs } = validateImageRoles(args, resolveModel(config));
   const prompt = String(args.prompt ?? '').trim();
   const ratio = args.ratio || ref(config, 'ratio', 'adaptive');
   const canvas = canvasSize(ratio);
@@ -1025,21 +1043,9 @@ async function buildGenerationBody(config, args, seconds, options: { signal?: Ab
   const lastFrame = String(args.lastFrameUrl ?? '').trim();
   if (lastFrame) await addImage(lastFrame, 'last_frame', '尾帧图');
 
-  // 人物形象 / 主体参考图：只发第一张（上游每个角色位只认一张）
-  const rawReferences = Array.isArray(args.referenceImages)
-    ? args.referenceImages
-    : (args.referenceImages ? [args.referenceImages] : []);
-  const references = rawReferences.map((item) => String(item ?? '').trim()).filter(Boolean);
-  if (rawReferences.length && !references.length) {
-    throw new Error('参考图（referenceImages）不能是空字符串。');
-  }
-  if (isVolcengine(config)) {
-    for (const [index, reference] of references.entries()) {
-      await addImage(reference, 'reference_image', `参考图 ${index + 1}`);
-    }
-  } else if (references.length) {
-    if (references.length > 1) notes.push(`A 模式中转兼容限制：只使用第1张参考图，其余 ${references.length - 1} 张未提交。需要多图时请使用火山直连。`);
-    await addImage(references[0], 'reference_image', '参考图 1');
+  // 一至多张参考图都显式标记角色，不按数量猜首尾帧、不截断或重排。
+  for (const [index, reference] of refs.entries()) {
+    await addImage(reference.trim(), 'reference_image', `参考图 ${index + 1}`);
   }
 
   const body = { ...parseExtraParams(config) };
@@ -2454,7 +2460,7 @@ function withResumeLock(tool, toolName, config) {
         const started = Date.now();
         const dir = resumeDirOf(args?.resume);
         let lock;
-        await appendRequestLog({ event: 'tool_started', provider: isVolcengine(config) ? 'volcengine' : 'service',
+        await appendRequestLog({ event: 'tool_started', provider: isMetaontic(config) ? 'metaontic' : isVolcengine(config) ? 'volcengine' : 'service',
           model: resolveModel(config), duration: args?.duration, segmentSeconds: args?.segmentSeconds,
           resuming: Boolean(dir), resumeDir: dir || undefined });
         try {
@@ -2565,7 +2571,7 @@ function resumeHint(dir, remainingSeconds, toolName = 'video_generate') {
 
 /** 剩下这几段的预估费用文案（确认框里给用户看钱）。 */
 async function remainingCostText(config, exec, remainingSteps) {
-  if (isVolcengine(config)) return { cost: '火山按实际调用计费，插件不预估费用或判断余额', remain: '' };
+  if (isManualKey(config)) return { cost: `${connectionLabel(config)}按实际调用计费`, remain: '' };
   try {
     const estimated = estimateSteps(
       config,
@@ -2649,7 +2655,7 @@ const PLUGIN_VERSION = typeof __PLUGIN_VERSION__ === 'string'
  * 拿不到（没设备凭据、服务不可用）就回 unknown，由调用方决定怎么写进确认框。
  */
 async function fetchDeviceQuota(config, signal) {
-  if (isVolcengine(config)) return { status: 'unknown', reason: '火山直连费用和余额请在火山控制台查看' };
+  if (isManualKey(config)) return { status: 'unknown', reason: `${connectionLabel(config)}费用和余额请在渠道控制台查看` };
   const api = resolveRegisterApi(config);
   const deviceId = String(ref(config, 'deviceId', '')).trim();
   const deviceSecret = String(ref(config, 'deviceSecret', '')).trim();
@@ -2857,12 +2863,12 @@ async function preflightGate(ctx, config, exec) {
   // 让模型在对话框里问用户「要不要授权我装 ffmpeg」，而不是闷头生成再丢一堆分段。
   const consent = await ffmpegConsentGate(config, exec, args);
   if (consent) return consent;
-  if (isVolcengine(config)) {
+  if (isManualKey(config)) {
     assertConfigured(config, resolveApiKey(config));
     return {
       kind: 'ask',
-      reason: `调用火山引擎 ${resolveModel(config)}，按火山账户实际用量计费。`,
-      displayReason: { zh: '本次将直连火山引擎生成视频，费用从你的火山账户扣除，具体价格和余额以火山控制台为准。确认后开始。', en: 'Generate via Volcano Engine, billed to your Volcano account. Confirm to continue.' },
+      reason: `调用${connectionLabel(config)} ${resolveModel(config)}，按渠道账户实际用量计费。`,
+      displayReason: { zh: `本次将通过${connectionLabel(config)}生成视频，按渠道账户实际用量计费。确认后开始。`, en: `Generate via ${connectionLabel(config)}, billed to your channel account. Confirm to continue.` },
     };
   }
   let estimate = null;
@@ -2959,7 +2965,7 @@ async function relayRequest(config, requestPath, options: { method?: string; bod
   const operation = method === 'POST' ? 'create_task' : 'query_task';
   const info: Record<string, any> = {
     requestId, operation, method,
-    provider: isVolcengine(config) ? 'volcengine' : 'service',
+    provider: isMetaontic(config) ? 'metaontic' : isVolcengine(config) ? 'volcengine' : 'service',
     model: body?.model || resolveModel(config),
     ...(method === 'POST' ? {
       duration: body?.duration, resolution: body?.resolution,
@@ -2993,8 +2999,8 @@ async function relayRequestCore(
   const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   const serialized = body === undefined ? undefined : JSON.stringify(body);
-  if (isVolcengine(config) && serialized && Buffer.byteLength(serialized, 'utf8') > 64 * 1024 * 1024) {
-    throw Object.assign(new Error('火山请求体超过64 MB，请减少内联图片或改用公网 URL / asset:// 素材。'), { code: 'request_too_large' });
+  if (serialized && Buffer.byteLength(serialized, 'utf8') > 64 * 1024 * 1024) {
+    throw Object.assign(new Error('视频请求体超过64 MB，请减少内联图片或改用公网 URL；火山直连也可使用 asset:// 素材。'), { code: 'request_too_large' });
   }
   let response;
   let text: string;
@@ -3811,7 +3817,7 @@ function videoTool(config, deps, ctx) {
       + '用户不想装就带 merge:false 重发，插件只返回分段列表（每段上游链接 + 本地文件）。'
       + '拿到 ffmpegMissing=true 的结果时也要照 installHint 引导安装，别只丢一句「已跳过合并」。'
       + '**人物形象 / 参考图**：公网图片 URL、base64（data URI 或纯 base64）、本机图片路径，'
-      + '或简写 `latest` 都支持——要固定人物长相、服装、场景时传 referenceImages（一次只认第一张）；'
+      + '或简写 `latest` 都支持——要固定人物长相、服装、场景时传 referenceImages，按数组顺序逐张提交并以图片1、图片2等指代；'
       + '首帧 / 尾帧用 firstFrameUrl / lastFrameUrl 传。公网 URL 直接交给中转站取图；本地图片由插件读进来'
       + '（按 ratio 先适配画幅）内联成 image_url 发给中转站，用户不需要自己找图床。'
       + '**用户说「就用我刚上传/刚拖进来的那张图」时直接传 `latest`**（`latest:2` 取第 2 新的）：'
@@ -3855,7 +3861,7 @@ function videoTool(config, deps, ctx) {
             '可选：人物形象 / 主体参考图（每项是公网 URL、base64（data URI 或纯 base64）、本机图片路径，'
             + '或 `latest` / `latest:2` 这种「用户最近上传的图片」简写）。'
             + '想把某个人的长相、发型、服装固定下来时用它，图片以 role=reference_image 传给上游。'
-            + 'B火山直连：2.0最多9张、2.5最多30张，不能与首尾帧混用，支持asset://素材。A服务端中转仅提交第一张。'
+            + '三种接入方式均按顺序提交全部参考图：2.0最多9张、2.5最多30张，不能与首尾帧混用；中转需支持原生content角色格式。C火山直连另支持asset://素材。'
             + '本地图片单张不超过 8 MB，支持 jpg/jpeg/png/webp/bmp/gif/tiff。',
         },
         segmentSeconds: {
@@ -4578,7 +4584,7 @@ function taskTool(config) {
 
 /** 用户可在插件内改的配置字段。 */
 const CONFIG_FIELDS = [
-  'connectionMode', 'volcengineApiKey', 'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
+  'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'apiKey', 'baseUrl', 'submitPath', 'queryPath', 'model',
   'duration', 'singleMaxSeconds', 'mode', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'pollErrorRetries',
@@ -4596,6 +4602,7 @@ const READ_ONLY_CONFIG_FIELDS = new Set(['apiKey', 'keyOrigin', 'deviceId', 'dev
 function maskSecrets(view) {
   return {
     ...view,
+    metaonticApiKey: view.metaonticApiKey ? '（已配置）' : '',
     volcengineApiKey: view.volcengineApiKey ? '（已配置）' : '',
     apiKey: view.apiKey ? '（已配置）' : '',
     deviceSecret: view.deviceSecret ? '（已配置）' : '',
@@ -4609,17 +4616,31 @@ function configView(config) {
   return {
     stored: maskSecrets(stored),
     effective: {
-      connectionMode: isVolcengine(config) ? 'volcengine' : 'service',
+      connectionMode: isMetaontic(config) ? 'metaontic' : isVolcengine(config) ? 'volcengine' : 'service',
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),
-      queryPath: String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath,
+      queryPath: isVolcengine(config) ? '/api/v3/contents/generations/tasks/{task_id}' : String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath,
       model: resolveModel(config),
       // 密钥只有一种合法来源：设置页「登录」时服务端下发
-      apiKeySource: isVolcengine(config) ? (resolveApiKey(config) ? 'volcengine' : 'missing') : ref(config, 'apiKey', '')
+      apiKeySource: isMetaontic(config) ? (resolveApiKey(config) ? 'metaontic' : 'missing') : isVolcengine(config) ? (resolveApiKey(config) ? 'volcengine' : 'missing') : ref(config, 'apiKey', '')
         ? (isServerIssuedKey(config) ? 'register' : 'unverified')
         : 'missing',
     },
   };
+}
+
+function normalizeConnectionPatch(config, input) {
+  const patch = { ...input };
+  if (patch.connectionMode === undefined) return patch;
+  const mode = patch.connectionMode;
+  if (!['service', 'metaontic', 'volcengine'].includes(mode)) throw new Error('未知接入方式');
+  const inactive = mode === 'volcengine'
+    ? ['metaonticApiKey', 'apiKey', 'keyOrigin', 'baseUrl', 'submitPath', 'queryPath', 'registerEmail', 'deviceId', 'deviceSecret', 'registerApi', 'registerToken']
+    : mode === 'metaontic'
+      ? ['volcengineApiKey', 'apiKey', 'keyOrigin', 'registerEmail', 'deviceId', 'deviceSecret', 'registerApi', 'registerToken']
+      : ['volcengineApiKey', 'metaonticApiKey'];
+  for (const key of inactive) patch[key] = '';
+  return patch;
 }
 
 /** 把字段改动合并进本插件在 profile patch 里的那条条目。 */
@@ -4649,7 +4670,7 @@ function configTool(config, settings) {
       + 'outputDir、keepSegments、resumeLockStaleMinutes、'
       + 'ffmpegBinary、ffprobeBinary、registerEmail、registerApi、estimateGroupRatio）。'
       + 'apiKey 只能由设置页「登录」时服务端下发，这里只能看、不能改；'
-      + '用户要换 Key 就让他去插件详情页点「登录」。'
+      + '仅服务端模式换 Key 需要登录；MetaOntic AI 使用 metaonticApiKey，火山直连使用 volcengineApiKey，可手动配置。'
       + '改动写进 profile 的 cordis.patch.yml，'
       + '宿主重载后生效。'
       + '用户说「把中转站地址/模型/时长改成 X」时用 action=set，看当前值用 action=get；'
@@ -4662,8 +4683,9 @@ function configTool(config, settings) {
           enum: ['get', 'set'],
           description: 'get=查看当前配置；set=修改配置（至少给一个要改的字段）。',
         },
-        connectionMode: { type: 'string', enum: ['service', 'volcengine'], description: 'A 服务端 / B 火山直连' },
-        volcengineApiKey: { type: 'string', description: 'B 模式火山 API Key' },
+        connectionMode: { type: 'string', enum: ['service', 'metaontic', 'volcengine'], description: 'A 服务端 / B MetaOntic AI / C 火山直连' },
+        metaonticApiKey: { type: 'string', description: 'MetaOntic AI 手动 API Key，无需登录' },
+        volcengineApiKey: { type: 'string', description: 'C 模式火山 API Key' },
         baseUrl: { type: 'string', description: '基础地址，即中转站站址，例如 https://ai.bileego.com。' },
         registerEmail: { type: 'string', description: '领 Key 用的邮箱（账号）；注册要邮箱验证码，一个邮箱只发一把。' },
         registerApi: { type: 'string', description: '插件服务地址（领 Key / 查额度 / 使用记录）；留空用内置域名。' },
@@ -4771,7 +4793,7 @@ function configTool(config, settings) {
           + '要换 Key 请在「插件 → 已安装插件 → MetaOnticVideo → 查看」点「登录」重新领取。',
         );
       }
-      const patch = {};
+      let patch = {};
       for (const key of CONFIG_FIELDS) {
         if (args?.[key] !== undefined && !READ_ONLY_CONFIG_FIELDS.has(key)) patch[key] = args[key];
       }
@@ -4784,8 +4806,11 @@ function configTool(config, settings) {
           + "metaontic-video 那一条的 config（见插件 README）。",
         );
       }
+      patch = normalizeConnectionPatch(config, patch);
       const entryId = await writeProfileConfig(settings, config, patch);
-      return { action, entryId, patchPath, patch, ...view };
+      const updated = {};
+      for (const key of CONFIG_FIELDS) updated[key] = patch[key] !== undefined ? patch[key] : ref(config, key, undefined);
+      return { action, entryId, patchPath, patch: maskSecrets(patch), ...configView(updated) };
     },
   };
 }
@@ -4799,7 +4824,7 @@ function buildPromptGuidance(config) {
   const segmentSeconds = resolveSegmentSeconds(config);
   return [
     '提示词遵循火山进阶原则：先定义主体的2–3个稳定特征并固定标签，再写有承接关系的动作、场景光线、运镜和音频；少写重复限制。多段时必须准备segmentPrompts，每段仅含新增事件和对白。2.0按事件顺序自然节奏，2.5可用连续秒级区间；完整剧本留在script.md，不直接反复发给模型。',
-    isVolcengine(config) ? '当前为 B 火山直连：使用 volcengineApiKey，无需服务端登录；不查询或判断余额、不套用中转站估价。仅按创建任务与查询任务接口的实际结果报告状态；创建成功不代表视频已生成，必须查询至succeeded且有视频地址。下述服务端领 Key 要求仅适用于 A 模式。' : '当前为 A 服务端模式：在设置页登录领取 Key。',
+    isMetaontic(config) ? '当前为 B MetaOntic AI：使用 metaonticApiKey 和服务端模式相同的中转地址，无需登录；不预估费用、不核对或查询额度、不查询使用记录。制作前仅确认实际调用计费并询问是否开始；创建成功不代表生成成功，必须查询至succeeded且有视频地址。下述登录领 Key 规则仅适用于 A 服务端模式。' : isVolcengine(config) ? '当前为 C 火山直连：使用 volcengineApiKey，无需服务端登录；不查询或判断余额、不套用中转站估价。仅按创建任务与查询任务接口的实际结果报告状态；创建成功不代表视频已生成，必须查询至succeeded且有视频地址。下述服务端领 Key 要求仅适用于 A 模式。' : '当前为 A 服务端模式：在设置页登录领取 Key。',
     'MetaOnticVideo（Seedance 视频生成插件）：需要生成视频、给视频加长时优先用它；'
       + '用户只要说想要多长（duration），超过单段上限的部分插件自己分段续拍再合并，不用用户自己拆任务。',
     '· 创意先完善再写脚本：模糊点子先用3–5句话给一个推荐故事方案，说明看点、行动或视觉发展、结尾变化与观众记忆点，'
@@ -4812,7 +4837,7 @@ function buildPromptGuidance(config) {
     '· **生成一条新视频必须先过两道确认，缺一不可**：'
       + '① 先把**视频脚本**写出来交给用户**审核**（脚本要含：画面风格、人物形象、分镜——逐镜的镜头 / 时间 / 画面、'
       + '对白——有对话就逐句写清谁在几秒说什么）；'
-      + '② 脚本审核通过后，**再单独问一次要不要开始做**（说清会消耗额度与预估费用），用户点头了才调用 video_generate。'
+      + '② 脚本审核通过后，**再单独问一次要不要开始做**（仅 A 服务端模式说明额度与预估费用；火山直连和 MetaOntic AI 只说明按实际调用计费，不估价、不查额度），用户点头了才调用 video_generate。'
       + '脚本一改，两道确认全部作废，要重新走。用户说「直接生成」也要先走这两步，不要跳过。'
       + '给已有视频接长（video_extend）不需要脚本，但同样要先确认再调用。',
     '· 需要拆分生成时，先读取video-director的references/segment-storyboard.md，在审核前展示分段表（段号、全片时间、生成时长、生成/续拍、主要画面与新对白、起止状态及交接）。'
@@ -4855,7 +4880,7 @@ function buildPromptGuidance(config) {
       + 'install:true 才会真装；装命令会先给用户确认，装完自动验证。'
       + '用户说「帮我装 ffmpeg」时就用它，别自己拼命令行。',
     '· 换模型、时长等配置用 video_config（写进 profile，宿主重载后生效）；'
-      + '但 apiKey 例外：它只能由服务端在「登录」时下发，不要手填、也不要让用户手填，'
+      + '但 A 服务端模式的 apiKey 例外：它只能由服务端在「登录」时下发，不要手填、也不要让用户手填，'
       + '缺 Key 或提示「不是服务端下发的」时，就引导用户去插件详情页点「登录」。'
       + '长视频要在本机合并，需要 ffmpeg：本机没装时，插件会先把这次生成拦回来（不产生费用），'
       + '这时要在对话框里问用户「要不要授权我装 ffmpeg」——按返回的说明说清他的系统与命令，'
@@ -4864,7 +4889,7 @@ function buildPromptGuidance(config) {
       + '用户不想装就带 merge:false 重发，插件只返回分段列表（每段链接 + 本地文件），'
       + '结果里会带 ffmpegMissing=true 与 installHint，照它引导安装即可。',
     `· 当前配置：直出上限 ${singleMax} 秒、每段延长 ${segmentSeconds} 秒。`,
-    '· 没有 API Key：让用户在插件设置页点「登录」，用邮箱收验证码领一把（一个邮箱只发一把，'
+    '· 仅 A 服务端模式没有 API Key 时：让用户在插件设置页点「登录」，用邮箱收验证码领一把（一个邮箱只发一把，'
       + '默认额度 ¥0.01），成功后上游 / Key / 地址 / 模型会自动填好；'
       + '设置页还能看到这把 Key 的剩余 / 已用额度和最近几次出片的使用记录。',
   ].join('\n');
@@ -4926,6 +4951,11 @@ export function apply(ctx: DshContext, config: any = {}) {
             },
           };
         }
+        if (isManualKey(config)) return {
+          kind: 'ask',
+          reason: `人工确认：调用${connectionLabel(config)}（预检异常：${message}）。`,
+          displayReason: { zh: `本次通过${connectionLabel(config)}调用视频模型，按实际调用计费。预检异常：${message}。确认后继续。`, en: `Call the video model with actual usage billing. Preflight error: ${message}. Confirm to continue.` },
+        };
         return {
           kind: 'ask',
           reason: `人工确认：调用视频模型（预估费用没算出来：${message}）。`,

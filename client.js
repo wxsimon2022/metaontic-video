@@ -2,7 +2,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.1.0",
+    version: "3.2.0",
     description: "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
     license: "MIT",
     type: "module",
@@ -65,6 +65,8 @@
     devDependencies: {
       "@types/node": "^20.19.43",
       esbuild: "^0.28.2",
+      react: "^19.3.1",
+      "react-dom": "^19.3.1",
       typescript: "^5.9.3"
     },
     scripts: {
@@ -72,20 +74,22 @@
       "build:locale": "esbuild scripts/build-locale.ts --format=esm --platform=node --packages=external --outfile=node_modules/.cache/build-locale.mjs --log-level=warning && node node_modules/.cache/build-locale.mjs",
       "build:host": `esbuild src/index.ts --format=esm --platform=node --target=node20 --packages=external --define:__PLUGIN_VERSION__=$(node -p 'JSON.stringify(require("./package.json").version)') --outfile=index.js`,
       "build:client": `esbuild src/client.ts --bundle --format=iife --platform=browser --target=es2022 --define:__PLUGIN_VERSION__=$(node -p 'JSON.stringify(require("./package.json").version)') --outfile=client.js`,
-      build: "npm run typecheck && npm run build:locale && npm run build:host && npm run build:client"
+      build: "npm run typecheck && npm run build:locale && npm run build:host && npm run build:client",
+      preview: "node scripts/preview.mjs"
     },
     dependencies: {
       "@deepseek-ai/schemastery": "~3.18.5"
     },
     releaseNotes: {
-      version: "3.1.0",
+      version: "3.2.0",
       items: [
-        "\u65B0\u589E\u521B\u610F\u5B8C\u5584\u6D41\u7A0B\uFF1A\u5148\u5C55\u5F00\u6545\u4E8B\u770B\u70B9\u3001\u53D1\u5C55\u548C\u7ED3\u5C3E\uFF0C\u518D\u7F16\u5199\u89C6\u9891\u811A\u672C\u3002",
-        "\u6309\u9898\u6750\u9009\u62E9\u753B\u9762\u98CE\u683C\u3001\u5BF9\u767D\u3001\u97F3\u4E50\u4E0E\u955C\u5934\uFF0C\u652F\u6301\u77ED\u5267\u3001\u4EA7\u54C1\u5C55\u793A\u3001\u98CE\u666F\u548C\u52A8\u753B\u7B49\u8868\u8FBE\u3002",
-        "\u652F\u6301\u201C\u66F4\u641E\u7B11\u201D\u201C\u5C11\u70B9\u5BF9\u767D\u201D\u201C\u6362\u4E2A\u7ED3\u5C3E\u201D\u7B49\u53E3\u8BED\u6539\u7A3F\uFF0C\u4FDD\u7559\u7528\u6237\u6EE1\u610F\u7684\u90E8\u5206\u3002",
-        "\u5F3A\u5316\u9010\u7248\u5BA1\u6838\u89C4\u5219\uFF1A\u9996\u6B21\u53CA\u6BCF\u6B21\u6539\u7A3F\u90FD\u8981\u6C42\u91CD\u65B0\u5F39\u51FA\u811A\u672C\u5BA1\u6838\u7A97\u53E3\uFF0C\u5F53\u524D\u7248\u901A\u8FC7\u540E\u518D\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u4E0E\u5236\u4F5C\u3002",
-        "\u65B0\u589E\u5206\u6BB5\u65B9\u6848\u4E0E\u793A\u610F\u56FE\u6D41\u7A0B\uFF1A\u5BA1\u6838\u524D\u5C55\u793A\u6BCF\u6BB5\u65F6\u957F\u3001\u5185\u5BB9\u3001\u8854\u63A5\u548C\u672C\u5730\u6784\u56FE\u793A\u610F\uFF0C\u5B9E\u9645\u751F\u6210\u4ECD\u9010\u6BB5\u9884\u89C8\u3001\u786E\u8BA4\u7EED\u505A\u3002",
-        "\u66F4\u65B0\u4E3AM\u5F62\u6298\u5E26\u4E0E\u64AD\u653E\u7B26\u53F7\u7684\u8F7B\u91CF\u77E2\u91CFLogo\uFF0C\u4FEE\u590D\u56FE\u6807\u8D85\u8FC7256 KiB\u5BFC\u81F4\u7684\u5143\u4FE1\u606F\u9519\u8BEF\u3002"
+        "\u65B0\u589E MetaOntic AI \u63A5\u5165\uFF1A\u53EA\u586B Key \u5373\u53EF\u4F7F\u7528\uFF0C\u4E0E\u670D\u52A1\u7AEF\u6A21\u5F0F\u5171\u7528\u4E2D\u8F6C\u63A5\u53E3\u3002",
+        "\u65B0\u589E\u72EC\u7ACB\u6D4F\u89C8\u5668\u9884\u89C8\uFF0C\u652F\u6301\u4E3B\u9898\u3001\u5C4F\u5BBD\u3001\u8BED\u8A00\u3001\u63A5\u5165\u65B9\u5F0F\u4E0E\u8BF7\u6C42\u72B6\u6001\u6A21\u62DF\u3002",
+        "\u4F18\u5316\u624B\u586B Key \u6A21\u5F0F\uFF1A\u65E0\u9700\u767B\u5F55\uFF0C\u4E0D\u9884\u4F30\u8D39\u7528\u3001\u4E0D\u6838\u5BF9\u989D\u5EA6\u3001\u4E0D\u663E\u793A\u4F7F\u7528\u8BB0\u5F55\uFF0C\u5236\u4F5C\u524D\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39\u786E\u8BA4\u3002",
+        "\u4F18\u5316\u8BBE\u7F6E\u9875\uFF1A\u624B\u586B Key \u652F\u6301\u663E\u793A\u4E0E\u9690\u85CF\uFF1B\u66F4\u591A\u8BBE\u7F6E\u6574\u5408\u4E3A\u7EDF\u4E00\u81EA\u9002\u5E94\u8868\u5355\uFF0C\u6C34\u5370\u79FB\u5165\u5176\u4E2D\uFF0C\u79FB\u9664\u8F93\u51FA\u76EE\u5F55\u4E0E\u989D\u5916\u53C2\u6570\u5165\u53E3\u3002",
+        "\u4FEE\u590D\u63A5\u5165\u65B9\u5F0F\u5207\u6362\uFF1A\u539F\u5B50\u4FDD\u5B58\u914D\u7F6E\u5E76\u6E05\u7A7A\u5176\u4ED6\u6E20\u9053\u51ED\u636E\uFF0C\u907F\u514D\u65E7 Key \u7EE7\u627F\u4E0E\u9010\u5B57\u6BB5\u91CD\u8F7D\u4E2D\u65AD\uFF1B\u5931\u8D25\u660E\u786E\u63D0\u793A\uFF0C\u914D\u7F6E\u5DE5\u5177\u8FD4\u56DE\u66F4\u65B0\u540E\u7684\u8131\u654F\u7ED3\u679C\u3002",
+        "\u4FEE\u590D\u4E2D\u8F6C\u53C2\u8003\u56FE\u4EC5\u63D0\u4EA4\u9996\u5F20\uFF1A\u6309\u987A\u5E8F\u63D0\u4EA4\u5168\u90E8\u53C2\u8003\u56FE\uFF0C\u7EDF\u4E00\u6821\u9A8C\u6570\u91CF\u3001\u9996\u5C3E\u5E27\u4E92\u65A5\u4E0E\u8BF7\u6C42\u4F53\u5927\u5C0F\uFF0C\u4E0D\u81EA\u52A8\u4E22\u56FE\u6216\u6362\u683C\u5F0F\u91CD\u8BD5\u3002",
+        "\u540C\u6B65\u5BFC\u6F14\u63D0\u793A\u8BCD\u3001\u4F7F\u7528\u6587\u6863\u4E0E\u53D1\u5E03\u7EA6\u5B9A\uFF1A\u4EC5\u660E\u786E\u8981\u6C42\u53D1\u7248\u65F6\u53D1\u5E03\uFF0C\u5E76\u6C47\u603B\u5168\u90E8\u672A\u53D1\u5E03\u903B\u8F91\u53D8\u5316\u3002"
       ]
     }
   };
@@ -104,11 +108,16 @@
         providerNewapi: "New API \u4E2D\u8F6C\u7AD9",
         apiKeyConfigured: "\u5DF2\u914D\u7F6E\uFF0C\u7559\u7A7A\u8868\u793A\u4FDD\u6301\u539F\u503C",
         connectionMode: "\u63A5\u5165\u65B9\u5F0F",
-        connectionModeHint: "A\uFF1A\u767B\u5F55\u9886\u53D6\u670D\u52A1\u7AEF Key\uFF1BB\uFF1A\u586B\u5199\u81EA\u5DF1\u7684\u706B\u5C71\u5F15\u64CE API Key\u3002\u5207\u6362\u540E\u70B9\u51FB\u4FDD\u5B58\u751F\u6548\u3002",
+        connectionModeHint: "A\uFF1A\u767B\u5F55\u9886\u53D6\u670D\u52A1\u7AEF Key\uFF1BB\uFF1AMetaOntic AI \u53EA\u586B Key\uFF0C\u65E0\u9700\u767B\u5F55\uFF1BC\uFF1A\u586B\u5199\u81EA\u5DF1\u7684\u706B\u5C71\u5F15\u64CE API Key\u3002\u5207\u6362\u540E\u70B9\u51FB\u4FDD\u5B58\u751F\u6548\u3002",
         volcengineKeyHint: "\u4ECE\u706B\u5C71\u65B9\u821F\u63A7\u5236\u53F0\u83B7\u53D6 API Key\uFF0C\u586B\u5165\u540E\u4FDD\u5B58\u3002\u8D39\u7528\u7531\u706B\u5C71\u8D26\u6237\u627F\u62C5\uFF0C\u65E0\u9700\u767B\u5F55\u672C\u63D2\u4EF6\u670D\u52A1\u7AEF\u3002",
+        metaontic: "B \xB7 MetaOntic AI",
+        metaonticApiKey: "MetaOntic AI API Key",
+        showKey: "\u67E5\u770B Key",
+        hideKey: "\u9690\u85CF Key",
+        metaonticKeyHint: "\u4F7F\u7528\u4E0E\u670D\u52A1\u7AEF\u6A21\u5F0F\u76F8\u540C\u7684\u4E2D\u8F6C\u5730\u5740\uFF0C\u586B\u5199 Key \u540E\u4FDD\u5B58\u3002\u65E0\u9700\u767B\u5F55\uFF0C\u4E0D\u9884\u4F30\u8D39\u7528\u3001\u4E0D\u6838\u5BF9\u989D\u5EA6\u3001\u4E0D\u663E\u793A\u4F7F\u7528\u8BB0\u5F55\u3002",
         volcengineApiKey: "\u706B\u5C71\u5F15\u64CE API Key",
         service: "A \xB7 \u670D\u52A1\u7AEF\u4E0B\u53D1 Key",
-        volcengine: "B \xB7 \u706B\u5C71\u5F15\u64CE\u76F4\u8FDE",
+        volcengine: "C \xB7 \u706B\u5C71\u5F15\u64CE\u76F4\u8FDE",
         seamTrimSeconds: "\u63A5\u7F1D\u88C1\u526A\u79D2\u6570\uFF08\u5982 0.5,0\uFF09",
         modelHiddenCurrent: "\u5F53\u524D\u6A21\u578B\uFF08\u6682\u4E0D\u63D0\u4F9B\u9009\u62E9\uFF09",
         releaseNotesTitle: "\u66F4\u65B0\u5185\u5BB9",
@@ -196,11 +205,14 @@
         versionHint: "\u70B9\u300C\u7ACB\u5373\u66F4\u65B0\u300D\u7531\u63D2\u4EF6\u81EA\u5DF1\u4ECE Gitee \u91CD\u88C5\u4E00\u904D\uFF0C\u4E0D\u7528\u53BB\u5378\u8F7D\u91CD\u52A0\u3002",
         versionCheckedAt: "\u68C0\u67E5\u4E8E {time}",
         sectionGeneration: "\u751F\u6210\u53C2\u6570",
-        sectionMerge: "\u5408\u5E76\u4E0E\u8F93\u51FA",
+        sectionMerge: "\u89C6\u9891\u5408\u5E76",
+        sectionAppearance: "\u753B\u9762\u8BBE\u7F6E",
         sectionAdvanced: "\u9AD8\u7EA7",
         sectionCombined: "\u66F4\u591A\u8BBE\u7F6E",
-        sectionCombinedHint: "\u8F93\u51FA\u76EE\u5F55\u3001\u63A5\u7F1D\u5904\u7406\u4E0E\u8FD0\u884C\u53C2\u6570",
-        sectionRuntime: "\u8FD0\u884C\u53C2\u6570",
+        sectionCombinedHint: "\u753B\u9762 \xB7 \u5408\u5E76 \xB7 \u7B49\u5F85 \xB7 \u672C\u5730\u5DE5\u5177",
+        sectionRuntime: "\u7B49\u5F85\u8BBE\u7F6E",
+        sectionTools: "\u672C\u5730\u5DE5\u5177",
+        toolsHint: "\u901A\u5E38\u65E0\u9700\u586B\u5199\uFF1B\u5DF2\u5B89\u88C5\u4F46\u65E0\u6CD5\u81EA\u52A8\u8BC6\u522B\u65F6\uFF0C\u53EF\u6307\u5B9A\u53EF\u6267\u884C\u6587\u4EF6\u8DEF\u5F84\u3002",
         segmentsRetained: "\u6240\u6709\u539F\u59CB\u5206\u6BB5\u81EA\u52A8\u4FDD\u7559\uFF0C\u4FBF\u4E8E\u9884\u89C8\u3001\u7EED\u505A\u548C\u91CD\u65B0\u526A\u8F91\u3002",
         register: "\u767B\u5F55",
         registerWorking: "\u767B\u5F55\u4E2D\u2026",
@@ -235,11 +247,16 @@
         providerNewapi: "New API relay",
         apiKeyConfigured: "Configured; leave empty to keep it",
         connectionMode: "Connection",
-        connectionModeHint: "A: sign in for a service key. B: enter your Volcano Engine API key. Save to apply.",
+        connectionModeHint: "A: sign in for a service key. B: MetaOntic AI requires only a key, no login. C: enter your Volcano Engine API key. Save to apply.",
         volcengineKeyHint: "Enter an API key from the Volcano Ark console and save. Billed to your Volcano account; no plugin service login required.",
+        metaontic: "B \xB7 MetaOntic AI",
+        metaonticApiKey: "MetaOntic AI API Key",
+        showKey: "Show key",
+        hideKey: "Hide key",
+        metaonticKeyHint: "Uses the service relay address. Enter a key and save. No login, cost estimates, balance checks or usage history.",
         volcengineApiKey: "Volcano Engine API Key",
         service: "A \xB7 Service-issued key",
-        volcengine: "B \xB7 Volcano Engine",
+        volcengine: "C \xB7 Volcano Engine",
         seamTrimSeconds: "Seam head trims (e.g. 0.5,0)",
         modelHiddenCurrent: "Current model (selection unavailable)",
         releaseNotesTitle: "Release notes",
@@ -319,11 +336,14 @@
         registerDisabled: "Register service unavailable: {message}",
         registerNoKey: "The register service returned no key (check the relay configuration).",
         sectionGeneration: "Generation",
-        sectionMerge: "Merge & output",
+        sectionMerge: "Video merging",
+        sectionAppearance: "Appearance",
         sectionAdvanced: "Advanced",
         sectionCombined: "More settings",
-        sectionCombinedHint: "Output paths, seams and runtime options",
+        sectionCombinedHint: "Appearance, merging, runtime and local tools",
         sectionRuntime: "Runtime options",
+        sectionTools: "Local tools",
+        toolsHint: "Usually leave blank. Set executable paths only if installed tools are not detected.",
         segmentsRetained: "Original segments are always retained for preview, resume and editing.",
         mode: "Continuation",
         modeContinuous: "Same camera",
@@ -350,19 +370,22 @@
         "doubao-seedance-2-0-fast-260128"
       ];
       const SELECTS = {
-        connectionMode: ["service", "volcengine"],
+        connectionMode: ["service", "metaontic", "volcengine"],
         model: MODEL_OPTIONS,
         mode: ["continuous", "closeup"],
         ratio: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
         mergeMode: ["seamless", "copy", "reencode"]
       };
       const SECTIONS = [
-        { key: "sectionGeneration", fields: ["connectionMode", "volcengineApiKey", "model", "mode", "ratio", "generateAudio", "watermark"] },
-        { key: "sectionMerge", fields: ["seamTrimSeconds", "mergeMode", "bgmFadeSeconds", "outputDir"] },
-        { key: "sectionAdvanced", fields: ["extraParams", "pollIntervalMs", "maxWaitMs", "ffmpegBinary", "ffprobeBinary"] }
+        { key: "sectionGeneration", fields: ["connectionMode", "metaonticApiKey", "volcengineApiKey", "model", "mode", "ratio", "generateAudio"] },
+        { key: "sectionAppearance", fields: ["watermark"] },
+        { key: "sectionMerge", fields: ["mergeMode", "seamTrimSeconds", "bgmFadeSeconds"] },
+        { key: "sectionRuntime", fields: ["pollIntervalMs", "maxWaitMs"] },
+        { key: "sectionTools", fields: ["ffmpegBinary", "ffprobeBinary"] }
       ];
       const FIELDS = [
         { key: "connectionMode", kind: "select", wide: true },
+        { key: "metaonticApiKey", kind: "text", secret: true, wide: true },
         { key: "volcengineApiKey", kind: "text", secret: true, wide: true },
         // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
         { key: "model", kind: "select", wide: true },
@@ -371,11 +394,9 @@
         { key: "generateAudio", kind: "switch" },
         { key: "watermark", kind: "switch" },
         { key: "seamTrimSeconds", kind: "text" },
-        { key: "mergeMode", kind: "select" },
+        { key: "mergeMode", kind: "select", wide: true },
         { key: "bgmFadeSeconds", kind: "number" },
-        { key: "outputDir", kind: "text", wide: true },
         { key: "keepSegments", kind: "switch" },
-        { key: "extraParams", kind: "text", wide: true },
         { key: "pollIntervalMs", kind: "number" },
         { key: "maxWaitMs", kind: "number" },
         { key: "ffmpegBinary", kind: "text", mono: true },
@@ -386,6 +407,7 @@
       const LOGGED_OUT_KEY = "metaontic-video.logged-out";
       const PLUGIN_OWNED_KEYS = [
         "connectionMode",
+        "metaonticApiKey",
         "volcengineApiKey",
         "apiKey",
         "keyOrigin",
@@ -410,7 +432,7 @@
       const UPDATE_ATTEMPTS = 3;
       const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
       const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-      const PLUGIN_VERSION = true ? "3.1.0".trim().replace(/^v/i, "") : "";
+      const PLUGIN_VERSION = true ? "3.2.0".trim().replace(/^v/i, "") : "";
       function currentOs() {
         const nav = window.navigator || {};
         const raw = String(
@@ -538,7 +560,11 @@
       .mov-advanced-toggle { cursor: pointer; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       .mov-advanced-toggle .mov-hint { display: block; margin: 5px 0 0 16px; font-weight: 400; }
       .mov-advanced-toggle:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 5px; border-radius: 4px; }
-      .mov-advanced-body { display: flex; flex-direction: column; gap: 16px; border-top: 1px solid ${TOKENS.border}; margin-top: 14px; padding-top: 16px; }
+      .mov-advanced-body { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid ${TOKENS.border}; margin-top: 14px; padding-top: 16px; }
+      .mov-advanced-body .mov-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 18px; align-items: start; }
+      .mov-advanced-body .mov-field-wide { grid-column: auto; }
+      @container (max-width: 480px) { .mov-advanced-body .mov-grid { grid-template-columns: minmax(0, 1fr); } }
+      .mov-advanced { container-type: inline-size; }
       .mov-section-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       /* \u6807\u9898\u5DE6\u8FB9\u4E00\u9053\u4E3B\u8272\u7AD6\u6761\uFF0C\u4EE3\u66FF\u7EAF\u6587\u5B57\u5206\u7EC4\u6807\u9898 */
       .mov-section-title::before { content: ""; flex: 0 0 auto; width: 3px; height: 13px; border-radius: 2px; background: ${TOKENS.primaryFill}; }
@@ -551,6 +577,11 @@
       .mov-field-wide { grid-column: 1 / -1; }
       .mov-label { display: block; font-size: 12px; color: ${TOKENS.muted}; margin-bottom: 6px; }
       .mov-input { padding: 8px 10px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; color: ${TOKENS.text}; font: inherit; font-size: 13px; height: 36px; }
+      .mov-key-control { position: relative; min-width: 0; }
+      .mov-key-control .mov-input { padding-right: 40px; }
+      .mov-key-eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 30px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 5px; background: transparent; color: ${TOKENS.muted}; cursor: pointer; }
+      .mov-key-eye:hover { color: ${TOKENS.text}; background: ${TOKENS.border}; }
+      .mov-key-eye:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
       .mov-input:focus, .mov-input:focus-visible { outline: none; border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 3px rgba(36, 123, 191, .18); }
       /* \u6A21\u578B ID \u4E0E\u53EF\u6267\u884C\u6587\u4EF6\u8DEF\u5F84\u5F88\u957F\uFF1A\u7B49\u5BBD\u5B57\u4F53 + \u7701\u7565\uFF0C\u4E0D\u628A\u6574\u884C\u6491\u53D8\u5F62 */
       .mov-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
@@ -626,6 +657,27 @@
       function same(a, b) {
         return a === b || a === void 0 && b === "" || a === "" && b === void 0;
       }
+      async function persistConnection(form, pending, nextMode) {
+        if (!["service", "metaontic", "volcengine"].includes(nextMode)) throw new Error("\u672A\u77E5\u63A5\u5165\u65B9\u5F0F");
+        const inactiveKeys = nextMode === "volcengine" ? [
+          "metaonticApiKey",
+          "apiKey",
+          "keyOrigin",
+          "baseUrl",
+          "submitPath",
+          "queryPath",
+          "registerEmail",
+          "deviceId",
+          "deviceSecret",
+          "registerApi",
+          "registerToken"
+        ] : nextMode === "metaontic" ? ["volcengineApiKey", "apiKey", "keyOrigin", "registerEmail", "deviceId", "deviceSecret", "registerApi", "registerToken"] : ["volcengineApiKey", "metaonticApiKey"];
+        if (typeof form.mutate !== "function") throw new Error("\u5F53\u524D\u5BBF\u4E3B\u4E0D\u652F\u6301\u539F\u5B50\u4FDD\u5B58\uFF0C\u8BF7\u66F4\u65B0 Harness");
+        const ops = pending.filter(([key]) => key !== "connectionMode" && !inactiveKeys.includes(key)).map(([key, next]) => ({ op: "set", path: [key], value: next }));
+        for (const key of inactiveKeys) ops.push({ op: "set", path: [key], value: "" });
+        ops.push({ op: "set", path: ["connectionMode"], value: nextMode });
+        if (!await form.mutate(ops)) throw new Error("\u5BBF\u4E3B\u672A\u63A5\u53D7\u914D\u7F6E\uFF0C\u8BF7\u91CD\u5F00\u8BBE\u7F6E\u9875\u540E\u91CD\u8BD5\uFF1B\u82E5\u4ECD\u5931\u8D25\uFF0C\u8BF7\u91CD\u542F Harness \u4EE5\u52A0\u8F7D\u6700\u65B0\u63D2\u4EF6\u5B57\u6BB5");
+      }
       function makePage({ form, t, manager }) {
         return function ConfigPage(props) {
           const snapshot = useSnapshot(form);
@@ -633,8 +685,18 @@
           const [draft, setDraft] = React.useState({});
           const selectedMode = draft.connectionMode ?? value.connectionMode ?? "service";
           const directMode = selectedMode === "volcengine";
+          const serviceMode = selectedMode === "service";
+          const [visibleKey, setVisibleKey] = React.useState("");
+          React.useEffect(() => {
+            setVisibleKey("");
+          }, [selectedMode]);
           const [status, setStatus] = React.useState("idle");
+          const [saveError, setSaveError] = React.useState("");
           const statusTimer = React.useRef(null);
+          const connectionBusy = React.useRef(false);
+          function serviceActive() {
+            return !connectionBusy.current && (form.getSnapshot().value?.connectionMode || "service") === "service";
+          }
           const [registerStatus, setRegisterStatus] = React.useState("idle");
           const [registerMessage, setRegisterMessage] = React.useState("");
           const [registerEmail, setRegisterEmail] = React.useState(() => {
@@ -669,7 +731,7 @@
             if (restoreTried.current) return;
             restoreTried.current = true;
             const snap = form.getSnapshot() || {};
-            if ((snap.value || {}).connectionMode === "volcengine") return;
+            if (((snap.value || {}).connectionMode || "service") !== "service") return;
             if (loggedOut()) {
               setRegisterStatus("idle");
               return;
@@ -687,7 +749,7 @@
             });
           }, []);
           React.useEffect(() => {
-            if (directMode || props?.view === "summary" || !(snapshot.secrets?.apiKey || value.apiKey)) return;
+            if (!serviceMode || props?.view === "summary" || !(snapshot.secrets?.apiKey || value.apiKey)) return;
             const refresh = () => {
               if (window.document?.visibilityState === "hidden") return;
               loadUsage().catch(() => {
@@ -702,7 +764,7 @@
               window.removeEventListener("focus", refresh);
               window.document?.removeEventListener("visibilitychange", refresh);
             };
-          }, [directMode, Boolean(snapshot.secrets?.apiKey || value.apiKey), value.deviceId, props?.view]);
+          }, [serviceMode, Boolean(snapshot.secrets?.apiKey || value.apiKey), value.deviceId, props?.view]);
           const updateTried = React.useRef(false);
           React.useEffect(() => {
             if (updateTried.current) return;
@@ -719,7 +781,7 @@
           }, []);
           if (props && props.view === "summary") {
             const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
-            const text = configured ? t("summary", { provider: t("providerNewapi"), model: value.model || "-" }) : t("summaryEmpty");
+            const text = configured ? t("summary", { provider: t(selectedMode), model: value.model || "-" }) : t("summaryEmpty");
             return h("span", { style: { color: TOKENS.muted } }, text);
           }
           const pending = Object.entries(draft).filter(([key, next]) => !same(value[key], next));
@@ -748,31 +810,14 @@
             }, holdMs);
           }
           async function save() {
+            if (connectionBusy.current) return;
+            connectionBusy.current = true;
+            setSaveError("");
             setStatus("saving");
             const nextMode = draft.connectionMode ?? value.connectionMode ?? "service";
-            const inactiveKeys = nextMode === "volcengine" ? [
-              "apiKey",
-              "keyOrigin",
-              "baseUrl",
-              "submitPath",
-              "queryPath",
-              "registerEmail",
-              "deviceId",
-              "deviceSecret",
-              "registerApi",
-              "registerToken"
-            ] : ["volcengineApiKey"];
             try {
-              for (const [key, next] of pending) {
-                if (inactiveKeys.includes(key)) continue;
-                const accepted = await form.set(key, next);
-                if (!accepted) throw new Error(`\u4FDD\u5B58 ${key} \u5931\u8D25`);
-              }
-              for (const key of inactiveKeys) {
-                const accepted = await form.unset(key);
-                if (accepted === false) throw new Error(`\u6E05\u7406 ${key} \u5931\u8D25`);
-              }
-              if (nextMode === "volcengine") {
+              await persistConnection(form, pending, nextMode);
+              if (nextMode !== "service") {
                 forgetDevice();
                 setRegisterEmail("");
                 setRegisterCode("");
@@ -782,8 +827,11 @@
               }
               setDraft({});
               flashStatus("saved");
-            } catch {
+            } catch (error) {
+              setSaveError(error?.message || String(error));
               setStatus("failed");
+            } finally {
+              connectionBusy.current = false;
             }
           }
           async function reset() {
@@ -887,6 +935,7 @@
           async function syncDeviceIdentity() {
             try {
               for (const [key, next] of deviceWrites()) {
+                if (!serviceActive()) return;
                 const accepted = await form.set(key, next);
                 if (accepted) clear(key);
               }
@@ -932,6 +981,7 @@
             return payload || {};
           }
           async function applyRegistration(result, fallbackBase, device) {
+            if (!serviceActive()) return;
             clearLoggedOut();
             const writes = [
               ["apiKey", result.api_key],
@@ -944,6 +994,7 @@
             if (result.model) writes.push(["model", result.model]);
             let ok = true;
             for (const [key, next] of writes) {
+              if (!serviceActive()) return;
               const accepted = await form.set(key, next);
               if (accepted) clear(key);
               else ok = false;
@@ -963,7 +1014,7 @@
               body: JSON.stringify({ device_id: device.id, device_secret: device.secret })
             });
             if (!result.api_key) throw new Error(t("registerNoKey"));
-            await applyRegistration(result, null, device);
+            if (!await applyRegistration(result, null, device)) return;
             setRegisterStatus("restored");
             return result;
           }
@@ -1068,7 +1119,7 @@
             }
           }
           async function loadQuota() {
-            if (directMode) return;
+            if (!serviceMode || !serviceActive()) return;
             const device = deviceIdentity();
             setQuotaStatus("working");
             setQuotaMessage("");
@@ -1078,6 +1129,7 @@
                 headers: { "content-type": "application/json", accept: "application/json" },
                 body: JSON.stringify({ device_id: device.id, device_secret: device.secret })
               });
+              if (!serviceActive()) return;
               setQuota(result);
               setQuotaAt((/* @__PURE__ */ new Date()).toLocaleTimeString());
               setQuotaStatus("ok");
@@ -1090,7 +1142,7 @@
             }
           }
           async function loadUsage() {
-            if (directMode || usageInFlight.current) return;
+            if (!serviceMode || !serviceActive() || usageInFlight.current) return;
             usageInFlight.current = true;
             const device = deviceIdentity();
             setUsageStatus("working");
@@ -1105,6 +1157,7 @@
                   limit: 10
                 })
               });
+              if (!serviceActive()) return;
               setUsage(result);
               setUsageAt((/* @__PURE__ */ new Date()).toLocaleTimeString());
               setUsageStatus("ok");
@@ -1206,12 +1259,14 @@
                 ...list.map((option) => h("option", { key: option, value: option }, optionLabel(t, field.key, option)))
               ]);
             }
-            return h("input", {
+            const canReveal = field.key === "metaonticApiKey" || field.key === "volcengineApiKey";
+            const revealed = canReveal && visibleKey === field.key;
+            const input = h("input", {
               id,
               "data-field": field.key,
               className: `mov-input${field.mono ? " mov-mono" : ""}`,
               style: inputStyle,
-              type: field.kind === "number" ? "number" : field.secret ? "password" : "text",
+              type: field.kind === "number" ? "number" : field.secret && !revealed ? "password" : "text",
               value: current ?? "",
               placeholder: field.secret && (snapshot.secrets?.[field.key] || value[field.key]) ? t("apiKeyConfigured") : "",
               onChange: (event) => edit(
@@ -1219,9 +1274,28 @@
                 field.kind === "number" && event.target.value !== "" ? Number(event.target.value) : event.target.value
               )
             });
+            if (!canReveal) return input;
+            return h("div", { className: "mov-key-control" }, [
+              input,
+              h("button", {
+                type: "button",
+                className: "mov-key-eye",
+                "aria-label": t(revealed ? "hideKey" : "showKey"),
+                title: t(revealed ? "hideKey" : "showKey"),
+                "data-action": `toggle-${field.key}`,
+                "aria-controls": id,
+                "aria-pressed": revealed,
+                onClick: () => setVisibleKey(revealed ? "" : field.key)
+              }, h("svg", { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true }, [
+                h("path", { key: "eye", d: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" }),
+                h("circle", { key: "pupil", cx: 12, cy: 12, r: 3 }),
+                revealed ? h("path", { key: "slash", d: "M3 3l18 18" }) : null
+              ]))
+            ]);
           }
           const hints = {
             connectionMode: t("connectionModeHint"),
+            metaonticApiKey: t("metaonticKeyHint"),
             volcengineApiKey: t("volcengineKeyHint"),
             model: t("modelHint"),
             bgmFadeSeconds: t("bgmFadeSecondsHint")
@@ -1239,7 +1313,7 @@
           const renderGrid = (section) => h(
             "div",
             { key: section.key, className: "mov-grid" },
-            section.fields.filter((key) => key !== "volcengineApiKey" || directMode).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
+            section.fields.filter((key) => (key !== "volcengineApiKey" || directMode) && (key !== "metaonticApiKey" || selectedMode === "metaontic")).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
           );
           const rows = [
             h("div", { key: "generation", className: "mov-section" }, [
@@ -1252,16 +1326,14 @@
                 h("span", { key: "hint", className: "mov-hint" }, t("sectionCombinedHint"))
               ]),
               h("div", { key: "body", className: "mov-advanced-body" }, [
-                h("div", { key: "merge-title", className: "mov-section-title" }, t("sectionMerge")),
-                renderGrid(SECTIONS[1]),
-                h("p", { key: "retained", className: "mov-hint", style: { margin: 0 } }, t("segmentsRetained")),
-                h("div", { key: "runtime-title", className: "mov-section-title" }, t("sectionRuntime")),
-                renderGrid(SECTIONS[2])
+                renderGrid({ key: "advancedFields", fields: ["mergeMode", "watermark", "seamTrimSeconds", "bgmFadeSeconds", "pollIntervalMs", "maxWaitMs", "ffmpegBinary", "ffprobeBinary"] }),
+                h("p", { key: "toolsHint", className: "mov-hint", style: { margin: 0 } }, t("toolsHint")),
+                h("p", { key: "retained", className: "mov-hint", style: { margin: 0 } }, t("segmentsRetained"))
               ])
             ])
           ];
           const overrides = Object.keys(snapshot.user || {});
-          const footerMessage = status === "saved" ? t("saved") : status === "failed" ? t("saveFailed") : pending.length ? t("dirty") : "";
+          const footerMessage = status === "saved" ? t("saved") : status === "failed" ? saveError || t("saveFailed") : pending.length ? t("dirty") : "";
           const footer = pending.length || status !== "idle" ? h("div", { key: "footer", className: "mov-footer" }, [
             footerMessage ? h("span", {
               key: "status",
@@ -1298,7 +1370,7 @@
             failed: TOKENS.error
           };
           const serverIssuedKey = value.keyOrigin === "register" || Boolean(value.deviceId && value.deviceSecret && value.registerEmail);
-          const keyReady = !directMode && Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;
+          const keyReady = serviceMode && Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;
           const registerText = registerStatus === "ok" ? t("registerOk") : registerStatus === "partial" ? t("registerPartial") : registerStatus === "restored" ? t("registerRestored") : registerMessage;
           const quotaSymbol = quota && quota.currency_symbol ? quota.currency_symbol : "\xA5";
           const money = (field) => `${quotaSymbol}${formatMoney(quota ? quota[field] : 0)}`;
@@ -1314,7 +1386,7 @@
             { key: "used", label: t("quotaUsed"), value: money("used_amount"), color: TOKENS.text },
             { key: "total", label: t("quotaTotal"), value: money("total_amount"), color: TOKENS.muted }
           ] : null;
-          const quotaBox = !directMode && keyReady ? h("div", {
+          const quotaBox = serviceMode && keyReady ? h("div", {
             key: "quota",
             "data-field": "quota",
             className: "mov-card mov-quota-compact"
@@ -1477,7 +1549,7 @@
             count: usage.count,
             amount: `${usageSymbol}${formatMoney(usage.amount_sum)}`
           })}${usage.truncated ? ` \xB7 ${t("usageMore", { count: usage.count })}` : ""}` : t("usageEmpty") : usageStatus === "working" ? t("usageLoading") : t("usageKeyMissing");
-          const usageBox = !directMode && keyReady ? h("div", {
+          const usageBox = serviceMode && keyReady ? h("div", {
             key: "usage",
             "data-field": "usage",
             className: "mov-card"
@@ -1622,7 +1694,7 @@
             updateAvailable ? h("span", { key: "hint", className: "mov-hint" }, t("versionHint")) : null,
             updateStatus === "ok" && updateAt ? h("span", { key: "at", className: "mov-foot-note" }, t("versionCheckedAt", { time: updateAt })) : null
           ]);
-          const registerBox = keyReady || directMode ? null : h("div", {
+          const registerBox = keyReady || !serviceMode ? null : h("div", {
             key: "register",
             className: "mov-card",
             style: { gap: 10 }
@@ -1707,7 +1779,7 @@
           if (snapshot.status === "loading") notice = t("loading");
           else if (snapshot.value === void 0) notice = t("unavailable");
           else if (snapshot.writable === false) notice = t("readOnly");
-          const blobs = notice && !snapshot.value ? [] : [registerBox, footer, resetRow, ...directMode ? [] : [quotaBox, usageBox], versionBox];
+          const blobs = notice && !snapshot.value ? [] : [registerBox, footer, resetRow, ...serviceMode ? [quotaBox, usageBox] : [], versionBox];
           return h("div", { className: "mov-page" }, [
             // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
             h("style", { key: "styles" }, PAGE_CSS),

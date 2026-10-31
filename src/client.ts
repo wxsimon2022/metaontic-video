@@ -31,11 +31,16 @@ window.__ModuleLoader__.load({
       providerNewapi: 'New API 中转站',
       apiKeyConfigured: '已配置，留空表示保持原值',
       connectionMode: '接入方式',
-      connectionModeHint: 'A：登录领取服务端 Key；B：填写自己的火山引擎 API Key。切换后点击保存生效。',
+      connectionModeHint: 'A：登录领取服务端 Key；B：MetaOntic AI 只填 Key，无需登录；C：填写自己的火山引擎 API Key。切换后点击保存生效。',
       volcengineKeyHint: '从火山方舟控制台获取 API Key，填入后保存。费用由火山账户承担，无需登录本插件服务端。',
+      metaontic: 'B · MetaOntic AI',
+      metaonticApiKey: 'MetaOntic AI API Key',
+      showKey: '查看 Key',
+      hideKey: '隐藏 Key',
+      metaonticKeyHint: '使用与服务端模式相同的中转地址，填写 Key 后保存。无需登录，不预估费用、不核对额度、不显示使用记录。',
       volcengineApiKey: '火山引擎 API Key',
       service: 'A · 服务端下发 Key',
-      volcengine: 'B · 火山引擎直连',
+      volcengine: 'C · 火山引擎直连',
       seamTrimSeconds: '接缝裁剪秒数（如 0.5,0）',
       modelHiddenCurrent: '当前模型（暂不提供选择）',
       releaseNotesTitle: '更新内容',
@@ -128,11 +133,14 @@ window.__ModuleLoader__.load({
       versionHint: '点「立即更新」由插件自己从 Gitee 重装一遍，不用去卸载重加。',
       versionCheckedAt: '检查于 {time}',
       sectionGeneration: '生成参数',
-      sectionMerge: '合并与输出',
+      sectionMerge: '视频合并',
+      sectionAppearance: '画面设置',
       sectionAdvanced: '高级',
       sectionCombined: '更多设置',
-      sectionCombinedHint: '输出目录、接缝处理与运行参数',
-      sectionRuntime: '运行参数',
+      sectionCombinedHint: '画面 · 合并 · 等待 · 本地工具',
+      sectionRuntime: '等待设置',
+      sectionTools: '本地工具',
+      toolsHint: '通常无需填写；已安装但无法自动识别时，可指定可执行文件路径。',
       segmentsRetained: '所有原始分段自动保留，便于预览、续做和重新剪辑。',
       register: '登录',
       registerWorking: '登录中…',
@@ -167,11 +175,16 @@ window.__ModuleLoader__.load({
       providerNewapi: 'New API relay',
       apiKeyConfigured: 'Configured; leave empty to keep it',
       connectionMode: 'Connection',
-      connectionModeHint: 'A: sign in for a service key. B: enter your Volcano Engine API key. Save to apply.',
+      connectionModeHint: 'A: sign in for a service key. B: MetaOntic AI requires only a key, no login. C: enter your Volcano Engine API key. Save to apply.',
       volcengineKeyHint: 'Enter an API key from the Volcano Ark console and save. Billed to your Volcano account; no plugin service login required.',
+      metaontic: 'B · MetaOntic AI',
+      metaonticApiKey: 'MetaOntic AI API Key',
+      showKey: 'Show key',
+      hideKey: 'Hide key',
+      metaonticKeyHint: 'Uses the service relay address. Enter a key and save. No login, cost estimates, balance checks or usage history.',
       volcengineApiKey: 'Volcano Engine API Key',
       service: 'A · Service-issued key',
-      volcengine: 'B · Volcano Engine',
+      volcengine: 'C · Volcano Engine',
       seamTrimSeconds: 'Seam head trims (e.g. 0.5,0)',
       modelHiddenCurrent: 'Current model (selection unavailable)',
       releaseNotesTitle: 'Release notes',
@@ -259,11 +272,14 @@ window.__ModuleLoader__.load({
       registerDisabled: 'Register service unavailable: {message}',
       registerNoKey: 'The register service returned no key (check the relay configuration).',
       sectionGeneration: 'Generation',
-      sectionMerge: 'Merge & output',
+      sectionMerge: 'Video merging',
+      sectionAppearance: 'Appearance',
       sectionAdvanced: 'Advanced',
       sectionCombined: 'More settings',
-      sectionCombinedHint: 'Output paths, seams and runtime options',
+      sectionCombinedHint: 'Appearance, merging, runtime and local tools',
       sectionRuntime: 'Runtime options',
+      sectionTools: 'Local tools',
+      toolsHint: 'Usually leave blank. Set executable paths only if installed tools are not detected.',
       segmentsRetained: 'Original segments are always retained for preview, resume and editing.',
       mode: 'Continuation',
       modeContinuous: 'Same camera',
@@ -297,7 +313,7 @@ window.__ModuleLoader__.load({
     ];
     /** 可编辑字段；kind 决定控件，标注 secret 的字段宿主只会告知是否已配置。 */
     const SELECTS = {
-      connectionMode: ['service', 'volcengine'],
+      connectionMode: ['service', 'metaontic', 'volcengine'],
       model: MODEL_OPTIONS,
       mode: ['continuous', 'closeup'],
       ratio: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
@@ -309,12 +325,15 @@ window.__ModuleLoader__.load({
     // 后者默认 15 = 段数最少，调小只会多出接缝。两者都留在配置里（默认 15），
     // 只有「上游对卡满 15 秒的延长段敏感」这种少数情况才需要改成 14。
     const SECTIONS = [
-      { key: 'sectionGeneration', fields: ['connectionMode', 'volcengineApiKey', 'model', 'mode', 'ratio', 'generateAudio', 'watermark'] },
-      { key: 'sectionMerge', fields: ['seamTrimSeconds', 'mergeMode', 'bgmFadeSeconds', 'outputDir'] },
-      { key: 'sectionAdvanced', fields: ['extraParams', 'pollIntervalMs', 'maxWaitMs', 'ffmpegBinary', 'ffprobeBinary'] },
+      { key: 'sectionGeneration', fields: ['connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'model', 'mode', 'ratio', 'generateAudio'] },
+      { key: 'sectionAppearance', fields: ['watermark'] },
+      { key: 'sectionMerge', fields: ['mergeMode', 'seamTrimSeconds', 'bgmFadeSeconds'] },
+      { key: 'sectionRuntime', fields: ['pollIntervalMs', 'maxWaitMs'] },
+      { key: 'sectionTools', fields: ['ffmpegBinary', 'ffprobeBinary'] },
     ];
     const FIELDS = [
       { key: 'connectionMode', kind: 'select', wide: true },
+      { key: 'metaonticApiKey', kind: 'text', secret: true, wide: true },
       { key: 'volcengineApiKey', kind: 'text', secret: true, wide: true },
       // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
       { key: 'model', kind: 'select', wide: true },
@@ -323,11 +342,9 @@ window.__ModuleLoader__.load({
       { key: 'generateAudio', kind: 'switch' },
       { key: 'watermark', kind: 'switch' },
       { key: 'seamTrimSeconds', kind: 'text' },
-      { key: 'mergeMode', kind: 'select' },
+      { key: 'mergeMode', kind: 'select', wide: true },
       { key: 'bgmFadeSeconds', kind: 'number' },
-      { key: 'outputDir', kind: 'text', wide: true },
       { key: 'keepSegments', kind: 'switch' },
-      { key: 'extraParams', kind: 'text', wide: true },
       { key: 'pollIntervalMs', kind: 'number' },
       { key: 'maxWaitMs', kind: 'number' },
       { key: 'ffmpegBinary', kind: 'text', mono: true },
@@ -341,7 +358,7 @@ window.__ModuleLoader__.load({
     const LOGGED_OUT_KEY = 'metaontic-video.logged-out';
     /** 插件自己会写进配置的项：重置时兜底一起清，免得宿主没把它们列进 user。 */
     const PLUGIN_OWNED_KEYS = [
-      'connectionMode', 'volcengineApiKey', 'apiKey', 'keyOrigin', 'baseUrl', 'registerEmail', 'deviceId', 'deviceSecret', 'model',
+      'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'apiKey', 'keyOrigin', 'baseUrl', 'registerEmail', 'deviceId', 'deviceSecret', 'model',
     ];
     /** 注册接口的握手请求头 X-Register-Token：与服务端 REGISTER_CLIENT_TOKEN 一致。 */
     const DEFAULT_REGISTER_TOKEN = 'metaontic-video-register-v1';
@@ -548,7 +565,11 @@ window.__ModuleLoader__.load({
       .mov-advanced-toggle { cursor: pointer; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       .mov-advanced-toggle .mov-hint { display: block; margin: 5px 0 0 16px; font-weight: 400; }
       .mov-advanced-toggle:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 5px; border-radius: 4px; }
-      .mov-advanced-body { display: flex; flex-direction: column; gap: 16px; border-top: 1px solid ${TOKENS.border}; margin-top: 14px; padding-top: 16px; }
+      .mov-advanced-body { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid ${TOKENS.border}; margin-top: 14px; padding-top: 16px; }
+      .mov-advanced-body .mov-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 18px; align-items: start; }
+      .mov-advanced-body .mov-field-wide { grid-column: auto; }
+      @container (max-width: 480px) { .mov-advanced-body .mov-grid { grid-template-columns: minmax(0, 1fr); } }
+      .mov-advanced { container-type: inline-size; }
       .mov-section-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       /* 标题左边一道主色竖条，代替纯文字分组标题 */
       .mov-section-title::before { content: ""; flex: 0 0 auto; width: 3px; height: 13px; border-radius: 2px; background: ${TOKENS.primaryFill}; }
@@ -561,6 +582,11 @@ window.__ModuleLoader__.load({
       .mov-field-wide { grid-column: 1 / -1; }
       .mov-label { display: block; font-size: 12px; color: ${TOKENS.muted}; margin-bottom: 6px; }
       .mov-input { padding: 8px 10px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; color: ${TOKENS.text}; font: inherit; font-size: 13px; height: 36px; }
+      .mov-key-control { position: relative; min-width: 0; }
+      .mov-key-control .mov-input { padding-right: 40px; }
+      .mov-key-eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 30px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 5px; background: transparent; color: ${TOKENS.muted}; cursor: pointer; }
+      .mov-key-eye:hover { color: ${TOKENS.text}; background: ${TOKENS.border}; }
+      .mov-key-eye:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
       .mov-input:focus, .mov-input:focus-visible { outline: none; border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 3px rgba(36, 123, 191, .18); }
       /* 模型 ID 与可执行文件路径很长：等宽字体 + 省略，不把整行撑变形 */
       .mov-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
@@ -641,6 +667,24 @@ window.__ModuleLoader__.load({
       return a === b || (a === undefined && b === '') || (a === '' && b === undefined);
     }
 
+    // 先写当前 Key、清空其他渠道凭据，最后提交模式。空值覆盖继承配置，避免 unset 后旧 Key 回流。
+    async function persistConnection(form, pending, nextMode) {
+      if (!['service', 'metaontic', 'volcengine'].includes(nextMode)) throw new Error('未知接入方式');
+      const inactiveKeys = nextMode === 'volcengine'
+        ? ['metaonticApiKey', 'apiKey', 'keyOrigin', 'baseUrl', 'submitPath', 'queryPath',
+          'registerEmail', 'deviceId', 'deviceSecret', 'registerApi', 'registerToken']
+        : nextMode === 'metaontic'
+          ? ['volcengineApiKey', 'apiKey', 'keyOrigin', 'registerEmail', 'deviceId', 'deviceSecret', 'registerApi', 'registerToken']
+          : ['volcengineApiKey', 'metaonticApiKey'];
+      if (typeof form.mutate !== 'function') throw new Error('当前宿主不支持原子保存，请更新 Harness');
+      const ops = pending.filter(([key]) => key !== 'connectionMode' && !inactiveKeys.includes(key))
+        .map(([key, next]) => ({ op: 'set', path: [key], value: next }));
+      for (const key of inactiveKeys) ops.push({ op: 'set', path: [key], value: '' });
+      ops.push({ op: 'set', path: ['connectionMode'], value: nextMode });
+      // 成功响应代表宿主已接受整批写入；插件可能已重载，旧控制器的快照不再更新。
+      if (!await form.mutate(ops)) throw new Error('宿主未接受配置，请重开设置页后重试；若仍失败，请重启 Harness 以加载最新插件字段');
+    }
+
     function makePage({ form, t, manager }) {
       return function ConfigPage(props) {
         const snapshot = useSnapshot(form);
@@ -648,9 +692,17 @@ window.__ModuleLoader__.load({
         const [draft, setDraft] = React.useState({});
         const selectedMode = draft.connectionMode ?? value.connectionMode ?? 'service';
         const directMode = selectedMode === 'volcengine';
+        const serviceMode = selectedMode === 'service';
+        const [visibleKey, setVisibleKey] = React.useState('');
+        React.useEffect(() => { setVisibleKey(''); }, [selectedMode]);
         const [status, setStatus] = React.useState('idle');
+        const [saveError, setSaveError] = React.useState('');
         // 「已保存」这类反馈过几秒自动收起：收起后操作条跟着消失，页面回到「没有改动」的样子
         const statusTimer = React.useRef(null);
+        const connectionBusy = React.useRef(false);
+        function serviceActive() {
+          return !connectionBusy.current && (form.getSnapshot().value?.connectionMode || 'service') === 'service';
+        }
         const [registerStatus, setRegisterStatus] = React.useState('idle');
         const [registerMessage, setRegisterMessage] = React.useState('');
         // 注册用「邮箱（账号）+ 邮件验证码」：邮箱一次只发一把 Key
@@ -697,7 +749,7 @@ window.__ModuleLoader__.load({
           if (restoreTried.current) return;
           restoreTried.current = true;
           const snap = form.getSnapshot() || {};
-          if ((snap.value || {}).connectionMode === 'volcengine') return;
+          if (((snap.value || {}).connectionMode || 'service') !== 'service') return;
           if (loggedOut()) {
             setRegisterStatus('idle');
             return;
@@ -714,7 +766,7 @@ window.__ModuleLoader__.load({
 
         // 页面可见时定时拉取，重新聚焦时立即刷新；火山直连不查询服务端记录。
         React.useEffect(() => {
-          if (directMode || props?.view === 'summary'
+          if (!serviceMode || props?.view === 'summary'
             || !(snapshot.secrets?.apiKey || value.apiKey)) return;
           const refresh = () => {
             if (window.document?.visibilityState === 'hidden') return;
@@ -729,7 +781,7 @@ window.__ModuleLoader__.load({
             window.removeEventListener('focus', refresh);
             window.document?.removeEventListener('visibilitychange', refresh);
           };
-        }, [directMode, Boolean(snapshot.secrets?.apiKey || value.apiKey), value.deviceId, props?.view]);
+        }, [serviceMode, Boolean(snapshot.secrets?.apiKey || value.apiKey), value.deviceId, props?.view]);
 
         // 版本卡片：先把上次查到的结果摆上（离线也能看），缓存过期了再静默查一次。
         const updateTried = React.useRef(false);
@@ -749,7 +801,7 @@ window.__ModuleLoader__.load({
         if (props && props.view === 'summary') {
           const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
           const text = configured
-            ? t('summary', { provider: t('providerNewapi'), model: value.model || '-' })
+            ? t('summary', { provider: t(selectedMode), model: value.model || '-' })
             : t('summaryEmpty');
           return h('span', { style: { color: TOKENS.muted } }, text);
         }
@@ -786,25 +838,14 @@ window.__ModuleLoader__.load({
         }
 
         async function save() {
+          if (connectionBusy.current) return;
+          connectionBusy.current = true;
+          setSaveError('');
           setStatus('saving');
           const nextMode = draft.connectionMode ?? value.connectionMode ?? 'service';
-          const inactiveKeys = nextMode === 'volcengine'
-            ? ['apiKey', 'keyOrigin', 'baseUrl', 'submitPath', 'queryPath',
-              'registerEmail', 'deviceId', 'deviceSecret', 'registerApi', 'registerToken']
-            : ['volcengineApiKey'];
           try {
-            // 先保存当前配置；写入失败时不清理旧接入凭据。
-            for (const [key, next] of pending) {
-              if (inactiveKeys.includes(key)) continue;
-              const accepted = await form.set(key, next);
-              if (!accepted) throw new Error(`保存 ${key} 失败`);
-            }
-            // 仅清除本插件非当前接入方式的字段，不删除宿主 profile 文件。
-            for (const key of inactiveKeys) {
-              const accepted = await form.unset(key);
-              if (accepted === false) throw new Error(`清理 ${key} 失败`);
-            }
-            if (nextMode === 'volcengine') {
+            await persistConnection(form, pending, nextMode);
+            if (nextMode !== 'service') {
               forgetDevice();
               setRegisterEmail('');
               setRegisterCode('');
@@ -814,8 +855,11 @@ window.__ModuleLoader__.load({
             }
             setDraft({});
             flashStatus('saved');
-          } catch {
+          } catch (error) {
+            setSaveError(error?.message || String(error));
             setStatus('failed');
+          } finally {
+            connectionBusy.current = false;
           }
         }
 
@@ -955,6 +999,7 @@ window.__ModuleLoader__.load({
         async function syncDeviceIdentity() {
           try {
             for (const [key, next] of deviceWrites()) {
+              if (!serviceActive()) return;
               const accepted = await form.set(key, next);
               if (accepted) clear(key);
             }
@@ -1007,6 +1052,7 @@ window.__ModuleLoader__.load({
         async function applyRegistration(result, fallbackBase, device) {
           // keyOrigin 是给宿主那侧看的标记：只有带这个标记（或早期版本的设备凭据 + 邮箱）
           // 的 Key 才被当成「服务端下发的」，手填的一律拒绝调用。
+          if (!serviceActive()) return;
           clearLoggedOut();
           const writes = [
             ['apiKey', result.api_key],
@@ -1021,6 +1067,7 @@ window.__ModuleLoader__.load({
           if (result.model) writes.push(['model', result.model]);
           let ok = true;
           for (const [key, next] of writes) {
+            if (!serviceActive()) return;
             const accepted = await form.set(key, next);
             if (accepted) clear(key);
             else ok = false;
@@ -1040,7 +1087,7 @@ window.__ModuleLoader__.load({
             body: JSON.stringify({ device_id: device.id, device_secret: device.secret }),
           });
           if (!result.api_key) throw new Error(t('registerNoKey'));
-          await applyRegistration(result, null, device);
+          if (!await applyRegistration(result, null, device)) return;
           setRegisterStatus('restored');
           return result;
         }
@@ -1157,7 +1204,7 @@ window.__ModuleLoader__.load({
          * 只有本机（设备标识 + 设备密钥都对上）才拿得到，展示的必然是自己那把。
          */
         async function loadQuota() {
-          if (directMode) return;
+          if (!serviceMode || !serviceActive()) return;
           const device = deviceIdentity();
           setQuotaStatus('working');
           setQuotaMessage('');
@@ -1167,6 +1214,7 @@ window.__ModuleLoader__.load({
               headers: { 'content-type': 'application/json', accept: 'application/json' },
               body: JSON.stringify({ device_id: device.id, device_secret: device.secret }),
             });
+            if (!serviceActive()) return;
             setQuota(result);
             setQuotaAt(new Date().toLocaleTimeString());
             setQuotaStatus('ok');
@@ -1186,7 +1234,7 @@ window.__ModuleLoader__.load({
          * 再去读它的调用日志（谁什么时候出了片、消耗多少），一次任务只显示一行。
          */
         async function loadUsage() {
-          if (directMode || usageInFlight.current) return;
+          if (!serviceMode || !serviceActive() || usageInFlight.current) return;
           usageInFlight.current = true;
           const device = deviceIdentity();
           setUsageStatus('working');
@@ -1201,6 +1249,7 @@ window.__ModuleLoader__.load({
                 limit: 10,
               }),
             });
+            if (!serviceActive()) return;
             setUsage(result);
             setUsageAt(new Date().toLocaleTimeString());
             setUsageStatus('ok');
@@ -1317,12 +1366,14 @@ window.__ModuleLoader__.load({
               ...list.map((option) => h('option', { key: option, value: option }, optionLabel(t, field.key, option))),
             ]);
           }
-          return h('input', {
+          const canReveal = field.key === 'metaonticApiKey' || field.key === 'volcengineApiKey';
+          const revealed = canReveal && visibleKey === field.key;
+          const input = h('input', {
             id,
             'data-field': field.key,
             className: `mov-input${field.mono ? ' mov-mono' : ''}`,
             style: inputStyle,
-            type: field.kind === 'number' ? 'number' : (field.secret ? 'password' : 'text'),
+            type: field.kind === 'number' ? 'number' : (field.secret && !revealed ? 'password' : 'text'),
             value: current ?? '',
             placeholder: field.secret && (snapshot.secrets?.[field.key] || value[field.key]) ? t('apiKeyConfigured') : '',
             onChange: (event) => edit(
@@ -1332,11 +1383,28 @@ window.__ModuleLoader__.load({
                 : event.target.value,
             ),
           });
+          if (!canReveal) return input;
+          return h('div', { className: 'mov-key-control' }, [
+            input,
+            h('button', {
+              type: 'button', className: 'mov-key-eye',
+              'aria-label': t(revealed ? 'hideKey' : 'showKey'),
+              title: t(revealed ? 'hideKey' : 'showKey'),
+              'data-action': `toggle-${field.key}`,
+              'aria-controls': id, 'aria-pressed': revealed,
+              onClick: () => setVisibleKey(revealed ? '' : field.key),
+            }, h('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }, [
+              h('path', { key: 'eye', d: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z' }),
+              h('circle', { key: 'pupil', cx: 12, cy: 12, r: 3 }),
+              revealed ? h('path', { key: 'slash', d: 'M3 3l18 18' }) : null,
+            ])),
+          ]);
         }
 
         // 少数需要解释的字段：模型选哪个（mini 便宜 / fast 贵一些）
         const hints = {
           connectionMode: t('connectionModeHint'),
+          metaonticApiKey: t('metaonticKeyHint'),
           volcengineApiKey: t('volcengineKeyHint'),
           model: t('modelHint'),
           bgmFadeSeconds: t('bgmFadeSecondsHint'),
@@ -1359,7 +1427,8 @@ window.__ModuleLoader__.load({
 
         // 配置区分成几节，每节一个标题 + 一个自适应网格。
         const renderGrid = (section) => h('div', { key: section.key, className: 'mov-grid' },
-          section.fields.filter((key) => key !== 'volcengineApiKey' || directMode)
+          section.fields.filter((key) => (key !== 'volcengineApiKey' || directMode)
+            && (key !== 'metaonticApiKey' || selectedMode === 'metaontic'))
             .map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean));
         const rows = [
           h('div', { key: 'generation', className: 'mov-section' }, [
@@ -1372,11 +1441,9 @@ window.__ModuleLoader__.load({
               h('span', { key: 'hint', className: 'mov-hint' }, t('sectionCombinedHint')),
             ]),
             h('div', { key: 'body', className: 'mov-advanced-body' }, [
-              h('div', { key: 'merge-title', className: 'mov-section-title' }, t('sectionMerge')),
-              renderGrid(SECTIONS[1]),
+              renderGrid({ key: 'advancedFields', fields: ['mergeMode', 'watermark', 'seamTrimSeconds', 'bgmFadeSeconds', 'pollIntervalMs', 'maxWaitMs', 'ffmpegBinary', 'ffprobeBinary'] }),
+              h('p', { key: 'toolsHint', className: 'mov-hint', style: { margin: 0 } }, t('toolsHint')),
               h('p', { key: 'retained', className: 'mov-hint', style: { margin: 0 } }, t('segmentsRetained')),
-              h('div', { key: 'runtime-title', className: 'mov-section-title' }, t('sectionRuntime')),
-              renderGrid(SECTIONS[2]),
             ]),
           ]),
         ];
@@ -1387,7 +1454,7 @@ window.__ModuleLoader__.load({
         const footerMessage = status === 'saved'
           ? t('saved')
           : (status === 'failed'
-            ? t('saveFailed')
+            ? (saveError || t('saveFailed'))
             : (pending.length ? t('dirty') : ''));
         const footer = (pending.length || status !== 'idle')
           ? h('div', { key: 'footer', className: 'mov-footer' }, [
@@ -1440,7 +1507,7 @@ window.__ModuleLoader__.load({
         // 这种情况要把注册区露出来，让用户点「登录」换回自己那把。
         const serverIssuedKey = value.keyOrigin === 'register'
           || Boolean(value.deviceId && value.deviceSecret && value.registerEmail);
-        const keyReady = !directMode && Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;
+        const keyReady = serviceMode && Boolean(snapshot.secrets?.apiKey || value.apiKey) && serverIssuedKey;
         // 邮箱是唯一标识，只发一把：已经配好 Key 的（注册过的或手填的）整块注册区直接隐藏，
         // 连「已经领到 Key 了」这类说明也不显示；要换 Key 只能找管理员。
         const registerText = registerStatus === 'ok'
@@ -1470,7 +1537,7 @@ window.__ModuleLoader__.load({
           ]
           : null;
         // 没登录就没有额度可言：整块不渲染（跟使用记录一个规矩）
-        const quotaBox = !directMode && keyReady ? h('div', {
+        const quotaBox = serviceMode && keyReady ? h('div', {
           key: 'quota',
           'data-field': 'quota',
           className: 'mov-card mov-quota-compact',
@@ -1688,7 +1755,7 @@ window.__ModuleLoader__.load({
             })}${usage.truncated ? ` · ${t('usageMore', { count: usage.count })}` : ''}`
             : t('usageEmpty'))
           : (usageStatus === 'working' ? t('usageLoading') : t('usageKeyMissing'));
-        const usageBox = !directMode && keyReady ? h('div', {
+        const usageBox = serviceMode && keyReady ? h('div', {
           key: 'usage',
           'data-field': 'usage',
           className: 'mov-card',
@@ -1845,7 +1912,7 @@ window.__ModuleLoader__.load({
         ]);
 
         // 有 Key 就整块不渲染（连标题、提示文字都没有），页面上只剩配置项 + 额度卡片。
-        const registerBox = keyReady || directMode ? null : h('div', {
+        const registerBox = keyReady || !serviceMode ? null : h('div', {
           key: 'register',
           className: 'mov-card',
           style: { gap: 10 },
@@ -1938,7 +2005,7 @@ window.__ModuleLoader__.load({
         // 配置读不出来（没有表单 / 不可写）时只显示提示，配置项与卡片一律不渲染。
         const blobs = notice && !snapshot.value
           ? []
-          : [registerBox, footer, resetRow, ...(directMode ? [] : [quotaBox, usageBox]), versionBox];
+          : [registerBox, footer, resetRow, ...(serviceMode ? [quotaBox, usageBox] : []), versionBox];
 
         return h('div', { className: 'mov-page' }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
