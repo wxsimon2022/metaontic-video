@@ -438,6 +438,8 @@
       versionNew: "\u6709\u65B0\u7248\u672C v{version}",
       versionFailed: "\u68C0\u67E5\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
       versionUpdate: "\u7ACB\u5373\u66F4\u65B0",
+      versionOptional: "\u8FD9\u662F\u666E\u901A\u66F4\u65B0\uFF0C\u4F60\u53EF\u4EE5\u81EA\u884C\u51B3\u5B9A\u662F\u5426\u5347\u7EA7\u3002\u7A0D\u540E\u5904\u7406\u4E0D\u5F71\u54CD\u7EE7\u7EED\u4F7F\u7528\uFF0C\u63D2\u4EF6\u4E0D\u4F1A\u81EA\u52A8\u5B89\u88C5\u3002",
+      versionLater: "\u7A0D\u540E\u518D\u8BF4",
       versionUpdateConfirm: "\u786E\u8BA4\u66F4\u65B0\u5230 v{version}",
       versionUpdateConfirmHint: "\u66F4\u65B0\u671F\u95F4\u8BBE\u7F6E\u9875\u53EF\u80FD\u77ED\u6682\u5173\u95ED\uFF0C\u73B0\u6709\u914D\u7F6E\u4E0E\u5BC6\u94A5\u4F1A\u4FDD\u7559\u3002",
       versionUpdating: "\u66F4\u65B0\u4E2D\u2026",
@@ -562,6 +564,8 @@
       versionNew: "v{version} is available",
       versionFailed: "Update check failed: {message}",
       versionUpdate: "Update now",
+      versionOptional: "This update is optional. You can keep using the plugin and update later. It will not install automatically.",
+      versionLater: "Later",
       versionUpdateConfirm: "Confirm update to v{version}",
       versionUpdateConfirmHint: "The settings page may briefly close during the update. Your settings and keys will be kept.",
       versionUpdating: "Updating\u2026",
@@ -684,7 +688,7 @@
     const UPDATE_ATTEMPTS = 3;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "3.4.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.5.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const match = /(\d+)\.(\d+)\.(\d+)/.exec(String(text || ""));
@@ -818,6 +822,11 @@
     }
     async function checkForUpdate(silent = false) {
       if (!silent) {
+        context.setUpdateDeferred?.("");
+        try {
+          window.localStorage.removeItem(`${context.UPDATE_CACHE_KEY}.deferred`);
+        } catch {
+        }
         context.setUpdateStatus("working");
         context.setUpdateMessage("");
       }
@@ -827,6 +836,7 @@
           context.updateCommit.current = commit;
         }).catch(() => {
         });
+        context.setUpdateConfirm?.(false);
         context.setUpdateLatest(latest);
         context.setUpdateAt((/* @__PURE__ */ new Date()).toLocaleTimeString());
         context.setUpdateStatus("ok");
@@ -841,6 +851,7 @@
       }
     }
     async function runOnlineUpdate() {
+      if (context.updateConfirm !== true) return;
       context.setUpdateConfirm(false);
       context.setUpdateStatus("installing");
       context.setUpdateMessage("");
@@ -935,7 +946,37 @@
       context.setUpdateStatus(outcome.application === "restart-required" ? "restart" : "applied");
       context.setUpdateMessage(outcome.application === "restart-required" ? context.t("versionUpdateRestart", { version }) : context.t(outcome.application === "applied" ? "versionUpdateDone" : "versionUpdatePending", { version }));
     }
-    return { readUpdateCache, rememberUpdateCheck, forgetUpdateCheck, checkForUpdate, runOnlineUpdate };
+    function deferUpdate() {
+      context.setUpdateConfirm(false);
+      context.setUpdateDeferred(context.updateLatest);
+      try {
+        window.localStorage.setItem(`${context.UPDATE_CACHE_KEY}.deferred`, context.updateLatest);
+      } catch {
+      }
+    }
+    return { deferUpdate, readUpdateCache, rememberUpdateCheck, forgetUpdateCheck, checkForUpdate, runOnlineUpdate };
+  }
+  function renderUpdateNotice({ h, t, available, latest, deferred, status, confirmed, onUpdate, onLater }) {
+    if (!available || deferred === latest || status === "installing") return null;
+    return h("div", { key: "update-notice", className: "mov-notice", role: "status", "data-field": "update-notice" }, [
+      h("strong", { key: "title" }, t("versionNew", { version: latest })),
+      h("p", { key: "optional" }, t("versionOptional")),
+      confirmed ? h("p", { key: "confirm" }, t("versionUpdateConfirmHint")) : null,
+      h("div", { key: "actions", className: "mov-cmd-row" }, [
+        h(
+          "button",
+          {
+            key: "update",
+            type: "button",
+            className: "mov-btn mov-btn-sm mov-btn-primary",
+            "data-action": confirmed ? "update-notice-confirm" : "update-notice-open",
+            onClick: onUpdate
+          },
+          confirmed ? t("versionUpdateConfirm", { version: latest }) : t("versionUpdate")
+        ),
+        h("button", { key: "later", type: "button", className: "mov-btn mov-btn-sm", "data-action": "update-later", onClick: onLater }, t("versionLater"))
+      ])
+    ]);
   }
 
   // src/client/account.ts
@@ -1293,7 +1334,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.4.0",
+    version: "3.5.0",
     description: "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
     license: "MIT",
     type: "module",
@@ -1377,23 +1418,12 @@
       hyperframes: "0.8.223"
     },
     releaseNotes: {
-      version: "3.4.0",
+      version: "3.5.0",
       items: [
-        "\u65B0\u589E\uFF1A\u65B0\u589E\u968F\u63D2\u4EF6\u6253\u5305\u7684\u64CD\u4F5C\u6307\u5357\uFF0C\u8986\u76D6\u5B89\u88C5\u914D\u7F6E\u3001\u521B\u610F\u4E0E\u811A\u672C\u5BA1\u6838\u3001\u9010\u6BB5\u751F\u6210\u7EED\u505A\u3001\u7D20\u6750\u3001\u8BBE\u7F6E\u53CA\u66F4\u65B0\u6392\u67E5\u3002",
-        "\u65B0\u589E\uFF1A\u89C6\u9891\u8FD0\u884C\u8FDB\u5EA6\u5728\u5BF9\u8BDD\u8F93\u5165\u6846\u4E0A\u65B9\u72EC\u7ACB\u663E\u793A\uFF0C\u6298\u53E0\u5DE5\u5177\u5361\u7247\u540E\u4ECD\u53EF\u67E5\u770B\uFF1B\u9002\u914D\u5BBF\u4E3B\u5BBD\u5EA6\u3001\u4FA7\u8FB9\u7559\u767D\u53CA\u5F53\u524D\u4F1A\u8BDD\u3002",
-        "\u4F18\u5316\uFF1A\u521B\u4F5C\u524D\u5148\u8BC4\u4F30\u65B9\u6848\u5B8C\u6574\u5EA6\uFF0C\u5B8C\u5584\u521B\u610F\u524D\u786E\u8BA4\u65B9\u5411\uFF1B\u5B8C\u6574\u65B9\u6848\u53EA\u6DA6\u8272\u4E0E\u6574\u7406\uFF0C\u5267\u60C5\u3001\u89D2\u8272\u3001\u7ED3\u5C3E\u548C\u5185\u5BB9\u53D6\u820D\u53D8\u66F4\u5148\u5F81\u5F97\u540C\u610F\u3002",
-        "\u4F18\u5316\uFF1A\u9996\u6B21\u53CA\u6BCF\u6B21\u6539\u7A3F\u5148\u5C55\u793A\u5B8C\u6574\u811A\u672C\u4E0E\u955C\u5934\u53C2\u8003\u793A\u610F\u56FE\uFF0C\u5206\u6BB5\u65F6\u9644\u8BA1\u5212\u8868\uFF1B\u5BA1\u6838\u7A97\u53E3\u4F7F\u7528\u7B80\u77ED\u4E3B\u9898\u3001\u5355\u4E2A\u95EE\u9898\u53CA\u4E24\u4E2A\u9009\u9879\uFF0C\u4FEE\u6539\u65B9\u5411\u9ED8\u8BA42\u20133\u9879\u7B80\u77ED\u5355\u9009\u3002",
-        "\u4F18\u5316\uFF1A\u811A\u672C\u7248\u672C\u3001\u72B6\u6001\u3001\u5BA1\u6838\u4E0E\u5236\u4F5C\u786E\u8BA4\u5143\u4FE1\u606F\u7EDF\u4E00\u4E2D\u6587\uFF0C\u517C\u5BB9\u65E7\u82F1\u6587\u8BB0\u5F55\uFF1B\u6539\u7A3F\u6E05\u7A7A\u65E7\u786E\u8BA4\u540E\u91CD\u65B0\u5BA1\u6838\u4E0E\u786E\u8BA4\u5236\u4F5C\u3002",
-        "\u4F18\u5316\uFF1A\u8FDB\u5EA6\u6309\u76EE\u6807\u65F6\u957F\u4F30\u7B97\uFF1A5\u79D2\u7EA6120\u79D2\u300115\u79D2\u7EA6150\u79D2\uFF0C\u5B9E\u9645\u6210\u529F\u524D\u6700\u591A99%\uFF1B\u4EC5\u5B9E\u9645\u6267\u884C\u540E\u8BA1\u65F6\uFF0C\u7B49\u5F85\u5BA1\u6279\u4E0D\u663E\u793A\u8FDB\u5EA6\u3002",
-        "\u4F18\u5316\uFF1A\u64CD\u4F5C\u89C4\u5219\u5728\u73B0\u6709\u5BF9\u8BDD\u4E0B\u4E00\u8F6E\u52A8\u6001\u751F\u6548\uFF1B\u672C\u5730\u5F00\u53D1\u548C\u5728\u7EBF\u66F4\u65B0\u4F18\u5148\u70ED\u52A0\u8F7D\uFF0C\u4EC5\u5BBF\u4E3B\u660E\u786E\u8981\u6C42\u65F6\u63D0\u793A\u91CD\u542F\uFF0C\u65E7\u786E\u8BA4\u7A97\u53E3\u9700\u91CD\u65B0\u53D1\u8D77\u3002",
-        "\u4F18\u5316\uFF1A\u6309\u804C\u8D23\u62C6\u5206\u5BBF\u4E3B\u4E0E\u754C\u9762\u6E90\u7801\uFF0C\u4FDD\u7559\u5355\u6587\u4EF6\u6784\u5EFA\u4E0E\u5B89\u88C5\u5165\u53E3\uFF0C\u8865\u5145\u4E09\u4E2A\u6E20\u9053\u7684\u6A21\u62DF\u96C6\u6210\u53CA\u5F02\u5E38\u6062\u590D\u9A8C\u8BC1\u3002",
-        "\u4F18\u5316\uFF1AMetaOntic AI\u4E0E\u706B\u5C71\u76F4\u8FDE\u7684\u7528\u6237\u8D39\u7528\u8BF4\u660E\u7EDF\u4E00\u4E3A\u201C\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39\u201D\uFF0C\u4FDD\u7559\u5404\u6E20\u9053\u539F\u6709\u5185\u90E8\u8BA1\u8D39\u903B\u8F91\u3002",
-        "\u4FEE\u590D\uFF1A\u4EFB\u52A1\u63D0\u4EA4\u540E\u4FDD\u5B58\u4EFB\u52A1ID\uFF0C\u6BCF\u6BB5\u6210\u529F\u540E\u5148\u4FDD\u5B58\u8FDB\u5EA6\u518D\u4EA4\u4ED8\uFF1B\u505C\u6B62\u6216\u8D85\u65F6\u540E\u53EF\u7528\u539Fresume\u67E5\u8BE2\u5DF2\u6709\u4EFB\u52A1\uFF0C\u907F\u514D\u91CD\u590D\u63D0\u4EA4\u3002",
-        "\u4FEE\u590D\uFF1A\u4E0B\u8F7D\u6216\u5408\u5E76\u5931\u8D25\u53EF\u5355\u72EC\u91CD\u8BD5\u4EA4\u4ED8\uFF1B\u6700\u7EC8\u5B8C\u6210\u540E\u66F4\u65B0\u8FDB\u5EA6\uFF0C\u518D\u6B21\u8BFB\u53D6\u9ED8\u8BA4\u4EA4\u4ED8\u5DF2\u6709\u6210\u679C\uFF0C\u907F\u514D\u91CD\u590D\u751F\u6210\u6700\u540E\u4E00\u6BB5\u3002",
-        "\u4FEE\u590D\uFF1A\u7EED\u505A\u5141\u8BB8\u7701\u7565prompt\uFF0C\u4FDD\u7559merge\u7B49\u4EA4\u4ED8\u9009\u9879\uFF1B\u6A21\u578B\u6216\u6E20\u9053\u53D8\u5316\u9700\u786E\u8BA4\uFF0C\u5F85\u67E5\u8BE2\u4EFB\u52A1\u5FC5\u987B\u6062\u590D\u539F\u914D\u7F6E\u3002",
-        "\u4FEE\u590D\uFF1A\u8D39\u7528\u9884\u68C0\u4F7F\u7528\u539F\u8FDB\u5EA6\u8BA1\u5212\uFF0C\u4EC5\u4F30\u7B97\u672C\u6B21\u6267\u884C\u6BB5\uFF1B\u5408\u5E76\u73AF\u5883\u68C0\u67E5\u6CBF\u7528\u4EA4\u4ED8\u8BBE\u7F6E\uFF0C\u65B0\u89C6\u9891\u7EED\u505A\u76EE\u6807\u9650\u5236\u5728120\u79D2\u5185\u3002",
-        "\u4FEE\u590D\uFF1A\u4FEE\u590D\u72EC\u7ACB\u9884\u89C8\u7F3A\u5C11\u5BBF\u4E3B\u63A5\u53E3\u5BFC\u81F4\u767D\u5C4F\u53CA\u8FDB\u5EA6\u6A21\u62DF\u5B57\u6BB5\u8FC7\u65F6\u95EE\u9898\uFF0C\u9A8C\u8BC1\u8BBE\u7F6E\u573A\u666F\u3001\u4FDD\u5B58\u3001\u8FDB\u5EA6\u3001\u4E3B\u9898\u3001\u8BED\u8A00\u53CA\u79FB\u52A8\u5E03\u5C40\u3002",
-        "\u4FEE\u590D\uFF1A\u4FEE\u590D\u5BA1\u6279\u524D\u8FDB\u5EA6\u95EA\u73B0\u3001\u6298\u53E0\u6216\u5D4C\u5957\u8C03\u7528\u8FDB\u5EA6\u4E22\u5931\uFF0C\u4EE5\u53CA\u5B8C\u6574\u811A\u672C\u585E\u5165\u5BA1\u6838\u7A97\u53E3\u5BFC\u81F4\u957F\u6587\u672C\u6324\u538B\u7684\u95EE\u9898\u3002"
+        "\u65B0\u589E\uFF1A\u8BBE\u7F6E\u9875\u9876\u90E8\u663E\u793A\u666E\u901A\u66F4\u65B0\u63D0\u793A\uFF0C\u63D0\u4F9B\u201C\u7ACB\u5373\u66F4\u65B0\u201D\u548C\u201C\u7A0D\u540E\u518D\u8BF4\u201D\uFF0C\u7531\u7528\u6237\u81EA\u884C\u51B3\u5B9A\u662F\u5426\u5347\u7EA7\u3002",
+        "\u4F18\u5316\uFF1A\u8BB0\u4F4F\u7A0D\u540E\u5904\u7406\u7684\u7248\u672C\uFF0C\u540C\u4E00\u7248\u672C\u4E0D\u91CD\u590D\u663E\u793A\u9876\u90E8\u63D0\u9192\uFF0C\u5E95\u90E8\u7248\u672C\u5361\u7247\u4ECD\u53EF\u66F4\u65B0\uFF1B\u624B\u52A8\u68C0\u67E5\u6216\u51FA\u73B0\u66F4\u9AD8\u7248\u672C\u65F6\u91CD\u65B0\u63D0\u793A\uFF0C\u4E0D\u5F71\u54CD\u7EE7\u7EED\u4F7F\u7528\u3002",
+        "\u4F18\u5316\uFF1A\u540C\u6B65\u4E2D\u82F1\u6587\u66F4\u65B0\u63D0\u793A\u3001README\u4E0E\u64CD\u4F5C\u6307\u5357\uFF0C\u8BF4\u660E\u63D0\u9192\u3001\u7A0D\u540E\u5904\u7406\u53CA\u5B89\u88C5\u786E\u8BA4\u6D41\u7A0B\u3002",
+        "\u4FEE\u590D\uFF1A\u5728\u7EBF\u5B89\u88C5\u5165\u53E3\u589E\u52A0\u660E\u786E\u786E\u8BA4\u6821\u9A8C\uFF0C\u68C0\u67E5\u66F4\u65B0\u548C\u7A0D\u540E\u5904\u7406\u4E0D\u4F1A\u81EA\u52A8\u5B89\u88C5\u63D2\u4EF6\u3002"
       ]
     }
   };
@@ -1448,6 +1478,13 @@
         const [updateAt, setUpdateAt] = React.useState("");
         const updateCommit = React.useRef("");
         const [updateConfirm, setUpdateConfirm] = React.useState(false);
+        const [updateDeferred, setUpdateDeferred] = React.useState(() => {
+          try {
+            return window.localStorage.getItem(`${UPDATE_CACHE_KEY}.deferred`) || "";
+          } catch {
+            return "";
+          }
+        });
         const { registerApiRoot, loggedOut, setLoggedOut, clearLoggedOut, forgetDevice, deviceIdentity, deviceFingerprint, deviceLabel, deviceWrites, syncDeviceIdentity, callRegister, applyRegistration, lookupOwnKey, startCooldown, sendEmailCode, register, loadQuota, loadUsage } = createAccountActions({
           get value() {
             return value;
@@ -1543,7 +1580,7 @@
             return setUsageAt;
           }
         });
-        const { readUpdateCache, rememberUpdateCheck, forgetUpdateCheck, checkForUpdate, runOnlineUpdate } = createUpdateActions({
+        const { readUpdateCache, rememberUpdateCheck, forgetUpdateCheck, checkForUpdate, runOnlineUpdate, deferUpdate } = createUpdateActions({
           get UPDATE_CACHE_KEY() {
             return UPDATE_CACHE_KEY;
           },
@@ -1585,6 +1622,12 @@
           },
           get updateLatest() {
             return updateLatest;
+          },
+          get updateConfirm() {
+            return updateConfirm;
+          },
+          get setUpdateDeferred() {
+            return setUpdateDeferred;
           },
           get UPDATE_SPEC() {
             return UPDATE_SPEC;
@@ -2209,6 +2252,21 @@
         return h("div", { className: "mov-page" }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
           h("style", { key: "styles" }, PAGE_CSS),
+          !notice || snapshot.value ? renderUpdateNotice({
+            h,
+            t,
+            available: updateAvailable,
+            latest: updateLatest,
+            deferred: updateDeferred,
+            status: updateStatus,
+            confirmed: updateConfirm,
+            onUpdate: () => {
+              if (updateConfirm) runOnlineUpdate().catch(() => {
+              });
+              else setUpdateConfirm(true);
+            },
+            onLater: deferUpdate
+          }) : null,
           notice ? h("p", { key: "notice", className: "mov-notice" }, notice) : null,
           ...notice && !snapshot.value ? [] : rows,
           ...blobs

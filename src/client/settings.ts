@@ -1,5 +1,5 @@
 import { createAccountActions } from './account.js';
-import { createUpdateActions } from './updates.js';
+import { createUpdateActions, renderUpdateNotice } from './updates.js';
 /** 浏览器端 settings：由入口注入宿主 React 与共享依赖。 */
 import packageInfo from '../../package.json';
 export function createSettingsPage({ useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS, persistBatch, DEFAULT_REGISTER_API, LOGGED_OUT_KEY, DEFAULT_REGISTER_TOKEN, PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, fetchLatestCommit, SELECTS, inputStyle, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell, PAGE_CSS }: any) {
@@ -59,6 +59,10 @@ function makePage({ form, t, manager }) {
         const updateCommit = React.useRef('');
         // 一键在线更新：第一下把按钮转成「确认更新」，第二下才真的重装本插件
         const [updateConfirm, setUpdateConfirm] = React.useState(false);
+        const [updateDeferred, setUpdateDeferred] = React.useState(() => {
+          try { return window.localStorage.getItem(`${UPDATE_CACHE_KEY}.deferred`) || ''; }
+          catch { return ''; }
+        });
 
                 const { registerApiRoot, loggedOut, setLoggedOut, clearLoggedOut, forgetDevice, deviceIdentity, deviceFingerprint, deviceLabel, deviceWrites, syncDeviceIdentity, callRegister, applyRegistration, lookupOwnKey, startCooldown, sendEmailCode, register, loadQuota, loadUsage } = createAccountActions({
           get value() { return value; },
@@ -94,7 +98,7 @@ function makePage({ form, t, manager }) {
           get setUsageAt() { return setUsageAt; },
         });
 
-        const { readUpdateCache, rememberUpdateCheck, forgetUpdateCheck, checkForUpdate, runOnlineUpdate } = createUpdateActions({
+        const { readUpdateCache, rememberUpdateCheck, forgetUpdateCheck, checkForUpdate, runOnlineUpdate, deferUpdate } = createUpdateActions({
           get UPDATE_CACHE_KEY() { return UPDATE_CACHE_KEY; },
           get UPDATE_MAX_AGE_MS() { return UPDATE_MAX_AGE_MS; },
           get setUpdateStatus() { return setUpdateStatus; },
@@ -109,6 +113,8 @@ function makePage({ form, t, manager }) {
           get manager() { return manager; },
           get PLUGIN_PACKAGE() { return PLUGIN_PACKAGE; },
           get updateLatest() { return updateLatest; },
+          get updateConfirm() { return updateConfirm; },
+          get setUpdateDeferred() { return setUpdateDeferred; },
           get UPDATE_SPEC() { return UPDATE_SPEC; },
           get UPDATE_ATTEMPTS() { return UPDATE_ATTEMPTS; },
         });
@@ -824,6 +830,12 @@ function makePage({ form, t, manager }) {
         return h('div', { className: 'mov-page' }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
           h('style', { key: 'styles' }, PAGE_CSS),
+          !notice || snapshot.value ? renderUpdateNotice({
+            h, t, available: updateAvailable, latest: updateLatest, deferred: updateDeferred,
+            status: updateStatus, confirmed: updateConfirm,
+            onUpdate: () => { if (updateConfirm) runOnlineUpdate().catch(() => {}); else setUpdateConfirm(true); },
+            onLater: deferUpdate,
+          }) : null,
           notice ? h('p', { key: 'notice', className: 'mov-notice' }, notice) : null,
           ...(notice && !snapshot.value ? [] : rows),
           ...blobs,

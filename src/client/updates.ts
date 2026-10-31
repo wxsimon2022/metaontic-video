@@ -208,6 +208,8 @@ function forgetUpdateCheck() {
  */
 async function checkForUpdate(silent = false) {
     if (!silent) {
+        context.setUpdateDeferred?.('');
+        try { window.localStorage.removeItem(`${context.UPDATE_CACHE_KEY}.deferred`); } catch {}
         context.setUpdateStatus('working');
         context.setUpdateMessage('');
     }
@@ -215,6 +217,7 @@ async function checkForUpdate(silent = false) {
         const latest = await context.fetchLatestVersion();
         // 提交号仅服务于安装，不阻塞版本检测结果。
         context.fetchLatestCommit().then((commit) => { context.updateCommit.current = commit; }).catch(() => { });
+        context.setUpdateConfirm?.(false);
         context.setUpdateLatest(latest);
         context.setUpdateAt(new Date().toLocaleTimeString());
         context.setUpdateStatus('ok');
@@ -242,6 +245,7 @@ async function checkForUpdate(silent = false) {
  * 更新完（或重启 Harness 后）再回来就是新版本。所以引用要提前取好。
  */
 async function runOnlineUpdate() {
+    if (context.updateConfirm !== true) return;
     context.setUpdateConfirm(false);
     // 先把「更新中」摆上：重装会把本插件的客户端模块换掉，页面随时可能消失，
     // 用户至少要立刻看到按钮/文案变了，而不是以为点了没反应。
@@ -363,5 +367,26 @@ async function runOnlineUpdate() {
         ? context.t('versionUpdateRestart', { version })
         : context.t(outcome.application === 'applied' ? 'versionUpdateDone' : 'versionUpdatePending', { version }));
 }
-  return { readUpdateCache, rememberUpdateCheck, forgetUpdateCheck, checkForUpdate, runOnlineUpdate };
+function deferUpdate() {
+    context.setUpdateConfirm(false);
+    context.setUpdateDeferred(context.updateLatest);
+    try { window.localStorage.setItem(`${context.UPDATE_CACHE_KEY}.deferred`, context.updateLatest); } catch {}
+}
+  return { deferUpdate, readUpdateCache, rememberUpdateCheck, forgetUpdateCheck, checkForUpdate, runOnlineUpdate };
+}
+
+/** Ordinary updates are optional: checking and dismissing never install anything. */
+export function renderUpdateNotice({ h, t, available, latest, deferred, status, confirmed, onUpdate, onLater }) {
+  if (!available || deferred === latest || status === 'installing') return null;
+  return h('div', { key: 'update-notice', className: 'mov-notice', role: 'status', 'data-field': 'update-notice' }, [
+    h('strong', { key: 'title' }, t('versionNew', { version: latest })),
+    h('p', { key: 'optional' }, t('versionOptional')),
+    confirmed ? h('p', { key: 'confirm' }, t('versionUpdateConfirmHint')) : null,
+    h('div', { key: 'actions', className: 'mov-cmd-row' }, [
+      h('button', { key: 'update', type: 'button', className: 'mov-btn mov-btn-sm mov-btn-primary',
+        'data-action': confirmed ? 'update-notice-confirm' : 'update-notice-open', onClick: onUpdate },
+        confirmed ? t('versionUpdateConfirm', { version: latest }) : t('versionUpdate')),
+      h('button', { key: 'later', type: 'button', className: 'mov-btn mov-btn-sm', 'data-action': 'update-later', onClick: onLater }, t('versionLater')),
+    ]),
+  ]);
 }

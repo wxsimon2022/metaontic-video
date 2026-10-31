@@ -136,7 +136,7 @@ test('online updates report hot application, required restart and inactive insta
       setUpdateConfirm() {}, setUpdateStatus: value => states.push(value), setUpdateMessage: value => messages.push(value),
       manager: () => ({ manager: { installBundle: async () => ({ ok: true, value: { application, version: '3.4.0' } }) } }),
       PLUGIN_PACKAGE: 'metaontic-video', UPDATE_SPEC: 'git+https://example.invalid/plugin.git', UPDATE_ATTEMPTS: 2,
-      updateCommit: { current: '' }, updateLatest: '3.4.0', setUpdateLatest() {}, forgetUpdateCheck() {},
+      updateConfirm: true, updateCommit: { current: '' }, updateLatest: '3.4.0', setUpdateLatest() {}, forgetUpdateCheck() {},
       t: key => key,
     });
     vm.runInContext(extract('runOnlineUpdate'), ctx);

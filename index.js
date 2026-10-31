@@ -159,7 +159,7 @@ function envValue(names) {
   }
   return "";
 }
-var PLUGIN_VERSION = true ? "3.4.0".trim().replace(/^v/i, "") : "";
+var PLUGIN_VERSION = true ? "3.5.0".trim().replace(/^v/i, "") : "";
 
 // src/utils/files.ts
 import path2 from "node:path";
