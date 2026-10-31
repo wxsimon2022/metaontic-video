@@ -1994,7 +1994,7 @@ async function confirmNextSegment(ctx, config, exec, {
 function resolveRegisterApi(config) {
   return (String(ref(config, "registerApi", "")).trim() || DEFAULT_REGISTER_API).replace(/\/+$/, "");
 }
-const PLUGIN_VERSION = true ? "3.2.1".trim().replace(/^v/i, "") : "";
+const PLUGIN_VERSION = true ? "3.2.2".trim().replace(/^v/i, "") : "";
 async function fetchDeviceQuota(config, signal) {
   if (isManualKey(config)) return { status: "unknown", reason: `${connectionLabel(config)}\u8D39\u7528\u548C\u4F59\u989D\u8BF7\u5728\u6E20\u9053\u63A7\u5236\u53F0\u67E5\u770B` };
   const api = resolveRegisterApi(config);

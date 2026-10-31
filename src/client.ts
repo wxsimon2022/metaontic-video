@@ -28,7 +28,6 @@ window.__ModuleLoader__.load({
     const zh = {
       summaryEmpty: '请选择接入方式，登录或填写 API Key 后保存。',
       summary: '{provider} · {model}',
-      providerNewapi: 'New API 中转站',
       apiKeyConfigured: '已配置，留空保留现有密钥',
       connectionMode: '接入方式',
       connectionModeHint: '邮箱登录领取密钥，或使用自己的 MetaOntic AI、火山引擎密钥。切换后保存生效。',
@@ -53,8 +52,6 @@ window.__ModuleLoader__.load({
       mergeModeReencode: '重编码拼接',
       bgmFadeSeconds: '音乐接缝淡化（秒）',
       bgmFadeSecondsHint: '淡化接缝两侧音频，减轻声音突变。默认 0.8 秒，设为 0 关闭。',
-      outputDir: '输出目录',
-      keepSegments: '保留分段',
       ffmpegBinary: 'ffmpeg 路径',
       ffprobeBinary: 'ffprobe 路径',
       ffmpegTitle: '长视频合并需要 ffmpeg',
@@ -132,13 +129,8 @@ window.__ModuleLoader__.load({
       versionHint: '可在此检查并安装新版本，现有配置与密钥会保留。',
       versionCheckedAt: '检查于 {time}',
       sectionGeneration: '生成参数',
-      sectionMerge: '视频合并',
-      sectionAppearance: '画面设置',
-      sectionAdvanced: '高级',
       sectionCombined: '更多设置',
       sectionCombinedHint: '画面 · 合并 · 等待 · 本地工具',
-      sectionRuntime: '等待设置',
-      sectionTools: '本地工具',
       toolsHint: '通常无需填写；已安装但无法自动识别时，可指定可执行文件路径。',
       segmentsRetained: '所有原始分段自动保留，便于预览、续做和重新剪辑。',
       register: '登录',
@@ -154,9 +146,8 @@ window.__ModuleLoader__.load({
       ratio: '画面比例',
       generateAudio: '生成音频',
       watermark: '添加水印',
-      extraParams: '额外参数（JSON）',
-      pollIntervalMs: '状态查询间隔（毫秒）',
-      maxWaitMs: '单个任务最长等待时间（毫秒）',
+      pollIntervalMs: '状态查询间隔（秒）',
+      maxWaitMs: '单个任务最长等待时间（秒）',
       save: '保存',
       reset: '重置插件',
       resetHint: '清除本机保存的密钥与自定义设置，恢复默认配置。',
@@ -167,11 +158,21 @@ window.__ModuleLoader__.load({
       loading: '读取配置中…',
       unavailable: '暂时无法加载插件设置，请重启 Harness 后重试；若仍无法加载，请检查 Harness 与插件的版本是否兼容。',
       readOnly: '当前配置为只读，无法保存修改。',
+      seamTrimSecondsHint: '分别裁剪第 2、3…段开头，例如 0.5,0。留空使用模型默认值，填 0 关闭；每项为 0–3 秒。',
+      waitSecondsHint: '至少 1 秒，支持小数。最长等待时间不得小于查询间隔。',
+      versionHistory: '历史更新',
+      unknownConnection: '未知接入方式，请重新选择。',
+      atomicUnsupported: '当前 Harness 不支持批量保存，请更新 Harness 后重试。',
+      atomicRejected: '设置未保存，请重新打开设置页后重试；若仍失败，请重启 Harness。',
+      invalidWait: '等待时间须为至少 1 秒的有效数值，且最长等待时间不得小于查询间隔。',
+      invalidSeam: '接缝裁剪须为逗号分隔的 0–3 秒数值，例如 0.5,0。',
+      resetDone: '已清除本机配置，恢复默认设置。',
+      resetFailed: '重置失败：{message}',
     };
+
     const en = {
       summaryEmpty: 'Choose a connection method, then log in or enter an API key and save.',
       summary: '{provider} · {model}',
-      providerNewapi: 'New API relay',
       apiKeyConfigured: 'Configured; leave blank to keep the current key',
       connectionMode: 'Connection',
       connectionModeHint: 'Log in by email to receive a key, or use your own MetaOntic AI or Volcano Engine key. Save to apply a change.',
@@ -196,8 +197,6 @@ window.__ModuleLoader__.load({
       mergeModeReencode: 'Re-encode',
       bgmFadeSeconds: 'Music seam cross-fade (s)',
       bgmFadeSecondsHint: 'Fade audio at segment boundaries to soften abrupt changes. Default: 0.8 seconds; set to 0 to disable.',
-      outputDir: 'Output directory',
-      keepSegments: 'Keep segments',
       ffmpegBinary: 'ffmpeg path',
       ffprobeBinary: 'ffprobe path',
       ffmpegTitle: 'Merging long videos needs ffmpeg',
@@ -270,13 +269,8 @@ window.__ModuleLoader__.load({
       registerDisabled: 'Login service unavailable: {message}',
       registerNoKey: 'The login service returned no key. Try again later or contact an administrator.',
       sectionGeneration: 'Generation',
-      sectionMerge: 'Video merging',
-      sectionAppearance: 'Appearance',
-      sectionAdvanced: 'Advanced',
       sectionCombined: 'More settings',
       sectionCombinedHint: 'Appearance, merging, runtime and local tools',
-      sectionRuntime: 'Runtime options',
-      sectionTools: 'Local tools',
       toolsHint: 'Usually leave blank. Set executable paths only if installed tools are not detected.',
       segmentsRetained: 'Original segments are always retained for preview, resume and editing.',
       mode: 'Continuation',
@@ -285,9 +279,8 @@ window.__ModuleLoader__.load({
       ratio: 'Aspect ratio',
       generateAudio: 'Generate audio',
       watermark: 'Add watermark',
-      extraParams: 'Extra params (JSON)',
-      pollIntervalMs: 'Status check interval (ms)',
-      maxWaitMs: 'Maximum wait per task (ms)',
+      pollIntervalMs: 'Status check interval (seconds)',
+      maxWaitMs: 'Maximum wait per task (seconds)',
       save: 'Save',
       reset: 'Reset plugin',
       resetHint: 'Clear locally saved keys and custom settings to restore defaults.',
@@ -298,6 +291,16 @@ window.__ModuleLoader__.load({
       loading: 'Reading configuration…',
       unavailable: 'Plugin settings could not be loaded. Restart Harness and try again. If this continues, check that your Harness and plugin versions are compatible.',
       readOnly: 'These settings are read-only and cannot be changed.',
+      seamTrimSecondsHint: 'Trim the start of segments 2, 3, etc., e.g. 0.5,0. Leave blank for model defaults; use 0 to disable. Each value: 0–3 seconds.',
+      waitSecondsHint: 'At least 1 second; decimals allowed. Maximum wait must be at least the check interval.',
+      versionHistory: 'Update history',
+      unknownConnection: 'Unknown connection method. Select one again.',
+      atomicUnsupported: 'This version of Harness does not support batch saving. Update Harness and try again.',
+      atomicRejected: 'Settings were not saved. Reopen this page and try again; restart Harness if the problem continues.',
+      invalidWait: 'Enter valid times of at least 1 second. Maximum wait must be at least the check interval.',
+      invalidSeam: 'Enter comma-separated trim values from 0 to 3 seconds, e.g. 0.5,0.',
+      resetDone: 'Local settings cleared and defaults restored.',
+      resetFailed: 'Reset failed: {message}',
     };
 
     /**
@@ -324,10 +327,6 @@ window.__ModuleLoader__.load({
     // 只有「上游对卡满 15 秒的延长段敏感」这种少数情况才需要改成 14。
     const SECTIONS = [
       { key: 'sectionGeneration', fields: ['connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'model', 'mode', 'ratio', 'generateAudio'] },
-      { key: 'sectionAppearance', fields: ['watermark'] },
-      { key: 'sectionMerge', fields: ['mergeMode', 'seamTrimSeconds', 'bgmFadeSeconds'] },
-      { key: 'sectionRuntime', fields: ['pollIntervalMs', 'maxWaitMs'] },
-      { key: 'sectionTools', fields: ['ffmpegBinary', 'ffprobeBinary'] },
     ];
     const FIELDS = [
       { key: 'connectionMode', kind: 'select', wide: true },
@@ -342,7 +341,6 @@ window.__ModuleLoader__.load({
       { key: 'seamTrimSeconds', kind: 'text' },
       { key: 'mergeMode', kind: 'select', wide: true },
       { key: 'bgmFadeSeconds', kind: 'number' },
-      { key: 'keepSegments', kind: 'switch' },
       { key: 'pollIntervalMs', kind: 'number' },
       { key: 'maxWaitMs', kind: 'number' },
       { key: 'ffmpegBinary', kind: 'text', mono: true },
@@ -665,22 +663,38 @@ window.__ModuleLoader__.load({
       return a === b || (a === undefined && b === '') || (a === '' && b === undefined);
     }
 
+    async function persistBatch(form, ops) {
+      if (typeof form.mutate !== 'function') throw new Error('atomicUnsupported');
+      if (!await form.mutate(ops)) throw new Error('atomicRejected');
+    }
+
+    function validateSettings(values) {
+      const interval = Number(values.pollIntervalMs ?? 5000);
+      const wait = Number(values.maxWaitMs ?? 600000);
+      if (![interval, wait].every((n) => Number.isSafeInteger(n) && n >= 1000) || wait < interval) {
+        throw new Error('invalidWait');
+      }
+      const trim = String(values.seamTrimSeconds ?? '').trim();
+      if (trim && !trim.split(',').every((part) => part.trim() !== '' && Number.isFinite(Number(part)) && Number(part) >= 0 && Number(part) <= 3)) {
+        throw new Error('invalidSeam');
+      }
+    }
+
     // 先写当前 Key、清空其他渠道凭据，最后提交模式。空值覆盖继承配置，避免 unset 后旧 Key 回流。
     async function persistConnection(form, pending, nextMode) {
-      if (!['service', 'metaontic', 'volcengine'].includes(nextMode)) throw new Error('未知接入方式');
+      if (!['service', 'metaontic', 'volcengine'].includes(nextMode)) throw new Error('unknownConnection');
       const inactiveKeys = nextMode === 'volcengine'
         ? ['metaonticApiKey', 'apiKey', 'keyOrigin', 'baseUrl', 'submitPath', 'queryPath',
           'registerEmail', 'deviceId', 'deviceSecret', 'registerApi', 'registerToken']
         : nextMode === 'metaontic'
           ? ['volcengineApiKey', 'apiKey', 'keyOrigin', 'registerEmail', 'deviceId', 'deviceSecret', 'registerApi', 'registerToken']
           : ['volcengineApiKey', 'metaonticApiKey'];
-      if (typeof form.mutate !== 'function') throw new Error('当前宿主不支持原子保存，请更新 Harness');
       const ops = pending.filter(([key]) => key !== 'connectionMode' && !inactiveKeys.includes(key))
         .map(([key, next]) => ({ op: 'set', path: [key], value: next }));
       for (const key of inactiveKeys) ops.push({ op: 'set', path: [key], value: '' });
       ops.push({ op: 'set', path: ['connectionMode'], value: nextMode });
       // 成功响应代表宿主已接受整批写入；插件可能已重载，旧控制器的快照不再更新。
-      if (!await form.mutate(ops)) throw new Error('宿主未接受配置，请重开设置页后重试；若仍失败，请重启 Harness 以加载最新插件字段');
+      await persistBatch(form, ops);
     }
 
     function makePage({ form, t, manager }) {
@@ -835,6 +849,11 @@ window.__ModuleLoader__.load({
           }, holdMs);
         }
 
+        function settingsError(error) {
+          const message = error?.message || String(error);
+          return ['unknownConnection', 'atomicUnsupported', 'atomicRejected', 'invalidWait', 'invalidSeam'].includes(message) ? t(message) : message;
+        }
+
         async function save() {
           if (connectionBusy.current) return;
           connectionBusy.current = true;
@@ -842,6 +861,7 @@ window.__ModuleLoader__.load({
           setStatus('saving');
           const nextMode = draft.connectionMode ?? value.connectionMode ?? 'service';
           try {
+            validateSettings({ ...value, ...draft });
             await persistConnection(form, pending, nextMode);
             if (nextMode !== 'service') {
               forgetDevice();
@@ -854,7 +874,7 @@ window.__ModuleLoader__.load({
             setDraft({});
             flashStatus('saved');
           } catch (error) {
-            setSaveError(error?.message || String(error));
+            setSaveError(settingsError(error));
             setStatus('failed');
           } finally {
             connectionBusy.current = false;
@@ -869,19 +889,29 @@ window.__ModuleLoader__.load({
          *    看着就像重置没生效（这个标记在下次登录成功时清掉）。
          */
         async function reset() {
-          const overridden = Object.keys(snapshot.user || {});
-          if (!overridden.length && !keyReady) return;
+          if (connectionBusy.current) return;
           if (!window.confirm(t('resetConfirm'))) return;
+          connectionBusy.current = true;
+          setSaveError('');
           setStatus('saving');
-          // 页面自己写过的项 + 兜底清单：宿主没列进 user 的也要清
-          const targets = new Set([...overridden, ...PLUGIN_OWNED_KEYS]);
-          for (const key of targets) await form.unset(key);
-          forgetDevice();
-          setDraft({});
-          setRegisterStatus('idle');
-          setRegisterMessage('');
-          setRegisterCode('');
-          setStatus('idle');
+          try {
+            const targets = new Set([...Object.keys(snapshot.user || {}), ...PLUGIN_OWNED_KEYS]);
+            await persistBatch(form, [...targets].map((key) => ({ op: 'unset', path: [key] })));
+            forgetDevice();
+            setDraft({});
+            setVisibleKey('');
+            setRegisterEmail('');
+            setRegisterStatus('idle');
+            setRegisterMessage('');
+            setRegisterCode('');
+            setQuota(null);
+            flashStatus('reset');
+          } catch (error) {
+            setSaveError(t('resetFailed', { message: settingsError(error) }));
+            setStatus('failed');
+          } finally {
+            connectionBusy.current = false;
+          }
         }
 
         /** 服务地址：配置里有就用配置的（老版本固定写死，这里保留兜底）。 */
@@ -995,14 +1025,17 @@ window.__ModuleLoader__.load({
 
         /** 进设置页时补一次设备凭据（老版本没存过，注册过的人不用重新领 Key）。 */
         async function syncDeviceIdentity() {
+          if (!serviceActive()) return;
+          const writes = deviceWrites();
+          if (!writes.length) return;
+          connectionBusy.current = true;
           try {
-            for (const [key, next] of deviceWrites()) {
-              if (!serviceActive()) return;
-              const accepted = await form.set(key, next);
-              if (accepted) clear(key);
-            }
+            await persistBatch(form, writes.map(([key, next]) => ({ op: 'set', path: [key], value: next })));
+            for (const [key] of writes) clear(key);
           } catch {
-            // 写不进配置不影响注册与查额度，只是调用前没法自动校验余额
+            // 后续登录仍可重新保存设备凭据。
+          } finally {
+            connectionBusy.current = false;
           }
         }
 
@@ -1051,7 +1084,6 @@ window.__ModuleLoader__.load({
           // keyOrigin 是给宿主那侧看的标记：只有带这个标记（或早期版本的设备凭据 + 邮箱）
           // 的 Key 才被当成「服务端下发的」，手填的一律拒绝调用。
           if (!serviceActive()) return;
-          clearLoggedOut();
           const writes = [
             ['apiKey', result.api_key],
             ['keyOrigin', 'register'],
@@ -1063,17 +1095,21 @@ window.__ModuleLoader__.load({
           const account = result.email || result.display_name || '';
           if (account) writes.push(['registerEmail', account]);
           if (result.model) writes.push(['model', result.model]);
-          let ok = true;
-          for (const [key, next] of writes) {
-            if (!serviceActive()) return;
-            const accepted = await form.set(key, next);
-            if (accepted) clear(key);
-            else ok = false;
+          if (!serviceActive()) return false;
+          connectionBusy.current = true;
+          try {
+            await persistConnection(form, writes, 'service');
+            clearLoggedOut();
+            for (const [key] of writes) clear(key);
+            setRegisterStatus('ok');
+          } catch (error) {
+            throw new Error(settingsError(error));
+          } finally {
+            connectionBusy.current = false;
           }
-          setRegisterStatus(ok ? 'ok' : 'partial');
           loadQuota().catch(() => {});
           loadUsage().catch(() => {});
-          return ok;
+          return true;
         }
 
         /** 本机取回：只有设备标识 + 设备密钥都对上，服务端才把注册信息给你。 */
@@ -1334,7 +1370,9 @@ window.__ModuleLoader__.load({
         }
 
         function control(field) {
-          const current = draft[field.key] !== undefined ? draft[field.key] : value[field.key];
+          const current = draft[field.key] !== undefined ? draft[field.key] : value[field.key] ?? (field.key === 'pollIntervalMs' ? 5000 : field.key === 'maxWaitMs' ? 600000 : undefined);
+          const secondsField = field.key === 'pollIntervalMs' || field.key === 'maxWaitMs';
+          const displayed = secondsField && current !== undefined && current !== '' ? Number(current) / 1000 : current;
           const id = `metaontic-video-${field.key}`;
           if (field.kind === 'switch') {
             return h('label', { htmlFor: id, className: 'mov-switch' },
@@ -1372,12 +1410,14 @@ window.__ModuleLoader__.load({
             className: `mov-input${field.mono ? ' mov-mono' : ''}`,
             style: inputStyle,
             type: field.kind === 'number' ? 'number' : (field.secret && !revealed ? 'password' : 'text'),
-            value: current ?? '',
+            value: displayed ?? '',
+            min: secondsField ? 1 : field.key === 'bgmFadeSeconds' ? 0 : undefined,
+            step: secondsField ? 0.001 : field.key === 'bgmFadeSeconds' ? 0.1 : undefined,
             placeholder: field.secret && (snapshot.secrets?.[field.key] || value[field.key]) ? t('apiKeyConfigured') : '',
             onChange: (event) => edit(
               field.key,
               field.kind === 'number' && event.target.value !== ''
-                ? Number(event.target.value)
+                ? (secondsField ? Math.round(Number(event.target.value) * 1000) : Number(event.target.value))
                 : event.target.value,
             ),
           });
@@ -1406,6 +1446,8 @@ window.__ModuleLoader__.load({
           volcengineApiKey: t('volcengineKeyHint'),
           model: t('modelHint'),
           bgmFadeSeconds: t('bgmFadeSecondsHint'),
+          seamTrimSeconds: t('seamTrimSecondsHint'),
+          maxWaitMs: t('waitSecondsHint'),
         };
 
         /** 一个可编辑字段：标签 + 控件（开关自带标签，就不重复画）。 */
@@ -1451,7 +1493,7 @@ window.__ModuleLoader__.load({
         const overrides = Object.keys(snapshot.user || {});
         const footerMessage = status === 'saved'
           ? t('saved')
-          : (status === 'failed'
+          : (status === 'reset' ? t('resetDone') : status === 'failed'
             ? (saveError || t('saveFailed'))
             : (pending.length ? t('dirty') : ''));
         const footer = (pending.length || status !== 'idle')
@@ -1461,7 +1503,7 @@ window.__ModuleLoader__.load({
                 key: 'status',
                 style: {
                   fontSize: 12,
-                  color: status === 'failed' ? TOKENS.error : (status === 'saved' ? TOKENS.success : TOKENS.muted),
+                  color: status === 'failed' ? TOKENS.error : (status === 'saved' || status === 'reset' ? TOKENS.success : TOKENS.muted),
                 },
               }, footerMessage)
               : null,
@@ -1487,7 +1529,7 @@ window.__ModuleLoader__.load({
               'data-action': 'reset',
               type: 'button',
               className: 'mov-btn',
-              disabled: status === 'saving',
+              disabled: status === 'saving' || snapshot.writable === false,
               onClick: reset,
             }, t('reset')),
           ])
@@ -1854,6 +1896,7 @@ window.__ModuleLoader__.load({
               className: 'mov-hint',
               style: { flex: '1 1 120px' },
             }, PLUGIN_VERSION ? t('versionCurrent', { version: PLUGIN_VERSION }) : ''),
+            h('a', { key: 'history', className: 'mov-hint', href: 'https://github.com/wxsimon2022/metaontic-video/blob/master/CHANGELOG.md', target: '_blank', rel: 'noopener noreferrer' }, t('versionHistory')),
             h('button', {
               key: 'check',
               'data-action': 'update-check',

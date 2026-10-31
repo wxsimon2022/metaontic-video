@@ -6,22 +6,36 @@ on:
   workflow_dispatch:
 
 jobs:
-  npm:
+  release:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          registry-url: https://registry.npmjs.org
+          node-version: 22
+      - name: Validate release tag
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          test "$GITHUB_REF_NAME" = "v$VERSION" || { echo 'Run this workflow on the matching version tag.'; exit 1; }
       - name: Install build tooling
         run: npm ci
-      - name: Check the packed file list
-        run: npm run build && npm pack --dry-run
-      - name: Publish
-        run: npm publish --provenance --access public
+      - name: Build and test
+        run: npm run build && node --test tests/*.test.mjs
+      - name: Pack plugin
+        run: |
+          mkdir -p dist
+          npm pack --pack-destination dist
+          git for-each-ref --format='%(contents)' "refs/tags/$GITHUB_REF_NAME" > dist/release-notes.txt
+      - name: Upload release package
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.tgz --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.tgz --verify-tag --title "MetaOnticVideo $GITHUB_REF_NAME" --notes-file dist/release-notes.txt
+          fi

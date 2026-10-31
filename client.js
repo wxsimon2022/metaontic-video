@@ -2,7 +2,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.2.1",
+    version: "3.2.2",
     description: "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
     license: "MIT",
     type: "module",
@@ -82,13 +82,14 @@
       "@deepseek-ai/schemastery": "~3.18.5"
     },
     releaseNotes: {
-      version: "3.2.1",
+      version: "3.2.2",
       items: [
-        "\u4F18\u5316\u8BBE\u7F6E\u9875\u4E2D\u82F1\u6587\u6587\u6848\uFF1A\u7EDF\u4E00\u5BC6\u94A5\u7528\u8BCD\uFF0C\u7CBE\u7B80\u767B\u5F55\u3001\u4FDD\u5B58\u3001\u66F4\u65B0\u4E0E\u5F02\u5E38\u63D0\u793A\uFF0C\u79FB\u9664\u56FA\u5B9A\u4EF7\u683C\u500D\u6570\u548C\u7EDD\u5BF9\u5316\u63CF\u8FF0\u3002",
-        "\u63A5\u5165\u65B9\u5F0F\u540D\u79F0\u8C03\u6574\u4E3A\u300CMetaOnticVideo\u300D\u3002",
-        "\u667A\u80FD\u4F53\u7531\u300C\u89C6\u9891\u5BFC\u6F14\u300D\u66F4\u540D\u4E3A\u300C\u89C6\u9891\u521B\u4F5C\u52A9\u624B\u300D\uFF0C\u540C\u6B65\u89D2\u8272\u63D0\u793A\u3001\u9884\u8BBE\u7B80\u4ECB\u4E0E\u4F7F\u7528\u8BF4\u660E\u3002",
-        "\u66F4\u65B0\u63D2\u4EF6\u4E2D\u82F1\u6587\u63CF\u8FF0\uFF0C\u8BF4\u660E\u521B\u610F\u5B8C\u5584\u3001\u811A\u672C\u5BA1\u6838\u3001\u53C2\u8003\u56FE\u3001\u7EED\u62CD\u3001\u9010\u6BB5\u9884\u89C8\u3001\u65AD\u70B9\u7EED\u505A\u548C\u4E09\u79CD\u63A5\u5165\u65B9\u5F0F\u3002",
-        "\u65B0\u589E\u5386\u53F2\u66F4\u65B0\u8BB0\u5F55 CHANGELOG.md\uFF0C\u63D0\u4F9B\u7248\u672C\u7D22\u5F15\u3001\u65E5\u671F\u548C\u6E90\u7801\u94FE\u63A5\uFF0CREADME \u589E\u52A0\u67E5\u770B\u5165\u53E3\u5E76\u5C06\u66F4\u65B0\u8BB0\u5F55\u7EB3\u5165\u53D1\u5E03\u6D41\u7A0B\u3002"
+        "\u767B\u5F55\u4E0E\u8BBE\u5907\u51ED\u636E\u540C\u6B65\u6539\u4E3A\u6279\u91CF\u4FDD\u5B58\uFF0C\u907F\u514D\u9010\u5B57\u6BB5\u91CD\u8F7D\u9020\u6210\u914D\u7F6E\u4E0D\u5B8C\u6574\u3002",
+        "\u91CD\u7F6E\u914D\u7F6E\u6539\u4E3A\u6279\u91CF\u6E05\u9664\uFF0C\u68C0\u67E5\u7ED3\u679C\u5E76\u53CD\u9988\u6210\u529F\u6216\u5931\u8D25\uFF0C\u5931\u8D25\u65F6\u4FDD\u7559\u672C\u673A\u767B\u5F55\u51ED\u636E\u3002",
+        "\u7B49\u5F85\u53C2\u6570\u6539\u4E3A\u6309\u79D2\u663E\u793A\u548C\u7F16\u8F91\uFF0C\u4FDD\u5B58\u65F6\u8F6C\u6362\u4E3A\u6BEB\u79D2\uFF0C\u589E\u52A0\u6700\u4F4E\u65F6\u957F\u548C\u7B49\u5F85\u65F6\u95F4\u5173\u7CFB\u6821\u9A8C\u3002",
+        "\u8865\u5145\u63A5\u7F1D\u88C1\u526A\u8BF4\u660E\u4E0E\u8303\u56F4\u6821\u9A8C\uFF0C\u7EDF\u4E00\u4FDD\u5B58\u5F02\u5E38\u7684\u4E2D\u82F1\u6587\u63D0\u793A\u3002",
+        "\u7248\u672C\u5361\u7247\u65B0\u589E\u5386\u53F2\u66F4\u65B0\u5165\u53E3\uFF0C\u6E05\u7406\u9690\u85CF\u5B57\u6BB5\u4E0E\u65E7\u5206\u7EC4\u5B9A\u4E49\u3002",
+        "\u53D1\u5E03\u6539\u4E3A GitHub Release \u63D0\u4F9B\u63D2\u4EF6\u538B\u7F29\u5305\uFF0C\u6784\u5EFA\u4E0E\u6D4B\u8BD5\u901A\u8FC7\u540E\u4E0A\u4F20\uFF0C\u4E0D\u518D\u53D1\u5E03\u5230 npm\u3002"
       ]
     }
   };
@@ -104,7 +105,6 @@
       const zh = {
         summaryEmpty: "\u8BF7\u9009\u62E9\u63A5\u5165\u65B9\u5F0F\uFF0C\u767B\u5F55\u6216\u586B\u5199 API Key \u540E\u4FDD\u5B58\u3002",
         summary: "{provider} \xB7 {model}",
-        providerNewapi: "New API \u4E2D\u8F6C\u7AD9",
         apiKeyConfigured: "\u5DF2\u914D\u7F6E\uFF0C\u7559\u7A7A\u4FDD\u7559\u73B0\u6709\u5BC6\u94A5",
         connectionMode: "\u63A5\u5165\u65B9\u5F0F",
         connectionModeHint: "\u90AE\u7BB1\u767B\u5F55\u9886\u53D6\u5BC6\u94A5\uFF0C\u6216\u4F7F\u7528\u81EA\u5DF1\u7684 MetaOntic AI\u3001\u706B\u5C71\u5F15\u64CE\u5BC6\u94A5\u3002\u5207\u6362\u540E\u4FDD\u5B58\u751F\u6548\u3002",
@@ -129,8 +129,6 @@
         mergeModeReencode: "\u91CD\u7F16\u7801\u62FC\u63A5",
         bgmFadeSeconds: "\u97F3\u4E50\u63A5\u7F1D\u6DE1\u5316\uFF08\u79D2\uFF09",
         bgmFadeSecondsHint: "\u6DE1\u5316\u63A5\u7F1D\u4E24\u4FA7\u97F3\u9891\uFF0C\u51CF\u8F7B\u58F0\u97F3\u7A81\u53D8\u3002\u9ED8\u8BA4 0.8 \u79D2\uFF0C\u8BBE\u4E3A 0 \u5173\u95ED\u3002",
-        outputDir: "\u8F93\u51FA\u76EE\u5F55",
-        keepSegments: "\u4FDD\u7559\u5206\u6BB5",
         ffmpegBinary: "ffmpeg \u8DEF\u5F84",
         ffprobeBinary: "ffprobe \u8DEF\u5F84",
         ffmpegTitle: "\u957F\u89C6\u9891\u5408\u5E76\u9700\u8981 ffmpeg",
@@ -204,13 +202,8 @@
         versionHint: "\u53EF\u5728\u6B64\u68C0\u67E5\u5E76\u5B89\u88C5\u65B0\u7248\u672C\uFF0C\u73B0\u6709\u914D\u7F6E\u4E0E\u5BC6\u94A5\u4F1A\u4FDD\u7559\u3002",
         versionCheckedAt: "\u68C0\u67E5\u4E8E {time}",
         sectionGeneration: "\u751F\u6210\u53C2\u6570",
-        sectionMerge: "\u89C6\u9891\u5408\u5E76",
-        sectionAppearance: "\u753B\u9762\u8BBE\u7F6E",
-        sectionAdvanced: "\u9AD8\u7EA7",
         sectionCombined: "\u66F4\u591A\u8BBE\u7F6E",
         sectionCombinedHint: "\u753B\u9762 \xB7 \u5408\u5E76 \xB7 \u7B49\u5F85 \xB7 \u672C\u5730\u5DE5\u5177",
-        sectionRuntime: "\u7B49\u5F85\u8BBE\u7F6E",
-        sectionTools: "\u672C\u5730\u5DE5\u5177",
         toolsHint: "\u901A\u5E38\u65E0\u9700\u586B\u5199\uFF1B\u5DF2\u5B89\u88C5\u4F46\u65E0\u6CD5\u81EA\u52A8\u8BC6\u522B\u65F6\uFF0C\u53EF\u6307\u5B9A\u53EF\u6267\u884C\u6587\u4EF6\u8DEF\u5F84\u3002",
         segmentsRetained: "\u6240\u6709\u539F\u59CB\u5206\u6BB5\u81EA\u52A8\u4FDD\u7559\uFF0C\u4FBF\u4E8E\u9884\u89C8\u3001\u7EED\u505A\u548C\u91CD\u65B0\u526A\u8F91\u3002",
         register: "\u767B\u5F55",
@@ -226,9 +219,8 @@
         ratio: "\u753B\u9762\u6BD4\u4F8B",
         generateAudio: "\u751F\u6210\u97F3\u9891",
         watermark: "\u6DFB\u52A0\u6C34\u5370",
-        extraParams: "\u989D\u5916\u53C2\u6570\uFF08JSON\uFF09",
-        pollIntervalMs: "\u72B6\u6001\u67E5\u8BE2\u95F4\u9694\uFF08\u6BEB\u79D2\uFF09",
-        maxWaitMs: "\u5355\u4E2A\u4EFB\u52A1\u6700\u957F\u7B49\u5F85\u65F6\u95F4\uFF08\u6BEB\u79D2\uFF09",
+        pollIntervalMs: "\u72B6\u6001\u67E5\u8BE2\u95F4\u9694\uFF08\u79D2\uFF09",
+        maxWaitMs: "\u5355\u4E2A\u4EFB\u52A1\u6700\u957F\u7B49\u5F85\u65F6\u95F4\uFF08\u79D2\uFF09",
         save: "\u4FDD\u5B58",
         reset: "\u91CD\u7F6E\u63D2\u4EF6",
         resetHint: "\u6E05\u9664\u672C\u673A\u4FDD\u5B58\u7684\u5BC6\u94A5\u4E0E\u81EA\u5B9A\u4E49\u8BBE\u7F6E\uFF0C\u6062\u590D\u9ED8\u8BA4\u914D\u7F6E\u3002",
@@ -238,12 +230,21 @@
         dirty: "\u6709\u672A\u4FDD\u5B58\u7684\u6539\u52A8",
         loading: "\u8BFB\u53D6\u914D\u7F6E\u4E2D\u2026",
         unavailable: "\u6682\u65F6\u65E0\u6CD5\u52A0\u8F7D\u63D2\u4EF6\u8BBE\u7F6E\uFF0C\u8BF7\u91CD\u542F Harness \u540E\u91CD\u8BD5\uFF1B\u82E5\u4ECD\u65E0\u6CD5\u52A0\u8F7D\uFF0C\u8BF7\u68C0\u67E5 Harness \u4E0E\u63D2\u4EF6\u7684\u7248\u672C\u662F\u5426\u517C\u5BB9\u3002",
-        readOnly: "\u5F53\u524D\u914D\u7F6E\u4E3A\u53EA\u8BFB\uFF0C\u65E0\u6CD5\u4FDD\u5B58\u4FEE\u6539\u3002"
+        readOnly: "\u5F53\u524D\u914D\u7F6E\u4E3A\u53EA\u8BFB\uFF0C\u65E0\u6CD5\u4FDD\u5B58\u4FEE\u6539\u3002",
+        seamTrimSecondsHint: "\u5206\u522B\u88C1\u526A\u7B2C 2\u30013\u2026\u6BB5\u5F00\u5934\uFF0C\u4F8B\u5982 0.5,0\u3002\u7559\u7A7A\u4F7F\u7528\u6A21\u578B\u9ED8\u8BA4\u503C\uFF0C\u586B 0 \u5173\u95ED\uFF1B\u6BCF\u9879\u4E3A 0\u20133 \u79D2\u3002",
+        waitSecondsHint: "\u81F3\u5C11 1 \u79D2\uFF0C\u652F\u6301\u5C0F\u6570\u3002\u6700\u957F\u7B49\u5F85\u65F6\u95F4\u4E0D\u5F97\u5C0F\u4E8E\u67E5\u8BE2\u95F4\u9694\u3002",
+        versionHistory: "\u5386\u53F2\u66F4\u65B0",
+        unknownConnection: "\u672A\u77E5\u63A5\u5165\u65B9\u5F0F\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u3002",
+        atomicUnsupported: "\u5F53\u524D Harness \u4E0D\u652F\u6301\u6279\u91CF\u4FDD\u5B58\uFF0C\u8BF7\u66F4\u65B0 Harness \u540E\u91CD\u8BD5\u3002",
+        atomicRejected: "\u8BBE\u7F6E\u672A\u4FDD\u5B58\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u8BBE\u7F6E\u9875\u540E\u91CD\u8BD5\uFF1B\u82E5\u4ECD\u5931\u8D25\uFF0C\u8BF7\u91CD\u542F Harness\u3002",
+        invalidWait: "\u7B49\u5F85\u65F6\u95F4\u987B\u4E3A\u81F3\u5C11 1 \u79D2\u7684\u6709\u6548\u6570\u503C\uFF0C\u4E14\u6700\u957F\u7B49\u5F85\u65F6\u95F4\u4E0D\u5F97\u5C0F\u4E8E\u67E5\u8BE2\u95F4\u9694\u3002",
+        invalidSeam: "\u63A5\u7F1D\u88C1\u526A\u987B\u4E3A\u9017\u53F7\u5206\u9694\u7684 0\u20133 \u79D2\u6570\u503C\uFF0C\u4F8B\u5982 0.5,0\u3002",
+        resetDone: "\u5DF2\u6E05\u9664\u672C\u673A\u914D\u7F6E\uFF0C\u6062\u590D\u9ED8\u8BA4\u8BBE\u7F6E\u3002",
+        resetFailed: "\u91CD\u7F6E\u5931\u8D25\uFF1A{message}"
       };
       const en = {
         summaryEmpty: "Choose a connection method, then log in or enter an API key and save.",
         summary: "{provider} \xB7 {model}",
-        providerNewapi: "New API relay",
         apiKeyConfigured: "Configured; leave blank to keep the current key",
         connectionMode: "Connection",
         connectionModeHint: "Log in by email to receive a key, or use your own MetaOntic AI or Volcano Engine key. Save to apply a change.",
@@ -268,8 +269,6 @@
         mergeModeReencode: "Re-encode",
         bgmFadeSeconds: "Music seam cross-fade (s)",
         bgmFadeSecondsHint: "Fade audio at segment boundaries to soften abrupt changes. Default: 0.8 seconds; set to 0 to disable.",
-        outputDir: "Output directory",
-        keepSegments: "Keep segments",
         ffmpegBinary: "ffmpeg path",
         ffprobeBinary: "ffprobe path",
         ffmpegTitle: "Merging long videos needs ffmpeg",
@@ -335,13 +334,8 @@
         registerDisabled: "Login service unavailable: {message}",
         registerNoKey: "The login service returned no key. Try again later or contact an administrator.",
         sectionGeneration: "Generation",
-        sectionMerge: "Video merging",
-        sectionAppearance: "Appearance",
-        sectionAdvanced: "Advanced",
         sectionCombined: "More settings",
         sectionCombinedHint: "Appearance, merging, runtime and local tools",
-        sectionRuntime: "Runtime options",
-        sectionTools: "Local tools",
         toolsHint: "Usually leave blank. Set executable paths only if installed tools are not detected.",
         segmentsRetained: "Original segments are always retained for preview, resume and editing.",
         mode: "Continuation",
@@ -350,9 +344,8 @@
         ratio: "Aspect ratio",
         generateAudio: "Generate audio",
         watermark: "Add watermark",
-        extraParams: "Extra params (JSON)",
-        pollIntervalMs: "Status check interval (ms)",
-        maxWaitMs: "Maximum wait per task (ms)",
+        pollIntervalMs: "Status check interval (seconds)",
+        maxWaitMs: "Maximum wait per task (seconds)",
         save: "Save",
         reset: "Reset plugin",
         resetHint: "Clear locally saved keys and custom settings to restore defaults.",
@@ -362,7 +355,17 @@
         dirty: "Unsaved changes",
         loading: "Reading configuration\u2026",
         unavailable: "Plugin settings could not be loaded. Restart Harness and try again. If this continues, check that your Harness and plugin versions are compatible.",
-        readOnly: "These settings are read-only and cannot be changed."
+        readOnly: "These settings are read-only and cannot be changed.",
+        seamTrimSecondsHint: "Trim the start of segments 2, 3, etc., e.g. 0.5,0. Leave blank for model defaults; use 0 to disable. Each value: 0\u20133 seconds.",
+        waitSecondsHint: "At least 1 second; decimals allowed. Maximum wait must be at least the check interval.",
+        versionHistory: "Update history",
+        unknownConnection: "Unknown connection method. Select one again.",
+        atomicUnsupported: "This version of Harness does not support batch saving. Update Harness and try again.",
+        atomicRejected: "Settings were not saved. Reopen this page and try again; restart Harness if the problem continues.",
+        invalidWait: "Enter valid times of at least 1 second. Maximum wait must be at least the check interval.",
+        invalidSeam: "Enter comma-separated trim values from 0 to 3 seconds, e.g. 0.5,0.",
+        resetDone: "Local settings cleared and defaults restored.",
+        resetFailed: "Reset failed: {message}"
       };
       const MODEL_OPTIONS = [
         "doubao-seedance-2-0-mini-260615",
@@ -376,11 +379,7 @@
         mergeMode: ["seamless", "copy", "reencode"]
       };
       const SECTIONS = [
-        { key: "sectionGeneration", fields: ["connectionMode", "metaonticApiKey", "volcengineApiKey", "model", "mode", "ratio", "generateAudio"] },
-        { key: "sectionAppearance", fields: ["watermark"] },
-        { key: "sectionMerge", fields: ["mergeMode", "seamTrimSeconds", "bgmFadeSeconds"] },
-        { key: "sectionRuntime", fields: ["pollIntervalMs", "maxWaitMs"] },
-        { key: "sectionTools", fields: ["ffmpegBinary", "ffprobeBinary"] }
+        { key: "sectionGeneration", fields: ["connectionMode", "metaonticApiKey", "volcengineApiKey", "model", "mode", "ratio", "generateAudio"] }
       ];
       const FIELDS = [
         { key: "connectionMode", kind: "select", wide: true },
@@ -395,7 +394,6 @@
         { key: "seamTrimSeconds", kind: "text" },
         { key: "mergeMode", kind: "select", wide: true },
         { key: "bgmFadeSeconds", kind: "number" },
-        { key: "keepSegments", kind: "switch" },
         { key: "pollIntervalMs", kind: "number" },
         { key: "maxWaitMs", kind: "number" },
         { key: "ffmpegBinary", kind: "text", mono: true },
@@ -431,7 +429,7 @@
       const UPDATE_ATTEMPTS = 3;
       const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
       const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-      const PLUGIN_VERSION = true ? "3.2.1".trim().replace(/^v/i, "") : "";
+      const PLUGIN_VERSION = true ? "3.2.2".trim().replace(/^v/i, "") : "";
       function currentOs() {
         const nav = window.navigator || {};
         const raw = String(
@@ -656,8 +654,23 @@
       function same(a, b) {
         return a === b || a === void 0 && b === "" || a === "" && b === void 0;
       }
+      async function persistBatch(form, ops) {
+        if (typeof form.mutate !== "function") throw new Error("atomicUnsupported");
+        if (!await form.mutate(ops)) throw new Error("atomicRejected");
+      }
+      function validateSettings(values) {
+        const interval = Number(values.pollIntervalMs ?? 5e3);
+        const wait = Number(values.maxWaitMs ?? 6e5);
+        if (![interval, wait].every((n) => Number.isSafeInteger(n) && n >= 1e3) || wait < interval) {
+          throw new Error("invalidWait");
+        }
+        const trim = String(values.seamTrimSeconds ?? "").trim();
+        if (trim && !trim.split(",").every((part) => part.trim() !== "" && Number.isFinite(Number(part)) && Number(part) >= 0 && Number(part) <= 3)) {
+          throw new Error("invalidSeam");
+        }
+      }
       async function persistConnection(form, pending, nextMode) {
-        if (!["service", "metaontic", "volcengine"].includes(nextMode)) throw new Error("\u672A\u77E5\u63A5\u5165\u65B9\u5F0F");
+        if (!["service", "metaontic", "volcengine"].includes(nextMode)) throw new Error("unknownConnection");
         const inactiveKeys = nextMode === "volcengine" ? [
           "metaonticApiKey",
           "apiKey",
@@ -671,11 +684,10 @@
           "registerApi",
           "registerToken"
         ] : nextMode === "metaontic" ? ["volcengineApiKey", "apiKey", "keyOrigin", "registerEmail", "deviceId", "deviceSecret", "registerApi", "registerToken"] : ["volcengineApiKey", "metaonticApiKey"];
-        if (typeof form.mutate !== "function") throw new Error("\u5F53\u524D\u5BBF\u4E3B\u4E0D\u652F\u6301\u539F\u5B50\u4FDD\u5B58\uFF0C\u8BF7\u66F4\u65B0 Harness");
         const ops = pending.filter(([key]) => key !== "connectionMode" && !inactiveKeys.includes(key)).map(([key, next]) => ({ op: "set", path: [key], value: next }));
         for (const key of inactiveKeys) ops.push({ op: "set", path: [key], value: "" });
         ops.push({ op: "set", path: ["connectionMode"], value: nextMode });
-        if (!await form.mutate(ops)) throw new Error("\u5BBF\u4E3B\u672A\u63A5\u53D7\u914D\u7F6E\uFF0C\u8BF7\u91CD\u5F00\u8BBE\u7F6E\u9875\u540E\u91CD\u8BD5\uFF1B\u82E5\u4ECD\u5931\u8D25\uFF0C\u8BF7\u91CD\u542F Harness \u4EE5\u52A0\u8F7D\u6700\u65B0\u63D2\u4EF6\u5B57\u6BB5");
+        await persistBatch(form, ops);
       }
       function makePage({ form, t, manager }) {
         return function ConfigPage(props) {
@@ -808,6 +820,10 @@
               setStatus("idle");
             }, holdMs);
           }
+          function settingsError(error) {
+            const message = error?.message || String(error);
+            return ["unknownConnection", "atomicUnsupported", "atomicRejected", "invalidWait", "invalidSeam"].includes(message) ? t(message) : message;
+          }
           async function save() {
             if (connectionBusy.current) return;
             connectionBusy.current = true;
@@ -815,6 +831,7 @@
             setStatus("saving");
             const nextMode = draft.connectionMode ?? value.connectionMode ?? "service";
             try {
+              validateSettings({ ...value, ...draft });
               await persistConnection(form, pending, nextMode);
               if (nextMode !== "service") {
                 forgetDevice();
@@ -827,25 +844,36 @@
               setDraft({});
               flashStatus("saved");
             } catch (error) {
-              setSaveError(error?.message || String(error));
+              setSaveError(settingsError(error));
               setStatus("failed");
             } finally {
               connectionBusy.current = false;
             }
           }
           async function reset() {
-            const overridden = Object.keys(snapshot.user || {});
-            if (!overridden.length && !keyReady) return;
+            if (connectionBusy.current) return;
             if (!window.confirm(t("resetConfirm"))) return;
+            connectionBusy.current = true;
+            setSaveError("");
             setStatus("saving");
-            const targets = /* @__PURE__ */ new Set([...overridden, ...PLUGIN_OWNED_KEYS]);
-            for (const key of targets) await form.unset(key);
-            forgetDevice();
-            setDraft({});
-            setRegisterStatus("idle");
-            setRegisterMessage("");
-            setRegisterCode("");
-            setStatus("idle");
+            try {
+              const targets = /* @__PURE__ */ new Set([...Object.keys(snapshot.user || {}), ...PLUGIN_OWNED_KEYS]);
+              await persistBatch(form, [...targets].map((key) => ({ op: "unset", path: [key] })));
+              forgetDevice();
+              setDraft({});
+              setVisibleKey("");
+              setRegisterEmail("");
+              setRegisterStatus("idle");
+              setRegisterMessage("");
+              setRegisterCode("");
+              setQuota(null);
+              flashStatus("reset");
+            } catch (error) {
+              setSaveError(t("resetFailed", { message: settingsError(error) }));
+              setStatus("failed");
+            } finally {
+              connectionBusy.current = false;
+            }
           }
           function registerApiRoot() {
             const configured = String(value.registerApi || "").trim();
@@ -932,13 +960,16 @@
             return writes;
           }
           async function syncDeviceIdentity() {
+            if (!serviceActive()) return;
+            const writes = deviceWrites();
+            if (!writes.length) return;
+            connectionBusy.current = true;
             try {
-              for (const [key, next] of deviceWrites()) {
-                if (!serviceActive()) return;
-                const accepted = await form.set(key, next);
-                if (accepted) clear(key);
-              }
+              await persistBatch(form, writes.map(([key, next]) => ({ op: "set", path: [key], value: next })));
+              for (const [key] of writes) clear(key);
             } catch {
+            } finally {
+              connectionBusy.current = false;
             }
           }
           async function callRegister(url, init = {}) {
@@ -981,7 +1012,6 @@
           }
           async function applyRegistration(result, fallbackBase, device) {
             if (!serviceActive()) return;
-            clearLoggedOut();
             const writes = [
               ["apiKey", result.api_key],
               ["keyOrigin", "register"],
@@ -991,19 +1021,23 @@
             const account = result.email || result.display_name || "";
             if (account) writes.push(["registerEmail", account]);
             if (result.model) writes.push(["model", result.model]);
-            let ok = true;
-            for (const [key, next] of writes) {
-              if (!serviceActive()) return;
-              const accepted = await form.set(key, next);
-              if (accepted) clear(key);
-              else ok = false;
+            if (!serviceActive()) return false;
+            connectionBusy.current = true;
+            try {
+              await persistConnection(form, writes, "service");
+              clearLoggedOut();
+              for (const [key] of writes) clear(key);
+              setRegisterStatus("ok");
+            } catch (error) {
+              throw new Error(settingsError(error));
+            } finally {
+              connectionBusy.current = false;
             }
-            setRegisterStatus(ok ? "ok" : "partial");
             loadQuota().catch(() => {
             });
             loadUsage().catch(() => {
             });
-            return ok;
+            return true;
           }
           async function lookupOwnKey() {
             const device = deviceIdentity();
@@ -1226,7 +1260,9 @@
             }
           }
           function control(field) {
-            const current = draft[field.key] !== void 0 ? draft[field.key] : value[field.key];
+            const current = draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0);
+            const secondsField = field.key === "pollIntervalMs" || field.key === "maxWaitMs";
+            const displayed = secondsField && current !== void 0 && current !== "" ? Number(current) / 1e3 : current;
             const id = `metaontic-video-${field.key}`;
             if (field.kind === "switch") {
               return h(
@@ -1266,11 +1302,13 @@
               className: `mov-input${field.mono ? " mov-mono" : ""}`,
               style: inputStyle,
               type: field.kind === "number" ? "number" : field.secret && !revealed ? "password" : "text",
-              value: current ?? "",
+              value: displayed ?? "",
+              min: secondsField ? 1 : field.key === "bgmFadeSeconds" ? 0 : void 0,
+              step: secondsField ? 1e-3 : field.key === "bgmFadeSeconds" ? 0.1 : void 0,
               placeholder: field.secret && (snapshot.secrets?.[field.key] || value[field.key]) ? t("apiKeyConfigured") : "",
               onChange: (event) => edit(
                 field.key,
-                field.kind === "number" && event.target.value !== "" ? Number(event.target.value) : event.target.value
+                field.kind === "number" && event.target.value !== "" ? secondsField ? Math.round(Number(event.target.value) * 1e3) : Number(event.target.value) : event.target.value
               )
             });
             if (!canReveal) return input;
@@ -1297,7 +1335,9 @@
             metaonticApiKey: t("metaonticKeyHint"),
             volcengineApiKey: t("volcengineKeyHint"),
             model: t("modelHint"),
-            bgmFadeSeconds: t("bgmFadeSecondsHint")
+            bgmFadeSeconds: t("bgmFadeSecondsHint"),
+            seamTrimSeconds: t("seamTrimSecondsHint"),
+            maxWaitMs: t("waitSecondsHint")
           };
           function fieldCell(field) {
             const classes = ["mov-field"];
@@ -1332,13 +1372,13 @@
             ])
           ];
           const overrides = Object.keys(snapshot.user || {});
-          const footerMessage = status === "saved" ? t("saved") : status === "failed" ? saveError || t("saveFailed") : pending.length ? t("dirty") : "";
+          const footerMessage = status === "saved" ? t("saved") : status === "reset" ? t("resetDone") : status === "failed" ? saveError || t("saveFailed") : pending.length ? t("dirty") : "";
           const footer = pending.length || status !== "idle" ? h("div", { key: "footer", className: "mov-footer" }, [
             footerMessage ? h("span", {
               key: "status",
               style: {
                 fontSize: 12,
-                color: status === "failed" ? TOKENS.error : status === "saved" ? TOKENS.success : TOKENS.muted
+                color: status === "failed" ? TOKENS.error : status === "saved" || status === "reset" ? TOKENS.success : TOKENS.muted
               }
             }, footerMessage) : null
           ]) : null;
@@ -1357,7 +1397,7 @@
               "data-action": "reset",
               type: "button",
               className: "mov-btn",
-              disabled: status === "saving",
+              disabled: status === "saving" || snapshot.writable === false,
               onClick: reset
             }, t("reset"))
           ]) : null;
@@ -1644,6 +1684,7 @@
                 className: "mov-hint",
                 style: { flex: "1 1 120px" }
               }, PLUGIN_VERSION ? t("versionCurrent", { version: PLUGIN_VERSION }) : ""),
+              h("a", { key: "history", className: "mov-hint", href: "https://github.com/wxsimon2022/metaontic-video/blob/master/CHANGELOG.md", target: "_blank", rel: "noopener noreferrer" }, t("versionHistory")),
               h("button", {
                 key: "check",
                 "data-action": "update-check",

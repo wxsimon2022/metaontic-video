@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 const source = readFileSync(new URL('../src/client.ts', import.meta.url), 'utf8');
-const start = source.indexOf('    async function persistConnection(');
+const start = source.indexOf('    async function persistBatch(');
 const context = vm.createContext({});
 vm.runInContext(source.slice(start, source.indexOf('\n    function makePage(', start)), context);
 const modes = ['service', 'metaontic', 'volcengine'];
@@ -20,7 +20,7 @@ for (const from of modes) for (const to of modes) test(`atomic save ${from} -> $
 });
 test('rejected atomic writes report failure without falling back to partial writes', async () => {
   let calls = 0;
-  await assert.rejects(context.persistConnection({ async mutate() { calls++; return false; }, async set() { throw new Error('partial writes forbidden'); } }, [], 'metaontic'), /宿主未接受/);
+  await assert.rejects(context.persistConnection({ async mutate() { calls++; return false; }, async set() { throw new Error('partial writes forbidden'); } }, [], 'metaontic'), /atomicRejected/);
   assert.equal(calls, 1);
-  await assert.rejects(context.persistConnection({}, [], 'metaontic'), /不支持原子保存/);
+  await assert.rejects(context.persistConnection({}, [], 'metaontic'), /atomicUnsupported/);
 });
