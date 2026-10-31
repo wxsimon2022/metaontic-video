@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import pkg from '../package.json';
+import { createPreviewHost } from './host.mjs';
 
 const h = React.createElement;
 const listeners = new Set(), components = {}, dictionaries = {};
@@ -49,20 +50,18 @@ window.fetch = async (input) => {
 let plugin;
 window.__ModuleLoader__ = { load(entry) { plugin = entry.factory(name => { if (name === 'react') return React; throw new Error(name); }); } };
 await import('../src/client.ts');
-plugin.apply({
-  locale: { register(ns, dict) { dictionaries[ns] = dict; }, bind(ns) { return (key, args = {}) => String(dictionaries[ns]?.[locale]?.[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => args[name] ?? `{${name}}`); } },
-  configForms: { get: () => form },
-  effect(fn) { fn(); },
-  slots: { register(spec, component) { components[spec.key] = component; return () => {}; }, inject(_slot, callback) { const result = callback(); if (result?.next) for (const _ of result) {} return () => {}; } },
-  get() { return { installBundle: async () => { alert('预览：已模拟更新，不会安装插件。'); return {}; } }; },
-});
+plugin.apply(createPreviewHost({
+  form, components, dictionaries, getLocale: () => locale,
+  onUpdate: () => alert('预览：已模拟更新，不会安装插件。'),
+}));
 preset('service');
 function App() {
   const [epoch, bump] = useState(0), [tab, setTab] = useState('settings'), [theme, setTheme] = useState('light'), [narrow, setNarrow] = useState(false), [failure, setFailure] = useState(false), [task, setTask] = useState('waiting');
+  const [taskStartedAt, setTaskStartedAt] = useState(Date.now);
   const [, render] = useState(0);
   React.useEffect(() => form.subscribe(() => render(n => n + 1)), []);
   const Page = components['metaontic-video'], Progress = components[task === 'extend' ? 'video_extend' : 'video_generate'];
-  const block = task === 'success' ? { kind: 'result', content: [{ type: 'text', text: '视频生成成功 · succeeded\n示例路径：/preview/video.mp4' }] } : task === 'failed' ? { kind: 'result', isError: true, content: [{ type: 'text', text: '预览：模拟生成失败，请检查错误详情。' }] } : { phase: 'running', args: { duration: 15 } };
+  const block = task === 'success' ? { kind: 'result', content: [{ type: 'text', text: '视频生成成功 · succeeded\n示例路径：/preview/video.mp4' }] } : task === 'failed' ? { kind: 'result', isError: true, content: [{ type: 'text', text: '预览：模拟生成失败，请检查错误详情。' }] } : { phase: 'start', args: { duration: 15 } };
   const masked = Object.fromEntries(Object.entries(value).map(([k, v]) => [k, secretFields.includes(k) && v ? '（模拟 Key 已隐藏）' : v]));
   return <>
     <header className="preview-bar"><strong>MetaOnticVideo · 样式预览</strong>
@@ -77,7 +76,7 @@ function App() {
     <p className="preview-note">复用 src/client.ts 的真实界面 · 数据与 Key 均为模拟 · 保存仅在当前页面内生效 · 修改源码自动刷新</p>
     <main className={`preview-content ${narrow ? 'narrow' : ''}`}>
       <nav className="preview-tabs"><button aria-pressed={tab === 'settings'} onClick={() => setTab('settings')}>插件设置</button><button aria-pressed={tab === 'progress'} onClick={() => setTab('progress')}>生成进度卡片</button></nav>
-      {tab === 'settings' ? <Page key={epoch} /> : <><select aria-label="任务状态" value={task} onChange={e => setTask(e.target.value)}><option value="waiting">生成等待</option><option value="extend">延长等待</option><option value="success">生成成功</option><option value="failed">失败</option></select><Progress key={`${epoch}-${task}`} toolName={task === 'extend' ? 'video_extend' : 'video_generate'} block={block} callId={task} /></>}
+      {tab === 'settings' ? <Page key={epoch} /> : <><select aria-label="任务状态" value={task} onChange={e => { setTask(e.target.value); setTaskStartedAt(Date.now()); }}><option value="waiting">生成等待</option><option value="extend">延长等待</option><option value="success">生成成功</option><option value="failed">失败</option></select><Progress key={`${epoch}-${task}`} toolName={task === 'extend' ? 'video_extend' : 'video_generate'} block={block} callId={task} startedAt={taskStartedAt} /></>}
       <details className="preview-inspect"><summary>模拟配置快照</summary><pre>{JSON.stringify(masked, null, 2)}</pre></details>
     </main>
   </>;

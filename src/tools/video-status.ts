@@ -43,7 +43,7 @@ export function taskTool(config) {
             {
               type: 'text',
               text: [
-                '延长任务已完成。',
+                '视频任务已完成。',
                 `任务 ID：${taskId}`,
                 `模型：${model || '-'}`,
                 `视频链接（约 24 小时内有效）：${videoUrl || '（无）'}`,
@@ -52,7 +52,7 @@ export function taskTool(config) {
           ];
         }
         if (status === 'failed') {
-          return [{ type: 'text', text: `延长任务失败（任务 ${taskId}）：${error || '未知错误'}` }];
+          return [{ type: 'text', text: `视频任务失败（任务 ${taskId}）：${error || '未知错误'}` }];
         }
         if (status === 'unknown') {
           const detail = String(error || '查询失败').replace(/。+$/, '');

@@ -124,17 +124,18 @@ export async function buildGenerationBody(config, args, seconds, options: { sign
 }
 
 /** 创建任务并等到结束；超时、取消、失败都归一化成同一形状。 */
-export async function runTask(config, body, signal): Promise<TaskResult> {
-  const created = await createTask(config, body, signal);
-  const taskId = extractTaskId(created);
+export async function runTask(config, body, signal, progress: { taskId?: string; onCreated?: (taskId: string) => Promise<void> } = {}): Promise<TaskResult> {
+  const created = progress.taskId ? null : await createTask(config, body, signal);
+  const taskId = progress.taskId || extractTaskId(created);
   await appendRequestLog({ event: 'task_created', taskId, model: body?.model, duration: body?.duration });
   if (!taskId) throw new Error('创建任务失败：响应中缺少任务 ID。');
   try {
+    await progress.onCreated?.(taskId);
     const final = await waitForCompletion(config, taskId, signal);
     await appendRequestLog({ event: 'task_finished', taskId, status: final.status, errorCode: final.errorCode });
     return { ...final, taskId };
   } catch (failure) {
-    if (failure?.code === 'ABORTED') throw failure;
+    if (failure?.code === 'ABORTED') return { taskId, status: 'unknown', errorCode: 'waiting_stopped', error: `已停止等待，任务 ${taskId} 已提交，可能仍在生成。用 resume 或 video_status 查询已有任务，不要重新提交。` };
     // 任务已经建好，这里只说明「查询没拿到结果」，不能说成「这一段没生成」：
     // 标成 unknown 并保留 taskId，让结果能引导用 video_status 事后补拉。
     return {

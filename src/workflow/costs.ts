@@ -74,8 +74,8 @@ export function estimateSteps(config, steps) {
  * 调用模型前的估算：拆几段、多少 token、大概多少美元。
  * 只按价目表与分辨率算，实际以中转站结算为准（确认框里写的是「预估」）。
  */
-export function estimateUsage(config, toolName, args) {
-  const plan = estimatePlan(config, toolName, args);
+export function estimateUsage(config, toolName, args, actualPlan = undefined) {
+  const plan = actualPlan ?? estimatePlan(config, toolName, args);
   // 有首/尾帧或参考图，就算「带参考素材」，价目表里视频一档更便宜。
   const referenceImages = Array.isArray(args?.referenceImages)
     ? args.referenceImages

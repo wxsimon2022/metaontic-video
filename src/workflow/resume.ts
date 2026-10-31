@@ -1,12 +1,12 @@
 /** workflow/resume：从宿主入口拆出的独立职责模块。 */
 import path from 'node:path';
 import { readFile, open, rm, mkdir, writeFile, rename } from 'node:fs/promises';
-import { ref, MAX_SEGMENT_SECONDS, MAX_SEGMENTS, MIN_SECONDS } from '../config.js';
+import { ref, MAX_SEGMENT_SECONDS, MAX_SEGMENTS, MIN_SECONDS, MAX_TOTAL_SECONDS } from '../config.js';
 import { uniqueSuffix } from '../utils/files.js';
 import os from 'node:os';
 import { requestLogContext, appendRequestLog } from '../utils/logging.js';
-import { isMetaontic, isVolcengine, resolveModel } from '../providers/connection.js';
-import { sumStepSeconds } from './planning.js';
+import { isMetaontic, isVolcengine, resolveModel, resolveBaseUrl, resolveSubmitPath, resolveQueryPath } from '../providers/connection.js';
+import { sumStepSeconds, modelMaxSeconds } from './planning.js';
 
 /* ---------------- 长视频的循环迭代：分段之间的人工确认 + 暂停后接着做 ---------------- */
 
@@ -168,6 +168,11 @@ export function withResumeLock(tool, toolName, config) {
             await appendRequestLog({ event: 'resume_lock_acquired', resumeDir: dir });
           }
           const result = await tool.execute(args, exec);
+          if (result?.resumeDir) {
+            const record = await readPauseFile(result.resumeDir);
+            record.deliveryPending = Boolean(result.deliveryError || result.ffmpegMissing);
+            await writePauseFile(result.resumeDir, record);
+          }
           await appendRequestLog({ event: 'tool_completed', elapsedMs: Date.now() - started,
             status: result?.status, paused: result?.paused, videoPath: result?.videoPath,
             segmentsDir: result?.segmentsDir, segmentCount: result?.segments?.length,
@@ -208,7 +213,7 @@ export function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
   const cursor = Number(data.cursor) || 0;
   const fullPlan = (data.plan || []).map((step) => ({ ...step }));
   const remaining = fullPlan.slice(done).map((step) => ({ ...step }));
-  const wanted = Number.isFinite(askedTotal) ? askedTotal : 0;
+  const wanted = Number.isFinite(askedTotal) ? Math.min(askedTotal, MAX_TOTAL_SECONDS) : 0;
   const cap = segmentSeconds > 0 ? segmentSeconds : MAX_SEGMENT_SECONDS;
   let total = cursor + sumStepSeconds(remaining);
   while (wanted > total && fullPlan.length < MAX_SEGMENTS && total + MIN_SECONDS <= wanted) {
@@ -223,7 +228,7 @@ export function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
 /** 续做时要沿用的参数：调用方只传 resume 时，靠这份记录还原上次的口径。 */
 export function pickResumeOptions(args) {
   const keys = [
-    'mode', 'ratio', 'generateAudio', 'watermark', 'segmentPrompts',
+    'mode', 'ratio', 'generateAudio', 'watermark', 'segmentPrompts', 'merge',
     // 这几个是 video_extend 的口径（延长方向、提示词写法、整片时间轴位置）
     'direction', 'wording', 'startAt',
   ];
@@ -262,4 +267,38 @@ export function pauseRecordAt({ stamp, prompt, fullPlan, done, cursor, lastVideo
 export function resumeHint(dir, remainingSeconds, toolName = 'video_generate') {
   return `要接着做就把 resume="${dir}" 再调一次 ${toolName}（prompt 可以省略，其余参数照旧）：`
     + `插件会接着已经生成的分段继续，剩下的 ${remainingSeconds} 秒不用重头生成、不会重复扣费。`;
+}
+
+/** Non-secret connection identity. Never copy API keys into progress files. */
+export function progressConnection(config) {
+  return {
+    provider: isMetaontic(config) ? 'metaontic' : isVolcengine(config) ? 'volcengine' : 'service',
+    model: resolveModel(config), baseUrl: resolveBaseUrl(config),
+    submitPath: resolveSubmitPath(config), queryPath: resolveQueryPath(config, '{task_id}'),
+  };
+}
+
+export function assertResumeConnection(data, config, args) {
+  if (!data?.connection) return; // Old records predate connection snapshots.
+  if (JSON.stringify(data.connection) === JSON.stringify(progressConnection(config))) return;
+  if (data.pendingTask) throw new Error('这份进度还有已提交的任务，请恢复原模型和接入渠道后查询，不能切换渠道重复提交。');
+  if (args?.resumeWithCurrentConfig === true) {
+    if (data.plan.slice(Number(data.done) || 0).some(step => step.seconds > modelMaxSeconds(config))) {
+      throw new Error('原进度中的分段超过当前模型单段上限，请恢复原模型后继续，不自动缩短已审核分段。');
+    }
+    return;
+  }
+  throw new Error('当前模型或接入渠道与原进度不一致。请恢复原配置；如需更换，先向用户说明变化并确认，再传 resumeWithCurrentConfig:true。');
+}
+
+/** Persist before delivery, including pending task IDs and the final completed cursor. */
+export async function saveProgress(dir, { config, toolName, stamp, prompt, fullPlan, cursor, referenceUrl, options, segments, pendingTask }) {
+  const completed = segments.filter(step => step.status === 'succeeded' && step.videoUrl);
+  const record = pauseRecordAt({ stamp, prompt, fullPlan, done: completed.length, cursor,
+    lastVideoUrl: referenceUrl, options, segments: completed });
+  Object.assign(record, { toolName, connection: progressConnection(config),
+    deliveryPending: !pendingTask && completed.length > 0,
+    state: pendingTask ? 'pending' : completed.length >= fullPlan.length ? 'completed' : 'paused',
+    pendingTask: pendingTask || null });
+  await writePauseFile(dir, record);
 }

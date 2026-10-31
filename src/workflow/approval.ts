@@ -2,10 +2,10 @@
 import { isManualKey, connectionLabel, resolveRegisterApi, assertConfigured, resolveApiKey, resolveModel } from '../providers/connection.js';
 import { estimateSteps, formatMoney, estimatePlan, estimateUsage } from './costs.js';
 import { finiteNumber, clampInteger } from '../utils/validation.js';
-import { ref, DEFAULT_USD_EXCHANGE_RATE, DEFAULT_REGISTER_TOKEN, PLUGIN_VERSION, MIN_SECONDS, DEFAULT_QUOTA_PER_UNIT, FIXED_RESOLUTION } from '../config.js';
-import { sumStepSeconds, resolveSegmentSeconds } from './planning.js';
+import { ref, DEFAULT_USD_EXCHANGE_RATE, DEFAULT_REGISTER_TOKEN, PLUGIN_VERSION, MIN_SECONDS, MAX_SEGMENTS, DEFAULT_QUOTA_PER_UNIT, FIXED_RESOLUTION } from '../config.js';
+import { sumStepSeconds, resolveSegmentSeconds, modelMaxSeconds } from './planning.js';
 import { ffmpegInstallOptions, hasFfmpeg, resolveBinary } from '../media/ffmpeg.js';
-import { resumeDirOf, readPauseFile, resumePlanFrom } from './resume.js';
+import { resumeDirOf, readPauseFile, resumePlanFrom, assertResumeConnection } from './resume.js';
 
 /** 剩下这几段的预估费用文案（确认框里给用户看钱）。 */
 export async function remainingCostText(config, exec, remainingSteps) {
@@ -201,7 +201,8 @@ export async function ffmpegConsentGate(config, exec, args) {
   let doneSteps = [];
   try {
     const gateArgs = await estimateArgsFor(config, exec.name, args);
-    plan = estimatePlan(config, exec.name, gateArgs);
+    if (gateArgs?.merge === false) return null;
+    plan = gateArgs.remainingPlan ?? estimatePlan(config, exec.name, gateArgs);
     const dir = resumeDirOf(args?.resume);
     if (dir) {
       const data = await readPauseFile(dir);
@@ -250,32 +251,45 @@ export async function ffmpegConsentGate(config, exec, args) {
  * - 其余情况：返回 ask，宿主弹审批面板给用户看预估费用，点「允许」才会执行。
  */
 /**
- * 确认框要估的是「这次真会花的钱」。接着上一次暂停继续时只生成剩下的几段，
- * 所以按暂停记录里剩下的计划估算，而不是按 args.duration（续做时可能压根没传）。
+ * 读取本次真实剩余计划；费用只估当前会执行的一段，环境预检检查完整计划。
+ * 续做使用暂停记录，不把剩余秒数重新拆段。待查询任务和交付重试不新增生成费用。
  */
 export async function estimateArgsFor(config, toolName, args) {
-  if (toolName !== 'video_generate') return args;
   const dir = resumeDirOf(args?.resume);
   if (!dir) return args;
-  try {
-    const data = await readPauseFile(dir);
-    const restarted = resumePlanFrom(data, {
-      askedTotal: args?.duration == null
-        ? null
-        : clampInteger(args.duration, MIN_SECONDS, Number.MAX_SAFE_INTEGER, 0),
+  const data = await readPauseFile(dir);
+  assertResumeConnection(data, config, args);
+  const merged = { ...(data.options || {}), ...args };
+  let plan;
+  if (toolName === 'video_generate') {
+    plan = resumePlanFrom(data, {
+      askedTotal: args?.duration == null ? null : clampInteger(args.duration, MIN_SECONDS, Number.MAX_SAFE_INTEGER, 0),
       segmentSeconds: resolveSegmentSeconds(config, args?.segmentSeconds),
-    });
-    const seconds = sumStepSeconds(restarted.plan);
-    if (!(seconds > 0)) return args;
-    return { ...args, duration: seconds, referenceImages: [] };
-  } catch {
-    return args;
+    }).plan;
+  } else {
+    const fullPlan = data.plan.map(step => ({ ...step }));
+    if (args?.segments != null) {
+      const count = clampInteger(args.segments, 1, MAX_SEGMENTS, 1);
+      const seconds = clampInteger(args.duration, MIN_SECONDS, modelMaxSeconds(config), modelMaxSeconds(config));
+      for (let n = 0; n < count && fullPlan.length < MAX_SEGMENTS; n++) fullPlan.push({ kind: 'extend', seconds });
+    }
+    plan = fullPlan.slice(Number(data.done) || 0);
   }
+  return { ...merged, remainingPlan: data.pendingTask || data.deliveryPending ? [] : plan,
+    duration: sumStepSeconds(plan), referenceImages: [] };
 }
 
 export async function preflightGate(ctx, config, exec) {
   // 装环境：只有真要装的时候才拦（让用户先看到命令）；纯检查放行。
   if (exec.name === 'video_setup') return setupGate(ctx, exec);
+
+  const rawArgs = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : {};
+  if (resumeDirOf(rawArgs.resume)) {
+    try {
+      const prepared = await estimateArgsFor(config, exec.name, rawArgs);
+      if (prepared.remainingPlan?.length === 0) return { kind: 'allow' };
+    } catch (error) { return { kind: 'deny', reason: error?.message || String(error) }; }
+  }
 
   if (approvalPolicy(ctx, exec) === 'never') {
     return {
@@ -301,7 +315,9 @@ export async function preflightGate(ctx, config, exec) {
   }
   let estimate = null;
   try {
-    estimate = estimateUsage(config, exec.name, await estimateArgsFor(config, exec.name, args));
+    const prepared = await estimateArgsFor(config, exec.name, args);
+    const plan = prepared.remainingPlan ?? estimatePlan(config, exec.name, prepared);
+    estimate = estimateUsage(config, exec.name, prepared, plan.slice(0, 1));
   } catch {
     estimate = null;
   }

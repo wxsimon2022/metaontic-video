@@ -8,6 +8,8 @@ function harness() {
     ref: (config, key, fallback) => config[key] ?? fallback,
     envValue: () => '',
     relayPreset: () => ({ baseUrl: 'https://ai.bileego.com', submitPath: '/doubao/api/v3/contents/generations/tasks', queryPath: '/doubao/api/v3/contents/generations/tasks/{task_id}' }),
+    resumeDirOf: value => value || '',
+    estimateArgsFor: async (_config, _tool, args) => ({ ...args, remainingPlan: [{ kind: 'extend', seconds: 5 }] }),
     approvalPolicy: () => 'ask', ffmpegConsentGate: async () => null,
     resolveModel: () => 'seedance',
     estimateUsage: () => { throw new Error('must not estimate'); },

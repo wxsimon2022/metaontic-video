@@ -2,7 +2,7 @@
 import { modelMaxSeconds } from '../workflow/planning.js';
 import { SEGMENT_OUTPUT_SCHEMA, renderResult } from './results.js';
 import { resolveApiKey, assertConfigured } from '../providers/connection.js';
-import { resumeDirOf, readPauseFile, writePauseFile, pauseRecordAt, pickResumeOptions, resumeHint } from '../workflow/resume.js';
+import { assertResumeConnection, saveProgress, resumeDirOf, readPauseFile, pickResumeOptions, resumeHint } from '../workflow/resume.js';
 import { clampInteger } from '../utils/validation.js';
 import { MAX_SEGMENTS, MIN_SECONDS, CONTENT_REJECTION_HINT } from '../config.js';
 import { getTask } from '../providers/transport.js';
@@ -28,7 +28,7 @@ export function extendTool(config, deps, ctx) {
       + '返回每段的任务 ID 和最终视频下载链接（约 24 小时内有效）；生成通常需要几分钟，'
       + '单次调用返回 timeout、或某段返回 unknown（查询失败、任务其实已提交）时，'
       + '都用返回的任务 ID 走 video_status 继续等，不要重复提交同一段。'
-      + '每段延长完都会先弹一次确认框问用户要不要继续：点「拒绝」就先交付已经延长好的部分，'
+      + '每段延长完先返回成果供展示，用户预览并确认继续后再用resume续做；未确认时停在当前成果，'
       + '结果里带 paused=true、resumeDir、remainingSeconds；之后用户说「继续」时把 resumeDir '
       + '原样传给 video_extend 的 resume 参数接着做（前面几段不重新生成、不重复扣费）。'
       + '多段默认会下载分段并在本机合并成一条成片（需要 ffmpeg）：没有 ffmpeg 时会先拦下来问用户，'
@@ -103,6 +103,8 @@ export function extendTool(config, deps, ctx) {
           type: 'boolean',
           description: '是否添加水印，默认 false。',
         },
+        merge: { type: 'boolean', description: '默认true：下载分段并在本机合并；false只返回上游链接。续做默认沿用原设置。' },
+        resumeWithCurrentConfig: { type: 'boolean', description: '仅在用户明确确认更换原进度的模型或接入渠道后设为true；有待查询任务时必须恢复原渠道。' },
         resume: {
           type: 'string',
           description:
@@ -114,7 +116,7 @@ export function extendTool(config, deps, ctx) {
             + '等它跑完再继续，别重复发（重复会把剩下的段提交两遍、重复扣费）。',
         },
       },
-      required: ['prompt'],
+      required: [],
     },
     output: {
       schema: {
@@ -138,6 +140,8 @@ export function extendTool(config, deps, ctx) {
           resumeDir: { type: 'string' },
           remainingSeconds: { type: 'integer' },
           totalSeconds: { type: 'integer' },
+          pendingTaskId: { type: 'string' },
+          deliveryError: { type: 'string' },
           error: { type: 'string' },
           errorCode: { type: 'string' },
           note: { type: 'string' },
@@ -159,6 +163,9 @@ export function extendTool(config, deps, ctx) {
       // 接着上一次暂停的延长继续（长视频循环迭代的第二轮起）
       const resumeDir = resumeDirOf(args?.resume);
       const resume = resumeDir ? await readPauseFile(resumeDir) : null;
+      assertResumeConnection(resume, config, args);
+      if (resume?.toolName && resume.toolName !== TOOL_NAME) throw new Error(`这份进度请使用 ${resume.toolName} 继续。`);
+      args = { ...(resume?.options || {}), ...args };
 
       const prompt = String(args?.prompt ?? '').trim() || String(resume?.prompt ?? '').trim();
       if (!prompt) {
@@ -217,7 +224,7 @@ export function extendTool(config, deps, ctx) {
           fullPlan.push({ kind: 'extend', seconds: secondsPerSegment });
         }
       }
-      const plan = fullPlan.slice(doneBefore);
+      const plan = resume?.deliveryPending ? [] : fullPlan.slice(doneBefore);
       const plannedSeconds = plan.reduce((sum, step) => sum + step.seconds, 0);
 
       let cursor = resume
@@ -243,9 +250,18 @@ export function extendTool(config, deps, ctx) {
       let errorCode;
       // 用户选择先不继续（确认框里点了拒绝/取消）：先把已经延长好的部分交付
       let paused = false;
-      let confirmWarned = false;
 
       // 被停止 / 超时也一样：已经延长好的部分先交付，留暂停记录给 resume。
+      const outDir = await resolveOutputDir(config, exec, deps);
+      const { stamp, segmentsDir } = resume
+        ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir }
+        : await allocateStamp(outDir, fileStamp());
+      let pendingTask = resume?.pendingTask || null;
+      const checkpoint = async () => saveProgress(segmentsDir, {
+        config, toolName: TOOL_NAME, stamp, prompt, fullPlan, cursor, referenceUrl,
+        options: { ...pickResumeOptions(args), direction, wording, startAt: cursor }, segments, pendingTask,
+      });
+      if (resume?.deliveryPending) await checkpoint();
       let interrupted = false;
       try {
       for (const [offset, step] of plan.entries()) {
@@ -265,7 +281,15 @@ export function extendTool(config, deps, ctx) {
           },
           referenceUrl,
         );
-        const final = await runTask(config, body, exec?.signal);
+        const final = await runTask(config, body, exec?.signal, {
+          taskId: pendingTask?.taskId,
+          onCreated: async (taskId) => {
+            pendingTask = { taskId, index: position + 1, kind: step.kind, seconds };
+            await checkpoint();
+          },
+        });
+        pendingTask = ['unknown', 'timeout'].includes(final.status)
+          ? { taskId: final.taskId, index: position + 1, kind: step.kind, seconds } : null;
         const taskId = final.taskId;
 
         segments.push({
@@ -282,6 +306,7 @@ export function extendTool(config, deps, ctx) {
         });
 
         if (final.status !== 'succeeded' || !final.videoUrl) {
+          await checkpoint();
           status = final.status;
           errorCode = final.errorCode;
           error =
@@ -295,6 +320,8 @@ export function extendTool(config, deps, ctx) {
           cursor = direction === 'forward' ? cursor - seconds : cursor + seconds;
           if (cursor < 0) cursor = null;
         }
+
+        await checkpoint();
 
         // 先结束本次调用并交付视频，让助手展示成果后再询问是否继续。
         // 工具内部阻塞在审批框时，宿主尚拿不到输出，无法展示刚完成的分段。
@@ -325,6 +352,18 @@ export function extendTool(config, deps, ctx) {
         videoUrl: completed.at(-1)?.videoUrl,
         totalSeconds: deliveredSeconds,
       };
+      if (resume?.deliveryPending && doneBefore < fullPlan.length) paused = true;
+      if (paused) {
+        result.paused = true;
+        result.remainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - completed.reduce((sum, step) => sum + step.seconds, 0));
+      }
+      result.resumeDir = segmentsDir;
+      result.segmentsDir = segmentsDir;
+      if (pendingTask) {
+        result.pendingTaskId = pendingTask.taskId;
+        result.note = '任务已提交，请用 resume 查询并接回原进度，或用 video_status 查询；不要重复提交。';
+      }
+
       if (!completed.length) {
         if (notes.length) result.note = notes.join('\n');
         return result;
@@ -340,11 +379,16 @@ export function extendTool(config, deps, ctx) {
         );
       }
 
-      const outDir = await resolveOutputDir(config, exec, deps);
-      const { stamp, segmentsDir } = resume
-        ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir }
-        : await allocateStamp(outDir, fileStamp());
-
+      if (args?.merge === false) {
+        if (paused) {
+          result.paused = true;
+          result.remainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - deliveredSeconds);
+          result.nextAction = 'present_video_then_wait_for_user';
+          notes.push(resumeHint(segmentsDir, result.remainingSeconds, TOOL_NAME));
+        }
+        result.note = [...notes, '按参数要求只返回上游链接，没有下载合并。'].join('\n');
+        return result;
+      }
       const delivery = await downloadSegmentsAndMerge(config, {
         segments: completed,
         segmentsDir,
@@ -353,9 +397,12 @@ export function extendTool(config, deps, ctx) {
         notes,
         keepSingleFile: paused,
         // 被中断时请求信号已经 abort：收尾（下载 + 合并）不能被它打断，否则等于白生成。
-        signal: interrupted ? undefined : exec?.signal,
+        signal: interrupted || exec?.signal?.aborted ? undefined : exec?.signal,
       });
       if (delivery.error) {
+        result.deliveryError = delivery.error;
+        if (delivery.ffmpegMissing) { result.ffmpegMissing = true; result.installHint = delivery.installHint; }
+        result.nextAction = 'resume_delivery_without_regeneration';
         result.segmentsDir = delivery.segmentsDir;
         result.note = notes.join('\n');
         return result;
@@ -389,20 +436,6 @@ export function extendTool(config, deps, ctx) {
         result.previewPath = completed.at(-1)?.localPath || result.videoPath;
         await appendRequestLog({ event: 'preview_required', previewPath: result.previewPath, resumeDir: result.resumeDir });
         result.remainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - deliveredSeconds);
-        try {
-          await writePauseFile(segmentsDir, pauseRecordAt({
-            stamp,
-            prompt,
-            fullPlan,
-            done: segments.length,
-            cursor,
-            lastVideoUrl: referenceUrl,
-            options: { ...pickResumeOptions(args), direction, wording, startAt: cursor },
-            segments,
-          }));
-        } catch (failure) {
-          notes.push(`暂停记录没写成（${failure?.message || failure}）：要接着做只能用上面的链接重新延长。`);
-        }
         notes.push(`已交付的成片是到第 ${segments.length} 段，分段仍保留在 ${segmentsDir}。`);
         notes.push(resumeHint(segmentsDir, result.remainingSeconds, TOOL_NAME));
         result.note = notes.join('\n');

@@ -9,6 +9,13 @@ export function previewInstruction(value) {
     + '用户首次授权制作不等于已看过本段，不得自动resume或调用其他生成工具绕过预览；展示工具不可用时给出可点击视频路径或播放链接，仍须等待明确确认。';
 }
 
+function recoveryInstruction(value, toolName) {
+  if (!value?.resumeDir) return '';
+  if (value.deliveryError || value.ffmpegMissing) return `生成进度已保存。交付尚未完成，请用 ${toolName} 的 resume="${value.resumeDir}" 重试下载或合并，不会重新生成或重复扣费。`;
+  if (value.pendingTaskId) return `任务 ${value.pendingTaskId} 已提交。请用 ${toolName} 的 resume="${value.resumeDir}" 查询并接回原进度，不会重新提交本段。`;
+  return '';
+}
+
 export function renderResult(value) {
   const {
     status, segments = [], videoUrl, error, videoPath, mergeMode, segmentsDir,
@@ -25,7 +32,7 @@ export function renderResult(value) {
   });
 
   if (status === 'succeeded') {
-    const parts = [];
+    const parts = [recoveryInstruction(value, 'video_extend')];
     if (paused) {
       parts.push(previewInstruction(value));
       parts.push(
@@ -56,6 +63,7 @@ export function renderResult(value) {
         type: 'text',
         text: [
           '延长任务仍在生成中（已超出单次等待时间）。',
+          recoveryInstruction(value, 'video_extend'),
           ...lines,
           `可用 video_status 查询任务 ${
             segments.at(-1)?.taskId || '（未知）'
@@ -69,6 +77,7 @@ export function renderResult(value) {
       {
         type: 'text',
         text: [
+          recoveryInstruction(value, 'video_extend'),
           '没能确认这段延长任务的状态（查询失败，不是任务失败）。任务已经提交，可能仍在生成；'
           + '用 video_status 按任务 ID 复查，不要重新提交。',
           ...lines,
@@ -147,7 +156,7 @@ export function renderVideoResult(value) {
       : `${head} → ${segment.videoUrl}`;
   });
 
-  const parts = paused ? [previewInstruction(value)] : [];
+  const parts = [recoveryInstruction(value, 'video_generate'), ...(paused ? [previewInstruction(value)] : [])];
   if (status === 'succeeded') {
     if (paused) {
       parts.push(
