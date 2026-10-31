@@ -379,7 +379,7 @@ window.__ModuleLoader__.load({
       + `?sha=${UPDATE_BRANCH}&per_page=1`;
     /** 在线更新最多试几次：Gitee 的匿名 HTTPS 克隆会排队，429 一般过一会儿就好。 */
     const UPDATE_ATTEMPTS = 3;
-    /** 版本检查结果的本地缓存与节流：6 小时内不重复联网，打开设置页先用缓存显示。 */
+    /** 版本检查结果的本地缓存：打开设置页先显示，再后台刷新。 */
     const UPDATE_CACHE_KEY = 'metaontic-video.update-check-v2';
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
     /** 构建时由 esbuild --define 注入的版本号；从源码直接跑（没注入）时为空串。 */
@@ -513,14 +513,23 @@ window.__ModuleLoader__.load({
       for (const url of UPDATE_MIRROR_FILES) {
         requests.push((async () => versionFromFile(await (await fetchUpdateSource(url, 6000)).json()))());
       }
-      const results = await Promise.allSettled(requests);
-      let best = '';
-      for (const result of results) {
-        if (result.status === 'fulfilled' && (!best || isNewerVersion(result.value, best))) best = result.value;
-      }
-      if (!best) throw new Error(results.filter((item) => item.status === 'rejected')
-        .map((item: any) => item.reason?.message || String(item.reason)).join('；'));
-      return best;
+      // 任一仓库或镜像发现新版本就立即返回；其他来源失败或超时不阻塞提醒。
+      return new Promise<string>((resolve, reject) => {
+        let remaining = requests.length;
+        let best = '';
+        const errors = [];
+        for (const request of requests) {
+          request.then((version) => {
+            if (!best || isNewerVersion(version, best)) best = version;
+            if (isNewerVersion(version, PLUGIN_VERSION)) resolve(version);
+          }, (error) => { errors.push(error?.message || String(error)); }).finally(() => {
+            if (--remaining === 0) {
+              if (best) resolve(best);
+              else reject(new Error(errors.join('；')));
+            }
+          });
+        }
+      });
     }
 
     /**

@@ -39,3 +39,7 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" dist/*.tgz --verify-tag --title "MetaOnticVideo $GITHUB_REF_NAME" --notes-file dist/release-notes.txt
           fi
+      - name: Upload Gitee release package
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: node scripts/publish-gitee.mjs "$GITHUB_REF_NAME" dist/*.tgz dist/release-notes.txt

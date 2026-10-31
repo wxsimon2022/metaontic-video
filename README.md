@@ -176,6 +176,8 @@ C 模式使用北京区域官方接口 `https://ark.cn-beijing.volces.com/api/v3
 手动值范围0–3秒。先预览接缝，不在词句中间下刀；裁剪音视频同步，不补静帧或慢放凑时长。
 未启用接缝裁剪时，默认直接拼接，避免交叉淡化造成短暂重影；也可选择重编码后直接拼接。旧配置中的 `seamless` 会兼容为直接拼接。当前不提供画面或音频交叉淡化，旧 `bgmFadeSeconds` 不生效；原始分段始终保留，旧 `keepSegments` 不再控制删除。手动或默认裁剪均保留所选合并方式。
 
+更新检测并行查询 GitHub、Gitee 及备用镜像；任意来源发现比本机新的版本立即提醒，另一个来源失败不影响结果。所有来源失败时自动检查静默处理。
+
 ## ffmpeg 与设置页
 
 多段本地合并需要 `ffmpeg`，媒体探测需要 `ffprobe`。设置页不再常驻安装提示卡片；需要合并但环境缺失时仍会提示处理。
@@ -262,7 +264,7 @@ npm pack --dry-run
 2. 同步锁文件，构建并执行相关验证，检查打包清单。
 3. 提交源码、构建产物与说明。
 4. 创建**附注标签（annotated tag）**，包含版本标题、变更分类及验证结果。
-5. 推送分支和标签到GitHub、Gitee，再检查发布工作流结果。
+5. 推送分支和标签到 GitHub、Gitee，两个仓库都创建 Release 并上传同一插件包，再检查发布工作流结果。
 
 标签说明统一格式如下；只保留本次适用分类，验证结果必须据实填写：
 
@@ -297,9 +299,9 @@ git show --no-patch "v<版本>"
 
 ### 插件包下载
 
-版本包在 [GitHub Releases](https://github.com/wxsimon2022/metaontic-video/releases) 下载，文件名为 `metaontic-video-<版本>.tgz`。不再向 npm 注册表发布，无需配置 `NPM_TOKEN` 或 Trusted Publishing。
+版本包在 [GitHub Releases](https://github.com/wxsimon2022/metaontic-video/releases) 或 [Gitee Releases](https://gitee.com/hackloop/metaontic-video/releases) 下载，文件名为 `metaontic-video-<版本>.tgz`。不再向 npm 注册表发布，无需配置 `NPM_TOKEN` 或 Trusted Publishing。
 
-`v*` 标签触发完整构建与测试，通过后使用 GitHub 自动令牌上传插件包。手动运行工作流时须选择与包版本匹配的标签。
+`v*` 标签触发完整构建与测试，通过后使用 GitHub 自动令牌上传插件包，并使用仓库 Actions Secret `GITEE_TOKEN` 创建 Gitee Release 和上传同一插件包。该密钥应具有 `hackloop/metaontic-video` 的发布权限；缺失或上传失败时工作流明确报错，不将单仓成功报告为双仓成功。手动运行工作流时须选择与包版本匹配的标签。
 
 本机打包可执行 `npm pack --pack-destination /tmp`。需要目录安装时，将 `.tgz` 解压后使用其中的 `package` 目录：
 

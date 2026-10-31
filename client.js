@@ -530,13 +530,24 @@
         for (const url of UPDATE_MIRROR_FILES) {
           requests.push((async () => versionFromFile(await (await fetchUpdateSource(url, 6e3)).json()))());
         }
-        const results = await Promise.allSettled(requests);
-        let best = "";
-        for (const result of results) {
-          if (result.status === "fulfilled" && (!best || isNewerVersion(result.value, best))) best = result.value;
-        }
-        if (!best) throw new Error(results.filter((item) => item.status === "rejected").map((item) => item.reason?.message || String(item.reason)).join("\uFF1B"));
-        return best;
+        return new Promise((resolve, reject) => {
+          let remaining = requests.length;
+          let best = "";
+          const errors = [];
+          for (const request of requests) {
+            request.then((version) => {
+              if (!best || isNewerVersion(version, best)) best = version;
+              if (isNewerVersion(version, PLUGIN_VERSION)) resolve(version);
+            }, (error) => {
+              errors.push(error?.message || String(error));
+            }).finally(() => {
+              if (--remaining === 0) {
+                if (best) resolve(best);
+                else reject(new Error(errors.join("\uFF1B")));
+              }
+            });
+          }
+        });
       }
       async function fetchLatestCommit() {
         const body = await (await fetchUpdateSource(UPDATE_COMMIT_API)).json();
