@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
   "license": "MIT",
   "type": "module",
@@ -76,12 +76,14 @@
     "@deepseek-ai/schemastery": "~3.18.5"
   },
   "releaseNotes": {
-    "version": "3.0.1",
+    "version": "3.1.0",
     "items": [
-      "修复设置页更新内容与当前版本不一致的问题，始终显示本机当前版本的更新说明。",
-      "检查更新和历史缓存不再覆盖当前版本说明。",
-      "视频生成进度按三分钟推进，达到99%后等待实际结果，成功后显示100%。",
-      "精简生成进度提示文案。"
+      "新增创意完善流程：先展开故事看点、发展和结尾，再编写视频脚本。",
+      "按题材选择画面风格、对白、音乐与镜头，支持短剧、产品展示、风景和动画等表达。",
+      "支持“更搞笑”“少点对白”“换个结尾”等口语改稿，保留用户满意的部分。",
+      "强化逐版审核规则：首次及每次改稿都要求重新弹出脚本审核窗口，当前版通过后再单独确认费用与制作。",
+      "新增分段方案与示意图流程：审核前展示每段时长、内容、衔接和本地构图示意，实际生成仍逐段预览、确认续做。",
+      "更新为M形折带与播放符号的轻量矢量Logo，修复图标超过256 KiB导致的元信息错误。"
     ]
   }
 }
