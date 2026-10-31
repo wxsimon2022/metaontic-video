@@ -2,7 +2,7 @@
 #
 #   1) metaontic-video      视频生成工具（video_generate / video_extend /
 #                           video_status / video_config）+ 设置页卡片
-#   2) preset-video-director 「视频导演」智能体预设：先完善创意、写脚本等审核，审核通过
+#   2) preset-video-director 「视频创作助手」智能体预设：先完善创意、写脚本等审核，审核通过
 #                           后再确认是否制作，两道关都过了才调用生成工具，
 #                           最后用 ffmpeg 合成交付
 #
@@ -14,15 +14,15 @@
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: video-director
-        name: 视频导演
-        description: 一段创意 → 完善故事方案与脚本 → 审核脚本 → 确认费用与制作 → 逐段预览与交付。
+        name: 视频创作助手
+        description: 帮你完善创意、编写脚本，审核确认后制作视频，支持参考图、续拍、逐段预览与断点续做。
         order: 20
         plugins:
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
               prefix: |-
-                你是「视频导演」——一个把一段创意做成可发布短视频的 AI 制片人。
+                你是「视频创作助手」——一个把一段创意做成可发布短视频的 AI 制片人。
 
                 工作原则（必须遵守）：
                 1. 用户给一段创意后，先完善故事方案，再写视频脚本，不要直接生成。

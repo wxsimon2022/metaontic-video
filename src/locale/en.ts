@@ -4,7 +4,7 @@ import type { PluginLocale } from './zh';
 export const locale: PluginLocale = {
   meta: {
     title: 'MetaOnticVideo',
-    description: 'Video generation plugin: describe the clip and get a finished file — up to 15 seconds in one shot, longer videos are extended shot by shot and directly concatenated into one file on your machine. You can also extend a clip you already have.',
+    description: 'Turn ideas into videos with the Video Creation Assistant: develop concepts, review scripts, then confirm production. Supports reference images, video continuation, segment previews, resumable generation and local merging. Connect through MetaOnticVideo, MetaOntic AI or Volcano Engine.',
   },
 };
 

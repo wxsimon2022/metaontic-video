@@ -1,7 +1,7 @@
 {
   "name": "metaontic-video",
-  "version": "3.2.0",
-  "description": "DeepSeek Harness video generation plugin with service-issued keys or Volcano Engine API access, model-aware duration limits, segment previews and resumable generation, retained source clips, ffmpeg merging, and a video director preset.",
+  "version": "3.2.1",
+  "description": "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
   "license": "MIT",
   "type": "module",
   "keywords": [
@@ -41,6 +41,7 @@
     "icon.svg",
     "logo.svg",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "engines": {
@@ -79,15 +80,13 @@
     "@deepseek-ai/schemastery": "~3.18.5"
   },
   "releaseNotes": {
-    "version": "3.2.0",
+    "version": "3.2.1",
     "items": [
-      "新增 MetaOntic AI 接入：只填 Key 即可使用，与服务端模式共用中转接口。",
-      "新增独立浏览器预览，支持主题、屏宽、语言、接入方式与请求状态模拟。",
-      "优化手填 Key 模式：无需登录，不预估费用、不核对额度、不显示使用记录，制作前按实际调用计费确认。",
-      "优化设置页：手填 Key 支持显示与隐藏；更多设置整合为统一自适应表单，水印移入其中，移除输出目录与额外参数入口。",
-      "修复接入方式切换：原子保存配置并清空其他渠道凭据，避免旧 Key 继承与逐字段重载中断；失败明确提示，配置工具返回更新后的脱敏结果。",
-      "修复中转参考图仅提交首张：按顺序提交全部参考图，统一校验数量、首尾帧互斥与请求体大小，不自动丢图或换格式重试。",
-      "同步导演提示词、使用文档与发布约定：仅明确要求发版时发布，并汇总全部未发布逻辑变化。"
+      "优化设置页中英文文案：统一密钥用词，精简登录、保存、更新与异常提示，移除固定价格倍数和绝对化描述。",
+      "接入方式名称调整为「MetaOnticVideo」。",
+      "智能体由「视频导演」更名为「视频创作助手」，同步角色提示、预设简介与使用说明。",
+      "更新插件中英文描述，说明创意完善、脚本审核、参考图、续拍、逐段预览、断点续做和三种接入方式。",
+      "新增历史更新记录 CHANGELOG.md，提供版本索引、日期和源码链接，README 增加查看入口并将更新记录纳入发布流程。"
     ]
   }
 }
