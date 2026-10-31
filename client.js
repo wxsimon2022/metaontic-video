@@ -2,7 +2,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.2.2",
+    version: "3.3.0",
     description: "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
     license: "MIT",
     type: "module",
@@ -82,14 +82,14 @@
       "@deepseek-ai/schemastery": "~3.18.5"
     },
     releaseNotes: {
-      version: "3.2.2",
+      version: "3.3.0",
       items: [
-        "\u767B\u5F55\u4E0E\u8BBE\u5907\u51ED\u636E\u540C\u6B65\u6539\u4E3A\u6279\u91CF\u4FDD\u5B58\uFF0C\u907F\u514D\u9010\u5B57\u6BB5\u91CD\u8F7D\u9020\u6210\u914D\u7F6E\u4E0D\u5B8C\u6574\u3002",
-        "\u91CD\u7F6E\u914D\u7F6E\u6539\u4E3A\u6279\u91CF\u6E05\u9664\uFF0C\u68C0\u67E5\u7ED3\u679C\u5E76\u53CD\u9988\u6210\u529F\u6216\u5931\u8D25\uFF0C\u5931\u8D25\u65F6\u4FDD\u7559\u672C\u673A\u767B\u5F55\u51ED\u636E\u3002",
-        "\u7B49\u5F85\u53C2\u6570\u6539\u4E3A\u6309\u79D2\u663E\u793A\u548C\u7F16\u8F91\uFF0C\u4FDD\u5B58\u65F6\u8F6C\u6362\u4E3A\u6BEB\u79D2\uFF0C\u589E\u52A0\u6700\u4F4E\u65F6\u957F\u548C\u7B49\u5F85\u65F6\u95F4\u5173\u7CFB\u6821\u9A8C\u3002",
-        "\u8865\u5145\u63A5\u7F1D\u88C1\u526A\u8BF4\u660E\u4E0E\u8303\u56F4\u6821\u9A8C\uFF0C\u7EDF\u4E00\u4FDD\u5B58\u5F02\u5E38\u7684\u4E2D\u82F1\u6587\u63D0\u793A\u3002",
-        "\u7248\u672C\u5361\u7247\u65B0\u589E\u5386\u53F2\u66F4\u65B0\u5165\u53E3\uFF0C\u6E05\u7406\u9690\u85CF\u5B57\u6BB5\u4E0E\u65E7\u5206\u7EC4\u5B9A\u4E49\u3002",
-        "\u53D1\u5E03\u6539\u4E3A GitHub Release \u63D0\u4F9B\u63D2\u4EF6\u538B\u7F29\u5305\uFF0C\u6784\u5EFA\u4E0E\u6D4B\u8BD5\u901A\u8FC7\u540E\u4E0A\u4F20\uFF0C\u4E0D\u518D\u53D1\u5E03\u5230 npm\u3002"
+        "\u65B0\u589E\u8BBE\u7F6E\u9875\u540E\u53F0\u66F4\u65B0\u68C0\u67E5\uFF1A\u53D1\u73B0\u65B0\u7248\u672C\u65F6\u5728\u5F53\u524D\u7248\u672C\u53F7\u65C1\u663E\u793A\u6447\u6446\u94C3\u94DB\uFF0C\u81EA\u52A8\u68C0\u67E5\u5931\u8D25\u9759\u9ED8\u5904\u7406\uFF0C\u4E0D\u5F71\u54CD\u6B63\u5E38\u64CD\u4F5C\u3002",
+        "\u4FEE\u590D\u63A5\u7F1D\u88C1\u526A\u8986\u76D6\u7528\u6237\u5408\u5E76\u65B9\u5F0F\u7684\u95EE\u9898\uFF0C\u88C1\u526A\u540E\u4ECD\u9075\u5FAA\u6240\u9009\u62FC\u63A5\u65B9\u5F0F\u3002",
+        "\u7EDF\u4E00\u63A5\u7F1D\u88C1\u526A\u89C4\u5219\uFF1A2.0 \u9ED8\u8BA4\u88C1\u524D\u6BB5\u5C3E6\u5E27\u3001\u540E\u6BB5\u59341\u5E27\uFF0C2.5 \u9ED8\u8BA4\u4E0D\u88C1\uFF0C\u586B0\u5173\u95ED\uFF1B\u4EA4\u4ED8\u8BF4\u660E\u533A\u5206\u624B\u52A8\u8BBE\u7F6E\u4E0E\u6A21\u578B\u9ED8\u8BA4\u7B56\u7565\u3002",
+        "\u539F\u59CB\u5206\u6BB5\u59CB\u7EC8\u4FDD\u7559\uFF0C\u65E7 keepSegments \u4EC5\u4F5C\u517C\u5BB9\uFF1B\u65E7 seamless \u6620\u5C04\u76F4\u63A5\u62FC\u63A5\uFF0C\u4E0D\u518D\u4F5C\u4E3A\u65B0\u5019\u9009\u3002",
+        "\u79FB\u9664\u65E0\u6548\u97F3\u4E50\u6DE1\u5316\u8BBE\u7F6E\u548C\u5E9F\u5F03\u4EA4\u53C9\u6DE1\u5316\u4EE3\u7801\uFF0C\u907F\u514D\u754C\u9762\u627F\u8BFA\u4E0E\u5B9E\u9645\u884C\u4E3A\u4E0D\u4E00\u81F4\u3002",
+        "\u7EDF\u4E00\u4E09\u6E20\u9053\u8D39\u7528\u3001\u811A\u672C\u5207\u955C\u548C\u6A21\u578B\u65F6\u957F\u89C4\u5219\uFF0C\u540C\u6B65 MetaOnticVideo \u63A5\u5165\u540D\u79F0\u3001\u4F7F\u7528\u6587\u6863\u4E0E\u56DE\u5F52\u6D4B\u8BD5\u3002"
       ]
     }
   };
@@ -127,8 +127,6 @@
         mergeModeSeamless: "\u76F4\u63A5\u62FC\u63A5\uFF08\u65E7\u914D\u7F6E\u517C\u5BB9\uFF09",
         mergeModeCopy: "\u65E0\u635F\u62FC\u63A5",
         mergeModeReencode: "\u91CD\u7F16\u7801\u62FC\u63A5",
-        bgmFadeSeconds: "\u97F3\u4E50\u63A5\u7F1D\u6DE1\u5316\uFF08\u79D2\uFF09",
-        bgmFadeSecondsHint: "\u6DE1\u5316\u63A5\u7F1D\u4E24\u4FA7\u97F3\u9891\uFF0C\u51CF\u8F7B\u58F0\u97F3\u7A81\u53D8\u3002\u9ED8\u8BA4 0.8 \u79D2\uFF0C\u8BBE\u4E3A 0 \u5173\u95ED\u3002",
         ffmpegBinary: "ffmpeg \u8DEF\u5F84",
         ffprobeBinary: "ffprobe \u8DEF\u5F84",
         ffmpegTitle: "\u957F\u89C6\u9891\u5408\u5E76\u9700\u8981 ffmpeg",
@@ -267,8 +265,6 @@
         mergeModeSeamless: "Direct concat (legacy setting)",
         mergeModeCopy: "Stream copy",
         mergeModeReencode: "Re-encode",
-        bgmFadeSeconds: "Music seam cross-fade (s)",
-        bgmFadeSecondsHint: "Fade audio at segment boundaries to soften abrupt changes. Default: 0.8 seconds; set to 0 to disable.",
         ffmpegBinary: "ffmpeg path",
         ffprobeBinary: "ffprobe path",
         ffmpegTitle: "Merging long videos needs ffmpeg",
@@ -376,7 +372,7 @@
         model: MODEL_OPTIONS,
         mode: ["continuous", "closeup"],
         ratio: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
-        mergeMode: ["seamless", "copy", "reencode"]
+        mergeMode: ["copy", "reencode"]
       };
       const SECTIONS = [
         { key: "sectionGeneration", fields: ["connectionMode", "metaonticApiKey", "volcengineApiKey", "model", "mode", "ratio", "generateAudio"] }
@@ -393,7 +389,6 @@
         { key: "watermark", kind: "switch" },
         { key: "seamTrimSeconds", kind: "text" },
         { key: "mergeMode", kind: "select", wide: true },
-        { key: "bgmFadeSeconds", kind: "number" },
         { key: "pollIntervalMs", kind: "number" },
         { key: "maxWaitMs", kind: "number" },
         { key: "ffmpegBinary", kind: "text", mono: true },
@@ -429,7 +424,7 @@
       const UPDATE_ATTEMPTS = 3;
       const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
       const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-      const PLUGIN_VERSION = true ? "3.2.2".trim().replace(/^v/i, "") : "";
+      const PLUGIN_VERSION = true ? "3.3.0".trim().replace(/^v/i, "") : "";
       function currentOs() {
         const nav = window.navigator || {};
         const raw = String(
@@ -474,6 +469,18 @@
           if (next[index] !== current[index]) return next[index] > current[index];
         }
         return false;
+      }
+      function updateBell(t, latest, current) {
+        if (!isNewerVersion(latest, current)) return null;
+        const label = t("versionNew", { version: latest });
+        return h(
+          "span",
+          { className: "mov-update-bell", "data-field": "update-bell", role: "img", "aria-label": label, title: label },
+          h("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true }, [
+            h("path", { key: "body", d: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" }),
+            h("path", { key: "clapper", d: "M10 21h4M12 2V1" })
+          ])
+        );
       }
       function decodeBase64Text(raw) {
         if (typeof atob !== "function") return "";
@@ -587,6 +594,10 @@
       .mov-switch:hover { border-color: ${TOKENS.primaryFill}; }
       .mov-switch input { width: 15px; height: 15px; accent-color: ${TOKENS.primaryFill}; cursor: pointer; }
       .mov-card { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
+      .mov-current-version { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 120px; }
+      .mov-update-bell { display: inline-flex; flex: 0 0 auto; color: ${TOKENS.primaryFill}; transform-origin: 50% 10%; animation: mov-bell-swing 1.6s ease-in-out infinite; }
+      @keyframes mov-bell-swing { 0%, 60%, 100% { transform: rotate(0deg); } 10%, 30% { transform: rotate(-18deg); } 20%, 40% { transform: rotate(18deg); } 50% { transform: rotate(-8deg); } }
+      @media (prefers-reduced-motion: reduce) { .mov-update-bell { animation: none; } }
       .mov-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
       .mov-card-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       .mov-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.5; }
@@ -778,6 +789,10 @@
           }, [serviceMode, Boolean(snapshot.secrets?.apiKey || value.apiKey), value.deviceId, props?.view]);
           const updateTried = React.useRef(false);
           React.useEffect(() => {
+            if (props?.view === "summary") {
+              updateTried.current = false;
+              return;
+            }
             if (updateTried.current) return;
             updateTried.current = true;
             const cached = readUpdateCache();
@@ -787,9 +802,9 @@
               if (cached.commit) updateCommit.current = cached.commit;
               setUpdateStatus("ok");
             }
-            if (!cached.fresh) checkForUpdate(true).catch(() => {
+            checkForUpdate(true).catch(() => {
             });
-          }, []);
+          }, [props?.view]);
           if (props && props.view === "summary") {
             const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
             const text = configured ? t("summary", { provider: t(selectedMode), model: value.model || "-" }) : t("summaryEmpty");
@@ -1281,13 +1296,14 @@
             if (field.kind === "select") {
               const options = SELECTS[field.key] || [];
               const hiddenModel = field.key === "model" && /seedance-2(?:-5|\.5)/i.test(String(current || ""));
-              const list = current && !options.includes(current) && !hiddenModel ? [...options, current] : options;
+              const legacyMerge = field.key === "mergeMode" && current === "seamless";
+              const list = current && !options.includes(current) && !hiddenModel && !legacyMerge ? [...options, current] : options;
               return h("select", {
                 id,
                 "data-field": field.key,
                 className: `mov-input${field.mono ? " mov-mono" : ""}`,
                 style: inputStyle,
-                value: current ?? "",
+                value: legacyMerge ? "copy" : current ?? "",
                 onChange: (event) => edit(field.key, event.target.value)
               }, [
                 hiddenModel ? h("option", { key: "hidden-current", value: current, hidden: true }, t("modelHiddenCurrent")) : null,
@@ -1303,8 +1319,8 @@
               style: inputStyle,
               type: field.kind === "number" ? "number" : field.secret && !revealed ? "password" : "text",
               value: displayed ?? "",
-              min: secondsField ? 1 : field.key === "bgmFadeSeconds" ? 0 : void 0,
-              step: secondsField ? 1e-3 : field.key === "bgmFadeSeconds" ? 0.1 : void 0,
+              min: secondsField ? 1 : void 0,
+              step: secondsField ? 1e-3 : void 0,
               placeholder: field.secret && (snapshot.secrets?.[field.key] || value[field.key]) ? t("apiKeyConfigured") : "",
               onChange: (event) => edit(
                 field.key,
@@ -1335,7 +1351,6 @@
             metaonticApiKey: t("metaonticKeyHint"),
             volcengineApiKey: t("volcengineKeyHint"),
             model: t("modelHint"),
-            bgmFadeSeconds: t("bgmFadeSecondsHint"),
             seamTrimSeconds: t("seamTrimSecondsHint"),
             maxWaitMs: t("waitSecondsHint")
           };
@@ -1365,7 +1380,7 @@
                 h("span", { key: "hint", className: "mov-hint" }, t("sectionCombinedHint"))
               ]),
               h("div", { key: "body", className: "mov-advanced-body" }, [
-                renderGrid({ key: "advancedFields", fields: ["mergeMode", "watermark", "seamTrimSeconds", "bgmFadeSeconds", "pollIntervalMs", "maxWaitMs", "ffmpegBinary", "ffprobeBinary"] }),
+                renderGrid({ key: "advancedFields", fields: ["mergeMode", "watermark", "seamTrimSeconds", "pollIntervalMs", "maxWaitMs", "ffmpegBinary", "ffprobeBinary"] }),
                 h("p", { key: "toolsHint", className: "mov-hint", style: { margin: 0 } }, t("toolsHint")),
                 h("p", { key: "retained", className: "mov-hint", style: { margin: 0 } }, t("segmentsRetained"))
               ])
@@ -1681,9 +1696,11 @@
               h("span", {
                 key: "current",
                 "data-field": "versionCurrent",
-                className: "mov-hint",
-                style: { flex: "1 1 120px" }
-              }, PLUGIN_VERSION ? t("versionCurrent", { version: PLUGIN_VERSION }) : ""),
+                className: "mov-hint mov-current-version"
+              }, [
+                h("span", { key: "label" }, PLUGIN_VERSION ? t("versionCurrent", { version: PLUGIN_VERSION }) : ""),
+                updateBell(t, updateLatest, PLUGIN_VERSION)
+              ]),
               h("a", { key: "history", className: "mov-hint", href: "https://github.com/wxsimon2022/metaontic-video/blob/master/CHANGELOG.md", target: "_blank", rel: "noopener noreferrer" }, t("versionHistory")),
               h("button", {
                 key: "check",

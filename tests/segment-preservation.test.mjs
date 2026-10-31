@@ -5,8 +5,8 @@ import path from 'node:path';
 import os from 'node:os';
 import vm from 'node:vm';
 
-for (const cumulative of [false, true]) {
-  test(`delivery retains both source segments (${cumulative ? 'cumulative output' : 'incremental output'})`, async () => {
+for (const cumulative of [false, true]) for (const cuts of [false, true]) {
+  test(`delivery retains both source segments (${cumulative ? 'cumulative output' : 'incremental output'}, cuts=${cuts})`, async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mv-preserve-'));
     try {
       const segmentsDir = path.join(dir, 'segments');
@@ -16,21 +16,23 @@ for (const cumulative of [false, true]) {
       await fs.writeFile(originals[1], 'second-source');
       const source = await fs.readFile(new URL('../index.js', import.meta.url), 'utf8');
       const context = vm.createContext({
+        ref: (config, key, fallback) => config[key] ?? fallback,
         path, ...fs, appendRequestLog: async () => {}, exists: async file => { try { await fs.stat(file); return true; } catch { return false; } },
         hasFfmpeg: async () => true,
         probeMedia: async file => ({durationSeconds: file === originals[1] && cumulative ? 30 : 15}),
         CUMULATIVE_TOLERANCE_MIN_SECONDS: 1.5, CUMULATIVE_TOLERANCE_RATIO: 0.25,
         formatSeconds: String,
-        prepareSeamTrims: async (_config, files) => ({files, temps: [], cuts: []}),
+        prepareSeamTrims: async (_config, files) => ({files, temps: [], cuts: cuts ? [{ index: 2, seconds: 0.5, tailSeconds: 0 }] : []}),
         cleanupSegmentTemps: async () => {},
         mergeClips: async (_config, files, out) => {
+          assert.equal(_config.mergeMode, 'reencode');
           await fs.writeFile(out, (await Promise.all(files.map(file => fs.readFile(file)))).join('|'));
           return {mode:'copy'};
         },
       });
       const start = source.indexOf('async function downloadSegmentsAndMerge(');
       vm.runInContext(source.slice(start, source.indexOf('async function resolveOutputDir', start)), context);
-      const result = await context.downloadSegmentsAndMerge({}, {
+      const result = await context.downloadSegmentsAndMerge({ mergeMode: 'reencode', keepSegments: false, seamTrimSeconds: cuts ? '0.5' : '0' }, {
         segments: [{index:1,kind:'generate',seconds:15},{index:2,kind:'extend',seconds:15}],
         segmentsDir, outDir:dir, stamp:'test',
       });

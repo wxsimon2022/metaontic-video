@@ -71,3 +71,28 @@ test('wait controls show seconds, retain millisecond precision and preserve an e
   input.props.onChange({ target: { value: '' } }); assert.equal(ctx.control(field).props.value, '');
   delete ctx.value.maxWaitMs; assert.equal(ctx.control({ key: 'maxWaitMs', kind: 'number' }).props.value, 600);
 });
+test('update bell only appears for newer versions and names the available version', () => {
+  const ctx = vm.createContext({ h: (tag, props, ...children) => ({ tag, props, children }) });
+  vm.runInContext(extract('isNewerVersion'), ctx);
+  vm.runInContext(extract('updateBell'), ctx);
+  const t = (_key, args) => `New version ${args.version}`;
+  assert.equal(ctx.updateBell(t, '3.2.2', '3.2.2'), null);
+  assert.equal(ctx.updateBell(t, '3.2.1', '3.2.2'), null);
+  assert.equal(ctx.updateBell(t, '', '3.2.2'), null);
+  const bell = ctx.updateBell(t, '3.2.3', '3.2.2');
+  assert.equal(bell.props['data-field'], 'update-bell');
+  assert.equal(bell.props['aria-label'], 'New version 3.2.3');
+});
+test('automatic update failures do not change page status; manual failures remain visible', async () => {
+  const events = [];
+  const ctx = vm.createContext({
+    fetchLatestVersion: async () => { throw new Error('offline'); },
+    setUpdateStatus: value => events.push(value), setUpdateMessage: value => events.push(value),
+    t: (_key, args) => args.message,
+  });
+  vm.runInContext(extract('checkForUpdate'), ctx);
+  assert.equal(await ctx.checkForUpdate(true), '');
+  assert.deepEqual(events, []);
+  assert.equal(await ctx.checkForUpdate(false), '');
+  assert.ok(events.includes('failed')); assert.ok(events.includes('offline'));
+});

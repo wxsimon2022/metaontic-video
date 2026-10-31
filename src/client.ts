@@ -50,8 +50,6 @@ window.__ModuleLoader__.load({
       mergeModeSeamless: '直接拼接（旧配置兼容）',
       mergeModeCopy: '无损拼接',
       mergeModeReencode: '重编码拼接',
-      bgmFadeSeconds: '音乐接缝淡化（秒）',
-      bgmFadeSecondsHint: '淡化接缝两侧音频，减轻声音突变。默认 0.8 秒，设为 0 关闭。',
       ffmpegBinary: 'ffmpeg 路径',
       ffprobeBinary: 'ffprobe 路径',
       ffmpegTitle: '长视频合并需要 ffmpeg',
@@ -195,8 +193,6 @@ window.__ModuleLoader__.load({
       mergeModeSeamless: 'Direct concat (legacy setting)',
       mergeModeCopy: 'Stream copy',
       mergeModeReencode: 'Re-encode',
-      bgmFadeSeconds: 'Music seam cross-fade (s)',
-      bgmFadeSecondsHint: 'Fade audio at segment boundaries to soften abrupt changes. Default: 0.8 seconds; set to 0 to disable.',
       ffmpegBinary: 'ffmpeg path',
       ffprobeBinary: 'ffprobe path',
       ffmpegTitle: 'Merging long videos needs ffmpeg',
@@ -318,12 +314,12 @@ window.__ModuleLoader__.load({
       model: MODEL_OPTIONS,
       mode: ['continuous', 'closeup'],
       ratio: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
-      mergeMode: ['seamless', 'copy', 'reencode'],
+      mergeMode: ['copy', 'reencode'],
     };
     // 字段按用途分组，页面用分节标题隔开——字段铺一格太糊，分了组一眼能扫到自己要改的那项。
     // 注：singleMaxSeconds（单次直出上限）与 duration（每段延长秒数）不进设置页：
-    // 前者就是 Seedance 单段 15 秒的能力值，调小只会把一条视频拆得更碎；
-    // 后者默认 15 = 段数最少，调小只会多出接缝。两者都留在配置里（默认 15），
+    // 前者由模型决定（2.0 为 15 秒、2.5 为 30 秒），调小只会把一条视频拆得更碎；
+    // 后者默认按模型上限规划，段数最少，调小只会多出接缝。两者都作为旧配置保留，
     // 只有「上游对卡满 15 秒的延长段敏感」这种少数情况才需要改成 14。
     const SECTIONS = [
       { key: 'sectionGeneration', fields: ['connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'model', 'mode', 'ratio', 'generateAudio'] },
@@ -340,7 +336,6 @@ window.__ModuleLoader__.load({
       { key: 'watermark', kind: 'switch' },
       { key: 'seamTrimSeconds', kind: 'text' },
       { key: 'mergeMode', kind: 'select', wide: true },
-      { key: 'bgmFadeSeconds', kind: 'number' },
       { key: 'pollIntervalMs', kind: 'number' },
       { key: 'maxWaitMs', kind: 'number' },
       { key: 'ffmpegBinary', kind: 'text', mono: true },
@@ -443,6 +438,16 @@ window.__ModuleLoader__.load({
         if (next[index] !== current[index]) return next[index] > current[index];
       }
       return false;
+    }
+
+    function updateBell(t, latest, current) {
+      if (!isNewerVersion(latest, current)) return null;
+      const label = t('versionNew', { version: latest });
+      return h('span', { className: 'mov-update-bell', 'data-field': 'update-bell', role: 'img', 'aria-label': label, title: label },
+        h('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }, [
+          h('path', { key: 'body', d: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9' }),
+          h('path', { key: 'clapper', d: 'M10 21h4M12 2V1' }),
+        ]));
     }
 
     /** Gitee 返回的文件内容是 base64：先还原成字节，再按 UTF-8 解出文本。 */
@@ -591,6 +596,10 @@ window.__ModuleLoader__.load({
       .mov-switch:hover { border-color: ${TOKENS.primaryFill}; }
       .mov-switch input { width: 15px; height: 15px; accent-color: ${TOKENS.primaryFill}; cursor: pointer; }
       .mov-card { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
+      .mov-current-version { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 120px; }
+      .mov-update-bell { display: inline-flex; flex: 0 0 auto; color: ${TOKENS.primaryFill}; transform-origin: 50% 10%; animation: mov-bell-swing 1.6s ease-in-out infinite; }
+      @keyframes mov-bell-swing { 0%, 60%, 100% { transform: rotate(0deg); } 10%, 30% { transform: rotate(-18deg); } 20%, 40% { transform: rotate(18deg); } 50% { transform: rotate(-8deg); } }
+      @media (prefers-reduced-motion: reduce) { .mov-update-bell { animation: none; } }
       .mov-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
       .mov-card-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       .mov-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.5; }
@@ -795,9 +804,10 @@ window.__ModuleLoader__.load({
           };
         }, [serviceMode, Boolean(snapshot.secrets?.apiKey || value.apiKey), value.deviceId, props?.view]);
 
-        // 版本卡片：先把上次查到的结果摆上（离线也能看），缓存过期了再静默查一次。
+        // 进入完整设置页先显示缓存，同时后台检查；摘要视图不触发检查。
         const updateTried = React.useRef(false);
         React.useEffect(() => {
+          if (props?.view === 'summary') { updateTried.current = false; return; }
           if (updateTried.current) return;
           updateTried.current = true;
           const cached = readUpdateCache();
@@ -807,8 +817,8 @@ window.__ModuleLoader__.load({
             if (cached.commit) updateCommit.current = cached.commit;
             setUpdateStatus('ok');
           }
-          if (!cached.fresh) checkForUpdate(true).catch(() => {});
-        }, []);
+          checkForUpdate(true).catch(() => {});
+        }, [props?.view]);
 
         if (props && props.view === 'summary') {
           const configured = Boolean(value.model) || Boolean(snapshot.secrets?.apiKey);
@@ -1301,7 +1311,7 @@ window.__ModuleLoader__.load({
 
         /**
          * 上次的版本检查结果（存在浏览器本地）：`fresh` 表示还没过期，
-         * 没过期就只用缓存显示、不再联网——打开设置页不该每次都打一个请求出去。
+         * 先用缓存显示结果；进入完整设置页仍会后台刷新，失败时保留缓存。
          */
         function readUpdateCache() {
           try {
@@ -1389,13 +1399,14 @@ window.__ModuleLoader__.load({
             const options = SELECTS[field.key] || [];
             // 当前值不在候选表里（例如服务端刚换的型号）就把它补进去，避免下拉里看不到自己现在的取值
             const hiddenModel = field.key === 'model' && /seedance-2(?:-5|\.5)/i.test(String(current || ''));
-            const list = current && !options.includes(current) && !hiddenModel ? [...options, current] : options;
+            const legacyMerge = field.key === 'mergeMode' && current === 'seamless';
+            const list = current && !options.includes(current) && !hiddenModel && !legacyMerge ? [...options, current] : options;
             return h('select', {
               id,
               'data-field': field.key,
               className: `mov-input${field.mono ? ' mov-mono' : ''}`,
               style: inputStyle,
-              value: current ?? '',
+              value: legacyMerge ? 'copy' : current ?? '',
               onChange: (event) => edit(field.key, event.target.value),
             }, [
               hiddenModel ? h('option', { key: 'hidden-current', value: current, hidden: true }, t('modelHiddenCurrent')) : null,
@@ -1411,8 +1422,8 @@ window.__ModuleLoader__.load({
             style: inputStyle,
             type: field.kind === 'number' ? 'number' : (field.secret && !revealed ? 'password' : 'text'),
             value: displayed ?? '',
-            min: secondsField ? 1 : field.key === 'bgmFadeSeconds' ? 0 : undefined,
-            step: secondsField ? 0.001 : field.key === 'bgmFadeSeconds' ? 0.1 : undefined,
+            min: secondsField ? 1 : undefined,
+            step: secondsField ? 0.001 : undefined,
             placeholder: field.secret && (snapshot.secrets?.[field.key] || value[field.key]) ? t('apiKeyConfigured') : '',
             onChange: (event) => edit(
               field.key,
@@ -1445,7 +1456,6 @@ window.__ModuleLoader__.load({
           metaonticApiKey: t('metaonticKeyHint'),
           volcengineApiKey: t('volcengineKeyHint'),
           model: t('modelHint'),
-          bgmFadeSeconds: t('bgmFadeSecondsHint'),
           seamTrimSeconds: t('seamTrimSecondsHint'),
           maxWaitMs: t('waitSecondsHint'),
         };
@@ -1481,7 +1491,7 @@ window.__ModuleLoader__.load({
               h('span', { key: 'hint', className: 'mov-hint' }, t('sectionCombinedHint')),
             ]),
             h('div', { key: 'body', className: 'mov-advanced-body' }, [
-              renderGrid({ key: 'advancedFields', fields: ['mergeMode', 'watermark', 'seamTrimSeconds', 'bgmFadeSeconds', 'pollIntervalMs', 'maxWaitMs', 'ffmpegBinary', 'ffprobeBinary'] }),
+              renderGrid({ key: 'advancedFields', fields: ['mergeMode', 'watermark', 'seamTrimSeconds', 'pollIntervalMs', 'maxWaitMs', 'ffmpegBinary', 'ffprobeBinary'] }),
               h('p', { key: 'toolsHint', className: 'mov-hint', style: { margin: 0 } }, t('toolsHint')),
               h('p', { key: 'retained', className: 'mov-hint', style: { margin: 0 } }, t('segmentsRetained')),
             ]),
@@ -1893,9 +1903,11 @@ window.__ModuleLoader__.load({
             h('span', {
               key: 'current',
               'data-field': 'versionCurrent',
-              className: 'mov-hint',
-              style: { flex: '1 1 120px' },
-            }, PLUGIN_VERSION ? t('versionCurrent', { version: PLUGIN_VERSION }) : ''),
+              className: 'mov-hint mov-current-version',
+            }, [
+              h('span', { key: 'label' }, PLUGIN_VERSION ? t('versionCurrent', { version: PLUGIN_VERSION }) : ''),
+              updateBell(t, updateLatest, PLUGIN_VERSION),
+            ]),
             h('a', { key: 'history', className: 'mov-hint', href: 'https://github.com/wxsimon2022/metaontic-video/blob/master/CHANGELOG.md', target: '_blank', rel: 'noopener noreferrer' }, t('versionHistory')),
             h('button', {
               key: 'check',

@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "3.2.2",
+  "version": "3.3.0",
   "description": "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
   "license": "MIT",
   "type": "module",
@@ -80,14 +80,14 @@
     "@deepseek-ai/schemastery": "~3.18.5"
   },
   "releaseNotes": {
-    "version": "3.2.2",
+    "version": "3.3.0",
     "items": [
-      "登录与设备凭据同步改为批量保存，避免逐字段重载造成配置不完整。",
-      "重置配置改为批量清除，检查结果并反馈成功或失败，失败时保留本机登录凭据。",
-      "等待参数改为按秒显示和编辑，保存时转换为毫秒，增加最低时长和等待时间关系校验。",
-      "补充接缝裁剪说明与范围校验，统一保存异常的中英文提示。",
-      "版本卡片新增历史更新入口，清理隐藏字段与旧分组定义。",
-      "发布改为 GitHub Release 提供插件压缩包，构建与测试通过后上传，不再发布到 npm。"
+      "新增设置页后台更新检查：发现新版本时在当前版本号旁显示摇摆铃铛，自动检查失败静默处理，不影响正常操作。",
+      "修复接缝裁剪覆盖用户合并方式的问题，裁剪后仍遵循所选拼接方式。",
+      "统一接缝裁剪规则：2.0 默认裁前段尾6帧、后段头1帧，2.5 默认不裁，填0关闭；交付说明区分手动设置与模型默认策略。",
+      "原始分段始终保留，旧 keepSegments 仅作兼容；旧 seamless 映射直接拼接，不再作为新候选。",
+      "移除无效音乐淡化设置和废弃交叉淡化代码，避免界面承诺与实际行为不一致。",
+      "统一三渠道费用、脚本切镜和模型时长规则，同步 MetaOnticVideo 接入名称、使用文档与回归测试。"
     ]
   }
 }
