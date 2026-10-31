@@ -2,7 +2,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.3.1",
+    version: "3.3.2",
     description: "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
     license: "MIT",
     type: "module",
@@ -82,13 +82,12 @@
       "@deepseek-ai/schemastery": "~3.18.5"
     },
     releaseNotes: {
-      version: "3.3.1",
-      prerelease: true,
+      version: "3.3.2",
       items: [
-        "\u6D4B\u8BD5\u7248\uFF1A\u7528\u4E8E\u9A8C\u8BC1\u65E7\u7248\u63D2\u4EF6\u8FDB\u5165\u8BBE\u7F6E\u9875\u540E\u663E\u793A\u65B0\u7248\u672C\u6447\u6446\u94C3\u94DB\uFF0C\u65E0\u9700\u5B89\u88C5\u672C\u6D4B\u8BD5\u5305\u3002",
-        "\u7248\u672C\u68C0\u67E5\u4EFB\u4E00\u4ED3\u5E93\u53D1\u73B0\u65B0\u7248\u672C\u5373\u63D0\u9192\uFF0C\u4E0D\u7B49\u5F85\u5176\u4ED6\u6765\u6E90\u5931\u8D25\u6216\u8D85\u65F6\uFF0C\u5168\u90E8\u5931\u8D25\u4ECD\u9759\u9ED8\u5904\u7406\u3002",
-        "\u53D1\u5E03\u6D41\u7A0B\u65B0\u589E Gitee Release \u540C\u7248\u63D2\u4EF6\u5305\u4E0A\u4F20\u548C\u9644\u4EF6\u6821\u9A8C\uFF0C\u652F\u6301\u8865\u53D1\u5DF2\u6709 GitHub \u7248\u672C\u3002",
-        "\u53CC\u4ED3 Release \u652F\u6301\u9884\u53D1\u5E03\u6807\u8BB0\uFF0C\u672C\u7248\u672C\u6807\u8BB0\u4E3A\u6D4B\u8BD5\u7248\u3002"
+        "\u4FEE\u590D\u811A\u672C\u5BA1\u6838\u5C55\u793A\u7EA6\u675F\uFF1A\u9996\u6B21\u4E0E\u6BCF\u6B21\u6539\u7A3F\u5148\u4FDD\u5B58\u5E76\u5B8C\u6574\u5C55\u793A\u5F53\u524D\u7248\u811A\u672C\uFF0C\u53EA\u7ED9\u8DEF\u5F84\u3001\u6458\u8981\u6216\u4FEE\u6539\u70B9\u4E0D\u7B97\u5C55\u793A\u3002",
+        "\u6587\u4EF6\u5C55\u793A\u5B8C\u6210\u540E\u624D\u53D1\u8D77\u5BA1\u6838\u63D0\u95EE\uFF0C\u7981\u6B62\u5E76\u884C\u6216\u540C\u6279\u8C03\u7528\uFF1B\u5C55\u793A\u5931\u8D25\u65F6\u56DE\u9000\u5B8C\u6574\u6B63\u6587\u3002",
+        "\u5BA1\u6838\u5F39\u7A97\u906E\u6321\u6B63\u6587\u65F6\uFF0C\u5728\u63D0\u95EE\u5DE5\u5177\u652F\u6301\u7684\u63CF\u8FF0\u4E2D\u9644\u5B8C\u6574\u811A\u672C\uFF0C\u786E\u4FDD\u5148\u8BFB\u540E\u9009\u3002",
+        "\u6F0F\u5C55\u793A\u7684\u5BA1\u6838\u7B54\u590D\u4E0D\u6CBF\u7528\uFF0C\u8865\u5C55\u793A\u540E\u91CD\u65B0\u5BA1\u6838\uFF0C\u4E0D\u76F4\u63A5\u8FDB\u5165\u5236\u4F5C\u786E\u8BA4\u6216\u751F\u6210\uFF1B\u540C\u6B65\u9884\u8BBE\u3001\u6280\u80FD\u3001\u5DE5\u5177\u63D0\u793A\u4E0E\u4F7F\u7528\u6587\u6863\u3002"
       ]
     }
   };
@@ -423,7 +422,7 @@
       const UPDATE_ATTEMPTS = 3;
       const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
       const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-      const PLUGIN_VERSION = true ? "3.3.1".trim().replace(/^v/i, "") : "";
+      const PLUGIN_VERSION = true ? "3.3.2".trim().replace(/^v/i, "") : "";
       function currentOs() {
         const nav = window.navigator || {};
         const raw = String(
