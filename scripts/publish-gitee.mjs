@@ -26,6 +26,10 @@ export async function publishGitee({ token, tag, archive, notes, prerelease = fa
   if (!release) release = await api('/releases', { method: 'POST', data: {
     tag_name: tag, name: `MetaOnticVideo ${tag}`, body: notes, target_commitish: 'master', prerelease: String(prerelease),
   } });
+  if (release?.id && release.body !== notes) {
+    release = await api(`/releases/${release.id}`, { method: 'PATCH', data: { name: `MetaOnticVideo ${tag}`, body: notes } });
+    if (release.body !== notes) throw new Error('Gitee release notes verification failed.');
+  }
   if (!release?.id) throw new Error('Gitee did not return a release ID.');
   const path = `/releases/${release.id}/attach_files`;
   const attachments = await api(path);

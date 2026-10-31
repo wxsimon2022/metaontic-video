@@ -12,6 +12,10 @@ test('Gitee creates a release, uploads its archive, verifies it and is safe to r
     let release = null; const attachments = []; let creates = 0, uploads = 0;
     const request = async (url, options) => {
       const path = url.pathname;
+      if (options.method === 'PATCH') {
+        release = { ...release, body: options.body.get('body') };
+        return { ok: true, json: async () => release };
+      }
       if (options.method === 'POST' && path.endsWith('/releases')) {
         creates++; assert.equal(options.body.get('tag_name'), 'v3.3.0'); assert.equal(options.body.get('body'), 'release notes'); release = { id: 1 };
         return { ok: true, json: async () => release };
@@ -26,7 +30,8 @@ test('Gitee creates a release, uploads its archive, verifies it and is safe to r
     };
     const args = { token: 'test-token', tag: 'v3.3.0', archive, notes: 'release notes', request };
     assert.match(await publishGitee(args), /v3.3.0$/);
-    await publishGitee(args); assert.equal(creates, 1); assert.equal(uploads, 1);
+    release.body = 'stale notes';
+    await publishGitee(args); assert.equal(release.body, 'release notes'); assert.equal(creates, 1); assert.equal(uploads, 1);
     attachments[0].size = 9;
     await assert.rejects(publishGitee(args), /different size/);
     await assert.rejects(publishGitee({ ...args, token: '' }), /Missing GITEE_TOKEN/);
