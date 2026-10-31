@@ -12,6 +12,12 @@ function makePage({ form, t, manager }) {
         const directMode = selectedMode === 'volcengine';
         const serviceMode = selectedMode === 'service';
         const [visibleKey, setVisibleKey] = React.useState('');
+        const [supportOpen, setSupportOpen] = React.useState(false);
+        const supportDialog = React.useRef(null);
+        React.useEffect(() => {
+          if (supportOpen && supportDialog.current && !supportDialog.current.open) supportDialog.current.showModal();
+        }, [supportOpen]);
+        React.useEffect(() => { setSupportOpen(false); }, [selectedMode]);
         React.useEffect(() => { setVisibleKey(''); }, [selectedMode]);
         const [status, setStatus] = React.useState('idle');
         const [saveError, setSaveError] = React.useState('');
@@ -533,16 +539,18 @@ function makePage({ form, t, manager }) {
             ? h('span', { key: 'at', className: 'mov-foot-note' }, t('quotaUpdatedAt', { time: quotaAt }))
             : null,
           quotaMessage ? h('span', { key: 'message', className: 'mov-hint' }, quotaMessage) : null,
-            keyReady
-              ? h('button', {
-                key: 'refresh',
-                'data-action': 'quota-refresh',
-                type: 'button',
-                className: 'mov-btn mov-btn-sm mov-trailing',
-                disabled: quotaStatus === 'working',
-                onClick: () => { loadQuota().catch(() => {}); },
-              }, t('quotaRefresh'))
-              : null,
+          h('div', { key: 'actions', className: 'mov-quota-actions mov-trailing' }, [
+            h('button', {
+              key: 'refresh', 'data-action': 'quota-refresh', type: 'button',
+              className: 'mov-btn mov-btn-sm', disabled: quotaStatus === 'working',
+              onClick: () => { loadQuota().catch(() => {}); },
+            }, t('quotaRefresh')),
+            h('button', {
+              key: 'support', 'data-action': 'support-recharge', type: 'button',
+              className: 'mov-btn mov-btn-sm', 'aria-haspopup': 'dialog',
+              onClick: () => setSupportOpen(true),
+            }, t('supportRecharge')),
+          ]),
 
         ]) : null;
 
@@ -857,6 +865,20 @@ function makePage({ form, t, manager }) {
           notice ? h('p', { key: 'notice', className: 'mov-notice' }, notice) : null,
           ...(notice && !snapshot.value ? [] : rows),
           ...blobs,
+          supportOpen ? h('dialog', {
+            key: 'support-dialog', ref: supportDialog, className: 'mov-support-dialog',
+            'aria-labelledby': 'mov-support-title',
+            onCancel: () => setSupportOpen(false), onClose: () => setSupportOpen(false),
+            onClick: (event) => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setSupportOpen(false); } },
+          }, h('div', { className: 'mov-support-content' }, [
+            h('div', { key: 'heading', className: 'mov-card-head' }, [
+              h('strong', { key: 'title', id: 'mov-support-title' }, t('supportRecharge')),
+              h('button', { key: 'close', type: 'button', className: 'mov-btn mov-btn-sm mov-trailing', 'aria-label': t('supportClose'), onClick: () => setSupportOpen(false) }, t('supportClose')),
+            ]),
+            h('p', { key: 'hint', className: 'mov-hint' }, t('supportScan')),
+            h('iframe', { key: 'qr', className: 'mov-support-frame', title: t('supportRecharge'), src: 'https://work.weixin.qq.com/ca/cawcde20e8080b7f6f', referrerPolicy: 'no-referrer' }),
+            h('a', { key: 'fallback', href: 'https://work.weixin.qq.com/ca/cawcde20e8080b7f6f', target: '_blank', rel: 'noopener noreferrer' }, t('supportOpenPage')),
+          ])) : null,
         ]);
       };
     }

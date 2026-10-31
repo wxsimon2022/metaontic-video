@@ -68,6 +68,12 @@
       .mov-btn:disabled { opacity: .5; cursor: default; }
       .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
       .mov-btn-primary:hover:not(:disabled) { color: #fff; opacity: .88; }
+      .mov-quota-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+      .mov-support-dialog { width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 1px solid ${TOKENS.border}; border-radius: 12px; color: ${TOKENS.text}; background: ${TOKENS.cardFill}; overflow: auto; }
+      .mov-support-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+      .mov-support-content { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+      .mov-support-content p { margin: 0; }
+      .mov-support-frame { width: 100%; height: min(480px, 62vh); border: 0; border-radius: 8px; background: white; }
       .mov-trailing { margin-left: auto; }
       /* \u989D\u5EA6\uFF1A\u4E09\u4E2A\u6570\u5B57\u5757\uFF0C\u4E00\u773C\u5206\u6E05\u5269\u4F59 / \u5DF2\u7528 / \u603B\u989D\u5EA6 */
       .mov-quota-compact { padding: 8px 12px; gap: 14px; flex-direction: row; align-items: center; flex-wrap: nowrap; overflow-x: auto; }
@@ -435,6 +441,10 @@
       quotaUnlimited: "\u4E0D\u9650\u989D\u5EA6",
       quotaLoading: "\u8BFB\u53D6\u989D\u5EA6\u4E2D\u2026",
       quotaRefresh: "\u5237\u65B0\u989D\u5EA6",
+      supportRecharge: "\u4EBA\u5DE5\u5145\u503C",
+      supportClose: "\u5173\u95ED",
+      supportScan: "\u8BF7\u7528\u5FAE\u4FE1\u626B\u63CF\u4E8C\u7EF4\u7801\uFF0C\u8054\u7CFB\u4EBA\u5DE5\u5145\u503C\u3002\u9875\u9762\u672A\u52A0\u8F7D\u65F6\u53EF\u70B9\u51FB\u4E0B\u65B9\u94FE\u63A5\u3002",
+      supportOpenPage: "\u6253\u5F00\u5BA2\u670D\u9875\u9762",
       quotaNoKey: "\u767B\u5F55\u540E\u53EF\u67E5\u770B\u5269\u4F59\u989D\u5EA6\u4E0E\u5DF2\u7528\u989D\u5EA6\u3002",
       quotaNotRegistered: "\u672A\u627E\u5230\u672C\u673A\u7684\u767B\u5F55\u8BB0\u5F55\uFF0C\u8BF7\u8054\u7CFB\u7BA1\u7406\u5458\u5904\u7406\u540E\u91CD\u65B0\u767B\u5F55\u3002",
       quotaFailed: "\u8BFB\u53D6\u989D\u5EA6\u5931\u8D25\uFF1A{message}",
@@ -588,6 +598,10 @@
       quotaUnlimited: "Unlimited",
       quotaLoading: "Reading quota\u2026",
       quotaRefresh: "Refresh quota",
+      supportRecharge: "Manual recharge",
+      supportClose: "Close",
+      supportScan: "Scan the QR code with WeChat to contact recharge support. If it does not load, use the link below.",
+      supportOpenPage: "Open support page",
       quotaNoKey: "Log in to view remaining and used quota.",
       quotaNotRegistered: "No login record found for this device. Contact an administrator before logging in again.",
       quotaFailed: "Failed to read quota: {message}",
@@ -727,7 +741,7 @@
     const UPDATE_ATTEMPTS = 3;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check-v2";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "3.7.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.8.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const match = /(\d+)\.(\d+)\.(\d+)/.exec(String(text || ""));
@@ -1373,7 +1387,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.7.0",
+    version: "3.8.0",
     description: "DeepSeek Harness video creation plugin with a Video Creation Assistant for concepts, script review and confirmed production; supports reference images, video continuation, segment previews, resumable generation, local merging, and MetaOnticVideo, MetaOntic AI or Volcano Engine access.",
     license: "MIT",
     type: "module",
@@ -1417,7 +1431,8 @@
       "\u64CD\u4F5C\u6307\u5357\u8BF4\u660E\u4E66.md",
       "CHANGELOG.md",
       "LICENSE",
-      "docs/guide/*.svg"
+      "docs/guide/*.svg",
+      "docs/guide/*.png"
     ],
     engines: {
       node: ">=20"
@@ -1458,17 +1473,12 @@
       hyperframes: "0.8.223"
     },
     releaseNotes: {
-      version: "3.7.0",
+      version: "3.8.0",
       items: [
-        "\u65B0\u589E\uFF1A\u89C6\u9891\u652F\u6301 480P\u3001720P\uFF0C\u5728\u811A\u672C\u9636\u6BB5\u7531\u7528\u6237\u660E\u786E\u786E\u8BA4\uFF0C\u8D39\u7528\u9884\u4F30\u4E0E\u751F\u6210\u53C2\u6570\u540C\u6B65\uFF1B\u6E05\u6670\u5EA6\u4E0D\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u914D\u7F6E\u3002",
-        "\u65B0\u589E\uFF1AB \u63A5\u5165\u652F\u6301\u56FE\u7247\u4E0E\u89C6\u9891\u5171\u7528\u6216\u5206\u522B\u914D\u7F6E Key\uFF1BA \u56FA\u5B9A\u4F7F\u7528\u767B\u5F55\u4E0B\u53D1\u7684 Key\uFF0C\u6A21\u578B\u533A\u57DF\u9690\u85CF Key \u914D\u7F6E\u3002",
-        "\u65B0\u589E\uFF1A\u63D0\u4EA4\u9632\u91CD\u4E0E media_submission \u6838\u5BF9\u5DE5\u5177\uFF0C\u63D0\u4EA4\u7ED3\u679C\u4E0D\u660E\u65F6\u505C\u6B62\u91CD\u53D1\uFF0C\u7ECF\u6E20\u9053\u6838\u5BF9\u540E\u5173\u8054\u539F\u4EFB\u52A1\u6216\u786E\u8BA4\u672A\u521B\u5EFA\u540E\u89E3\u9501\u3002",
-        "\u4F18\u5316\uFF1A\u751F\u6210\u53C2\u6570\u6309\u63A5\u5165\u3001\u6A21\u578B\u3001\u753B\u9762\u4E0E\u58F0\u97F3\u5206\u7EC4\uFF1BB \u5171\u7528\u65F6 Key \u4F4D\u4E8E\u4E24\u4E2A\u6A21\u578B\u4E0A\u65B9\uFF0C\u4E0D\u5171\u7528\u65F6\u5404\u6A21\u578B\u4E0B\u65B9\u663E\u793A\u5BF9\u5E94 Key\u3002",
-        "\u4F18\u5316\uFF1A\u771F\u4EBA\u53C2\u8003\u56FE\u7ECF\u540C\u610F\u8F6C\u6362\u540E\u5C55\u793A\u5168\u90E8\u7ED3\u679C\uFF0C\u7528\u6237\u6838\u5BF9\u786E\u8BA4\u540E\u624D\u91CD\u8BD5\u89C6\u9891\uFF1B\u8F6C\u6362\u3001\u56FE\u7247\u4EFB\u52A1\u548C\u89C6\u9891\u91CD\u8BD5\u8FDB\u5EA6\u9010\u9879\u4FDD\u5B58\u3002",
-        "\u4F18\u5316\uFF1A\u706B\u5C71\u76F4\u8FDE\u589E\u52A0\u81EA\u884C\u6838\u5BF9 Key \u6A21\u578B\u80FD\u529B\u63D0\u793A\uFF1B\u91CD\u5199\u56FE\u6587\u64CD\u4F5C\u6307\u5357\uFF0C\u7A81\u51FA\u63D2\u4EF6\u5B89\u88C5\u3001ai.bileego.com \u6CE8\u518C\u83B7\u53D6 Key \u53CA A/B \u914D\u7F6E\uFF0C\u968F\u5305\u63D0\u4F9B\u793A\u610F\u56FE\uFF0C\u5E76\u6C89\u6DC0\u7EF4\u62A4\u7ECF\u9A8C\u3002",
-        "\u4FEE\u590D\uFF1A\u9996\u6B21\u5931\u8D25\u6062\u590D\u4FDD\u7559\u53C2\u8003\u56FE\u3001\u9996\u5C3E\u5E27\u53CA\u6E05\u6670\u5EA6\u7B49\u539F\u8BF7\u6C42\u53C2\u6570\uFF0C\u590D\u7528\u5DF2\u5B8C\u6210\u56FE\u7247\uFF0C\u907F\u514D\u91CD\u590D\u8F6C\u6362\u6536\u8D39\u6216\u6062\u590D\u540E\u91CD\u7F6E\u5355\u6B21\u89C6\u9891\u91CD\u8BD5\u989D\u5EA6\u3002",
-        "\u4FEE\u590D\uFF1A\u56FE\u7247\u3001\u89C6\u9891\u53CA\u72B6\u6001\u67E5\u8BE2\u56FA\u5B9A\u672C\u6B21\u8FDE\u63A5\u914D\u7F6E\uFF0C\u907F\u514D\u8BBE\u7F6E\u53D8\u5316\u9020\u6210\u5730\u5740\u6216 Key \u6DF7\u7528\uFF1B\u7F3A\u5C11\u5BF9\u5E94 Key \u65F6\u505C\u6B62\uFF0C\u4E0D\u56DE\u9000\u4F7F\u7528\u5176\u4ED6\u6A21\u578B Key\u3002",
-        "\u4FEE\u590D\uFF1A\u53D1\u5E03\u6D41\u7A0B\u4FDD\u7559\u9644\u6CE8\u6807\u7B7E\u5B8C\u6574\u8BF4\u660E\uFF0C\u5E76\u8865\u9F50 Gitee \u66F4\u65B0 Release \u6240\u9700\u53C2\u6570\uFF0C\u6838\u5BF9\u53CC\u4ED3\u8BF4\u660E\u4E0E\u9644\u4EF6\u3002"
+        "\u65B0\u589E\uFF1A\u989D\u5EA6\u5361\u7247\u7684\u201C\u5237\u65B0\u989D\u5EA6\u201D\u53F3\u4FA7\u589E\u52A0\u201C\u4EBA\u5DE5\u5145\u503C\u201D\uFF0C\u70B9\u51FB\u52A0\u8F7D\u4F01\u4E1A\u5FAE\u4FE1\u5BA2\u670D\u4E8C\u7EF4\u7801\u9875\u9762\uFF0C\u652F\u6301\u5173\u95ED\u3001Esc \u9000\u51FA\u53CA\u76F4\u63A5\u6253\u5F00\u5BA2\u670D\u9875\u3002",
+        "\u4F18\u5316\uFF1A\u64CD\u4F5C\u6307\u5357\u53EA\u4ECB\u7ECD MetaOntic AI \u914D\u7F6E\u8DEF\u7EBF\uFF0C\u8BF4\u660E ai.bileego.com \u6CE8\u518C\u83B7\u53D6 Key\u3001\u5171\u7528\u6216\u5206\u522B\u586B\u5199\u89C6\u9891\u4E0E\u56FE\u7247 Key\uFF0C\u53BB\u6389\u63A5\u5165\u65B9\u5F0F\u5B57\u6BCD\u6807\u8BB0\u53CA\u5176\u4ED6\u63A5\u5165\u6D41\u7A0B\u3002",
+        "\u4F18\u5316\uFF1A\u8865\u5145 DeepSeek Harness \u65B0\u5EFA\u4F1A\u8BDD\u3001\u5C06\u6A21\u5F0F\u5207\u6362\u4E3A\u201C\u89C6\u9891\u521B\u4F5C\u52A9\u624B\u201D\u5E76\u53D1\u9001\u9700\u6C42\u7684\u6B65\u9AA4\u4E0E\u793A\u610F\u56FE\u3002",
+        "\u4F18\u5316\uFF1AKey \u914D\u7F6E\u91C7\u7528\u771F\u5B9E\u63D2\u4EF6\u7EC4\u4EF6\u7684\u9884\u89C8\u622A\u56FE\uFF0C\u4F7F\u7528\u6A21\u62DF\u6570\u636E\u5E76\u9690\u85CF\u5BC6\u94A5\uFF1B\u540C\u6B65\u5176\u4F59\u6D41\u7A0B\u56FE\u914D\u8272\u3001\u56FE\u7247\u6253\u5305\u6E05\u5355\u53CA\u6587\u6863\u7EF4\u62A4\u7ECF\u9A8C\u3002"
       ]
     }
   };
@@ -1484,6 +1494,14 @@
         const directMode = selectedMode === "volcengine";
         const serviceMode = selectedMode === "service";
         const [visibleKey, setVisibleKey] = React.useState("");
+        const [supportOpen, setSupportOpen] = React.useState(false);
+        const supportDialog = React.useRef(null);
+        React.useEffect(() => {
+          if (supportOpen && supportDialog.current && !supportDialog.current.open) supportDialog.current.showModal();
+        }, [supportOpen]);
+        React.useEffect(() => {
+          setSupportOpen(false);
+        }, [selectedMode]);
         React.useEffect(() => {
           setVisibleKey("");
         }, [selectedMode]);
@@ -2025,17 +2043,27 @@
           }, quotaFallback),
           quotaReady ? h("span", { key: "at", className: "mov-foot-note" }, t("quotaUpdatedAt", { time: quotaAt })) : null,
           quotaMessage ? h("span", { key: "message", className: "mov-hint" }, quotaMessage) : null,
-          keyReady ? h("button", {
-            key: "refresh",
-            "data-action": "quota-refresh",
-            type: "button",
-            className: "mov-btn mov-btn-sm mov-trailing",
-            disabled: quotaStatus === "working",
-            onClick: () => {
-              loadQuota().catch(() => {
-              });
-            }
-          }, t("quotaRefresh")) : null
+          h("div", { key: "actions", className: "mov-quota-actions mov-trailing" }, [
+            h("button", {
+              key: "refresh",
+              "data-action": "quota-refresh",
+              type: "button",
+              className: "mov-btn mov-btn-sm",
+              disabled: quotaStatus === "working",
+              onClick: () => {
+                loadQuota().catch(() => {
+                });
+              }
+            }, t("quotaRefresh")),
+            h("button", {
+              key: "support",
+              "data-action": "support-recharge",
+              type: "button",
+              className: "mov-btn mov-btn-sm",
+              "aria-haspopup": "dialog",
+              onClick: () => setSupportOpen(true)
+            }, t("supportRecharge"))
+          ])
         ]) : null;
         function copyText(text, mark) {
           try {
@@ -2324,7 +2352,29 @@
           }) : null,
           notice ? h("p", { key: "notice", className: "mov-notice" }, notice) : null,
           ...notice && !snapshot.value ? [] : rows,
-          ...blobs
+          ...blobs,
+          supportOpen ? h("dialog", {
+            key: "support-dialog",
+            ref: supportDialog,
+            className: "mov-support-dialog",
+            "aria-labelledby": "mov-support-title",
+            onCancel: () => setSupportOpen(false),
+            onClose: () => setSupportOpen(false),
+            onClick: (event) => {
+              if (event.target === event.currentTarget) {
+                const rect = event.currentTarget.getBoundingClientRect();
+                if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setSupportOpen(false);
+              }
+            }
+          }, h("div", { className: "mov-support-content" }, [
+            h("div", { key: "heading", className: "mov-card-head" }, [
+              h("strong", { key: "title", id: "mov-support-title" }, t("supportRecharge")),
+              h("button", { key: "close", type: "button", className: "mov-btn mov-btn-sm mov-trailing", "aria-label": t("supportClose"), onClick: () => setSupportOpen(false) }, t("supportClose"))
+            ]),
+            h("p", { key: "hint", className: "mov-hint" }, t("supportScan")),
+            h("iframe", { key: "qr", className: "mov-support-frame", title: t("supportRecharge"), src: "https://work.weixin.qq.com/ca/cawcde20e8080b7f6f", referrerPolicy: "no-referrer" }),
+            h("a", { key: "fallback", href: "https://work.weixin.qq.com/ca/cawcde20e8080b7f6f", target: "_blank", rel: "noopener noreferrer" }, t("supportOpenPage"))
+          ])) : null
         ]);
       };
     }

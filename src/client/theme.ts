@@ -75,6 +75,12 @@ const TOKENS = {
       .mov-btn:disabled { opacity: .5; cursor: default; }
       .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
       .mov-btn-primary:hover:not(:disabled) { color: #fff; opacity: .88; }
+      .mov-quota-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+      .mov-support-dialog { width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 1px solid ${TOKENS.border}; border-radius: 12px; color: ${TOKENS.text}; background: ${TOKENS.cardFill}; overflow: auto; }
+      .mov-support-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+      .mov-support-content { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+      .mov-support-content p { margin: 0; }
+      .mov-support-frame { width: 100%; height: min(480px, 62vh); border: 0; border-radius: 8px; background: white; }
       .mov-trailing { margin-left: auto; }
       /* 额度：三个数字块，一眼分清剩余 / 已用 / 总额度 */
       .mov-quota-compact { padding: 8px 12px; gap: 14px; flex-direction: row; align-items: center; flex-wrap: nowrap; overflow-x: auto; }
