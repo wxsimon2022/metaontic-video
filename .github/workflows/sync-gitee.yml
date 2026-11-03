@@ -36,14 +36,6 @@ jobs:
           git fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
           git rev-parse --verify "refs/tags/$RELEASE_TAG"
           git for-each-ref --format='%(contents)' "refs/tags/$RELEASE_TAG" > dist/release-notes.txt
-      # 一次性维护步骤：企业附件配额已满，先清掉过期的旧发行版再上传。合并回 master 前删除本步骤。
-      - name: Prune expired Gitee releases (maintenance)
-        env:
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-          KEEP: '3'
-          DAYS: '3'
-          DRY_RUN: 'false'
-        run: node scripts/prune-gitee.mjs
       - name: Publish and verify every Gitee archive
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
