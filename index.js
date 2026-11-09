@@ -8228,7 +8228,7 @@ function applyVideoBusiness(runtime) {
     return runtime.tools.register("video", withMediaPreview(guarded));
   };
   const canvasBridge = createCanvasBridge(void 0, config);
-  const canvasProjects = createCanvasProjectSync(void 0, config, { get: (session) => (ctx.get?.("sessionTitle") || ctx.sessionTitle)?.get(session) });
+  const canvasProjects = createCanvasProjectSync(void 0, config, { get: (session) => ctx.get?.("sessionTitle")?.get(session) });
   const generation = canvasBridge.wrap(videoTool(config, deps, ctx));
   const extension = canvasBridge.wrap(extendTool(config, deps, ctx));
   register(jsonSafeTool(canvasBridge.tool));
