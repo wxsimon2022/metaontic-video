@@ -151,6 +151,7 @@ function makePage({ form, t, manager }) {
           model: t('modelHint'),
           imageModel: t('imageModelHint'),
           seamTrimSeconds: t('seamTrimSecondsHint'),
+          autoCreateCanvas: t('autoCreateCanvasHint'),
           maxWaitMs: t('waitSecondsHint'),
         };
 

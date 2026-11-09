@@ -10,7 +10,7 @@ import { resumeDirOf } from '../workflow/resume.js';
 import { approvalPolicy } from '../workflow/approval.js';
 
 /** 真实用户答复只由宿主 userQuestions 获取，不接受助手提交 approved:true。 */
-export function projectTool(config, ctx, reviewGuard, generationProperties, extensionProperties, segmentReview = null) {
+export function projectTool(config, ctx, reviewGuard, generationProperties, extensionProperties, segmentReview = null, onReviewReady = null) {
   return {
     name: 'video_project',
     description: '先在完善创意的同一轮合并询问时长、画幅和清晰度，用户回答后prepare创建独立projectId并传已确认duration，决定角色图路线。原始需求未写时长但已在完善创意中回答，也必须传确认的duration，禁止省略造成重复询问；只有从未确认时长才由工具兜底询问，未答不继续，禁止自行默认15秒。scenery仅用于无固定主体空镜，fixed_subject用于需要固定外形的人物/主体。角色图选择绑定项目不随提示词改变。脚本、分镜、逐段生成提示词及完整制作参数准备后，正文完整展示，再review弹本版脚本审核（同版已通过不重复，改稿需重审）；通过后直接调用对应生成工具，工具付费审批即开始制作确认，不另弹开始制作问题。改稿或参数改变须review，status只读取真实状态。每段完成后先展示视频，再调用review_segment并传resume弹结果确认窗；这不属于重复制作确认，禁止跳过。不会生成或扣费。',
@@ -78,18 +78,29 @@ export function projectTool(config, ctx, reviewGuard, generationProperties, exte
         if (!scriptBody) throw new Error('脚本正文不能为空。');
         if (name === 'video_generate' && !spec.resume) resolveSegmentPrompts(spec.segmentPrompts, estimatePlan(config, name, spec).length);
         const fingerprint = productionFingerprint(config, name, spec);
+        // 同步发生在审核等待前；草稿持久化用于取消后或status补同步，不代表审核通过。
+        data.canvasDraft = { scriptPath, specification: spec };
+        await writeProject(data);
+        let canvasProject;
+        if (onReviewReady) {
+          try { canvasProject = await onReviewReady(data.id, exec); }
+          catch { canvasProject = { status: 'pending', reason: '画布同步未完成，可用项目status补同步；未新增生成任务。' }; }
+          // 同步会更新canvasAuto，后续保存审核事实不能用旧data覆盖绑定。
+          data = await readProject(data.id, exec);
+        }
+        const canvasOutput = canvasProject ? { canvasProject } : {};
         const gate = await reviewGuard.gate({ ...exec, name: 'ask_user_question', arguments: { requireStoryboard: true, requiredScriptText: scriptBody, questions: [{ id: 'script_review', question: '审核当前脚本' }] } });
-        if (gate) return { projectId: data.id, status: 'blocked', reason: gate.reason };
+        if (gate) return { projectId: data.id, status: 'blocked', ...canvasOutput, reason: gate.reason };
         const service = ctx.get?.('userQuestions') || exec.agent?.ctx?.get?.('userQuestions');
-        if (!service?.ask || approvalPolicy(ctx, exec) === 'never') return { projectId: data.id, status: 'pending', reason: '无法取得脚本审核答复，未生成。' };
+        if (!service?.ask || approvalPolicy(ctx, exec) === 'never') return { projectId: data.id, status: 'pending', ...canvasOutput, reason: '无法取得脚本审核答复，未生成。' };
         data.approved = null; await writeProject(data);
         const result = await service.ask({ agent: exec.agent, signal: exec.signal, ...(exec.callId ? { wait: { callId: exec.callId } } : {}), questions: [{ id: 'script_review', header: '脚本审核', question: '请审核刚展示的本版脚本、分镜、角色图及费用预估。是否通过？通过后仍会单独确认视频调用费用。', multiSelect: false, options: [{ label: '脚本通过', description: '使用本版材料，下一步确认视频制作费用。' }, { label: '需要修改', description: '先修改并重新展示审核，不生成。' }] }] });
         const answer = result?.answers?.find(a => a.id === 'script_review');
-        if (exec.signal?.aborted || answer?.custom || answer?.selected?.length !== 1 || answer.selected[0] !== '脚本通过') return { projectId: data.id, status: 'draft', reason: '未取得审核通过，未生成。' };
+        if (exec.signal?.aborted || answer?.custom || answer?.selected?.length !== 1 || answer.selected[0] !== '脚本通过') return { projectId: data.id, status: 'draft', ...canvasOutput, reason: '未取得审核通过，未生成。' };
         if (await scriptDigest(scriptPath) !== scriptHash || productionFingerprint(config, name, spec) !== fingerprint) throw new Error('等待审核期间材料或配置改变，请重新展示审核。');
         data.approved = { scriptPath, scriptHash, fingerprint, specification: spec, name, resumeDir: resumeDirOf(spec.resume), reviewedAt: new Date().toISOString() };
         await writeProject(data);
-        return { projectId: data.id, status: 'approved', nextAction: `直接调用${name}并带projectId和本次specification；工具付费审批承担制作确认，不再另问一次。` };
+        return { projectId: data.id, status: 'approved', ...canvasOutput, nextAction: `直接调用${name}并带projectId和本次specification；工具付费审批承担制作确认，不再另问一次。` };
       });
     },
   };

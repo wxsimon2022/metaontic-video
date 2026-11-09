@@ -6,7 +6,7 @@ import { modelMaxSeconds } from '../workflow/planning.js';
 
 /** 用户可在插件内改的配置字段。 */
 export const CONFIG_FIELDS = [
-  'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel', 'imageUseVideoKey', 'imageApiKey',
+  'autoCreateCanvas', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel', 'imageUseVideoKey', 'imageApiKey',
   'duration', 'singleMaxSeconds', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'pollErrorRetries',
@@ -34,6 +34,7 @@ export function configView(config) {
   return {
     stored: maskSecrets(stored),
     effective: {
+      autoCreateCanvas: ref(config, 'autoCreateCanvas', true) !== false,
       connectionMode: isVolcengine(config) ? 'volcengine' : 'metaontic',
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),
@@ -131,7 +132,8 @@ export function configTool(config, settings) {
           action: { type: 'string' },
           patchPath: { type: 'string' },
           stored: { type: 'object' },
-          effective: { type: 'object' },
+          effective: {
+      autoCreateCanvas: ref(config, 'autoCreateCanvas', true) !== false, type: 'object' },
           error: { type: 'string' },
         },
       },

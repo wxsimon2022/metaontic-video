@@ -5,10 +5,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, copyFile, stat, open } from 'node:fs/promises';
 import path from 'node:path';
 import { dshHome } from '../../../core/paths.js';
-import { sessionOwner } from '../workflow/project.js';
+import { readProject, sessionOwner } from '../workflow/project.js';
 import { mediaPreviewMeta } from '../workflow/media-preview.js';
 import { videoResultState } from '../workflow/result-state.js';
 import { downloadFile } from '../media/download.js';
+import { ref } from '../config.js';
+import { resumeDirOf, readPauseFile } from '../workflow/resume.js';
 
 export const canvasLinkSchema = { type: 'object', properties: {
   projectId: { type: 'string' }, canvasId: { type: 'string' }, nodeId: { type: 'string' }, fingerprint: { type: 'string' },
@@ -143,7 +145,7 @@ export async function publishCanvasResult(adapter, record) {
   return { status: 'synced', token: record.id, count: publications.length, phase: record.phase };
 }
 
-export function createCanvasBridge(load = loadCanvasAdapter) {
+export function createCanvasBridge(load = loadCanvasAdapter, config: any = {}) {
   const busy = new Set<string>();
   async function sync(token, exec) {
     if (busy.has(token)) throw new Error('此成果正在回填，请稍后查询。');
@@ -159,16 +161,26 @@ export function createCanvasBridge(load = loadCanvasAdapter) {
       const blocks = tool.output?.render?.(args, value) || [];
       return value?.canvasSync ? [...blocks, { type: 'text', text: `画布回填：${JSON.stringify(value.canvasSync)}` }] : blocks;
     } }, parameters: { ...tool.parameters, properties: { ...tool.parameters.properties, canvas: canvasLinkSchema } }, async execute(args, exec) {
-      if (args.canvas) {
+      // 自动绑定仅用于投影，不修改已审核的生成参数及其摘要。
+      let canvas = args.canvas;
+      const resumeDir = resumeDirOf(args.resume);
+      const saved = !canvas && resumeDir ? await readPauseFile(resumeDir) : null;
+      const projectId = args.projectId || saved?.options?.projectId;
+      canvas ||= saved?.options?.canvas;
+      if (!canvas && projectId && ref(config, 'autoCreateCanvas', true) !== false) {
+        const project = await readProject(projectId, exec);
+        canvas = project.canvasAuto?.canvas;
+      }
+      if (canvas) {
         sessionOwner(exec);
-        const input = await readCanvasInput(await load(), args.canvas);
-        if (input.canvas.fingerprint !== args.canvas.fingerprint) throw new Error('画布内容或参考素材已修改，请重新读取并审核；未提交生成任务。');
+        const input = await readCanvasInput(await load(), canvas);
+        if (input.canvas.fingerprint !== canvas.fingerprint) throw new Error('画布内容或参考素材已修改，请重新读取并审核；未提交生成任务。');
       }
       const result = await tool.execute(args, exec);
-      if (!args.canvas || !result || typeof result !== 'object') return result;
+      if (!canvas || !result || typeof result !== 'object') return result;
       const media = mediaPreviewMeta(result, tool.name).media;
       if (!media.length) return { ...result, canvasSync: { status: 'no_media', reason: '尚无成功素材，未回填虚构成果。' } };
-      const record = { id: randomUUID(), owner: sessionOwner(exec), canvas: args.canvas, media, ratio: args.ratio, phase: tool.name === 'video_prepare_image' ? 'reference_review' : videoResultState(result).phase, createdAt: Date.now() };
+      const record = { id: randomUUID(), owner: sessionOwner(exec), canvas, media, ratio: args.ratio, phase: tool.name === 'video_prepare_image' ? 'reference_review' : videoResultState(result).phase, createdAt: Date.now() };
       try { await saveRecord(record); }
       catch { return { ...result, canvasSync: { status: 'failed', reason: '回填记录保存失败；生成成果已保留，请勿重新生成。' } }; }
       try { return { ...result, canvasSync: await sync(record.id, exec) }; }

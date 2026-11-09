@@ -83,3 +83,11 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 本地成品：`.local/test/3.20.1-test.6/metaontic-video-3.20.1-test.6.tgz`；1,215,871字节；SHA-256 `424be4b79032bf72ff10420f9a810f3afda8652edd14ea3054740f478691b671`。未上传服务器、未发版。
 
 安装后在独立Chrome上下文连接当前运行的Harness，打开原版无限画布，确认直接制作入口存在，info接口HTTP200，返回当前真实视频模型与密钥就绪状态（不返回密钥）。未修改项目/节点，未发送聊天，未付费生成。画布不会按助手对话自动新建项目或铺设分镜，目前仍需用户先创建项目与媒体节点。
+
+## 对话自动融合测试包 3.20.1-test.7
+
+启用既有canvas-project模块，video_project prepare自动建立并请求打开原版项目，review同步完整脚本、分镜和实际制作段计划，status沿已审核材料幂等补同步。生成/角色图工具按projectId自动取得绑定，resume从原断点恢复项目绑定；投影绑定不修改生成参数或审核摘要。自动管理节点或连线被用户修改/删除时停止同步，不覆盖或复活。已有显式canvas绑定仍优先。画布未就绪保留创作项目并返回同步状态，不绕过任何费用与成果审核。
+
+构建、451项自动测试、diff检查通过；实际npm原版0.20.1临时环境验证自动创建/打开、脚本与制作段计划同步、重复调用仅一个项目、隐式项目绑定和模拟媒体回填，无付费请求。macOS宿主Node24/pnpm11严格成品安装升级检查通过；desktop profile从test.6升级至test.7并核对已安装代码。CLI未返回applied/restart-required，未断言Electron原窗口已热加载。未覆盖真实付费全流程和Windows桌面实测；平台路径继续使用node:path和原子写入。
+
+本地包：`.local/test/3.20.1-test.7/metaontic-video-3.20.1-test.7.tgz`，1199994字节，SHA-256 `90a55a883655cc7102231a4187cfda170cf3fb0c668b5bbd48343317391abe69`。未上传、未创建标签或Release；源码正式版本与releaseNotes保持3.20.2。指南在用户后续要求不再更新之前已同步本地MD/PDF，此后未继续调整。

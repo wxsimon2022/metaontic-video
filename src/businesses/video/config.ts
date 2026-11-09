@@ -6,6 +6,7 @@ import { METAONTIC_BASE_URL } from './connection-defaults.js';
 import z from '@deepseek-ai/schemastery';
 
 export const videoConfigFields = {
+  autoCreateCanvas: z.boolean().default(true).description('自动创建流程画布并同步脚本、分镜与生成成果；关闭后保留已有画布，仍可手动使用画布节点。').volatile(),
   connectionMode: z.union(['metaontic', 'volcengine']).default('metaontic')
     .description('接入方式：MetaOntic AI（metaontic）；火山引擎直连（volcengine，当前设置页暂不提供选择）').volatile(),
   metaonticApiKey: z.string().default('').description('MetaOntic AI API密钥').volatile(),

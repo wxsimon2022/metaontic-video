@@ -291,17 +291,17 @@ function getInner(value) {
 function extractKeys(data) {
   return filterKeys(data ?? {}, (key) => !key.startsWith("$"));
 }
-function validateVolatileSchema(schema, path22 = [], blocked2 = false, seen = /* @__PURE__ */ new Map()) {
+function validateVolatileSchema(schema, path23 = [], blocked2 = false, seen = /* @__PURE__ */ new Map()) {
   const states = seen.get(schema) ?? /* @__PURE__ */ new Set();
   if (states.has(blocked2)) return;
   states.add(blocked2);
   seen.set(schema, states);
-  if (schema.meta?.volatile && blocked2) throw new ValidationError("volatile fields require a fixed object path without an enclosing volatile field", { path: path22 });
+  if (schema.meta?.volatile && blocked2) throw new ValidationError("volatile fields require a fixed object path without an enclosing volatile field", { path: path23 });
   const nested = blocked2 || !!schema.meta?.volatile;
-  if (schema.dict) for (const [key, child] of Object.entries(schema.dict)) validateVolatileSchema(child, [...path22, key], nested, seen);
-  if (schema.sKey) validateVolatileSchema(schema.sKey, [...path22, "<key>"], true, seen);
-  if (schema.inner && (schema.type !== "lazy" || schema.inner[kSchema])) validateVolatileSchema(schema.inner, [...path22, "*"], true, seen);
-  if (schema.list) for (let index = 0; index < schema.list.length; index++) validateVolatileSchema(schema.list[index], [...path22, String(index)], true, seen);
+  if (schema.dict) for (const [key, child] of Object.entries(schema.dict)) validateVolatileSchema(child, [...path23, key], nested, seen);
+  if (schema.sKey) validateVolatileSchema(schema.sKey, [...path23, "<key>"], true, seen);
+  if (schema.inner && (schema.type !== "lazy" || schema.inner[kSchema])) validateVolatileSchema(schema.inner, [...path23, "*"], true, seen);
+  if (schema.list) for (let index = 0; index < schema.list.length; index++) validateVolatileSchema(schema.list[index], [...path23, String(index)], true, seen);
 }
 function checkWithinRange(data, meta, description, options, skipMin = false) {
   const { max = Infinity, min = -Infinity } = meta;
@@ -943,6 +943,7 @@ var init_config = __esm({
     init_connection_defaults();
     init_lib2();
     videoConfigFields = {
+      autoCreateCanvas: Schema.boolean().default(true).description("\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03\u5E76\u540C\u6B65\u811A\u672C\u3001\u5206\u955C\u4E0E\u751F\u6210\u6210\u679C\uFF1B\u5173\u95ED\u540E\u4FDD\u7559\u5DF2\u6709\u753B\u5E03\uFF0C\u4ECD\u53EF\u624B\u52A8\u4F7F\u7528\u753B\u5E03\u8282\u70B9\u3002").volatile(),
       connectionMode: Schema.union(["metaontic", "volcengine"]).default("metaontic").description("\u63A5\u5165\u65B9\u5F0F\uFF1AMetaOntic AI\uFF08metaontic\uFF09\uFF1B\u706B\u5C71\u5F15\u64CE\u76F4\u8FDE\uFF08volcengine\uFF0C\u5F53\u524D\u8BBE\u7F6E\u9875\u6682\u4E0D\u63D0\u4F9B\u9009\u62E9\uFF09").volatile(),
       metaonticApiKey: Schema.string().default("").description("MetaOntic AI API\u5BC6\u94A5").volatile(),
       volcengineApiKey: Schema.string().default("").description("\u706B\u5C71\u5F15\u64CE\u76F4\u8FDE\u6A21\u5F0F\u7684\u706B\u5C71 API\u5BC6\u94A5").volatile(),
@@ -1090,8 +1091,8 @@ function resolveSubmitPath(config) {
 }
 function resolveQueryPath(config, taskId) {
   if (isVolcengine(config)) return `/api/v3/contents/generations/tasks/${encodeURIComponent(taskId)}`;
-  const path22 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
-  return path22.replace("{task_id}", encodeURIComponent(taskId));
+  const path23 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
+  return path23.replace("{task_id}", encodeURIComponent(taskId));
 }
 function resolveModel(config) {
   const preset = relayPreset();
@@ -3592,7 +3593,7 @@ async function preflightGate(ctx, config, exec) {
 }
 
 // src/businesses/video/tools/video-project.ts
-function projectTool(config, ctx, reviewGuard, generationProperties, extensionProperties, segmentReview = null) {
+function projectTool(config, ctx, reviewGuard, generationProperties, extensionProperties, segmentReview = null, onReviewReady = null) {
   return {
     name: "video_project",
     description: "\u5148\u5728\u5B8C\u5584\u521B\u610F\u7684\u540C\u4E00\u8F6E\u5408\u5E76\u8BE2\u95EE\u65F6\u957F\u3001\u753B\u5E45\u548C\u6E05\u6670\u5EA6\uFF0C\u7528\u6237\u56DE\u7B54\u540Eprepare\u521B\u5EFA\u72EC\u7ACBprojectId\u5E76\u4F20\u5DF2\u786E\u8BA4duration\uFF0C\u51B3\u5B9A\u89D2\u8272\u56FE\u8DEF\u7EBF\u3002\u539F\u59CB\u9700\u6C42\u672A\u5199\u65F6\u957F\u4F46\u5DF2\u5728\u5B8C\u5584\u521B\u610F\u4E2D\u56DE\u7B54\uFF0C\u4E5F\u5FC5\u987B\u4F20\u786E\u8BA4\u7684duration\uFF0C\u7981\u6B62\u7701\u7565\u9020\u6210\u91CD\u590D\u8BE2\u95EE\uFF1B\u53EA\u6709\u4ECE\u672A\u786E\u8BA4\u65F6\u957F\u624D\u7531\u5DE5\u5177\u515C\u5E95\u8BE2\u95EE\uFF0C\u672A\u7B54\u4E0D\u7EE7\u7EED\uFF0C\u7981\u6B62\u81EA\u884C\u9ED8\u8BA415\u79D2\u3002scenery\u4EC5\u7528\u4E8E\u65E0\u56FA\u5B9A\u4E3B\u4F53\u7A7A\u955C\uFF0Cfixed_subject\u7528\u4E8E\u9700\u8981\u56FA\u5B9A\u5916\u5F62\u7684\u4EBA\u7269/\u4E3B\u4F53\u3002\u89D2\u8272\u56FE\u9009\u62E9\u7ED1\u5B9A\u9879\u76EE\u4E0D\u968F\u63D0\u793A\u8BCD\u6539\u53D8\u3002\u811A\u672C\u3001\u5206\u955C\u3001\u9010\u6BB5\u751F\u6210\u63D0\u793A\u8BCD\u53CA\u5B8C\u6574\u5236\u4F5C\u53C2\u6570\u51C6\u5907\u540E\uFF0C\u6B63\u6587\u5B8C\u6574\u5C55\u793A\uFF0C\u518Dreview\u5F39\u672C\u7248\u811A\u672C\u5BA1\u6838\uFF08\u540C\u7248\u5DF2\u901A\u8FC7\u4E0D\u91CD\u590D\uFF0C\u6539\u7A3F\u9700\u91CD\u5BA1\uFF09\uFF1B\u901A\u8FC7\u540E\u76F4\u63A5\u8C03\u7528\u5BF9\u5E94\u751F\u6210\u5DE5\u5177\uFF0C\u5DE5\u5177\u4ED8\u8D39\u5BA1\u6279\u5373\u5F00\u59CB\u5236\u4F5C\u786E\u8BA4\uFF0C\u4E0D\u53E6\u5F39\u5F00\u59CB\u5236\u4F5C\u95EE\u9898\u3002\u6539\u7A3F\u6216\u53C2\u6570\u6539\u53D8\u987Breview\uFF0Cstatus\u53EA\u8BFB\u53D6\u771F\u5B9E\u72B6\u6001\u3002\u6BCF\u6BB5\u5B8C\u6210\u540E\u5148\u5C55\u793A\u89C6\u9891\uFF0C\u518D\u8C03\u7528review_segment\u5E76\u4F20resume\u5F39\u7ED3\u679C\u786E\u8BA4\u7A97\uFF1B\u8FD9\u4E0D\u5C5E\u4E8E\u91CD\u590D\u5236\u4F5C\u786E\u8BA4\uFF0C\u7981\u6B62\u8DF3\u8FC7\u3002\u4E0D\u4F1A\u751F\u6210\u6216\u6263\u8D39\u3002",
@@ -3669,19 +3670,31 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         if (!scriptBody) throw new Error("\u811A\u672C\u6B63\u6587\u4E0D\u80FD\u4E3A\u7A7A\u3002");
         if (name === "video_generate" && !spec.resume) resolveSegmentPrompts(spec.segmentPrompts, estimatePlan(config, name, spec).length);
         const fingerprint = productionFingerprint(config, name, spec);
+        data.canvasDraft = { scriptPath, specification: spec };
+        await writeProject(data);
+        let canvasProject;
+        if (onReviewReady) {
+          try {
+            canvasProject = await onReviewReady(data.id, exec);
+          } catch {
+            canvasProject = { status: "pending", reason: "\u753B\u5E03\u540C\u6B65\u672A\u5B8C\u6210\uFF0C\u53EF\u7528\u9879\u76EEstatus\u8865\u540C\u6B65\uFF1B\u672A\u65B0\u589E\u751F\u6210\u4EFB\u52A1\u3002" };
+          }
+          data = await readProject(data.id, exec);
+        }
+        const canvasOutput = canvasProject ? { canvasProject } : {};
         const gate = await reviewGuard.gate({ ...exec, name: "ask_user_question", arguments: { requireStoryboard: true, requiredScriptText: scriptBody, questions: [{ id: "script_review", question: "\u5BA1\u6838\u5F53\u524D\u811A\u672C" }] } });
-        if (gate) return { projectId: data.id, status: "blocked", reason: gate.reason };
+        if (gate) return { projectId: data.id, status: "blocked", ...canvasOutput, reason: gate.reason };
         const service = ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
-        if (!service?.ask || approvalPolicy(ctx, exec) === "never") return { projectId: data.id, status: "pending", reason: "\u65E0\u6CD5\u53D6\u5F97\u811A\u672C\u5BA1\u6838\u7B54\u590D\uFF0C\u672A\u751F\u6210\u3002" };
+        if (!service?.ask || approvalPolicy(ctx, exec) === "never") return { projectId: data.id, status: "pending", ...canvasOutput, reason: "\u65E0\u6CD5\u53D6\u5F97\u811A\u672C\u5BA1\u6838\u7B54\u590D\uFF0C\u672A\u751F\u6210\u3002" };
         data.approved = null;
         await writeProject(data);
         const result = await service.ask({ agent: exec.agent, signal: exec.signal, ...exec.callId ? { wait: { callId: exec.callId } } : {}, questions: [{ id: "script_review", header: "\u811A\u672C\u5BA1\u6838", question: "\u8BF7\u5BA1\u6838\u521A\u5C55\u793A\u7684\u672C\u7248\u811A\u672C\u3001\u5206\u955C\u3001\u89D2\u8272\u56FE\u53CA\u8D39\u7528\u9884\u4F30\u3002\u662F\u5426\u901A\u8FC7\uFF1F\u901A\u8FC7\u540E\u4ECD\u4F1A\u5355\u72EC\u786E\u8BA4\u89C6\u9891\u8C03\u7528\u8D39\u7528\u3002", multiSelect: false, options: [{ label: "\u811A\u672C\u901A\u8FC7", description: "\u4F7F\u7528\u672C\u7248\u6750\u6599\uFF0C\u4E0B\u4E00\u6B65\u786E\u8BA4\u89C6\u9891\u5236\u4F5C\u8D39\u7528\u3002" }, { label: "\u9700\u8981\u4FEE\u6539", description: "\u5148\u4FEE\u6539\u5E76\u91CD\u65B0\u5C55\u793A\u5BA1\u6838\uFF0C\u4E0D\u751F\u6210\u3002" }] }] });
         const answer = result?.answers?.find((a) => a.id === "script_review");
-        if (exec.signal?.aborted || answer?.custom || answer?.selected?.length !== 1 || answer.selected[0] !== "\u811A\u672C\u901A\u8FC7") return { projectId: data.id, status: "draft", reason: "\u672A\u53D6\u5F97\u5BA1\u6838\u901A\u8FC7\uFF0C\u672A\u751F\u6210\u3002" };
+        if (exec.signal?.aborted || answer?.custom || answer?.selected?.length !== 1 || answer.selected[0] !== "\u811A\u672C\u901A\u8FC7") return { projectId: data.id, status: "draft", ...canvasOutput, reason: "\u672A\u53D6\u5F97\u5BA1\u6838\u901A\u8FC7\uFF0C\u672A\u751F\u6210\u3002" };
         if (await scriptDigest(scriptPath) !== scriptHash || productionFingerprint(config, name, spec) !== fingerprint) throw new Error("\u7B49\u5F85\u5BA1\u6838\u671F\u95F4\u6750\u6599\u6216\u914D\u7F6E\u6539\u53D8\uFF0C\u8BF7\u91CD\u65B0\u5C55\u793A\u5BA1\u6838\u3002");
         data.approved = { scriptPath, scriptHash, fingerprint, specification: spec, name, resumeDir: resumeDirOf(spec.resume), reviewedAt: (/* @__PURE__ */ new Date()).toISOString() };
         await writeProject(data);
-        return { projectId: data.id, status: "approved", nextAction: `\u76F4\u63A5\u8C03\u7528${name}\u5E76\u5E26projectId\u548C\u672C\u6B21specification\uFF1B\u5DE5\u5177\u4ED8\u8D39\u5BA1\u6279\u627F\u62C5\u5236\u4F5C\u786E\u8BA4\uFF0C\u4E0D\u518D\u53E6\u95EE\u4E00\u6B21\u3002` };
+        return { projectId: data.id, status: "approved", ...canvasOutput, nextAction: `\u76F4\u63A5\u8C03\u7528${name}\u5E76\u5E26projectId\u548C\u672C\u6B21specification\uFF1B\u5DE5\u5177\u4ED8\u8D39\u5BA1\u6279\u627F\u62C5\u5236\u4F5C\u786E\u8BA4\uFF0C\u4E0D\u518D\u53E6\u95EE\u4E00\u6B21\u3002` };
       });
     }
   };
@@ -4108,8 +4121,8 @@ async function fetchActualCost(config, taskIds, signal) {
   const base = resolveBaseUrl(config).replace(/\/v1\/?$/, "");
   if (!key || !base) return pending("\u8D39\u7528\u5F85\u67E5\u8BE2\uFF1A\u539F\u8C03\u7528\u8FDE\u63A5\u4E0D\u53EF\u7528\u3002");
   const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(8e3)]) : AbortSignal.timeout(8e3);
-  async function get(path22, authenticated) {
-    const response = await fetch(`${base}${path22}`, {
+  async function get(path23, authenticated) {
+    const response = await fetch(`${base}${path23}`, {
       method: "GET",
       redirect: "error",
       signal: requestSignal,
@@ -4318,14 +4331,14 @@ function findKey(payload, keys, depth = Infinity) {
   }
   return void 0;
 }
-function collectUrls(payload, path22 = [], found = []) {
+function collectUrls(payload, path23 = [], found = []) {
   if (typeof payload === "string") {
-    if (/^https?:\/\//i.test(payload)) found.push([path22, payload]);
+    if (/^https?:\/\//i.test(payload)) found.push([path23, payload]);
   } else if (Array.isArray(payload)) {
-    for (const item of payload) collectUrls(item, path22, found);
+    for (const item of payload) collectUrls(item, path23, found);
   } else if (payload && typeof payload === "object") {
     for (const [key, value] of Object.entries(payload)) {
-      collectUrls(value, [...path22, key], found);
+      collectUrls(value, [...path23, key], found);
     }
   }
   return found;
@@ -4343,22 +4356,22 @@ function extractTaskId(payload) {
 }
 function extractVideoUrl(payload) {
   const candidates = collectUrls(payload).filter(
-    ([path22, url]) => !looksLikeImageUrl(url) && !path22.some(isImageKey)
+    ([path23, url]) => !looksLikeImageUrl(url) && !path23.some(isImageKey)
   );
   if (!candidates.length) return void 0;
   for (const wanted of VIDEO_URL_KEYS) {
-    for (const [path22, url] of candidates) {
-      if (path22.length && String(path22.at(-1)).toLowerCase() === wanted) return url;
+    for (const [path23, url] of candidates) {
+      if (path23.length && String(path23.at(-1)).toLowerCase() === wanted) return url;
     }
   }
-  for (const [path22, url] of candidates) {
-    if (path22.length && GENERIC_URL_KEYS.has(String(path22.at(-1)).toLowerCase())) return url;
+  for (const [path23, url] of candidates) {
+    if (path23.length && GENERIC_URL_KEYS.has(String(path23.at(-1)).toLowerCase())) return url;
   }
   return candidates[0][1];
 }
 function extractImageUrl(payload) {
   const found = collectUrls(payload).find(
-    ([path22, url]) => looksLikeImageUrl(url) || path22.some(isImageKey)
+    ([path23, url]) => looksLikeImageUrl(url) || path23.some(isImageKey)
   );
   return found?.[1];
 }
@@ -4415,8 +4428,8 @@ async function relayRequest(config, requestPath, options = {}) {
     throw error;
   }
 }
-async function relayRequestCore(config, path22, { method = "GET", body, signal } = {}, trace = {}) {
-  const url = `${resolveBaseUrl(config)}${path22}`;
+async function relayRequestCore(config, path23, { method = "GET", body, signal } = {}, trace = {}) {
+  const url = `${resolveBaseUrl(config)}${path23}`;
   const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   const serialized = body === void 0 ? void 0 : JSON.stringify(body);
@@ -4742,6 +4755,7 @@ async function downloadFile(url, destPath, { signal } = {}) {
 }
 
 // src/businesses/video/integrations/canvas.ts
+init_config();
 var canvasLinkSchema = { type: "object", properties: {
   projectId: { type: "string" },
   canvasId: { type: "string" },
@@ -4933,7 +4947,7 @@ async function publishCanvasResult(adapter, record) {
   if (saved?.ok === false || saved?.deleted) throw new Error("\u753B\u5E03\u5DF2\u5220\u9664\u6216\u56DE\u586B\u5931\u8D25");
   return { status: "synced", token: record.id, count: publications.length, phase: record.phase };
 }
-function createCanvasBridge(load = loadCanvasAdapter) {
+function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
   const busy = /* @__PURE__ */ new Set();
   async function sync(token, exec) {
     if (busy.has(token)) throw new Error("\u6B64\u6210\u679C\u6B63\u5728\u56DE\u586B\uFF0C\u8BF7\u7A0D\u540E\u67E5\u8BE2\u3002");
@@ -4951,16 +4965,25 @@ function createCanvasBridge(load = loadCanvasAdapter) {
       const blocks = tool2.output?.render?.(args, value) || [];
       return value?.canvasSync ? [...blocks, { type: "text", text: `\u753B\u5E03\u56DE\u586B\uFF1A${JSON.stringify(value.canvasSync)}` }] : blocks;
     } }, parameters: { ...tool2.parameters, properties: { ...tool2.parameters.properties, canvas: canvasLinkSchema } }, async execute(args, exec) {
-      if (args.canvas) {
+      let canvas = args.canvas;
+      const resumeDir = resumeDirOf(args.resume);
+      const saved = !canvas && resumeDir ? await readPauseFile(resumeDir) : null;
+      const projectId = args.projectId || saved?.options?.projectId;
+      canvas ||= saved?.options?.canvas;
+      if (!canvas && projectId && ref(config, "autoCreateCanvas", true) !== false) {
+        const project = await readProject(projectId, exec);
+        canvas = project.canvasAuto?.canvas;
+      }
+      if (canvas) {
         sessionOwner(exec);
-        const input = await readCanvasInput(await load(), args.canvas);
-        if (input.canvas.fingerprint !== args.canvas.fingerprint) throw new Error("\u753B\u5E03\u5185\u5BB9\u6216\u53C2\u8003\u7D20\u6750\u5DF2\u4FEE\u6539\uFF0C\u8BF7\u91CD\u65B0\u8BFB\u53D6\u5E76\u5BA1\u6838\uFF1B\u672A\u63D0\u4EA4\u751F\u6210\u4EFB\u52A1\u3002");
+        const input = await readCanvasInput(await load(), canvas);
+        if (input.canvas.fingerprint !== canvas.fingerprint) throw new Error("\u753B\u5E03\u5185\u5BB9\u6216\u53C2\u8003\u7D20\u6750\u5DF2\u4FEE\u6539\uFF0C\u8BF7\u91CD\u65B0\u8BFB\u53D6\u5E76\u5BA1\u6838\uFF1B\u672A\u63D0\u4EA4\u751F\u6210\u4EFB\u52A1\u3002");
       }
       const result = await tool2.execute(args, exec);
-      if (!args.canvas || !result || typeof result !== "object") return result;
+      if (!canvas || !result || typeof result !== "object") return result;
       const media = mediaPreviewMeta(result, tool2.name).media;
       if (!media.length) return { ...result, canvasSync: { status: "no_media", reason: "\u5C1A\u65E0\u6210\u529F\u7D20\u6750\uFF0C\u672A\u56DE\u586B\u865A\u6784\u6210\u679C\u3002" } };
-      const record = { id: randomUUID7(), owner: sessionOwner(exec), canvas: args.canvas, media, ratio: args.ratio, phase: tool2.name === "video_prepare_image" ? "reference_review" : videoResultState(result).phase, createdAt: Date.now() };
+      const record = { id: randomUUID7(), owner: sessionOwner(exec), canvas, media, ratio: args.ratio, phase: tool2.name === "video_prepare_image" ? "reference_review" : videoResultState(result).phase, createdAt: Date.now() };
       try {
         await saveRecord(record);
       } catch {
@@ -4998,10 +5021,187 @@ function createCanvasBridge(load = loadCanvasAdapter) {
   return { wrap, tool };
 }
 
-// src/businesses/video/integrations/canvas-native.ts
+// src/businesses/video/integrations/canvas-project.ts
+import { createHash as createHash6 } from "node:crypto";
+import { readFile as readFile10 } from "node:fs/promises";
 import path18 from "node:path";
-import { createHash as createHash7, randomUUID as randomUUID8 } from "node:crypto";
-import { mkdir as mkdir11, readFile as readFile10, writeFile as writeFile8, rename as rename9 } from "node:fs/promises";
+init_config();
+var digest2 = (value) => createHash6("sha256").update(JSON.stringify(value)).digest("hex");
+function scriptStoryboardShots(script) {
+  const lines = script.split(/\r?\n/), shots = [];
+  const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split(/(?<!\\)\|/).map((s) => s.trim().replace(/\\\|/g, "|"));
+  let fenced = false;
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (/^\s*(```|~~~)/.test(lines[i])) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced || !lines[i].includes("|")) continue;
+    const header = cells(lines[i]), separator = cells(lines[i + 1]);
+    if (separator.length !== header.length || !separator.every((x) => /^:?-{3,}:?$/.test(x))) continue;
+    const titleAt = header.findIndex((x) => /镜头|shot/i.test(x));
+    const visualAt = header.findIndex((x) => /画面|visual/i.test(x));
+    if (titleAt < 0 || visualAt < 0 || titleAt === visualAt) continue;
+    const timeAt = header.findIndex((x) => /时间|时长|time|duration/i.test(x));
+    const cameraAt = header.findIndex((x) => /景别|运镜|camera/i.test(x));
+    const soundAt = header.findIndex((x) => /声音|音效|sound|sfx/i.test(x));
+    const dialogueAt = header.findIndex((x) => /台词|对白|dialogue/i.test(x));
+    for (i += 2; i < lines.length && lines[i].includes("|") && lines[i].trim(); i++) {
+      const row = cells(lines[i]);
+      if (row.length !== header.length || !row[visualAt]) continue;
+      const time = row[timeAt] || "", range = time.match(/(\d+(?:\.\d+)?)\s*(?:秒|s)?\s*[–—~～至-]\s*(\d+(?:\.\d+)?)/i);
+      const explicit = time.match(/^(\d+(?:\.\d+)?)\s*(?:秒|s)$/i);
+      const duration = range ? Number(range[2]) - Number(range[1]) : explicit ? Number(explicit[1]) : null;
+      shots.push({
+        title: row[titleAt],
+        visual: header.map((h, j) => `${h}\uFF1A${row[j]}`).join("\n"),
+        camera: row[cameraAt] || "",
+        sfx: row[soundAt] || "",
+        dialogue: row[dialogueAt] ? [{ role: "\u5267\u672C\u5BF9\u767D", line: row[dialogueAt] }] : [],
+        ...duration > 0 ? { duration } : {},
+        metaonticTime: time
+      });
+    }
+    i--;
+  }
+  return shots;
+}
+function createCanvasProjectSync(load = loadCanvasAdapter, config = {}) {
+  async function sync(projectId, exec, draft = {}) {
+    if (ref(config, "autoCreateCanvas", true) === false) return { status: "disabled", reason: "\u5DF2\u5728\u63D2\u4EF6\u8BBE\u7F6E\u5173\u95ED\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03\uFF1B\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\u3002" };
+    return lockProject(`canvas:${projectId}`, async () => {
+      const project = await readProject(projectId, exec);
+      draft = { ...project.canvasDraft || { scriptPath: project.approved?.scriptPath, specification: project.approved?.specification }, ...draft };
+      if (draft.specification?.canvas) return { status: "external", projectId: draft.specification.canvas.projectId, reason: "\u6CBF\u7528\u7528\u6237\u9009\u62E9\u7684\u539F\u753B\u5E03\uFF0C\u4E0D\u53E6\u5EFA\u9879\u76EE\u3002" };
+      let adapter;
+      try {
+        adapter = await load();
+      } catch {
+        return { status: "unavailable", reason: "\u81EA\u52A8\u753B\u5E03\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u5B89\u88C5\u5E76\u542F\u7528\u539F\u7248\u65E0\u9650\u753B\u5E030.20.1\uFF1B\u521B\u4F5C\u9879\u76EE\u5DF2\u4FDD\u7559\u3002" };
+      }
+      const rpc = adapter.rpc;
+      if (!rpc.canvasCreateProject) return { status: "unavailable", reason: "\u539F\u7248\u753B\u5E03\u7F3A\u5C11\u521B\u5EFA\u63A5\u53E3\uFF0C\u672A\u521B\u5EFA\u66FF\u4EE3\u753B\u5E03\u3002" };
+      const prefix = `mov_${project.id.replaceAll("-", "")}`;
+      if (!project.canvasAuto) {
+        project.canvasAuto = { version: 1, name: `MetaOntic \u521B\u4F5C ${project.id}`, nodes: {}, links: {} };
+        await writeProject(project);
+      }
+      const binding = project.canvasAuto;
+      if (!binding.projectId) {
+        const created = await rpc.canvasCreateProject({ name: binding.name });
+        if (!created?.ok || !/^[A-Za-z0-9_-]{1,100}$/.test(created.projectId || "")) throw new Error("\u81EA\u52A8\u753B\u5E03\u521B\u5EFA\u672A\u786E\u8BA4\uFF0C\u8BF7\u91CD\u8BD5\u540C\u6B65\uFF0C\u4E0D\u91CD\u65B0\u521B\u5EFA\u521B\u4F5C\u9879\u76EE\u3002");
+        binding.projectId = created.projectId;
+        await writeProject(project);
+      }
+      const loc = { id: binding.projectId };
+      const doc = await rpc.projectsGet(loc);
+      if (!doc?.nodes || doc.deleted) throw new Error("\u81EA\u52A8\u753B\u5E03\u5DF2\u5220\u9664\u6216\u4E0D\u53EF\u7528\uFF0C\u4E0D\u4F1A\u91CD\u65B0\u521B\u5EFA\u5DF2\u5220\u9664\u7684\u9879\u76EE\u3002");
+      let script = "";
+      if (draft.scriptPath) {
+        const scriptPath = path18.resolve(exec.agent.session.header?.cwd || process.cwd(), draft.scriptPath);
+        if (!/\.md$/i.test(scriptPath)) throw new Error("\u81EA\u52A8\u540C\u6B65\u811A\u672C\u9700\u8981Markdown\u6587\u4EF6\u3002");
+        script = await readFile10(scriptPath, "utf8");
+        if (script.length > 2e5) throw new Error("\u811A\u672C\u8FC7\u5927\uFF0C\u81EA\u52A8\u753B\u5E03\u672A\u8986\u76D6\u65E7\u8282\u70B9\u3002");
+      }
+      const specification = draft.specification || null;
+      const nodes = { ...doc.nodes }, edges = [...doc.edges || []];
+      const managed = { ...binding.nodes }, managedEdges = { ...binding.links || {} };
+      const deleted = new Set(doc.tombstones || []), edgeDeleted = new Set(doc.edgeTombstones || []);
+      const add = (key, type, label, x, y, data) => {
+        const id = `${prefix}_${key}`;
+        if (deleted.has(id)) throw new Error("\u81EA\u52A8\u8282\u70B9\u5DF2\u88AB\u5220\u9664\uFF0C\u4E0D\u4F1A\u81EA\u52A8\u590D\u6D3B\uFF1B\u8BF7\u5728\u9879\u76EE\u4E2D\u660E\u786E\u9009\u62E9\u65B0\u7684\u753B\u5E03\u7ED1\u5B9A\u3002");
+        const previous = nodes[id];
+        if (previous && (!managed[id] || digest2({ type: previous.type, data: previous.data }) !== managed[id])) throw new Error("\u81EA\u52A8\u8282\u70B9\u5DF2\u5728\u753B\u5E03\u4E2D\u4FEE\u6539\uFF0C\u4FDD\u7559\u4F60\u7684\u7F16\u8F91\uFF1B\u8BF7\u5148\u5904\u7406\u5DEE\u5F02\u518D\u540C\u6B65\u3002");
+        const next = { ...previous || { id, x, y, w: type === "script" ? 420 : 360, h: 280 }, type, data };
+        nodes[id] = next;
+        managed[id] = digest2({ type, data });
+        return id;
+      };
+      const connect = (from2, to, port = "prompt") => {
+        const id = `${prefix}_edge_${from2.slice(prefix.length + 1)}_${to.slice(prefix.length + 1)}`;
+        if (edgeDeleted.has(id)) throw new Error("\u81EA\u52A8\u8FDE\u7EBF\u5DF2\u88AB\u5220\u9664\uFF0C\u4FDD\u7559\u4F60\u7684\u7F16\u8F91\uFF0C\u4E0D\u91CD\u65B0\u8FDE\u56DE\u3002");
+        const desired = { id, fromNode: from2, toNode: to, fromPort: "out", toPort: port };
+        const existing = edges.find((e) => e.id === id);
+        if (existing && (!managedEdges[id] || digest2(existing) !== managedEdges[id])) throw new Error("\u81EA\u52A8\u8FDE\u7EBF\u5DF2\u4FEE\u6539\uFF0C\u4FDD\u7559\u4F60\u7684\u7F16\u8F91\u3002");
+        if (!existing) edges.push(desired);
+        managedEdges[id] = digest2(desired);
+      };
+      const source = add("script", "script", "\u5B8C\u6574\u5267\u672C", 40, 60, { label: "\u5B8C\u6574\u5267\u672C", idea: "\u7531MetaOnticVideo\u521B\u4F5C\u9879\u76EE\u540C\u6B65", output: script || nodes[`${prefix}_script`]?.data?.output || "", status: script || nodes[`${prefix}_script`]?.data?.output ? "done" : "idle", metaonticProjectId: project.id });
+      const overview = add("project", "text", "\u521B\u4F5C\u9879\u76EE", 40, 400, { label: "\u521B\u4F5C\u9879\u76EE", text: `\u76EE\u6807\u65F6\u957F\uFF1A${project.duration ?? "\u5F85\u786E\u8BA4"}\u79D2
+\u89D2\u8272\u56FE\u8DEF\u7EBF\uFF1A${project.choice || "\u5F85\u786E\u8BA4"}
+\u811A\u672C\u3001\u8D39\u7528\u4E0E\u5206\u6BB5\u5BA1\u6838\u4ECD\u6309\u539F\u6D41\u7A0B\u8FDB\u884C\uFF1B\u81EA\u52A8\u5EFA\u56FE\u4E0D\u4EA7\u751F\u6A21\u578B\u8D39\u7528\u3002`, metaonticProjectId: project.id });
+      connect(overview, source);
+      let nodeId = `${prefix}_production`;
+      if (specification) {
+        const prompts = specification.segmentPrompts?.length ? specification.segmentPrompts : [specification.prompt];
+        const shots = scriptStoryboardShots(script);
+        const board = add("storyboard", "storyboard", "\u955C\u5934\u5206\u955C", 540, 60, { label: "\u955C\u5934\u5206\u955C", shots, script, output: script, status: "done", metaonticProjectId: project.id, metaonticPlanNote: shots.length ? "\u6309\u5267\u672C\u5206\u955C\u8868\u540C\u6B65\uFF0C\u5236\u4F5C\u6BB5\u8BA1\u5212\u53E6\u5217\uFF0C\u4E0D\u89E6\u53D1\u751F\u6210\u3002" : "\u672A\u8BC6\u522B\u5230\u5206\u955C\u8868\uFF0C\u5B8C\u6574\u539F\u6587\u4FDD\u7559\u5728\u5267\u672C\u4E2D\uFF1B\u5236\u4F5C\u6BB5\u8BA1\u5212\u53E6\u5217\u3002" });
+        connect(source, board, "script");
+        for (const [index, prompt] of prompts.entries()) {
+          const plan = add(`segment_${index + 1}`, "text", `\u7B2C${index + 1}\u6BB5\u5236\u4F5C\u5185\u5BB9`, 1050, 60 + index * 320, { label: `\u7B2C${index + 1}\u6BB5\u5236\u4F5C\u5185\u5BB9`, text: String(prompt), metaonticProjectId: project.id });
+          connect(board, plan);
+        }
+        const production = add("production", "video", "\u89C6\u9891\u5236\u4F5C", 1550, 60, {
+          label: "\u89C6\u9891\u5236\u4F5C",
+          prompt: specification.prompt,
+          ratio: specification.ratio,
+          resolution: specification.resolution,
+          duration: specification.duration,
+          status: "idle",
+          metaonticProjectId: project.id,
+          metaonticAssistantManaged: true
+        });
+        nodeId = production;
+        connect(board, production);
+      } else if (!nodes[nodeId]) {
+        nodeId = source;
+      }
+      const result = await rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes, edges, ts: Date.now() } });
+      if (result?.ok === false || result?.deleted) throw new Error("\u81EA\u52A8\u753B\u5E03\u4FDD\u5B58\u5931\u8D25\uFF0C\u4FDD\u7559\u539F\u521B\u4F5C\u9879\u76EE\u3002");
+      binding.nodes = managed;
+      binding.links = managedEdges;
+      binding.nodeId = nodeId;
+      try {
+        binding.canvas = (await readCanvasInput(adapter, { projectId: binding.projectId, nodeId })).canvas;
+      } catch {
+        delete binding.canvas;
+      }
+      await writeProject(project);
+      let opened = false;
+      try {
+        opened = (await rpc.canvasOpen?.({ projectId: binding.projectId }))?.ok === true;
+      } catch {
+      }
+      return {
+        status: "synced",
+        projectId: binding.projectId,
+        nodeId,
+        openRequested: opened,
+        bindingReady: Boolean(binding.canvas),
+        ...!binding.canvas ? { reason: "\u753B\u5E03\u8282\u70B9\u5DF2\u5EFA\u7ACB\uFF1B\u6210\u679C\u56DE\u586B\u524D\u8BF7\u5728\u539F\u7248\u753B\u5E03\u8BBE\u7F6E\u6570\u636E\u6839\u76EE\u5F55\u3002" } : {}
+      };
+    });
+  }
+  function wrapProject(tool) {
+    return { ...tool, async execute(args, exec) {
+      const result = await tool.execute(args, exec);
+      if (result?.canvasProject) return result;
+      if (!result?.projectId || !["prepare", "review", "status"].includes(args.action) || ["pending", "blocked"].includes(result.status)) return result;
+      try {
+        const canvas = await sync(result.projectId, exec, args.action === "review" ? args : {});
+        return { ...result, canvasProject: canvas };
+      } catch (e) {
+        return { ...result, canvasProject: { status: "pending", reason: e.message || "\u81EA\u52A8\u753B\u5E03\u540C\u6B65\u672A\u5B8C\u6210\uFF0C\u91CD\u8BD5\u9879\u76EE\u540C\u6B65\u5373\u53EF\uFF0C\u4E0D\u9700\u8981\u91CD\u751F\u6210\u3002" } };
+      }
+    } };
+  }
+  return { sync, wrapProject };
+}
+
+// src/businesses/video/integrations/canvas-native.ts
+import path19 from "node:path";
+import { createHash as createHash8, randomUUID as randomUUID8 } from "node:crypto";
+import { mkdir as mkdir11, readFile as readFile11, writeFile as writeFile8, rename as rename9 } from "node:fs/promises";
 init_connection();
 
 // src/businesses/video/providers/seedance.ts
@@ -5072,7 +5272,7 @@ function endWithPunctuation(text) {
 }
 
 // src/businesses/video/workflow/real-person.ts
-import { createHash as createHash6 } from "node:crypto";
+import { createHash as createHash7 } from "node:crypto";
 
 // src/businesses/video/tools/results.ts
 import { resolve as resolve2 } from "node:path";
@@ -5434,7 +5634,7 @@ async function recoverRealPersonImages(config, body, ctx, exec, final, state = {
   try {
     for (const item of images) {
       const source = String(item.image_url.url);
-      const key = createHash6("sha256").update(source).digest("hex");
+      const key = createHash7("sha256").update(source).digest("hex");
       const entry = state.images[key] ||= {};
       if (entry.failed) throw new Error(`\u56FE\u7247\u4EFB\u52A1 ${entry.taskId || ""} \u5DF2\u660E\u786E\u5931\u8D25\uFF1A${entry.failed}\u3002\u4E0D\u81EA\u52A8\u518D\u6B21\u51FA\u56FE\u3002`);
       if (!entry.imageUrl) {
@@ -5686,7 +5886,7 @@ async function runTask(liveConfig, body, signal, progress = {}) {
 
 // src/businesses/video/integrations/canvas-native.ts
 init_connection_defaults();
-var hash3 = (value) => createHash7("sha256").update(JSON.stringify(value)).digest("hex");
+var hash3 = (value) => createHash8("sha256").update(JSON.stringify(value)).digest("hex");
 var validToken = (value) => /^[a-f0-9-]{36}$/.test(String(value || ""));
 var terminal = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled"]);
 function planCanvasNative(input, config, operation = "generate", draft = {}) {
@@ -5755,26 +5955,26 @@ function planCanvasNative(input, config, operation = "generate", draft = {}) {
 }
 function createCanvasNativeService(liveConfig, options = {}) {
   const load = options.load || loadCanvasAdapter;
-  const directory2 = options.directory || path18.join(dshHome(), "metaontic-video", "canvas-native");
+  const directory2 = options.directory || path19.join(dshHome(), "metaontic-video", "canvas-native");
   const snapshots = /* @__PURE__ */ new Map(), running = /* @__PURE__ */ new Map(), locks2 = /* @__PURE__ */ new Set();
   const proposals = /* @__PURE__ */ new Map();
   let disposed = false;
   const file = (id) => {
     if (!validToken(id)) throw new Error("\u5236\u4F5C\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548\u3002");
-    return path18.join(directory2, `${id}.json`);
+    return path19.join(directory2, `${id}.json`);
   };
-  const pointer = (link) => path18.join(directory2, `node-${hash3([link.projectId, link.canvasId || "", link.nodeId])}.json`);
+  const pointer = (link) => path19.join(directory2, `node-${hash3([link.projectId, link.canvasId || "", link.nodeId])}.json`);
   async function save2(job) {
     await mkdir11(directory2, { recursive: true, mode: 448 });
     const dest = file(job.id), temp = `${dest}.${randomUUID8()}.tmp`;
     await writeFile8(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
     await rename9(temp, dest);
   }
-  const read = async (id) => JSON.parse(await readFile10(file(id), "utf8"));
+  const read = async (id) => JSON.parse(await readFile11(file(id), "utf8"));
   async function previous(link) {
     let id;
     try {
-      id = JSON.parse(await readFile10(pointer(link), "utf8")).id;
+      id = JSON.parse(await readFile11(pointer(link), "utf8")).id;
     } catch (e) {
       if (e.code === "ENOENT") return null;
       throw e;
@@ -6032,14 +6232,14 @@ function approvedCharacterReferences(images, state) {
 
 // src/businesses/video/workflow/segment-run.ts
 init_config();
-import path20 from "node:path";
+import path21 from "node:path";
 import { stat as stat8 } from "node:fs/promises";
 
 // src/businesses/video/media/merge.ts
 init_config();
 init_connection();
 import { rm as rm8, mkdir as mkdir12, writeFile as writeFile9, rename as rename10, stat as stat7, copyFile as copyFile2 } from "node:fs/promises";
-import path19 from "node:path";
+import path20 from "node:path";
 function evenNumber(value, fallback) {
   const number2 = Number(value);
   if (!Number.isFinite(number2) || number2 <= 0) return fallback;
@@ -6102,7 +6302,7 @@ async function cleanupSegmentTemps(temps) {
 }
 async function mergeClips(config, files, outPath, { signal } = {}) {
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  await mkdir12(path19.dirname(outPath), { recursive: true });
+  await mkdir12(path20.dirname(outPath), { recursive: true });
   const work = `${outPath}.${uniqueSuffix("work")}.mp4`;
   let copyError = "";
   let audioError = "";
@@ -6283,7 +6483,7 @@ async function downloadSegmentsAndMerge(config, {
   const deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0);
   const ffmpegReady = segments.length > 1 ? await hasFfmpeg(config, signal) : true;
   let probeWarned = false;
-  const destOf = (segment) => path19.join(
+  const destOf = (segment) => path20.join(
     segmentsDir,
     `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`
   );
@@ -6362,13 +6562,13 @@ async function downloadSegmentsAndMerge(config, {
       installHint: guide.hint
     };
   }
-  const finalPath = path19.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
+  const finalPath = path20.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
   try {
     if (files.length === 1 && keepSingleFile) {
       return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "segment", videoPath: files[0] };
     }
     if (files.length === 1) {
-      await mkdir12(path19.dirname(finalPath), { recursive: true });
+      await mkdir12(path20.dirname(finalPath), { recursive: true });
       const copy = `${finalPath}.${uniqueSuffix("copy")}.mp4`;
       try {
         await copyFile2(files[0], copy);
@@ -6497,7 +6697,7 @@ async function runSegmentDelivery({
   const previewOnly = paused && !cumulativePreview;
   if (previewOnly) {
     for (const segment of completed.slice(0, -1)) {
-      const file = path20.join(segmentsDir, `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`);
+      const file = path21.join(segmentsDir, `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`);
       try {
         if ((await stat8(file)).isFile()) segment.localPath = file;
       } catch {
@@ -7562,7 +7762,7 @@ function setupTool(config) {
 
 // src/businesses/video/internal/hyperframes.ts
 import { spawn as spawn2 } from "node:child_process";
-import path21 from "node:path";
+import path22 from "node:path";
 import { createRequire as createRequire3 } from "node:module";
 import { stat as stat9, mkdir as mkdir13 } from "node:fs/promises";
 function runHyperframes(cli, args, cwd, config, signal) {
@@ -7579,7 +7779,7 @@ function runHyperframes(cli, args, cwd, config, signal) {
         ...Object.fromEntries([
           ["HYPERFRAMES_FFMPEG_PATH", resolveBinary(config, "ffmpegBinary", "ffmpeg")],
           ["HYPERFRAMES_FFPROBE_PATH", resolveBinary(config, "ffprobeBinary", "ffprobe")]
-        ].filter(([, binary]) => path21.isAbsolute(binary)))
+        ].filter(([, binary]) => path22.isAbsolute(binary)))
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true
@@ -7659,16 +7859,16 @@ function hyperframesTool(config, deps) {
       let cli;
       try {
         const require2 = createRequire3(import.meta.url);
-        cli = path21.join(path21.dirname(require2.resolve("hyperframes/package.json")), "bin/hyperframes.mjs");
+        cli = path22.join(path22.dirname(require2.resolve("hyperframes/package.json")), "bin/hyperframes.mjs");
       } catch {
         return { status: "dependency_missing", note: "Hyperframes \u4E3A\u5185\u90E8\u5F00\u53D1\u80FD\u529B\uFF0C\u516C\u5F00\u63D2\u4EF6\u5305\u4E0D\u5305\u542B\u8BE5\u4F9D\u8D56\uFF1B\u9700\u5728\u5F00\u53D1\u73AF\u5883\u5355\u72EC\u51C6\u5907\u3002" };
       }
       let cwd = process.cwd();
       if (deps.workdir && exec?.agent) cwd = await deps.workdir.ensure(exec.agent, exec.signal) || cwd;
-      const project = path21.resolve(cwd, args.projectDir || ".");
+      const project = path22.resolve(cwd, args.projectDir || ".");
       if (action !== "check") {
         if (!args.projectDir) throw new Error("lint/render \u5FC5\u987B\u6307\u5B9A projectDir\u3002");
-        if (!(await stat9(path21.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
+        if (!(await stat9(path22.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
       }
       let videoPath;
       let command = ["doctor", "--json"];
@@ -7676,9 +7876,9 @@ function hyperframesTool(config, deps) {
       if (action === "render") {
         if (args.fps !== void 0 && ![24, 25, 30, 50, 60].includes(args.fps)) throw new Error("\u4E0D\u652F\u6301\u7684\u5E27\u7387\u3002");
         const output = args.output || `renders/output-${Date.now()}.mp4`;
-        videoPath = path21.resolve(project, output);
-        const relative = path21.relative(project, videoPath);
-        if (!relative || relative === ".." || relative.startsWith(`..${path21.sep}`) || path21.isAbsolute(relative) || path21.extname(videoPath).toLowerCase() !== ".mp4") {
+        videoPath = path22.resolve(project, output);
+        const relative = path22.relative(project, videoPath);
+        if (!relative || relative === ".." || relative.startsWith(`..${path22.sep}`) || path22.isAbsolute(relative) || path22.extname(videoPath).toLowerCase() !== ".mp4") {
           throw new Error("\u8F93\u51FA\u5FC5\u987B\u662F\u9879\u76EE\u76EE\u5F55\u5185\u7684 .mp4 \u6587\u4EF6\u3002");
         }
         try {
@@ -7687,7 +7887,7 @@ function hyperframesTool(config, deps) {
         } catch (error) {
           if (error.code !== "ENOENT") throw error;
         }
-        await mkdir13(path21.dirname(videoPath), { recursive: true });
+        await mkdir13(path22.dirname(videoPath), { recursive: true });
         command = ["render", project, "--output", videoPath, "--fps", String(args.fps || 30), "--workers", "1", "--strict"];
       }
       const result = await runHyperframes(cli, command, action === "check" ? cwd : project, config, exec?.signal);
@@ -7703,6 +7903,7 @@ init_connection_defaults();
 init_config();
 init_connection();
 var CONFIG_FIELDS = [
+  "autoCreateCanvas",
   "connectionMode",
   "metaonticApiKey",
   "volcengineApiKey",
@@ -7744,6 +7945,7 @@ function configView(config) {
   return {
     stored: maskSecrets(stored),
     effective: {
+      autoCreateCanvas: ref(config, "autoCreateCanvas", true) !== false,
       connectionMode: isVolcengine(config) ? "volcengine" : "metaontic",
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),
@@ -7829,7 +8031,10 @@ function configTool(config, settings) {
           action: { type: "string" },
           patchPath: { type: "string" },
           stored: { type: "object" },
-          effective: { type: "object" },
+          effective: {
+            autoCreateCanvas: ref(config, "autoCreateCanvas", true) !== false,
+            type: "object"
+          },
           error: { type: "string" }
         }
       },
@@ -7877,7 +8082,9 @@ function buildPromptGuidance(config) {
   const singleMax = resolveSingleMax(config);
   const segmentSeconds = resolveSegmentSeconds(config);
   return [
-    "\xB7 \u65E0\u9650\u753B\u5E03\u8054\u52A8\uFF1A\u7528\u6237\u8981\u7528MetaOnticVideo\u5236\u4F5C\u753B\u5E03\u8282\u70B9\u65F6\uFF0C\u5148video_canvas(action:list/read)\u8BFB\u53D6\u76EE\u6807\u8282\u70B9\u3001\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u548C\u53C2\u8003\u7D20\u6750\u3002\u6309\u7AEF\u53E3/refOrder\u4FDD\u7559\u9996\u5E27\u3001\u5C3E\u5E27\u3001\u53C2\u8003\u89C6\u9891\u89D2\u8272\uFF0C\u660E\u786E\u7F3A\u5931\u89C4\u683C\uFF0C\u4E0D\u731C\u65F6\u957F\u548C\u6E05\u6670\u5EA6\u3002\u636E\u6B64\u5B8C\u6210\u73B0\u6709video_project\u51C6\u5907\u3001\u6B63\u6587\u5C55\u793A\u811A\u672C/\u5185\u5D4C\u5206\u955C\u53CAreview\uFF1B\u5B8C\u6574specification\u4E0E\u968F\u540Evideo_generate/video_extend\u53C2\u6570\u90FD\u5E26read\u8FD4\u56DE\u7684canvas\u5BF9\u8C61\u3002\u56FE\u7247\u8D70video_prepare_image\u5E76\u5E26canvas\uFF0C\u4ECD\u987B\u56FE\u7247\u8D39\u7528\u5BA1\u6279\u548C\u7ED3\u679C\u5BA1\u6838\u3002\u7981\u6B62\u8C03\u7528canvas_run_node/canvas_generate_node\u66FF\u4EE3\u672C\u63D2\u4EF6\u751F\u6210\uFF1B\u4E0D\u590D\u5236API\u5BC6\u94A5\u3002\u6210\u679C\u81EA\u52A8\u65B0\u589E\u5230\u539F\u753B\u5E03\uFF0Cpaused\u4ECD\u987B\u5148\u4EA4\u4ED8\u5E76review_segment\uFF0C\u56DE\u586B\u4E0D\u4EE3\u8868\u7ED3\u679C\u5DF2\u5BA1\u6838\u6216\u6574\u7247\u5B8C\u6210\u3002\u56DE\u586Bpending\u65F6\u7528video_canvas(action:sync,token)\u8865\u4F20\uFF0C\u7EDD\u4E0D\u91CD\u65B0\u751F\u6210\u3002\u539F\u7248\u8282\u70B9\u81EA\u5E26\u751F\u6210\u6309\u94AE\u4ECD\u8D70\u5176\u72EC\u7ACB\u914D\u7F6E\uFF0C\u4E0D\u5BA3\u79F0\u5DF2\u88AB\u66FF\u6362\u3002",
+    `\xB7 \u5F53\u524D\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03\uFF1A${ref(config, "autoCreateCanvas", true) === false ? "\u5173\u95ED\uFF1B\u4E0D\u81EA\u52A8\u5EFA\u56FE\u6216\u540C\u6B65\uFF0C\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\uFF0C\u660E\u786E\u624B\u52A8\u9009\u4E2D\u8282\u70B9\u65F6\u4ECD\u53EF\u8054\u52A8" : "\u5F00\u542F"}\u3002\u8BE5\u5F00\u5173\u53EA\u80FD\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u4FEE\u6539\uFF0Cvideo_config\u53EF\u53EA\u8BFB\u6838\u5BF9\u3002`,
+    "\xB7 \u81EA\u52A8\u878D\u5408\u753B\u5E03\uFF1A\u6309\u5F53\u524D\u5F00\u5173\u6267\u884C\u3002\u666E\u901A\u521B\u4F5C\u7167\u5E38\u8C03\u7528video_project prepare/review\uFF0C\u5DE5\u5177\u81EA\u52A8\u5EFA\u539F\u7248\u753B\u5E03\u9879\u76EE\u3001\u540C\u6B65\u5B8C\u6574\u811A\u672C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\u5E76\u8BF7\u6C42\u6253\u5F00\u3002\u4E0D\u8981\u8981\u6C42\u7528\u6237\u53E6\u5EFA\u9879\u76EE/\u8282\u70B9\u6216\u53E6\u95EE\u662F\u5426\u540C\u6B65\u3002\u751F\u6210\u4F20projectId\uFF0C\u7EED\u505A\u4F20\u539Fresume\uFF0C\u6210\u679C\u81EA\u52A8\u56DE\u586B\uFF0C\u4E0D\u5FC5\u624B\u5DE5\u62FC\u81EA\u52A8canvas\u7ED1\u5B9A\u3002canvasProject unavailable/pending\u5982\u5B9E\u8BF4\u660E\uFF0C\u7528video_project status\u91CD\u8BD5\u540C\u6B65\uFF0C\u4E0D\u91CD\u5EFA\u521B\u4F5C\u9879\u76EE\u6216\u91CD\u751F\u6210\u3002\u4ECD\u4FDD\u7559\u811A\u672C\u3001\u8D39\u7528\u548C\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838\u3002",
+    "\xB7 \u65E0\u9650\u753B\u5E03\u8054\u52A8\uFF1A\u7528\u6237\u8981\u7528MetaOnticVideo\u5236\u4F5C\u753B\u5E03\u8282\u70B9\u65F6\uFF0C\u5148video_canvas(action:list/read)\u8BFB\u53D6\u76EE\u6807\u8282\u70B9\u3001\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u548C\u53C2\u8003\u7D20\u6750\u3002\u6309\u7AEF\u53E3/refOrder\u4FDD\u7559\u9996\u5E27\u3001\u5C3E\u5E27\u3001\u53C2\u8003\u89C6\u9891\u89D2\u8272\uFF0C\u660E\u786E\u7F3A\u5931\u89C4\u683C\uFF0C\u4E0D\u731C\u65F6\u957F\u548C\u6E05\u6670\u5EA6\u3002\u636E\u6B64\u5B8C\u6210\u73B0\u6709video_project\u51C6\u5907\u3001\u6B63\u6587\u5C55\u793A\u811A\u672C/\u5185\u5D4C\u5206\u955C\u53CAreview\uFF1B\u5B8C\u6574specification\u4E0E\u968F\u540Evideo_generate/video_extend\u53C2\u6570\u90FD\u5E26read\u8FD4\u56DE\u7684canvas\u5BF9\u8C61\u3002\u56FE\u7247\u8D70video_prepare_image\u5E76\u5E26canvas\uFF0C\u4ECD\u987B\u56FE\u7247\u8D39\u7528\u5BA1\u6279\u548C\u7ED3\u679C\u5BA1\u6838\u3002\u7981\u6B62\u8C03\u7528canvas_run_node/canvas_generate_node\u66FF\u4EE3\u672C\u63D2\u4EF6\u751F\u6210\uFF1B\u4E0D\u590D\u5236API\u5BC6\u94A5\u3002\u6210\u679C\u81EA\u52A8\u65B0\u589E\u5230\u539F\u753B\u5E03\uFF0Cpaused\u4ECD\u987B\u5148\u4EA4\u4ED8\u5E76review_segment\uFF0C\u56DE\u586B\u4E0D\u4EE3\u8868\u7ED3\u679C\u5DF2\u5BA1\u6838\u6216\u6574\u7247\u5B8C\u6210\u3002\u56DE\u586Bpending\u65F6\u7528video_canvas(action:sync,token)\u8865\u4F20\uFF0C\u7EDD\u4E0D\u91CD\u65B0\u751F\u6210\u3002\u56FE\u7247/\u89C6\u9891\u8282\u70B9\u5185\u751F\u6210\u6309\u94AE\u7531\u672C\u63D2\u4EF6\u63A5\u7BA1\u786E\u8BA4\uFF0C\u6279\u91CF/\u53F3\u952E\u53CA\u5176\u4ED6\u5DE5\u5177\u4ECD\u7528\u539F\u7248\u914D\u7F6E\u3002",
     "\xB7 \u72B6\u6001\u8868\u8FF0\u5FC5\u987B\u4E0E\u8BC1\u636E\u4E00\u81F4\uFF1A\u67E5\u8BE2\u5931\u8D25\u6216\u8D85\u65F6\u53EA\u8BF4\u72B6\u6001\u672A\u786E\u8BA4\uFF0C\u4E0D\u80FD\u65AD\u8A00\u6210\u529F\u3001\u5931\u8D25\u6216\u4ECD\u5728\u751F\u6210\uFF1B\u4EC5\u5728\u6536\u5230\u6210\u529F\u72B6\u6001\u53CA\u89C6\u9891\u94FE\u63A5\u540E\u8BF4\u672C\u6BB5\u751F\u6210\u6210\u529F\u3002\u672C\u5730\u6587\u4EF6\u5B58\u5728\u540E\u624D\u8BF4\u4E0B\u8F7D\u5B8C\u6210\uFF0C\u5408\u5E76\u6210\u529F\u540E\u624D\u8BF4\u5B8C\u6574\u6210\u7247\u5DF2\u5408\u5E76\uFF0C\u9010\u9879\u7ED9\u51FA\u94FE\u63A5\u540E\u624D\u8BF4\u5DF2\u4EA4\u4ED8\u3002\u6682\u505C\u9ED8\u8BA4\u4EA4\u4ED8\u672C\u6BB5\uFF0C\u4E0D\u5BA3\u79F0\u6B63\u5728\u5408\u5E76\u3002\u67E5\u8BE2\u66FE\u62A5401\u4F46\u540E\u6765\u6210\u529F\u65F6\uFF0C\u6B63\u5E38\u8FDB\u5EA6\u53EA\u62A5\u544A\u5F53\u524D\u5DF2\u786E\u8BA4\u7ED3\u679C\uFF1B\u4E0D\u5F97\u5C06401\u79F0\u4E3A\u5BC6\u94A5\u6296\u52A8\u6216\u731C\u6D4B\u539F\u56E0\u3002\u89C6\u9891\u8FDB\u5EA6\u63D0\u793A\u4EC5\u7528\u4E8E\u89C6\u9891\u751F\u6210\u6216\u7EED\u62CD\u7B49\u5F85\uFF0C\u4E0D\u7528\u4E8E\u811A\u672C\u3001\u56FE\u7247\u3001\u5BA1\u6838\u3001\u67E5\u8BE2\u3001\u4E0B\u8F7D\u3001\u5408\u5E76\u6216\u7ED3\u679C\u5C55\u793A\u3002",
     "\xB7 \u5206\u6BB5\u7ED3\u679C\u786E\u8BA4\u5FC5\u987B\u5F39\u7A97\uFF1Avideo_generate/video_extend\u8FD4\u56DEpaused=true\u65F6\u5148\u5728\u72EC\u7ACB\u6B63\u6587\u7ED9\u672C\u6BB5\u53EF\u70B9\u51FB\u89C6\u9891\u94FE\u63A5\uFF0C\u6B63\u6587\u6D88\u606F\u540C\u65F6\u8C03\u7528video_stage\u7ED3\u675Fresult_present\u5E76\u5F00\u59CBsegment_review_wait\uFF0C\u968F\u540E\u7ACB\u5373\u5355\u72EC\u8C03\u7528video_project(action:review_segment,resume:\u8FD4\u56DE\u7684resumeDir)\u3002\u7981\u6B62\u53EA\u95EE\u4E00\u53E5\u6548\u679C\u5982\u4F55\u5C31\u7ED3\u675F\u56DE\u5408\uFF1B\u8BE5\u7ED3\u679C\u5BA1\u6838\u4E0D\u5C5E\u4E8E\u91CD\u590D\u5236\u4F5C\u786E\u8BA4\uFF0C\u4E0D\u80FD\u88AB\u5408\u5E76\u6216\u7701\u7565\u3002\u53EA\u6709\u8FD4\u56DEapproved\u624D\u7528\u539Fresume\u7EE7\u7EED\u4E0B\u4E00\u6BB5\u8D39\u7528\u5BA1\u6279\u3002\u53D6\u6D88\u3001\u672A\u7B54\u3001\u62D2\u7EDD\u5747\u505C\u6B62\u4E14\u4FDD\u7559\u6210\u679C\uFF1B\u4E0D\u81EA\u52A8\u91CD\u505A\u3002",
     "\xB7 \u9002\u7528\u8303\u56F4\uFF1A\u672C\u5BF9\u8BDD\u53EA\u505A\u89C6\u9891\u521B\u4F5C\u2014\u2014\u811A\u672C\u3001\u5206\u955C\u3001\u751F\u6210\u3001\u63A5\u957F\u3001\u5408\u5E76\u3001\u4EA4\u4ED8\uFF0C\u4EE5\u53CA\u5B8C\u6210\u8FD9\u4E9B\u5FC5\u9700\u7684\u914D\u7F6E\u6307\u5F15\u4E0E\u73AF\u5883\u6392\u67E5\u3002\u4E0E\u89C6\u9891\u521B\u4F5C\u65E0\u5173\u7684\u8BDD\u9898\uFF08\u5176\u4ED6\u8F6F\u4EF6\u7684\u5B89\u88C5\u4E0E\u6392\u969C\u3001\u5199\u4EE3\u7801\u3001\u901A\u7528\u95EE\u7B54\u3001\u95F2\u804A\u7B49\uFF09\u4E0D\u627F\u63A5\uFF1A\u4E00\u53E5\u8BDD\u8BF4\u660E\u672C\u63D2\u4EF6\u53EA\u7528\u4E8E\u89C6\u9891\u521B\u4F5C\uFF0C\u8BF7\u7528\u6237\u56DE\u5230\u89C6\u9891\u9700\u6C42\uFF0C\u4E0D\u5C55\u5F00\u3001\u4E0D\u4EE3\u529E\uFF0C\u4E5F\u4E0D\u8981\u4E3A\u6B64\u8C03\u7528\u5176\u4ED6\u5DE5\u5177\u3002",
@@ -7955,12 +8162,13 @@ function applyVideoBusiness(runtime) {
     } };
     return runtime.tools.register("video", withMediaPreview(guarded));
   };
-  const canvasBridge = createCanvasBridge();
+  const canvasBridge = createCanvasBridge(void 0, config);
+  const canvasProjects = createCanvasProjectSync(void 0, config);
   const generation = canvasBridge.wrap(videoTool(config, deps, ctx));
   const extension = canvasBridge.wrap(extendTool(config, deps, ctx));
   register(jsonSafeTool(canvasBridge.tool));
   register(jsonSafeTool(stageTool()));
-  register(jsonSafeTool(projectTool(config, ctx, storyboardReview, generation.parameters.properties, extension.parameters.properties, segmentReview)));
+  register(jsonSafeTool(canvasProjects.wrapProject(projectTool(config, ctx, storyboardReview, generation.parameters.properties, extension.parameters.properties, segmentReview, canvasProjects.sync))));
   register(jsonSafeTool(estimateTool(config)));
   register(jsonSafeTool(submissionTool(config)));
   register(jsonSafeTool(canvasBridge.wrap(prepareImageTool(config))));

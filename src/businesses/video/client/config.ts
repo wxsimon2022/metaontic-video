@@ -37,6 +37,7 @@ export function createClientConfig() {
       { key: 'sectionConnection', fields: ['connectionMode'] },
       { key: 'sectionModels', fields: ['imageUseVideoKey', 'model', 'metaonticApiKey', 'volcengineApiKey', 'imageModel', 'imageApiKey'] },
       { key: 'sectionVideo', fields: ['ratio', 'generateAudio'] },
+      { key: 'sectionCanvas', fields: ['autoCreateCanvas'] },
     ];
     const FIELDS = [
       { key: 'connectionMode', kind: 'select', wide: true },
@@ -51,6 +52,7 @@ export function createClientConfig() {
       { key: 'generateAudio', kind: 'switch' },
       { key: 'watermark', kind: 'switch' },
       { key: 'usageStatsEnabled', kind: 'switch' },
+      { key: 'autoCreateCanvas', kind: 'switch', wide: true },
       { key: 'seamTrimSeconds', kind: 'text' },
       { key: 'mergeMode', kind: 'select', wide: true },
       { key: 'pollIntervalMs', kind: 'number' },
@@ -62,7 +64,7 @@ export function createClientConfig() {
 
     /** 插件自己会写进配置的项：重置时兜底一起清，免得宿主没把它们列进 user。 */
     const PLUGIN_OWNED_KEYS = [
-      'usageStatsEnabled', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'entryId', 'baseUrl',
+      'autoCreateCanvas', 'usageStatsEnabled', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'entryId', 'baseUrl',
       'submitPath', 'queryPath', 'imageUseVideoKey', 'imageApiKey', 'imageModel', 'model',
       'estimateGroupRatio', 'duration', 'singleMaxSeconds', 'seamTrimSeconds', 'mergeMode', 'bgmFadeSeconds',
       'outputDir', 'keepSegments', 'resumeLockStaleMinutes', 'ffmpegBinary', 'ffprobeBinary', 'mode',

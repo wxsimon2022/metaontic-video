@@ -3,13 +3,51 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { readProject, writeProject, lockProject } from '../workflow/project.js';
+import { ref } from '../config.js';
 import { loadCanvasAdapter, readCanvasInput } from './canvas.js';
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
-export function createCanvasProjectSync(load = loadCanvasAdapter) {
+/** 提取真实剧本分镜表；没有明确的镜头/画面列时不编造镜头或秒数。 */
+export function scriptStoryboardShots(script: string) {
+  const lines = script.split(/\r?\n/), shots = [];
+  const cells = line => line.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/).map(s => s.trim().replace(/\\\|/g, '|'));
+  let fenced = false;
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (/^\s*(```|~~~)/.test(lines[i])) { fenced = !fenced; continue; }
+    if (fenced || !lines[i].includes('|')) continue;
+    const header = cells(lines[i]), separator = cells(lines[i + 1]);
+    if (separator.length !== header.length || !separator.every(x => /^:?-{3,}:?$/.test(x))) continue;
+    const titleAt = header.findIndex(x => /镜头|shot/i.test(x));
+    const visualAt = header.findIndex(x => /画面|visual/i.test(x));
+    if (titleAt < 0 || visualAt < 0 || titleAt === visualAt) continue;
+    const timeAt = header.findIndex(x => /时间|时长|time|duration/i.test(x));
+    const cameraAt = header.findIndex(x => /景别|运镜|camera/i.test(x));
+    const soundAt = header.findIndex(x => /声音|音效|sound|sfx/i.test(x));
+    const dialogueAt = header.findIndex(x => /台词|对白|dialogue/i.test(x));
+    for (i += 2; i < lines.length && lines[i].includes('|') && lines[i].trim(); i++) {
+      const row = cells(lines[i]);
+      if (row.length !== header.length || !row[visualAt]) continue;
+      const time = row[timeAt] || '', range = time.match(/(\d+(?:\.\d+)?)\s*(?:秒|s)?\s*[–—~～至-]\s*(\d+(?:\.\d+)?)/i);
+      const explicit = time.match(/^(\d+(?:\.\d+)?)\s*(?:秒|s)$/i);
+      const duration = range ? Number(range[2]) - Number(range[1]) : explicit ? Number(explicit[1]) : null;
+      shots.push({ title: row[titleAt], visual: header.map((h, j) => `${h}：${row[j]}`).join('\n'),
+        camera: row[cameraAt] || '', sfx: row[soundAt] || '',
+        dialogue: row[dialogueAt] ? [{ role: '剧本对白', line: row[dialogueAt] }] : [],
+        ...(duration > 0 ? { duration } : {}), metaonticTime: time });
+    }
+    i--;
+  }
+  return shots;
+}
+
+export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = {}) {
   async function sync(projectId, exec, draft: any = {}) {
+    if (ref(config, 'autoCreateCanvas', true) === false) return { status: 'disabled', reason: '已在插件设置关闭自动创建流程画布；已有画布保留。' };
     return lockProject(`canvas:${projectId}`, async () => {
       const project = await readProject(projectId, exec);
+      // status重试也恢复已审核材料，不能用空草稿覆盖制作计划。
+      draft = { ...(project.canvasDraft || { scriptPath: project.approved?.scriptPath, specification: project.approved?.specification }), ...draft };
+      if (draft.specification?.canvas) return { status: 'external', projectId: draft.specification.canvas.projectId, reason: '沿用用户选择的原画布，不另建项目。' };
       let adapter;
       try { adapter = await load(); }
       catch { return { status: 'unavailable', reason: '自动画布尚未就绪，请安装并启用原版无限画布0.20.1；创作项目已保留。' }; }
@@ -58,15 +96,15 @@ export function createCanvasProjectSync(load = loadCanvasAdapter) {
         if (!existing) edges.push(desired);
         managedEdges[id] = digest(desired);
       };
-      const source = add('script', 'script', '完整剧本', 40, 60, { label: '完整剧本', idea: '由MetaOnticVideo创作项目同步', output: script || nodes[`${prefix}_script`]?.data?.output || '', status: script ? 'done' : 'idle', metaonticProjectId: project.id });
+      const source = add('script', 'script', '完整剧本', 40, 60, { label: '完整剧本', idea: '由MetaOnticVideo创作项目同步', output: script || nodes[`${prefix}_script`]?.data?.output || '', status: (script || nodes[`${prefix}_script`]?.data?.output) ? 'done' : 'idle', metaonticProjectId: project.id });
       const overview = add('project', 'text', '创作项目', 40, 400, { label: '创作项目', text: `目标时长：${project.duration ?? '待确认'}秒\n角色图路线：${project.choice || '待确认'}\n脚本、费用与分段审核仍按原流程进行；自动建图不产生模型费用。`, metaonticProjectId: project.id });
       connect(overview, source);
       let nodeId = `${prefix}_production`;
       if (specification) {
         // segmentPrompts代表真实制作段；不把付费段数冒充创作镜头数。
         const prompts = specification.segmentPrompts?.length ? specification.segmentPrompts : [specification.prompt];
-        const shots = prompts.map((prompt, index) => ({ id: `${prefix}_plan_${index + 1}`, title: `制作段${index + 1}`, visual: prompt, prompt }));
-        const board = add('storyboard', 'storyboard', '分镜与制作提示词', 540, 60, { label: '分镜与制作提示词', shots, output: script, status: 'done', metaonticProjectId: project.id, metaonticPlanNote: '完整创作分镜见剧本；此列表保留实际制作段提示词，不按段数推断镜头。' });
+        const shots = scriptStoryboardShots(script); // 不把制作段冒充创作镜头。
+        const board = add('storyboard', 'storyboard', '镜头分镜', 540, 60, { label: '镜头分镜', shots, script, output: script, status: 'done', metaonticProjectId: project.id, metaonticPlanNote: shots.length ? '按剧本分镜表同步，制作段计划另列，不触发生成。' : '未识别到分镜表，完整原文保留在剧本中；制作段计划另列。' });
         connect(source, board, 'script');
         for (const [index, prompt] of prompts.entries()) {
           const plan = add(`segment_${index + 1}`, 'text', `第${index + 1}段制作内容`, 1050, 60 + index * 320, { label: `第${index + 1}段制作内容`, text: String(prompt), metaonticProjectId: project.id });
@@ -95,6 +133,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter) {
     return { ...tool, async execute(args, exec) {
       // 先执行原有创作与审核，未确认时长/角色图不提前创建画布。
       const result = await tool.execute(args, exec);
+      if (result?.canvasProject) return result;
       if (!result?.projectId || !['prepare', 'review', 'status'].includes(args.action) || ['pending', 'blocked'].includes(result.status)) return result;
       try {
         const canvas = await sync(result.projectId, exec, args.action === 'review' ? args : {});

@@ -39,3 +39,5 @@ description: 用于宣传视频助手模式或明确的产品、品牌、服务�
 原版canvas_run_node/canvas_generate_node使用原版配置，不用它们代替MetaOnticVideo生成。成果由桥接自动新增回原画布；canvasSync.pending时用video_canvas(action:sync,token)补传，不重新生成、不重复扣费。源稿修改后重新read和review；不复活已删节点。
 
 用户可在画布中选中一个节点，点击工具栏「用 MetaOnticVideo 生成」自动填入节点定位请求；收到此请求直接用定位信息调用video_canvas read，不重复索取项目名/节点名。填入请求不表示用户已审核制作规格或同意费用，继续走既有审核和确认。
+
+创作与无限画布自动融合：普通视频需求仍按现有创作流程调用video_project prepare/review，项目工具自动创建原版画布项目、同步完整剧本和实际制作段计划并请求打开。无需用户另建项目/节点，也不需要另问是否同步画布。生成工具凭projectId（续做凭原resume）自动找到绑定并回填成果，无需助手抄写自动绑定canvas参数；明确从已有节点发起时仍使用read返回的canvas。canvasProject unavailable/pending须如实说明，通过video_project status重试同步，不新建创作项目、不重复付费生成。自动建图不代表脚本、费用或分段成果已审核，原审核全部保留。
