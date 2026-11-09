@@ -75,8 +75,9 @@ test('画布项目名跟随会话标题，用户改过的画布名不被覆盖',
   let title='民勤蜜瓜独白短视频';
   const sync=api.createCanvasProjectSync(async()=>adapter,{}, {get:()=>({title})});
   await sync.sync(project.id,exec);
-  // 创建仍用唯一名（重试靠同名幂等复用），画布上显示的名字直接就是会话标题。
-  assert.equal(created,`MetaOntic 创作 ${project.id}`);
+  // 画布名与会话标题同源，不带创作项目 id；重试仍靠原版同名幂等复用。
+  assert.equal(created,title);
+  assert.ok(!created.includes(project.id));
   assert.equal(doc.name,title);
   // 画布端把项目名当本地字段，却把默认画布名当 Host 权威：两处都写，界面上才稳定显示会话名。
   assert.equal(doc.defaultCanvasName,title);
@@ -92,6 +93,11 @@ test('画布项目名跟随会话标题，用户改过的画布名不被覆盖',
   assert.equal(puts.at(-1).doc,false);
   assert.equal((await api.readProject(project.id,exec)).canvasAuto.appliedName,title);
   // 用户手动改过的画布名：标题事件与同步都不覆盖。
+  // 画布端把自己的项目名缓存推回来（这里直接改回来模拟）：同步不再跟着来回改，画布名照旧跟随标题。
+  doc.name=`MetaOntic 创作画布`;
+  await sync.sync(project.id,exec);
+  assert.equal(doc.name,'MetaOntic 创作画布');
+  assert.equal(doc.defaultCanvasName,title);
   doc.name='我的话布';doc.defaultCanvasName='我的第一集';
   await sync.followTitle(exec.agent.session,{type:'session/title',data:{title:'又一次改名'}});
   assert.equal(doc.name,'我的话布');
@@ -119,17 +125,18 @@ test('首轮还没有会话标题时先建画布，标题落定后补名；非�
   }};
   const sync=api.createCanvasProjectSync(async()=>adapter,{}, {get:()=>null});
   await sync.sync(project.id,exec);
-  assert.equal(doc.name,`MetaOntic 创作 ${project.id}`);
+  assert.equal(doc.name,'MetaOntic 创作画布');
+  assert.ok(!doc.name.includes(project.id));
   await sync.followTitle(exec.agent.session,{type:'turn/end',data:{title:'不算标题'}});
   await sync.followTitle(exec.agent.session,{type:'session/title',data:{title:'   '}});
   await sync.followTitle({id:'other-session'},{type:'session/title',data:{title:'别的会话'}});
-  assert.equal(doc.name,`MetaOntic 创作 ${project.id}`);
+  assert.equal(doc.name,'MetaOntic 创作画布');
   await sync.followTitle(exec.agent.session,{type:'session/title',data:{title:'15秒小孩与父母搞笑视频'}});
   assert.equal(doc.name,'15秒小孩与父母搞笑视频');
   assert.equal(doc.defaultCanvasName,'15秒小孩与父母搞笑视频');
   const again=await api.readProject(project.id,exec);
   assert.equal(again.canvasAuto.appliedName,'15秒小孩与父母搞笑视频');
-  assert.equal(again.canvasAuto.name,`MetaOntic 创作 ${project.id}`);
+  assert.equal(again.canvasAuto.name,'MetaOntic 创作画布');
  }finally{if(old===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=old;await rm(root,{recursive:true,force:true});}
 });
 
@@ -138,6 +145,8 @@ test('画布名归属判定只认插件写过的名字',()=>{
  assert.equal(api.pluginNamedCanvas(binding,'MetaOntic 创作 abc-123'),true);
  assert.equal(api.pluginNamedCanvas(binding,'MetaOntic 创作 9ebc517d'),true);
  assert.equal(api.pluginNamedCanvas({appliedName:'民勤蜜瓜独白短视频'},'民勤蜜瓜独白短视频'),true);
+ // 交付过名字之后，画布端推回来的创建名不再算插件可写，避免两边来回改。
+ assert.equal(api.pluginNamedCanvas({name:'MetaOntic 创作画布',appliedName:'民勤蜜瓜独白短视频'},'MetaOntic 创作画布'),false);
  assert.equal(api.pluginNamedCanvas(binding,'我的话布'),false);
  assert.equal(api.pluginNamedCanvas(binding,''),false);
  // 老版本只写过标题、没记归属：名字正好等于当前标题时按插件写过处理。
@@ -149,6 +158,37 @@ test('画布名归属判定只认插件写过的名字',()=>{
  assert.equal(api.pluginNamedCanvasName(binding,'我的第一集','民勤蜜瓜独白短视频'),false);
  // 原版 projectsGet 不带该字段时视为缺省「默认画布」，仍算插件可写。
  assert.equal(api.pluginNamedCanvasName(binding,'','民勤蜜瓜独白短视频'),true);
+});
+
+test('同名画布已被别的创作项目占用时另起带序号的名字，不写进别人的画布',async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'自动画布 重名 ')),old=process.env.DSH_HOME;
+ process.env.DSH_HOME=root;
+ try {
+  const exec={agent:{session:{id:'auto-canvas-dup',header:{cwd:root}}}};
+  const first=await api.createProject(exec,'scenery');first.duration=30;first.choice='not_needed';
+  first.canvasAuto={version:1,name:'民勤蜜瓜独白短视频',projectId:'pother',nodes:{},links:{}};
+  await api.writeProject(first);
+  const project=await api.createProject(exec,'scenery');project.duration=30;project.choice='not_needed';await api.writeProject(project);
+  const docs=new Map([['pother',{name:'民勤蜜瓜独白短视频',nodes:{},edges:[],defaultCanvasName:'默认画布'}]]);
+  const attempted=[];
+  const adapter={connect:async()=>({ok:true,already:true}),rpc:{
+   canvasCreateProject:async(args)=>{attempted.push(args.name);
+    if(args.name==='民勤蜜瓜独白短视频')return {ok:true,projectId:'pother',name:args.name,reused:true};
+    docs.set('p2',{name:args.name,nodes:{},edges:[],defaultCanvasName:'默认画布'});return {ok:true,projectId:'p2',name:args.name};},
+   projectsGet:async({id})=>structuredClone(docs.get(id)),
+   projectsPut:async({id,name,defaultCanvasName})=>{const d=docs.get(id);if(name)d.name=name;if(defaultCanvasName)d.defaultCanvasName=defaultCanvasName;return {ok:true};},
+   dataRootGet:async()=>({dataRoot:root}),assetsGet:async()=>({items:[]}),
+   projectDirGet:async()=>({ok:true,abs:path.join(root,'projects','p2'),dataRoot:root}),
+   assetCreate:async()=>({ok:true}),canvasOpen:async()=>({ok:true}),
+  }};
+  const sync=api.createCanvasProjectSync(async()=>adapter,{}, {get:()=>({title:'民勤蜜瓜独白短视频'})});
+  const result=await sync.sync(project.id,exec);
+  assert.deepEqual(attempted,['民勤蜜瓜独白短视频','民勤蜜瓜独白短视频 2']);
+  assert.equal(result.projectId,'p2');
+  assert.equal((await api.readProject(project.id,exec)).canvasAuto.name,'民勤蜜瓜独白短视频 2');
+  assert.equal(docs.get('pother').name,'民勤蜜瓜独白短视频');
+  assert.equal(docs.get('p2').name,'民勤蜜瓜独白短视频');
+ }finally{if(old===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=old;await rm(root,{recursive:true,force:true});}
 });
 
 test('老版本只写过标题名的画布补记归属，以后跟着会话改名',async()=>{

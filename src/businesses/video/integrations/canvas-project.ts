@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { readProject, writeProject, lockProject, projectsOfSession } from '../workflow/project.js';
+import { readProject, writeProject, lockProject, projectsOfSession, allProjects } from '../workflow/project.js';
 import { ref } from '../config.js';
 import { loadCanvasAdapter, readCanvasInput, markCanvasChanged } from './canvas.js';
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -54,8 +54,10 @@ export function canvasScriptPreview(script: string) {
 export function pluginNamedCanvas(binding: any, current: any, title: any = '') {
   const name = String(current || '').trim(), wanted = String(title || '').trim();
   if (!name) return false;
-  return name === binding?.name || name === binding?.appliedName || name.startsWith('MetaOntic 创作 ')
-    || Boolean(wanted) && name === wanted;
+  // 已经交付过名字：之后只认那一个名字。画布端把项目名当自己的本地字段，会把旧名推回来，
+  // 认创建名就会两边来回改；让给它，画布名（Host 权威）仍然跟着会话标题。
+  if (binding?.appliedName) return name === binding.appliedName;
+  return name === binding?.name || name.startsWith('MetaOntic 创作') || Boolean(wanted) && name === wanted;
 }
 
 /** 画布内的默认画布名同理：只有原版缺省名、上次应用的名字或当前标题能证明是插件写的。
@@ -83,15 +85,19 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       if (!rpc.canvasCreateProject) return { status: 'unavailable', reason: '原版画布缺少创建接口，未创建替代画布。' };
       const prefix = `mov_${project.id.replaceAll('-', '')}`;
       // 名称先持久化：创建成功但响应/记录保存中断时，重试由原版同名幂等复用。
+      // 画布名与会话标题同源，不带创作项目 id；标题未生成时用中性名，冲突时再接序号。
+      const baseName = conversationName || 'MetaOntic 创作画布';
       if (!project.canvasAuto) {
-        project.canvasAuto = { version: 1, name: `MetaOntic 创作 ${project.id}`, nodes: {}, links: {} };
+        project.canvasAuto = { version: 1, name: baseName, nodes: {}, links: {} };
         await writeProject(project);
       }
       const binding = project.canvasAuto;
       if (!binding.projectId) {
-        const created = await rpc.canvasCreateProject({ name: binding.name });
+        const created = await createAutoCanvas(rpc, project, binding, baseName);
         if (!created?.ok || !/^[A-Za-z0-9_-]{1,100}$/.test(created.projectId || '')) throw new Error('自动画布创建未确认，请重试同步，不重新创建创作项目。');
-        binding.projectId = created.projectId; await writeProject(project);
+        binding.projectId = created.projectId;
+        if (created.name) binding.name = String(created.name);
+        await writeProject(project);
       }
       const loc = { id: binding.projectId };
       const doc = await rpc.projectsGet(loc);
@@ -201,6 +207,26 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       return { status: 'synced', projectId: binding.projectId, nodeId, openRequested: opened, bindingReady: Boolean(binding.canvas),
         ...(!binding.canvas ? { reason: '画布节点已建立；成果回填前请在原版画布设置数据根目录。' } : {}) };
     });
+  }
+  /** 原版按名字复用项目：同名项目已属于别的创作项目时让开，换成带序号的中性名再建，
+   *  既不带创作项目 id，也不写进别人的画布。 */
+  async function createAutoCanvas(rpc, project, binding, baseName) {
+    const created = await rpc.canvasCreateProject({ name: binding.name || baseName });
+    if (!created?.ok || !created.reused) return created;
+    if (!(await canvasClaimedByOthers(created.projectId, project.id))) return created;
+    for (let index = 2; index <= 5; index++) {
+      const retry = await rpc.canvasCreateProject({ name: `${baseName} ${index}` });
+      if (!retry?.ok) return retry;
+      if (!retry.reused) return retry;
+      if (!(await canvasClaimedByOthers(retry.projectId, project.id))) return retry;
+    }
+    return created;
+  }
+  async function canvasClaimedByOthers(projectId, selfProjectId) {
+    for (const other of await allProjects()) {
+      if (other?.id !== selfProjectId && other?.canvasAuto?.projectId === projectId) return true;
+    }
+    return false;
   }
   /** 会话标题落定或被改名后补齐画布项目名；只改插件写过的名字，不覆盖用户改名，也不改动图。 */
   async function followTitle(session, event) {

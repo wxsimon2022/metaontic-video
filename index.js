@@ -2907,6 +2907,19 @@ function sessionOwner(exec) {
   if (typeof id !== "string" || !id) throw new Error("\u9879\u76EE\u64CD\u4F5C\u9700\u8981\u53EF\u8BC6\u522B\u7684\u4F1A\u8BDD\uFF0C\u5C1A\u672A\u63D0\u4EA4\u89C6\u9891\u3002");
   return hash(id);
 }
+async function allProjects() {
+  const dir = path8.join(dshHome(), "metaontic-video", "projects");
+  const names = await readdir2(dir).catch(() => []);
+  const found = [];
+  for (const name of names) {
+    if (!name.endsWith(".json")) continue;
+    try {
+      found.push(JSON.parse(await readFile4(path8.join(dir, name), "utf8")));
+    } catch {
+    }
+  }
+  return found;
+}
 async function projectsOfSession(session) {
   let owner;
   try {
@@ -2914,18 +2927,7 @@ async function projectsOfSession(session) {
   } catch {
     return [];
   }
-  const dir = path8.join(dshHome(), "metaontic-video", "projects");
-  const names = await readdir2(dir).catch(() => []);
-  const found = [];
-  for (const name of names) {
-    if (!name.endsWith(".json")) continue;
-    try {
-      const data = JSON.parse(await readFile4(path8.join(dir, name), "utf8"));
-      if (data?.owner === owner) found.push(data);
-    } catch {
-    }
-  }
-  return found;
+  return (await allProjects()).filter((project) => project?.owner === owner);
 }
 function projectFile(id) {
   if (!/^[a-f0-9-]{36}$/.test(String(id || ""))) throw new Error("\u7F3A\u5C11\u6709\u6548 projectId\uFF0C\u8BF7\u5148\u8C03\u7528 video_project(action:prepare)\u3002");
@@ -5155,7 +5157,8 @@ function canvasScriptPreview(script) {
 function pluginNamedCanvas(binding, current, title = "") {
   const name = String(current || "").trim(), wanted = String(title || "").trim();
   if (!name) return false;
-  return name === binding?.name || name === binding?.appliedName || name.startsWith("MetaOntic \u521B\u4F5C ") || Boolean(wanted) && name === wanted;
+  if (binding?.appliedName) return name === binding.appliedName;
+  return name === binding?.name || name.startsWith("MetaOntic \u521B\u4F5C") || Boolean(wanted) && name === wanted;
 }
 function pluginNamedCanvasName(binding, current, title = "") {
   const name = String(current || "").trim(), wanted = String(title || "").trim();
@@ -5182,15 +5185,17 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
       }
       if (!rpc.canvasCreateProject) return { status: "unavailable", reason: "\u539F\u7248\u753B\u5E03\u7F3A\u5C11\u521B\u5EFA\u63A5\u53E3\uFF0C\u672A\u521B\u5EFA\u66FF\u4EE3\u753B\u5E03\u3002" };
       const prefix = `mov_${project.id.replaceAll("-", "")}`;
+      const baseName = conversationName || "MetaOntic \u521B\u4F5C\u753B\u5E03";
       if (!project.canvasAuto) {
-        project.canvasAuto = { version: 1, name: `MetaOntic \u521B\u4F5C ${project.id}`, nodes: {}, links: {} };
+        project.canvasAuto = { version: 1, name: baseName, nodes: {}, links: {} };
         await writeProject(project);
       }
       const binding = project.canvasAuto;
       if (!binding.projectId) {
-        const created = await rpc.canvasCreateProject({ name: binding.name });
+        const created = await createAutoCanvas(rpc, project, binding, baseName);
         if (!created?.ok || !/^[A-Za-z0-9_-]{1,100}$/.test(created.projectId || "")) throw new Error("\u81EA\u52A8\u753B\u5E03\u521B\u5EFA\u672A\u786E\u8BA4\uFF0C\u8BF7\u91CD\u8BD5\u540C\u6B65\uFF0C\u4E0D\u91CD\u65B0\u521B\u5EFA\u521B\u4F5C\u9879\u76EE\u3002");
         binding.projectId = created.projectId;
+        if (created.name) binding.name = String(created.name);
         await writeProject(project);
       }
       const loc = { id: binding.projectId };
@@ -5331,6 +5336,24 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
         ...!binding.canvas ? { reason: "\u753B\u5E03\u8282\u70B9\u5DF2\u5EFA\u7ACB\uFF1B\u6210\u679C\u56DE\u586B\u524D\u8BF7\u5728\u539F\u7248\u753B\u5E03\u8BBE\u7F6E\u6570\u636E\u6839\u76EE\u5F55\u3002" } : {}
       };
     });
+  }
+  async function createAutoCanvas(rpc, project, binding, baseName) {
+    const created = await rpc.canvasCreateProject({ name: binding.name || baseName });
+    if (!created?.ok || !created.reused) return created;
+    if (!await canvasClaimedByOthers(created.projectId, project.id)) return created;
+    for (let index = 2; index <= 5; index++) {
+      const retry = await rpc.canvasCreateProject({ name: `${baseName} ${index}` });
+      if (!retry?.ok) return retry;
+      if (!retry.reused) return retry;
+      if (!await canvasClaimedByOthers(retry.projectId, project.id)) return retry;
+    }
+    return created;
+  }
+  async function canvasClaimedByOthers(projectId, selfProjectId) {
+    for (const other of await allProjects()) {
+      if (other?.id !== selfProjectId && other?.canvasAuto?.projectId === projectId) return true;
+    }
+    return false;
   }
   async function followTitle(session, event) {
     try {
