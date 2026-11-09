@@ -145,7 +145,7 @@ test('first Save waits for background device synchronization instead of silently
   h.ctx.connectionBusy.current = false; h.ctx.connectionBusy.pending = null; release();
   await first;
   assert.equal(h.calls(), 1); assert.equal(h.state.connectionMode, 'metaontic');
-  assert.equal(h.state.metaonticApiKey, 'video-key'); assert.equal(h.state.apiKey, '');
+  assert.equal(h.state.metaonticApiKey, 'video-key'); assert.equal(h.state.apiKey, 'previous');
   assert.equal(h.ctx.saveInFlight.current, false);
   assert.ok(h.events.some(e => Array.isArray(e) && e[0] === 'flash' && e[1] === 'saved'));
 });

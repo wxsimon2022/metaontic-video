@@ -9,6 +9,11 @@ const dir = await mkdtemp(path.join(tmpdir(), 'metaontic-module-test-'));
 await build({ stdin: { contents: `
 export * from './src/businesses/video/client/progress.ts';
 export * from './src/client/auth-notice.ts';
+export * from './src/client/infinite-canvas.ts';
+export * from './src/client/canvas-launcher.ts';
+export * from './src/client/canvas-native.ts';
+export * from './src/businesses/video/integrations/canvas-native.ts';
+export * from './src/businesses/video/integrations/canvas.ts';
 export * from './src/core/telemetry/reporter.ts';
 export {classifyError} from './src/businesses/video/utils/errors.ts';
 export * from './src/businesses/video/client/tool-result.ts';

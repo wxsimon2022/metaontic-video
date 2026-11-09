@@ -31,3 +31,11 @@ description: 用于宣传视频助手模式或明确的产品、品牌、服务�
 准备完整逐段提示词，正文展示脚本与分镜后调用video_project(action:review)。通过后调用对应视频工具，由其付费审批确认制作，不额外重复问开始制作。
 
 生成每段后先展示视频，再review_segment确认效果，随后进入下一段费用审批。未知或超时任务按原taskId/resume查询；已完成段不重做，新段仍计费。最终成片在前、原始分段在后，正文给出真实可点击链接，交付卡片只登记最终成片。没有实际生成或合并成功时，不声称已经完成。
+
+## 无限画布联动
+
+用户要求制作画布节点时，先用video_canvas(action:list/read)定位项目和节点，读取原稿、分镜、连线端口与参考素材；不让用户手工抄写已有文本，不询问API密钥。遵守原有创意完善、缺失规格、角色图选择和脚本审核流程。video_project.review的specification和随后video_generate/video_extend需携带read返回的canvas对象；图片走video_prepare_image并带canvas。生成、续拍及图片费用审批不能省略；暂停仍须展示真实分段后review_segment。
+
+原版canvas_run_node/canvas_generate_node使用原版配置，不用它们代替MetaOnticVideo生成。成果由桥接自动新增回原画布；canvasSync.pending时用video_canvas(action:sync,token)补传，不重新生成、不重复扣费。源稿修改后重新read和review；不复活已删节点。
+
+用户可在画布中选中一个节点，点击工具栏「用 MetaOnticVideo 生成」自动填入节点定位请求；收到此请求直接用定位信息调用video_canvas read，不重复索取项目名/节点名。填入请求不表示用户已审核制作规格或同意费用，继续走既有审核和确认。

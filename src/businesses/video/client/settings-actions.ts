@@ -53,7 +53,8 @@ export function createSettingsActions(context: any) {
         setSaveError('');
         setStatus('saving');
         try {
-            const targets = new Set([...Object.keys(snapshot.user || {}), ...PLUGIN_OWNED_KEYS]);
+            // 旧配置可能含已移除字段；宿主即使 unset 也会拒绝非 volatile 路径。
+            const targets = new Set(PLUGIN_OWNED_KEYS);
             await persistBatch(form, [...targets].map((key) => ({ op: 'unset', path: [key] })));
             setDraft({});
             setVisibleKey('');

@@ -69,3 +69,7 @@ flowchart TB
 [Module structure and adding agents or businesses](./docs/engineering/structure-refactor.md)
 
 See [LICENSE](./LICENSE).
+
+### Infinite Canvas
+
+The video creation panel can install and open the original [`dsh-infinite-canvas`](https://github.com/NINKCH/dsh-infinite_canvas). Click Generate or Regenerate inside an image/video node to review the plan, approve costs and review results directly on the canvas, without opening or sending a chat. API keys stay in MetaOnticVideo. Each video node runs one segment (up to 15 seconds for 2.0 or 30 seconds for 2.5); review the result before extending it. Images currently support one square image per call. Results are added to the original canvas; failed publishing can be retried without generating again. Native batch runs, context-menu runs and other generation tools retain their original configuration. The assistant-based video_canvas workflow remains available for full script creation. Supports original version 0.20.1 with a configured data root; existing installations are preserved.

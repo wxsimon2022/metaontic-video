@@ -41,7 +41,7 @@ test('published host preserves schema, tool registration, live configuration and
   assert.ok(plugin.Config);
   const config = { connectionMode: 'metaontic', metaonticApiKey: 'test', model: 'seedance-2-0' };
   const host = harness(config, '/tmp');
-  assert.deepEqual([...host.tools.keys()].sort(), ['media_submission', 'video_config', 'video_estimate', 'video_extend', 'video_generate', 'video_prepare_image', 'video_project', 'video_setup', 'video_stage', 'video_status']);
+  assert.deepEqual([...host.tools.keys()].sort(), ['media_submission', 'video_canvas', 'video_config', 'video_estimate', 'video_extend', 'video_generate', 'video_prepare_image', 'video_project', 'video_setup', 'video_stage', 'video_status']);
   assert.match(host.prompt(), /直出上限 15 秒/);
   config.model = 'seedance-2-5';
   assert.match(host.prompt(), /直出上限 30 秒/);
@@ -49,7 +49,7 @@ test('published host preserves schema, tool registration, live configuration and
   assert.equal(decision.kind, 'deny');
   assert.match(decision.reason, /projectId/);
   host.dispose();
-  assert.equal(host.disposed(), 10);
+  assert.equal(host.disposed(), 11);
 });
 
 test('conversation stays inside video creation and configuration is read-only in chat', async () => {

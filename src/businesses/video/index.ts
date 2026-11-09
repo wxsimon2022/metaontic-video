@@ -14,6 +14,8 @@ import { withVideoExecution } from './workflow/execution.js';
 import { withResumeLock } from './workflow/resume.js';
 import { jsonSafeTool } from '../../core/utils/json.js';
 import { submissionTool } from './tools/media-submission.js';
+import { createCanvasBridge } from './integrations/canvas.js';
+import { registerCanvasNative } from './integrations/canvas-native.js';
 import { prepareImageTool } from './tools/video-prepare-image.js';
 import { videoTool } from './tools/video-generate.js';
 import { extendTool } from './tools/video-extend.js';
@@ -39,6 +41,7 @@ function asDisposer(value: unknown): (() => void) | undefined {
 
 function applyVideoBusiness(runtime: BusinessRuntime) {
   const { ctx, config } = runtime;
+  runtime.defer(registerCanvasNative(ctx, config));
   // 可选服务的宿主对象（会话工作目录等），拿到就放进来
   const deps: Record<string, any> = {};
   const segmentReview = createSegmentReview(ctx);
@@ -62,13 +65,17 @@ function applyVideoBusiness(runtime: BusinessRuntime) {
     } };
     return runtime.tools.register('video', withMediaPreview(guarded));
   };
+  const canvasBridge = createCanvasBridge();
+  const generation = canvasBridge.wrap(videoTool(config, deps, ctx));
+  const extension = canvasBridge.wrap(extendTool(config, deps, ctx));
+  register(jsonSafeTool(canvasBridge.tool));
   register(jsonSafeTool(stageTool()));
-  register(jsonSafeTool(projectTool(config, ctx, storyboardReview, videoTool(config, deps, ctx).parameters.properties, extendTool(config, deps, ctx).parameters.properties, segmentReview)));
+  register(jsonSafeTool(projectTool(config, ctx, storyboardReview, generation.parameters.properties, extension.parameters.properties, segmentReview)));
   register(jsonSafeTool(estimateTool(config)));
   register(jsonSafeTool(submissionTool(config)));
-  register(jsonSafeTool(prepareImageTool(config)));
-  register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(videoTool(config, deps, ctx), config), config)), 'video_generate', config), deliveryOrder.remember));
-  register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(extendTool(config, deps, ctx), config), config)), 'video_extend', config), deliveryOrder.remember));
+  register(jsonSafeTool(canvasBridge.wrap(prepareImageTool(config))));
+  register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(generation, config), config)), 'video_generate', config), deliveryOrder.remember));
+  register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(extension, config), config)), 'video_extend', config), deliveryOrder.remember));
   register(withVideoExecution(jsonSafeTool(withActualCost(taskTool(config), config))));
   register(jsonSafeTool(setupTool(config)));
   // 雪藏功能：默认不注册，不进入对外技能和提示词，仅供内部显式启用。

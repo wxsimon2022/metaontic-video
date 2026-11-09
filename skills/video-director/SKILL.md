@@ -320,3 +320,11 @@ ffmpeg -y -f concat -safe 0 -i clips/concat.txt \
 暂停默认只下载并展示新段，完整计划结束后再合并；明确需要累计预览时仅传原resume和cumulativePreview:true，只做已有视频交付，不生成下一段。
 
 状态文案按工具证据区分：上游生成成功不等于下载、合并或交付完成；查询失败/超时不推断任务终态。暂停先给本段预览并审核，不能说默认正在合并。已有分段不重生成，新增剩余分段仍计费；上游链接有效期由渠道决定，不保证24小时。401称鉴权异常，不称密钥抖动；后来成功查询后进度只报告当前确认结果。视频进度提示只用于生成/续拍等待，其他阶段禁止使用。
+
+## 无限画布联动
+
+用户要求制作画布节点时，先用video_canvas(action:list/read)定位项目和节点，读取原稿、分镜、连线端口与参考素材；不让用户手工抄写已有文本，不询问API密钥。遵守原有创意完善、缺失规格、角色图选择和脚本审核流程。video_project.review的specification和随后video_generate/video_extend需携带read返回的canvas对象；图片走video_prepare_image并带canvas。生成、续拍及图片费用审批不能省略；暂停仍须展示真实分段后review_segment。
+
+原版canvas_run_node/canvas_generate_node使用原版配置，不用它们代替MetaOnticVideo生成。成果由桥接自动新增回原画布；canvasSync.pending时用video_canvas(action:sync,token)补传，不重新生成、不重复扣费。源稿修改后重新read和review；不复活已删节点。
+
+用户可在画布中选中一个节点，点击工具栏「用 MetaOnticVideo 生成」自动填入节点定位请求；收到此请求直接用定位信息调用video_canvas read，不重复索取项目名/节点名。填入请求不表示用户已审核制作规格或同意费用，继续走既有审核和确认。

@@ -555,17 +555,33 @@
       "connectionMode",
       "metaonticApiKey",
       "volcengineApiKey",
-      "apiKey",
-      "keyOrigin",
+      "entryId",
       "baseUrl",
-      "registerEmail",
-      "deviceId",
-      "deviceSecret",
-      "loginKey",
-      "model",
-      "imageModel",
+      "submitPath",
+      "queryPath",
       "imageUseVideoKey",
-      "imageApiKey"
+      "imageApiKey",
+      "imageModel",
+      "model",
+      "estimateGroupRatio",
+      "duration",
+      "singleMaxSeconds",
+      "seamTrimSeconds",
+      "mergeMode",
+      "bgmFadeSeconds",
+      "outputDir",
+      "keepSegments",
+      "resumeLockStaleMinutes",
+      "ffmpegBinary",
+      "ffprobeBinary",
+      "mode",
+      "ratio",
+      "generateAudio",
+      "watermark",
+      "extraParams",
+      "pollIntervalMs",
+      "maxWaitMs",
+      "pollErrorRetries"
     ];
     function currentOs() {
       const nav = window.navigator || {};
@@ -1000,19 +1016,7 @@
     }
     async function persistConnection(form, pending, nextMode) {
       if (!["metaontic", "volcengine"].includes(nextMode)) throw new Error("unknownConnection");
-      const inactiveKeys = nextMode === "volcengine" ? [
-        "metaonticApiKey",
-        "apiKey",
-        "keyOrigin",
-        "baseUrl",
-        "submitPath",
-        "queryPath",
-        "registerEmail",
-        "deviceId",
-        "deviceSecret",
-        "registerApi",
-        "registerToken"
-      ] : nextMode === "metaontic" ? ["volcengineApiKey", "apiKey", "keyOrigin", "registerEmail", "deviceId", "deviceSecret", "registerApi", "registerToken"] : ["volcengineApiKey", "metaonticApiKey"];
+      const inactiveKeys = nextMode === "volcengine" ? ["metaonticApiKey", "baseUrl", "submitPath", "queryPath"] : ["volcengineApiKey"];
       const ops = pending.filter(([key]) => key !== "connectionMode" && !inactiveKeys.includes(key)).map(([key, next]) => ({ op: "set", path: [key], value: next }));
       for (const key of inactiveKeys) ops.push({ op: "set", path: [key], value: "" });
       const saved = form.getSnapshot?.()?.value || {};
@@ -1376,7 +1380,7 @@
       setSaveError("");
       setStatus("saving");
       try {
-        const targets = /* @__PURE__ */ new Set([...Object.keys(snapshot.user || {}), ...PLUGIN_OWNED_KEYS]);
+        const targets = new Set(PLUGIN_OWNED_KEYS);
         await persistBatch(form, [...targets].map((key) => ({ op: "unset", path: [key] })));
         setDraft({});
         setVisibleKey("");
@@ -2053,7 +2057,7 @@
   }
 
   // src/businesses/video/client/panel.ts
-  function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID: PANEL_ID2, GUIDE_URL: GUIDE_URL2, LOGO_SVG }) {
+  function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID: PANEL_ID2, GUIDE_URL: GUIDE_URL2, LOGO_SVG, CanvasCompanion }) {
     const LOGO_SRC = LOGO_SVG ? `data:image/svg+xml,${encodeURIComponent(LOGO_SVG)}` : "";
     const PANEL_CSS = `
       .mov-panel { width: 100%; max-width: 880px; margin: 0 auto; padding: 30px 32px 44px; display: flex; flex-direction: column; gap: 18px; }
@@ -2263,6 +2267,7 @@
             }, t("panelGuide"))
           ])
         ]),
+        CanvasCompanion && h(CanvasCompanion, { key: "canvas", manager: props.manager, openCanvas: props.openCanvas, openCanvasSettings: props.openCanvasSettings, startSession: props.startSession }),
         h("section", { key: "flow", className: "mov-section" }, [
           h("div", { key: "flow-label", className: "mov-section-title" }, t("panelFlow")),
           h("div", { key: "flow-steps", className: "mov-panel-flow" }, flowChildren)
@@ -2270,6 +2275,470 @@
       ]);
     }
     return { PANEL_ID: PANEL_ID2, PanelIcon, VideoPanel };
+  }
+
+  // src/client/infinite-canvas.ts
+  var CANVAS_PACKAGE = "@ninkch/dsh-infinite-canvas";
+  var CANVAS_SPEC = `${CANVAS_PACKAGE}@0.20.1`;
+  function canvasBundleState(result) {
+    const bundles = Array.isArray(result) ? result : result?.ok === true && Array.isArray(result.value) ? result.value : null;
+    if (!bundles) throw new Error("\u65E0\u6CD5\u8BFB\u53D6\u63D2\u4EF6\u5217\u8868\uFF0C\u8BF7\u5230 Harness \u63D2\u4EF6\u7BA1\u7406\u68C0\u67E5\u5B89\u88C5\u72B6\u6001\u3002");
+    const bundle = bundles.find((b) => b?.name === CANVAS_PACKAGE && b.installed === true);
+    return bundle ? { installed: true, available: !bundle.error && !bundle.meta?.error && bundle.availability !== "missing" && bundle.enabled !== false } : { installed: false, available: false };
+  }
+  async function installCanvas(manager) {
+    if (typeof manager?.listBundles !== "function" || typeof manager?.installBundle !== "function") throw new Error("\u5F53\u524D\u5BBF\u4E3B\u65E0\u6CD5\u5B89\u88C5\u63D2\u4EF6\uFF0C\u8BF7\u5728 Harness \u63D2\u4EF6\u7BA1\u7406\u4E2D\u641C\u7D22 @ninkch/dsh-infinite-canvas\u3002");
+    const current = canvasBundleState(await manager.listBundles());
+    if (current.installed) return { existing: true, ...current };
+    const result = await manager.installBundle(CANVAS_SPEC, { enabled: true, saveExact: true, requestId: `metaontic-canvas-${Date.now()}` });
+    if (result?.ok !== true || !["applied", "restart-required"].includes(result.value?.application) || result.value?.error) throw new Error("\u65E0\u9650\u753B\u5E03\u5B89\u88C5\u672A\u5B8C\u6210\uFF0C\u8BF7\u5230 Harness \u63D2\u4EF6\u7BA1\u7406\u67E5\u770B\u8BE6\u7EC6\u539F\u56E0\uFF1B\u4FDD\u7559\u73B0\u6709\u63D2\u4EF6\u4E0E\u914D\u7F6E\u3002");
+    if (result.value?.application === "restart-required") return { installed: true, available: false, restartRequired: true };
+    return { ...canvasBundleState(await manager.listBundles()), restartRequired: false };
+  }
+  function createCanvasCompanion({ React, h }) {
+    function CanvasCompanion({ manager, openCanvas, openCanvasSettings, startSession }) {
+      const [state, setState] = React.useState(null);
+      const [busy, setBusy] = React.useState(false);
+      const [message, setMessage] = React.useState("");
+      const running = React.useRef(false);
+      const alive = React.useRef(true);
+      React.useEffect(() => {
+        alive.current = true;
+        let cancelled = false;
+        Promise.resolve().then(async () => {
+          const service = manager?.().manager;
+          if (typeof service?.listBundles !== "function") throw new Error("\u8BF7\u5728 Harness \u63D2\u4EF6\u7BA1\u7406\u4E2D\u5B89\u88C5 @ninkch/dsh-infinite-canvas\u3002");
+          return canvasBundleState(await service.listBundles());
+        }).then((value) => {
+          if (!cancelled) setState(value);
+        }).catch((e) => {
+          if (!cancelled) setMessage(e.message);
+        });
+        return () => {
+          cancelled = true;
+          alive.current = false;
+        };
+      }, []);
+      const install = async () => {
+        if (running.current) return;
+        running.current = true;
+        setBusy(true);
+        setMessage("\u6B63\u5728\u5B89\u88C5\u539F\u7248\u65E0\u9650\u753B\u5E03\u2026");
+        try {
+          const result = await installCanvas(manager?.().manager);
+          if (!alive.current) return;
+          if (result.restartRequired) setMessage("\u5BBF\u4E3B\u8FD4\u56DE restart-required\uFF0C\u8BF7\u91CD\u542F Harness \u540E\u6253\u5F00\u65E0\u9650\u753B\u5E03\u3002");
+          else {
+            setState({ installed: result.installed, available: result.available });
+            setMessage(result.available ? "\u65E0\u9650\u753B\u5E03\u5DF2\u5B89\u88C5\uFF0C\u53EF\u70B9\u51FB\u6253\u5F00\u3002" : "\u8BF7\u5230\u65E0\u9650\u753B\u5E03\u63D2\u4EF6\u8BE6\u60C5\u6838\u5BF9\u542F\u7528\u4E0E\u52A0\u8F7D\u72B6\u6001\u3002");
+          }
+        } catch (e) {
+          if (alive.current) setMessage(e.message);
+        } finally {
+          running.current = false;
+          if (alive.current) setBusy(false);
+        }
+      };
+      const open = async () => {
+        try {
+          if (!openCanvas) throw new Error();
+          await openCanvas();
+        } catch {
+          setMessage("\u8BF7\u4ECE Harness \u5DE6\u4FA7\u680F\u300C\u65E0\u9650\u753B\u5E03\u300D\u6253\u5F00\uFF0C\u6216\u5728\u63D2\u4EF6\u7BA1\u7406\u6838\u5BF9\u542F\u7528\u72B6\u6001\u3002");
+        }
+      };
+      return h("section", { className: "mov-section", "aria-label": "\u65E0\u9650\u753B\u5E03" }, [
+        h("div", { key: "title", className: "mov-section-title" }, "\u6D41\u7A0B\u753B\u5E03 \xB7 Infinite Canvas"),
+        h("p", { key: "desc", style: { margin: 0, fontSize: 13, lineHeight: 1.65 } }, "\u63A5\u5165\u539F\u7248 dsh-infinite-canvas\u3002\u5728\u56FE\u7247\u6216\u89C6\u9891\u8282\u70B9\u5185\u70B9\u51FB\u751F\u6210\uFF0C\u76F4\u63A5\u5728\u753B\u5E03\u4E2D\u786E\u8BA4\u5236\u4F5C\u65B9\u6848\u548C\u8D39\u7528\u3001\u67E5\u770B\u5E76\u5BA1\u6838\u6210\u679C\uFF0C\u65E0\u9700\u8DF3\u8F6C\u804A\u5929\u3002API\u5BC6\u94A5\u6CBF\u7528\u672C\u63D2\u4EF6\u8BBE\u7F6E\u3002\u6BCF\u4E2A\u89C6\u9891\u8282\u70B9\u5236\u4F5C\u4E00\u6BB5\uFF0C\u5BA1\u6838\u540E\u53EF\u9009\u4E2D\u6210\u679C\u7EE7\u7EED\u7EED\u62CD\uFF1B\u56FE\u7247\u6682\u652F\u63011:1\u5355\u5F20\u3002\u539F\u7248\u6279\u91CF\u8FD0\u884C\u3001\u53F3\u952E\u8FD0\u884C\u53CA\u5176\u4ED6\u751F\u6210\u5DE5\u5177\u4ECD\u4F7F\u7528\u539F\u7248\u914D\u7F6E\u3002"),
+        h("div", { key: "actions", className: "mov-panel-actions" }, [
+          state?.available ? h("button", { key: "open", type: "button", className: "mov-btn", onClick: open }, "\u6253\u5F00\u65E0\u9650\u753B\u5E03") : state?.installed ? h("button", { key: "settings", type: "button", className: "mov-btn", onClick: openCanvasSettings }, "\u67E5\u770B\u753B\u5E03\u63D2\u4EF6") : h("button", { key: "install", type: "button", className: "mov-btn", disabled: busy || !state, onClick: install }, busy ? "\u5B89\u88C5\u4E2D\u2026" : "\u5B89\u88C5\u539F\u7248\u65E0\u9650\u753B\u5E03"),
+          startSession && h("button", { key: "session", type: "button", className: "mov-btn", onClick: startSession }, "\u65B0\u5EFA\u8054\u52A8\u521B\u4F5C\u4F1A\u8BDD"),
+          h("a", { key: "docs", className: "mov-panel-link", href: "https://github.com/NINKCH/dsh-infinite_canvas", target: "_blank", rel: "noopener noreferrer" }, "\u753B\u5E03\u9879\u76EE\u4E0E\u4F7F\u7528\u6587\u6863")
+        ]),
+        message && h("p", { key: "status", role: "status", style: { margin: 0, fontSize: 12 } }, message)
+      ]);
+    }
+    return { CanvasCompanion };
+  }
+
+  // src/client/canvas-launcher.ts
+  var ID = /^[A-Za-z0-9_-]{1,100}$/;
+  async function canvasReadRpc(method, args = {}, fetcher = fetch) {
+    if (!["projectsList", "projectsGet"].includes(method)) throw new Error("\u4E0D\u652F\u6301\u7684\u753B\u5E03\u8BFB\u53D6\u64CD\u4F5C");
+    const response = await fetcher("/infinite-canvas/api/rpc", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ method, args }),
+      signal: AbortSignal.timeout(1e4)
+    });
+    let body;
+    try {
+      body = await response.json();
+    } catch {
+      throw new Error("\u753B\u5E03\u670D\u52A1\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u6838\u5BF9\u539F\u7248\u753B\u5E03\u5DF2\u542F\u7528\u3002");
+    }
+    if (!response.ok || !body || body.error) throw new Error("\u753B\u5E03\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002");
+    return body;
+  }
+  async function resolveCanvasSelection(nodeId, visibleIds, rpc = canvasReadRpc) {
+    if (!ID.test(nodeId) || !visibleIds.length || visibleIds.some((id) => !ID.test(id)) || !visibleIds.includes(nodeId)) throw new Error("\u8BF7\u5148\u9009\u4E2D\u4E00\u4E2A\u753B\u5E03\u8282\u70B9\u3002");
+    const listed = await rpc("projectsList");
+    const projects = Array.isArray(listed) ? listed : listed?.projects || listed?.items;
+    if (!Array.isArray(projects)) throw new Error("\u753B\u5E03\u9879\u76EE\u5217\u8868\u4E0D\u53EF\u7528\u3002");
+    const locations = [];
+    for (const p of projects) {
+      if (!ID.test(p.id)) throw new Error("\u753B\u5E03\u9879\u76EE\u6807\u8BC6\u65E0\u6548\u3002");
+      if (!p.defaultCanvasDeleted && (!Array.isArray(p.nodeIds) || visibleIds.every((id) => p.nodeIds.includes(id)))) locations.push({ projectId: p.id });
+      for (const c of p.canvases || []) {
+        if (!ID.test(c.id)) throw new Error("\u5B50\u753B\u5E03\u6807\u8BC6\u65E0\u6548\u3002");
+        locations.push({ projectId: p.id, canvasId: c.id });
+      }
+    }
+    if (locations.length > 200) throw new Error("\u753B\u5E03\u6570\u91CF\u8F83\u591A\uFF0C\u8BF7\u6682\u7528\u89C6\u9891\u521B\u4F5C\u52A9\u624B\u6307\u5B9A\u9879\u76EE\u548C\u8282\u70B9\u3002");
+    const matches = [];
+    for (let i = 0; i < locations.length; i += 6) {
+      const batch = await Promise.all(locations.slice(i, i + 6).map(async (loc) => {
+        const doc = await rpc("projectsGet", { id: loc.projectId, ...loc.canvasId ? { canvasId: loc.canvasId } : {} });
+        return visibleIds.every((id) => Object.hasOwn(doc.nodes || {}, id)) ? loc : null;
+      }));
+      matches.push(...batch.filter(Boolean));
+    }
+    if (matches.length !== 1) throw new Error(matches.length ? "\u591A\u4E2A\u753B\u5E03\u5305\u542B\u76F8\u540C\u8282\u70B9\uFF0C\u65E0\u6CD5\u786E\u5B9A\u5F52\u5C5E\uFF1B\u8BF7\u5728\u52A9\u624B\u4E2D\u6307\u5B9A\u9879\u76EE\u548C\u8282\u70B9\u3002" : "\u8282\u70B9\u5C1A\u672A\u540C\u6B65\u5230\u753B\u5E03\u670D\u52A1\uFF0C\u8BF7\u7B49\u5F85\u4FDD\u5B58\u5B8C\u6210\u540E\u91CD\u8BD5\u3002");
+    return { ...matches[0], nodeId };
+  }
+
+  // src/client/canvas-native.ts
+  async function canvasNativeRpc(args, fetcher = fetch) {
+    const response = await fetcher("/metaontic-video/canvas-native", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(args), signal: AbortSignal.timeout(2e4) });
+    let body;
+    try {
+      body = await response.json();
+    } catch {
+      throw new Error("\u753B\u5E03\u76F4\u63A5\u5236\u4F5C\u670D\u52A1\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u52A0\u8F7D\u72B6\u6001\u3002");
+    }
+    if (!response.ok || body?.error) throw new Error(body?.error || "\u5236\u4F5C\u8BF7\u6C42\u672A\u5B8C\u6210\uFF0C\u8BF7\u67E5\u8BE2\u539F\u8BB0\u5F55\uFF0C\u4E0D\u8981\u91CD\u590D\u751F\u6210\u3002");
+    return body;
+  }
+  function mountCanvasNative({ document: doc, MutationObserver: Observer, rpc = canvasNativeRpc, resolve = resolveCanvasSelection }) {
+    if (!doc?.body || !Observer) return () => {
+    };
+    let disposed = false, dialog, timer, target, current, busy = false;
+    const badges = /* @__PURE__ */ new Map();
+    const composers = /* @__PURE__ */ new Map();
+    let info = null, infoError = "", readingInfo = false;
+    const style = doc.createElement("style");
+    style.textContent = '.dshic-composer[data-metaontic-bound] .dshic-composer-controls .is-model{display:none!important}.dshic-composer[data-metaontic-bound] .dshic-send{width:auto!important;min-width:100px;padding:0 12px!important;font-size:12px;white-space:nowrap}.dshic-composer[data-metaontic-bound] .dshic-send svg{display:none}.dshic-composer[data-metaontic-bound] .dshic-send::after{content:"\u751F\u6210\u5E76\u786E\u8BA4\u8D39\u7528"}.mov-canvas-binding{margin:0 12px 10px;padding:10px 12px;border-radius:8px;background:#7563ff12;font-size:12px;line-height:1.7;overflow-wrap:anywhere}.mov-canvas-binding strong{display:block}';
+    doc.head.append(style);
+    const el = (tag, text = "") => {
+      const n = doc.createElement(tag);
+      n.textContent = text;
+      return n;
+    };
+    const stop = (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+    async function refreshInfo() {
+      if (disposed || readingInfo) return;
+      readingInfo = true;
+      try {
+        info = await rpc({ action: "info" });
+        infoError = "";
+      } catch {
+        info = null;
+        infoError = "MetaOnticVideo\u8FDE\u63A5\u672A\u5C31\u7EEA\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u5DF2\u52A0\u8F7D";
+      } finally {
+        readingInfo = false;
+        if (!disposed) scan();
+      }
+    }
+    const clearTimer = () => {
+      if (timer) clearTimeout(timer);
+      timer = void 0;
+    };
+    function close() {
+      clearTimer();
+      dialog?.remove();
+      dialog = void 0;
+      current = void 0;
+      busy = false;
+    }
+    function shell(title) {
+      close();
+      dialog = el("dialog");
+      dialog.dataset.metaonticNative = "dialog";
+      dialog.style.cssText = "width:min(620px,calc(100vw - 32px));max-height:85vh;overflow:auto;box-sizing:border-box;border:1px solid #8886;border-radius:16px;padding:24px;background:var(--dsw-alias-background-primary,#fff);color:var(--dsw-alias-label-primary,#222);z-index:2147483647;";
+      dialog.append(el("h3", title));
+      const exit = button("\u5173\u95ED", close);
+      exit.style.float = "right";
+      dialog.prepend(exit);
+      dialog.addEventListener("cancel", (e) => {
+        e.preventDefault();
+        close();
+      });
+      dialog.addEventListener("pointerdown", (e) => e.stopPropagation());
+      doc.body.append(dialog);
+      dialog.showModal();
+      return dialog;
+    }
+    function button(label, action) {
+      const b = el("button", label);
+      b.type = "button";
+      b.className = "dshic-btn";
+      b.style.cssText = "margin:6px 8px 6px 0;padding:8px 12px;cursor:pointer;";
+      b.addEventListener("click", async () => {
+        if (busy || disposed) return;
+        busy = true;
+        b.disabled = true;
+        try {
+          await action();
+        } catch (e) {
+          showError(e.message);
+        } finally {
+          busy = false;
+          if (b.isConnected) b.disabled = false;
+        }
+      });
+      return b;
+    }
+    function showError(message) {
+      if (!dialog) return;
+      let status = dialog.querySelector("[role=status]");
+      if (!status) {
+        status = el("p");
+        status.setAttribute("role", "status");
+        dialog.append(status);
+      }
+      status.textContent = message;
+    }
+    function check(label) {
+      const row = el("label"), box = el("input");
+      box.type = "checkbox";
+      row.style.cssText = "display:block;margin:12px 0;line-height:1.6;";
+      row.append(box, doc.createTextNode(" " + label));
+      dialog.append(row);
+      return box;
+    }
+    async function preview(operation, draft) {
+      const before = dialog;
+      const response = await rpc({ action: "prepare", ...target, operation, draft });
+      if (disposed || !dialog || dialog !== before) return;
+      if (response.job) return renderJob(response.job);
+      const p = response.proposal;
+      const panel = shell("MetaOnticVideo \xB7 \u5236\u4F5C\u4E0E\u8D39\u7528\u786E\u8BA4");
+      const pre = el("pre", p.prompt);
+      pre.style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;max-height:30vh;overflow:auto;font:inherit;background:#8881;padding:12px;";
+      panel.append(pre);
+      panel.append(el("p", `${p.model} \xB7 ${p.ratio}${p.duration ? ` \xB7 ${p.duration}\u79D2 \xB7 ${p.resolution.toUpperCase()} \xB7 \u97F3\u9891${p.generateAudio ? "\u5F00" : "\u5173"}` : " \xB7 2048\xD72048"}`));
+      if (p.references.length) panel.append(el("p", `\u53C2\u8003\u7D20\u6750\uFF1A${p.references.map((r) => `${r.port === "frame" ? "\u9996\u5E27" : "\u53C2\u8003\u56FE"} ${r.nodeId}`).join("\u3001")}`));
+      panel.append(el("p", p.estimate ? `\u672C\u6B21\u57FA\u7840\u4F30\u4EF7\u7EA6 \xA5${p.estimate.cny.toFixed(4)}\uFF0C\u5B9E\u9645\u4EE5\u6E20\u9053\u8D26\u5355\u4E3A\u51C6\u3002` : "\u672C\u6B21\u4F1A\u8C03\u7528\u6A21\u578B\u5E76\u5355\u72EC\u8BA1\u8D39\uFF0C\u65E0\u6CD5\u7ED9\u51FA\u53EF\u9760\u91D1\u989D\uFF0C\u6309\u6E20\u9053\u5B9E\u9645\u7528\u91CF\u7ED3\u7B97\u3002"));
+      for (const note of p.notes || []) panel.append(el("p", note));
+      const plan = check("\u6211\u5DF2\u6838\u5BF9\u672C\u6BB5\u5185\u5BB9\u3001\u89C4\u683C\u53CA\u53C2\u8003\u7D20\u6750\uFF0C\u8BA4\u53EF\u6B64\u5236\u4F5C\u65B9\u6848");
+      const cost = check("\u6211\u540C\u610F\u672C\u6B21\u6A21\u578B\u8C03\u7528\u8D39\u7528");
+      const textOnly = p.kind === "video" && !p.references.length && p.operation === "generate" ? check("\u76F4\u63A5\u6587\u751F\u89C6\u9891\uFF0C\u672C\u6B21\u4E0D\u751F\u6210\u89D2\u8272\u53C2\u8003\u56FE") : null;
+      panel.append(button("\u786E\u8BA4\u5E76\u751F\u6210", async () => {
+        if (!plan.checked || !cost.checked || textOnly && !textOnly.checked) throw new Error("\u8BF7\u5B8C\u6210\u4E0A\u9762\u7684\u786E\u8BA4\u540E\u518D\u751F\u6210\u3002");
+        const response2 = await rpc({ action: "start", id: p.id, confirmPlan: plan.checked, confirmCost: cost.checked, textOnly: textOnly?.checked === true });
+        if (!disposed && dialog === panel) renderJob(response2.job);
+      }));
+    }
+    function renderJob(job) {
+      current = job;
+      const panel = shell("MetaOnticVideo \xB7 \u753B\u5E03\u5236\u4F5C");
+      current = job;
+      const labels = { running: "\u6B63\u5728\u751F\u6210\uFF0C\u5173\u95ED\u7A97\u53E3\u4E0D\u4F1A\u91CD\u590D\u63D0\u4EA4", interrupted: "\u4E0A\u6B21\u7B49\u5F85\u5DF2\u4E2D\u65AD\uFF0C\u8BF7\u67E5\u8BE2\u539F\u4EFB\u52A1", succeeded: "\u751F\u6210\u6210\u529F\uFF0C\u8BF7\u67E5\u770B\u5E76\u5BA1\u6838\u6210\u679C", failed: "\u4EFB\u52A1\u5931\u8D25\uFF0C\u672A\u81EA\u52A8\u91CD\u505A", cancelled: "\u4EFB\u52A1\u5DF2\u53D6\u6D88", unknown: "\u4EFB\u52A1\u72B6\u6001\u5F85\u786E\u8BA4", submission_unknown: "\u63D0\u4EA4\u7ED3\u679C\u5F85\u6838\u5BF9\uFF0C\u5DF2\u963B\u6B62\u91CD\u590D\u751F\u6210" };
+      panel.append(el("p", labels[job.state] || "\u4EFB\u52A1\u72B6\u6001\u5F85\u786E\u8BA4"));
+      if (job.taskId) panel.append(el("p", `\u539F\u4EFB\u52A1\uFF1A${job.taskId}`));
+      if (job.message) panel.append(el("p", job.message));
+      for (const media of job.media || []) {
+        let url;
+        try {
+          url = new URL(media.url);
+          if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) continue;
+        } catch {
+          continue;
+        }
+        const player = el(media.kind === "image" ? "img" : "video");
+        player.src = url.href;
+        player.style.cssText = "display:block;max-width:100%;max-height:38vh;margin:12px auto;";
+        if (media.kind === "video") {
+          player.controls = true;
+          player.preload = "metadata";
+        } else player.alt = "\u672C\u6B21\u751F\u6210\u56FE\u7247";
+        panel.append(player);
+        const link = el("a", "\u6253\u5F00\u6210\u679C\u539F\u6587\u4EF6");
+        link.href = url.href;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        panel.append(link);
+      }
+      if (job.sync?.status === "pending") {
+        panel.append(el("p", "\u6210\u679C\u5DF2\u4FDD\u7559\uFF0C\u753B\u5E03\u56DE\u586B\u5F85\u5B8C\u6210\uFF1B\u8865\u4F20\u4E0D\u4F1A\u91CD\u65B0\u751F\u6210\u3002"));
+        panel.append(button("\u53EA\u8865\u4F20\u5230\u753B\u5E03", async () => renderJob((await rpc({ action: "sync", id: job.id })).job)));
+      } else if (job.sync?.status === "synced") panel.append(el("p", "\u6210\u679C\u5DF2\u65B0\u589E\u5230\u539F\u753B\u5E03\u3002"));
+      if (job.media?.length && !job.reviewed) {
+        panel.append(button("\u6548\u679C\u53EF\u4EE5\uFF0C\u5B8C\u6210\u7ED3\u679C\u5BA1\u6838", async () => renderJob((await rpc({ action: "review", id: job.id, accept: true })).job)));
+        panel.append(el("p", "\u4E0D\u6EE1\u610F\u53EF\u5173\u95ED\u5E76\u4FDD\u7559\u6210\u679C\uFF1B\u672A\u901A\u8FC7\u5BA1\u6838\u4E0D\u4F1A\u7EE7\u7EED\u7EED\u62CD\u3002"));
+      } else if (job.reviewed) panel.append(el("p", "\u7ED3\u679C\u5DF2\u5BA1\u6838\uFF0C\u53EF\u4EE5\u5173\u95ED\u7A97\u53E3\u6216\u9009\u4E2D\u89C6\u9891\u6210\u679C\u8282\u70B9\u7EED\u62CD\u3002"));
+      if (["unknown", "interrupted", "running"].includes(job.state) && job.taskId && job.state !== "running") panel.append(button("\u53EA\u67E5\u8BE2\u539F\u4EFB\u52A1", async () => renderJob((await rpc({ action: "query", id: job.id })).job)));
+      if (job.state === "running") timer = setTimeout(async () => {
+        try {
+          const response = await rpc({ action: "status", id: job.id });
+          if (!disposed && dialog === panel) renderJob(response.job);
+        } catch (e) {
+          if (dialog === panel) {
+            showError(e.message);
+            panel.append(button("\u5237\u65B0\u539F\u5236\u4F5C\u8BB0\u5F55", async () => renderJob((await rpc({ action: "status", id: job.id })).job)));
+          }
+        }
+      }, 2e3);
+    }
+    async function open(selection, isCurrent) {
+      const panel = shell("MetaOnticVideo \xB7 \u8BFB\u53D6\u753B\u5E03\u8282\u70B9");
+      panel.append(el("p", "\u6B63\u5728\u8BFB\u53D6\u5DF2\u4FDD\u5B58\u7684\u8282\u70B9\u4E0E\u7D20\u6750\u2026"));
+      target = await resolve(selection.nodeId, selection.visibleIds);
+      if (disposed || dialog !== panel) return;
+      if (!isCurrent()) throw new Error("\u753B\u5E03\u6216\u8282\u70B9\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u70B9\u51FB\u751F\u6210\u3002");
+      const response = await rpc({ action: "latest", ...target });
+      if (disposed || dialog !== panel) return;
+      if (response.job && (!["succeeded", "failed", "cancelled"].includes(response.job.state) || response.job.media?.length && !response.job.reviewed || response.job.sync?.status === "pending")) return renderJob(response.job);
+      const form = shell("MetaOnticVideo \xB7 \u5F53\u524D\u8282\u70B9\u5236\u4F5C");
+      form.append(el("p", "\u6CBF\u7528\u8282\u70B9\u5DF2\u4FDD\u5B58\u7684\u5185\u5BB9\u3001\u753B\u5E45\u3001\u65F6\u957F\u548C\u6E05\u6670\u5EA6\uFF1B\u7A0D\u540E\u5206\u522B\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002\u751F\u6210\u4E0D\u518D\u6253\u5F00\u804A\u5929\u3002"));
+      const audio = selection.kind === "video" ? check("\u751F\u6210\u540C\u6B65\u97F3\u9891") : null;
+      form.append(button("\u67E5\u770B\u672C\u6B21\u751F\u6210\u65B9\u6848", () => preview("generate", { generateAudio: audio?.checked === true })));
+      if (selection.kind === "video") {
+        form.append(el("p", "\u9009\u4E2D\u672C\u63D2\u4EF6\u76F4\u63A5\u751F\u6210\u5E76\u5DF2\u5BA1\u6838\u7684\u89C6\u9891\u6210\u679C\uFF0C\u53EF\u5728\u8FD9\u91CC\u586B\u5199\u65B0\u7684\u5185\u5BB9\u7EED\u62CD\u3002"));
+        const prompt = el("textarea");
+        prompt.placeholder = "\u672C\u6B21\u65B0\u589E\u5185\u5BB9\uFF08\u4E0D\u91CD\u6F14\u4E0A\u4E00\u6BB5\uFF09";
+        prompt.style.cssText = "width:100%;min-height:80px;box-sizing:border-box;";
+        const transition = el("textarea");
+        transition.placeholder = "\u4E0A\u4E00\u6BB5\u7ED3\u5C3E \u2192 \u672C\u6BB5\u52A8\u4F5C\u3001\u955C\u5934\u4E0E\u58F0\u97F3\u8854\u63A5";
+        transition.style.cssText = prompt.style.cssText;
+        const seconds = el("input");
+        seconds.type = "number";
+        seconds.min = "4";
+        seconds.max = "30";
+        seconds.placeholder = "\u672C\u6B21\u65B0\u589E\u79D2\u6570";
+        const resolution = el("select");
+        for (const value of ["", "480p", "720p"]) {
+          const option = el("option", value ? value.toUpperCase() : "\u9009\u62E9\u7EED\u62CD\u6E05\u6670\u5EA6");
+          option.value = value;
+          resolution.append(option);
+        }
+        form.append(prompt, transition, seconds, resolution);
+        form.append(button("\u67E5\u770B\u672C\u6B21\u7EED\u62CD\u65B9\u6848", () => preview("extend", { prompt: prompt.value, transitionDescription: transition.value, duration: Number(seconds.value), resolution: resolution.value, generateAudio: audio.checked })));
+      }
+      if (response.job) form.append(button("\u67E5\u770B\u4E0A\u6B21\u6210\u679C", () => renderJob(response.job)));
+    }
+    function selected(root) {
+      const nodes = [...root.querySelectorAll(".dshic-canvas .dshic-node[data-node-id]")], selection = nodes.filter((n) => n.classList.contains("is-selected"));
+      if (selection.length !== 1) return null;
+      const node = selection[0], kind = node.classList.contains("type-image") ? "image" : node.classList.contains("type-video") ? "video" : "";
+      return kind ? { nodeId: node.getAttribute("data-node-id"), visibleIds: nodes.map((n) => n.getAttribute("data-node-id")).sort(), kind } : null;
+    }
+    function capture(event) {
+      const b = event.target?.closest?.("button");
+      if (!b || b.closest("[data-metaontic-native]")) return;
+      const composer = b.matches(".dshic-send") && b.closest(".dshic-composer");
+      const regenerate = b.closest(".dshic-media-foot") && ["\u91CD\u65B0\u751F\u6210", "Regenerate"].includes(b.textContent.trim());
+      if (!composer && !regenerate) return;
+      const entry = [...badges.values()].find((entry2) => entry2.root.contains(b));
+      if (!entry) return;
+      let snapshot = selected(entry.root);
+      if (regenerate) {
+        const node = b.closest(".dshic-node[data-node-id]");
+        if (node && (node.classList.contains("type-image") || node.classList.contains("type-video"))) snapshot = { nodeId: node.getAttribute("data-node-id"), visibleIds: [...entry.root.querySelectorAll(".dshic-node[data-node-id]")].map((n) => n.getAttribute("data-node-id")).sort(), kind: node.classList.contains("type-image") ? "image" : "video" };
+      }
+      if (!snapshot) return;
+      stop(event);
+      if (event.type !== "click" || disposed) return;
+      if (dialog) {
+        dialog.focus();
+        return;
+      }
+      const before = JSON.stringify(snapshot);
+      void open(snapshot, () => entry.root.isConnected && (regenerate ? !!entry.root.querySelector(`[data-node-id="${snapshot.nodeId}"]`) : JSON.stringify(selected(entry.root)) === before)).catch((e) => showError(e.message));
+    }
+    function scan() {
+      if (disposed) return;
+      for (const [bar, entry] of badges) if (!bar.isConnected) {
+        entry.badge.remove();
+        badges.delete(bar);
+      }
+      for (const bar of doc.querySelectorAll(".dshic-toolbar")) {
+        if (badges.has(bar) || !bar.parentElement?.querySelector(".dshic-canvas")) continue;
+        const badge = el("span", "\u56FE\u7247/\u89C6\u9891\u751F\u6210 \xB7 MetaOnticVideo");
+        badge.dataset.metaonticNative = "badge";
+        badge.style.cssText = "font-size:12px;padding:4px 8px;border-radius:8px;background:#7563ff18;";
+        badge.title = "\u8282\u70B9\u751F\u6210\u4E0E\u91CD\u65B0\u751F\u6210\u76F4\u63A5\u5728\u753B\u5E03\u5185\u786E\u8BA4\u65B9\u6848\u3001\u8D39\u7528\u548C\u7ED3\u679C\uFF1B\u539F\u7248\u6279\u91CF\u8FD0\u884C\u53CA\u53F3\u952E\u8FD0\u884C\u4ECD\u8D70\u539F\u7248\u914D\u7F6E\u3002";
+        bar.append(badge);
+        badges.set(bar, { root: bar.parentElement, badge });
+      }
+      for (const [composer, entry] of composers) {
+        const selection = selected(entry.root);
+        if (!composer.isConnected || !selection || !entry.root.contains(composer)) {
+          entry.binding.remove();
+          composer.removeAttribute("data-metaontic-bound");
+          if (entry.send.isConnected) {
+            entry.send.title = entry.title;
+            entry.send.removeAttribute("aria-label");
+          }
+          composers.delete(composer);
+        }
+      }
+      for (const { root } of badges.values()) {
+        const selection = selected(root);
+        if (!selection) continue;
+        for (const composer of root.querySelectorAll(".dshic-composer")) {
+          let entry = composers.get(composer);
+          const send = composer.querySelector(".dshic-send");
+          if (!send) continue;
+          if (!entry) {
+            const binding = el("div");
+            binding.dataset.metaonticNative = "binding";
+            binding.className = "mov-canvas-binding";
+            const title = el("strong", "MetaOnticVideo \u76F4\u63A5\u5236\u4F5C"), model = el("span");
+            binding.append(title, model);
+            composer.prepend(binding);
+            composer.setAttribute("data-metaontic-bound", "true");
+            entry = { root, binding, model, send, original: send.innerHTML, title: send.title };
+            composers.set(composer, entry);
+          }
+          const ready = selection.kind === "image" ? info?.imageReady : info?.videoReady;
+          const text = info ? `${info.channel} \xB7 ${selection.kind === "image" ? info.imageModel : info.videoModel} \xB7 ${ready ? "\u6CBF\u7528\u63D2\u4EF6API\u5BC6\u94A5" : "\u8BF7\u5148\u5728\u63D2\u4EF6\u8BBE\u7F6E\u586B\u5199API\u5BC6\u94A5"}
+${selection.kind === "image" ? "1:1\u5355\u5F20\u56FE\u7247" : `\u5355\u6BB54\u2013${info.singleMax}\u79D2\uFF0C480P/720P`}\uFF1B\u70B9\u4E0B\u65B9\u751F\u6210\uFF0C\u5728\u753B\u5E03\u5185\u786E\u8BA4\u65B9\u6848\u3001\u8D39\u7528\u5E76\u5BA1\u6838\u7ED3\u679C\u3002` : infoError || "\u6B63\u5728\u8BFB\u53D6MetaOnticVideo\u63A5\u5165\u4E0E\u6A21\u578B\u2026";
+          if (entry.model.textContent !== text) entry.model.textContent = text;
+          entry.model.style.whiteSpace = "pre-line";
+          send.title = "\u4F7F\u7528MetaOnticVideo\u8BBE\u7F6E\u751F\u6210\uFF1B\u786E\u8BA4\u8D39\u7528\u540E\u624D\u63D0\u4EA4";
+          send.setAttribute("aria-label", "MetaOnticVideo\u751F\u6210\u5E76\u786E\u8BA4\u8D39\u7528");
+        }
+      }
+    }
+    doc.addEventListener("click", capture, true);
+    doc.defaultView?.addEventListener("focus", refreshInfo);
+    const observer = new Observer(scan);
+    observer.observe(doc.body, { childList: true, subtree: true });
+    scan();
+    void refreshInfo();
+    return () => {
+      disposed = true;
+      close();
+      observer.disconnect();
+      doc.removeEventListener("click", capture, true);
+      doc.defaultView?.removeEventListener("focus", refreshInfo);
+      style.remove();
+      for (const [composer, entry] of composers) {
+        entry.binding.remove();
+        composer.removeAttribute("data-metaontic-bound");
+        if (entry.send.isConnected) {
+          entry.send.title = entry.title;
+          entry.send.removeAttribute("aria-label");
+        }
+      }
+      composers.clear();
+      for (const entry of badges.values()) entry.badge.remove();
+      badges.clear();
+    };
   }
 
   // icon.svg
@@ -2297,6 +2766,10 @@
           hooks: ["videoExecutions"],
           resolve: (binding) => ({ hooks: { videoExecutions: videoExecutionSource2(binding.eventSource) } })
         }), "metaontic-video: actual video execution");
+        ctx.effect(() => mountCanvasNative({
+          document: typeof document === "undefined" ? void 0 : document,
+          MutationObserver: typeof MutationObserver === "undefined" ? void 0 : MutationObserver
+        }), "metaontic-video: canvas native generation");
         const t = ctx.locale.bind(NS);
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), "metaontic-video: dictionaries");
         ctx.effect(() => ctx.slots.inject("conversation.chat.node", () => registerAuthNotice(ctx, h, t)), "metaontic-video: friendly service authentication notice");
@@ -2333,7 +2806,8 @@
         };
         const Page = makePage({ form, t, manager: pluginManager });
         settings.register({ id: "video", namespace: NAMESPACE, locale: NS, Page });
-        const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: icon_default });
+        const { CanvasCompanion } = createCanvasCompanion({ React, h });
+        const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: icon_default, CanvasCompanion });
         ctx.effect(() => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
           name: "sidebar.panellist",
           id: PANEL_ID,
@@ -2349,7 +2823,16 @@
           // 面板要的两个动作都按需取服务：老宿主没有这些服务时按钮自然失效，不报错。
           inject: () => ({
             startSession: () => ctx.get("uiWorkspace")?.startSession(void 0, { agentPreset: "video-director" }),
-            openSettings: () => ctx.get("pluginNavigation")?.openBundle(NAMESPACE)
+            openSettings: () => ctx.get("pluginNavigation")?.openBundle(NAMESPACE),
+            manager: pluginManager,
+            openCanvasSettings: () => ctx.get("pluginNavigation")?.openBundle(CANVAS_PACKAGE),
+            openCanvas: () => {
+              const right = ctx.get("sidebarRight");
+              if (typeof right?.openTab === "function") return right.openTab("infinite-canvas");
+              const layout = ctx.get("layout");
+              if (typeof layout?.selectPanel === "function") return layout.selectPanel("infinite-canvas");
+              throw new Error("canvas-navigation-unavailable");
+            }
           })
         }, VideoPanel)), "metaontic-video: sidebar panel");
       }

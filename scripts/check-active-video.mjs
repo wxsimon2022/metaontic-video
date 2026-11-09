@@ -46,6 +46,13 @@ async function walk(directory) {
   }
 }
 await walk(path.join(home, 'sessions'));
-const active = [...states.values()].filter(value => value === 'start').length;
+let nativeActive = 0;
+const nativeDir = path.join(home, 'metaontic-video', 'canvas-native');
+for (const entry of await readdir(nativeDir).catch(error => { if (error.code === 'ENOENT') return []; throw error; })) {
+  if (!/^[a-f0-9-]{36}\.json$/.test(entry)) continue;
+  const job = JSON.parse(await readFile(path.join(nativeDir, entry), 'utf8'));
+  if (job.state === 'running') nativeActive++;
+}
+const active = [...states.values()].filter(value => value === 'start').length + nativeActive;
 console.log(`未闭合视频执行记录：${active}`);
 if (active) { console.error('先核对任务是否执行中；任务结束前不构建或热替换。'); process.exitCode = 2; }

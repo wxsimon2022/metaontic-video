@@ -39,7 +39,7 @@ test('stale revision recovers and saves the full connection in one user action',
   };
   await context.persistConnection(form, [['connectionMode', 'metaontic'], ['metaonticApiKey', 'new-key']], 'metaontic');
   assert.equal(calls, 2); assert.equal(seen[0], seen[1]);
-  assert.equal(disk.connectionMode, 'metaontic'); assert.equal(disk.metaonticApiKey, 'new-key'); assert.equal(disk.apiKey, '');
+  assert.equal(disk.connectionMode, 'metaontic'); assert.equal(disk.metaonticApiKey, 'new-key'); assert.equal(disk.apiKey, 'issued');
 });
 for (const variant of ['same-revision', 'changed-field', 'read-only', 'loading', 'second-rejected']) test(`atomic recovery stops safely: ${variant}`, async () => {
   const state = { status: 'ready', writable: true, revision: 1, value: { connectionMode: 'service' } };
@@ -134,3 +134,42 @@ test('save preserves custom relay address and models without copying hidden secr
  assert.equal(disk.baseUrl,'https://ai.bileego.com');
  assert.equal(disk.submitPath,'/doubao/api/v3/contents/generations/tasks');
  });
+
+test('真实配置声明约束下整批保存不写已移除字段', async () => {
+  const { Config } = await import('../index.js');
+  const fields = Config.dict;
+  const disk = {};
+  await context.persistConnection({
+    getSnapshot: () => ({status:'ready',writable:true,revision:1,value:disk}),
+    async mutate(ops) {
+      for (const op of ops) {
+        assert.ok(fields[op.path[0]], `未声明配置：${op.path[0]}`);
+        assert.equal(fields[op.path[0]].meta.volatile, true);
+      }
+      for (const op of ops) disk[op.path[0]] = op.value;
+      return true;
+    },
+  }, [['metaonticApiKey','new-key']], 'metaontic');
+  assert.equal(disk.metaonticApiKey,'new-key');
+  assert.ok(disk.baseUrl);
+});
+
+test('重置仅提交当前声明字段，不把旧用户字段带入批量写入', async () => {
+  const { Config } = await import('../index.js');
+  const { api } = await import('./module-test-api.mjs');
+  const scope = vm.createContext({window:{navigator:{}}, VOLCENGINE_MODE_AVAILABLE:false, IMAGE_MODEL:'image'});
+  vm.runInContext(sourceOf('businesses/video/client/config') + '\nglobalThis.keys = createClientConfig().PLUGIN_OWNED_KEYS;', scope);
+  assert.deepEqual(Array.from(scope.keys).sort(), Object.keys(Config.dict).sort());
+  let ops;
+  const ctx = {
+    connectionBusy:{current:false}, confirm:()=>true, t:x=>x,
+    snapshot:{user:{apiKey:'legacy',deviceSecret:'legacy',outputDir:'old'}},
+    PLUGIN_OWNED_KEYS:Array.from(scope.keys),
+    persistBatch:async (form, batch)=>{ops=batch;}, form:{},
+    setSaveError:()=>{},setStatus:()=>{},setDraft:()=>{},setVisibleKey:()=>{},flashStatus:()=>{},settingsError:e=>e.message,
+  };
+  await api.createSettingsActions(ctx).reset();
+  assert.ok(ops.length);
+  assert.ok(ops.every(op=>Config.dict[op.path[0]]?.meta.volatile));
+  assert.ok(!ops.some(op=>['apiKey','deviceSecret'].includes(op.path[0])));
+});

@@ -6,6 +6,7 @@
  */
 export function createPreviewHost({ form, components, dictionaries, getLocale, onUpdate }) {
   const calls = [];
+  let canvasInstalled = false;
   // 左侧栏那一行的显示名由注册项的 label 给（宿主要求传函数），预览按同样方式取。
   const labels = {};
   const uuid = (() => { let n = 0; return () => `reg-${++n}`; })();
@@ -54,6 +55,14 @@ export function createPreviewHost({ form, components, dictionaries, getLocale, o
       if (name === 'layout') {
         return { selectPanel: (id) => calls.push({ action: 'selectPanel', id }) };
       }
+      if (name === 'remote.pluginManager') return {
+        listBundles: async () => canvasInstalled ? [{ name: '@ninkch/dsh-infinite-canvas', installed: true, enabled: true }] : [],
+        installBundle: async (spec) => {
+          if (spec.startsWith('@ninkch/dsh-infinite-canvas@')) { canvasInstalled = true; calls.push({ action: 'installCanvas', spec }); return { ok: true, value: { application: 'applied' } }; }
+          onUpdate(); return {};
+        },
+      };
+      if (name === 'sidebarRight') return { openTab: (kind) => calls.push({ action: 'openCanvas', kind }) };
       return { installBundle: async () => { onUpdate(); return {}; } };
     },
   };
