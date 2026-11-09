@@ -191,6 +191,56 @@ test('同名画布已被别的创作项目占用时另起带序号的名字，�
  }finally{if(old===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=old;await rm(root,{recursive:true,force:true});}
 });
 
+test('同名画布已有内容（不是本创作项目的）时也不占用',async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'自动画布 占名 ')),old=process.env.DSH_HOME;
+ process.env.DSH_HOME=root;
+ try {
+  const exec={agent:{session:{id:'auto-canvas-taken',header:{cwd:root}}}};
+  const project=await api.createProject(exec,'scenery');project.duration=30;project.choice='not_needed';await api.writeProject(project);
+  const docs=new Map([['puser',{name:'民勤蜜瓜独白短视频',nodes:{n1:{id:'n1',type:'text',x:0,y:0,w:360,h:280,data:{label:'用户自己的节点'}}},edges:[],defaultCanvasName:'默认画布'}]]);
+  const attempted=[];
+  const adapter={connect:async()=>({ok:true,already:true}),rpc:{
+   canvasCreateProject:async(args)=>{attempted.push(args.name);
+    if(args.name==='民勤蜜瓜独白短视频')return {ok:true,projectId:'puser',name:args.name,reused:true};
+    docs.set('pmine',{name:args.name,nodes:{},edges:[],defaultCanvasName:'默认画布'});return {ok:true,projectId:'pmine',name:args.name};},
+   projectsGet:async({id})=>structuredClone(docs.get(id)),
+   projectsPut:async({id,name,defaultCanvasName})=>{const d=docs.get(id);if(name)d.name=name;if(defaultCanvasName)d.defaultCanvasName=defaultCanvasName;return {ok:true};},
+   dataRootGet:async()=>({dataRoot:root}),assetsGet:async()=>({items:[]}),
+   projectDirGet:async()=>({ok:true,abs:path.join(root,'projects','pmine'),dataRoot:root}),
+   assetCreate:async()=>({ok:true}),canvasOpen:async()=>({ok:true}),
+  }};
+  const sync=api.createCanvasProjectSync(async()=>adapter,{}, {get:()=>({title:'民勤蜜瓜独白短视频'})});
+  const result=await sync.sync(project.id,exec);
+  assert.deepEqual(attempted,['民勤蜜瓜独白短视频','民勤蜜瓜独白短视频 2']);
+  assert.equal(result.projectId,'pmine');
+  assert.deepEqual(Object.keys(docs.get('puser').nodes),['n1']);
+ }finally{if(old===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=old;await rm(root,{recursive:true,force:true});}
+});
+
+test('旧记录里带创作项目 id 的创建名不再沿用',async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'自动画布 旧名 ')),old=process.env.DSH_HOME;
+ process.env.DSH_HOME=root;
+ try {
+  const exec={agent:{session:{id:'auto-canvas-oldname',header:{cwd:root}}}};
+  const project=await api.createProject(exec,'scenery');project.duration=30;project.choice='not_needed';
+  project.canvasAuto={version:1,name:`MetaOntic 创作 ${project.id}`,nodes:{},links:{}};
+  await api.writeProject(project);
+  let created='';
+  const adapter={connect:async()=>({ok:true,already:true}),rpc:{
+   canvasCreateProject:async(args)=>{created=args.name;return {ok:true,projectId:'pold'};},
+   projectsGet:async()=>({name:'MetaOntic 创作画布',nodes:{},edges:[],defaultCanvasName:'默认画布'}),
+   projectsPut:async()=>({ok:true}),
+   dataRootGet:async()=>({dataRoot:root}),assetsGet:async()=>({items:[]}),
+   projectDirGet:async()=>({ok:true,abs:path.join(root,'projects','pold'),dataRoot:root}),
+   assetCreate:async()=>({ok:true}),canvasOpen:async()=>({ok:true}),
+  }};
+  const sync=api.createCanvasProjectSync(async()=>adapter,{}, {get:()=>null});
+  await sync.sync(project.id,exec);
+  assert.equal(created,'MetaOntic 创作画布');
+  assert.ok(!created.includes(project.id));
+ }finally{if(old===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=old;await rm(root,{recursive:true,force:true});}
+});
+
 test('老版本只写过标题名的画布补记归属，以后跟着会话改名',async()=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'自动画布 归属 ')),old=process.env.DSH_HOME;
  process.env.DSH_HOME=root;

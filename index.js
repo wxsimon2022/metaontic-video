@@ -5338,22 +5338,21 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
     });
   }
   async function createAutoCanvas(rpc, project, binding, baseName) {
-    const created = await rpc.canvasCreateProject({ name: binding.name || baseName });
-    if (!created?.ok || !created.reused) return created;
-    if (!await canvasClaimedByOthers(created.projectId, project.id)) return created;
-    for (let index = 2; index <= 5; index++) {
-      const retry = await rpc.canvasCreateProject({ name: `${baseName} ${index}` });
-      if (!retry?.ok) return retry;
-      if (!retry.reused) return retry;
-      if (!await canvasClaimedByOthers(retry.projectId, project.id)) return retry;
+    const stored = typeof binding.name === "string" && binding.name.trim() && !binding.name.includes(project.id) ? binding.name : baseName;
+    let created = await rpc.canvasCreateProject({ name: stored });
+    for (let index = 2; index <= 5 && created?.ok && created.reused; index++) {
+      if (await canvasReusable(rpc, created.projectId, project.id)) return created;
+      created = await rpc.canvasCreateProject({ name: `${baseName} ${index}` });
     }
     return created;
   }
-  async function canvasClaimedByOthers(projectId, selfProjectId) {
+  async function canvasReusable(rpc, projectId, selfProjectId) {
+    const doc = await rpc.projectsGet({ id: projectId });
+    if (!doc?.nodes || Object.keys(doc.nodes).length) return false;
     for (const other of await allProjects()) {
-      if (other?.id !== selfProjectId && other?.canvasAuto?.projectId === projectId) return true;
+      if (other?.id !== selfProjectId && other?.canvasAuto?.projectId === projectId) return false;
     }
-    return false;
+    return true;
   }
   async function followTitle(session, event) {
     try {

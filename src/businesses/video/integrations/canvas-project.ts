@@ -208,25 +208,25 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
         ...(!binding.canvas ? { reason: '画布节点已建立；成果回填前请在原版画布设置数据根目录。' } : {}) };
     });
   }
-  /** 原版按名字复用项目：同名项目已属于别的创作项目时让开，换成带序号的中性名再建，
-   *  既不带创作项目 id，也不写进别人的画布。 */
+  /** 原版按名字复用项目：只有「空项目」（上次创建中断留下的）才认领，
+   *  已经装了内容或已属于别的创作项目时让开，换带序号的中性名另建，不写进别人的画布。 */
   async function createAutoCanvas(rpc, project, binding, baseName) {
-    const created = await rpc.canvasCreateProject({ name: binding.name || baseName });
-    if (!created?.ok || !created.reused) return created;
-    if (!(await canvasClaimedByOthers(created.projectId, project.id))) return created;
-    for (let index = 2; index <= 5; index++) {
-      const retry = await rpc.canvasCreateProject({ name: `${baseName} ${index}` });
-      if (!retry?.ok) return retry;
-      if (!retry.reused) return retry;
-      if (!(await canvasClaimedByOthers(retry.projectId, project.id))) return retry;
+    // 旧记录里的名字带创作项目 id（用户不要这串 id）时不再沿用，直接换成中性名。
+    const stored = typeof binding.name === 'string' && binding.name.trim() && !binding.name.includes(project.id) ? binding.name : baseName;
+    let created = await rpc.canvasCreateProject({ name: stored });
+    for (let index = 2; index <= 5 && created?.ok && created.reused; index++) {
+      if (await canvasReusable(rpc, created.projectId, project.id)) return created;
+      created = await rpc.canvasCreateProject({ name: `${baseName} ${index}` });
     }
     return created;
   }
-  async function canvasClaimedByOthers(projectId, selfProjectId) {
+  async function canvasReusable(rpc, projectId, selfProjectId) {
+    const doc = await rpc.projectsGet({ id: projectId });
+    if (!doc?.nodes || Object.keys(doc.nodes).length) return false;
     for (const other of await allProjects()) {
-      if (other?.id !== selfProjectId && other?.canvasAuto?.projectId === projectId) return true;
+      if (other?.id !== selfProjectId && other?.canvasAuto?.projectId === projectId) return false;
     }
-    return false;
+    return true;
   }
   /** 会话标题落定或被改名后补齐画布项目名；只改插件写过的名字，不覆盖用户改名，也不改动图。 */
   async function followTitle(session, event) {
