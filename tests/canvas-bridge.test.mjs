@@ -9,7 +9,7 @@ after(() => rm(temp, {recursive:true,force:true}));
 const exec = {agent:{session:{id:'canvas-test'}}};
 function fixture() {
  let doc = { name:'test',nodes:{s:{id:'s',type:'script',x:0,y:0,data:{output:'已写剧本'}},v:{id:'v',type:'video',x:400,y:0,data:{prompt:'海边日出',ratio:'9:16',duration:30}}},edges:[{id:'e',fromNode:'s',fromPort:'out',toNode:'v',toPort:'prompt'}]};
- const assets=new Map();let puts=0;
+ const assets=new Map();let puts=0,connects=0;
  const rpc={
   projectsGet:async()=>structuredClone(doc),
   projectsList:async()=>[{id:'p',name:'test'}],
@@ -19,7 +19,7 @@ function fixture() {
   assetCreate:async({asset})=>{assets.set(asset.id,asset);return {ok:true};},
   projectsPut:async({doc:next})=>{puts++;doc=structuredClone(next);return {ok:true};},
  };
- return {adapter:{rpc,assetPath:(_,a)=>a.path},assets,doc:()=>doc,puts:()=>puts, change:fn=>fn(doc)};
+ return {adapter:{rpc,connect:async()=>{connects++;return {ok:true,already:true};},assetPath:(_,a)=>a.path},assets,doc:()=>doc,puts:()=>puts,connects:()=>connects, change:fn=>fn(doc)};
 }
 test('读取上游文本及边，返回摘要，不读供应商配置或执行画布生成',async()=>{
  const f=fixture();f.change(d=>d.settings={apiKey:'not-to-project'});
@@ -52,6 +52,7 @@ test('回填新增实际视频节点，重复补传不重复节点，不覆盖�
  assert.equal(Object.keys(f.doc().nodes).length,3);assert.equal(f.doc().nodes.v.data.prompt,'海边日出');
  const added=Object.values(f.doc().nodes).find(n=>n.id.startsWith('mov_'));
  assert.equal(added.data.metaonticPhase,'segment_review');assert.equal(added.data.ratio,'9:16');
+ assert.ok(f.connects()>=1); // projectsPut 无「文档已变更」信号 → 回填后必须补一次幂等连线确认
  assert.equal(f.assets.size,1);const a=[...f.assets.values()][0];
  assert.equal(await readFile(path.join(temp,'projects','test','video',`${a.id}.mp4`),'utf8'),'mock-mp4');
 });

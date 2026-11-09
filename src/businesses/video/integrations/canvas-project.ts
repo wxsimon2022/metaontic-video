@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { readProject, writeProject, lockProject } from '../workflow/project.js';
 import { ref } from '../config.js';
-import { loadCanvasAdapter, readCanvasInput } from './canvas.js';
+import { loadCanvasAdapter, readCanvasInput, markCanvasChanged } from './canvas.js';
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 /** 提取真实剧本分镜表；没有明确的镜头/画面列时不编造镜头或秒数。 */
@@ -88,6 +88,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       }
       const specification = draft.specification || null;
       const nodes = { ...doc.nodes }, edges = [...(doc.edges || [])];
+      const ensuredEdges: any[] = [], removedEdges: string[] = [];
       const managed = { ...binding.nodes }, managedEdges = { ...(binding.links || {}) };
       const deleted = new Set(doc.tombstones || []), edgeDeleted = new Set(doc.edgeTombstones || []);
       const add = (key, type, label, x, y, data) => {
@@ -116,6 +117,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
         const existing = edges.find(e => e.id === id);
         if (existing && (!managedEdges[id] || digest(existing) !== managedEdges[id])) throw new Error('自动连线已修改，保留你的编辑。');
         if (!existing) edges.push(desired);
+        ensuredEdges.push(desired);
         managedEdges[id] = digest(desired);
       };
       const source = add('script', 'script', '完整剧本', 40, 60, { label: '完整剧本', idea: '由MetaOnticVideo创作项目同步', output: canvasScriptPreview(script) || nodes[`${prefix}_script`]?.data?.output || '', status: (script || nodes[`${prefix}_script`]?.data?.output) ? 'done' : 'idle', metaonticProjectId: project.id });
@@ -125,7 +127,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
         const edge = edges[i];
         if (managedEdges[edge.id] && ['text', 'script'].includes(nodes[edge.toNode]?.type)) {
           if (digest(edge) !== managedEdges[edge.id]) throw new Error('自动连线已修改，保留你的编辑。');
-          edges.splice(i, 1); delete managedEdges[edge.id];
+          edges.splice(i, 1); removedEdges.push(edge.id); delete managedEdges[edge.id];
         }
       }
       let nodeId = `${prefix}_production`;
@@ -158,8 +160,11 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       } else if (!nodes[nodeId]) {
         nodeId = source;
       }
-      const result = await rpc.projectsPut({ ...loc, name: conversationName || doc.name, doc: { ...doc, nodes, edges, ts: Date.now() } });
+      const result = await rpc.projectsPut({ ...loc, name: conversationName || doc.name, doc: { ...doc, nodes, edges, ts: Date.now(),
+        ...(removedEdges.length ? { edgeTombstones: [...new Set([...(doc.edgeTombstones || []), ...removedEdges])] } : {}) } });
       if (result?.ok === false || result?.deleted) throw new Error('自动画布保存失败，保留原创作项目。');
+      // projectsPut 不产生「文档已变更」信号：不补这一下，打开的画布只会补节点、连线一条都看不到。
+      await markCanvasChanged(adapter, binding.projectId, [...ensuredEdges, ...edges]);
       binding.nodes = managed; binding.links = managedEdges; binding.nodeId = nodeId;
       // 获取当前内容摘要，后续生成不必让助手复制定位参数。
       try { binding.canvas = (await readCanvasInput(adapter, { projectId: binding.projectId, nodeId })).canvas; }

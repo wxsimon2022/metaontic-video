@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {api} from './module-test-api.mjs';
 
 test('创作项目自动建图、恢复审核材料、自动回填且不改变审核参数；保护用户编辑',async()=>{
@@ -11,8 +12,8 @@ test('创作项目自动建图、恢复审核材料、自动回填且不改变�
  try {
   const exec={agent:{session:{id:'auto-canvas',header:{cwd:root}}}};
   const project=await api.createProject(exec,'scenery');project.duration=30;project.choice='not_needed';await api.writeProject(project);
-  let creates=0,doc={name:'自动创作',nodes:{},edges:[]};
-  const adapter={rpc:{
+  let creates=0,doc={name:'自动创作',nodes:{},edges:[]};const connects=[];
+  const adapter={connect:async(args)=>{connects.push(args);return {ok:true,already:true};},rpc:{
    canvasCreateProject:async()=>{creates++;return {ok:true,projectId:'auto'};},
    projectsGet:async()=>structuredClone(doc),
    projectsPut:async({doc:next})=>{doc=structuredClone(next);return {ok:true};},
@@ -31,6 +32,9 @@ test('创作项目自动建图、恢复审核材料、自动回填且不改变�
   assert.equal(Object.values(doc.nodes).find(n=>n.type==='storyboard').data.shots.length,4);
   await sync.sync(project.id,exec);assert.equal(creates,1);
   assert.equal(doc.edges.length,2);
+  // 宿主 projectsPut 不产生「文档已变更」信号（画布端只补节点、不补连线）→ 保存后必须补一次幂等连线确认。
+  assert.ok(connects.length>=1);
+  assert.deepEqual(connects[0],{projectId:'auto',fromNode:doc.edges[0].fromNode,fromPort:'out',toNode:doc.edges[0].toNode,toPort:doc.edges[0].toPort});
   for(const edge of doc.edges){
    const target=doc.nodes[edge.toNode];
    assert.ok((target.type==='storyboard'&&edge.toPort==='script')||(target.type==='video'&&edge.toPort==='prompt'));
@@ -68,7 +72,7 @@ test('review在用户答复前同步已验证草稿，取消审核保留画布�
   const scriptPath=path.join(root,'剧本.md');await writeFile(scriptPath,'# 正文\n| 镜头 | 时间 | 画面 |\n| --- | --- | --- |\n| 一 | 0–30秒 | 海边 |');
   const spec={prompt:'海边',segmentPrompts:['清晨','黄昏'],duration:30,ratio:'9:16',resolution:'720p'};
   let doc={nodes:{},edges:[]},askCalled=false,answer;
-  const adapter={rpc:{canvasCreateProject:async()=>({ok:true,projectId:'pre'}),projectsGet:async()=>structuredClone(doc),projectsPut:async({doc:next})=>{doc=next;return {ok:true};},dataRootGet:async()=>({dataRoot:root})}};
+  const adapter={connect:async(args)=>{connects.push(args);return {ok:true,already:true};},rpc:{canvasCreateProject:async()=>({ok:true,projectId:'pre'}),projectsGet:async()=>structuredClone(doc),projectsPut:async({doc:next})=>{doc=next;return {ok:true};},dataRootGet:async()=>({dataRoot:root})}};
   const sync=api.createCanvasProjectSync(async()=>adapter);
   const ctx={get:n=>n==='userQuestions'?{ask:async()=>{
    askCalled=true;assert.ok(Object.values(doc.nodes).some(n=>n.type==='storyboard'&&n.data.shots.length===1));
@@ -94,4 +98,38 @@ test('画布展示去除脚本元数据与Markdown外观，保留实际内容',(
  assert.ok(preview.includes('完整剧本\n清晨'));
  assert.ok(preview.includes('一 · 草原'));
  assert.equal(api.scriptStoryboardShots(source).length,1);
+});
+
+test('旧版无效文本连线被清理并记墓碑，画布端能删掉缓存里的旧线',async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'自动画布 墓碑 ')),old=process.env.DSH_HOME;
+ process.env.DSH_HOME=root;
+ try {
+  const exec={agent:{session:{id:'auto-canvas-tomb',header:{cwd:root}}}};
+  const project=await api.createProject(exec,'scenery');project.duration=30;project.choice='not_needed';await api.writeProject(project);
+  let doc={name:'自动创作',nodes:{},edges:[]};const connects=[];
+  const adapter={connect:async(args)=>{connects.push(args);return {ok:true,already:true};},rpc:{
+   canvasCreateProject:async()=>({ok:true,projectId:'auto'}),
+   projectsGet:async()=>structuredClone(doc),
+   projectsPut:async({doc:next})=>{doc=structuredClone(next);return {ok:true};},
+   dataRootGet:async()=>({dataRoot:root}),assetsGet:async()=>({items:[]}),
+   projectDirGet:async()=>({ok:true,abs:path.join(root,'projects','auto'),dataRoot:root}),
+   assetCreate:async()=>({ok:true}),canvasOpen:async()=>({ok:true}),
+  }};
+  const sync=api.createCanvasProjectSync(async()=>adapter);
+  const scriptPath=path.join(root,'剧本.md');await writeFile(scriptPath,'# 剧本');
+  const spec={prompt:'日出',segmentPrompts:['日出'],duration:30,ratio:'9:16',resolution:'720p'};
+  const saved=await api.readProject(project.id,exec);saved.approved={scriptPath,specification:spec};await api.writeProject(saved);
+  await sync.sync(project.id,exec);
+  // 旧版本记录过的自动连线：指向没有输入端口的文本节点，画布端本来就不该保留。
+  const prefix=`mov_${project.id.replaceAll('-','')}`;
+  const legacy={id:`${prefix}_edge_project_script`,fromNode:`${prefix}_project`,toNode:`${prefix}_script`,fromPort:'out',toPort:'prompt'};
+  const again=await api.readProject(project.id,exec);
+  again.canvasAuto.links[legacy.id]=createHash('sha256').update(JSON.stringify(legacy)).digest('hex');
+  await api.writeProject(again);
+  doc.edges.push(legacy);
+  await sync.sync(project.id,exec);
+  assert.ok(!doc.edges.some(e=>e.id===legacy.id));
+  assert.ok((doc.edgeTombstones||[]).includes(legacy.id));
+  assert.equal(connects.length,2);
+ }finally{if(old===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=old;await rm(root,{recursive:true,force:true});}
 });

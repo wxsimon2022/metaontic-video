@@ -1,3 +1,21 @@
+/** 原版宿主的 projectsPut 不产生「Agent 改动了项目文档」信号：打开的画布只按缺失节点逐个补，
+ *  不会合并 edges（mergeHostDoc 才会），于是插件建好的节点会出现在画布上、连线一条都没有。
+ *  这里对文档里已存在的连线做一次幂等确认来触发该信号：canvasConnect 遇到同一条线直接返回，不改内容。 */
+export async function markCanvasChanged(adapter: any, projectId: string, candidates: any[] = []) {
+  // canvasConnect 不在宿主浏览器 RPC 表里，只有模块内部接口；adapter.connect 来自 _internals。
+  const connect = adapter?.connect;
+  if (typeof connect !== 'function') return false;
+  for (const edge of candidates) {
+    if (!edge?.fromNode || !edge?.toNode) continue;
+    try {
+      const result = await connect({ projectId, fromNode: edge.fromNode, toNode: edge.toNode,
+        ...(edge.fromPort ? { fromPort: edge.fromPort } : {}), ...(edge.toPort ? { toPort: edge.toPort } : {}) });
+      if (result?.ok !== false) return true;
+    } catch { /* 端口规则不满足等：换下一条候选，不阻断同步或回填 */ }
+  }
+  return false;
+}
+
 /** 与原版画布0.20.1互操作；生成始终经过既有工具及宿主审批。 */
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
@@ -30,7 +48,8 @@ export async function loadCanvasAdapter() {
     const internal = module._internals;
     const rpc = internal?.rpcMethods?.();
     if (!rpc?.projectsGet || !rpc?.projectsPut || !rpc?.assetsGet || !rpc?.assetCreate || !rpc?.projectDirGet || !rpc?.dataRootGet || !rpc?.projectsList) throw new Error('not-ready');
-    return { rpc, assetPath: (root, asset) => asset.sha ? internal.objectAbsFor(root, asset.sha) : path.resolve(root, internal.physicalRel(asset.rel)) };
+    return { rpc, assetPath: (root, asset) => asset.sha ? internal.objectAbsFor(root, asset.sha) : path.resolve(root, internal.physicalRel(asset.rel)),
+      ...(typeof internal.canvasConnect === 'function' ? { connect: (args: any) => internal.canvasConnect(args) } : {}) };
   } catch { throw new Error('画布联动需要已启用的原版 @ninkch/dsh-infinite-canvas 0.20.1；请在插件详情核对安装和启用状态，不会改写画布配置。'); }
 }
 /** 有向上游、原顺序和端口一并保留；只输出创作字段，不读取原版供应商配置。 */
@@ -143,10 +162,13 @@ export async function publishCanvasResult(adapter, record) {
     const edgeId = `mov_edge_${id}`;
     if (['text', 'script', 'storyboard', 'shot'].includes(source.type) && !edges.some(e => e.id === edgeId) && !doc.edgeTombstones?.includes(edgeId)) edges.push({ id: edgeId, fromNode: source.id, fromPort: 'out', toNode: id, toPort: 'prompt', ...(record.native ? { metaonticResult: true } : {}) });
   }
-  // 媒体之间没有兼容的提示词端口，清理旧版本创建的成果关系线。
-  for (let i = edges.length - 1; i >= 0; i--) if (edges[i].fromNode === source.id && edges[i].id.startsWith('mov_edge_') && ['image', 'video'].includes(source.type)) edges.splice(i, 1);
-  const saved = await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes, edges, ts: Date.now() } });
+  // 媒体之间没有兼容的提示词端口，清理旧版本创建的成果关系线；同时记墓碑，让画布端删掉缓存里的旧线。
+  const removedEdges: string[] = [];
+  for (let i = edges.length - 1; i >= 0; i--) if (edges[i].fromNode === source.id && edges[i].id.startsWith('mov_edge_') && ['image', 'video'].includes(source.type)) { removedEdges.push(edges[i].id); edges.splice(i, 1); }
+  const saved = await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes, edges, ts: Date.now(),
+    ...(removedEdges.length ? { edgeTombstones: [...new Set([...(doc.edgeTombstones || []), ...removedEdges])] } : {}) } });
   if (saved?.ok === false || saved?.deleted) throw new Error('画布已删除或回填失败');
+  await markCanvasChanged(adapter, loc.id, [...edges.filter((e: any) => e.id.startsWith('mov_edge_')), ...edges]);
   return { status: 'synced', token: record.id, count: publications.length, phase: record.phase };
 }
 
@@ -191,6 +213,7 @@ export function createCanvasBridge(load = loadCanvasAdapter, config: any = {}) {
           if (previous && previous.data?.text !== previous.metaonticStateText) return;
           const node = { ...(previous || { id, type: 'text', x: source.x, y: source.y + (source.h || 280) + 80, w: 360, h: 180 }), metaonticStateText: text, data: { label: '制作状态', text } };
           await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes: { ...doc.nodes, [id]: node }, ts: Date.now() } });
+          await markCanvasChanged(adapter, loc.id, doc.edges || []);
         } catch { /* 状态投影失败不影响生成与成果 */ }
       };
       await showState('正在执行制作流程；是否已提交以工具进度为准。');
