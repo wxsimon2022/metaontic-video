@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { readProject, writeProject, lockProject } from '../workflow/project.js';
+import { readProject, writeProject, lockProject, projectsOfSession } from '../workflow/project.js';
 import { ref } from '../config.js';
 import { loadCanvasAdapter, readCanvasInput, markCanvasChanged } from './canvas.js';
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -47,6 +47,23 @@ export function canvasScriptPreview(script: string) {
     .map(line => line.replace(/^#{1,6}\s+/, '').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '图片：$1（$2）').replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1（$2）').replace(/`([^`]+)`/g, '$1')
       .replace(/^\s*\|(.+)\|\s*$/, (_, row) => row.split(/(?<!\\)\|/).map(x => x.trim()).join(' · ')))
     .join('\n').trim();
+}
+
+/** 能证明是插件写过的画布项目名才算：创建名、上次应用的名字、旧版本用过的固定前缀，
+ *  以及已经等于当前会话标题的名字（老版本只写过标题、没记归属）。用户手动改过的名字一律不动。 */
+export function pluginNamedCanvas(binding: any, current: any, title: any = '') {
+  const name = String(current || '').trim(), wanted = String(title || '').trim();
+  if (!name) return false;
+  return name === binding?.name || name === binding?.appliedName || name.startsWith('MetaOntic 创作 ')
+    || Boolean(wanted) && name === wanted;
+}
+
+/** 画布内的默认画布名同理：只有原版缺省名、上次应用的名字或当前标题能证明是插件写的。
+ *  原版端把默认画布名当 Host 权威字段，项目名却由画布端本地缓存回推，所以两处都要跟着标题写。 */
+export function pluginNamedCanvasName(binding: any, current: any, title: any = '') {
+  const name = String(current || '').trim(), wanted = String(title || '').trim();
+  // 空名字就是原版缺省「默认画布」（projectsGet 不带该字段），同样没有用户起过的名字。
+  return !name || name === '默认画布' || name === binding?.appliedCanvasName || Boolean(wanted) && name === wanted;
 }
 
 export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = {}, sessionTitle: any = null) {
@@ -160,9 +177,18 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       } else if (!nodes[nodeId]) {
         nodeId = source;
       }
-      const result = await rpc.projectsPut({ ...loc, name: conversationName || doc.name, doc: { ...doc, nodes, edges, ts: Date.now(),
+      // 画布名跟着会话标题走；会话标题通常首轮之后才生成，那就等 session/title 事件补名。
+      const currentName = String(doc.name || '').trim();
+      const canvasName = conversationName && pluginNamedCanvas(binding, currentName, conversationName) ? conversationName : currentName;
+      const currentCanvasName = String(doc.defaultCanvasName || '').trim();
+      const canvasLabel = !doc.defaultCanvasDeleted && conversationName && pluginNamedCanvasName(binding, currentCanvasName, conversationName)
+        ? conversationName : currentCanvasName;
+      const result = await rpc.projectsPut({ ...loc, name: canvasName, ...(canvasLabel ? { defaultCanvasName: canvasLabel } : {}),
+        doc: { ...doc, nodes, edges, ts: Date.now(),
         ...(removedEdges.length ? { edgeTombstones: [...new Set([...(doc.edgeTombstones || []), ...removedEdges])] } : {}) } });
       if (result?.ok === false || result?.deleted) throw new Error('自动画布保存失败，保留原创作项目。');
+      if (canvasName) binding.appliedName = canvasName;
+      if (canvasLabel) binding.appliedCanvasName = canvasLabel;
       // projectsPut 不产生「文档已变更」信号：不补这一下，打开的画布只会补节点、连线一条都看不到。
       await markCanvasChanged(adapter, binding.projectId, [...ensuredEdges, ...edges]);
       binding.nodes = managed; binding.links = managedEdges; binding.nodeId = nodeId;
@@ -176,6 +202,43 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
         ...(!binding.canvas ? { reason: '画布节点已建立；成果回填前请在原版画布设置数据根目录。' } : {}) };
     });
   }
+  /** 会话标题落定或被改名后补齐画布项目名；只改插件写过的名字，不覆盖用户改名，也不改动图。 */
+  async function followTitle(session, event) {
+    try {
+      if (!session || event?.type !== 'session/title') return;
+      const title = String(event.data?.title || '').trim().slice(0, 80);
+      if (!title) return;
+      for (const project of await projectsOfSession(session)) {
+        const binding = project.canvasAuto;
+        if (!binding?.projectId) continue;
+        try {
+          await lockProject(`canvas:${project.id}`, async () => {
+            const adapter = await load();
+            const loc = { id: binding.projectId };
+            const doc = await adapter.rpc.projectsGet(loc);
+            if (!doc?.nodes || doc.deleted) return;
+            const current = String(doc.name || '').trim(), currentCanvas = String(doc.defaultCanvasName || '').trim();
+            // 用户手动改过的名字不动；已经一致的只补记归属，便于以后跟着会话改名。
+            const ownsName = pluginNamedCanvas(binding, current, title);
+            const ownsCanvasName = !doc.defaultCanvasDeleted && pluginNamedCanvasName(binding, currentCanvas, title);
+            if (!ownsName && !ownsCanvasName) return;
+            const put: any = { ...loc };
+            if (ownsName && current !== title) put.name = title;
+            if (ownsCanvasName && currentCanvas !== title) put.defaultCanvasName = title;
+            if (put.name || put.defaultCanvasName) {
+              // 只写名字：不带 doc 就不会碰节点、连线、视图与设定集。
+              const result = await adapter.rpc.projectsPut(put);
+              if (result?.ok === false || result?.deleted) return;
+            }
+            let recorded = false;
+            if (ownsName && binding.appliedName !== title) { binding.appliedName = title; recorded = true; }
+            if (ownsCanvasName && binding.appliedCanvasName !== title) { binding.appliedCanvasName = title; recorded = true; }
+            if (recorded) await writeProject(project);
+          });
+        } catch { /* 该项目正在同步或画布未就绪：留到下次同步或下个标题事件 */ }
+      }
+    } catch { /* 后台补名不打断会话 */ }
+  }
   function wrapProject(tool) {
     return { ...tool, async execute(args, exec) {
       // 先执行原有创作与审核，未确认时长/角色图不提前创建画布。
@@ -188,5 +251,5 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       } catch (e) { return { ...result, canvasProject: { status: 'pending', reason: e.message || '自动画布同步未完成，重试项目同步即可，不需要重生成。' } }; }
     } };
   }
-  return { sync, wrapProject };
+  return { sync, wrapProject, followTitle };
 }

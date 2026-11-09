@@ -1,7 +1,7 @@
 import { assertSegmentReviewed } from './segment-review.js';
 /** 项目身份、真实审核答复与制作参数的持久化。无密钥、无付费调用。 */
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { dshHome } from '../media/references.js';
 import { ref, resolveResolution } from '../config.js';
@@ -20,6 +20,22 @@ export function sessionOwner(exec) {
   const id = session?.id || session?.header?.id;
   if (typeof id !== 'string' || !id) throw new Error('项目操作需要可识别的会话，尚未提交视频。');
   return hash(id);
+}
+/** 会话拥有的创作项目；会话标题晚到或被改名时，用它按 owner 找回需要对齐名字的画布绑定。 */
+export async function projectsOfSession(session) {
+  let owner;
+  try { owner = sessionOwner({ agent: { session } }); } catch { return []; }
+  const dir = path.join(dshHome(), 'metaontic-video', 'projects');
+  const names = await readdir(dir).catch(() => []);
+  const found = [];
+  for (const name of names) {
+    if (!name.endsWith('.json')) continue;
+    try {
+      const data = JSON.parse(await readFile(path.join(dir, name), 'utf8'));
+      if (data?.owner === owner) found.push(data);
+    } catch { /* 单个项目读不动就跳过，不影响其余项目 */ }
+  }
+  return found;
 }
 function projectFile(id) {
   if (!/^[a-f0-9-]{36}$/.test(String(id || ''))) throw new Error('缺少有效 projectId，请先调用 video_project(action:prepare)。');

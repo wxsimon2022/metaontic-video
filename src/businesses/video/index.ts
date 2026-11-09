@@ -68,6 +68,8 @@ function applyVideoBusiness(runtime: BusinessRuntime) {
   };
   const canvasBridge = createCanvasBridge(undefined, config);
   const canvasProjects = createCanvasProjectSync(undefined, config, { get: session => (ctx.get?.('sessionTitle'))?.get(session) });
+  // 会话标题通常首轮之后才生成：标题落定或被改写时，把自动画布的项目名对齐成同一个名字。
+  runtime.defer((ctx as any).on('session/event', canvasProjects.followTitle));
   const generation = canvasBridge.wrap(videoTool(config, deps, ctx));
   const extension = canvasBridge.wrap(extendTool(config, deps, ctx));
   register(jsonSafeTool(canvasBridge.tool));
