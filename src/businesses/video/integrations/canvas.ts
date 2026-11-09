@@ -134,12 +134,17 @@ export async function publishCanvasResult(adapter, record) {
   const nodes = { ...doc.nodes }, edges = [...(doc.edges || [])];
   for (const { id, media, index } of publications) {
     if (doc.tombstones?.includes(id)) continue; // 用户主动删除的成果不复活。
-    if (!nodes[id]) nodes[id] = { id, type: media.kind, x: (Number(source.x) || 0) + 440, y: (Number(source.y) || 0) + index * 300, w: 360, h: 280,
+    let resultY = Number(source.y) || 0;
+    const resultX = (Number(source.x) || 0) + (Number(source.w) || 360) + 120;
+    while (Object.values(nodes).some((n: any) => resultX < n.x + (n.w || 360) + 40 && resultX + 400 > n.x && resultY < n.y + (n.h || 280) + 40 && resultY + 320 > n.y)) resultY += 340;
+    if (!nodes[id]) nodes[id] = { id, metaonticSourceNode: source.id, metaonticCreatedAt: record.createdAt, type: media.kind, x: resultX, y: resultY, w: 360, h: 280,
       data: { label: `MetaOntic · ${media.label}`, status: 'done', assetId: id, prompt: '', ratio: record.ratio || '16:9', demo: false, metaonticPhase: record.phase,
         ...(record.native ? { metaonticNativeJob: record.id, metaonticTaskId: record.native.taskId || '', metaonticVideoUrl: record.native.videoUrl || '', metaonticSeconds: record.native.seconds ?? null, duration: record.native.seconds ?? null, resolution: record.native.resolution || '', prompt: record.native.prompt || '' } : {}) } };
     const edgeId = `mov_edge_${id}`;
-    if (!edges.some(e => e.id === edgeId) && !doc.edgeTombstones?.includes(edgeId)) edges.push({ id: edgeId, fromNode: source.id, fromPort: 'out', toNode: id, toPort: 'prompt', ...(record.native ? { metaonticResult: true } : {}) });
+    if (['text', 'script', 'storyboard', 'shot'].includes(source.type) && !edges.some(e => e.id === edgeId) && !doc.edgeTombstones?.includes(edgeId)) edges.push({ id: edgeId, fromNode: source.id, fromPort: 'out', toNode: id, toPort: 'prompt', ...(record.native ? { metaonticResult: true } : {}) });
   }
+  // 媒体之间没有兼容的提示词端口，清理旧版本创建的成果关系线。
+  for (let i = edges.length - 1; i >= 0; i--) if (edges[i].fromNode === source.id && edges[i].id.startsWith('mov_edge_') && ['image', 'video'].includes(source.type)) edges.splice(i, 1);
   const saved = await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes, edges, ts: Date.now() } });
   if (saved?.ok === false || saved?.deleted) throw new Error('画布已删除或回填失败');
   return { status: 'synced', token: record.id, count: publications.length, phase: record.phase };
@@ -176,7 +181,24 @@ export function createCanvasBridge(load = loadCanvasAdapter, config: any = {}) {
         const input = await readCanvasInput(await load(), canvas);
         if (input.canvas.fingerprint !== canvas.fingerprint) throw new Error('画布内容或参考素材已修改，请重新读取并审核；未提交生成任务。');
       }
-      const result = await tool.execute(args, exec);
+      const showState = async (text) => {
+        if (!canvas || !['video_generate', 'video_extend'].includes(tool.name)) return;
+        try {
+          const adapter = await load(), loc = location(canvas), doc = await adapter.rpc.projectsGet(loc);
+          const source = doc.nodes?.[canvas.nodeId], id = `${canvas.nodeId}_state`;
+          if (!source?.data?.metaonticAssistantManaged || doc.tombstones?.includes(id)) return;
+          const previous = doc.nodes[id];
+          if (previous && previous.data?.text !== previous.metaonticStateText) return;
+          const node = { ...(previous || { id, type: 'text', x: source.x, y: source.y + (source.h || 280) + 80, w: 360, h: 180 }), metaonticStateText: text, data: { label: '制作状态', text } };
+          await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes: { ...doc.nodes, [id]: node }, ts: Date.now() } });
+        } catch { /* 状态投影失败不影响生成与成果 */ }
+      };
+      await showState('正在执行制作流程；是否已提交以工具进度为准。');
+      let result;
+      try { result = await tool.execute(args, exec); }
+      catch (error) { await showState('本次制作流程中断，请查看会话中的工具结果。'); throw error; }
+      const phase = videoResultState(result).phase;
+      await showState(({ complete: '制作完成', generated: '生成成功', segment_review: '本段完成，等待结果审核', task_pending: '任务状态待确认', delivery_pending: '生成结果待交付', partial: '部分完成', failed: '制作失败', reference_review: '等待参考图审核' })[phase] || '本轮流程已结束，请查看会话结果。');
       if (!canvas || !result || typeof result !== 'object') return result;
       const media = mediaPreviewMeta(result, tool.name).media;
       if (!media.length) return { ...result, canvasSync: { status: 'no_media', reason: '尚无成功素材，未回填虚构成果。' } };

@@ -4922,11 +4922,16 @@ async function publishCanvasResult(adapter, record) {
   const nodes = { ...doc.nodes }, edges = [...doc.edges || []];
   for (const { id, media, index } of publications) {
     if (doc.tombstones?.includes(id)) continue;
+    let resultY = Number(source.y) || 0;
+    const resultX = (Number(source.x) || 0) + (Number(source.w) || 360) + 120;
+    while (Object.values(nodes).some((n) => resultX < n.x + (n.w || 360) + 40 && resultX + 400 > n.x && resultY < n.y + (n.h || 280) + 40 && resultY + 320 > n.y)) resultY += 340;
     if (!nodes[id]) nodes[id] = {
       id,
+      metaonticSourceNode: source.id,
+      metaonticCreatedAt: record.createdAt,
       type: media.kind,
-      x: (Number(source.x) || 0) + 440,
-      y: (Number(source.y) || 0) + index * 300,
+      x: resultX,
+      y: resultY,
       w: 360,
       h: 280,
       data: {
@@ -4941,8 +4946,9 @@ async function publishCanvasResult(adapter, record) {
       }
     };
     const edgeId = `mov_edge_${id}`;
-    if (!edges.some((e) => e.id === edgeId) && !doc.edgeTombstones?.includes(edgeId)) edges.push({ id: edgeId, fromNode: source.id, fromPort: "out", toNode: id, toPort: "prompt", ...record.native ? { metaonticResult: true } : {} });
+    if (["text", "script", "storyboard", "shot"].includes(source.type) && !edges.some((e) => e.id === edgeId) && !doc.edgeTombstones?.includes(edgeId)) edges.push({ id: edgeId, fromNode: source.id, fromPort: "out", toNode: id, toPort: "prompt", ...record.native ? { metaonticResult: true } : {} });
   }
+  for (let i = edges.length - 1; i >= 0; i--) if (edges[i].fromNode === source.id && edges[i].id.startsWith("mov_edge_") && ["image", "video"].includes(source.type)) edges.splice(i, 1);
   const saved = await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes, edges, ts: Date.now() } });
   if (saved?.ok === false || saved?.deleted) throw new Error("\u753B\u5E03\u5DF2\u5220\u9664\u6216\u56DE\u586B\u5931\u8D25");
   return { status: "synced", token: record.id, count: publications.length, phase: record.phase };
@@ -4979,7 +4985,29 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
         const input = await readCanvasInput(await load(), canvas);
         if (input.canvas.fingerprint !== canvas.fingerprint) throw new Error("\u753B\u5E03\u5185\u5BB9\u6216\u53C2\u8003\u7D20\u6750\u5DF2\u4FEE\u6539\uFF0C\u8BF7\u91CD\u65B0\u8BFB\u53D6\u5E76\u5BA1\u6838\uFF1B\u672A\u63D0\u4EA4\u751F\u6210\u4EFB\u52A1\u3002");
       }
-      const result = await tool2.execute(args, exec);
+      const showState = async (text) => {
+        if (!canvas || !["video_generate", "video_extend"].includes(tool2.name)) return;
+        try {
+          const adapter = await load(), loc = location(canvas), doc = await adapter.rpc.projectsGet(loc);
+          const source = doc.nodes?.[canvas.nodeId], id = `${canvas.nodeId}_state`;
+          if (!source?.data?.metaonticAssistantManaged || doc.tombstones?.includes(id)) return;
+          const previous = doc.nodes[id];
+          if (previous && previous.data?.text !== previous.metaonticStateText) return;
+          const node = { ...previous || { id, type: "text", x: source.x, y: source.y + (source.h || 280) + 80, w: 360, h: 180 }, metaonticStateText: text, data: { label: "\u5236\u4F5C\u72B6\u6001", text } };
+          await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes: { ...doc.nodes, [id]: node }, ts: Date.now() } });
+        } catch {
+        }
+      };
+      await showState("\u6B63\u5728\u6267\u884C\u5236\u4F5C\u6D41\u7A0B\uFF1B\u662F\u5426\u5DF2\u63D0\u4EA4\u4EE5\u5DE5\u5177\u8FDB\u5EA6\u4E3A\u51C6\u3002");
+      let result;
+      try {
+        result = await tool2.execute(args, exec);
+      } catch (error) {
+        await showState("\u672C\u6B21\u5236\u4F5C\u6D41\u7A0B\u4E2D\u65AD\uFF0C\u8BF7\u67E5\u770B\u4F1A\u8BDD\u4E2D\u7684\u5DE5\u5177\u7ED3\u679C\u3002");
+        throw error;
+      }
+      const phase = videoResultState(result).phase;
+      await showState({ complete: "\u5236\u4F5C\u5B8C\u6210", generated: "\u751F\u6210\u6210\u529F", segment_review: "\u672C\u6BB5\u5B8C\u6210\uFF0C\u7B49\u5F85\u7ED3\u679C\u5BA1\u6838", task_pending: "\u4EFB\u52A1\u72B6\u6001\u5F85\u786E\u8BA4", delivery_pending: "\u751F\u6210\u7ED3\u679C\u5F85\u4EA4\u4ED8", partial: "\u90E8\u5206\u5B8C\u6210", failed: "\u5236\u4F5C\u5931\u8D25", reference_review: "\u7B49\u5F85\u53C2\u8003\u56FE\u5BA1\u6838" }[phase] || "\u672C\u8F6E\u6D41\u7A0B\u5DF2\u7ED3\u675F\uFF0C\u8BF7\u67E5\u770B\u4F1A\u8BDD\u7ED3\u679C\u3002");
       if (!canvas || !result || typeof result !== "object") return result;
       const media = mediaPreviewMeta(result, tool2.name).media;
       if (!media.length) return { ...result, canvasSync: { status: "no_media", reason: "\u5C1A\u65E0\u6210\u529F\u7D20\u6750\uFF0C\u672A\u56DE\u586B\u865A\u6784\u6210\u679C\u3002" } };
@@ -5066,7 +5094,10 @@ function scriptStoryboardShots(script) {
   }
   return shots;
 }
-function createCanvasProjectSync(load = loadCanvasAdapter, config = {}) {
+function canvasScriptPreview(script) {
+  return script.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").split(/\r?\n/).filter((line) => !/^\s*(```|~~~)/.test(line) && !/^\s*\|?\s*:?-{3,}:?\s*\|/.test(line)).map((line) => line.replace(/^#{1,6}\s+/, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "\u56FE\u7247\uFF1A$1\uFF08$2\uFF09").replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1\uFF08$2\uFF09").replace(/`([^`]+)`/g, "$1").replace(/^\s*\|(.+)\|\s*$/, (_, row) => row.split(/(?<!\\)\|/).map((x) => x.trim()).join(" \xB7 "))).join("\n").trim();
+}
+function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionTitle = null) {
   async function sync(projectId, exec, draft = {}) {
     if (ref(config, "autoCreateCanvas", true) === false) return { status: "disabled", reason: "\u5DF2\u5728\u63D2\u4EF6\u8BBE\u7F6E\u5173\u95ED\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03\uFF1B\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\u3002" };
     return lockProject(`canvas:${projectId}`, async () => {
@@ -5080,6 +5111,11 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}) {
         return { status: "unavailable", reason: "\u81EA\u52A8\u753B\u5E03\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u5B89\u88C5\u5E76\u542F\u7528\u539F\u7248\u65E0\u9650\u753B\u5E030.20.1\uFF1B\u521B\u4F5C\u9879\u76EE\u5DF2\u4FDD\u7559\u3002" };
       }
       const rpc = adapter.rpc;
+      let conversationName = "";
+      try {
+        conversationName = String(sessionTitle?.get(exec.agent.session)?.title || "").trim().slice(0, 80);
+      } catch {
+      }
       if (!rpc.canvasCreateProject) return { status: "unavailable", reason: "\u539F\u7248\u753B\u5E03\u7F3A\u5C11\u521B\u5EFA\u63A5\u53E3\uFF0C\u672A\u521B\u5EFA\u66FF\u4EE3\u753B\u5E03\u3002" };
       const prefix = `mov_${project.id.replaceAll("-", "")}`;
       if (!project.canvasAuto) {
@@ -5111,8 +5147,18 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}) {
         const id = `${prefix}_${key}`;
         if (deleted.has(id)) throw new Error("\u81EA\u52A8\u8282\u70B9\u5DF2\u88AB\u5220\u9664\uFF0C\u4E0D\u4F1A\u81EA\u52A8\u590D\u6D3B\uFF1B\u8BF7\u5728\u9879\u76EE\u4E2D\u660E\u786E\u9009\u62E9\u65B0\u7684\u753B\u5E03\u7ED1\u5B9A\u3002");
         const previous = nodes[id];
+        if (key === "script" && previous?.type === "script" && previous.data?.output === "" && previous.data?.metaonticProjectId === project.id) {
+          const initial = { label: "\u5B8C\u6574\u5267\u672C", idea: "\u7531MetaOnticVideo\u521B\u4F5C\u9879\u76EE\u540C\u6B65", output: "", status: "idle", metaonticProjectId: project.id };
+          if (JSON.stringify(previous.data) === JSON.stringify(initial)) managed[id] = digest2({ type: previous.type, data: previous.data });
+        }
         if (previous && (!managed[id] || digest2({ type: previous.type, data: previous.data }) !== managed[id])) throw new Error("\u81EA\u52A8\u8282\u70B9\u5DF2\u5728\u753B\u5E03\u4E2D\u4FEE\u6539\uFF0C\u4FDD\u7559\u4F60\u7684\u7F16\u8F91\uFF1B\u8BF7\u5148\u5904\u7406\u5DEE\u5F02\u518D\u540C\u6B65\u3002");
         const next = { ...previous || { id, x, y, w: type === "script" ? 420 : 360, h: 280 }, type, data };
+        const oldX = key === "production" ? 1550 : key.startsWith("segment_") ? 1050 : null;
+        const oldY = key === "production" ? 60 : key.startsWith("segment_") ? 60 + (Number(key.slice(8)) - 1) * 320 : null;
+        if (previous && previous.x === oldX && previous.y === oldY && previous.w === 360 && previous.h === 280) {
+          next.x = x;
+          next.y = y;
+        }
         nodes[id] = next;
         managed[id] = digest2({ type, data });
         return id;
@@ -5126,28 +5172,47 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}) {
         if (!existing) edges.push(desired);
         managedEdges[id] = digest2(desired);
       };
-      const source = add("script", "script", "\u5B8C\u6574\u5267\u672C", 40, 60, { label: "\u5B8C\u6574\u5267\u672C", idea: "\u7531MetaOnticVideo\u521B\u4F5C\u9879\u76EE\u540C\u6B65", output: script || nodes[`${prefix}_script`]?.data?.output || "", status: script || nodes[`${prefix}_script`]?.data?.output ? "done" : "idle", metaonticProjectId: project.id });
+      const source = add("script", "script", "\u5B8C\u6574\u5267\u672C", 40, 60, { label: "\u5B8C\u6574\u5267\u672C", idea: "\u7531MetaOnticVideo\u521B\u4F5C\u9879\u76EE\u540C\u6B65", output: canvasScriptPreview(script) || nodes[`${prefix}_script`]?.data?.output || "", status: script || nodes[`${prefix}_script`]?.data?.output ? "done" : "idle", metaonticProjectId: project.id });
       const overview = add("project", "text", "\u521B\u4F5C\u9879\u76EE", 40, 400, { label: "\u521B\u4F5C\u9879\u76EE", text: `\u76EE\u6807\u65F6\u957F\uFF1A${project.duration ?? "\u5F85\u786E\u8BA4"}\u79D2
 \u89D2\u8272\u56FE\u8DEF\u7EBF\uFF1A${project.choice || "\u5F85\u786E\u8BA4"}
 \u811A\u672C\u3001\u8D39\u7528\u4E0E\u5206\u6BB5\u5BA1\u6838\u4ECD\u6309\u539F\u6D41\u7A0B\u8FDB\u884C\uFF1B\u81EA\u52A8\u5EFA\u56FE\u4E0D\u4EA7\u751F\u6A21\u578B\u8D39\u7528\u3002`, metaonticProjectId: project.id });
-      connect(overview, source);
+      for (let i = edges.length - 1; i >= 0; i--) {
+        const edge = edges[i];
+        if (managedEdges[edge.id] && ["text", "script"].includes(nodes[edge.toNode]?.type)) {
+          if (digest2(edge) !== managedEdges[edge.id]) throw new Error("\u81EA\u52A8\u8FDE\u7EBF\u5DF2\u4FEE\u6539\uFF0C\u4FDD\u7559\u4F60\u7684\u7F16\u8F91\u3002");
+          edges.splice(i, 1);
+          delete managedEdges[edge.id];
+        }
+      }
       let nodeId = `${prefix}_production`;
       if (specification) {
         const prompts = specification.segmentPrompts?.length ? specification.segmentPrompts : [specification.prompt];
+        const wanted = new Set(prompts.map((_, i) => `${prefix}_segment_${i + 1}`));
+        for (const id of Object.keys(managed)) {
+          if (!id.startsWith(`${prefix}_segment_`) || wanted.has(id) || !nodes[id]) continue;
+          if (digest2({ type: nodes[id].type, data: nodes[id].data }) !== managed[id] || edges.some((e) => e.fromNode === id || e.toNode === id))
+            throw new Error("\u65E7\u5236\u4F5C\u6BB5\u5DF2\u5728\u753B\u5E03\u4E2D\u7F16\u8F91\u6216\u8FDE\u63A5\uFF0C\u4FDD\u7559\u4F60\u7684\u7F16\u8F91\uFF1B\u8BF7\u5148\u5904\u7406\u5DEE\u5F02\u518D\u540C\u6B65\u3002");
+          delete nodes[id];
+          delete managed[id];
+        }
         const shots = scriptStoryboardShots(script);
         const board = add("storyboard", "storyboard", "\u955C\u5934\u5206\u955C", 540, 60, { label: "\u955C\u5934\u5206\u955C", shots, script, output: script, status: "done", metaonticProjectId: project.id, metaonticPlanNote: shots.length ? "\u6309\u5267\u672C\u5206\u955C\u8868\u540C\u6B65\uFF0C\u5236\u4F5C\u6BB5\u8BA1\u5212\u53E6\u5217\uFF0C\u4E0D\u89E6\u53D1\u751F\u6210\u3002" : "\u672A\u8BC6\u522B\u5230\u5206\u955C\u8868\uFF0C\u5B8C\u6574\u539F\u6587\u4FDD\u7559\u5728\u5267\u672C\u4E2D\uFF1B\u5236\u4F5C\u6BB5\u8BA1\u5212\u53E6\u5217\u3002" });
         connect(source, board, "script");
         for (const [index, prompt] of prompts.entries()) {
-          const plan = add(`segment_${index + 1}`, "text", `\u7B2C${index + 1}\u6BB5\u5236\u4F5C\u5185\u5BB9`, 1050, 60 + index * 320, { label: `\u7B2C${index + 1}\u6BB5\u5236\u4F5C\u5185\u5BB9`, text: String(prompt), metaonticProjectId: project.id });
-          connect(board, plan);
+          const plan = add(`segment_${index + 1}`, "text", `\u7B2C${index + 1}\u6BB5\u5236\u4F5C\u5185\u5BB9`, 540, 420 + index * 320, { label: `\u7B2C${index + 1}\u6BB5\u5236\u4F5C\u5185\u5BB9`, text: String(prompt), metaonticProjectId: project.id });
         }
-        const production = add("production", "video", "\u89C6\u9891\u5236\u4F5C", 1550, 60, {
-          label: "\u89C6\u9891\u5236\u4F5C",
+        const results = edges.filter((e) => e.fromNode === `${prefix}_production`).map((e) => nodes[e.toNode]).filter(Boolean);
+        results.push(...Object.values(nodes).filter((n) => n.metaonticSourceNode === `${prefix}_production`));
+        const latest = results.sort((a, b) => (b.metaonticCreatedAt || 0) - (a.metaonticCreatedAt || 0))[0];
+        const phase = latest?.data?.metaonticPhase;
+        const state = phase === "segment_review" ? "\u5206\u6BB5\u5F85\u5BA1\u6838" : ["complete", "generated"].includes(phase) ? "\u5DF2\u6709\u751F\u6210\u6210\u679C" : phase ? "\u5DF2\u6709\u9636\u6BB5\u6210\u679C" : "\u5F85\u5236\u4F5C";
+        const production = add("production", "video", "\u89C6\u9891\u5236\u4F5C", 1040, 60, {
+          label: `\u89C6\u9891\u5236\u4F5C \xB7 ${state}`,
           prompt: specification.prompt,
           ratio: specification.ratio,
           resolution: specification.resolution,
           duration: specification.duration,
-          status: "idle",
+          status: ["complete", "generated"].includes(phase) ? "done" : "idle",
           metaonticProjectId: project.id,
           metaonticAssistantManaged: true
         });
@@ -5156,7 +5221,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}) {
       } else if (!nodes[nodeId]) {
         nodeId = source;
       }
-      const result = await rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes, edges, ts: Date.now() } });
+      const result = await rpc.projectsPut({ ...loc, name: conversationName || doc.name, doc: { ...doc, nodes, edges, ts: Date.now() } });
       if (result?.ok === false || result?.deleted) throw new Error("\u81EA\u52A8\u753B\u5E03\u4FDD\u5B58\u5931\u8D25\uFF0C\u4FDD\u7559\u539F\u521B\u4F5C\u9879\u76EE\u3002");
       binding.nodes = managed;
       binding.links = managedEdges;
@@ -8163,7 +8228,7 @@ function applyVideoBusiness(runtime) {
     return runtime.tools.register("video", withMediaPreview(guarded));
   };
   const canvasBridge = createCanvasBridge(void 0, config);
-  const canvasProjects = createCanvasProjectSync(void 0, config);
+  const canvasProjects = createCanvasProjectSync(void 0, config, { get: (session) => (ctx.get?.("sessionTitle") || ctx.sessionTitle)?.get(session) });
   const generation = canvasBridge.wrap(videoTool(config, deps, ctx));
   const extension = canvasBridge.wrap(extendTool(config, deps, ctx));
   register(jsonSafeTool(canvasBridge.tool));

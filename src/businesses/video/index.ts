@@ -67,7 +67,7 @@ function applyVideoBusiness(runtime: BusinessRuntime) {
     return runtime.tools.register('video', withMediaPreview(guarded));
   };
   const canvasBridge = createCanvasBridge(undefined, config);
-  const canvasProjects = createCanvasProjectSync(undefined, config);
+  const canvasProjects = createCanvasProjectSync(undefined, config, { get: session => (ctx.get?.('sessionTitle') || ctx.sessionTitle)?.get(session) });
   const generation = canvasBridge.wrap(videoTool(config, deps, ctx));
   const extension = canvasBridge.wrap(extendTool(config, deps, ctx));
   register(jsonSafeTool(canvasBridge.tool));

@@ -30,6 +30,12 @@ test('创作项目自动建图、恢复审核材料、自动回填且不改变�
   assert.equal(creates,1);assert.equal(Object.values(doc.nodes).filter(n=>n.type==='storyboard').length,1);
   assert.equal(Object.values(doc.nodes).find(n=>n.type==='storyboard').data.shots.length,4);
   await sync.sync(project.id,exec);assert.equal(creates,1);
+  assert.equal(doc.edges.length,2);
+  for(const edge of doc.edges){
+   const target=doc.nodes[edge.toNode];
+   assert.ok((target.type==='storyboard'&&edge.toPort==='script')||(target.type==='video'&&edge.toPort==='prompt'));
+   assert.equal(edge.fromPort,'out');
+  }
   const file=path.join(root,'成片.mp4');await writeFile(file,'mock');
   let calls=0;const bridge=api.createCanvasBridge(async()=>adapter);
   const tool=bridge.wrap({name:'video_generate',parameters:{properties:{}},execute:async(args)=>{
@@ -78,4 +84,14 @@ test('review在用户答复前同步已验证草稿，取消审核保留画布�
   const saved=await api.readProject(project.id,exec);assert.ok(saved.canvasAuto.canvas);assert.deepEqual(saved.canvasDraft.specification,spec);assert.equal(saved.approved,null);
   await sync.sync(project.id,exec);assert.ok(Object.values(doc.nodes).some(n=>n.type==='storyboard'&&n.data.shots.length===1));
  }finally{if(old===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=old;await rm(root,{recursive:true,force:true});}
+});
+
+test('画布展示去除脚本元数据与Markdown外观，保留实际内容',()=>{
+ const source='---\n状态: 草稿\n---\n# 完整剧本\n**清晨**\n| 镜头 | 画面 |\n| --- | --- |\n| 一 | 草原 |';
+ const preview=api.canvasScriptPreview(source);
+ assert.ok(!preview.includes('状态:'));
+ assert.ok(!preview.includes('---'));
+ assert.ok(preview.includes('完整剧本\n清晨'));
+ assert.ok(preview.includes('一 · 草原'));
+ assert.equal(api.scriptStoryboardShots(source).length,1);
 });

@@ -40,7 +40,16 @@ export function scriptStoryboardShots(script: string) {
   return shots;
 }
 
-export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = {}) {
+/** 原版剧本节点是纯文本预览；转换展示副本，原始脚本仍用于审核与分镜解析。 */
+export function canvasScriptPreview(script: string) {
+  return script.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, '')
+    .split(/\r?\n/).filter(line => !/^\s*(```|~~~)/.test(line) && !/^\s*\|?\s*:?-{3,}:?\s*\|/.test(line))
+    .map(line => line.replace(/^#{1,6}\s+/, '').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '图片：$1（$2）').replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1（$2）').replace(/`([^`]+)`/g, '$1')
+      .replace(/^\s*\|(.+)\|\s*$/, (_, row) => row.split(/(?<!\\)\|/).map(x => x.trim()).join(' · ')))
+    .join('\n').trim();
+}
+
+export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = {}, sessionTitle: any = null) {
   async function sync(projectId, exec, draft: any = {}) {
     if (ref(config, 'autoCreateCanvas', true) === false) return { status: 'disabled', reason: '已在插件设置关闭自动创建流程画布；已有画布保留。' };
     return lockProject(`canvas:${projectId}`, async () => {
@@ -52,6 +61,8 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       try { adapter = await load(); }
       catch { return { status: 'unavailable', reason: '自动画布尚未就绪，请安装并启用原版无限画布0.20.1；创作项目已保留。' }; }
       const rpc = adapter.rpc;
+      let conversationName = '';
+      try { conversationName = String(sessionTitle?.get(exec.agent.session)?.title || '').trim().slice(0, 80); } catch { /* 宿主未提供标题时保留原名 */ }
       if (!rpc.canvasCreateProject) return { status: 'unavailable', reason: '原版画布缺少创建接口，未创建替代画布。' };
       const prefix = `mov_${project.id.replaceAll('-', '')}`;
       // 名称先持久化：创建成功但响应/记录保存中断时，重试由原版同名幂等复用。
@@ -83,8 +94,19 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
         const id = `${prefix}_${key}`;
         if (deleted.has(id)) throw new Error('自动节点已被删除，不会自动复活；请在项目中明确选择新的画布绑定。');
         const previous = nodes[id];
+        // 旧版空剧本仅在其余字段仍为自动初始值时恢复，不能覆盖用户正文。
+        if (key === 'script' && previous?.type === 'script' && previous.data?.output === '' && previous.data?.metaonticProjectId === project.id) {
+          const initial = { label: '完整剧本', idea: '由MetaOnticVideo创作项目同步', output: '', status: 'idle', metaonticProjectId: project.id };
+          if (JSON.stringify(previous.data) === JSON.stringify(initial)) managed[id] = digest({ type: previous.type, data: previous.data });
+        }
         if (previous && (!managed[id] || digest({ type: previous.type, data: previous.data }) !== managed[id])) throw new Error('自动节点已在画布中修改，保留你的编辑；请先处理差异再同步。');
         const next = { ...(previous || { id, x, y, w: type === 'script' ? 420 : 360, h: 280 }), type, data };
+        // 只迁移旧自动布局；用户移动或缩放过的节点保留原位。
+        const oldX = key === 'production' ? 1550 : key.startsWith('segment_') ? 1050 : null;
+        const oldY = key === 'production' ? 60 : key.startsWith('segment_') ? 60 + (Number(key.slice(8)) - 1) * 320 : null;
+        if (previous && previous.x === oldX && previous.y === oldY && previous.w === 360 && previous.h === 280) {
+          next.x = x; next.y = y;
+        }
         nodes[id] = next; managed[id] = digest({ type, data }); return id;
       };
       const connect = (from, to, port = 'prompt') => {
@@ -96,27 +118,47 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
         if (!existing) edges.push(desired);
         managedEdges[id] = digest(desired);
       };
-      const source = add('script', 'script', '完整剧本', 40, 60, { label: '完整剧本', idea: '由MetaOnticVideo创作项目同步', output: script || nodes[`${prefix}_script`]?.data?.output || '', status: (script || nodes[`${prefix}_script`]?.data?.output) ? 'done' : 'idle', metaonticProjectId: project.id });
+      const source = add('script', 'script', '完整剧本', 40, 60, { label: '完整剧本', idea: '由MetaOnticVideo创作项目同步', output: canvasScriptPreview(script) || nodes[`${prefix}_script`]?.data?.output || '', status: (script || nodes[`${prefix}_script`]?.data?.output) ? 'done' : 'idle', metaonticProjectId: project.id });
       const overview = add('project', 'text', '创作项目', 40, 400, { label: '创作项目', text: `目标时长：${project.duration ?? '待确认'}秒\n角色图路线：${project.choice || '待确认'}\n脚本、费用与分段审核仍按原流程进行；自动建图不产生模型费用。`, metaonticProjectId: project.id });
-      connect(overview, source);
+      // text/script没有输入端口；清理旧版创建的无效自动连线，保留用户改动。
+      for (let i = edges.length - 1; i >= 0; i--) {
+        const edge = edges[i];
+        if (managedEdges[edge.id] && ['text', 'script'].includes(nodes[edge.toNode]?.type)) {
+          if (digest(edge) !== managedEdges[edge.id]) throw new Error('自动连线已修改，保留你的编辑。');
+          edges.splice(i, 1); delete managedEdges[edge.id];
+        }
+      }
       let nodeId = `${prefix}_production`;
       if (specification) {
         // segmentPrompts代表真实制作段；不把付费段数冒充创作镜头数。
         const prompts = specification.segmentPrompts?.length ? specification.segmentPrompts : [specification.prompt];
+        const wanted = new Set(prompts.map((_, i) => `${prefix}_segment_${i + 1}`));
+        for (const id of Object.keys(managed)) {
+          if (!id.startsWith(`${prefix}_segment_`) || wanted.has(id) || !nodes[id]) continue;
+          if (digest({ type: nodes[id].type, data: nodes[id].data }) !== managed[id] || edges.some(e => e.fromNode === id || e.toNode === id))
+            throw new Error('旧制作段已在画布中编辑或连接，保留你的编辑；请先处理差异再同步。');
+          delete nodes[id]; delete managed[id];
+        }
         const shots = scriptStoryboardShots(script); // 不把制作段冒充创作镜头。
         const board = add('storyboard', 'storyboard', '镜头分镜', 540, 60, { label: '镜头分镜', shots, script, output: script, status: 'done', metaonticProjectId: project.id, metaonticPlanNote: shots.length ? '按剧本分镜表同步，制作段计划另列，不触发生成。' : '未识别到分镜表，完整原文保留在剧本中；制作段计划另列。' });
         connect(source, board, 'script');
         for (const [index, prompt] of prompts.entries()) {
-          const plan = add(`segment_${index + 1}`, 'text', `第${index + 1}段制作内容`, 1050, 60 + index * 320, { label: `第${index + 1}段制作内容`, text: String(prompt), metaonticProjectId: project.id });
-          connect(board, plan);
+          const plan = add(`segment_${index + 1}`, 'text', `第${index + 1}段制作内容`, 540, 420 + index * 320, { label: `第${index + 1}段制作内容`, text: String(prompt), metaonticProjectId: project.id });
+          // 制作段是只读文本说明，原版文本节点没有输入端口。
         }
-        const production = add('production', 'video', '视频制作', 1550, 60, { label: '视频制作', prompt: specification.prompt, ratio: specification.ratio, resolution: specification.resolution, duration: specification.duration,
-          status: 'idle', metaonticProjectId: project.id, metaonticAssistantManaged: true });
+        const results = edges.filter(e => e.fromNode === `${prefix}_production`).map(e => nodes[e.toNode]).filter(Boolean);
+        // 新版成果不使用媒体→文本连线，通过显式来源标识关联。
+        results.push(...Object.values(nodes).filter((n: any) => n.metaonticSourceNode === `${prefix}_production`));
+        const latest: any = results.sort((a: any, b: any) => (b.metaonticCreatedAt || 0) - (a.metaonticCreatedAt || 0))[0];
+        const phase = latest?.data?.metaonticPhase;
+        const state = phase === 'segment_review' ? '分段待审核' : ['complete', 'generated'].includes(phase) ? '已有生成成果' : phase ? '已有阶段成果' : '待制作';
+        const production = add('production', 'video', '视频制作', 1040, 60, { label: `视频制作 · ${state}`, prompt: specification.prompt, ratio: specification.ratio, resolution: specification.resolution, duration: specification.duration,
+          status: ['complete', 'generated'].includes(phase) ? 'done' : 'idle', metaonticProjectId: project.id, metaonticAssistantManaged: true });
         nodeId = production; connect(board, production);
       } else if (!nodes[nodeId]) {
         nodeId = source;
       }
-      const result = await rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes, edges, ts: Date.now() } });
+      const result = await rpc.projectsPut({ ...loc, name: conversationName || doc.name, doc: { ...doc, nodes, edges, ts: Date.now() } });
       if (result?.ok === false || result?.deleted) throw new Error('自动画布保存失败，保留原创作项目。');
       binding.nodes = managed; binding.links = managedEdges; binding.nodeId = nodeId;
       // 获取当前内容摘要，后续生成不必让助手复制定位参数。

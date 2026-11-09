@@ -527,7 +527,8 @@
     const SECTIONS = [
       { key: "sectionConnection", fields: ["connectionMode"] },
       { key: "sectionModels", fields: ["imageUseVideoKey", "model", "metaonticApiKey", "volcengineApiKey", "imageModel", "imageApiKey"] },
-      { key: "sectionVideo", fields: ["ratio", "generateAudio"] }
+      { key: "sectionVideo", fields: ["ratio", "generateAudio"] },
+      { key: "sectionCanvas", fields: ["autoCreateCanvas"] }
     ];
     const FIELDS = [
       { key: "connectionMode", kind: "select", wide: true },
@@ -542,6 +543,7 @@
       { key: "generateAudio", kind: "switch" },
       { key: "watermark", kind: "switch" },
       { key: "usageStatsEnabled", kind: "switch" },
+      { key: "autoCreateCanvas", kind: "switch", wide: true },
       { key: "seamTrimSeconds", kind: "text" },
       { key: "mergeMode", kind: "select", wide: true },
       { key: "pollIntervalMs", kind: "number" },
@@ -551,6 +553,7 @@
     ];
     const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((field) => [field.key, field]));
     const PLUGIN_OWNED_KEYS = [
+      "autoCreateCanvas",
       "usageStatsEnabled",
       "connectionMode",
       "metaonticApiKey",
@@ -733,6 +736,9 @@
       sectionGeneration: "\u751F\u6210\u53C2\u6570",
       sectionConnection: "\u63A5\u5165\u4E0E API\u5BC6\u94A5",
       sectionVideo: "\u753B\u9762\u4E0E\u58F0\u97F3",
+      sectionCanvas: "\u6D41\u7A0B\u753B\u5E03",
+      autoCreateCanvas: "\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03",
+      autoCreateCanvasHint: "\u5F00\u542F\u540E\u968F\u521B\u4F5C\u81EA\u52A8\u5EFA\u56FE\uFF0C\u5BA1\u6838\u524D\u540C\u6B65\u5267\u672C\u3001\u5206\u955C\u548C\u5236\u4F5C\u8BA1\u5212\uFF0C\u751F\u6210\u540E\u56DE\u586B\u6210\u679C\u3002\u9700\u542F\u7528\u539F\u7248\u65E0\u9650\u753B\u5E03\u5E76\u8BBE\u7F6E\u6570\u636E\u6839\u76EE\u5F55\u3002\u5173\u95ED\u540E\u505C\u6B62\u81EA\u52A8\u5EFA\u56FE\u548C\u540C\u6B65\uFF0C\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\uFF0C\u624B\u52A8\u8282\u70B9\u5236\u4F5C\u4ECD\u53EF\u7528\u3002",
       sectionModels: "\u6A21\u578B\u914D\u7F6E",
       sectionCombined: "\u66F4\u591A\u8BBE\u7F6E",
       advancedPicture: "\u753B\u9762",
@@ -880,6 +886,9 @@
       sectionGeneration: "Generation",
       sectionConnection: "Connection & credentials",
       sectionVideo: "Picture & audio",
+      sectionCanvas: "Workflow canvas",
+      autoCreateCanvas: "Automatically create a workflow canvas",
+      autoCreateCanvasHint: "Create a canvas with each project, sync scripts and plans before review, and publish results. Requires original canvas and its data root. Turning off stops automatic creation and sync, preserves existing canvases, and keeps manual node generation available.",
       sectionModels: "Models",
       sectionCombined: "More settings",
       advancedPicture: "Picture",
@@ -1394,7 +1403,7 @@
     }
     function control(field) {
       const { draft, value, h, SELECTS, inputStyle, t, snapshot, visibleKey, setVisibleKey, edit, optionLabel } = context;
-      const current = draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (["imageUseVideoKey", "usageStatsEnabled"].includes(field.key) ? true : field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0);
+      const current = draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (["imageUseVideoKey", "usageStatsEnabled", "autoCreateCanvas"].includes(field.key) ? true : field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0);
       const secondsField = field.key === "pollIntervalMs" || field.key === "maxWaitMs";
       const displayed = secondsField && current !== void 0 && current !== "" ? Number(current) / 1e3 : current;
       const id = `metaontic-video-${field.key}`;
@@ -1812,6 +1821,7 @@
           model: t("modelHint"),
           imageModel: t("imageModelHint"),
           seamTrimSeconds: t("seamTrimSecondsHint"),
+          autoCreateCanvas: t("autoCreateCanvasHint"),
           maxWaitMs: t("waitSecondsHint")
         };
         function fieldCell(field) {
