@@ -31,7 +31,7 @@ function makeReact() {
   };
 }
 
-function harness(documents, viewOptions = {}) {
+function harness(documents) {
   const context = vm.createContext({
     fetch: async (url, options = {}) => {
       const { method, args } = JSON.parse(options.body || '{}');
@@ -43,7 +43,7 @@ function harness(documents, viewOptions = {}) {
   vm.runInContext(sourceOf('businesses/video/client/canvas-view'), context);
   const h = (type, elementProps, children) => ({ type, props: elementProps || {}, children: Array.isArray(children) ? children : children === undefined ? [] : [children] });
   const mini = makeReact();
-  const { FlowCanvas } = context.createCanvasView({ React: mini.React, h, TOKENS, stageHeight: 620, ...viewOptions });
+  const { FlowCanvas } = context.createCanvasView({ React: mini.React, h, TOKENS });
   return { FlowCanvas, mini };
 }
 
@@ -62,9 +62,9 @@ const texts = (tree) => { const out = []; walk(tree, (node) => { for (const chil
 
 test('画布操作在画布上方：先操作行、再选择画布、最后才是画布区', async () => {
   const { FlowCanvas, mini } = harness(documents);
-  mini.begin(); let tree = FlowCanvas({ onOpenPage: () => {} });
+  mini.begin(); let tree = FlowCanvas();
   await mini.flush();
-  mini.begin(); tree = FlowCanvas({ onOpenPage: () => {} });
+  mini.begin(); tree = FlowCanvas();
 
   const slot = (key) => find(tree, (node) => node.props.key === key);
   const top = slot('top'), stage = slot('stage'), picker = slot('picker'), ops = slot('ops');
@@ -78,7 +78,7 @@ test('画布操作在画布上方：先操作行、再选择画布、最后才�
   assert.ok(find(picker, (node) => node.props.key === 'list'), '画布芯片放在选择画布行里');
 
   const opsLabels = texts(ops);
-  for (const label of ['新建画布…', '+ 文本', '+ 图片', '+ 视频', '刷新', '重置视图', '导出 JSON', '删除画布', '打开独立页面']) {
+  for (const label of ['新建画布…', '+ 文本', '+ 图片', '+ 视频', '刷新', '重置视图', '导出 JSON', '删除画布']) {
     assert.ok(opsLabels.includes(label), `操作行应有「${label}」：${opsLabels.join('、')}`);
   }
   const pickerLabels = texts(picker);
@@ -99,25 +99,59 @@ test('没有任何画布时也能新建：操作行仍给出「新建画布…�
   assert.equal(find(tree, (node) => node.props.key === 'stage'), null, '没有画布时不渲染画布区');
 });
 
-test('独立页面版：根节点带 movc-page，工具条一行排布、画布区按视口高度撑开', async () => {
-  const { FlowCanvas, mini } = harness(documents, { variant: 'page' });
-  mini.begin(); FlowCanvas({});
+test('独立页面样式：工具条两行（操作 + 选择画布），画布区按视口高度撑开，按钮不再用 120px 方块', async () => {
+  const { FlowCanvas, mini } = harness(documents);
+  mini.begin(); FlowCanvas();
   await mini.flush();
   mini.begin();
-  const tree = FlowCanvas({});
-  assert.match(tree.props.className, /movc-page/, '独立页面要有 movc-page 类');
+  const tree = FlowCanvas();
   const css = find(tree, (node) => node.type === 'style').children.join('');
-  assert.match(css, /\.movc-page \.movc-top \{[^}]*flex-direction: row/, '页面版工具条一行排布');
-  assert.match(css, /\.movc-page \.movc-stage \{[^}]*height: clamp\(520px, calc\(100vh - 320px\), 1400px\)/, '页面版画布区按视口撑开');
-  assert.match(css, /\.movc-page \.movc-ops \.mov-btn \{[^}]*height: 34px/, '页面版按钮大一档');
+  assert.match(css, /\.movc-ops \.mov-btn \{[^}]*height: 32px/, '工具条按钮按内容排布');
+  assert.doesNotMatch(css, /\.movc-ops \.mov-btn \{[^}]*border-radius: 999px/, '按钮沿用宿主 8px 圆角，不用胶囊');
+  assert.match(css, /\.movc-stage \{[^}]*height: clamp\(520px, calc\(100vh - 320px\), 1400px\)/, '画布区按视口高度撑开');
+  assert.match(css, /\.movc-top \{[^}]*flex-direction: column/, '操作行与选择画布行上下排布');
+  assert.ok(!/打开独立页面/.test(texts(tree).join('')), '独立页面里不再有「打开独立页面」按钮');
 });
 
-test('面板版没有 movc-page 类，画布区仍是固定高度', async () => {
-  const { FlowCanvas, mini } = harness(documents);
-  mini.begin(); FlowCanvas({});
+test('流程顺序：按连线从上游排队，成果节点不参与，已产出节点标为完成', () => {
+  const context = vm.createContext({});
+  vm.runInContext(sourceOf('businesses/video/client/canvas-view'), context);
+  const canvas = {
+    nodes: {
+      script: { id: 'script', type: 'script', data: { text: '剧本' } },
+      v2: { id: 'v2', type: 'video', data: { label: '第二段', prompt: 'B' } },
+      v1: { id: 'v1', type: 'video', data: { label: '第一段', prompt: 'A' } },
+      pic: { id: 'pic', type: 'image', data: { label: '封面', prompt: 'C' } },
+      out: { id: 'out', type: 'video', metaonticSourceNode: 'v1', data: { assetId: 'a1', status: 'done' } },
+    },
+    edges: [
+      { id: 'e1', fromNode: 'script', toNode: 'v1', fromPort: 'out', toPort: 'prompt' },
+      { id: 'e2', fromNode: 'v1', toNode: 'v2', fromPort: 'out', toPort: 'prompt' },
+      { id: 'e3', fromNode: 'script', toNode: 'out', fromPort: 'out', toPort: 'prompt', metaonticResult: true },
+    ],
+  };
+  const steps = context.flowSteps(canvas);
+  assert.deepEqual([...steps.map(s => s.id)], ['v1', 'v2', 'pic'], '按上游顺序排队，成果节点被排除');
+  assert.equal(steps[0].done, true, '有成果节点指回 v1');
+  assert.equal(steps[1].done, false);
+  assert.equal(context.flowSteps(null).length, 0);
+});
+
+test('工具条给出流程主行动与进度，未完成节点标虚线框', async () => {
+  const { FlowCanvas, mini } = harness({
+    list: { canvases: [{ projectId: 'p1', name: '青旅宣传片', nodeCount: 2 }] },
+    get: { canvas: { projectId: 'p1', name: '青旅宣传片', dataRoot: '/tmp/canvas',
+      nodes: { v1: { id: 'v1', type: 'video', x: 0, y: 0, w: 360, h: 300, data: { label: '第一段', prompt: 'A' } } }, edges: [] } },
+  });
+  mini.begin(); FlowCanvas();
   await mini.flush();
   mini.begin();
-  const tree = FlowCanvas({});
-  assert.doesNotMatch(tree.props.className, /movc-page/);
-  assert.match(find(tree, (node) => node.type === 'style').children.join(''), /\.movc-stage \{[^}]*height: 620px/);
+  const tree = FlowCanvas();
+  const ops = find(tree, (node) => node.props.key === 'ops');
+  const labels = texts(ops);
+  assert.ok(labels.includes('制作「第一段」'), `工具条要有流程主行动：${labels.join('、')}`);
+  assert.ok(labels.includes('流程进度 0/1'), '工具条要显示流程进度');
+  const node = find(tree, (n) => n.props['data-current'] === 'true');
+  assert.ok(node, '当前待制作节点要有标记');
+  assert.ok(texts(tree).some((text) => text.includes('当前轮到「第一段」')), '提示要说明当前轮到哪个节点');
 });

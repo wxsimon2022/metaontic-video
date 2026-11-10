@@ -227,3 +227,31 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 未覆盖：真实桌面窗口里的新布局外观与点击位置（需宿主重载后人工复核）；Windows 未实测。
 
 本地成品：`.local/test/3.20.1-test.22/metaontic-video-3.20.1-test.22.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+
+## 画布只做独立页面 + 页面版样式 3.20.1-test.23
+
+按用户「优化单独页面的、侧边栏那个页面的去掉流程画布」调整布局与观感：
+
+- 视频创作面板不再内嵌流程画布：`createSidebarPanel` 去掉 `FlowCanvas` 参数与 `flow-canvas` 节点，面板注入里不再有 `openCanvasPage`，`client.ts` 只构造一份画布组件（独立页面）。画布入口只剩左侧栏那一行 `sidebar.panellist:metaontic-video-canvas`（名字走字典 `canvasPanelLabel`），点开就是 `main:metaontic-video-canvas` 整页。
+- 画布组件只保留整页形态：删掉 `variant`/`stageHeight` 分支与「打开独立页面」按钮，根节点固定为 `mov-section movc`，画布区高度改为 `clamp(520px, calc(100vh - 320px), 1400px)`，随窗口高度撑开。
+- 工具条样式：`.movc-top` 一张卡片两行——第一行 `movc-ops` 放画布名与全部操作，第二行 `movc-picker` 放「选择画布」与画布芯片；画布芯片改为单行横向滚动，按钮统一为胶囊小按钮（`height 34px`、字号 13、宽度自适应），不再沿用设置页 `120px` 方块；危险操作（删除选中/删除画布）悬停转红，`新建画布…` 保持主色。
+- 画布本身：画布区加 22px 点阵底纹，节点选中加主色描边环、悬停加深阴影，节点状态改胶囊标签（`已完成` 绿、`待制作` 灰），节点内小按钮改胶囊并在悬停时变色；弹窗按钮宽度自适应，不再固定 120px。窄容器下（`@container max-width: 460px`）分组竖线自动隐藏，避免落在行首。
+- 画布行为、rpc 形状与存储路径不变。
+
+验证：类型检查、构建、461 项自动测试、diff 检查通过；新增/更新 `tests/canvas-view-layout.test.mjs`（操作区在选择画布行之前、工具条按钮 34px、画布区 clamp 高度、独立页面不再有「打开独立页面」按钮）、`tests/sidebar-panel.test.mjs`（面板不再内嵌画布、不再转交 `openCanvasPage`、源码里没有 `FlowCanvas`/`openCanvasPage`）、`tests/preview-boot.test.mjs`（面板不提供 `openCanvasPage`，画布页注册仍在）。另外用本机 Chrome 无头渲染真实组件 + 主题 CSS 截图人工核对整页、弹窗与空状态（脚本留在 `.local/canvas-qa/style-preview/`，截图 `/tmp/canvas-page3.png`、`/tmp/canvas-modal.png`、`/tmp/canvas-empty.png`）。
+
+未覆盖：真实 Harness 桌面窗口里的实际观感与交互（需宿主重载后人工复核）；Windows 未实测。
+
+本地成品：`.local/test/3.20.1-test.23/metaontic-video-3.20.1-test.23.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+
+## 画布流程操作 + 按钮风格对齐宿主 3.20.1-test.24
+
+- 按钮风格回到宿主（DSH）语言：画布工具条与节点内按钮不再用胶囊，统一 8px/6px 圆角描边按钮，高度与字号按工具条收紧（`32px`/`12px`，节点内 `11px`），主行动沿用 `.mov-btn-primary`，不再自己叠加 primary 覆盖；节点状态标签直接复用宿主的结果胶囊类 `mov-chip` / `mov-chip-ok`；画布芯片（选择画布）改为 8px 圆角的按钮式选择控件，选中仍用主色实心；画布区与弹窗圆角对齐宿主卡片 `12px`。危险操作（删除选中/删除画布）只在悬停时转 `error` 色。
+- 流程操作：新增纯函数 `flowSteps(canvas)`，按连线把图片/视频制作节点从上游排到下游（成果节点、`metaonticSourceNode` 节点不参与排队，环由 seen 兜住），并按画布上是否有指回该节点的成果节点标注 `done`。工具条新增「制作「节点名」」主行动（下一个未完成节点，禁用于流程已完成）与「流程进度 x/y」，当前待制作节点在画布上标 `data-current` 虚线框，底部提示说明当前轮到哪个节点。点主行动直接打开该节点的制作弹窗，方案与费用确认、结果审核、回填都走原有链路，不新增付费入口。
+- 提示词同步：`prompts/guidance.ts` 里"面板里的「流程画布」"改为"左侧栏「流程画布」那一行打开独立页面，视频创作面板里不再内嵌"，并补一句画布按连线顺序执行、进度与虚线框的说明。
+
+验证：类型检查、构建、463 项自动测试、diff 检查通过。新增测试：`flowSteps` 排队顺序/成果节点排除/`done` 标记/空画布；渲染断言工具条含「制作「第一段」」与「流程进度 0/1」、当前节点被标记、提示说明当前节点；样式断言工具条按钮不再是胶囊且高度 32px。另用 Chrome 无头渲染真实组件截图核对（`/tmp/canvas-dsh.png`）。
+
+未覆盖：真实 Harness 桌面窗口里的观感与点击（需宿主重载后人工复核）；画布内付费生成链路未实跑；Windows 未实测。
+
+本地成品：`.local/test/3.20.1-test.24/metaontic-video-3.20.1-test.24.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。

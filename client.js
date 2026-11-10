@@ -2307,8 +2307,29 @@
     }
     return { type: node?.type || "text", x: Number(spot?.x || 0) + 40, y: Number(spot?.y || 0) + 40, w: spot?.w, h: spot?.h, data };
   }
-  function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant = "panel" }) {
-    const ROOT_CLASS = variant === "page" ? "mov-section movc movc-page" : "mov-section movc";
+  function flowSteps(canvas) {
+    const nodes = Object.values(canvas?.nodes || {});
+    const edges = Array.isArray(canvas?.edges) ? canvas.edges : [];
+    const produced = new Set(nodes.map((node) => node?.metaonticSourceNode).filter(Boolean));
+    const author = nodes.filter((node) => ["image", "video"].includes(node?.type) && !node?.metaonticSourceNode && !node?.data?.assetId);
+    const byId = new Map(author.map((node) => [node.id, node]));
+    const inbound = new Map(author.map((node) => [node.id, []]));
+    for (const edge of edges) {
+      if (edge?.metaonticResult) continue;
+      if (byId.has(edge?.toNode) && byId.has(edge?.fromNode)) inbound.get(edge.toNode).push(edge.fromNode);
+    }
+    const ordered = [], seen = /* @__PURE__ */ new Set();
+    const visit = (node) => {
+      if (!node || seen.has(node.id)) return;
+      seen.add(node.id);
+      for (const up of inbound.get(node.id) || []) visit(byId.get(up));
+      ordered.push(node);
+    };
+    for (const node of author) visit(node);
+    return ordered.map((node) => ({ id: node.id, type: node.type, label: String(node?.data?.label || (node.type === "image" ? "\u56FE\u7247" : "\u89C6\u9891")), done: produced.has(node.id) }));
+  }
+  function createCanvasView({ React, h, TOKENS }) {
+    const ROOT_CLASS = "mov-section movc";
     const rpc = async (method, args = {}) => {
       const response = await fetch("/metaontic-video/canvas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ method, args }) });
       const body = await response.json().catch(() => ({}));
@@ -2333,50 +2354,51 @@
       cancelled: "\u5DF2\u53D6\u6D88"
     })[state] || "\u72B6\u6001\u672A\u77E5";
     const CSS = `
-.movc { display: flex; flex-direction: column; gap: 12px; }
+.movc { display: flex; flex-direction: column; gap: 14px; }
 .movc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.movc-top { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; padding: 10px 12px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; }
-.movc-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 132px; overflow: auto; }
+.movc-top { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 4px; padding: 12px 14px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; }
+.movc-list { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
 .movc-pick { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
 .movc-name-empty { font-size: 13px; font-weight: 600; color: ${TOKENS.muted}; }
-/* \u5DE5\u5177\u6761\u6309\u94AE\uFF1A\u80F6\u56CA\u5C0F\u6309\u94AE\uFF0C\u6309\u5BBD\u5EA6\u81EA\u9002\u5E94\uFF0C\u4E0D\u518D\u6CBF\u7528\u8BBE\u7F6E\u9875\u7684 120px \u65B9\u5757\u3002 */
-.movc-ops { gap: 6px; row-gap: 8px; container-type: inline-size; }
-.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 30px; min-height: 30px; padding: 0 11px; border-radius: 999px; background: ${TOKENS.cardFill}; font-size: 12px; line-height: 1; white-space: nowrap; overflow-wrap: normal; }
-.movc-ops .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
-.movc-ops .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; }
-.movc-ops .mov-btn-primary:hover:not(:disabled) { color: #fff; opacity: .88; }
+/* \u5DE5\u5177\u6761\u6309\u94AE\uFF1A\u6CBF\u7528 .mov-btn \u7684 8px \u5706\u89D2\u3001\u63CF\u8FB9\u4E0E\u4E3B\u8272\uFF0C\u53EA\u628A\u56FA\u5B9A 120px \u5BBD\u6539\u6210\u6309\u5185\u5BB9\u6392\u5E03\u3002 */
+.movc-ops { flex: 1 1 auto; min-width: 0; gap: 6px; row-gap: 8px; container-type: inline-size; }
+.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 32px; min-height: 32px; padding: 0 12px; font-size: 12px; white-space: nowrap; overflow-wrap: normal; }
 .movc-ops .movc-danger:hover:not(:disabled) { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
+.movc-flow { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; white-space: nowrap; }
+/* \u6D41\u7A0B\u4E3B\u884C\u52A8\uFF1A\u7528\u4E3B\u8272\u63CF\u8FB9\u7A81\u51FA\uFF0C\u4F46\u4E0D\u548C\u300C\u65B0\u5EFA\u753B\u5E03\u2026\u300D\u7684\u5B9E\u5FC3\u4E3B\u6309\u94AE\u62A2\u6CE8\u610F\u529B\u3002 */
+.movc-ops .movc-run { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-ops .movc-run:disabled { border-color: ${TOKENS.border}; color: ${TOKENS.text}; }
 .movc-sep { flex: 0 0 auto; width: 1px; height: 18px; margin: 0 2px; background: ${TOKENS.border}; }
 /* \u9762\u677F\u7A84\u7684\u65F6\u5019\u6309\u94AE\u672C\u6765\u5C31\u4F1A\u6362\u884C\uFF0C\u5206\u7EC4\u7AD6\u7EBF\u4F1A\u843D\u5728\u884C\u9996\uFF0C\u76F4\u63A5\u4E0D\u6536\u3002 */
 @container (max-width: 460px) { .movc-sep { display: none; } }
 .movc-ops .mov-btn:focus-visible, .movc-chip:focus-visible, .movc-mini:focus-visible, .movc-name-text:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
 .movc-ops .mov-btn:active:not(:disabled), .movc-chip:active, .movc-mini:active { opacity: .82; }
-.movc-chip { border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; border-radius: 999px; padding: 3px 11px; font-size: 12px; line-height: 1.7; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.movc-chip { display: inline-flex; align-items: center; box-sizing: border-box; height: 30px; padding: 0 10px; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
 .movc-chip:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
 .movc-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
-.movc-stage { position: relative; height: ${stageHeight}px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background-color: ${TOKENS.controlFill}; background-image: radial-gradient(${TOKENS.border} 1px, transparent 1px); background-size: 22px 22px; overflow: hidden; cursor: grab; touch-action: none; }
+.movc-stage { position: relative; height: clamp(520px, calc(100vh - 320px), 1400px); border: 1px solid ${TOKENS.border}; border-radius: 12px; background-color: ${TOKENS.controlFill}; background-image: radial-gradient(${TOKENS.border} 1px, transparent 1px); background-size: 22px 22px; overflow: hidden; cursor: grab; touch-action: none; }
 .movc-stage[data-panning="true"] { cursor: grabbing; }
 .movc-stage[data-connect="true"] { cursor: crosshair; }
 .movc-world { position: absolute; inset: 0; transform-origin: 0 0; }
 .movc-edge { stroke: ${TOKENS.primaryFill}; stroke-width: 2; fill: none; opacity: .75; }
 .movc-edge-hit { stroke: transparent; stroke-width: 14; fill: none; cursor: pointer; }
-.movc-node { position: absolute; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid ${TOKENS.border}; border-radius: 10px; background: ${TOKENS.cardFill}; box-shadow: 0 1px 4px #0000000f; overflow: hidden; cursor: grab; }
+.movc-node { position: absolute; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid ${TOKENS.border}; border-radius: 10px; background: ${TOKENS.cardFill}; box-shadow: 0 1px 4px #0000000f; overflow: hidden; cursor: grab; }
 .movc-node:hover { box-shadow: 0 3px 12px #0000001f; }
 .movc-node[data-selected="true"] { border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 1px ${TOKENS.primaryFill}, 0 3px 12px #0000001f; }
+.movc-node[data-current="true"]:not([data-selected="true"]) { outline: 2px dashed ${TOKENS.primaryFill}; outline-offset: 2px; }
 .movc-node-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.movc-node-title { font-size: 12px; font-weight: 600; color: ${TOKENS.text}; }
-.movc-badge { font-size: 11px; color: ${TOKENS.muted}; border: 1px solid ${TOKENS.border}; border-radius: 999px; padding: 0 7px; line-height: 1.7; }
-.movc-badge[data-state="done"] { color: ${TOKENS.success}; border-color: ${TOKENS.success}; }
+.movc-node-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
+.movc-badge { color: ${TOKENS.muted}; }
 .movc-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
-.movc-mini { font-size: 11px; padding: 2px 8px; border: 1px solid ${TOKENS.border}; border-radius: 999px; background: ${TOKENS.cardFill}; color: ${TOKENS.muted}; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.movc-mini { flex: 0 0 auto; font: inherit; font-size: 11px; padding: 2px 8px; border: 1px solid ${TOKENS.border}; border-radius: 6px; background: transparent; color: ${TOKENS.text}; cursor: pointer; transition: border-color .15s, color .15s, opacity .15s; }
 .movc-mini:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-mini-danger:hover { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
-.movc-body { font-size: 11px; line-height: 1.6; color: ${TOKENS.muted}; white-space: pre-wrap; overflow: auto; flex: 1; }
+.movc-body { font-size: 12px; line-height: 1.6; color: ${TOKENS.muted}; white-space: pre-wrap; overflow: auto; flex: 1; }
 .movc-media { width: 100%; height: 100%; object-fit: contain; border-radius: 6px; background: #0001; }
 .movc-shots { margin: 0; padding-left: 16px; }
 .movc-modal { position: fixed; inset: 0; background: #0006; display: flex; align-items: center; justify-content: center; z-index: 2147483000; }
-.movc-modal-body { width: min(640px, calc(100vw - 32px)); max-height: 86vh; overflow: auto; box-sizing: border-box; border: 1px solid ${TOKENS.border}; border-radius: 14px; padding: 18px 20px; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; display: flex; flex-direction: column; gap: 8px; }
+.movc-modal-body { width: min(640px, calc(100vw - 32px)); max-height: 86vh; overflow: auto; box-sizing: border-box; border: 1px solid ${TOKENS.border}; border-radius: 12px; padding: 18px 20px; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; display: flex; flex-direction: column; gap: 8px; }
 .movc-modal-body h4 { margin: 0; font-size: 14px; }
 .movc-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
 .movc-field textarea, .movc-field input, .movc-field select { width: 100%; box-sizing: border-box; font: inherit; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.border}; border-radius: 8px; padding: 6px 8px; }
@@ -2389,26 +2411,12 @@
 .movc-plan { font-size: 12px; line-height: 1.7; background: ${TOKENS.controlFill}; border-radius: 8px; padding: 10px 12px; }
 .movc-marquee { position: absolute; border: 1px dashed ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}1f; pointer-events: none; border-radius: 4px; }
 .movc-name { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 160px; min-width: 0; }
-.movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
+.movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; font-size: 14px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
 .movc-name-text:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-name input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 13px; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.primaryFill}; border-radius: 8px; padding: 5px 8px; }
 .movc-name-err { flex: 1 1 100%; font-size: 12px; color: #c0392b; }
 /* \u5F39\u7A97\u91CC\u7684\u6309\u94AE\u6309\u5185\u5BB9\u81EA\u9002\u5E94\uFF0C\u4E0D\u6491\u6210\u8BBE\u7F6E\u9875\u90A3\u79CD 120px \u65B9\u5757\u3002 */
 .movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; white-space: nowrap; overflow-wrap: normal; }
-/* \u72EC\u7ACB\u9875\u9762\uFF1A\u5DE5\u5177\u6761\u4E00\u884C\u653E\u4E0B\uFF08\u64CD\u4F5C\u5728\u5DE6\u3001\u9009\u62E9\u753B\u5E03\u5728\u53F3\uFF09\uFF0C\u753B\u5E03\u533A\u5403\u6389\u5269\u4F59\u9AD8\u5EA6\u3002 */
-.movc-page { gap: 14px; }
-.movc-page .movc-top { flex-direction: row; align-items: center; gap: 10px 14px; padding: 10px 14px; }
-.movc-page .movc-ops { flex: 1 1 auto; min-width: 0; }
-.movc-page .movc-ops .mov-btn { height: 34px; min-height: 34px; padding: 0 14px; font-size: 13px; }
-.movc-page .movc-picker { flex: 0 1 auto; min-width: 0; }
-.movc-page .movc-list { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; max-height: none; padding-bottom: 2px; }
-.movc-page .movc-chip { padding: 4px 13px; font-size: 13px; white-space: nowrap; }
-.movc-page .movc-name-text { font-size: 14px; }
-.movc-page .movc-node { padding: 10px 12px; }
-.movc-page .movc-node-title { font-size: 13px; }
-.movc-page .movc-body { font-size: 12px; }
-.movc-page .movc-mini { font-size: 12px; padding: 3px 10px; }
-.movc-page .movc-stage { height: clamp(520px, calc(100vh - 320px), 1400px); border-radius: 14px; }
 `;
     function nodeBody(node) {
       const data = node?.data || {};
@@ -2424,7 +2432,7 @@
       const text = textOf(node);
       return h("div", { key: "text", className: "movc-body" }, text ? text.slice(0, 600) : "\uFF08\u6682\u65E0\u5185\u5BB9\uFF0C\u53EF\u5148\u7F16\u8F91\uFF09");
     }
-    function FlowCanvas({ onOpenPage } = {}) {
+    function FlowCanvas() {
       const [list, setList] = React.useState([]);
       const [canvas, setCanvas] = React.useState(null);
       const [error, setError] = React.useState("");
@@ -2790,6 +2798,9 @@
         moving.current = { ids, x: event.clientX, y: event.clientY, origins };
         event.currentTarget.setPointerCapture?.(event.pointerId);
       };
+      const steps = flowSteps(canvas);
+      const nextStep = steps.find((step) => !step.done) || null;
+      const doneSteps = steps.filter((step) => step.done).length;
       const nodes = canvas ? Object.values(canvas.nodes || {}) : [];
       const edges = canvas?.edges || [];
       const geometry = (node) => ({ ...node, ...sizeOf(node), ...positions[node.id] || {} });
@@ -2872,12 +2883,28 @@
             canvas ? h("button", { key: "text-node", type: "button", className: "mov-btn", onClick: () => void newNode("text") }, "+ \u6587\u672C") : null,
             canvas ? h("button", { key: "image", type: "button", className: "mov-btn", onClick: () => void newNode("image") }, "+ \u56FE\u7247") : null,
             canvas ? h("button", { key: "video", type: "button", className: "mov-btn", onClick: () => void newNode("video") }, "+ \u89C6\u9891") : null,
+            canvas ? h("span", { key: "sep-flow", className: "movc-sep" }) : null,
+            canvas ? h(
+              "button",
+              {
+                key: "run-next",
+                type: "button",
+                className: "mov-btn movc-run",
+                disabled: !nextStep,
+                title: nextStep ? `\u5F53\u524D\u8BFB\u53D6\u8282\u70B9\u5185\u5BB9\u5E76\u6CBF\u4E0A\u6E38\u62FC\u63A5\u63D0\u793A\u8BCD\uFF0C\u751F\u6210\u524D\u4ECD\u9700\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528` : "\u6D41\u7A0B\u91CC\u7684\u5236\u4F5C\u8282\u70B9\u90FD\u5DF2\u6709\u6210\u679C",
+                onClick: () => {
+                  const node = (canvas?.nodes || {})[nextStep?.id];
+                  if (node) void openDialog(node);
+                }
+              },
+              nextStep ? `\u5236\u4F5C\u300C${labelOf((canvas?.nodes || {})[nextStep.id])}\u300D` : "\u6D41\u7A0B\u5DF2\u5B8C\u6210"
+            ) : null,
+            canvas && steps.length ? h("span", { key: "flow-progress", className: "movc-flow" }, `\u6D41\u7A0B\u8FDB\u5EA6 ${doneSteps}/${steps.length}${nextStep ? "" : " \xB7 \u5168\u90E8\u6709\u6210\u679C"}`) : null,
             canvas ? h("span", { key: "sep-c", className: "movc-sep" }) : null,
             canvas ? h("button", { key: "refresh", type: "button", className: "mov-btn", onClick: () => void refresh() }, "\u5237\u65B0") : null,
             canvas ? h("button", { key: "reset", type: "button", className: "mov-btn", onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, "\u91CD\u7F6E\u89C6\u56FE") : null,
             canvas ? h("button", { key: "export", type: "button", className: "mov-btn", onClick: () => exportCanvas() }, "\u5BFC\u51FA JSON") : null,
             canvas ? h("span", { key: "sep-d", className: "movc-sep" }) : null,
-            canvas && typeof onOpenPage === "function" ? h("button", { key: "page", type: "button", className: "mov-btn", onClick: () => onOpenPage() }, "\u6253\u5F00\u72EC\u7ACB\u9875\u9762") : null,
             canvas && selectedIds.length ? h("button", { key: "del-selected", type: "button", className: "mov-btn movc-danger", onClick: () => void removeNodes(selectedIds) }, `\u5220\u9664\u9009\u4E2D\uFF08${selectedIds.length}\uFF09`) : null,
             canvas ? h("button", { key: "del-canvas", type: "button", className: "mov-btn movc-danger", onClick: () => setConfirmDelete(true) }, "\u5220\u9664\u753B\u5E03") : null
           ]),
@@ -2946,6 +2973,7 @@
                 key: node.id,
                 className: "movc-node",
                 "data-selected": String(selectedIds.includes(node.id)),
+                "data-current": String(nextStep?.id === node.id),
                 style: { left: node.x, top: node.y, width: node.w, height: node.h },
                 onPointerDown: (e) => startMove(e, node),
                 onClick: (e) => {
@@ -2960,7 +2988,8 @@
               }, [
                 h("div", { key: "head", className: "movc-node-head" }, [
                   h("span", { key: "label", className: "movc-node-title" }, labelOf(node)),
-                  h("span", { key: "status", className: "movc-badge", "data-state": node.data?.status === "done" ? "done" : "todo" }, node.data?.status === "done" ? "\u5DF2\u5B8C\u6210" : "\u5F85\u5236\u4F5C"),
+                  // 状态标签直接复用宿主的结果胶囊样式（.mov-chip / .mov-chip-ok）。
+                  h("span", { key: "status", className: node.data?.status === "done" ? "mov-chip mov-chip-ok" : "mov-chip movc-badge" }, node.data?.status === "done" ? "\u5DF2\u5B8C\u6210" : "\u5F85\u5236\u4F5C"),
                   h("span", { key: "actions", className: "movc-actions" }, [
                     h("button", { key: "edit", type: "button", className: "movc-mini", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
                       e.stopPropagation();
@@ -2992,6 +3021,7 @@
             height: Math.abs(marquee.y2 - marquee.y1)
           } }) : null
         ) : null,
+        canvas && steps.length ? h("p", { key: "flow-hint", className: "movc-hint" }, nextStep ? `\u6D41\u7A0B\uFF1A\u6309\u8FDE\u7EBF\u987A\u5E8F\u9010\u4E2A\u5236\u4F5C\uFF0C\u5F53\u524D\u8F6E\u5230\u300C${nextStep.label}\u300D\uFF08\u753B\u5E03\u4E0A\u865A\u7EBF\u6846\u6807\u51FA\uFF09\u3002\u70B9\u4E0A\u9762\u7684\u300C\u5236\u4F5C\u300D\u6309\u94AE\u4F1A\u8BFB\u53D6\u8282\u70B9\u5185\u5BB9\u4E0E\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u62FC\u51FA\u63D0\u793A\u8BCD\uFF0C\u4ECD\u7136\u8981\u5148\u6838\u5BF9\u5236\u4F5C\u65B9\u6848\u3001\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u624D\u4F1A\u8C03\u7528\u6A21\u578B\u3002` : `\u6D41\u7A0B\uFF1A${steps.length} \u4E2A\u5236\u4F5C\u8282\u70B9\u90FD\u5DF2\u6709\u56DE\u586B\u6210\u679C\u3002\u8981\u91CD\u505A\u67D0\u4E00\u6BB5\uFF0C\u70B9\u8BE5\u8282\u70B9\u91CC\u7684\u300C\u5236\u4F5C\u300D\uFF0C\u91CD\u65B0\u6838\u5BF9\u65B9\u6848\u5E76\u786E\u8BA4\u8D39\u7528\u3002`) : null,
         canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D\uFF08Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
         connectFrom ? h("p", { key: "connect", className: "movc-hint" }, "\u8FDE\u7EBF\u6A21\u5F0F\uFF1A\u70B9\u51FB\u76EE\u6807\u8282\u70B9\u5B8C\u6210\u8FDE\u63A5\uFF0C\u70B9\u7A7A\u767D\u5904\u53D6\u6D88\u3002") : null,
         confirmDelete ? h(
@@ -3144,7 +3174,7 @@
         };
         const Page = makePage({ form, t, manager: pluginManager });
         settings.register({ id: "video", namespace: NAMESPACE, locale: NS, Page });
-        const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS, stageHeight: 620, variant: "page" });
+        const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS });
         const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: icon_default });
         ctx.effect(() => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
           name: "sidebar.panellist",

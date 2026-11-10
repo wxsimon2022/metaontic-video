@@ -20,9 +20,33 @@ export function duplicateNodePayload(node: any, spot: any) {
   return { type: node?.type || 'text', x: Number(spot?.x || 0) + 40, y: Number(spot?.y || 0) + 40, w: spot?.w, h: spot?.h, data };
 }
 
-export function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant = 'panel' }: any) {
-  // 独立页面（variant='page'）空间更大：工具条排成一行、画布区占满剩余高度、控件字号大一号。
-  const ROOT_CLASS = variant === 'page' ? 'mov-section movc movc-page' : 'mov-section movc';
+/** 流程执行顺序：图片/视频节点按连线从上游排到下游，成果节点不参与排队。
+ *  节点「是否已产出」看画布上有没有它生成的成果节点（metaonticSourceNode 指回本节点）。 */
+export function flowSteps(canvas: any) {
+  const nodes: any[] = Object.values(canvas?.nodes || {});
+  const edges: any[] = Array.isArray(canvas?.edges) ? canvas.edges : [];
+  const produced = new Set(nodes.map(node => node?.metaonticSourceNode).filter(Boolean));
+  const author = nodes.filter(node => ['image', 'video'].includes(node?.type) && !node?.metaonticSourceNode && !node?.data?.assetId);
+  const byId = new Map(author.map(node => [node.id, node]));
+  const inbound = new Map(author.map(node => [node.id, [] as string[]]));
+  for (const edge of edges) {
+    if (edge?.metaonticResult) continue;
+    if (byId.has(edge?.toNode) && byId.has(edge?.fromNode)) inbound.get(edge.toNode)!.push(edge.fromNode);
+  }
+  const ordered: any[] = [], seen = new Set();
+  const visit = (node: any) => {
+    if (!node || seen.has(node.id)) return;
+    seen.add(node.id);
+    for (const up of inbound.get(node.id) || []) visit(byId.get(up));
+    ordered.push(node);
+  };
+  for (const node of author) visit(node);
+  return ordered.map(node => ({ id: node.id, type: node.type, label: String(node?.data?.label || (node.type === 'image' ? '图片' : '视频')), done: produced.has(node.id) }));
+}
+
+export function createCanvasView({ React, h, TOKENS }: any) {
+  // 流程画布只作为插件自己的独立页面渲染，空间大，工具条与画布区按整页尺寸排布。
+  const ROOT_CLASS = 'mov-section movc';
   const rpc = async (method: string, args: any = {}) => {
     const response = await fetch('/metaontic-video/canvas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ method, args }) });
     const body = await response.json().catch(() => ({}));
@@ -43,50 +67,51 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant 
   }[state] || '状态未知');
 
   const CSS = `
-.movc { display: flex; flex-direction: column; gap: 12px; }
+.movc { display: flex; flex-direction: column; gap: 14px; }
 .movc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.movc-top { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; padding: 10px 12px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; }
-.movc-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 132px; overflow: auto; }
+.movc-top { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 4px; padding: 12px 14px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; }
+.movc-list { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
 .movc-pick { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
 .movc-name-empty { font-size: 13px; font-weight: 600; color: ${TOKENS.muted}; }
-/* 工具条按钮：胶囊小按钮，按宽度自适应，不再沿用设置页的 120px 方块。 */
-.movc-ops { gap: 6px; row-gap: 8px; container-type: inline-size; }
-.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 30px; min-height: 30px; padding: 0 11px; border-radius: 999px; background: ${TOKENS.cardFill}; font-size: 12px; line-height: 1; white-space: nowrap; overflow-wrap: normal; }
-.movc-ops .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
-.movc-ops .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; }
-.movc-ops .mov-btn-primary:hover:not(:disabled) { color: #fff; opacity: .88; }
+/* 工具条按钮：沿用 .mov-btn 的 8px 圆角、描边与主色，只把固定 120px 宽改成按内容排布。 */
+.movc-ops { flex: 1 1 auto; min-width: 0; gap: 6px; row-gap: 8px; container-type: inline-size; }
+.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 32px; min-height: 32px; padding: 0 12px; font-size: 12px; white-space: nowrap; overflow-wrap: normal; }
 .movc-ops .movc-danger:hover:not(:disabled) { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
+.movc-flow { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; white-space: nowrap; }
+/* 流程主行动：用主色描边突出，但不和「新建画布…」的实心主按钮抢注意力。 */
+.movc-ops .movc-run { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-ops .movc-run:disabled { border-color: ${TOKENS.border}; color: ${TOKENS.text}; }
 .movc-sep { flex: 0 0 auto; width: 1px; height: 18px; margin: 0 2px; background: ${TOKENS.border}; }
 /* 面板窄的时候按钮本来就会换行，分组竖线会落在行首，直接不收。 */
 @container (max-width: 460px) { .movc-sep { display: none; } }
 .movc-ops .mov-btn:focus-visible, .movc-chip:focus-visible, .movc-mini:focus-visible, .movc-name-text:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
 .movc-ops .mov-btn:active:not(:disabled), .movc-chip:active, .movc-mini:active { opacity: .82; }
-.movc-chip { border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; border-radius: 999px; padding: 3px 11px; font-size: 12px; line-height: 1.7; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.movc-chip { display: inline-flex; align-items: center; box-sizing: border-box; height: 30px; padding: 0 10px; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
 .movc-chip:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
 .movc-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
-.movc-stage { position: relative; height: ${stageHeight}px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background-color: ${TOKENS.controlFill}; background-image: radial-gradient(${TOKENS.border} 1px, transparent 1px); background-size: 22px 22px; overflow: hidden; cursor: grab; touch-action: none; }
+.movc-stage { position: relative; height: clamp(520px, calc(100vh - 320px), 1400px); border: 1px solid ${TOKENS.border}; border-radius: 12px; background-color: ${TOKENS.controlFill}; background-image: radial-gradient(${TOKENS.border} 1px, transparent 1px); background-size: 22px 22px; overflow: hidden; cursor: grab; touch-action: none; }
 .movc-stage[data-panning="true"] { cursor: grabbing; }
 .movc-stage[data-connect="true"] { cursor: crosshair; }
 .movc-world { position: absolute; inset: 0; transform-origin: 0 0; }
 .movc-edge { stroke: ${TOKENS.primaryFill}; stroke-width: 2; fill: none; opacity: .75; }
 .movc-edge-hit { stroke: transparent; stroke-width: 14; fill: none; cursor: pointer; }
-.movc-node { position: absolute; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid ${TOKENS.border}; border-radius: 10px; background: ${TOKENS.cardFill}; box-shadow: 0 1px 4px #0000000f; overflow: hidden; cursor: grab; }
+.movc-node { position: absolute; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid ${TOKENS.border}; border-radius: 10px; background: ${TOKENS.cardFill}; box-shadow: 0 1px 4px #0000000f; overflow: hidden; cursor: grab; }
 .movc-node:hover { box-shadow: 0 3px 12px #0000001f; }
 .movc-node[data-selected="true"] { border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 1px ${TOKENS.primaryFill}, 0 3px 12px #0000001f; }
+.movc-node[data-current="true"]:not([data-selected="true"]) { outline: 2px dashed ${TOKENS.primaryFill}; outline-offset: 2px; }
 .movc-node-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.movc-node-title { font-size: 12px; font-weight: 600; color: ${TOKENS.text}; }
-.movc-badge { font-size: 11px; color: ${TOKENS.muted}; border: 1px solid ${TOKENS.border}; border-radius: 999px; padding: 0 7px; line-height: 1.7; }
-.movc-badge[data-state="done"] { color: ${TOKENS.success}; border-color: ${TOKENS.success}; }
+.movc-node-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
+.movc-badge { color: ${TOKENS.muted}; }
 .movc-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
-.movc-mini { font-size: 11px; padding: 2px 8px; border: 1px solid ${TOKENS.border}; border-radius: 999px; background: ${TOKENS.cardFill}; color: ${TOKENS.muted}; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.movc-mini { flex: 0 0 auto; font: inherit; font-size: 11px; padding: 2px 8px; border: 1px solid ${TOKENS.border}; border-radius: 6px; background: transparent; color: ${TOKENS.text}; cursor: pointer; transition: border-color .15s, color .15s, opacity .15s; }
 .movc-mini:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-mini-danger:hover { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
-.movc-body { font-size: 11px; line-height: 1.6; color: ${TOKENS.muted}; white-space: pre-wrap; overflow: auto; flex: 1; }
+.movc-body { font-size: 12px; line-height: 1.6; color: ${TOKENS.muted}; white-space: pre-wrap; overflow: auto; flex: 1; }
 .movc-media { width: 100%; height: 100%; object-fit: contain; border-radius: 6px; background: #0001; }
 .movc-shots { margin: 0; padding-left: 16px; }
 .movc-modal { position: fixed; inset: 0; background: #0006; display: flex; align-items: center; justify-content: center; z-index: 2147483000; }
-.movc-modal-body { width: min(640px, calc(100vw - 32px)); max-height: 86vh; overflow: auto; box-sizing: border-box; border: 1px solid ${TOKENS.border}; border-radius: 14px; padding: 18px 20px; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; display: flex; flex-direction: column; gap: 8px; }
+.movc-modal-body { width: min(640px, calc(100vw - 32px)); max-height: 86vh; overflow: auto; box-sizing: border-box; border: 1px solid ${TOKENS.border}; border-radius: 12px; padding: 18px 20px; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; display: flex; flex-direction: column; gap: 8px; }
 .movc-modal-body h4 { margin: 0; font-size: 14px; }
 .movc-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
 .movc-field textarea, .movc-field input, .movc-field select { width: 100%; box-sizing: border-box; font: inherit; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.border}; border-radius: 8px; padding: 6px 8px; }
@@ -99,26 +124,12 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant 
 .movc-plan { font-size: 12px; line-height: 1.7; background: ${TOKENS.controlFill}; border-radius: 8px; padding: 10px 12px; }
 .movc-marquee { position: absolute; border: 1px dashed ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}1f; pointer-events: none; border-radius: 4px; }
 .movc-name { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 160px; min-width: 0; }
-.movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
+.movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; font-size: 14px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
 .movc-name-text:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-name input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 13px; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.primaryFill}; border-radius: 8px; padding: 5px 8px; }
 .movc-name-err { flex: 1 1 100%; font-size: 12px; color: #c0392b; }
 /* 弹窗里的按钮按内容自适应，不撑成设置页那种 120px 方块。 */
 .movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; white-space: nowrap; overflow-wrap: normal; }
-/* 独立页面：工具条一行放下（操作在左、选择画布在右），画布区吃掉剩余高度。 */
-.movc-page { gap: 14px; }
-.movc-page .movc-top { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 14px; }
-.movc-page .movc-ops { flex: 1 1 auto; min-width: 0; }
-.movc-page .movc-ops .mov-btn { height: 34px; min-height: 34px; padding: 0 14px; font-size: 13px; }
-.movc-page .movc-picker { flex: 1 1 auto; min-width: 0; }
-.movc-page .movc-list { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; max-height: none; padding-bottom: 2px; }
-.movc-page .movc-chip { padding: 4px 13px; font-size: 13px; white-space: nowrap; }
-.movc-page .movc-name-text { font-size: 14px; }
-.movc-page .movc-node { padding: 10px 12px; }
-.movc-page .movc-node-title { font-size: 13px; }
-.movc-page .movc-body { font-size: 12px; }
-.movc-page .movc-mini { font-size: 12px; padding: 3px 10px; }
-.movc-page .movc-stage { height: clamp(520px, calc(100vh - 320px), 1400px); border-radius: 14px; }
 `;
 
   function nodeBody(node: any) {
@@ -136,7 +147,7 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant 
     return h('div', { key: 'text', className: 'movc-body' }, text ? text.slice(0, 600) : '（暂无内容，可先编辑）');
   }
 
-  function FlowCanvas({ onOpenPage }: any = {}) {
+  function FlowCanvas() {
     const [list, setList] = React.useState([] as any[]);
     const [canvas, setCanvas] = React.useState(null as any);
     const [error, setError] = React.useState('');
@@ -438,6 +449,9 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant 
       event.currentTarget.setPointerCapture?.(event.pointerId);
     };
 
+    const steps = flowSteps(canvas);
+    const nextStep = steps.find(step => !step.done) || null;
+    const doneSteps = steps.filter(step => step.done).length;
     const nodes = canvas ? Object.values(canvas.nodes || {}) : [];
     const edges = canvas?.edges || [];
     const geometry = (node: any) => ({ ...node, ...sizeOf(node), ...(positions[node.id] || {}) });
@@ -506,13 +520,17 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant 
           canvas ? h('button', { key: 'text-node', type: 'button', className: 'mov-btn', onClick: () => void newNode('text') }, '+ 文本') : null,
           canvas ? h('button', { key: 'image', type: 'button', className: 'mov-btn', onClick: () => void newNode('image') }, '+ 图片') : null,
           canvas ? h('button', { key: 'video', type: 'button', className: 'mov-btn', onClick: () => void newNode('video') }, '+ 视频') : null,
+          canvas ? h('span', { key: 'sep-flow', className: 'movc-sep' }) : null,
+          canvas ? h('button', { key: 'run-next', type: 'button', className: 'mov-btn movc-run', disabled: !nextStep,
+            title: nextStep ? `当前读取节点内容并沿上游拼接提示词，生成前仍需确认方案与费用` : '流程里的制作节点都已有成果',
+            onClick: () => { const node = (canvas?.nodes || {})[nextStep?.id]; if (node) void openDialog(node); } },
+            nextStep ? `制作「${labelOf((canvas?.nodes || {})[nextStep.id])}」` : '流程已完成') : null,
+          canvas && steps.length ? h('span', { key: 'flow-progress', className: 'movc-flow' }, `流程进度 ${doneSteps}/${steps.length}${nextStep ? '' : ' · 全部有成果'}`) : null,
           canvas ? h('span', { key: 'sep-c', className: 'movc-sep' }) : null,
           canvas ? h('button', { key: 'refresh', type: 'button', className: 'mov-btn', onClick: () => void refresh() }, '刷新') : null,
           canvas ? h('button', { key: 'reset', type: 'button', className: 'mov-btn', onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, '重置视图') : null,
           canvas ? h('button', { key: 'export', type: 'button', className: 'mov-btn', onClick: () => exportCanvas() }, '导出 JSON') : null,
           canvas ? h('span', { key: 'sep-d', className: 'movc-sep' }) : null,
-          // 「打开独立页面」只在内嵌场景有意义；独立页面本身不再显示这个按钮。
-          canvas && variant !== 'page' && typeof onOpenPage === 'function' ? h('button', { key: 'page', type: 'button', className: 'mov-btn', onClick: () => onOpenPage() }, '打开独立页面') : null,
           canvas && selectedIds.length ? h('button', { key: 'del-selected', type: 'button', className: 'mov-btn movc-danger', onClick: () => void removeNodes(selectedIds) }, `删除选中（${selectedIds.length}）`) : null,
           canvas ? h('button', { key: 'del-canvas', type: 'button', className: 'mov-btn movc-danger', onClick: () => setConfirmDelete(true) }, '删除画布') : null,
         ]),
@@ -549,7 +567,7 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant 
           ...nodes.map(raw => {
             const node: any = geometry(raw);
             const media = ['image', 'video'].includes(node.type);
-            return h('div', { key: node.id, className: 'movc-node', 'data-selected': String(selectedIds.includes(node.id)), style: { left: node.x, top: node.y, width: node.w, height: node.h },
+            return h('div', { key: node.id, className: 'movc-node', 'data-selected': String(selectedIds.includes(node.id)), 'data-current': String(nextStep?.id === node.id), style: { left: node.x, top: node.y, width: node.w, height: node.h },
               onPointerDown: (e: any) => startMove(e, node), onClick: (e: any) => {
                 e.stopPropagation();
                 if (connectFrom && connectFrom !== node.id) { void connectTo(node.id); return; }
@@ -558,7 +576,8 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant 
               } }, [
               h('div', { key: 'head', className: 'movc-node-head' }, [
                 h('span', { key: 'label', className: 'movc-node-title' }, labelOf(node)),
-                h('span', { key: 'status', className: 'movc-badge', 'data-state': node.data?.status === 'done' ? 'done' : 'todo' }, node.data?.status === 'done' ? '已完成' : '待制作'),
+                // 状态标签直接复用宿主的结果胶囊样式（.mov-chip / .mov-chip-ok）。
+                h('span', { key: 'status', className: node.data?.status === 'done' ? 'mov-chip mov-chip-ok' : 'mov-chip movc-badge' }, node.data?.status === 'done' ? '已完成' : '待制作'),
                 h('span', { key: 'actions', className: 'movc-actions' }, [
                   h('button', { key: 'edit', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void openDialog(node); } }, media ? '制作' : '编辑'),
                   h('button', { key: 'copy', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void duplicateNode(node); } }, '复制'),
@@ -574,6 +593,9 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant 
           left: Math.min(marquee.x1, marquee.x2), top: Math.min(marquee.y1, marquee.y2),
           width: Math.abs(marquee.x2 - marquee.x1), height: Math.abs(marquee.y2 - marquee.y1),
         } }) : null) : null,
+      canvas && steps.length ? h('p', { key: 'flow-hint', className: 'movc-hint' }, nextStep
+        ? `流程：按连线顺序逐个制作，当前轮到「${nextStep.label}」（画布上虚线框标出）。点上面的「制作」按钮会读取节点内容与上游剧本/分镜拼出提示词，仍然要先核对制作方案、单独确认费用才会调用模型。`
+        : `流程：${steps.length} 个制作节点都已有回填成果。要重做某一段，点该节点里的「制作」，重新核对方案并确认费用。`) : null,
       canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `双击画布名重命名（Enter 保存，Esc 取消）；拖动空白处平移、滚轮缩放；拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
       connectFrom ? h('p', { key: 'connect', className: 'movc-hint' }, '连线模式：点击目标节点完成连接，点空白处取消。') : null,
       confirmDelete ? h('div', { key: 'delete-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget) setConfirmDelete(false); } },
