@@ -1,7 +1,6 @@
-/** 内置流程画布：在插件自己的目录里实现与原版画布同形的项目/资产接口，
- *  新画布不再依赖 @ninkch/dsh-infinite-canvas（原版装不装、版本好坏都不影响流程画布）。
+/** 内置流程画布：本插件自己实现项目/资产接口，不依赖任何第三方画布插件。
  *  存储：~/.dsh/metaontic-video/canvas/projects/<id>.json（节点/连线/视图）与 canvas/data（素材）。
- *  接口形状与原版一致，所以 readCanvasInput / publishCanvasResult / markCanvasChanged 直接复用。 */
+ *  读写接口与 readCanvasInput / publishCanvasResult / markCanvasChanged 的既有形状一致，直接复用。 */
 import { mkdir, readFile, writeFile, rename, readdir, stat } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -65,7 +64,7 @@ function mergeDoc(id: string, prev: any, args: any) {
     tombstones, edgeTombstones, rev: (prev?.rev || 0) + 1, ...(incoming.ts ? { ts: incoming.ts } : {}) };
 }
 
-/** 与原版同形的只读/写入接口；不需要版本门，也不读写原版任何配置。 */
+/** 只读/写入接口；不需要版本门，也不读写任何第三方插件配置。 */
 export function builtinRpc() {
   return {
     async projectsGet(args: any) {
@@ -151,7 +150,13 @@ export async function builtinCanvasList() {
   return (await allDocs()).map(doc => ({ projectId: doc.id, name: doc.name, updatedAt: doc.updatedAt || 0, nodeCount: Object.keys(doc.nodes || {}).length }));
 }
 
-/** 面板只读/改名用的接口：只暴露内置画布自己的文档，不碰原版存储与配置。 */
+/** 读取必须存在的画布文档；不存在或已删除就停住，不静默新建。 */
+async function requireDoc(projectId: any) {
+  const doc = await readDoc(projectId);
+  if (!doc || doc.deleted) throw new Error('画布不存在或已删除。');
+  return doc;
+}
+/** 面板读取/编辑用的接口：只暴露内置画布自己的文档，不碰其他插件的存储与配置。 */
 export async function builtinCanvasHandle(args: any) {
   const method = String(args?.method || '');
   const params = args?.args || {};
@@ -171,10 +176,76 @@ export async function builtinCanvasHandle(args: any) {
     await writeDoc(doc.id, doc);
     return { canvas: { projectId: doc.id, name: doc.name } };
   }
+  if (method === 'nodeSave') {
+    const doc = await requireDoc(params.projectId);
+    const incoming = params.node || {};
+    const id = String(incoming.id || '');
+    if (!validId(id)) throw new Error('节点标识无效。');
+    if (doc.tombstones?.includes(id)) throw new Error('该节点已删除，不自动复活；请新建节点。');
+    const prev = doc.nodes?.[id];
+    const type = String(incoming.type || prev?.type || 'text');
+    if (!['text', 'script', 'storyboard', 'shot', 'image', 'video'].includes(type)) throw new Error('节点类型不支持。');
+    // 只接受界面能编辑的创作字段，其余（成果标识、来源关系等）沿用原值，避免误伤回填与投影。
+    const data = { ...(prev?.data || {}), ...(incoming.data || {}) };
+    for (const key of ['label', 'prompt', 'text', 'output', 'script', 'requirement', 'ratio', 'resolution'] ) {
+      if (incoming.data && key in incoming.data) data[key] = String(incoming.data[key] ?? '');
+    }
+    if (incoming.data && 'duration' in incoming.data) {
+      const duration = Number(incoming.data.duration);
+      data.duration = Number.isFinite(duration) && duration > 0 ? duration : null;
+    }
+    const node = { id, type, x: Number.isFinite(Number(incoming.x)) ? Number(incoming.x) : Number(prev?.x) || 0,
+      y: Number.isFinite(Number(incoming.y)) ? Number(incoming.y) : Number(prev?.y) || 0,
+      w: Number(incoming.w) || Number(prev?.w) || 360, h: Number(incoming.h) || Number(prev?.h) || 280, data };
+    doc.nodes = { ...(doc.nodes || {}), [id]: node }; doc.updatedAt = Date.now(); doc.rev = (doc.rev || 0) + 1;
+    await writeDoc(doc.id, doc);
+    return { canvas: { projectId: doc.id, node, rev: doc.rev } };
+  }
+  if (method === 'nodeDelete') {
+    const doc = await requireDoc(params.projectId);
+    const id = String(params.nodeId || '');
+    if (!doc.nodes?.[id]) throw new Error('节点不存在或已删除。');
+    const nodes = { ...doc.nodes }; delete nodes[id];
+    const edges = (doc.edges || []).filter(edge => edge.fromNode !== id && edge.toNode !== id);
+    const goneEdges = (doc.edges || []).filter(edge => edge.fromNode === id || edge.toNode === id).map(edge => edge.id);
+    doc.nodes = nodes; doc.edges = edges;
+    doc.tombstones = [...new Set([...(doc.tombstones || []), id])];
+    doc.edgeTombstones = [...new Set([...(doc.edgeTombstones || []), ...goneEdges])];
+    doc.updatedAt = Date.now(); doc.rev = (doc.rev || 0) + 1;
+    await writeDoc(doc.id, doc);
+    return { canvas: { projectId: doc.id, removed: id, rev: doc.rev } };
+  }
+  if (method === 'edgeAdd') {
+    const doc = await requireDoc(params.projectId);
+    const from = String(params.fromNode || ''), to = String(params.toNode || '');
+    if (!doc.nodes?.[from] || !doc.nodes?.[to]) throw new Error('连线两端节点必须在场。');
+    if (from === to) throw new Error('不能连接同一个节点。');
+    const existing = (doc.edges || []).find(edge => edge.fromNode === from && edge.toNode === to);
+    if (existing) return { canvas: { projectId: doc.id, edge: existing, already: true } };
+    const edge = { id: `mov_connect_${randomUUID().replaceAll('-', '').slice(0, 16)}`, fromNode: from, toNode: to,
+      fromPort: String(params.fromPort || 'out').slice(0, 24), toPort: String(params.toPort || 'prompt').slice(0, 24) };
+    doc.edges = [...(doc.edges || []), edge];
+    if (doc.edgeTombstones?.includes(edge.id)) doc.edgeTombstones = doc.edgeTombstones.filter(x => x !== edge.id);
+    doc.updatedAt = Date.now(); doc.rev = (doc.rev || 0) + 1;
+    await writeDoc(doc.id, doc);
+    return { canvas: { projectId: doc.id, edge, rev: doc.rev } };
+  }
+  if (method === 'edgeDelete') {
+    const doc = await requireDoc(params.projectId);
+    const id = String(params.edgeId || '');
+    const edge = (doc.edges || []).find(item => item.id === id);
+    if (!edge) throw new Error('连线不存在或已删除。');
+    doc.edges = (doc.edges || []).filter(item => item.id !== id);
+    // 记墓碑，避免同步或回填把用户删掉的自动线又加回来。
+    if (id.startsWith('mov_connect_') || id.startsWith('mov_edge_') || id.includes('_edge_')) doc.edgeTombstones = [...new Set([...(doc.edgeTombstones || []), id])];
+    doc.updatedAt = Date.now(); doc.rev = (doc.rev || 0) + 1;
+    await writeDoc(doc.id, doc);
+    return { canvas: { projectId: doc.id, removed: id, rev: doc.rev } };
+  }
   throw new Error('未知画布操作。');
 }
 
-/** 浏览器端只读访问；与原版画布接口一样限定同源 POST 与 JSON。 */
+/** 浏览器端访问；统一限定同源 POST 与 JSON。 */
 export function registerBuiltinCanvas(ctx) {
   return ctx.inject(['webServer'], scope => {
     if (typeof scope.webServer?.register !== 'function') return;

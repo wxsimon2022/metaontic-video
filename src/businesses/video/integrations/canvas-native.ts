@@ -36,7 +36,7 @@ export function planCanvasNative(input, config, operation = 'generate', draft: a
   const prompt = String(draft.prompt ?? [node.prompt, ...texts.map(n => n.type === 'storyboard' ? '' : n.text || n.output || n.script || n.requirement), shots.length ? JSON.stringify(shots) : ''].filter(Boolean).join('\n')).trim();
   if (!prompt) throw new Error('请先在节点填写本次要生成的画面或续拍内容。');
   if (prompt.length > 20000) throw new Error('提示词过长，请缩小本节点的制作范围。');
-  if (/@[^@\n]+@/.test(prompt)) throw new Error('请先把@设定引用展开为明确描述，直接制作暂不自动解析原版设定引用。');
+  if (/@[^@\n]+@/.test(prompt)) throw new Error('请先把@设定引用展开为明确描述，直接制作暂不自动解析设定引用。');
   const ratio = draft.ratio ?? node.ratio;
   if (!['16:9', '9:16', '1:1', '4:3', '3:4'].includes(ratio)) throw new Error('请在节点明确选择画幅后再制作。');
   const refs = incoming.filter(e => e.toPort !== 'prompt');
@@ -79,6 +79,8 @@ export function planCanvasNative(input, config, operation = 'generate', draft: a
 
 export function createCanvasNativeService(liveConfig, options: any = {}) {
   const load = options.load || loadCanvasAdapter;
+  // 画布适配器按项目标识解析：内置画布文档走插件自己的存储，注入的加载器优先（自动化检查）。
+  const adapterFor = link => options.resolve ? options.resolve(link) : resolveCanvasAdapter(link?.projectId, load);
   const directory = options.directory || path.join(dshHome(), 'metaontic-video', 'canvas-native');
   const snapshots = new Map<string, any>(), running = new Map<string, AbortController>(), locks = new Set<string>();
   const proposals = new Map<string, any>();
@@ -148,7 +150,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: Boolean(resolveApiKey(config)), imageReady, singleMax: modelMaxSeconds(config) };
     }
     if (args.action === 'prepare') {
-      const adapter = await load(), input = await readCanvasInput(adapter, args);
+      const adapter = await adapterFor(args), input = await readCanvasInput(adapter, args);
       const old = await previous(input.canvas);
       if (old && (!terminal.has(old.state) || (old.media?.length && !old.reviewed) || old.sync?.status === 'pending')) return { job: view(old) };
       if (args.operation === 'extend') {
@@ -185,7 +187,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       try {
         if (args.confirmPlan !== true || args.confirmCost !== true || (p.plan.kind === 'video' && !p.plan.images.length && p.plan.operation === 'generate' && args.textOnly !== true)) throw new Error('请分别确认制作方案、费用及纯文生选择。');
         if (hash(snapshotConfig(liveConfig)) !== p.identity) throw new Error('插件配置已变，请重新确认。');
-        const input = await readCanvasInput(await load(), p.canvas);
+        const input = await readCanvasInput(await adapterFor(p.canvas), p.canvas);
         if (input.canvas.fingerprint !== p.canvas.fingerprint) throw new Error('节点或上游素材已变化，请重新核对方案。');
         const old = await previous(p.canvas);
         if (old && (!terminal.has(old.state) || (old.media?.length && !old.reviewed) || old.sync?.status === 'pending')) return { job: view(old) };

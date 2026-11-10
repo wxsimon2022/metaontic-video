@@ -1,8 +1,7 @@
-/** 原版宿主的 projectsPut 不产生「Agent 改动了项目文档」信号：打开的画布只按缺失节点逐个补，
- *  不会合并 edges（mergeHostDoc 才会），于是插件建好的节点会出现在画布上、连线一条都没有。
- *  这里对文档里已存在的连线做一次幂等确认来触发该信号：canvasConnect 遇到同一条线直接返回，不改内容。 */
+/** 幂等补线：把候选连线交给适配器的 connect（内置画布直接写入，已存在则原样返回，不改内容），
+ *  保证 projectsPut 之后该有的连线一条不少；端口规则不满足时换下一条，不阻断同步或回填。 */
 export async function markCanvasChanged(adapter: any, projectId: string, candidates: any[] = []) {
-  // canvasConnect 不在宿主浏览器 RPC 表里，只有模块内部接口；adapter.connect 来自 _internals。
+  // 适配器自带 connect（内置画布写入 edges）；没有该能力的实现直接跳过。
   const connect = adapter?.connect;
   if (typeof connect !== 'function') return false;
   for (const edge of candidates) {
@@ -16,9 +15,7 @@ export async function markCanvasChanged(adapter: any, projectId: string, candida
   return false;
 }
 
-/** 与原版画布0.20.1起互操作（含原版自更新到的0.20.x）；生成始终经过既有工具及宿主审批。 */
-import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
+/** 画布由本插件内置实现，和任何第三方画布插件无关；生成始终经过既有工具及宿主审批。 */
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, copyFile, stat, open } from 'node:fs/promises';
 import path from 'node:path';
@@ -33,50 +30,21 @@ import { resumeDirOf, readPauseFile } from '../workflow/resume.js';
 
 export const canvasLinkSchema = { type: 'object', properties: {
   projectId: { type: 'string' }, canvasId: { type: 'string' }, nodeId: { type: 'string' }, fingerprint: { type: 'string' },
-}, required: ['projectId', 'nodeId', 'fingerprint'], description: 'video_canvas(action:read)返回的原版画布定位与内容摘要；原样传入，不猜测。' };
+}, required: ['projectId', 'nodeId', 'fingerprint'], description: 'video_canvas(action:read)返回的流程画布定位与内容摘要；原样传入，不猜测。' };
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 function location(link) {
   if (!validId(link?.projectId) || !validId(link?.nodeId) || (link.canvasId && !validId(link.canvasId))) throw new Error('画布项目或节点标识无效');
   return { id: link.projectId, ...(link.canvasId ? { canvasId: link.canvasId } : {}) };
 }
-/** 原版画布自带的升级入口会把它推到更高的0.20.x；锁死单版本会让已安装的0.20.2直接不可用。
- *  版本仍设下限（0.20.1，私有接口首个核对版本），真正的开关是下面的 rpc/_internals 能力核对。 */
-export function canvasVersionSupported(version: any) {
-  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(String(version ?? '').trim());
-  if (!match) return false;
-  const [major, minor, patch] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  if (major !== 0) return major > 0;
-  return minor > 20 || (minor === 20 && patch >= 1);
-}
-export async function loadCanvasAdapter() {
-  const require = createRequire(import.meta.url);
-  const notInstalled = '画布联动需要已启用的原版 @ninkch/dsh-infinite-canvas 0.20.1 或更新版本；请在插件详情核对安装和启用状态，不会改写画布配置。';
-  let pkg: any;
-  try {
-    pkg = require('@ninkch/dsh-infinite-canvas/package.json');
-  } catch { throw new Error(notInstalled); }
-  // 分开报出「版本不支持/装到一半坏了/接口不对」，否则用户只看到笼统一句，不知道该修哪一步。
-  if (!canvasVersionSupported(pkg?.version)) throw new Error(`画布联动暂不支持原版无限画布 ${pkg?.version || '未知版本'}；请升级到 0.20.1 或更新版本，不会改写画布配置。`);
-  let module: any;
-  try {
-    module = await import(pathToFileURL(require.resolve('@ninkch/dsh-infinite-canvas')).href);
-  } catch (error: any) {
-    throw new Error(`原版无限画布 ${pkg.version} 加载失败（安装可能不完整）：${error?.message || error}；请在插件详情重新安装该插件，不会改写画布配置。`);
-  }
-  const internal = module?._internals;
-  const rpc = internal?.rpcMethods?.();
-  if (!rpc?.projectsGet || !rpc?.projectsPut || !rpc?.assetsGet || !rpc?.assetCreate || !rpc?.projectDirGet || !rpc?.dataRootGet || !rpc?.projectsList) throw new Error(`原版无限画布 ${pkg.version} 缺少画布联动所需的接口；请确认安装的是原版 @ninkch/dsh-infinite-canvas，不会重新创建创作项目。`);
-  return { rpc, assetPath: (root, asset) => asset.sha ? internal.objectAbsFor(root, asset.sha) : path.resolve(root, internal.physicalRel(asset.rel)),
-    ...(typeof internal.canvasConnect === 'function' ? { connect: (args: any) => internal.canvasConnect(args) } : {}) };
-}
-/** 按画布项目标识选后端：内置存储里有这份文档就走内置画布，否则沿用原版适配器。
- *  读、回填、补名都走这里，老项目继续留在原版，新建项目完全不需要原版在场。 */
+export async function loadCanvasAdapter() { return builtinCanvasAdapter(); }
+/** 画布适配器统一来自内置实现；仍按项目标识解析，兼容测试注入的加载器。
+ *  读、回填、补名都走这里，不需要任何第三方画布插件在场。 */
 export async function resolveCanvasAdapter(projectId: any, load: any = loadCanvasAdapter) {
   if (projectId && await builtinCanvasExists(projectId)) return builtinCanvasAdapter();
   return load();
 }
-/** 有向上游、原顺序和端口一并保留；只输出创作字段，不读取原版供应商配置。 */
+/** 有向上游、原顺序和端口一并保留；只输出创作字段，不读取供应商配置。 */
 export async function readCanvasInput(adapter, link) {
   const doc = await adapter.rpc.projectsGet(location(link));
   if (!doc?.nodes?.[link.nodeId]) throw new Error('画布节点不存在，请重新选择。');
@@ -96,7 +64,7 @@ export async function readCanvasInput(adapter, link) {
   const assets = nodes.filter(n => n.assetId).map(n => n.assetId);
   const records = assets.length ? (await adapter.rpc.assetsGet({ ids: assets })).items || [] : [];
   const root = (await adapter.rpc.dataRootGet()).dataRoot;
-  if (!root) throw new Error('请先在无限画布设置数据根目录，确保参考素材和回填成果可持久保存。');
+  if (!root) throw new Error('画布数据目录不可用，请核对插件数据目录权限，确保参考素材和回填成果可持久保存。');
   const references = [];
   for (const node of nodes.filter(n => n.assetId)) {
     const a = records.find(a => a.id === node.assetId);
@@ -110,7 +78,7 @@ export async function readCanvasInput(adapter, link) {
   const bible = { world: b.world || '', style: b.style || '', characters: b.characters || [], scenes: b.scenes || [], props: b.props || [] };
   const fingerprint = digest({ nodes, edges, references, bible });
   return { canvas: { projectId: link.projectId, ...(link.canvasId ? { canvasId: link.canvasId } : {}), nodeId: link.nodeId, fingerprint }, nodes, edges, references, bible,
-    instruction: '按端口、refOrder和原连线核对参考图及首尾帧/参考视频角色，不把所有素材一律当参考图。不得默认时长或清晰度。正文展示脚本/分镜后走video_project审核，生成工具传入canvas。不要调用canvas_run_node或canvas_generate_node代替本插件生成。' };
+    instruction: '按端口、refOrder和原连线核对参考图及首尾帧/参考视频角色，不把所有素材一律当参考图。不得默认时长或清晰度。正文展示脚本/分镜后走video_project审核，生成工具传入canvas。' };
 }
 
 function resultFile(token) {
@@ -256,16 +224,12 @@ export function createCanvasBridge(load = loadCanvasAdapter, config: any = {}) {
       catch { return { ...result, canvasSync: { status: 'pending', token: record.id, reason: '画布回填未完成，成果已保留；调用video_canvas(action:sync,token)补传，不重新生成。' } }; }
     } };
   }
-  const tool = { name: 'video_canvas', description: '与已启用的原版无限画布联动。list列出项目；read读取指定节点及上游脚本/分镜/素材并返回canvas定位和摘要，不生成不收费。之后按既有video_project审核与生成工具费用审批，video_generate/video_extend/video_prepare_image传canvas即自动回填成果节点。sync只补传此前失败的回填，不新增任务。严禁用画布自带生成工具绕过本插件审批。',
+  const tool = { name: 'video_canvas', description: '与本插件内置流程画布联动（不依赖任何第三方画布插件）。list列出流程画布；read读取指定节点及上游脚本/分镜/素材并返回canvas定位和摘要，不生成不收费。之后按既有video_project审核与生成工具费用审批，video_generate/video_extend/video_prepare_image传canvas即自动回填成果节点。sync只补传此前失败的回填，不新增任务。',
     parameters: { type: 'object', properties: { action: { type: 'string', enum: ['list','read','sync'] }, projectId: { type: 'string' }, canvasId: { type: 'string' }, nodeId: { type: 'string' }, token: { type: 'string' } }, required: ['action'] },
     output: { schema: { type: 'object' }, render(_args, value) { return [{ type: 'text', text: JSON.stringify(value) }]; } },
     timeoutMs: 600000, isConcurrencySafe() { return false; }, async execute(args, exec) {
       if (args.action === 'sync') return sync(args.token, exec);
-      if (args.action === 'list') {
-        const listed = await load().then(adapter => adapter.rpc.projectsList()).catch(() => []);
-        const merged = (Array.isArray(listed) ? listed : listed?.projects || listed?.items || []).map(p => ({ id: p.id, name: p.name, canvases: p.canvases, nodeIds: p.nodeIds }));
-        return { projects: [...await builtinCanvasList(), ...merged] };
-      }
+      if (args.action === 'list') return { projects: await builtinCanvasList() };
       if (args.action === 'read') return readCanvasInput(await resolveCanvasAdapter(args.projectId, load), args);
       throw new Error('未知画布操作');
     } };

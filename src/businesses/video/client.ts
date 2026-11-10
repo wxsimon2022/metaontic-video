@@ -10,9 +10,7 @@ import { createSettingsState } from './client/state.js';
 import { createUpdates } from '../../client/updates.js';
 import { createSettingsPage } from './client/settings.js';
 import { createSidebarPanel } from './client/panel.js';
-import { createCanvasCompanion, CANVAS_PACKAGE } from '../../client/infinite-canvas.js';
 import { createCanvasView } from './client/canvas-view.js';
-import { mountCanvasNative } from '../../client/canvas-native.js';
 import iconMark from '../../../icon.svg';
 
 /** 左侧栏入参与面板本体共用的面板 id；也是 `main` 键位槽的 key。 */
@@ -42,10 +40,6 @@ export function createVideoClient(require) {
           hooks: ['videoExecutions'],
           resolve: (binding) => ({ hooks: { videoExecutions: videoExecutionSource(binding.eventSource) } }),
         }), 'metaontic-video: actual video execution');
-        ctx.effect(() => mountCanvasNative({
-          document: typeof document === 'undefined' ? undefined : document,
-          MutationObserver: typeof MutationObserver === 'undefined' ? undefined : MutationObserver,
-        }), 'metaontic-video: canvas native generation');
         const t = ctx.locale.bind(NS);
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'metaontic-video: dictionaries');
         ctx.effect(() => ctx.slots.inject('conversation.chat.node', () => registerAuthNotice(ctx, h, t)), 'metaontic-video: friendly service authentication notice');
@@ -88,9 +82,8 @@ export function createVideoClient(require) {
         // 打开「已安装插件」里的 metaontic-video 详情页时显示在描述与组件行之间。
         settings.register({ id: 'video', namespace: NAMESPACE, locale: NS, Page });
         // 面板组件要用当前配置快照与界面字典（form/t 在 apply 里才有），所以在这里构造。
-        const { CanvasCompanion } = createCanvasCompanion({ React, h });
         const { FlowCanvas } = createCanvasView({ React, h, TOKENS });
-        const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: iconMark, CanvasCompanion, FlowCanvas });
+        const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: iconMark, FlowCanvas });
         // 左侧栏入口与面板本体是宿主 root 作用域的两个 slot，用同一个 id 关联：
         // sidebar.panellist 只放一行图标（收到 {size, active}），点它切到 main 里同 id 的面板。
         // 老版本宿主没有这两个 slot 时 inject 不会触发，其余界面与工具不受影响。
@@ -111,14 +104,6 @@ export function createVideoClient(require) {
             startSession: () => ctx.get('uiWorkspace')?.startSession(undefined, { agentPreset: 'video-director' }),
             openSettings: () => ctx.get('pluginNavigation')?.openBundle(NAMESPACE),
             manager: pluginManager,
-            openCanvasSettings: () => ctx.get('pluginNavigation')?.openBundle(CANVAS_PACKAGE),
-            openCanvas: () => {
-              const right = ctx.get('sidebarRight');
-              if (typeof right?.openTab === 'function') return right.openTab('infinite-canvas');
-              const layout = ctx.get('layout');
-              if (typeof layout?.selectPanel === 'function') return layout.selectPanel('infinite-canvas');
-              throw new Error('canvas-navigation-unavailable');
-            },
           }),
         }, VideoPanel)), 'metaontic-video: sidebar panel');
       },

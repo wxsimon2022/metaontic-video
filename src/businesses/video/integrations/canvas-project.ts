@@ -1,4 +1,4 @@
-/** 创作项目自动投影到原版画布；只写本项目管理的节点，不执行任何生成。 */
+/** 创作项目自动投影到插件内置的流程画布；只写本项目管理的节点，不执行任何生成。 */
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -8,13 +8,11 @@ import { loadCanvasAdapter, readCanvasInput, markCanvasChanged, resolveCanvasAda
 import { builtinCanvasAdapter, BUILTIN_BACKEND } from './canvas-builtin.js';
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
-/** 后端只决定「新建的流程画布写到哪里」：老绑定沿用原版项目，新建默认写内置画布，
- *  这样原版装没装、版本好坏都不再挡住流程画布；设置里可强制回原版。 */
-async function adapterForNewCanvas(binding: any, load: any, config: any) {
+/** 流程画布一律写内置存储：老绑定按项目标识解析，新建直接建内置画布。
+ *  只有自动化检查显式注入的加载器会被优先使用。 */
+async function adapterForNewCanvas(binding: any, load: any) {
   if (binding?.projectId) return resolveCanvasAdapter(binding.projectId, load);
-  // 显式注入的加载器（备用实现/自动化检查）优先，默认加载器才走内置画布。
   if (load !== loadCanvasAdapter) return load();
-  if (binding?.backend === 'original' || ref(config, 'canvasBackend', BUILTIN_BACKEND) === 'original') return load();
   return builtinCanvasAdapter();
 }
 
@@ -51,7 +49,7 @@ export function scriptStoryboardShots(script: string) {
   return shots;
 }
 
-/** 原版剧本节点是纯文本预览；转换展示副本，原始脚本仍用于审核与分镜解析。 */
+/** 剧本节点是纯文本预览；转换展示副本，原始脚本仍用于审核与分镜解析。 */
 export function canvasScriptPreview(script: string) {
   return script.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, '')
     .split(/\r?\n/).filter(line => !/^\s*(```|~~~)/.test(line) && !/^\s*\|?\s*:?-{3,}:?\s*\|/.test(line))
@@ -71,11 +69,11 @@ export function pluginNamedCanvas(binding: any, current: any, title: any = '') {
   return name === binding?.name || name.startsWith('MetaOntic 创作') || Boolean(wanted) && name === wanted;
 }
 
-/** 画布内的默认画布名同理：只有原版缺省名、上次应用的名字或当前标题能证明是插件写的。
- *  原版端把默认画布名当 Host 权威字段，项目名却由画布端本地缓存回推，所以两处都要跟着标题写。 */
+/** 画布内的默认画布名同理：只有缺省名、上次应用的名字或当前标题能证明是插件写的。
+ *  项目名与画布名都跟着会话标题写。 */
 export function pluginNamedCanvasName(binding: any, current: any, title: any = '') {
   const name = String(current || '').trim(), wanted = String(title || '').trim();
-  // 空名字就是原版缺省「默认画布」（projectsGet 不带该字段），同样没有用户起过的名字。
+  // 空名字就是缺省「默认画布」（projectsGet 不带该字段），同样没有用户起过的名字。
   return !name || name === '默认画布' || name === binding?.appliedCanvasName || Boolean(wanted) && name === wanted;
 }
 
@@ -88,18 +86,18 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       draft = { ...(project.canvasDraft || { scriptPath: project.approved?.scriptPath, specification: project.approved?.specification }), ...draft };
       if (draft.specification?.canvas) return { status: 'external', projectId: draft.specification.canvas.projectId, reason: '沿用用户选择的原画布，不另建项目。' };
       let adapter;
-      try { adapter = await adapterForNewCanvas(project.canvasAuto, load, config); }
+      try { adapter = await adapterForNewCanvas(project.canvasAuto, load); }
       catch (error: any) {
-        // 适配失败可能是没装、版本不支持或装了但加载失败，用适配给出的具体原因，用户才知道怎么修。
-        const reason = String(error?.message || '').trim() || '自动画布尚未就绪，请安装并启用原版无限画布0.20.1 或更新版本。';
+        // 适配失败时给出具体原因，用户才知道怎么修；创作项目本身已保留。
+        const reason = String(error?.message || '').trim() || '流程画布目录暂不可用，请核对插件数据目录权限。';
         return { status: 'unavailable', reason: `${reason}创作项目已保留，可查询项目状态重试同步。` };
       }
       const rpc = adapter.rpc;
       let conversationName = '';
       try { conversationName = String(sessionTitle?.get(exec.agent.session)?.title || '').trim().slice(0, 80); } catch { /* 宿主未提供标题时保留原名 */ }
-      if (!rpc.canvasCreateProject) return { status: 'unavailable', reason: '原版画布缺少创建接口，未创建替代画布。' };
+      if (!rpc.canvasCreateProject) return { status: 'unavailable', reason: '流程画布缺少创建接口，未创建替代画布。' };
       const prefix = `mov_${project.id.replaceAll('-', '')}`;
-      // 名称先持久化：创建成功但响应/记录保存中断时，重试由原版同名幂等复用。
+      // 名称先持久化：创建成功但响应/记录保存中断时，重试由内置画布同名幂等复用。
       // 画布名与会话标题同源，不带创作项目 id；标题未生成时用中性名，冲突时再接序号。
       const baseName = conversationName || 'MetaOntic 创作画布';
       if (!project.canvasAuto) {
@@ -184,7 +182,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
         connect(source, board, 'script');
         for (const [index, prompt] of prompts.entries()) {
           const plan = add(`segment_${index + 1}`, 'text', `第${index + 1}段制作内容`, 540, 420 + index * 320, { label: `第${index + 1}段制作内容`, text: String(prompt), metaonticProjectId: project.id });
-          // 制作段是只读文本说明，原版文本节点没有输入端口。
+          // 制作段是只读文本说明，文本节点没有输入端口。
         }
         const results = edges.filter(e => e.fromNode === `${prefix}_production`).map(e => nodes[e.toNode]).filter(Boolean);
         // 新版成果不使用媒体→文本连线，通过显式来源标识关联。
@@ -220,10 +218,10 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       let opened = false;
       try { opened = (await rpc.canvasOpen?.({ projectId: binding.projectId }))?.ok === true; } catch { /* 已建图不因打开失败重建 */ }
       return { status: 'synced', projectId: binding.projectId, nodeId, openRequested: opened, bindingReady: Boolean(binding.canvas),
-        ...(!binding.canvas ? { reason: '画布节点已建立；成果回填前请在原版画布设置数据根目录。' } : {}) };
+        ...(!binding.canvas ? { reason: '画布节点已建立；成果会回填到插件自己的画布数据目录。' } : {}) };
     });
   }
-  /** 原版按名字复用项目：只有「空项目」（上次创建中断留下的）才认领，
+  /** 按名字复用画布项目：只有「空项目」（上次创建中断留下的）才认领，
    *  已经装了内容或已属于别的创作项目时让开，换带序号的中性名另建，不写进别人的画布。 */
   async function createAutoCanvas(rpc, project, binding, baseName) {
     // 旧记录里的名字带创作项目 id（用户不要这串 id）时不再沿用，直接换成中性名。
@@ -254,7 +252,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
         if (!binding?.projectId) continue;
         try {
           await lockProject(`canvas:${project.id}`, async () => {
-            const adapter = await adapterForNewCanvas(binding, load, config);
+            const adapter = await adapterForNewCanvas(binding, load);
             const loc = { id: binding.projectId };
             const doc = await adapter.rpc.projectsGet(loc);
             if (!doc?.nodes || doc.deleted) return;
