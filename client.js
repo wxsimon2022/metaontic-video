@@ -2333,26 +2333,41 @@
       cancelled: "\u5DF2\u53D6\u6D88"
     })[state] || "\u72B6\u6001\u672A\u77E5";
     const CSS = `
-.movc { display: flex; flex-direction: column; gap: 10px; }
+.movc { display: flex; flex-direction: column; gap: 12px; }
 .movc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.movc-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.movc-chip { border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
-.movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-top { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; padding: 10px 12px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; }
+.movc-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 132px; overflow: auto; }
+.movc-pick { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
+.movc-name-empty { font-size: 13px; font-weight: 600; color: ${TOKENS.muted}; }
+/* \u5DE5\u5177\u6761\u6309\u94AE\uFF1A\u80F6\u56CA\u5C0F\u6309\u94AE\uFF0C\u6309\u5BBD\u5EA6\u81EA\u9002\u5E94\uFF0C\u4E0D\u518D\u6CBF\u7528\u8BBE\u7F6E\u9875\u7684 120px \u65B9\u5757\u3002 */
+.movc-ops { gap: 6px; row-gap: 8px; }
+.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 30px; min-height: 30px; padding: 0 11px; border-radius: 999px; background: ${TOKENS.cardFill}; font-size: 12px; line-height: 1; white-space: nowrap; overflow-wrap: normal; }
+.movc-ops .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-ops .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; }
+.movc-ops .mov-btn-primary:hover:not(:disabled) { color: #fff; opacity: .88; }
+.movc-ops .movc-danger:hover:not(:disabled) { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
+.movc-sep { flex: 0 0 auto; width: 1px; height: 18px; margin: 0 2px; background: ${TOKENS.border}; }
+.movc-chip { border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; border-radius: 999px; padding: 3px 11px; font-size: 12px; line-height: 1.7; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.movc-chip:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
 .movc-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
-.movc-stage { position: relative; height: ${stageHeight}px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; overflow: hidden; cursor: grab; touch-action: none; }
+.movc-stage { position: relative; height: ${stageHeight}px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background-color: ${TOKENS.controlFill}; background-image: radial-gradient(${TOKENS.border} 1px, transparent 1px); background-size: 22px 22px; overflow: hidden; cursor: grab; touch-action: none; }
 .movc-stage[data-panning="true"] { cursor: grabbing; }
 .movc-stage[data-connect="true"] { cursor: crosshair; }
 .movc-world { position: absolute; inset: 0; transform-origin: 0 0; }
 .movc-edge { stroke: ${TOKENS.primaryFill}; stroke-width: 2; fill: none; opacity: .75; }
 .movc-edge-hit { stroke: transparent; stroke-width: 14; fill: none; cursor: pointer; }
-.movc-node { position: absolute; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid ${TOKENS.border}; border-radius: 10px; background: ${TOKENS.cardFill}; box-shadow: 0 1px 4px #0000000f; overflow: hidden; }
-.movc-node[data-selected="true"] { border-color: ${TOKENS.primaryFill}; }
+.movc-node { position: absolute; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid ${TOKENS.border}; border-radius: 10px; background: ${TOKENS.cardFill}; box-shadow: 0 1px 4px #0000000f; overflow: hidden; cursor: grab; }
+.movc-node:hover { box-shadow: 0 3px 12px #0000001f; }
+.movc-node[data-selected="true"] { border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 1px ${TOKENS.primaryFill}, 0 3px 12px #0000001f; }
 .movc-node-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .movc-node-title { font-size: 12px; font-weight: 600; color: ${TOKENS.text}; }
-.movc-badge { font-size: 11px; color: ${TOKENS.muted}; }
+.movc-badge { font-size: 11px; color: ${TOKENS.muted}; border: 1px solid ${TOKENS.border}; border-radius: 999px; padding: 0 7px; line-height: 1.7; }
+.movc-badge[data-state="done"] { color: ${TOKENS.success}; border-color: ${TOKENS.success}; }
 .movc-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
-.movc-mini { font-size: 11px; padding: 2px 6px; border: 1px solid ${TOKENS.border}; border-radius: 6px; background: transparent; color: ${TOKENS.text}; cursor: pointer; }
+.movc-mini { font-size: 11px; padding: 2px 8px; border: 1px solid ${TOKENS.border}; border-radius: 999px; background: ${TOKENS.cardFill}; color: ${TOKENS.muted}; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
 .movc-mini:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-mini-danger:hover { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
 .movc-body { font-size: 11px; line-height: 1.6; color: ${TOKENS.muted}; white-space: pre-wrap; overflow: auto; flex: 1; }
 .movc-media { width: 100%; height: 100%; object-fit: contain; border-radius: 6px; background: #0001; }
 .movc-shots { margin: 0; padding-left: 16px; }
@@ -2371,9 +2386,11 @@
 .movc-marquee { position: absolute; border: 1px dashed ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}1f; pointer-events: none; border-radius: 4px; }
 .movc-name { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 160px; min-width: 0; }
 .movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
-.movc-name-text:hover { border-color: ${TOKENS.border}; }
+.movc-name-text:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-name input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 13px; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.primaryFill}; border-radius: 8px; padding: 5px 8px; }
 .movc-name-err { flex: 1 1 100%; font-size: 12px; color: #c0392b; }
+/* \u5F39\u7A97\u91CC\u7684\u6309\u94AE\u6309\u5185\u5BB9\u81EA\u9002\u5E94\uFF0C\u4E0D\u6491\u6210\u8BBE\u7F6E\u9875\u90A3\u79CD 120px \u65B9\u5757\u3002 */
+.movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; white-space: nowrap; overflow-wrap: normal; }
 `;
     function nodeBody(node) {
       const data = node?.data || {};
@@ -2805,13 +2822,58 @@
       return h("section", { className: "mov-section movc" }, [
         h("style", { key: "css" }, CSS),
         h("div", { key: "title", className: "mov-section-title" }, "\u6D41\u7A0B\u753B\u5E03"),
-        list.length ? h("div", { key: "list", className: "movc-list" }, list.map((item) => h(
-          "button",
-          { key: item.projectId, type: "button", className: "movc-chip", "data-active": String(canvas?.projectId === item.projectId), onClick: () => void load(item.projectId) },
-          `${item.name} \xB7 ${item.nodeCount} \u8282\u70B9`
-        ))) : null,
-        !list.length ? h("p", { key: "empty", className: "movc-hint" }, error || "\u8FD8\u6CA1\u6709\u6D41\u7A0B\u753B\u5E03\uFF1A\u786E\u8BA4\u521B\u4F5C\u9700\u6C42\u540E\u4F1A\u5728\u8FD9\u91CC\u81EA\u52A8\u5EFA\u7ACB\uFF0C\u811A\u672C\u5BA1\u6838\u540E\u540C\u6B65\u5206\u955C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\uFF0C\u751F\u6210\u6210\u679C\u81EA\u52A8\u56DE\u586B\u3002") : null,
-        error && list.length ? h("p", { key: "error", className: "movc-hint" }, error) : null,
+        // 画布操作全部放最上面：先选画布、再操作当前画布，画布区只负责画本事。
+        h("div", { key: "top", className: "movc-top" }, [
+          h("div", { key: "ops", className: "movc-bar movc-ops" }, [
+            canvas ? h("span", { key: "name", className: "movc-name" }, inline ? [
+              h("input", {
+                key: "input",
+                autoFocus: true,
+                value: inline.value,
+                "aria-label": "\u753B\u5E03\u540D\u79F0",
+                onChange: (e) => setInline({ value: e.target.value, error: "" }),
+                onKeyDown: (e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void commitRename();
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setInline(null);
+                  }
+                },
+                onBlur: () => void commitRename()
+              })
+            ] : [
+              h("button", { key: "text", type: "button", className: "movc-name-text", title: "\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D", onDoubleClick: () => setInline({ value: canvas.name || "", error: "" }) }, canvas.name || canvas.projectId),
+              h("button", { key: "edit", type: "button", className: "movc-mini", title: "\u91CD\u547D\u540D", onClick: () => setInline({ value: canvas.name || "", error: "" }) }, "\u270E")
+            ]) : h("span", { key: "name-empty", className: "movc-name-empty" }, "\u672A\u9009\u62E9\u753B\u5E03"),
+            h("span", { key: "sep-a", className: "movc-sep" }),
+            h("button", { key: "new-canvas", type: "button", className: "mov-btn mov-btn-primary", onClick: () => setCreateDialog({ value: "", error: "" }) }, "\u65B0\u5EFA\u753B\u5E03\u2026"),
+            canvas ? h("span", { key: "sep-b", className: "movc-sep" }) : null,
+            canvas ? h("button", { key: "text-node", type: "button", className: "mov-btn", onClick: () => void newNode("text") }, "+ \u6587\u672C") : null,
+            canvas ? h("button", { key: "image", type: "button", className: "mov-btn", onClick: () => void newNode("image") }, "+ \u56FE\u7247") : null,
+            canvas ? h("button", { key: "video", type: "button", className: "mov-btn", onClick: () => void newNode("video") }, "+ \u89C6\u9891") : null,
+            canvas ? h("span", { key: "sep-c", className: "movc-sep" }) : null,
+            canvas ? h("button", { key: "refresh", type: "button", className: "mov-btn", onClick: () => void refresh() }, "\u5237\u65B0") : null,
+            canvas ? h("button", { key: "reset", type: "button", className: "mov-btn", onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, "\u91CD\u7F6E\u89C6\u56FE") : null,
+            canvas ? h("button", { key: "export", type: "button", className: "mov-btn", onClick: () => exportCanvas() }, "\u5BFC\u51FA JSON") : null,
+            canvas ? h("span", { key: "sep-d", className: "movc-sep" }) : null,
+            canvas && typeof onOpenPage === "function" ? h("button", { key: "page", type: "button", className: "mov-btn", onClick: () => onOpenPage() }, "\u6253\u5F00\u72EC\u7ACB\u9875\u9762") : null,
+            canvas && selectedIds.length ? h("button", { key: "del-selected", type: "button", className: "mov-btn movc-danger", onClick: () => void removeNodes(selectedIds) }, `\u5220\u9664\u9009\u4E2D\uFF08${selectedIds.length}\uFF09`) : null,
+            canvas ? h("button", { key: "del-canvas", type: "button", className: "mov-btn movc-danger", onClick: () => setConfirmDelete(true) }, "\u5220\u9664\u753B\u5E03") : null
+          ]),
+          h("div", { key: "picker", className: "movc-bar" }, [
+            h("span", { key: "pick-label", className: "movc-pick" }, "\u9009\u62E9\u753B\u5E03"),
+            list.length ? h("div", { key: "list", className: "movc-list" }, list.map((item) => h(
+              "button",
+              { key: item.projectId, type: "button", className: "movc-chip", "data-active": String(canvas?.projectId === item.projectId), onClick: () => void load(item.projectId) },
+              `${item.name} \xB7 ${item.nodeCount} \u8282\u70B9`
+            ))) : h("span", { key: "no-canvas", className: "movc-hint" }, "\u6682\u65E0\u753B\u5E03\uFF0C\u70B9\u300C\u65B0\u5EFA\u753B\u5E03\u2026\u300D\u521B\u5EFA\u4E00\u4EFD\u7A7A\u767D\u6587\u6863\u3002")
+          ])
+        ]),
+        error ? h("p", { key: "error", className: "movc-hint" }, error) : null,
+        !list.length ? h("p", { key: "empty", className: "movc-hint" }, "\u8FD8\u6CA1\u6709\u6D41\u7A0B\u753B\u5E03\uFF1A\u786E\u8BA4\u521B\u4F5C\u9700\u6C42\u540E\u4F1A\u5728\u8FD9\u91CC\u81EA\u52A8\u5EFA\u7ACB\uFF0C\u811A\u672C\u5BA1\u6838\u540E\u540C\u6B65\u5206\u955C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\uFF0C\u751F\u6210\u6210\u679C\u81EA\u52A8\u56DE\u586B\uFF1B\u4E5F\u53EF\u4EE5\u76F4\u63A5\u300C\u65B0\u5EFA\u753B\u5E03\u2026\u300D\u3002") : null,
         canvas ? h(
           "div",
           {
@@ -2880,7 +2942,7 @@
               }, [
                 h("div", { key: "head", className: "movc-node-head" }, [
                   h("span", { key: "label", className: "movc-node-title" }, labelOf(node)),
-                  h("span", { key: "status", className: "movc-badge" }, node.data?.status === "done" ? "\u5DF2\u5B8C\u6210" : "\u5F85\u5236\u4F5C"),
+                  h("span", { key: "status", className: "movc-badge", "data-state": node.data?.status === "done" ? "done" : "todo" }, node.data?.status === "done" ? "\u5DF2\u5B8C\u6210" : "\u5F85\u5236\u4F5C"),
                   h("span", { key: "actions", className: "movc-actions" }, [
                     h("button", { key: "edit", type: "button", className: "movc-mini", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
                       e.stopPropagation();
@@ -2895,7 +2957,7 @@
                       setConnectFrom(connectFrom === node.id ? "" : node.id);
                       setSelectedIds([node.id]);
                     } }, connectFrom === node.id ? "\u53D6\u6D88\u8FDE\u7EBF" : "\u8FDE\u7EBF"),
-                    h("button", { key: "del", type: "button", className: "movc-mini", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
+                    h("button", { key: "del", type: "button", className: "movc-mini movc-mini-danger", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
                       e.stopPropagation();
                       void removeNodes([node.id]);
                     } }, "\u5220\u9664")
@@ -2912,41 +2974,6 @@
             height: Math.abs(marquee.y2 - marquee.y1)
           } }) : null
         ) : null,
-        canvas ? h("div", { key: "meta", className: "movc-bar" }, [
-          h("span", { key: "name", className: "movc-name" }, inline ? [
-            h("input", {
-              key: "input",
-              autoFocus: true,
-              value: inline.value,
-              "aria-label": "\u753B\u5E03\u540D\u79F0",
-              onChange: (e) => setInline({ value: e.target.value, error: "" }),
-              onKeyDown: (e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void commitRename();
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  setInline(null);
-                }
-              },
-              onBlur: () => void commitRename()
-            })
-          ] : [
-            h("button", { key: "text", type: "button", className: "movc-name-text", title: "\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D", onDoubleClick: () => setInline({ value: canvas.name || "", error: "" }) }, canvas.name || canvas.projectId),
-            h("button", { key: "edit", type: "button", className: "movc-mini", title: "\u91CD\u547D\u540D", onClick: () => setInline({ value: canvas.name || "", error: "" }) }, "\u270E")
-          ]),
-          h("button", { key: "new-canvas", type: "button", className: "mov-btn", onClick: () => setCreateDialog({ value: "", error: "" }) }, "\u65B0\u5EFA\u753B\u5E03\u2026"),
-          h("button", { key: "text", type: "button", className: "mov-btn", onClick: () => void newNode("text") }, "+ \u6587\u672C"),
-          h("button", { key: "image", type: "button", className: "mov-btn", onClick: () => void newNode("image") }, "+ \u56FE\u7247"),
-          h("button", { key: "video", type: "button", className: "mov-btn", onClick: () => void newNode("video") }, "+ \u89C6\u9891"),
-          h("button", { key: "refresh", type: "button", className: "mov-btn", onClick: () => void refresh() }, "\u5237\u65B0"),
-          h("button", { key: "reset", type: "button", className: "mov-btn", onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, "\u91CD\u7F6E\u89C6\u56FE"),
-          h("button", { key: "export", type: "button", className: "mov-btn", onClick: () => exportCanvas() }, "\u5BFC\u51FA JSON"),
-          h("button", { key: "del-canvas", type: "button", className: "mov-btn", onClick: () => setConfirmDelete(true) }, "\u5220\u9664\u753B\u5E03"),
-          selectedIds.length ? h("button", { key: "del-selected", type: "button", className: "mov-btn", onClick: () => void removeNodes(selectedIds) }, `\u5220\u9664\u9009\u4E2D\uFF08${selectedIds.length}\uFF09`) : null,
-          typeof onOpenPage === "function" ? h("button", { key: "page", type: "button", className: "mov-btn", onClick: () => onOpenPage() }, "\u6253\u5F00\u72EC\u7ACB\u9875\u9762") : null
-        ]) : null,
         canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D\uFF08Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
         connectFrom ? h("p", { key: "connect", className: "movc-hint" }, "\u8FDE\u7EBF\u6A21\u5F0F\uFF1A\u70B9\u51FB\u76EE\u6807\u8282\u70B9\u5B8C\u6210\u8FDE\u63A5\uFF0C\u70B9\u7A7A\u767D\u5904\u53D6\u6D88\u3002") : null,
         confirmDelete ? h(

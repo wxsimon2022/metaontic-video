@@ -41,26 +41,45 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
   }[state] || '状态未知');
 
   const CSS = `
-.movc { display: flex; flex-direction: column; gap: 10px; }
+.movc { display: flex; flex-direction: column; gap: 12px; }
 .movc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.movc-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.movc-chip { border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
-.movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-top { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; padding: 10px 12px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; }
+.movc-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 132px; overflow: auto; }
+.movc-pick { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
+.movc-name-empty { font-size: 13px; font-weight: 600; color: ${TOKENS.muted}; }
+/* 工具条按钮：胶囊小按钮，按宽度自适应，不再沿用设置页的 120px 方块。 */
+.movc-ops { gap: 6px; row-gap: 8px; container-type: inline-size; }
+.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 30px; min-height: 30px; padding: 0 11px; border-radius: 999px; background: ${TOKENS.cardFill}; font-size: 12px; line-height: 1; white-space: nowrap; overflow-wrap: normal; }
+.movc-ops .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-ops .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; }
+.movc-ops .mov-btn-primary:hover:not(:disabled) { color: #fff; opacity: .88; }
+.movc-ops .movc-danger:hover:not(:disabled) { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
+.movc-sep { flex: 0 0 auto; width: 1px; height: 18px; margin: 0 2px; background: ${TOKENS.border}; }
+/* 面板窄的时候按钮本来就会换行，分组竖线会落在行首，直接不收。 */
+@container (max-width: 460px) { .movc-sep { display: none; } }
+.movc-ops .mov-btn:focus-visible, .movc-chip:focus-visible, .movc-mini:focus-visible, .movc-name-text:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
+.movc-ops .mov-btn:active:not(:disabled), .movc-chip:active, .movc-mini:active { opacity: .82; }
+.movc-chip { border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; border-radius: 999px; padding: 3px 11px; font-size: 12px; line-height: 1.7; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.movc-chip:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
 .movc-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
-.movc-stage { position: relative; height: ${stageHeight}px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; overflow: hidden; cursor: grab; touch-action: none; }
+.movc-stage { position: relative; height: ${stageHeight}px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background-color: ${TOKENS.controlFill}; background-image: radial-gradient(${TOKENS.border} 1px, transparent 1px); background-size: 22px 22px; overflow: hidden; cursor: grab; touch-action: none; }
 .movc-stage[data-panning="true"] { cursor: grabbing; }
 .movc-stage[data-connect="true"] { cursor: crosshair; }
 .movc-world { position: absolute; inset: 0; transform-origin: 0 0; }
 .movc-edge { stroke: ${TOKENS.primaryFill}; stroke-width: 2; fill: none; opacity: .75; }
 .movc-edge-hit { stroke: transparent; stroke-width: 14; fill: none; cursor: pointer; }
-.movc-node { position: absolute; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid ${TOKENS.border}; border-radius: 10px; background: ${TOKENS.cardFill}; box-shadow: 0 1px 4px #0000000f; overflow: hidden; }
-.movc-node[data-selected="true"] { border-color: ${TOKENS.primaryFill}; }
+.movc-node { position: absolute; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid ${TOKENS.border}; border-radius: 10px; background: ${TOKENS.cardFill}; box-shadow: 0 1px 4px #0000000f; overflow: hidden; cursor: grab; }
+.movc-node:hover { box-shadow: 0 3px 12px #0000001f; }
+.movc-node[data-selected="true"] { border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 1px ${TOKENS.primaryFill}, 0 3px 12px #0000001f; }
 .movc-node-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .movc-node-title { font-size: 12px; font-weight: 600; color: ${TOKENS.text}; }
-.movc-badge { font-size: 11px; color: ${TOKENS.muted}; }
+.movc-badge { font-size: 11px; color: ${TOKENS.muted}; border: 1px solid ${TOKENS.border}; border-radius: 999px; padding: 0 7px; line-height: 1.7; }
+.movc-badge[data-state="done"] { color: ${TOKENS.success}; border-color: ${TOKENS.success}; }
 .movc-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
-.movc-mini { font-size: 11px; padding: 2px 6px; border: 1px solid ${TOKENS.border}; border-radius: 6px; background: transparent; color: ${TOKENS.text}; cursor: pointer; }
+.movc-mini { font-size: 11px; padding: 2px 8px; border: 1px solid ${TOKENS.border}; border-radius: 999px; background: ${TOKENS.cardFill}; color: ${TOKENS.muted}; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
 .movc-mini:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-mini-danger:hover { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
 .movc-body { font-size: 11px; line-height: 1.6; color: ${TOKENS.muted}; white-space: pre-wrap; overflow: auto; flex: 1; }
 .movc-media { width: 100%; height: 100%; object-fit: contain; border-radius: 6px; background: #0001; }
 .movc-shots { margin: 0; padding-left: 16px; }
@@ -79,9 +98,11 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
 .movc-marquee { position: absolute; border: 1px dashed ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}1f; pointer-events: none; border-radius: 4px; }
 .movc-name { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 160px; min-width: 0; }
 .movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
-.movc-name-text:hover { border-color: ${TOKENS.border}; }
+.movc-name-text:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-name input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 13px; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.primaryFill}; border-radius: 8px; padding: 5px 8px; }
 .movc-name-err { flex: 1 1 100%; font-size: 12px; color: #c0392b; }
+/* 弹窗里的按钮按内容自适应，不撑成设置页那种 120px 方块。 */
+.movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; white-space: nowrap; overflow-wrap: normal; }
 `;
 
   function nodeBody(node: any) {
@@ -451,11 +472,42 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
     return h('section', { className: 'mov-section movc' }, [
       h('style', { key: 'css' }, CSS),
       h('div', { key: 'title', className: 'mov-section-title' }, '流程画布'),
-      list.length ? h('div', { key: 'list', className: 'movc-list' }, list.map(item =>
-        h('button', { key: item.projectId, type: 'button', className: 'movc-chip', 'data-active': String(canvas?.projectId === item.projectId), onClick: () => void load(item.projectId) },
-          `${item.name} · ${item.nodeCount} 节点`))) : null,
-      !list.length ? h('p', { key: 'empty', className: 'movc-hint' }, error || '还没有流程画布：确认创作需求后会在这里自动建立，脚本审核后同步分镜与制作段计划，生成成果自动回填。') : null,
-      error && list.length ? h('p', { key: 'error', className: 'movc-hint' }, error) : null,
+      // 画布操作全部放最上面：先选画布、再操作当前画布，画布区只负责画本事。
+      h('div', { key: 'top', className: 'movc-top' }, [
+        h('div', { key: 'ops', className: 'movc-bar movc-ops' }, [
+          canvas ? h('span', { key: 'name', className: 'movc-name' }, inline ? [
+            h('input', { key: 'input', autoFocus: true, value: inline.value, 'aria-label': '画布名称',
+              onChange: (e: any) => setInline({ value: e.target.value, error: '' }),
+              onKeyDown: (e: any) => { if (e.key === 'Enter') { e.preventDefault(); void commitRename(); } if (e.key === 'Escape') { e.preventDefault(); setInline(null); } },
+              onBlur: () => void commitRename() }),
+          ] : [
+            h('button', { key: 'text', type: 'button', className: 'movc-name-text', title: '双击画布名重命名', onDoubleClick: () => setInline({ value: canvas.name || '', error: '' }) }, canvas.name || canvas.projectId),
+            h('button', { key: 'edit', type: 'button', className: 'movc-mini', title: '重命名', onClick: () => setInline({ value: canvas.name || '', error: '' }) }, '✎'),
+          ]) : h('span', { key: 'name-empty', className: 'movc-name-empty' }, '未选择画布'),
+          h('span', { key: 'sep-a', className: 'movc-sep' }),
+          h('button', { key: 'new-canvas', type: 'button', className: 'mov-btn mov-btn-primary', onClick: () => setCreateDialog({ value: '', error: '' }) }, '新建画布…'),
+          canvas ? h('span', { key: 'sep-b', className: 'movc-sep' }) : null,
+          canvas ? h('button', { key: 'text-node', type: 'button', className: 'mov-btn', onClick: () => void newNode('text') }, '+ 文本') : null,
+          canvas ? h('button', { key: 'image', type: 'button', className: 'mov-btn', onClick: () => void newNode('image') }, '+ 图片') : null,
+          canvas ? h('button', { key: 'video', type: 'button', className: 'mov-btn', onClick: () => void newNode('video') }, '+ 视频') : null,
+          canvas ? h('span', { key: 'sep-c', className: 'movc-sep' }) : null,
+          canvas ? h('button', { key: 'refresh', type: 'button', className: 'mov-btn', onClick: () => void refresh() }, '刷新') : null,
+          canvas ? h('button', { key: 'reset', type: 'button', className: 'mov-btn', onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, '重置视图') : null,
+          canvas ? h('button', { key: 'export', type: 'button', className: 'mov-btn', onClick: () => exportCanvas() }, '导出 JSON') : null,
+          canvas ? h('span', { key: 'sep-d', className: 'movc-sep' }) : null,
+          canvas && typeof onOpenPage === 'function' ? h('button', { key: 'page', type: 'button', className: 'mov-btn', onClick: () => onOpenPage() }, '打开独立页面') : null,
+          canvas && selectedIds.length ? h('button', { key: 'del-selected', type: 'button', className: 'mov-btn movc-danger', onClick: () => void removeNodes(selectedIds) }, `删除选中（${selectedIds.length}）`) : null,
+          canvas ? h('button', { key: 'del-canvas', type: 'button', className: 'mov-btn movc-danger', onClick: () => setConfirmDelete(true) }, '删除画布') : null,
+        ]),
+        h('div', { key: 'picker', className: 'movc-bar' }, [
+          h('span', { key: 'pick-label', className: 'movc-pick' }, '选择画布'),
+          list.length ? h('div', { key: 'list', className: 'movc-list' }, list.map(item =>
+            h('button', { key: item.projectId, type: 'button', className: 'movc-chip', 'data-active': String(canvas?.projectId === item.projectId), onClick: () => void load(item.projectId) },
+              `${item.name} · ${item.nodeCount} 节点`))) : h('span', { key: 'no-canvas', className: 'movc-hint' }, '暂无画布，点「新建画布…」创建一份空白文档。'),
+        ]),
+      ]),
+      error ? h('p', { key: 'error', className: 'movc-hint' }, error) : null,
+      !list.length ? h('p', { key: 'empty', className: 'movc-hint' }, '还没有流程画布：确认创作需求后会在这里自动建立，脚本审核后同步分镜与制作段计划，生成成果自动回填；也可以直接「新建画布…」。') : null,
       canvas ? h('div', { key: 'stage', className: 'movc-stage', 'data-panning': String(panning), 'data-connect': String(Boolean(connectFrom)),
         onClick: (event: any) => {
           if (connectFrom) { setConnectFrom(''); return; }
@@ -489,12 +541,12 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
               } }, [
               h('div', { key: 'head', className: 'movc-node-head' }, [
                 h('span', { key: 'label', className: 'movc-node-title' }, labelOf(node)),
-                h('span', { key: 'status', className: 'movc-badge' }, node.data?.status === 'done' ? '已完成' : '待制作'),
+                h('span', { key: 'status', className: 'movc-badge', 'data-state': node.data?.status === 'done' ? 'done' : 'todo' }, node.data?.status === 'done' ? '已完成' : '待制作'),
                 h('span', { key: 'actions', className: 'movc-actions' }, [
                   h('button', { key: 'edit', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void openDialog(node); } }, media ? '制作' : '编辑'),
                   h('button', { key: 'copy', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void duplicateNode(node); } }, '复制'),
                   h('button', { key: 'link', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); setConnectFrom(connectFrom === node.id ? '' : node.id); setSelectedIds([node.id]); } }, connectFrom === node.id ? '取消连线' : '连线'),
-                  h('button', { key: 'del', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void removeNodes([node.id]); } }, '删除'),
+                  h('button', { key: 'del', type: 'button', className: 'movc-mini movc-mini-danger', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void removeNodes([node.id]); } }, '删除'),
                 ]),
               ]),
               nodeBody(node),
@@ -505,27 +557,6 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
           left: Math.min(marquee.x1, marquee.x2), top: Math.min(marquee.y1, marquee.y2),
           width: Math.abs(marquee.x2 - marquee.x1), height: Math.abs(marquee.y2 - marquee.y1),
         } }) : null) : null,
-      canvas ? h('div', { key: 'meta', className: 'movc-bar' }, [
-        h('span', { key: 'name', className: 'movc-name' }, inline ? [
-          h('input', { key: 'input', autoFocus: true, value: inline.value, 'aria-label': '画布名称',
-            onChange: (e: any) => setInline({ value: e.target.value, error: '' }),
-            onKeyDown: (e: any) => { if (e.key === 'Enter') { e.preventDefault(); void commitRename(); } if (e.key === 'Escape') { e.preventDefault(); setInline(null); } },
-            onBlur: () => void commitRename() }),
-        ] : [
-          h('button', { key: 'text', type: 'button', className: 'movc-name-text', title: '双击画布名重命名', onDoubleClick: () => setInline({ value: canvas.name || '', error: '' }) }, canvas.name || canvas.projectId),
-          h('button', { key: 'edit', type: 'button', className: 'movc-mini', title: '重命名', onClick: () => setInline({ value: canvas.name || '', error: '' }) }, '✎'),
-        ]),
-        h('button', { key: 'new-canvas', type: 'button', className: 'mov-btn', onClick: () => setCreateDialog({ value: '', error: '' }) }, '新建画布…'),
-        h('button', { key: 'text', type: 'button', className: 'mov-btn', onClick: () => void newNode('text') }, '+ 文本'),
-        h('button', { key: 'image', type: 'button', className: 'mov-btn', onClick: () => void newNode('image') }, '+ 图片'),
-        h('button', { key: 'video', type: 'button', className: 'mov-btn', onClick: () => void newNode('video') }, '+ 视频'),
-        h('button', { key: 'refresh', type: 'button', className: 'mov-btn', onClick: () => void refresh() }, '刷新'),
-        h('button', { key: 'reset', type: 'button', className: 'mov-btn', onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, '重置视图'),
-        h('button', { key: 'export', type: 'button', className: 'mov-btn', onClick: () => exportCanvas() }, '导出 JSON'),
-        h('button', { key: 'del-canvas', type: 'button', className: 'mov-btn', onClick: () => setConfirmDelete(true) }, '删除画布'),
-        selectedIds.length ? h('button', { key: 'del-selected', type: 'button', className: 'mov-btn', onClick: () => void removeNodes(selectedIds) }, `删除选中（${selectedIds.length}）`) : null,
-        typeof onOpenPage === 'function' ? h('button', { key: 'page', type: 'button', className: 'mov-btn', onClick: () => onOpenPage() }, '打开独立页面') : null,
-      ]) : null,
       canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `双击画布名重命名（Enter 保存，Esc 取消）；拖动空白处平移、滚轮缩放；拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
       connectFrom ? h('p', { key: 'connect', className: 'movc-hint' }, '连线模式：点击目标节点完成连接，点空白处取消。') : null,
       confirmDelete ? h('div', { key: 'delete-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget) setConfirmDelete(false); } },
