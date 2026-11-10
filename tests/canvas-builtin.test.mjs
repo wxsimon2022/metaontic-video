@@ -156,22 +156,33 @@ test('内置画布节点可直接制作：按项目解析适配器，成果回�
  } finally { if(old===undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME=old; await rm(root,{recursive:true,force:true}); }
 });
 
-/** 面板「新建画布」：点一次就新建一份空白文档，即使名字一样也不复用别人/自动建图的同名画布。 */
-test('新建画布总是新建空白文档并在列表里可见',async()=>{
+/** 面板「新建画布」：每次新建一份空白文档；必须命名，且不能和已有画布重名（对照原版口径）。 */
+test('新建画布总是新建空白文档，必须命名且不重名',async()=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'内置画布新建 ')),old=process.env.DSH_HOME;
  process.env.DSH_HOME=root;
  try {
-  const first=await api.builtinCanvasHandle({method:'create',args:{name:'同名画布'}});
-  const second=await api.builtinCanvasHandle({method:'create',args:{name:'同名画布'}});
-  assert.notEqual(first.canvas.projectId,second.canvas.projectId,'同名也要各自新建，不复用');
+  const first=await api.builtinCanvasHandle({method:'create',args:{name:'宣传片 A'}});
+  const second=await api.builtinCanvasHandle({method:'create',args:{name:'宣传片 B'}});
+  assert.notEqual(first.canvas.projectId,second.canvas.projectId,'每次都是新文档，不复用');
   for(const made of [first,second]){
    assert.deepEqual(made.canvas.nodes,{});assert.deepEqual(made.canvas.edges,[]);
    assert.ok(made.canvas.dataRoot.startsWith(root),'画布数据根指向插件自己的目录');
   }
-  const names=(await api.builtinCanvasHandle({method:'list'})).canvases.map(c=>c.name);
-  assert.deepEqual(names.sort(),['同名画布','同名画布']);
-  const created=await api.builtinCanvasHandle({method:'create',args:{}});
-  assert.equal(created.canvas.name,'新建流程画布');
+  assert.deepEqual((await api.builtinCanvasHandle({method:'list'})).canvases.map(c=>c.name).sort(),['宣传片 A','宣传片 B']);
+  // 重名与空名都拒绝，并且不产生多余文档。
+  await assert.rejects(api.builtinCanvasHandle({method:'create',args:{name:'宣传片 A'}}),/同名画布已存在/);
+  await assert.rejects(api.builtinCanvasHandle({method:'create',args:{name:'   '}}),/画布名不能为空/);
+  assert.equal((await api.builtinCanvasHandle({method:'list'})).canvases.length,2);
+  await assert.rejects(api.builtinCanvasHandle({method:'create',args:{}}),/画布名不能为空/);
+  const made=await api.builtinCanvasHandle({method:'create',args:{name:'新建流程画布'}});
+  assert.equal(made.canvas.name,'新建流程画布');
+  // 改名同样必须命名且不重名；改成自己原来的名字是幂等的。
+  await assert.rejects(api.builtinCanvasHandle({method:'rename',args:{projectId:made.canvas.projectId,name:'宣传片 A'}}),/同名画布已存在/);
+  await assert.rejects(api.builtinCanvasHandle({method:'rename',args:{projectId:made.canvas.projectId,name:''}}),/画布名不能为空/);
+  assert.equal((await api.builtinCanvasHandle({method:'rename',args:{projectId:made.canvas.projectId,name:'新建流程画布'}})).canvas.name,'新建流程画布');
+  assert.equal((await api.builtinCanvasHandle({method:'rename',args:{projectId:made.canvas.projectId,name:'正片'}})).canvas.name,'正片');
+  const renamed=await api.builtinCanvasHandle({method:'get',args:{projectId:made.canvas.projectId}});
+  assert.equal(renamed.canvas.name,'正片');
  } finally { if(old===undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME=old; await rm(root,{recursive:true,force:true}); }
 });
 
