@@ -167,3 +167,17 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 未覆盖：真实桌面窗口内的画布点击/拖拽与画布内付费生成全链路（需要宿主重载后人工复核）；Windows 未实测；真实 Harness 桌面端到端未验证。
 
 本地成品：`.local/test/3.20.1-test.18/metaontic-video-3.20.1-test.18.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。desktop profile 由 test.17 升级到 test.18，并按用户要求卸载第三方画布插件；运行中的宿主需重载后生效。
+
+## 流程画布独立页面 3.20.1-test.19
+
+流程画布改为插件自己的独立页面，不再只作为视频创作面板里的一个区块：
+
+- 新增左侧栏入口 `sidebar.panellist: metaontic-video-canvas`（名字走字典 `canvasPanelLabel`，中英分别为「流程画布」「Workflow canvas」）与对应 `main` 键位槽 `metaontic-video-canvas`，页面用更高的画布区（620px）。
+- 视频创作面板里仍保留一份紧凑的内嵌画布（460px），并在工具条提供「打开独立页面」；点击走 `layout.selectPanel('metaontic-video-canvas')`（老宿主回退 `sidebarRight.openTab`），两者都不可用时按钮不显示、不报错。
+- 独立页面与内嵌区块共用同一份组件与同一套画布服务（`/metaontic-video/canvas`、`/metaontic-video/canvas-native`、`/metaontic-video/canvas-media`），没有第二套状态或存储。
+
+验证：类型检查、构建、456 项自动测试、diff 检查通过。新增/更新测试：预览宿主确认注册了画布页图标与 `main:metaontic-video-canvas`，`openCanvasPage` 切到该页面；面板测试确认把入口转交给画布组件且不再出现第三方画布安装文案；画布内制作测试改为等待「终态与回填记录都落盘」后再断言，消除中间快照导致的偶发失败。
+
+未覆盖：真实桌面窗口里点左侧栏切页与画布交互（需宿主重载后人工复核）；Windows 未实测。
+
+本地成品：`.local/test/3.20.1-test.19/metaontic-video-3.20.1-test.19.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
