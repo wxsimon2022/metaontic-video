@@ -107,10 +107,10 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant 
 .movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; white-space: nowrap; overflow-wrap: normal; }
 /* 独立页面：工具条一行放下（操作在左、选择画布在右），画布区吃掉剩余高度。 */
 .movc-page { gap: 14px; }
-.movc-page .movc-top { flex-direction: row; align-items: center; gap: 10px 14px; padding: 10px 14px; }
+.movc-page .movc-top { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 14px; }
 .movc-page .movc-ops { flex: 1 1 auto; min-width: 0; }
 .movc-page .movc-ops .mov-btn { height: 34px; min-height: 34px; padding: 0 14px; font-size: 13px; }
-.movc-page .movc-picker { flex: 0 1 auto; min-width: 0; }
+.movc-page .movc-picker { flex: 1 1 auto; min-width: 0; }
 .movc-page .movc-list { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; max-height: none; padding-bottom: 2px; }
 .movc-page .movc-chip { padding: 4px 13px; font-size: 13px; white-space: nowrap; }
 .movc-page .movc-name-text { font-size: 14px; }
@@ -511,7 +511,8 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant 
           canvas ? h('button', { key: 'reset', type: 'button', className: 'mov-btn', onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, '重置视图') : null,
           canvas ? h('button', { key: 'export', type: 'button', className: 'mov-btn', onClick: () => exportCanvas() }, '导出 JSON') : null,
           canvas ? h('span', { key: 'sep-d', className: 'movc-sep' }) : null,
-          canvas && typeof onOpenPage === 'function' ? h('button', { key: 'page', type: 'button', className: 'mov-btn', onClick: () => onOpenPage() }, '打开独立页面') : null,
+          // 「打开独立页面」只在内嵌场景有意义；独立页面本身不再显示这个按钮。
+          canvas && variant !== 'page' && typeof onOpenPage === 'function' ? h('button', { key: 'page', type: 'button', className: 'mov-btn', onClick: () => onOpenPage() }, '打开独立页面') : null,
           canvas && selectedIds.length ? h('button', { key: 'del-selected', type: 'button', className: 'mov-btn movc-danger', onClick: () => void removeNodes(selectedIds) }, `删除选中（${selectedIds.length}）`) : null,
           canvas ? h('button', { key: 'del-canvas', type: 'button', className: 'mov-btn movc-danger', onClick: () => setConfirmDelete(true) }, '删除画布') : null,
         ]),
