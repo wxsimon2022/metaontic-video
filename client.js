@@ -2069,7 +2069,7 @@
   }
 
   // src/businesses/video/client/panel.ts
-  function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID: PANEL_ID2, GUIDE_URL: GUIDE_URL2, LOGO_SVG, FlowCanvas }) {
+  function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID: PANEL_ID2, GUIDE_URL: GUIDE_URL2, LOGO_SVG }) {
     const LOGO_SRC = LOGO_SVG ? `data:image/svg+xml,${encodeURIComponent(LOGO_SVG)}` : "";
     const PANEL_CSS = `
       .mov-panel { width: 100%; max-width: 880px; margin: 0 auto; padding: 30px 32px 44px; display: flex; flex-direction: column; gap: 18px; }
@@ -2279,7 +2279,6 @@
             }, t("panelGuide"))
           ])
         ]),
-        FlowCanvas && h(FlowCanvas, { key: "flow-canvas", onOpenPage: props?.openCanvasPage }),
         h("section", { key: "flow", className: "mov-section" }, [
           h("div", { key: "flow-label", className: "mov-section-title" }, t("panelFlow")),
           h("div", { key: "flow-steps", className: "mov-panel-flow" }, flowChildren)
@@ -2308,7 +2307,8 @@
     }
     return { type: node?.type || "text", x: Number(spot?.x || 0) + 40, y: Number(spot?.y || 0) + 40, w: spot?.w, h: spot?.h, data };
   }
-  function createCanvasView({ React, h, TOKENS, stageHeight = 460 }) {
+  function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant = "panel" }) {
+    const ROOT_CLASS = variant === "page" ? "mov-section movc movc-page" : "mov-section movc";
     const rpc = async (method, args = {}) => {
       const response = await fetch("/metaontic-video/canvas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ method, args }) });
       const body = await response.json().catch(() => ({}));
@@ -2340,13 +2340,17 @@
 .movc-pick { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
 .movc-name-empty { font-size: 13px; font-weight: 600; color: ${TOKENS.muted}; }
 /* \u5DE5\u5177\u6761\u6309\u94AE\uFF1A\u80F6\u56CA\u5C0F\u6309\u94AE\uFF0C\u6309\u5BBD\u5EA6\u81EA\u9002\u5E94\uFF0C\u4E0D\u518D\u6CBF\u7528\u8BBE\u7F6E\u9875\u7684 120px \u65B9\u5757\u3002 */
-.movc-ops { gap: 6px; row-gap: 8px; }
+.movc-ops { gap: 6px; row-gap: 8px; container-type: inline-size; }
 .movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 30px; min-height: 30px; padding: 0 11px; border-radius: 999px; background: ${TOKENS.cardFill}; font-size: 12px; line-height: 1; white-space: nowrap; overflow-wrap: normal; }
 .movc-ops .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-ops .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; }
 .movc-ops .mov-btn-primary:hover:not(:disabled) { color: #fff; opacity: .88; }
 .movc-ops .movc-danger:hover:not(:disabled) { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
 .movc-sep { flex: 0 0 auto; width: 1px; height: 18px; margin: 0 2px; background: ${TOKENS.border}; }
+/* \u9762\u677F\u7A84\u7684\u65F6\u5019\u6309\u94AE\u672C\u6765\u5C31\u4F1A\u6362\u884C\uFF0C\u5206\u7EC4\u7AD6\u7EBF\u4F1A\u843D\u5728\u884C\u9996\uFF0C\u76F4\u63A5\u4E0D\u6536\u3002 */
+@container (max-width: 460px) { .movc-sep { display: none; } }
+.movc-ops .mov-btn:focus-visible, .movc-chip:focus-visible, .movc-mini:focus-visible, .movc-name-text:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
+.movc-ops .mov-btn:active:not(:disabled), .movc-chip:active, .movc-mini:active { opacity: .82; }
 .movc-chip { border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; border-radius: 999px; padding: 3px 11px; font-size: 12px; line-height: 1.7; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
 .movc-chip:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
@@ -2391,6 +2395,20 @@
 .movc-name-err { flex: 1 1 100%; font-size: 12px; color: #c0392b; }
 /* \u5F39\u7A97\u91CC\u7684\u6309\u94AE\u6309\u5185\u5BB9\u81EA\u9002\u5E94\uFF0C\u4E0D\u6491\u6210\u8BBE\u7F6E\u9875\u90A3\u79CD 120px \u65B9\u5757\u3002 */
 .movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; white-space: nowrap; overflow-wrap: normal; }
+/* \u72EC\u7ACB\u9875\u9762\uFF1A\u5DE5\u5177\u6761\u4E00\u884C\u653E\u4E0B\uFF08\u64CD\u4F5C\u5728\u5DE6\u3001\u9009\u62E9\u753B\u5E03\u5728\u53F3\uFF09\uFF0C\u753B\u5E03\u533A\u5403\u6389\u5269\u4F59\u9AD8\u5EA6\u3002 */
+.movc-page { gap: 14px; }
+.movc-page .movc-top { flex-direction: row; align-items: center; gap: 10px 14px; padding: 10px 14px; }
+.movc-page .movc-ops { flex: 1 1 auto; min-width: 0; }
+.movc-page .movc-ops .mov-btn { height: 34px; min-height: 34px; padding: 0 14px; font-size: 13px; }
+.movc-page .movc-picker { flex: 0 1 auto; min-width: 0; }
+.movc-page .movc-list { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; max-height: none; padding-bottom: 2px; }
+.movc-page .movc-chip { padding: 4px 13px; font-size: 13px; white-space: nowrap; }
+.movc-page .movc-name-text { font-size: 14px; }
+.movc-page .movc-node { padding: 10px 12px; }
+.movc-page .movc-node-title { font-size: 13px; }
+.movc-page .movc-body { font-size: 12px; }
+.movc-page .movc-mini { font-size: 12px; padding: 3px 10px; }
+.movc-page .movc-stage { height: clamp(520px, calc(100vh - 320px), 1400px); border-radius: 14px; }
 `;
     function nodeBody(node) {
       const data = node?.data || {};
@@ -2819,7 +2837,7 @@
           dialog.job.state !== "running" ? h("button", { key: "again", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => patchDialog({ stage: "form", job: null, plan: null }) }, "\u91CD\u65B0\u751F\u6210\uFF08\u91CD\u65B0\u786E\u8BA4\u8D39\u7528\uFF09") : null
         ])
       ]) : null;
-      return h("section", { className: "mov-section movc" }, [
+      return h("section", { className: ROOT_CLASS }, [
         h("style", { key: "css" }, CSS),
         h("div", { key: "title", className: "mov-section-title" }, "\u6D41\u7A0B\u753B\u5E03"),
         // 画布操作全部放最上面：先选画布、再操作当前画布，画布区只负责画本事。
@@ -2863,7 +2881,7 @@
             canvas && selectedIds.length ? h("button", { key: "del-selected", type: "button", className: "mov-btn movc-danger", onClick: () => void removeNodes(selectedIds) }, `\u5220\u9664\u9009\u4E2D\uFF08${selectedIds.length}\uFF09`) : null,
             canvas ? h("button", { key: "del-canvas", type: "button", className: "mov-btn movc-danger", onClick: () => setConfirmDelete(true) }, "\u5220\u9664\u753B\u5E03") : null
           ]),
-          h("div", { key: "picker", className: "movc-bar" }, [
+          h("div", { key: "picker", className: "movc-bar movc-picker" }, [
             h("span", { key: "pick-label", className: "movc-pick" }, "\u9009\u62E9\u753B\u5E03"),
             list.length ? h("div", { key: "list", className: "movc-list" }, list.map((item) => h(
               "button",
@@ -3126,9 +3144,8 @@
         };
         const Page = makePage({ form, t, manager: pluginManager });
         settings.register({ id: "video", namespace: NAMESPACE, locale: NS, Page });
-        const { FlowCanvas } = createCanvasView({ React, h, TOKENS });
-        const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS, stageHeight: 620 });
-        const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: icon_default, FlowCanvas });
+        const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS, stageHeight: 620, variant: "page" });
+        const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: icon_default });
         ctx.effect(() => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
           name: "sidebar.panellist",
           id: PANEL_ID,
@@ -3145,15 +3162,7 @@
           inject: () => ({
             startSession: () => ctx.get("uiWorkspace")?.startSession(void 0, { agentPreset: "video-director" }),
             openSettings: () => ctx.get("pluginNavigation")?.openBundle(NAMESPACE),
-            manager: pluginManager,
-            // 切到插件自己的流程画布页面；宿主没有 layout 服务时按钮不显示。
-            openCanvasPage: () => {
-              const layout = ctx.get("layout");
-              if (typeof layout?.selectPanel === "function") return layout.selectPanel(CANVAS_PANEL_ID);
-              const right = ctx.get("sidebarRight");
-              if (typeof right?.openTab === "function") return right.openTab(CANVAS_PANEL_ID);
-              throw new Error("canvas-navigation-unavailable");
-            }
+            manager: pluginManager
           })
         }, VideoPanel)), "metaontic-video: sidebar panel");
         ctx.effect(() => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
