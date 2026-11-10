@@ -109,3 +109,17 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 未覆盖：真实桌面端从建图到回填、标题事件补名的端到端未在真实窗口复核；项目名由画布端本地缓存回推，缓存过期前仍可能显示旧名；标题始终为空的会话只有中性名；Windows 未实测；付费生成全链路未验证。
 
 本地成品：`.local/test/3.20.1-test.14/metaontic-video-3.20.1-test.14.tgz`，1204358 字节，SHA-256 `cd07ebfa176cbfc97aa1bafe52d9d8f8e834370ef1090e785eabcded3773317a`（test.13 为同次中间包，已被 test.14 取代）。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。经用户要求，desktop profile 已从 test.12 安装升级到 test.14，并核对已安装包版本与包内构建产物含本次改动。CLI 未返回 applied/restart-required，不能据此断言运行窗口已热加载，未要求重启。
+
+## 版本门放宽与失败诊断 3.20.1-test.15
+
+现象：本机新建创作项目后没有生成流程画布，项目记录里没有 canvasAuto，只有一句「自动画布尚未就绪」。原因有两层，都在插件这一侧：适配器把原版版本锁成 `0.20.1` 单值，而桌面 profile 里的原版被它自己的更新按钮升到了 `0.20.2`，于是加载直接以 version 失败，创建流程根本没走到建画布那一步。
+
+顺带核对出一个上游问题：npm 上 `@ninkch/dsh-infinite-canvas@0.20.2` 成品包不完整，`index.js` 第 20 行 `import { planShotSegments } from './shot-segments.js'`，但包内没有这个文件（`npm pack` 解包共 245 个文件，无 shot-segments.js；包内 `files` 字段也没列它）。当前运行中的宿主是升级前装载的旧模块，所以画布 RPC 还能用，一旦重启原版就整块加载失败。故本机用 `dsh plugin --profile desktop add @ninkch/dsh-infinite-canvas@0.20.1` 回到完整可用的 0.20.1，插件安装按钮继续固定 0.20.1。
+
+改动：`canvasVersionSupported` 把版本门从「等于 0.20.1」改成「0.20.1 起」（0.20.x 及更高主版本放行），真正的开关仍是 rpc/_internals 能力核对；失败分四类分别报出——未安装、版本不支持、模块加载失败（安装不完整）、缺少联动接口，并把原因透传到 canvasProject 的 unavailable reason，用户据此知道该重装、该升级还是该等。
+
+验证：类型检查、构建、463 项自动测试、diff 检查通过；`.local/canvas-qa/version-gate.mjs` 用真实包核对四种失败分类（无包／伪 0.20.0／官方 0.20.2 解包／完整 0.20.1）；`.local/canvas-qa/auto-name.mjs` 用真实 0.20.1 复核创建命名、标题补名、连线保持、用户改名不被覆盖，未使用用户数据根、无付费请求。本机重启宿主后 `/infinite-canvas/api/rpc` 的 projectsList/dataRootGet 正常返回，说明 0.20.1 修复在真实进程里生效。
+
+未覆盖：官方 0.20.2 无法加载（上游缺文件），未验证它在任何环境可用；桌面窗口内的建图到回填未复核；Windows 未实测；付费生成全链路未验证。
+
+本地成品：`.local/test/3.20.1-test.15/metaontic-video-3.20.1-test.15.tgz`，1204708 字节，SHA-256 `06d06de2f85e39c31b31a4bd4246edc0fa55984f2cef33aecee88deb0227dda7`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。desktop profile 已从 test.14 升级到 test.15，并核对包内构建产物含本次改动。
