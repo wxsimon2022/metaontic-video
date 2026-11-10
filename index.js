@@ -4732,8 +4732,6 @@ function submissionTool(liveConfig) {
 }
 
 // src/businesses/video/integrations/canvas.ts
-import { createRequire as createRequire2 } from "node:module";
-import { pathToFileURL as pathToFileURL2 } from "node:url";
 import { createHash as createHash5, randomUUID as randomUUID8 } from "node:crypto";
 import { mkdir as mkdir11, readFile as readFile10, writeFile as writeFile8, rename as rename9, copyFile, stat as stat7, open as open4 } from "node:fs/promises";
 import path18 from "node:path";
@@ -4915,6 +4913,11 @@ function builtinCanvasAdapter() {
 async function builtinCanvasList() {
   return (await allDocs()).map((doc) => ({ projectId: doc.id, name: doc.name, updatedAt: doc.updatedAt || 0, nodeCount: Object.keys(doc.nodes || {}).length }));
 }
+async function requireDoc(projectId) {
+  const doc = await readDoc(projectId);
+  if (!doc || doc.deleted) throw new Error("\u753B\u5E03\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");
+  return doc;
+}
 async function builtinCanvasHandle(args) {
   const method = String(args?.method || "");
   const params = args?.args || {};
@@ -4942,6 +4945,88 @@ async function builtinCanvasHandle(args) {
     doc.rev = (doc.rev || 0) + 1;
     await writeDoc(doc.id, doc);
     return { canvas: { projectId: doc.id, name: doc.name } };
+  }
+  if (method === "nodeSave") {
+    const doc = await requireDoc(params.projectId);
+    const incoming = params.node || {};
+    const id = String(incoming.id || "");
+    if (!validId(id)) throw new Error("\u8282\u70B9\u6807\u8BC6\u65E0\u6548\u3002");
+    if (doc.tombstones?.includes(id)) throw new Error("\u8BE5\u8282\u70B9\u5DF2\u5220\u9664\uFF0C\u4E0D\u81EA\u52A8\u590D\u6D3B\uFF1B\u8BF7\u65B0\u5EFA\u8282\u70B9\u3002");
+    const prev = doc.nodes?.[id];
+    const type = String(incoming.type || prev?.type || "text");
+    if (!["text", "script", "storyboard", "shot", "image", "video"].includes(type)) throw new Error("\u8282\u70B9\u7C7B\u578B\u4E0D\u652F\u6301\u3002");
+    const data = { ...prev?.data || {}, ...incoming.data || {} };
+    for (const key of ["label", "prompt", "text", "output", "script", "requirement", "ratio", "resolution"]) {
+      if (incoming.data && key in incoming.data) data[key] = String(incoming.data[key] ?? "");
+    }
+    if (incoming.data && "duration" in incoming.data) {
+      const duration = Number(incoming.data.duration);
+      data.duration = Number.isFinite(duration) && duration > 0 ? duration : null;
+    }
+    const node = {
+      id,
+      type,
+      x: Number.isFinite(Number(incoming.x)) ? Number(incoming.x) : Number(prev?.x) || 0,
+      y: Number.isFinite(Number(incoming.y)) ? Number(incoming.y) : Number(prev?.y) || 0,
+      w: Number(incoming.w) || Number(prev?.w) || 360,
+      h: Number(incoming.h) || Number(prev?.h) || 280,
+      data
+    };
+    doc.nodes = { ...doc.nodes || {}, [id]: node };
+    doc.updatedAt = Date.now();
+    doc.rev = (doc.rev || 0) + 1;
+    await writeDoc(doc.id, doc);
+    return { canvas: { projectId: doc.id, node, rev: doc.rev } };
+  }
+  if (method === "nodeDelete") {
+    const doc = await requireDoc(params.projectId);
+    const id = String(params.nodeId || "");
+    if (!doc.nodes?.[id]) throw new Error("\u8282\u70B9\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");
+    const nodes = { ...doc.nodes };
+    delete nodes[id];
+    const edges = (doc.edges || []).filter((edge) => edge.fromNode !== id && edge.toNode !== id);
+    const goneEdges = (doc.edges || []).filter((edge) => edge.fromNode === id || edge.toNode === id).map((edge) => edge.id);
+    doc.nodes = nodes;
+    doc.edges = edges;
+    doc.tombstones = [.../* @__PURE__ */ new Set([...doc.tombstones || [], id])];
+    doc.edgeTombstones = [.../* @__PURE__ */ new Set([...doc.edgeTombstones || [], ...goneEdges])];
+    doc.updatedAt = Date.now();
+    doc.rev = (doc.rev || 0) + 1;
+    await writeDoc(doc.id, doc);
+    return { canvas: { projectId: doc.id, removed: id, rev: doc.rev } };
+  }
+  if (method === "edgeAdd") {
+    const doc = await requireDoc(params.projectId);
+    const from2 = String(params.fromNode || ""), to = String(params.toNode || "");
+    if (!doc.nodes?.[from2] || !doc.nodes?.[to]) throw new Error("\u8FDE\u7EBF\u4E24\u7AEF\u8282\u70B9\u5FC5\u987B\u5728\u573A\u3002");
+    if (from2 === to) throw new Error("\u4E0D\u80FD\u8FDE\u63A5\u540C\u4E00\u4E2A\u8282\u70B9\u3002");
+    const existing = (doc.edges || []).find((edge2) => edge2.fromNode === from2 && edge2.toNode === to);
+    if (existing) return { canvas: { projectId: doc.id, edge: existing, already: true } };
+    const edge = {
+      id: `mov_connect_${randomUUID7().replaceAll("-", "").slice(0, 16)}`,
+      fromNode: from2,
+      toNode: to,
+      fromPort: String(params.fromPort || "out").slice(0, 24),
+      toPort: String(params.toPort || "prompt").slice(0, 24)
+    };
+    doc.edges = [...doc.edges || [], edge];
+    if (doc.edgeTombstones?.includes(edge.id)) doc.edgeTombstones = doc.edgeTombstones.filter((x) => x !== edge.id);
+    doc.updatedAt = Date.now();
+    doc.rev = (doc.rev || 0) + 1;
+    await writeDoc(doc.id, doc);
+    return { canvas: { projectId: doc.id, edge, rev: doc.rev } };
+  }
+  if (method === "edgeDelete") {
+    const doc = await requireDoc(params.projectId);
+    const id = String(params.edgeId || "");
+    const edge = (doc.edges || []).find((item) => item.id === id);
+    if (!edge) throw new Error("\u8FDE\u7EBF\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");
+    doc.edges = (doc.edges || []).filter((item) => item.id !== id);
+    if (id.startsWith("mov_connect_") || id.startsWith("mov_edge_") || id.includes("_edge_")) doc.edgeTombstones = [.../* @__PURE__ */ new Set([...doc.edgeTombstones || [], id])];
+    doc.updatedAt = Date.now();
+    doc.rev = (doc.rev || 0) + 1;
+    await writeDoc(doc.id, doc);
+    return { canvas: { projectId: doc.id, removed: id, rev: doc.rev } };
   }
   throw new Error("\u672A\u77E5\u753B\u5E03\u64CD\u4F5C\u3002");
 }
@@ -5059,44 +5144,15 @@ var canvasLinkSchema = { type: "object", properties: {
   canvasId: { type: "string" },
   nodeId: { type: "string" },
   fingerprint: { type: "string" }
-}, required: ["projectId", "nodeId", "fingerprint"], description: "video_canvas(action:read)\u8FD4\u56DE\u7684\u539F\u7248\u753B\u5E03\u5B9A\u4F4D\u4E0E\u5185\u5BB9\u6458\u8981\uFF1B\u539F\u6837\u4F20\u5165\uFF0C\u4E0D\u731C\u6D4B\u3002" };
+}, required: ["projectId", "nodeId", "fingerprint"], description: "video_canvas(action:read)\u8FD4\u56DE\u7684\u6D41\u7A0B\u753B\u5E03\u5B9A\u4F4D\u4E0E\u5185\u5BB9\u6458\u8981\uFF1B\u539F\u6837\u4F20\u5165\uFF0C\u4E0D\u731C\u6D4B\u3002" };
 var digest = (value) => createHash5("sha256").update(JSON.stringify(value)).digest("hex");
 var validId2 = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 function location(link) {
   if (!validId2(link?.projectId) || !validId2(link?.nodeId) || link.canvasId && !validId2(link.canvasId)) throw new Error("\u753B\u5E03\u9879\u76EE\u6216\u8282\u70B9\u6807\u8BC6\u65E0\u6548");
   return { id: link.projectId, ...link.canvasId ? { canvasId: link.canvasId } : {} };
 }
-function canvasVersionSupported(version) {
-  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(String(version ?? "").trim());
-  if (!match) return false;
-  const [major, minor, patch] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  if (major !== 0) return major > 0;
-  return minor > 20 || minor === 20 && patch >= 1;
-}
 async function loadCanvasAdapter() {
-  const require2 = createRequire2(import.meta.url);
-  const notInstalled = "\u753B\u5E03\u8054\u52A8\u9700\u8981\u5DF2\u542F\u7528\u7684\u539F\u7248 @ninkch/dsh-infinite-canvas 0.20.1 \u6216\u66F4\u65B0\u7248\u672C\uFF1B\u8BF7\u5728\u63D2\u4EF6\u8BE6\u60C5\u6838\u5BF9\u5B89\u88C5\u548C\u542F\u7528\u72B6\u6001\uFF0C\u4E0D\u4F1A\u6539\u5199\u753B\u5E03\u914D\u7F6E\u3002";
-  let pkg;
-  try {
-    pkg = require2("@ninkch/dsh-infinite-canvas/package.json");
-  } catch {
-    throw new Error(notInstalled);
-  }
-  if (!canvasVersionSupported(pkg?.version)) throw new Error(`\u753B\u5E03\u8054\u52A8\u6682\u4E0D\u652F\u6301\u539F\u7248\u65E0\u9650\u753B\u5E03 ${pkg?.version || "\u672A\u77E5\u7248\u672C"}\uFF1B\u8BF7\u5347\u7EA7\u5230 0.20.1 \u6216\u66F4\u65B0\u7248\u672C\uFF0C\u4E0D\u4F1A\u6539\u5199\u753B\u5E03\u914D\u7F6E\u3002`);
-  let module;
-  try {
-    module = await import(pathToFileURL2(require2.resolve("@ninkch/dsh-infinite-canvas")).href);
-  } catch (error) {
-    throw new Error(`\u539F\u7248\u65E0\u9650\u753B\u5E03 ${pkg.version} \u52A0\u8F7D\u5931\u8D25\uFF08\u5B89\u88C5\u53EF\u80FD\u4E0D\u5B8C\u6574\uFF09\uFF1A${error?.message || error}\uFF1B\u8BF7\u5728\u63D2\u4EF6\u8BE6\u60C5\u91CD\u65B0\u5B89\u88C5\u8BE5\u63D2\u4EF6\uFF0C\u4E0D\u4F1A\u6539\u5199\u753B\u5E03\u914D\u7F6E\u3002`);
-  }
-  const internal = module?._internals;
-  const rpc = internal?.rpcMethods?.();
-  if (!rpc?.projectsGet || !rpc?.projectsPut || !rpc?.assetsGet || !rpc?.assetCreate || !rpc?.projectDirGet || !rpc?.dataRootGet || !rpc?.projectsList) throw new Error(`\u539F\u7248\u65E0\u9650\u753B\u5E03 ${pkg.version} \u7F3A\u5C11\u753B\u5E03\u8054\u52A8\u6240\u9700\u7684\u63A5\u53E3\uFF1B\u8BF7\u786E\u8BA4\u5B89\u88C5\u7684\u662F\u539F\u7248 @ninkch/dsh-infinite-canvas\uFF0C\u4E0D\u4F1A\u91CD\u65B0\u521B\u5EFA\u521B\u4F5C\u9879\u76EE\u3002`);
-  return {
-    rpc,
-    assetPath: (root, asset) => asset.sha ? internal.objectAbsFor(root, asset.sha) : path18.resolve(root, internal.physicalRel(asset.rel)),
-    ...typeof internal.canvasConnect === "function" ? { connect: (args) => internal.canvasConnect(args) } : {}
-  };
+  return builtinCanvasAdapter();
 }
 async function resolveCanvasAdapter(projectId, load = loadCanvasAdapter) {
   if (projectId && await builtinCanvasExists(projectId)) return builtinCanvasAdapter();
@@ -5145,7 +5201,7 @@ async function readCanvasInput(adapter, link) {
   const assets = nodes.filter((n) => n.assetId).map((n) => n.assetId);
   const records = assets.length ? (await adapter.rpc.assetsGet({ ids: assets })).items || [] : [];
   const root = (await adapter.rpc.dataRootGet()).dataRoot;
-  if (!root) throw new Error("\u8BF7\u5148\u5728\u65E0\u9650\u753B\u5E03\u8BBE\u7F6E\u6570\u636E\u6839\u76EE\u5F55\uFF0C\u786E\u4FDD\u53C2\u8003\u7D20\u6750\u548C\u56DE\u586B\u6210\u679C\u53EF\u6301\u4E45\u4FDD\u5B58\u3002");
+  if (!root) throw new Error("\u753B\u5E03\u6570\u636E\u76EE\u5F55\u4E0D\u53EF\u7528\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\u6743\u9650\uFF0C\u786E\u4FDD\u53C2\u8003\u7D20\u6750\u548C\u56DE\u586B\u6210\u679C\u53EF\u6301\u4E45\u4FDD\u5B58\u3002");
   const references = [];
   for (const node of nodes.filter((n) => n.assetId)) {
     const a = records.find((a2) => a2.id === node.assetId);
@@ -5164,7 +5220,7 @@ async function readCanvasInput(adapter, link) {
     edges,
     references,
     bible,
-    instruction: "\u6309\u7AEF\u53E3\u3001refOrder\u548C\u539F\u8FDE\u7EBF\u6838\u5BF9\u53C2\u8003\u56FE\u53CA\u9996\u5C3E\u5E27/\u53C2\u8003\u89C6\u9891\u89D2\u8272\uFF0C\u4E0D\u628A\u6240\u6709\u7D20\u6750\u4E00\u5F8B\u5F53\u53C2\u8003\u56FE\u3002\u4E0D\u5F97\u9ED8\u8BA4\u65F6\u957F\u6216\u6E05\u6670\u5EA6\u3002\u6B63\u6587\u5C55\u793A\u811A\u672C/\u5206\u955C\u540E\u8D70video_project\u5BA1\u6838\uFF0C\u751F\u6210\u5DE5\u5177\u4F20\u5165canvas\u3002\u4E0D\u8981\u8C03\u7528canvas_run_node\u6216canvas_generate_node\u4EE3\u66FF\u672C\u63D2\u4EF6\u751F\u6210\u3002"
+    instruction: "\u6309\u7AEF\u53E3\u3001refOrder\u548C\u539F\u8FDE\u7EBF\u6838\u5BF9\u53C2\u8003\u56FE\u53CA\u9996\u5C3E\u5E27/\u53C2\u8003\u89C6\u9891\u89D2\u8272\uFF0C\u4E0D\u628A\u6240\u6709\u7D20\u6750\u4E00\u5F8B\u5F53\u53C2\u8003\u56FE\u3002\u4E0D\u5F97\u9ED8\u8BA4\u65F6\u957F\u6216\u6E05\u6670\u5EA6\u3002\u6B63\u6587\u5C55\u793A\u811A\u672C/\u5206\u955C\u540E\u8D70video_project\u5BA1\u6838\uFF0C\u751F\u6210\u5DE5\u5177\u4F20\u5165canvas\u3002"
   };
 }
 function resultFile(token) {
@@ -5358,7 +5414,7 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
   }
   const tool = {
     name: "video_canvas",
-    description: "\u4E0E\u5DF2\u542F\u7528\u7684\u539F\u7248\u65E0\u9650\u753B\u5E03\u8054\u52A8\u3002list\u5217\u51FA\u9879\u76EE\uFF1Bread\u8BFB\u53D6\u6307\u5B9A\u8282\u70B9\u53CA\u4E0A\u6E38\u811A\u672C/\u5206\u955C/\u7D20\u6750\u5E76\u8FD4\u56DEcanvas\u5B9A\u4F4D\u548C\u6458\u8981\uFF0C\u4E0D\u751F\u6210\u4E0D\u6536\u8D39\u3002\u4E4B\u540E\u6309\u65E2\u6709video_project\u5BA1\u6838\u4E0E\u751F\u6210\u5DE5\u5177\u8D39\u7528\u5BA1\u6279\uFF0Cvideo_generate/video_extend/video_prepare_image\u4F20canvas\u5373\u81EA\u52A8\u56DE\u586B\u6210\u679C\u8282\u70B9\u3002sync\u53EA\u8865\u4F20\u6B64\u524D\u5931\u8D25\u7684\u56DE\u586B\uFF0C\u4E0D\u65B0\u589E\u4EFB\u52A1\u3002\u4E25\u7981\u7528\u753B\u5E03\u81EA\u5E26\u751F\u6210\u5DE5\u5177\u7ED5\u8FC7\u672C\u63D2\u4EF6\u5BA1\u6279\u3002",
+    description: "\u4E0E\u672C\u63D2\u4EF6\u5185\u7F6E\u6D41\u7A0B\u753B\u5E03\u8054\u52A8\uFF08\u4E0D\u4F9D\u8D56\u4EFB\u4F55\u7B2C\u4E09\u65B9\u753B\u5E03\u63D2\u4EF6\uFF09\u3002list\u5217\u51FA\u6D41\u7A0B\u753B\u5E03\uFF1Bread\u8BFB\u53D6\u6307\u5B9A\u8282\u70B9\u53CA\u4E0A\u6E38\u811A\u672C/\u5206\u955C/\u7D20\u6750\u5E76\u8FD4\u56DEcanvas\u5B9A\u4F4D\u548C\u6458\u8981\uFF0C\u4E0D\u751F\u6210\u4E0D\u6536\u8D39\u3002\u4E4B\u540E\u6309\u65E2\u6709video_project\u5BA1\u6838\u4E0E\u751F\u6210\u5DE5\u5177\u8D39\u7528\u5BA1\u6279\uFF0Cvideo_generate/video_extend/video_prepare_image\u4F20canvas\u5373\u81EA\u52A8\u56DE\u586B\u6210\u679C\u8282\u70B9\u3002sync\u53EA\u8865\u4F20\u6B64\u524D\u5931\u8D25\u7684\u56DE\u586B\uFF0C\u4E0D\u65B0\u589E\u4EFB\u52A1\u3002",
     parameters: { type: "object", properties: { action: { type: "string", enum: ["list", "read", "sync"] }, projectId: { type: "string" }, canvasId: { type: "string" }, nodeId: { type: "string" }, token: { type: "string" } }, required: ["action"] },
     output: { schema: { type: "object" }, render(_args, value) {
       return [{ type: "text", text: JSON.stringify(value) }];
@@ -5369,11 +5425,7 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
     },
     async execute(args, exec) {
       if (args.action === "sync") return sync(args.token, exec);
-      if (args.action === "list") {
-        const listed = await load().then((adapter) => adapter.rpc.projectsList()).catch(() => []);
-        const merged = (Array.isArray(listed) ? listed : listed?.projects || listed?.items || []).map((p) => ({ id: p.id, name: p.name, canvases: p.canvases, nodeIds: p.nodeIds }));
-        return { projects: [...await builtinCanvasList(), ...merged] };
-      }
+      if (args.action === "list") return { projects: await builtinCanvasList() };
       if (args.action === "read") return readCanvasInput(await resolveCanvasAdapter(args.projectId, load), args);
       throw new Error("\u672A\u77E5\u753B\u5E03\u64CD\u4F5C");
     }
@@ -5387,10 +5439,9 @@ import { readFile as readFile11 } from "node:fs/promises";
 import path19 from "node:path";
 init_config();
 var digest2 = (value) => createHash6("sha256").update(JSON.stringify(value)).digest("hex");
-async function adapterForNewCanvas(binding, load, config) {
+async function adapterForNewCanvas(binding, load) {
   if (binding?.projectId) return resolveCanvasAdapter(binding.projectId, load);
   if (load !== loadCanvasAdapter) return load();
-  if (binding?.backend === "original" || ref(config, "canvasBackend", BUILTIN_BACKEND) === "original") return load();
   return builtinCanvasAdapter();
 }
 function scriptStoryboardShots(script) {
@@ -5454,9 +5505,9 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
       if (draft.specification?.canvas) return { status: "external", projectId: draft.specification.canvas.projectId, reason: "\u6CBF\u7528\u7528\u6237\u9009\u62E9\u7684\u539F\u753B\u5E03\uFF0C\u4E0D\u53E6\u5EFA\u9879\u76EE\u3002" };
       let adapter;
       try {
-        adapter = await adapterForNewCanvas(project.canvasAuto, load, config);
+        adapter = await adapterForNewCanvas(project.canvasAuto, load);
       } catch (error) {
-        const reason = String(error?.message || "").trim() || "\u81EA\u52A8\u753B\u5E03\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u5B89\u88C5\u5E76\u542F\u7528\u539F\u7248\u65E0\u9650\u753B\u5E030.20.1 \u6216\u66F4\u65B0\u7248\u672C\u3002";
+        const reason = String(error?.message || "").trim() || "\u6D41\u7A0B\u753B\u5E03\u76EE\u5F55\u6682\u4E0D\u53EF\u7528\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\u6743\u9650\u3002";
         return { status: "unavailable", reason: `${reason}\u521B\u4F5C\u9879\u76EE\u5DF2\u4FDD\u7559\uFF0C\u53EF\u67E5\u8BE2\u9879\u76EE\u72B6\u6001\u91CD\u8BD5\u540C\u6B65\u3002` };
       }
       const rpc = adapter.rpc;
@@ -5465,7 +5516,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
         conversationName = String(sessionTitle?.get(exec.agent.session)?.title || "").trim().slice(0, 80);
       } catch {
       }
-      if (!rpc.canvasCreateProject) return { status: "unavailable", reason: "\u539F\u7248\u753B\u5E03\u7F3A\u5C11\u521B\u5EFA\u63A5\u53E3\uFF0C\u672A\u521B\u5EFA\u66FF\u4EE3\u753B\u5E03\u3002" };
+      if (!rpc.canvasCreateProject) return { status: "unavailable", reason: "\u6D41\u7A0B\u753B\u5E03\u7F3A\u5C11\u521B\u5EFA\u63A5\u53E3\uFF0C\u672A\u521B\u5EFA\u66FF\u4EE3\u753B\u5E03\u3002" };
       const prefix = `mov_${project.id.replaceAll("-", "")}`;
       const baseName = conversationName || "MetaOntic \u521B\u4F5C\u753B\u5E03";
       if (!project.canvasAuto) {
@@ -5615,7 +5666,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
         nodeId,
         openRequested: opened,
         bindingReady: Boolean(binding.canvas),
-        ...!binding.canvas ? { reason: "\u753B\u5E03\u8282\u70B9\u5DF2\u5EFA\u7ACB\uFF1B\u6210\u679C\u56DE\u586B\u524D\u8BF7\u5728\u539F\u7248\u753B\u5E03\u8BBE\u7F6E\u6570\u636E\u6839\u76EE\u5F55\u3002" } : {}
+        ...!binding.canvas ? { reason: "\u753B\u5E03\u8282\u70B9\u5DF2\u5EFA\u7ACB\uFF1B\u6210\u679C\u4F1A\u56DE\u586B\u5230\u63D2\u4EF6\u81EA\u5DF1\u7684\u753B\u5E03\u6570\u636E\u76EE\u5F55\u3002" } : {}
       };
     });
   }
@@ -5646,7 +5697,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
         if (!binding?.projectId) continue;
         try {
           await lockProject(`canvas:${project.id}`, async () => {
-            const adapter = await adapterForNewCanvas(binding, load, config);
+            const adapter = await adapterForNewCanvas(binding, load);
             const loc = { id: binding.projectId };
             const doc = await adapter.rpc.projectsGet(loc);
             if (!doc?.nodes || doc.deleted) return;
@@ -6402,7 +6453,7 @@ function planCanvasNative(input, config, operation = "generate", draft = {}) {
   const prompt = String(draft.prompt ?? [node.prompt, ...texts.map((n) => n.type === "storyboard" ? "" : n.text || n.output || n.script || n.requirement), shots.length ? JSON.stringify(shots) : ""].filter(Boolean).join("\n")).trim();
   if (!prompt) throw new Error("\u8BF7\u5148\u5728\u8282\u70B9\u586B\u5199\u672C\u6B21\u8981\u751F\u6210\u7684\u753B\u9762\u6216\u7EED\u62CD\u5185\u5BB9\u3002");
   if (prompt.length > 2e4) throw new Error("\u63D0\u793A\u8BCD\u8FC7\u957F\uFF0C\u8BF7\u7F29\u5C0F\u672C\u8282\u70B9\u7684\u5236\u4F5C\u8303\u56F4\u3002");
-  if (/@[^@\n]+@/.test(prompt)) throw new Error("\u8BF7\u5148\u628A@\u8BBE\u5B9A\u5F15\u7528\u5C55\u5F00\u4E3A\u660E\u786E\u63CF\u8FF0\uFF0C\u76F4\u63A5\u5236\u4F5C\u6682\u4E0D\u81EA\u52A8\u89E3\u6790\u539F\u7248\u8BBE\u5B9A\u5F15\u7528\u3002");
+  if (/@[^@\n]+@/.test(prompt)) throw new Error("\u8BF7\u5148\u628A@\u8BBE\u5B9A\u5F15\u7528\u5C55\u5F00\u4E3A\u660E\u786E\u63CF\u8FF0\uFF0C\u76F4\u63A5\u5236\u4F5C\u6682\u4E0D\u81EA\u52A8\u89E3\u6790\u8BBE\u5B9A\u5F15\u7528\u3002");
   const ratio = draft.ratio ?? node.ratio;
   if (!["16:9", "9:16", "1:1", "4:3", "3:4"].includes(ratio)) throw new Error("\u8BF7\u5728\u8282\u70B9\u660E\u786E\u9009\u62E9\u753B\u5E45\u540E\u518D\u5236\u4F5C\u3002");
   const refs = incoming.filter((e) => e.toPort !== "prompt");
@@ -6451,6 +6502,7 @@ function planCanvasNative(input, config, operation = "generate", draft = {}) {
 }
 function createCanvasNativeService(liveConfig, options = {}) {
   const load = options.load || loadCanvasAdapter;
+  const adapterFor = (link) => options.resolve ? options.resolve(link) : resolveCanvasAdapter(link?.projectId, load);
   const directory2 = options.directory || path20.join(dshHome(), "metaontic-video", "canvas-native");
   const snapshots = /* @__PURE__ */ new Map(), running = /* @__PURE__ */ new Map(), locks2 = /* @__PURE__ */ new Set();
   const proposals = /* @__PURE__ */ new Map();
@@ -6559,7 +6611,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: Boolean(resolveApiKey(config)), imageReady, singleMax: modelMaxSeconds(config) };
     }
     if (args.action === "prepare") {
-      const adapter = await load(), input = await readCanvasInput(adapter, args);
+      const adapter = await adapterFor(args), input = await readCanvasInput(adapter, args);
       const old = await previous(input.canvas);
       if (old && (!terminal.has(old.state) || old.media?.length && !old.reviewed || old.sync?.status === "pending")) return { job: view(old) };
       if (args.operation === "extend") {
@@ -6614,7 +6666,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       try {
         if (args.confirmPlan !== true || args.confirmCost !== true || p.plan.kind === "video" && !p.plan.images.length && p.plan.operation === "generate" && args.textOnly !== true) throw new Error("\u8BF7\u5206\u522B\u786E\u8BA4\u5236\u4F5C\u65B9\u6848\u3001\u8D39\u7528\u53CA\u7EAF\u6587\u751F\u9009\u62E9\u3002");
         if (hash3(snapshotConfig(liveConfig)) !== p.identity) throw new Error("\u63D2\u4EF6\u914D\u7F6E\u5DF2\u53D8\uFF0C\u8BF7\u91CD\u65B0\u786E\u8BA4\u3002");
-        const input = await readCanvasInput(await load(), p.canvas);
+        const input = await readCanvasInput(await adapterFor(p.canvas), p.canvas);
         if (input.canvas.fingerprint !== p.canvas.fingerprint) throw new Error("\u8282\u70B9\u6216\u4E0A\u6E38\u7D20\u6750\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u6838\u5BF9\u65B9\u6848\u3002");
         const old = await previous(p.canvas);
         if (old && (!terminal.has(old.state) || old.media?.length && !old.reviewed || old.sync?.status === "pending")) return { job: view(old) };
@@ -8259,7 +8311,7 @@ function setupTool(config) {
 // src/businesses/video/internal/hyperframes.ts
 import { spawn as spawn2 } from "node:child_process";
 import path23 from "node:path";
-import { createRequire as createRequire3 } from "node:module";
+import { createRequire as createRequire2 } from "node:module";
 import { stat as stat10, mkdir as mkdir14 } from "node:fs/promises";
 function runHyperframes(cli, args, cwd, config, signal) {
   return new Promise((resolve3, reject) => {
@@ -8354,7 +8406,7 @@ function hyperframesTool(config, deps) {
       };
       let cli;
       try {
-        const require2 = createRequire3(import.meta.url);
+        const require2 = createRequire2(import.meta.url);
         cli = path23.join(path23.dirname(require2.resolve("hyperframes/package.json")), "bin/hyperframes.mjs");
       } catch {
         return { status: "dependency_missing", note: "Hyperframes \u4E3A\u5185\u90E8\u5F00\u53D1\u80FD\u529B\uFF0C\u516C\u5F00\u63D2\u4EF6\u5305\u4E0D\u5305\u542B\u8BE5\u4F9D\u8D56\uFF1B\u9700\u5728\u5F00\u53D1\u73AF\u5883\u5355\u72EC\u51C6\u5907\u3002" };
@@ -8579,8 +8631,8 @@ function buildPromptGuidance(config) {
   const segmentSeconds = resolveSegmentSeconds(config);
   return [
     `\xB7 \u5F53\u524D\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03\uFF1A${ref(config, "autoCreateCanvas", true) === false ? "\u5173\u95ED\uFF1B\u4E0D\u81EA\u52A8\u5EFA\u56FE\u6216\u540C\u6B65\uFF0C\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\uFF0C\u660E\u786E\u624B\u52A8\u9009\u4E2D\u8282\u70B9\u65F6\u4ECD\u53EF\u8054\u52A8" : "\u5F00\u542F"}\u3002\u8BE5\u5F00\u5173\u53EA\u80FD\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u4FEE\u6539\uFF0Cvideo_config\u53EF\u53EA\u8BFB\u6838\u5BF9\u3002`,
-    "\xB7 \u81EA\u52A8\u878D\u5408\u753B\u5E03\uFF1A\u6309\u5F53\u524D\u5F00\u5173\u6267\u884C\u3002\u666E\u901A\u521B\u4F5C\u7167\u5E38\u8C03\u7528video_project prepare/review\uFF0C\u5DE5\u5177\u81EA\u52A8\u5EFA\u539F\u7248\u753B\u5E03\u9879\u76EE\u3001\u540C\u6B65\u5B8C\u6574\u811A\u672C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\u5E76\u8BF7\u6C42\u6253\u5F00\u3002\u4E0D\u8981\u8981\u6C42\u7528\u6237\u53E6\u5EFA\u9879\u76EE/\u8282\u70B9\u6216\u53E6\u95EE\u662F\u5426\u540C\u6B65\u3002\u751F\u6210\u4F20projectId\uFF0C\u7EED\u505A\u4F20\u539Fresume\uFF0C\u6210\u679C\u81EA\u52A8\u56DE\u586B\uFF0C\u4E0D\u5FC5\u624B\u5DE5\u62FC\u81EA\u52A8canvas\u7ED1\u5B9A\u3002canvasProject unavailable/pending\u5982\u5B9E\u8BF4\u660E\uFF0C\u7528video_project status\u91CD\u8BD5\u540C\u6B65\uFF0C\u4E0D\u91CD\u5EFA\u521B\u4F5C\u9879\u76EE\u6216\u91CD\u751F\u6210\u3002\u4ECD\u4FDD\u7559\u811A\u672C\u3001\u8D39\u7528\u548C\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838\u3002",
-    "\xB7 \u65E0\u9650\u753B\u5E03\u8054\u52A8\uFF1A\u7528\u6237\u8981\u7528MetaOnticVideo\u5236\u4F5C\u753B\u5E03\u8282\u70B9\u65F6\uFF0C\u5148video_canvas(action:list/read)\u8BFB\u53D6\u76EE\u6807\u8282\u70B9\u3001\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u548C\u53C2\u8003\u7D20\u6750\u3002\u6309\u7AEF\u53E3/refOrder\u4FDD\u7559\u9996\u5E27\u3001\u5C3E\u5E27\u3001\u53C2\u8003\u89C6\u9891\u89D2\u8272\uFF0C\u660E\u786E\u7F3A\u5931\u89C4\u683C\uFF0C\u4E0D\u731C\u65F6\u957F\u548C\u6E05\u6670\u5EA6\u3002\u636E\u6B64\u5B8C\u6210\u73B0\u6709video_project\u51C6\u5907\u3001\u6B63\u6587\u5C55\u793A\u811A\u672C/\u5185\u5D4C\u5206\u955C\u53CAreview\uFF1B\u5B8C\u6574specification\u4E0E\u968F\u540Evideo_generate/video_extend\u53C2\u6570\u90FD\u5E26read\u8FD4\u56DE\u7684canvas\u5BF9\u8C61\u3002\u56FE\u7247\u8D70video_prepare_image\u5E76\u5E26canvas\uFF0C\u4ECD\u987B\u56FE\u7247\u8D39\u7528\u5BA1\u6279\u548C\u7ED3\u679C\u5BA1\u6838\u3002\u7981\u6B62\u8C03\u7528canvas_run_node/canvas_generate_node\u66FF\u4EE3\u672C\u63D2\u4EF6\u751F\u6210\uFF1B\u4E0D\u590D\u5236API\u5BC6\u94A5\u3002\u6210\u679C\u81EA\u52A8\u65B0\u589E\u5230\u539F\u753B\u5E03\uFF0Cpaused\u4ECD\u987B\u5148\u4EA4\u4ED8\u5E76review_segment\uFF0C\u56DE\u586B\u4E0D\u4EE3\u8868\u7ED3\u679C\u5DF2\u5BA1\u6838\u6216\u6574\u7247\u5B8C\u6210\u3002\u56DE\u586Bpending\u65F6\u7528video_canvas(action:sync,token)\u8865\u4F20\uFF0C\u7EDD\u4E0D\u91CD\u65B0\u751F\u6210\u3002\u56FE\u7247/\u89C6\u9891\u8282\u70B9\u5185\u751F\u6210\u6309\u94AE\u7531\u672C\u63D2\u4EF6\u63A5\u7BA1\u786E\u8BA4\uFF0C\u6279\u91CF/\u53F3\u952E\u53CA\u5176\u4ED6\u5DE5\u5177\u4ECD\u7528\u539F\u7248\u914D\u7F6E\u3002",
+    "\xB7 \u6D41\u7A0B\u753B\u5E03\u662F\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF08\u9762\u677F\u91CC\u7684\u300C\u6D41\u7A0B\u753B\u5E03\u300D\uFF09\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u4EFB\u4F55\u7B2C\u4E09\u65B9\u753B\u5E03\u63D2\u4EF6\uFF1B\u6309\u5F53\u524D\u5F00\u5173\u6267\u884C\u81EA\u52A8\u6295\u5F71\u3002\u666E\u901A\u521B\u4F5C\u7167\u5E38\u8C03\u7528video_project prepare/review\uFF0C\u5DE5\u5177\u81EA\u52A8\u5EFA\u6D41\u7A0B\u753B\u5E03\u9879\u76EE\u3001\u540C\u6B65\u5B8C\u6574\u811A\u672C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\u5E76\u8BF7\u6C42\u6253\u5F00\u3002\u4E0D\u8981\u8981\u6C42\u7528\u6237\u53E6\u5EFA\u9879\u76EE/\u8282\u70B9\u6216\u53E6\u95EE\u662F\u5426\u540C\u6B65\u3002\u751F\u6210\u4F20projectId\uFF0C\u7EED\u505A\u4F20\u539Fresume\uFF0C\u6210\u679C\u81EA\u52A8\u56DE\u586B\uFF0C\u4E0D\u5FC5\u624B\u5DE5\u62FC\u81EA\u52A8canvas\u7ED1\u5B9A\u3002canvasProject unavailable/pending\u5982\u5B9E\u8BF4\u660E\uFF0C\u7528video_project status\u91CD\u8BD5\u540C\u6B65\uFF0C\u4E0D\u91CD\u5EFA\u521B\u4F5C\u9879\u76EE\u6216\u91CD\u751F\u6210\u3002\u4ECD\u4FDD\u7559\u811A\u672C\u3001\u8D39\u7528\u548C\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838\u3002",
+    "\xB7 \u6D41\u7A0B\u753B\u5E03\u8054\u52A8\uFF1A\u7528\u6237\u8981\u7528MetaOnticVideo\u5236\u4F5C\u753B\u5E03\u8282\u70B9\u65F6\uFF0C\u5148video_canvas(action:list/read)\u8BFB\u53D6\u76EE\u6807\u8282\u70B9\u3001\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u548C\u53C2\u8003\u7D20\u6750\u3002\u6309\u7AEF\u53E3/refOrder\u4FDD\u7559\u9996\u5E27\u3001\u5C3E\u5E27\u3001\u53C2\u8003\u89C6\u9891\u89D2\u8272\uFF0C\u660E\u786E\u7F3A\u5931\u89C4\u683C\uFF0C\u4E0D\u731C\u65F6\u957F\u548C\u6E05\u6670\u5EA6\u3002\u636E\u6B64\u5B8C\u6210\u73B0\u6709video_project\u51C6\u5907\u3001\u6B63\u6587\u5C55\u793A\u811A\u672C/\u5185\u5D4C\u5206\u955C\u53CAreview\uFF1B\u5B8C\u6574specification\u4E0E\u968F\u540Evideo_generate/video_extend\u53C2\u6570\u90FD\u5E26read\u8FD4\u56DE\u7684canvas\u5BF9\u8C61\u3002\u56FE\u7247\u8D70video_prepare_image\u5E76\u5E26canvas\uFF0C\u4ECD\u987B\u56FE\u7247\u8D39\u7528\u5BA1\u6279\u548C\u7ED3\u679C\u5BA1\u6838\u3002\u4E0D\u590D\u5236API\u5BC6\u94A5\u3002\u6210\u679C\u81EA\u52A8\u65B0\u589E\u5230\u6D41\u7A0B\u753B\u5E03\uFF0Cpaused\u4ECD\u987B\u5148\u4EA4\u4ED8\u5E76review_segment\uFF0C\u56DE\u586B\u4E0D\u4EE3\u8868\u7ED3\u679C\u5DF2\u5BA1\u6838\u6216\u6574\u7247\u5B8C\u6210\u3002\u56DE\u586Bpending\u65F6\u7528video_canvas(action:sync,token)\u8865\u4F20\uFF0C\u7EDD\u4E0D\u91CD\u65B0\u751F\u6210\u3002\u753B\u5E03\u8282\u70B9\u5185\u7684\u300C\u5236\u4F5C\u300D\u6309\u94AE\u7531\u63D2\u4EF6\u63A5\u7BA1\u65B9\u6848\u3001\u8D39\u7528\u4E0E\u7ED3\u679C\u5BA1\u6838\uFF1B\u7528\u6237\u5728\u753B\u5E03\u5185\u81EA\u884C\u70B9\u51FB\u751F\u6210\u65F6\u540C\u6837\u5148\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002",
     "\xB7 \u72B6\u6001\u8868\u8FF0\u5FC5\u987B\u4E0E\u8BC1\u636E\u4E00\u81F4\uFF1A\u67E5\u8BE2\u5931\u8D25\u6216\u8D85\u65F6\u53EA\u8BF4\u72B6\u6001\u672A\u786E\u8BA4\uFF0C\u4E0D\u80FD\u65AD\u8A00\u6210\u529F\u3001\u5931\u8D25\u6216\u4ECD\u5728\u751F\u6210\uFF1B\u4EC5\u5728\u6536\u5230\u6210\u529F\u72B6\u6001\u53CA\u89C6\u9891\u94FE\u63A5\u540E\u8BF4\u672C\u6BB5\u751F\u6210\u6210\u529F\u3002\u672C\u5730\u6587\u4EF6\u5B58\u5728\u540E\u624D\u8BF4\u4E0B\u8F7D\u5B8C\u6210\uFF0C\u5408\u5E76\u6210\u529F\u540E\u624D\u8BF4\u5B8C\u6574\u6210\u7247\u5DF2\u5408\u5E76\uFF0C\u9010\u9879\u7ED9\u51FA\u94FE\u63A5\u540E\u624D\u8BF4\u5DF2\u4EA4\u4ED8\u3002\u6682\u505C\u9ED8\u8BA4\u4EA4\u4ED8\u672C\u6BB5\uFF0C\u4E0D\u5BA3\u79F0\u6B63\u5728\u5408\u5E76\u3002\u67E5\u8BE2\u66FE\u62A5401\u4F46\u540E\u6765\u6210\u529F\u65F6\uFF0C\u6B63\u5E38\u8FDB\u5EA6\u53EA\u62A5\u544A\u5F53\u524D\u5DF2\u786E\u8BA4\u7ED3\u679C\uFF1B\u4E0D\u5F97\u5C06401\u79F0\u4E3A\u5BC6\u94A5\u6296\u52A8\u6216\u731C\u6D4B\u539F\u56E0\u3002\u89C6\u9891\u8FDB\u5EA6\u63D0\u793A\u4EC5\u7528\u4E8E\u89C6\u9891\u751F\u6210\u6216\u7EED\u62CD\u7B49\u5F85\uFF0C\u4E0D\u7528\u4E8E\u811A\u672C\u3001\u56FE\u7247\u3001\u5BA1\u6838\u3001\u67E5\u8BE2\u3001\u4E0B\u8F7D\u3001\u5408\u5E76\u6216\u7ED3\u679C\u5C55\u793A\u3002",
     "\xB7 \u5206\u6BB5\u7ED3\u679C\u786E\u8BA4\u5FC5\u987B\u5F39\u7A97\uFF1Avideo_generate/video_extend\u8FD4\u56DEpaused=true\u65F6\u5148\u5728\u72EC\u7ACB\u6B63\u6587\u7ED9\u672C\u6BB5\u53EF\u70B9\u51FB\u89C6\u9891\u94FE\u63A5\uFF0C\u6B63\u6587\u6D88\u606F\u540C\u65F6\u8C03\u7528video_stage\u7ED3\u675Fresult_present\u5E76\u5F00\u59CBsegment_review_wait\uFF0C\u968F\u540E\u7ACB\u5373\u5355\u72EC\u8C03\u7528video_project(action:review_segment,resume:\u8FD4\u56DE\u7684resumeDir)\u3002\u7981\u6B62\u53EA\u95EE\u4E00\u53E5\u6548\u679C\u5982\u4F55\u5C31\u7ED3\u675F\u56DE\u5408\uFF1B\u8BE5\u7ED3\u679C\u5BA1\u6838\u4E0D\u5C5E\u4E8E\u91CD\u590D\u5236\u4F5C\u786E\u8BA4\uFF0C\u4E0D\u80FD\u88AB\u5408\u5E76\u6216\u7701\u7565\u3002\u53EA\u6709\u8FD4\u56DEapproved\u624D\u7528\u539Fresume\u7EE7\u7EED\u4E0B\u4E00\u6BB5\u8D39\u7528\u5BA1\u6279\u3002\u53D6\u6D88\u3001\u672A\u7B54\u3001\u62D2\u7EDD\u5747\u505C\u6B62\u4E14\u4FDD\u7559\u6210\u679C\uFF1B\u4E0D\u81EA\u52A8\u91CD\u505A\u3002",
     "\xB7 \u9002\u7528\u8303\u56F4\uFF1A\u672C\u5BF9\u8BDD\u53EA\u505A\u89C6\u9891\u521B\u4F5C\u2014\u2014\u811A\u672C\u3001\u5206\u955C\u3001\u751F\u6210\u3001\u63A5\u957F\u3001\u5408\u5E76\u3001\u4EA4\u4ED8\uFF0C\u4EE5\u53CA\u5B8C\u6210\u8FD9\u4E9B\u5FC5\u9700\u7684\u914D\u7F6E\u6307\u5F15\u4E0E\u73AF\u5883\u6392\u67E5\u3002\u4E0E\u89C6\u9891\u521B\u4F5C\u65E0\u5173\u7684\u8BDD\u9898\uFF08\u5176\u4ED6\u8F6F\u4EF6\u7684\u5B89\u88C5\u4E0E\u6392\u969C\u3001\u5199\u4EE3\u7801\u3001\u901A\u7528\u95EE\u7B54\u3001\u95F2\u804A\u7B49\uFF09\u4E0D\u627F\u63A5\uFF1A\u4E00\u53E5\u8BDD\u8BF4\u660E\u672C\u63D2\u4EF6\u53EA\u7528\u4E8E\u89C6\u9891\u521B\u4F5C\uFF0C\u8BF7\u7528\u6237\u56DE\u5230\u89C6\u9891\u9700\u6C42\uFF0C\u4E0D\u5C55\u5F00\u3001\u4E0D\u4EE3\u529E\uFF0C\u4E5F\u4E0D\u8981\u4E3A\u6B64\u8C03\u7528\u5176\u4ED6\u5DE5\u5177\u3002",
