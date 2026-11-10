@@ -10,7 +10,7 @@ export async function canvasNativeRpc(args: any, fetcher: any = fetch) {
   return body;
 }
 
-export function createCanvasView({ React, h, TOKENS }: any) {
+export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
   const rpc = async (method: string, args: any = {}) => {
     const response = await fetch('/metaontic-video/canvas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ method, args }) });
     const body = await response.json().catch(() => ({}));
@@ -37,7 +37,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
 .movc-chip { border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
 .movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
-.movc-stage { position: relative; height: 460px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; overflow: hidden; cursor: grab; touch-action: none; }
+.movc-stage { position: relative; height: ${stageHeight}px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; overflow: hidden; cursor: grab; touch-action: none; }
 .movc-stage[data-panning="true"] { cursor: grabbing; }
 .movc-stage[data-connect="true"] { cursor: crosshair; }
 .movc-world { position: absolute; inset: 0; transform-origin: 0 0; }
@@ -83,7 +83,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
     return h('div', { key: 'text', className: 'movc-body' }, text ? text.slice(0, 600) : '（暂无内容，可先编辑）');
   }
 
-  function FlowCanvas() {
+  function FlowCanvas({ onOpenPage }: any = {}) {
     const [list, setList] = React.useState([] as any[]);
     const [canvas, setCanvas] = React.useState(null as any);
     const [error, setError] = React.useState('');
@@ -376,6 +376,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
         h('button', { key: 'video', type: 'button', className: 'mov-btn', onClick: () => void newNode('video') }, '+ 视频'),
         h('button', { key: 'refresh', type: 'button', className: 'mov-btn', onClick: () => void refresh() }, '刷新'),
         h('button', { key: 'reset', type: 'button', className: 'mov-btn', onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, '重置视图'),
+        typeof onOpenPage === 'function' ? h('button', { key: 'page', type: 'button', className: 'mov-btn', onClick: () => onOpenPage() }, '打开独立页面') : null,
       ]) : null,
       canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `拖动空白处平移、滚轮缩放；拖动节点移动，点「连线」后再点目标节点连接（点连线可断开）。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
       connectFrom ? h('p', { key: 'connect', className: 'movc-hint' }, '连线模式：点击目标节点完成连接，点空白处取消。') : null,

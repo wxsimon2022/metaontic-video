@@ -8,7 +8,7 @@ const TOKENS = { text: 'text', muted: 'muted', border: 'border', cardFill: 'card
 const GUIDE_URL = 'https://video.mybfs.cn';
 
 /** 面板与字典都在 TS 里，按仓库既有做法在隔离上下文里跑纯函数，再用桩 h 收集渲染树。 */
-function harness({ locale = 'zh', props = {}, logo = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>' } = {}) {
+function harness({ locale = 'zh', props = {}, flowCanvas, logo = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>' } = {}) {
   const context = vm.createContext({});
   vm.runInContext(sourceOf('businesses/video/client/panel', 'businesses/video/client/locale'), context);
   const dictionaries = context.createDictionaries();
@@ -20,6 +20,7 @@ function harness({ locale = 'zh', props = {}, logo = '<svg viewBox="0 0 100 100"
     h: (type, elementProps, children) => ({ type, props: elementProps || {}, children: Array.isArray(children) ? children : children === undefined ? [] : [children] }),
     TOKENS, PAGE_CSS: '.mov-btn{}', t,
     PANEL_ID: 'metaontic-video', GUIDE_URL, LOGO_SVG: logo,
+    ...(flowCanvas ? { FlowCanvas: flowCanvas } : {}),
   });
   const tree = panel.VideoPanel({
     startSession: () => calls.push({ action: 'startSession' }),
@@ -180,4 +181,17 @@ test('入口用同一个 id 注册左侧栏图标与 main 面板', () => {
   assert.match(source, /name: 'main',\s*key: PANEL_ID/);
   assert.match(source, /agentPreset: 'video-director'/);
   assert.match(source, /openBundle\(NAMESPACE\)/);
+});
+
+test('面板把「打开独立页面」接到插件自己的画布页，不提供第三方画布安装入口', () => {
+  const opened = [];
+  const FlowCanvas = () => null;
+  const { tree } = harness({ flowCanvas: FlowCanvas, props: { openCanvasPage: () => opened.push('page') } });
+  const canvasSlot = find(tree, (node) => node.type === FlowCanvas);
+  assert.ok(canvasSlot, '面板应渲染流程画布组件');
+  assert.equal(typeof canvasSlot.props.onOpenPage, 'function', '面板要把 openCanvasPage 交给画布组件');
+  canvasSlot.props.onOpenPage();
+  assert.deepEqual(opened, ['page']);
+  const labels = texts(tree);
+  assert.ok(!labels.some((text) => /安装原版|打开无限画布|查看画布插件/.test(text)), '不再有第三方画布安装入口');
 });

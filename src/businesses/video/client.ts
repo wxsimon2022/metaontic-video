@@ -15,6 +15,8 @@ import iconMark from '../../../icon.svg';
 
 /** 左侧栏入参与面板本体共用的面板 id；也是 `main` 键位槽的 key。 */
 const PANEL_ID = 'metaontic-video';
+/** 流程画布是插件自己的独立页面：单独的左侧栏入口与 `main` 键位槽，不与创作面板挤在一起。 */
+const CANVAS_PANEL_ID = 'metaontic-video-canvas';
 /** 面板里的「使用说明」链接。 */
 const GUIDE_URL = 'https://ai.mybfs.cn';
 
@@ -83,6 +85,8 @@ export function createVideoClient(require) {
         settings.register({ id: 'video', namespace: NAMESPACE, locale: NS, Page });
         // 面板组件要用当前配置快照与界面字典（form/t 在 apply 里才有），所以在这里构造。
         const { FlowCanvas } = createCanvasView({ React, h, TOKENS });
+        // 独立页面用更高的画布区；面板内嵌的那份保持紧凑。
+        const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS, stageHeight: 620 });
         const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: iconMark, FlowCanvas });
         // 左侧栏入口与面板本体是宿主 root 作用域的两个 slot，用同一个 id 关联：
         // sidebar.panellist 只放一行图标（收到 {size, active}），点它切到 main 里同 id 的面板。
@@ -104,8 +108,28 @@ export function createVideoClient(require) {
             startSession: () => ctx.get('uiWorkspace')?.startSession(undefined, { agentPreset: 'video-director' }),
             openSettings: () => ctx.get('pluginNavigation')?.openBundle(NAMESPACE),
             manager: pluginManager,
+            // 切到插件自己的流程画布页面；宿主没有 layout 服务时按钮不显示。
+            openCanvasPage: () => {
+              const layout = ctx.get('layout');
+              if (typeof layout?.selectPanel === 'function') return layout.selectPanel(CANVAS_PANEL_ID);
+              const right = ctx.get('sidebarRight');
+              if (typeof right?.openTab === 'function') return right.openTab(CANVAS_PANEL_ID);
+              throw new Error('canvas-navigation-unavailable');
+            },
           }),
         }, VideoPanel)), 'metaontic-video: sidebar panel');
+        ctx.effect(() => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+          name: 'sidebar.panellist',
+          id: CANVAS_PANEL_ID,
+          order: 31,
+          locale: NS,
+          label: () => t('canvasPanelLabel'),
+        }, PanelIcon)), 'metaontic-video: canvas sidebar entry');
+        ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({
+          name: 'main',
+          key: CANVAS_PANEL_ID,
+          locale: NS,
+        }, FlowCanvasPage)), 'metaontic-video: canvas page');
       },
     };
 }

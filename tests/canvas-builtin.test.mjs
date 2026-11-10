@@ -136,7 +136,12 @@ test('内置画布节点可直接制作：按项目解析适配器，成果回�
    assert.equal(proposal.operation,'generate');
    await service.handle({action:'start',id:proposal.id,confirmPlan:true,confirmCost:true,textOnly:true});
    let job;
-   for(let n=0;n<100;n++){ ({job}=await service.handle({action:'status',id:proposal.id})); if(job.state!=='running') break; await new Promise(r=>setTimeout(r,10)); }
+   // 终态与回填记录分两次落盘：等到状态结束并且回填记录已经可见，避免读到中间快照。
+   for(let n=0;n<200;n++){
+    ({job}=await service.handle({action:'status',id:proposal.id}));
+    if(job.state!=='running'&&(job.sync||!job.media?.length)) break;
+    await new Promise(r=>setTimeout(r,10));
+   }
    assert.equal(job.state,'succeeded');assert.equal(calls,1);assert.equal(publications,1);
    assert.equal(job.sync.status,'synced');
    const doc=await api.builtinRpc().projectsGet({id:projectId});

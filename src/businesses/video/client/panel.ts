@@ -202,7 +202,7 @@ export function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GU
             }, t('panelGuide')),
           ]),
         ]),
-        FlowCanvas && h(FlowCanvas, { key: 'flow-canvas' }),
+        FlowCanvas && h(FlowCanvas, { key: 'flow-canvas', onOpenPage: props?.openCanvasPage }),
         h('section', { key: 'flow', className: 'mov-section' }, [
           h('div', { key: 'flow-label', className: 'mov-section-title' }, t('panelFlow')),
           h('div', { key: 'flow-steps', className: 'mov-panel-flow' }, flowChildren),

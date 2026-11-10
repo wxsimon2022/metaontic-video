@@ -737,6 +737,7 @@
       sectionConnection: "\u63A5\u5165\u4E0E API\u5BC6\u94A5",
       sectionVideo: "\u753B\u9762\u4E0E\u58F0\u97F3",
       sectionCanvas: "\u6D41\u7A0B\u753B\u5E03",
+      canvasPanelLabel: "\u6D41\u7A0B\u753B\u5E03",
       autoCreateCanvas: "\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03",
       autoCreateCanvasHint: "\u5F00\u542F\u540E\u968F\u521B\u4F5C\u81EA\u52A8\u5EFA\u56FE\uFF0C\u5BA1\u6838\u524D\u540C\u6B65\u5267\u672C\u3001\u5206\u955C\u548C\u5236\u4F5C\u8BA1\u5212\uFF0C\u751F\u6210\u540E\u56DE\u586B\u6210\u679C\u3002\u6D41\u7A0B\u753B\u5E03\u662F\u672C\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u5176\u4ED6\u753B\u5E03\u63D2\u4EF6\u3002\u5173\u95ED\u540E\u505C\u6B62\u81EA\u52A8\u5EFA\u56FE\u548C\u540C\u6B65\uFF0C\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\uFF0C\u624B\u52A8\u8282\u70B9\u5236\u4F5C\u4ECD\u53EF\u7528\u3002",
       sectionModels: "\u6A21\u578B\u914D\u7F6E",
@@ -887,6 +888,7 @@
       sectionConnection: "Connection & credentials",
       sectionVideo: "Picture & audio",
       sectionCanvas: "Workflow canvas",
+      canvasPanelLabel: "Workflow canvas",
       autoCreateCanvas: "Automatically create a workflow canvas",
       autoCreateCanvasHint: "Create a canvas with each project, sync scripts and plans before review, and publish results. The workflow canvas is built into this plugin; no other canvas plugin is required. Turning off stops automatic creation and sync, preserves existing canvases, and keeps manual node generation available.",
       sectionModels: "Models",
@@ -2277,7 +2279,7 @@
             }, t("panelGuide"))
           ])
         ]),
-        FlowCanvas && h(FlowCanvas, { key: "flow-canvas" }),
+        FlowCanvas && h(FlowCanvas, { key: "flow-canvas", onOpenPage: props?.openCanvasPage }),
         h("section", { key: "flow", className: "mov-section" }, [
           h("div", { key: "flow-label", className: "mov-section-title" }, t("panelFlow")),
           h("div", { key: "flow-steps", className: "mov-panel-flow" }, flowChildren)
@@ -2299,7 +2301,7 @@
     if (!response.ok || body?.error) throw new Error(body?.error || "\u5236\u4F5C\u8BF7\u6C42\u672A\u5B8C\u6210\uFF0C\u8BF7\u67E5\u8BE2\u539F\u8BB0\u5F55\uFF0C\u4E0D\u8981\u91CD\u590D\u751F\u6210\u3002");
     return body;
   }
-  function createCanvasView({ React, h, TOKENS }) {
+  function createCanvasView({ React, h, TOKENS, stageHeight = 460 }) {
     const rpc = async (method, args = {}) => {
       const response = await fetch("/metaontic-video/canvas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ method, args }) });
       const body = await response.json().catch(() => ({}));
@@ -2330,7 +2332,7 @@
 .movc-chip { border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
 .movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
-.movc-stage { position: relative; height: 460px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; overflow: hidden; cursor: grab; touch-action: none; }
+.movc-stage { position: relative; height: ${stageHeight}px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; overflow: hidden; cursor: grab; touch-action: none; }
 .movc-stage[data-panning="true"] { cursor: grabbing; }
 .movc-stage[data-connect="true"] { cursor: crosshair; }
 .movc-world { position: absolute; inset: 0; transform-origin: 0 0; }
@@ -2374,7 +2376,7 @@
       const text = textOf(node);
       return h("div", { key: "text", className: "movc-body" }, text ? text.slice(0, 600) : "\uFF08\u6682\u65E0\u5185\u5BB9\uFF0C\u53EF\u5148\u7F16\u8F91\uFF09");
     }
-    function FlowCanvas() {
+    function FlowCanvas({ onOpenPage } = {}) {
       const [list, setList] = React.useState([]);
       const [canvas, setCanvas] = React.useState(null);
       const [error, setError] = React.useState("");
@@ -2764,7 +2766,8 @@
           h("button", { key: "image", type: "button", className: "mov-btn", onClick: () => void newNode("image") }, "+ \u56FE\u7247"),
           h("button", { key: "video", type: "button", className: "mov-btn", onClick: () => void newNode("video") }, "+ \u89C6\u9891"),
           h("button", { key: "refresh", type: "button", className: "mov-btn", onClick: () => void refresh() }, "\u5237\u65B0"),
-          h("button", { key: "reset", type: "button", className: "mov-btn", onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, "\u91CD\u7F6E\u89C6\u56FE")
+          h("button", { key: "reset", type: "button", className: "mov-btn", onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, "\u91CD\u7F6E\u89C6\u56FE"),
+          typeof onOpenPage === "function" ? h("button", { key: "page", type: "button", className: "mov-btn", onClick: () => onOpenPage() }, "\u6253\u5F00\u72EC\u7ACB\u9875\u9762") : null
         ]) : null,
         canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
         connectFrom ? h("p", { key: "connect", className: "movc-hint" }, "\u8FDE\u7EBF\u6A21\u5F0F\uFF1A\u70B9\u51FB\u76EE\u6807\u8282\u70B9\u5B8C\u6210\u8FDE\u63A5\uFF0C\u70B9\u7A7A\u767D\u5904\u53D6\u6D88\u3002") : null,
@@ -2815,6 +2818,7 @@
 
   // src/businesses/video/client.ts
   var PANEL_ID = "metaontic-video";
+  var CANVAS_PANEL_ID = "metaontic-video-canvas";
   var GUIDE_URL = "https://ai.mybfs.cn";
   function createVideoClient(require2) {
     const React = require2("react");
@@ -2872,6 +2876,7 @@
         const Page = makePage({ form, t, manager: pluginManager });
         settings.register({ id: "video", namespace: NAMESPACE, locale: NS, Page });
         const { FlowCanvas } = createCanvasView({ React, h, TOKENS });
+        const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS, stageHeight: 620 });
         const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: icon_default, FlowCanvas });
         ctx.effect(() => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
           name: "sidebar.panellist",
@@ -2889,9 +2894,29 @@
           inject: () => ({
             startSession: () => ctx.get("uiWorkspace")?.startSession(void 0, { agentPreset: "video-director" }),
             openSettings: () => ctx.get("pluginNavigation")?.openBundle(NAMESPACE),
-            manager: pluginManager
+            manager: pluginManager,
+            // 切到插件自己的流程画布页面；宿主没有 layout 服务时按钮不显示。
+            openCanvasPage: () => {
+              const layout = ctx.get("layout");
+              if (typeof layout?.selectPanel === "function") return layout.selectPanel(CANVAS_PANEL_ID);
+              const right = ctx.get("sidebarRight");
+              if (typeof right?.openTab === "function") return right.openTab(CANVAS_PANEL_ID);
+              throw new Error("canvas-navigation-unavailable");
+            }
           })
         }, VideoPanel)), "metaontic-video: sidebar panel");
+        ctx.effect(() => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
+          name: "sidebar.panellist",
+          id: CANVAS_PANEL_ID,
+          order: 31,
+          locale: NS,
+          label: () => t("canvasPanelLabel")
+        }, PanelIcon)), "metaontic-video: canvas sidebar entry");
+        ctx.effect(() => ctx.slots.inject("main", () => ctx.slots.register({
+          name: "main",
+          key: CANVAS_PANEL_ID,
+          locale: NS
+        }, FlowCanvasPage)), "metaontic-video: canvas page");
       }
     };
   }

@@ -25,6 +25,9 @@ test('standalone preview host mounts the real client and registers settings and 
   assert.equal(typeof components['conversation.input.dock:metaontic-video-progress'], 'function', '输入框进度');
   assert.equal(typeof components['sidebar.panellist:metaontic-video'], 'function', '左侧栏图标');
   assert.equal(typeof components['main:metaontic-video'], 'function', '左侧栏面板本体');
+  // 流程画布是插件自己的独立页面：单独的左侧栏入口与 main 键位槽。
+  assert.equal(typeof components['sidebar.panellist:metaontic-video-canvas'], 'function', '画布页图标');
+  assert.equal(typeof components['main:metaontic-video-canvas'], 'function', '流程画布页面');
   const panel = components['main:metaontic-video:props']();
   panel.startSession();
   const started = host.calls.at(-1);
@@ -35,4 +38,8 @@ test('standalone preview host mounts the real client and registers settings and 
   const opened = host.calls.at(-1);
   assert.equal(opened.action, 'openBundle');
   assert.equal(opened.bundle, 'metaontic-video');
+  panel.openCanvasPage();
+  const switched = host.calls.at(-1);
+  assert.equal(switched.action, 'selectPanel');
+  assert.equal(switched.id, 'metaontic-video-canvas');
 });

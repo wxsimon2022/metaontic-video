@@ -149,3 +149,21 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 未覆盖：真实桌面窗口里的画布交互（需要宿主重载后复核）；画布节点上的「生成并确认费用」「审核」入口尚未接到内置画布（当前仍走助手与工具、原版节点捕获不变）；Windows 未实测；付费生成全链路未验证。
 
 本地成品：`.local/test/3.20.1-test.17/metaontic-video-3.20.1-test.17.tgz`，SHA-256 `7cce8ee7700649036b89c50b3b46ed26f3cfd7a740cf2162ec3d99942b10d801`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。desktop profile 已从 test.16 升级到 test.17；运行中的宿主尚未重载，`/metaontic-video/canvas` 仍返回 405（旧版本进程），重载后复核。
+
+## 自有实现完整化与移除第三方画布 3.20.1-test.18
+
+流程画布现在是插件自己的功能组件：不再安装、加载、读取或依赖任何第三方画布插件，也不要求用户设置画布数据根目录。
+
+实现完整性（都走插件自己的存储与既有审核）：
+
+- 画布内制作：图片/视频节点点「制作」→ 填内容、画幅、时长、清晰度 → 查看制作方案与预估费用 → 分别确认制作方案与费用（纯文生视频再确认一次）→ 提交 → 轮询任务状态 → 画布内查看并审核成果 → 审核通过后续拍下一段。费用确认与结果审核都在画布内，不跳聊天；API密钥沿用插件设置，不复制。
+- 画布编辑：新建文本/图片/视频节点、编辑节点内容与生成参数、拖动节点、平移缩放、连线与断开（连线记墓碑，自动线不会被同步复活）、删除节点（不复活）、重命名画布。新增 `builtinCanvasHandle` 方法 `nodeSave/nodeDelete/edgeAdd/edgeDelete`，只接受界面能编辑的创作字段，成果标识与来源关系等既有数据不被覆盖。
+- 删除第三方耦合代码：`src/client/infinite-canvas.ts`（安装入口/CANVAS_SPEC/bundle 状态）、`src/client/canvas-launcher.ts`（原版 DOM 选中捕获）、`src/client/canvas-native.ts`（原版节点内按钮捕获与弹窗）；面板不再有安装/打开/查看画布插件按钮，`client.ts` 不再取 `sidebarRight/layout` 去切原版页签。`loadCanvasAdapter` 现在直接返回内置适配器，`canvasVersionSupported` 与版本门一并删除；`resolveCanvasAdapter`/`adapterForNewCanvas` 只按内置文档解析，仍保留测试注入加载器。
+- 画布内制作服务 `createCanvasNativeService` 改为按项目标识解析适配器（`options.resolve` 可注入），因此服务端不需要第三方插件即可对内画布运行；`/metaontic-video/canvas-native` 路由与同源校验不变。
+- `video_canvas` 工具的 list 只列内置画布，read/sync 语义不变；动态提示词、面板文案、README 中英文与使用说明书同步改为「插件自带流程画布」。
+
+验证：类型检查、构建、455 项自动测试、diff 检查通过。新增测试覆盖内置画布编辑动作（新建/编辑/连线幂等/断开记墓碑/删除不复活/字段保护）与「无第三方插件在场时建图→按项目解析适配器→生成→审核→成果回填到 `~/.dsh/metaontic-video/canvas/data`」；`tests/canvas-builtin.test.mjs` 原先断言「默认加载器必须失败」改为断言内置适配器可用。
+
+未覆盖：真实桌面窗口内的画布点击/拖拽与画布内付费生成全链路（需要宿主重载后人工复核）；Windows 未实测；真实 Harness 桌面端到端未验证。
+
+本地成品：`.local/test/3.20.1-test.18/metaontic-video-3.20.1-test.18.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。desktop profile 由 test.17 升级到 test.18，并按用户要求卸载第三方画布插件；运行中的宿主需重载后生效。
