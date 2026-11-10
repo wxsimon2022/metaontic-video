@@ -8,7 +8,7 @@ const TOKENS = { text: 'text', muted: 'muted', border: 'border', cardFill: 'card
 const GUIDE_URL = 'https://video.mybfs.cn';
 
 /** 面板与字典都在 TS 里，按仓库既有做法在隔离上下文里跑纯函数，再用桩 h 收集渲染树。 */
-function harness({ locale = 'zh', props = {}, flowCanvas, logo = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>' } = {}) {
+function harness({ locale = 'zh', props = {}, logo = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>' } = {}) {
   const context = vm.createContext({});
   vm.runInContext(sourceOf('businesses/video/client/panel', 'businesses/video/client/locale'), context);
   const dictionaries = context.createDictionaries();
@@ -20,7 +20,6 @@ function harness({ locale = 'zh', props = {}, flowCanvas, logo = '<svg viewBox="
     h: (type, elementProps, children) => ({ type, props: elementProps || {}, children: Array.isArray(children) ? children : children === undefined ? [] : [children] }),
     TOKENS, PAGE_CSS: '.mov-btn{}', t,
     PANEL_ID: 'metaontic-video', GUIDE_URL, LOGO_SVG: logo,
-    ...(flowCanvas ? { FlowCanvas: flowCanvas } : {}),
   });
   const tree = panel.VideoPanel({
     startSession: () => calls.push({ action: 'startSession' }),
@@ -183,15 +182,14 @@ test('入口用同一个 id 注册左侧栏图标与 main 面板', () => {
   assert.match(source, /openBundle\(NAMESPACE\)/);
 });
 
-test('面板把「打开独立页面」接到插件自己的画布页，不提供第三方画布安装入口', () => {
-  const opened = [];
-  const FlowCanvas = () => null;
-  const { tree } = harness({ flowCanvas: FlowCanvas, props: { openCanvasPage: () => opened.push('page') } });
-  const canvasSlot = find(tree, (node) => node.type === FlowCanvas);
-  assert.ok(canvasSlot, '面板应渲染流程画布组件');
-  assert.equal(typeof canvasSlot.props.onOpenPage, 'function', '面板要把 openCanvasPage 交给画布组件');
-  canvasSlot.props.onOpenPage();
-  assert.deepEqual(opened, ['page']);
+test('视频创作面板不再内嵌流程画布，也没有第三方画布安装入口', () => {
+  const { tree } = harness({ props: { openCanvasPage: () => { throw new Error('面板不再直接开画布页'); } } });
   const labels = texts(tree);
-  assert.ok(!labels.some((text) => /安装原版|打开无限画布|查看画布插件/.test(text)), '不再有第三方画布安装入口');
+  assert.ok(!labels.includes('流程画布'), '面板里不该再有流程画布区块');
+  assert.ok(!labels.some((text) => /安装原版|打开无限画布|查看画布插件|打开独立页面/.test(text)), '画布入口只留在左侧栏那一行');
+  // 画布页有自己的左侧栏入口与 main 槽：面板不渲染画布组件，也不转交 openCanvasPage。
+  const source = readFileSync(new URL('../src/businesses/video/client/panel.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /FlowCanvas/, '面板不再接收画布组件');
+  assert.doesNotMatch(source, /openCanvasPage/, '面板不再转交画布页入口');
+  assert.equal(find(tree, (node) => node.type === 'section' && node.props.className === 'movc'), null, '面板里没有画布容器');
 });

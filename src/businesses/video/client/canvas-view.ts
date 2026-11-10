@@ -20,7 +20,9 @@ export function duplicateNodePayload(node: any, spot: any) {
   return { type: node?.type || 'text', x: Number(spot?.x || 0) + 40, y: Number(spot?.y || 0) + 40, w: spot?.w, h: spot?.h, data };
 }
 
-export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
+export function createCanvasView({ React, h, TOKENS, stageHeight = 460, variant = 'panel' }: any) {
+  // 独立页面（variant='page'）空间更大：工具条排成一行、画布区占满剩余高度、控件字号大一号。
+  const ROOT_CLASS = variant === 'page' ? 'mov-section movc movc-page' : 'mov-section movc';
   const rpc = async (method: string, args: any = {}) => {
     const response = await fetch('/metaontic-video/canvas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ method, args }) });
     const body = await response.json().catch(() => ({}));
@@ -103,6 +105,20 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
 .movc-name-err { flex: 1 1 100%; font-size: 12px; color: #c0392b; }
 /* 弹窗里的按钮按内容自适应，不撑成设置页那种 120px 方块。 */
 .movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; white-space: nowrap; overflow-wrap: normal; }
+/* 独立页面：工具条一行放下（操作在左、选择画布在右），画布区吃掉剩余高度。 */
+.movc-page { gap: 14px; }
+.movc-page .movc-top { flex-direction: row; align-items: center; gap: 10px 14px; padding: 10px 14px; }
+.movc-page .movc-ops { flex: 1 1 auto; min-width: 0; }
+.movc-page .movc-ops .mov-btn { height: 34px; min-height: 34px; padding: 0 14px; font-size: 13px; }
+.movc-page .movc-picker { flex: 0 1 auto; min-width: 0; }
+.movc-page .movc-list { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; max-height: none; padding-bottom: 2px; }
+.movc-page .movc-chip { padding: 4px 13px; font-size: 13px; white-space: nowrap; }
+.movc-page .movc-name-text { font-size: 14px; }
+.movc-page .movc-node { padding: 10px 12px; }
+.movc-page .movc-node-title { font-size: 13px; }
+.movc-page .movc-body { font-size: 12px; }
+.movc-page .movc-mini { font-size: 12px; padding: 3px 10px; }
+.movc-page .movc-stage { height: clamp(520px, calc(100vh - 320px), 1400px); border-radius: 14px; }
 `;
 
   function nodeBody(node: any) {
@@ -469,7 +485,7 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
       ]),
     ]) : null;
 
-    return h('section', { className: 'mov-section movc' }, [
+    return h('section', { className: ROOT_CLASS }, [
       h('style', { key: 'css' }, CSS),
       h('div', { key: 'title', className: 'mov-section-title' }, '流程画布'),
       // 画布操作全部放最上面：先选画布、再操作当前画布，画布区只负责画本事。
@@ -499,7 +515,7 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
           canvas && selectedIds.length ? h('button', { key: 'del-selected', type: 'button', className: 'mov-btn movc-danger', onClick: () => void removeNodes(selectedIds) }, `删除选中（${selectedIds.length}）`) : null,
           canvas ? h('button', { key: 'del-canvas', type: 'button', className: 'mov-btn movc-danger', onClick: () => setConfirmDelete(true) }, '删除画布') : null,
         ]),
-        h('div', { key: 'picker', className: 'movc-bar' }, [
+        h('div', { key: 'picker', className: 'movc-bar movc-picker' }, [
           h('span', { key: 'pick-label', className: 'movc-pick' }, '选择画布'),
           list.length ? h('div', { key: 'list', className: 'movc-list' }, list.map(item =>
             h('button', { key: item.projectId, type: 'button', className: 'movc-chip', 'data-active': String(canvas?.projectId === item.projectId), onClick: () => void load(item.projectId) },

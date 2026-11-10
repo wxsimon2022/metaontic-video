@@ -38,8 +38,7 @@ test('standalone preview host mounts the real client and registers settings and 
   const opened = host.calls.at(-1);
   assert.equal(opened.action, 'openBundle');
   assert.equal(opened.bundle, 'metaontic-video');
-  panel.openCanvasPage();
-  const switched = host.calls.at(-1);
-  assert.equal(switched.action, 'selectPanel');
-  assert.equal(switched.id, 'metaontic-video-canvas');
+  // 流程画布只在独立页面：视频创作面板不再内嵌，也不再有跳转入口。
+  assert.equal(panel.openCanvasPage, undefined, '面板不再提供 openCanvasPage');
+  assert.equal(components['main:metaontic-video-canvas:props'], undefined, '画布页不需要宿主注入动作');
 });

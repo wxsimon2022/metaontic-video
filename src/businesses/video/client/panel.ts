@@ -1,5 +1,5 @@
 /** 浏览器端左侧栏面板：由入口注入宿主 React 与共享依赖。 */
-export function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG, FlowCanvas }: any) {
+export function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG }: any) {
     // 插件图标（icon.svg）由打包器当文本内联进来，转成 data URI 后用 <img> 渲染：
     // 不依赖宿主能否按路径取到插件资源，也不会和页面里其他 svg 的渐变 id 撞名。
     const LOGO_SRC = LOGO_SVG ? `data:image/svg+xml,${encodeURIComponent(LOGO_SVG)}` : '';
@@ -202,7 +202,6 @@ export function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GU
             }, t('panelGuide')),
           ]),
         ]),
-        FlowCanvas && h(FlowCanvas, { key: 'flow-canvas', onOpenPage: props?.openCanvasPage }),
         h('section', { key: 'flow', className: 'mov-section' }, [
           h('div', { key: 'flow-label', className: 'mov-section-title' }, t('panelFlow')),
           h('div', { key: 'flow-steps', className: 'mov-panel-flow' }, flowChildren),
