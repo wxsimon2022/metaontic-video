@@ -49,17 +49,25 @@ export function canvasVersionSupported(version: any) {
   return minor > 20 || (minor === 20 && patch >= 1);
 }
 export async function loadCanvasAdapter() {
+  const require = createRequire(import.meta.url);
+  const notInstalled = '画布联动需要已启用的原版 @ninkch/dsh-infinite-canvas 0.20.1 或更新版本；请在插件详情核对安装和启用状态，不会改写画布配置。';
+  let pkg: any;
   try {
-    const require = createRequire(import.meta.url);
-    const pkg = require('@ninkch/dsh-infinite-canvas/package.json');
-    if (!canvasVersionSupported(pkg.version)) throw new Error('version');
-    const module = await import(pathToFileURL(require.resolve('@ninkch/dsh-infinite-canvas')).href);
-    const internal = module._internals;
-    const rpc = internal?.rpcMethods?.();
-    if (!rpc?.projectsGet || !rpc?.projectsPut || !rpc?.assetsGet || !rpc?.assetCreate || !rpc?.projectDirGet || !rpc?.dataRootGet || !rpc?.projectsList) throw new Error('not-ready');
-    return { rpc, assetPath: (root, asset) => asset.sha ? internal.objectAbsFor(root, asset.sha) : path.resolve(root, internal.physicalRel(asset.rel)),
-      ...(typeof internal.canvasConnect === 'function' ? { connect: (args: any) => internal.canvasConnect(args) } : {}) };
-  } catch { throw new Error('画布联动需要已启用的原版 @ninkch/dsh-infinite-canvas 0.20.1 或更新版本；请在插件详情核对安装和启用状态，不会改写画布配置。'); }
+    pkg = require('@ninkch/dsh-infinite-canvas/package.json');
+  } catch { throw new Error(notInstalled); }
+  // 分开报出「版本不支持/装到一半坏了/接口不对」，否则用户只看到笼统一句，不知道该修哪一步。
+  if (!canvasVersionSupported(pkg?.version)) throw new Error(`画布联动暂不支持原版无限画布 ${pkg?.version || '未知版本'}；请升级到 0.20.1 或更新版本，不会改写画布配置。`);
+  let module: any;
+  try {
+    module = await import(pathToFileURL(require.resolve('@ninkch/dsh-infinite-canvas')).href);
+  } catch (error: any) {
+    throw new Error(`原版无限画布 ${pkg.version} 加载失败（安装可能不完整）：${error?.message || error}；请在插件详情重新安装该插件，不会改写画布配置。`);
+  }
+  const internal = module?._internals;
+  const rpc = internal?.rpcMethods?.();
+  if (!rpc?.projectsGet || !rpc?.projectsPut || !rpc?.assetsGet || !rpc?.assetCreate || !rpc?.projectDirGet || !rpc?.dataRootGet || !rpc?.projectsList) throw new Error(`原版无限画布 ${pkg.version} 缺少画布联动所需的接口；请确认安装的是原版 @ninkch/dsh-infinite-canvas，不会重新创建创作项目。`);
+  return { rpc, assetPath: (root, asset) => asset.sha ? internal.objectAbsFor(root, asset.sha) : path.resolve(root, internal.physicalRel(asset.rel)),
+    ...(typeof internal.canvasConnect === 'function' ? { connect: (args: any) => internal.canvasConnect(args) } : {}) };
 }
 /** 有向上游、原顺序和端口一并保留；只输出创作字段，不读取原版供应商配置。 */
 export async function readCanvasInput(adapter, link) {
