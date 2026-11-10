@@ -4809,23 +4809,37 @@ function location(link) {
   if (!validId(link?.projectId) || !validId(link?.nodeId) || link.canvasId && !validId(link.canvasId)) throw new Error("\u753B\u5E03\u9879\u76EE\u6216\u8282\u70B9\u6807\u8BC6\u65E0\u6548");
   return { id: link.projectId, ...link.canvasId ? { canvasId: link.canvasId } : {} };
 }
+function canvasVersionSupported(version) {
+  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(String(version ?? "").trim());
+  if (!match) return false;
+  const [major, minor, patch] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (major !== 0) return major > 0;
+  return minor > 20 || minor === 20 && patch >= 1;
+}
 async function loadCanvasAdapter() {
+  const require2 = createRequire2(import.meta.url);
+  const notInstalled = "\u753B\u5E03\u8054\u52A8\u9700\u8981\u5DF2\u542F\u7528\u7684\u539F\u7248 @ninkch/dsh-infinite-canvas 0.20.1 \u6216\u66F4\u65B0\u7248\u672C\uFF1B\u8BF7\u5728\u63D2\u4EF6\u8BE6\u60C5\u6838\u5BF9\u5B89\u88C5\u548C\u542F\u7528\u72B6\u6001\uFF0C\u4E0D\u4F1A\u6539\u5199\u753B\u5E03\u914D\u7F6E\u3002";
+  let pkg;
   try {
-    const require2 = createRequire2(import.meta.url);
-    const pkg = require2("@ninkch/dsh-infinite-canvas/package.json");
-    if (pkg.version !== "0.20.1") throw new Error("version");
-    const module = await import(pathToFileURL2(require2.resolve("@ninkch/dsh-infinite-canvas")).href);
-    const internal = module._internals;
-    const rpc = internal?.rpcMethods?.();
-    if (!rpc?.projectsGet || !rpc?.projectsPut || !rpc?.assetsGet || !rpc?.assetCreate || !rpc?.projectDirGet || !rpc?.dataRootGet || !rpc?.projectsList) throw new Error("not-ready");
-    return {
-      rpc,
-      assetPath: (root, asset) => asset.sha ? internal.objectAbsFor(root, asset.sha) : path17.resolve(root, internal.physicalRel(asset.rel)),
-      ...typeof internal.canvasConnect === "function" ? { connect: (args) => internal.canvasConnect(args) } : {}
-    };
+    pkg = require2("@ninkch/dsh-infinite-canvas/package.json");
   } catch {
-    throw new Error("\u753B\u5E03\u8054\u52A8\u9700\u8981\u5DF2\u542F\u7528\u7684\u539F\u7248 @ninkch/dsh-infinite-canvas 0.20.1\uFF1B\u8BF7\u5728\u63D2\u4EF6\u8BE6\u60C5\u6838\u5BF9\u5B89\u88C5\u548C\u542F\u7528\u72B6\u6001\uFF0C\u4E0D\u4F1A\u6539\u5199\u753B\u5E03\u914D\u7F6E\u3002");
+    throw new Error(notInstalled);
   }
+  if (!canvasVersionSupported(pkg?.version)) throw new Error(`\u753B\u5E03\u8054\u52A8\u6682\u4E0D\u652F\u6301\u539F\u7248\u65E0\u9650\u753B\u5E03 ${pkg?.version || "\u672A\u77E5\u7248\u672C"}\uFF1B\u8BF7\u5347\u7EA7\u5230 0.20.1 \u6216\u66F4\u65B0\u7248\u672C\uFF0C\u4E0D\u4F1A\u6539\u5199\u753B\u5E03\u914D\u7F6E\u3002`);
+  let module;
+  try {
+    module = await import(pathToFileURL2(require2.resolve("@ninkch/dsh-infinite-canvas")).href);
+  } catch (error) {
+    throw new Error(`\u539F\u7248\u65E0\u9650\u753B\u5E03 ${pkg.version} \u52A0\u8F7D\u5931\u8D25\uFF08\u5B89\u88C5\u53EF\u80FD\u4E0D\u5B8C\u6574\uFF09\uFF1A${error?.message || error}\uFF1B\u8BF7\u5728\u63D2\u4EF6\u8BE6\u60C5\u91CD\u65B0\u5B89\u88C5\u8BE5\u63D2\u4EF6\uFF0C\u4E0D\u4F1A\u6539\u5199\u753B\u5E03\u914D\u7F6E\u3002`);
+  }
+  const internal = module?._internals;
+  const rpc = internal?.rpcMethods?.();
+  if (!rpc?.projectsGet || !rpc?.projectsPut || !rpc?.assetsGet || !rpc?.assetCreate || !rpc?.projectDirGet || !rpc?.dataRootGet || !rpc?.projectsList) throw new Error(`\u539F\u7248\u65E0\u9650\u753B\u5E03 ${pkg.version} \u7F3A\u5C11\u753B\u5E03\u8054\u52A8\u6240\u9700\u7684\u63A5\u53E3\uFF1B\u8BF7\u786E\u8BA4\u5B89\u88C5\u7684\u662F\u539F\u7248 @ninkch/dsh-infinite-canvas\uFF0C\u4E0D\u4F1A\u91CD\u65B0\u521B\u5EFA\u521B\u4F5C\u9879\u76EE\u3002`);
+  return {
+    rpc,
+    assetPath: (root, asset) => asset.sha ? internal.objectAbsFor(root, asset.sha) : path17.resolve(root, internal.physicalRel(asset.rel)),
+    ...typeof internal.canvasConnect === "function" ? { connect: (args) => internal.canvasConnect(args) } : {}
+  };
 }
 async function readCanvasInput(adapter, link) {
   const doc = await adapter.rpc.projectsGet(location(link));
@@ -5174,8 +5188,9 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
       let adapter;
       try {
         adapter = await load();
-      } catch {
-        return { status: "unavailable", reason: "\u81EA\u52A8\u753B\u5E03\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u5B89\u88C5\u5E76\u542F\u7528\u539F\u7248\u65E0\u9650\u753B\u5E030.20.1\uFF1B\u521B\u4F5C\u9879\u76EE\u5DF2\u4FDD\u7559\u3002" };
+      } catch (error) {
+        const reason = String(error?.message || "").trim() || "\u81EA\u52A8\u753B\u5E03\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u5B89\u88C5\u5E76\u542F\u7528\u539F\u7248\u65E0\u9650\u753B\u5E030.20.1 \u6216\u66F4\u65B0\u7248\u672C\u3002";
+        return { status: "unavailable", reason: `${reason}\u521B\u4F5C\u9879\u76EE\u5DF2\u4FDD\u7559\uFF0C\u53EF\u67E5\u8BE2\u9879\u76EE\u72B6\u6001\u91CD\u8BD5\u540C\u6B65\u3002` };
       }
       const rpc = adapter.rpc;
       let conversationName = "";
