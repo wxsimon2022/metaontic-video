@@ -4,8 +4,19 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { readProject, writeProject, lockProject, projectsOfSession, allProjects } from '../workflow/project.js';
 import { ref } from '../config.js';
-import { loadCanvasAdapter, readCanvasInput, markCanvasChanged } from './canvas.js';
+import { loadCanvasAdapter, readCanvasInput, markCanvasChanged, resolveCanvasAdapter } from './canvas.js';
+import { builtinCanvasAdapter, BUILTIN_BACKEND } from './canvas-builtin.js';
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+
+/** 后端只决定「新建的流程画布写到哪里」：老绑定沿用原版项目，新建默认写内置画布，
+ *  这样原版装没装、版本好坏都不再挡住流程画布；设置里可强制回原版。 */
+async function adapterForNewCanvas(binding: any, load: any, config: any) {
+  if (binding?.projectId) return resolveCanvasAdapter(binding.projectId, load);
+  // 显式注入的加载器（备用实现/自动化检查）优先，默认加载器才走内置画布。
+  if (load !== loadCanvasAdapter) return load();
+  if (binding?.backend === 'original' || ref(config, 'canvasBackend', BUILTIN_BACKEND) === 'original') return load();
+  return builtinCanvasAdapter();
+}
 
 /** 提取真实剧本分镜表；没有明确的镜头/画面列时不编造镜头或秒数。 */
 export function scriptStoryboardShots(script: string) {
@@ -77,7 +88,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       draft = { ...(project.canvasDraft || { scriptPath: project.approved?.scriptPath, specification: project.approved?.specification }), ...draft };
       if (draft.specification?.canvas) return { status: 'external', projectId: draft.specification.canvas.projectId, reason: '沿用用户选择的原画布，不另建项目。' };
       let adapter;
-      try { adapter = await load(); }
+      try { adapter = await adapterForNewCanvas(project.canvasAuto, load, config); }
       catch (error: any) {
         // 适配失败可能是没装、版本不支持或装了但加载失败，用适配给出的具体原因，用户才知道怎么修。
         const reason = String(error?.message || '').trim() || '自动画布尚未就绪，请安装并启用原版无限画布0.20.1 或更新版本。';
@@ -92,7 +103,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       // 画布名与会话标题同源，不带创作项目 id；标题未生成时用中性名，冲突时再接序号。
       const baseName = conversationName || 'MetaOntic 创作画布';
       if (!project.canvasAuto) {
-        project.canvasAuto = { version: 1, name: baseName, nodes: {}, links: {} };
+        project.canvasAuto = { version: 1, name: baseName, nodes: {}, links: {}, backend: adapter.backend === BUILTIN_BACKEND ? BUILTIN_BACKEND : 'original' };
         await writeProject(project);
       }
       const binding = project.canvasAuto;
@@ -243,7 +254,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
         if (!binding?.projectId) continue;
         try {
           await lockProject(`canvas:${project.id}`, async () => {
-            const adapter = await load();
+            const adapter = await adapterForNewCanvas(binding, load, config);
             const loc = { id: binding.projectId };
             const doc = await adapter.rpc.projectsGet(loc);
             if (!doc?.nodes || doc.deleted) return;

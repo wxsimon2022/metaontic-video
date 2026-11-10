@@ -291,17 +291,17 @@ function getInner(value) {
 function extractKeys(data) {
   return filterKeys(data ?? {}, (key) => !key.startsWith("$"));
 }
-function validateVolatileSchema(schema, path23 = [], blocked2 = false, seen = /* @__PURE__ */ new Map()) {
+function validateVolatileSchema(schema, path24 = [], blocked2 = false, seen = /* @__PURE__ */ new Map()) {
   const states = seen.get(schema) ?? /* @__PURE__ */ new Set();
   if (states.has(blocked2)) return;
   states.add(blocked2);
   seen.set(schema, states);
-  if (schema.meta?.volatile && blocked2) throw new ValidationError("volatile fields require a fixed object path without an enclosing volatile field", { path: path23 });
+  if (schema.meta?.volatile && blocked2) throw new ValidationError("volatile fields require a fixed object path without an enclosing volatile field", { path: path24 });
   const nested = blocked2 || !!schema.meta?.volatile;
-  if (schema.dict) for (const [key, child] of Object.entries(schema.dict)) validateVolatileSchema(child, [...path23, key], nested, seen);
-  if (schema.sKey) validateVolatileSchema(schema.sKey, [...path23, "<key>"], true, seen);
-  if (schema.inner && (schema.type !== "lazy" || schema.inner[kSchema])) validateVolatileSchema(schema.inner, [...path23, "*"], true, seen);
-  if (schema.list) for (let index = 0; index < schema.list.length; index++) validateVolatileSchema(schema.list[index], [...path23, String(index)], true, seen);
+  if (schema.dict) for (const [key, child] of Object.entries(schema.dict)) validateVolatileSchema(child, [...path24, key], nested, seen);
+  if (schema.sKey) validateVolatileSchema(schema.sKey, [...path24, "<key>"], true, seen);
+  if (schema.inner && (schema.type !== "lazy" || schema.inner[kSchema])) validateVolatileSchema(schema.inner, [...path24, "*"], true, seen);
+  if (schema.list) for (let index = 0; index < schema.list.length; index++) validateVolatileSchema(schema.list[index], [...path24, String(index)], true, seen);
 }
 function checkWithinRange(data, meta, description, options, skipMin = false) {
   const { max = Infinity, min = -Infinity } = meta;
@@ -1091,8 +1091,8 @@ function resolveSubmitPath(config) {
 }
 function resolveQueryPath(config, taskId) {
   if (isVolcengine(config)) return `/api/v3/contents/generations/tasks/${encodeURIComponent(taskId)}`;
-  const path23 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
-  return path23.replace("{task_id}", encodeURIComponent(taskId));
+  const path24 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
+  return path24.replace("{task_id}", encodeURIComponent(taskId));
 }
 function resolveModel(config) {
   const preset = relayPreset();
@@ -4143,8 +4143,8 @@ async function fetchActualCost(config, taskIds, signal) {
   const base = resolveBaseUrl(config).replace(/\/v1\/?$/, "");
   if (!key || !base) return pending("\u8D39\u7528\u5F85\u67E5\u8BE2\uFF1A\u539F\u8C03\u7528\u8FDE\u63A5\u4E0D\u53EF\u7528\u3002");
   const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(8e3)]) : AbortSignal.timeout(8e3);
-  async function get(path23, authenticated) {
-    const response = await fetch(`${base}${path23}`, {
+  async function get(path24, authenticated) {
+    const response = await fetch(`${base}${path24}`, {
       method: "GET",
       redirect: "error",
       signal: requestSignal,
@@ -4353,14 +4353,14 @@ function findKey(payload, keys, depth = Infinity) {
   }
   return void 0;
 }
-function collectUrls(payload, path23 = [], found = []) {
+function collectUrls(payload, path24 = [], found = []) {
   if (typeof payload === "string") {
-    if (/^https?:\/\//i.test(payload)) found.push([path23, payload]);
+    if (/^https?:\/\//i.test(payload)) found.push([path24, payload]);
   } else if (Array.isArray(payload)) {
-    for (const item of payload) collectUrls(item, path23, found);
+    for (const item of payload) collectUrls(item, path24, found);
   } else if (payload && typeof payload === "object") {
     for (const [key, value] of Object.entries(payload)) {
-      collectUrls(value, [...path23, key], found);
+      collectUrls(value, [...path24, key], found);
     }
   }
   return found;
@@ -4378,22 +4378,22 @@ function extractTaskId(payload) {
 }
 function extractVideoUrl(payload) {
   const candidates = collectUrls(payload).filter(
-    ([path23, url]) => !looksLikeImageUrl(url) && !path23.some(isImageKey)
+    ([path24, url]) => !looksLikeImageUrl(url) && !path24.some(isImageKey)
   );
   if (!candidates.length) return void 0;
   for (const wanted of VIDEO_URL_KEYS) {
-    for (const [path23, url] of candidates) {
-      if (path23.length && String(path23.at(-1)).toLowerCase() === wanted) return url;
+    for (const [path24, url] of candidates) {
+      if (path24.length && String(path24.at(-1)).toLowerCase() === wanted) return url;
     }
   }
-  for (const [path23, url] of candidates) {
-    if (path23.length && GENERIC_URL_KEYS.has(String(path23.at(-1)).toLowerCase())) return url;
+  for (const [path24, url] of candidates) {
+    if (path24.length && GENERIC_URL_KEYS.has(String(path24.at(-1)).toLowerCase())) return url;
   }
   return candidates[0][1];
 }
 function extractImageUrl(payload) {
   const found = collectUrls(payload).find(
-    ([path23, url]) => looksLikeImageUrl(url) || path23.some(isImageKey)
+    ([path24, url]) => looksLikeImageUrl(url) || path24.some(isImageKey)
   );
   return found?.[1];
 }
@@ -4450,8 +4450,8 @@ async function relayRequest(config, requestPath, options = {}) {
     throw error;
   }
 }
-async function relayRequestCore(config, path23, { method = "GET", body, signal } = {}, trace = {}) {
-  const url = `${resolveBaseUrl(config)}${path23}`;
+async function relayRequestCore(config, path24, { method = "GET", body, signal } = {}, trace = {}) {
+  const url = `${resolveBaseUrl(config)}${path24}`;
   const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   const serialized = body === void 0 ? void 0 : JSON.stringify(body);
@@ -4734,19 +4734,276 @@ function submissionTool(liveConfig) {
 // src/businesses/video/integrations/canvas.ts
 import { createRequire as createRequire2 } from "node:module";
 import { pathToFileURL as pathToFileURL2 } from "node:url";
-import { createHash as createHash5, randomUUID as randomUUID7 } from "node:crypto";
-import { mkdir as mkdir10, readFile as readFile9, writeFile as writeFile7, rename as rename8, copyFile, stat as stat6, open as open4 } from "node:fs/promises";
-import path17 from "node:path";
+import { createHash as createHash5, randomUUID as randomUUID8 } from "node:crypto";
+import { mkdir as mkdir11, readFile as readFile10, writeFile as writeFile8, rename as rename9, copyFile, stat as stat7, open as open4 } from "node:fs/promises";
+import path18 from "node:path";
+
+// src/businesses/video/integrations/canvas-builtin.ts
+import { mkdir as mkdir9, readFile as readFile9, writeFile as writeFile7, rename as rename7, readdir as readdir5, stat as stat6 } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { randomUUID as randomUUID7 } from "node:crypto";
+import path16 from "node:path";
+var BUILTIN_BACKEND = "builtin";
+var validId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
+var storeDir = () => path16.join(dshHome(), "metaontic-video", "canvas");
+var docsDir = () => path16.join(storeDir(), "projects");
+var dataRootOf = () => path16.join(storeDir(), "data");
+var assetsFile = () => path16.join(storeDir(), "assets.json");
+var docFile = (id) => {
+  if (!validId(id)) throw new Error("\u753B\u5E03\u9879\u76EE\u6807\u8BC6\u65E0\u6548");
+  return path16.join(docsDir(), `${id}.json`);
+};
+async function readJson(file, fallback = null) {
+  try {
+    return JSON.parse(await readFile9(file, "utf8"));
+  } catch {
+    return fallback;
+  }
+}
+async function writeJson(file, value) {
+  await mkdir9(path16.dirname(file), { recursive: true, mode: 448 });
+  const temp = `${file}.${randomUUID7()}.tmp`;
+  await writeFile7(temp, JSON.stringify(value), { mode: 384, flag: "wx" });
+  await rename7(temp, file);
+}
+async function builtinCanvasExists(projectId) {
+  if (!validId(projectId)) return false;
+  return Boolean(await readJson(docFile(projectId)));
+}
+async function readDoc(id) {
+  return readJson(docFile(id));
+}
+async function writeDoc(id, doc) {
+  await writeJson(docFile(id), doc);
+}
+async function allDocs() {
+  const names = await readdir5(docsDir()).catch(() => []);
+  const docs = [];
+  for (const name of names) if (name.endsWith(".json")) {
+    const doc = await readJson(path16.join(docsDir(), name));
+    if (doc?.id) docs.push(doc);
+  }
+  return docs.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+}
+async function readAssets() {
+  return await readJson(assetsFile(), {}) || {};
+}
+async function writeAssets(assets) {
+  await writeJson(assetsFile(), assets);
+}
+var newId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+function mergeDoc(id, prev, args) {
+  const incoming = args?.doc || {};
+  const tombstones = [.../* @__PURE__ */ new Set([...prev?.tombstones || [], ...incoming.tombstones || []])];
+  const edgeTombstones = [.../* @__PURE__ */ new Set([...prev?.edgeTombstones || [], ...incoming.edgeTombstones || []])];
+  const nodes = { ...incoming.nodes !== void 0 ? incoming.nodes : prev?.nodes || {} };
+  const edges = [...incoming.edges !== void 0 ? incoming.edges : prev?.edges || []];
+  for (const gone of tombstones) delete nodes[gone];
+  const kept = edges.filter((edge) => edge?.id && !edgeTombstones.includes(edge.id) && nodes[edge.fromNode] && nodes[edge.toNode]);
+  return {
+    id,
+    createdAt: prev?.createdAt || incoming.createdAt || Date.now(),
+    updatedAt: Date.now(),
+    name: String(args?.name || prev?.name || id).slice(0, 80),
+    ...args?.defaultCanvasName !== void 0 ? { defaultCanvasName: String(args.defaultCanvasName).slice(0, 80) } : prev?.defaultCanvasName !== void 0 ? { defaultCanvasName: prev.defaultCanvasName } : {},
+    ...incoming.bible !== void 0 ? { bible: incoming.bible } : prev?.bible !== void 0 ? { bible: prev.bible } : {},
+    nodes,
+    edges,
+    view: incoming.view || prev?.view || { x: 60, y: 40, scale: 1 },
+    assets: { ...prev?.assets || {}, ...incoming.assets || {} },
+    tombstones,
+    edgeTombstones,
+    rev: (prev?.rev || 0) + 1,
+    ...incoming.ts ? { ts: incoming.ts } : {}
+  };
+}
+function builtinRpc() {
+  return {
+    async projectsGet(args) {
+      const doc = await readDoc(args?.id);
+      if (!doc) return { id: args?.id, nodes: {}, edges: [], missing: true };
+      return { ...doc, nodeIds: Object.keys(doc.nodes || {}) };
+    },
+    async projectsPut(args) {
+      const id = String(args?.id || "");
+      const prev = await readDoc(id);
+      const next = mergeDoc(id, prev, args);
+      next.assets = { ...prev?.assets || {} };
+      await writeDoc(id, next);
+      return { ok: true, id, rev: next.rev };
+    },
+    async projectsList() {
+      return (await allDocs()).map((doc) => ({ id: doc.id, name: doc.name, updatedAt: doc.updatedAt, nodeIds: Object.keys(doc.nodes || {}), nodeCount: Object.keys(doc.nodes || {}).length }));
+    },
+    async projectsDelete(args) {
+      await writeDoc(String(args?.id || ""), { id: args?.id, deleted: true, nodes: {}, edges: [], updatedAt: Date.now() });
+      return { ok: true, deleted: true };
+    },
+    async assetsGet(args) {
+      const assets = await readAssets();
+      return { items: (args?.ids || []).map((id) => assets[id]).filter(Boolean) };
+    },
+    async assetCreate(args) {
+      const asset = args?.asset;
+      if (!asset?.id) throw new Error("\u753B\u5E03\u8D44\u4EA7\u6807\u8BC6\u65E0\u6548");
+      const assets = await readAssets();
+      assets[asset.id] = { ...asset, projectName: args?.projectName || "" };
+      await writeAssets(assets);
+      const doc = await readDoc(asset.projectId);
+      if (doc) {
+        doc.assets = { ...doc.assets || {}, [asset.id]: assets[asset.id] };
+        await writeDoc(doc.id, doc);
+      }
+      return { ok: true, id: asset.id };
+    },
+    async dataRootGet() {
+      return { dataRoot: dataRootOf(), exists: true, store: "builtin" };
+    },
+    async projectDirGet(args) {
+      const id = String(args?.projectId || "");
+      if (!validId(id)) return { ok: false };
+      return { ok: true, dataRoot: dataRootOf(), abs: path16.join(dataRootOf(), "projects", id) };
+    },
+    async canvasCreateProject(args) {
+      const name = String(args?.name || "").trim().slice(0, 80) || "MetaOntic \u521B\u4F5C\u753B\u5E03";
+      const empty = (await allDocs()).find((doc) => doc.name === name && !Object.keys(doc.nodes || {}).length && !doc.claimedBy);
+      if (empty) return { ok: true, projectId: empty.id, name, reused: true };
+      const id = newId();
+      await writeDoc(id, { id, createdAt: Date.now(), updatedAt: Date.now(), name, nodes: {}, edges: [], view: { x: 60, y: 40, scale: 1 }, rev: 1 });
+      return { ok: true, projectId: id, name };
+    },
+    async canvasRename(args) {
+      const doc = await readDoc(args?.projectId);
+      if (!doc) return { ok: false };
+      doc.name = String(args?.name || doc.name).slice(0, 80);
+      doc.updatedAt = Date.now();
+      doc.rev = (doc.rev || 0) + 1;
+      await writeDoc(doc.id, doc);
+      return { ok: true, id: doc.id, name: doc.name };
+    },
+    async canvasOpen() {
+      return { ok: true };
+    }
+  };
+}
+function createBuiltinConnect() {
+  return async (args) => {
+    const id = String(args?.projectId || "");
+    const doc = await readDoc(id);
+    if (!doc?.nodes) return { ok: false };
+    const from2 = String(args?.fromNode || ""), to = String(args?.toNode || "");
+    if (!doc.nodes[from2] || !doc.nodes[to]) return { ok: false };
+    if ((doc.edges || []).some((edge2) => edge2.fromNode === from2 && edge2.toNode === to)) return { ok: true, already: true };
+    const edge = {
+      id: `mov_conn_${randomUUID7().replaceAll("-", "").slice(0, 16)}`,
+      fromNode: from2,
+      toNode: to,
+      ...args?.fromPort ? { fromPort: args.fromPort } : {},
+      ...args?.toPort ? { toPort: args.toPort } : {}
+    };
+    doc.edges = [...doc.edges || [], edge];
+    doc.updatedAt = Date.now();
+    doc.rev = (doc.rev || 0) + 1;
+    await writeDoc(id, doc);
+    return { ok: true, id: edge.id };
+  };
+}
+function builtinCanvasAdapter() {
+  const rpc = builtinRpc();
+  return { backend: BUILTIN_BACKEND, rpc, assetPath: (root, asset) => path16.resolve(root, String(asset?.rel || "")), connect: createBuiltinConnect() };
+}
+async function builtinCanvasList() {
+  return (await allDocs()).map((doc) => ({ projectId: doc.id, name: doc.name, updatedAt: doc.updatedAt || 0, nodeCount: Object.keys(doc.nodes || {}).length }));
+}
+async function builtinCanvasHandle(args) {
+  const method = String(args?.method || "");
+  const params = args?.args || {};
+  if (method === "list") return { canvases: await builtinCanvasList() };
+  if (method === "get") {
+    const doc = await readDoc(params.projectId);
+    if (!doc || doc.deleted) throw new Error("\u753B\u5E03\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");
+    return { canvas: {
+      projectId: doc.id,
+      name: doc.name,
+      updatedAt: doc.updatedAt || 0,
+      view: doc.view || { x: 60, y: 40, scale: 1 },
+      nodes: doc.nodes || {},
+      edges: doc.edges || [],
+      dataRoot: dataRootOf()
+    } };
+  }
+  if (method === "rename") {
+    const doc = await readDoc(params.projectId);
+    if (!doc) throw new Error("\u753B\u5E03\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");
+    const name = String(params.name || "").trim().slice(0, 80);
+    if (!name) throw new Error("\u753B\u5E03\u540D\u4E0D\u80FD\u4E3A\u7A7A\u3002");
+    doc.name = name;
+    doc.updatedAt = Date.now();
+    doc.rev = (doc.rev || 0) + 1;
+    await writeDoc(doc.id, doc);
+    return { canvas: { projectId: doc.id, name: doc.name } };
+  }
+  throw new Error("\u672A\u77E5\u753B\u5E03\u64CD\u4F5C\u3002");
+}
+function registerBuiltinCanvas(ctx) {
+  return ctx.inject(["webServer"], (scope) => {
+    if (typeof scope.webServer?.register !== "function") return;
+    const removeMedia = scope.webServer.register({ kind: "exact", path: "/metaontic-video/canvas-media", async handler(req, res) {
+      try {
+        if (req.method !== "GET") throw new Error("\u4EC5\u63A5\u53D7GET\u3002");
+        const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+        if (req.headers["sec-fetch-site"] === "cross-site") throw new Error("\u8BF7\u6C42\u6765\u6E90\u65E0\u6548\u3002");
+        const assets = await readAssets();
+        const asset = assets[String(url.searchParams.get("assetId") || "")];
+        const root = dataRootOf();
+        if (!asset?.rel) throw new Error("\u7D20\u6750\u4E0D\u5B58\u5728\u3002");
+        const file = path16.resolve(root, String(asset.rel));
+        if (!file.startsWith(root + path16.sep)) throw new Error("\u7D20\u6750\u8DEF\u5F84\u65E0\u6548\u3002");
+        const info = await stat6(file);
+        if (!info.isFile()) throw new Error("\u7D20\u6750\u4E0D\u5B58\u5728\u3002");
+        res.setHeader("content-type", asset.mime || "application/octet-stream");
+        res.setHeader("content-length", String(info.size));
+        res.setHeader("cache-control", "private, max-age=300");
+        createReadStream(file).pipe(res);
+      } catch (e) {
+        res.statusCode = 404;
+        res.end();
+      }
+    } });
+    const remove = scope.webServer.register({ kind: "exact", path: "/metaontic-video/canvas", async handler(req, res) {
+      res.setHeader("content-type", "application/json; charset=utf-8");
+      res.setHeader("cache-control", "no-store");
+      try {
+        if (req.method !== "POST") throw new Error("\u4EC5\u63A5\u53D7POST\u3002");
+        if (req.headers["sec-fetch-site"] === "cross-site" || req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) throw new Error("\u8BF7\u6C42\u6765\u6E90\u65E0\u6548\u3002");
+        if (!String(req.headers["content-type"] || "").startsWith("application/json")) throw new Error("\u8BF7\u6C42\u7C7B\u578B\u65E0\u6548\u3002");
+        let raw = "";
+        for await (const chunk of req) {
+          raw += chunk;
+          if (raw.length > 2e5) throw new Error("\u8BF7\u6C42\u8FC7\u5927\u3002");
+        }
+        res.end(JSON.stringify(await builtinCanvasHandle(JSON.parse(raw))));
+      } catch (e) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: String(e?.message || "\u753B\u5E03\u64CD\u4F5C\u672A\u5B8C\u6210\u3002") }));
+      }
+    } });
+    return () => {
+      if (typeof remove === "function") remove();
+      if (typeof removeMedia === "function") removeMedia();
+    };
+  });
+}
 
 // src/businesses/video/media/download.ts
-import { mkdir as mkdir9, rename as rename7, rm as rm7 } from "node:fs/promises";
-import path16 from "node:path";
+import { mkdir as mkdir10, rename as rename8, rm as rm7 } from "node:fs/promises";
+import path17 from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { createWriteStream } from "node:fs";
 var DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1e3;
 async function downloadFile(url, destPath, { signal } = {}) {
-  await mkdir9(path16.dirname(destPath), { recursive: true });
+  await mkdir10(path17.dirname(destPath), { recursive: true });
   const partial = `${destPath}.${uniqueSuffix("part")}`;
   const timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -4763,7 +5020,7 @@ async function downloadFile(url, destPath, { signal } = {}) {
       });
     }
     await pipeline(Readable.fromWeb(response.body), createWriteStream(partial));
-    await rename7(partial, destPath);
+    await rename8(partial, destPath);
     return destPath;
   } catch (error) {
     await rm7(partial, { force: true }).catch(() => {
@@ -4804,9 +5061,9 @@ var canvasLinkSchema = { type: "object", properties: {
   fingerprint: { type: "string" }
 }, required: ["projectId", "nodeId", "fingerprint"], description: "video_canvas(action:read)\u8FD4\u56DE\u7684\u539F\u7248\u753B\u5E03\u5B9A\u4F4D\u4E0E\u5185\u5BB9\u6458\u8981\uFF1B\u539F\u6837\u4F20\u5165\uFF0C\u4E0D\u731C\u6D4B\u3002" };
 var digest = (value) => createHash5("sha256").update(JSON.stringify(value)).digest("hex");
-var validId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
+var validId2 = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 function location(link) {
-  if (!validId(link?.projectId) || !validId(link?.nodeId) || link.canvasId && !validId(link.canvasId)) throw new Error("\u753B\u5E03\u9879\u76EE\u6216\u8282\u70B9\u6807\u8BC6\u65E0\u6548");
+  if (!validId2(link?.projectId) || !validId2(link?.nodeId) || link.canvasId && !validId2(link.canvasId)) throw new Error("\u753B\u5E03\u9879\u76EE\u6216\u8282\u70B9\u6807\u8BC6\u65E0\u6548");
   return { id: link.projectId, ...link.canvasId ? { canvasId: link.canvasId } : {} };
 }
 function canvasVersionSupported(version) {
@@ -4837,9 +5094,13 @@ async function loadCanvasAdapter() {
   if (!rpc?.projectsGet || !rpc?.projectsPut || !rpc?.assetsGet || !rpc?.assetCreate || !rpc?.projectDirGet || !rpc?.dataRootGet || !rpc?.projectsList) throw new Error(`\u539F\u7248\u65E0\u9650\u753B\u5E03 ${pkg.version} \u7F3A\u5C11\u753B\u5E03\u8054\u52A8\u6240\u9700\u7684\u63A5\u53E3\uFF1B\u8BF7\u786E\u8BA4\u5B89\u88C5\u7684\u662F\u539F\u7248 @ninkch/dsh-infinite-canvas\uFF0C\u4E0D\u4F1A\u91CD\u65B0\u521B\u5EFA\u521B\u4F5C\u9879\u76EE\u3002`);
   return {
     rpc,
-    assetPath: (root, asset) => asset.sha ? internal.objectAbsFor(root, asset.sha) : path17.resolve(root, internal.physicalRel(asset.rel)),
+    assetPath: (root, asset) => asset.sha ? internal.objectAbsFor(root, asset.sha) : path18.resolve(root, internal.physicalRel(asset.rel)),
     ...typeof internal.canvasConnect === "function" ? { connect: (args) => internal.canvasConnect(args) } : {}
   };
+}
+async function resolveCanvasAdapter(projectId, load = loadCanvasAdapter) {
+  if (projectId && await builtinCanvasExists(projectId)) return builtinCanvasAdapter();
+  return load();
 }
 async function readCanvasInput(adapter, link) {
   const doc = await adapter.rpc.projectsGet(location(link));
@@ -4890,8 +5151,8 @@ async function readCanvasInput(adapter, link) {
     const a = records.find((a2) => a2.id === node.assetId);
     if (!a || !["image", "video"].includes(a.kind) || !a.rel && !a.sha) throw new Error("\u4E0A\u6E38\u5A92\u4F53\u8D44\u4EA7\u672A\u843D\u76D8\uFF0C\u8BF7\u5148\u5728\u753B\u5E03\u4E2D\u4FDD\u5B58\u7D20\u6750\u3002");
     const file = adapter.assetPath(root, a);
-    if (!(await stat6(file)).isFile()) throw new Error("\u753B\u5E03\u53C2\u8003\u7D20\u6750\u6587\u4EF6\u4E0D\u5B58\u5728\u3002");
-    const info = await stat6(file);
+    if (!(await stat7(file)).isFile()) throw new Error("\u753B\u5E03\u53C2\u8003\u7D20\u6750\u6587\u4EF6\u4E0D\u5B58\u5728\u3002");
+    const info = await stat7(file);
     references.push({ nodeId: node.id, assetId: a.id, kind: a.kind, path: file, size: info.size, modified: info.mtimeMs });
   }
   const b = doc.bible || {};
@@ -4908,14 +5169,14 @@ async function readCanvasInput(adapter, link) {
 }
 function resultFile(token) {
   if (!/^[a-f0-9-]{36}$/.test(String(token || ""))) throw new Error("\u56DE\u586B\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548");
-  return path17.join(dshHome(), "metaontic-video", "canvas-results", `${token}.json`);
+  return path18.join(dshHome(), "metaontic-video", "canvas-results", `${token}.json`);
 }
 async function saveRecord(record) {
   const file = resultFile(record.id);
-  await mkdir10(path17.dirname(file), { recursive: true, mode: 448 });
-  const temp = `${file}.${randomUUID7()}.tmp`;
-  await writeFile7(temp, JSON.stringify(record), { mode: 384, flag: "wx" });
-  await rename8(temp, file);
+  await mkdir11(path18.dirname(file), { recursive: true, mode: 448 });
+  const temp = `${file}.${randomUUID8()}.tmp`;
+  await writeFile8(temp, JSON.stringify(record), { mode: 384, flag: "wx" });
+  await rename9(temp, file);
 }
 async function publishCanvasResult(adapter, record) {
   const loc = location(record.canvas);
@@ -4928,24 +5189,24 @@ async function publishCanvasResult(adapter, record) {
   for (const [index, media] of record.media.entries()) {
     const id = `mov_${digest({ canvas: record.canvas, media }).slice(0, 24)}`;
     const extension = media.kind === "image" ? ".png" : ".mp4";
-    let dest = path17.join(dir.abs, media.kind, `${id}${extension}`);
+    let dest = path18.join(dir.abs, media.kind, `${id}${extension}`);
     let rel = `projects/${record.canvas.projectId}/${media.kind}/${id}${extension}`;
     if (media.kind === "image") {
       for (const suffix of [".jpg", ".webp"]) {
         const existing = dest.replace(/\.png$/, suffix);
-        if ((await stat6(existing).catch(() => null))?.isFile()) {
+        if ((await stat7(existing).catch(() => null))?.isFile()) {
           dest = existing;
           rel = rel.replace(/\.png$/, suffix);
           break;
         }
       }
     }
-    if (!(await stat6(dest).catch(() => null))?.isFile()) {
-      await mkdir10(path17.dirname(dest), { recursive: true });
+    if (!(await stat7(dest).catch(() => null))?.isFile()) {
+      await mkdir11(path18.dirname(dest), { recursive: true });
       if (media.localPath) {
-        const tmp = `${dest}.${randomUUID7()}.tmp`;
+        const tmp = `${dest}.${randomUUID8()}.tmp`;
         await copyFile(media.localPath, tmp);
-        await rename8(tmp, dest);
+        await rename9(tmp, dest);
       } else {
         const url = new URL(media.url);
         if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("\u6210\u679CURL\u683C\u5F0F\u65E0\u6548");
@@ -4968,11 +5229,11 @@ async function publishCanvasResult(adapter, record) {
     if (dest.endsWith(".png") && (mime === "image/jpeg" || mime === "image/webp")) {
       const suffix = mime === "image/jpeg" ? ".jpg" : ".webp";
       const corrected = dest.replace(/\.png$/, suffix);
-      await rename8(dest, corrected);
+      await rename9(dest, corrected);
       dest = corrected;
       rel = rel.replace(/\.png$/, suffix);
     }
-    const created = await adapter.rpc.assetCreate({ projectName: doc.name || "", asset: { id, projectId: record.canvas.projectId, kind: media.kind, mime, name: media.label, rel, size: (await stat6(dest)).size, createdAt: record.createdAt, stored: "disk", source: "metaontic-video" } });
+    const created = await adapter.rpc.assetCreate({ projectName: doc.name || "", asset: { id, projectId: record.canvas.projectId, kind: media.kind, mime, name: media.label, rel, size: (await stat7(dest)).size, createdAt: record.createdAt, stored: "disk", source: "metaontic-video" } });
     if (created?.ok === false) throw new Error("\u753B\u5E03\u8D44\u4EA7\u767B\u8BB0\u5931\u8D25");
     publications.push({ id, media, index });
   }
@@ -5029,9 +5290,9 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
     if (busy.has(token)) throw new Error("\u6B64\u6210\u679C\u6B63\u5728\u56DE\u586B\uFF0C\u8BF7\u7A0D\u540E\u67E5\u8BE2\u3002");
     busy.add(token);
     try {
-      const record = JSON.parse(await readFile9(resultFile(token), "utf8"));
+      const record = JSON.parse(await readFile10(resultFile(token), "utf8"));
       if (record.owner !== sessionOwner(exec)) throw new Error("\u6B64\u6210\u679C\u4E0D\u5C5E\u4E8E\u5F53\u524D\u4F1A\u8BDD");
-      return await publishCanvasResult(await load(), record);
+      return await publishCanvasResult(await resolveCanvasAdapter(record?.canvas?.projectId, load), record);
     } finally {
       busy.delete(token);
     }
@@ -5052,13 +5313,13 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
       }
       if (canvas) {
         sessionOwner(exec);
-        const input = await readCanvasInput(await load(), canvas);
+        const input = await readCanvasInput(await resolveCanvasAdapter(canvas?.projectId, load), canvas);
         if (input.canvas.fingerprint !== canvas.fingerprint) throw new Error("\u753B\u5E03\u5185\u5BB9\u6216\u53C2\u8003\u7D20\u6750\u5DF2\u4FEE\u6539\uFF0C\u8BF7\u91CD\u65B0\u8BFB\u53D6\u5E76\u5BA1\u6838\uFF1B\u672A\u63D0\u4EA4\u751F\u6210\u4EFB\u52A1\u3002");
       }
       const showState = async (text) => {
         if (!canvas || !["video_generate", "video_extend"].includes(tool2.name)) return;
         try {
-          const adapter = await load(), loc = location(canvas), doc = await adapter.rpc.projectsGet(loc);
+          const adapter = await resolveCanvasAdapter(canvas?.projectId, load), loc = location(canvas), doc = await adapter.rpc.projectsGet(loc);
           const source = doc.nodes?.[canvas.nodeId], id = `${canvas.nodeId}_state`;
           if (!source?.data?.metaonticAssistantManaged || doc.tombstones?.includes(id)) return;
           const previous = doc.nodes[id];
@@ -5082,7 +5343,7 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
       if (!canvas || !result || typeof result !== "object") return result;
       const media = mediaPreviewMeta(result, tool2.name).media;
       if (!media.length) return { ...result, canvasSync: { status: "no_media", reason: "\u5C1A\u65E0\u6210\u529F\u7D20\u6750\uFF0C\u672A\u56DE\u586B\u865A\u6784\u6210\u679C\u3002" } };
-      const record = { id: randomUUID7(), owner: sessionOwner(exec), canvas, media, ratio: args.ratio, phase: tool2.name === "video_prepare_image" ? "reference_review" : videoResultState(result).phase, createdAt: Date.now() };
+      const record = { id: randomUUID8(), owner: sessionOwner(exec), canvas, media, ratio: args.ratio, phase: tool2.name === "video_prepare_image" ? "reference_review" : videoResultState(result).phase, createdAt: Date.now() };
       try {
         await saveRecord(record);
       } catch {
@@ -5108,12 +5369,12 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
     },
     async execute(args, exec) {
       if (args.action === "sync") return sync(args.token, exec);
-      const adapter = await load();
       if (args.action === "list") {
-        const listed = await adapter.rpc.projectsList();
-        return { projects: (Array.isArray(listed) ? listed : listed?.projects || listed?.items || []).map((p) => ({ id: p.id, name: p.name, canvases: p.canvases, nodeIds: p.nodeIds })) };
+        const listed = await load().then((adapter) => adapter.rpc.projectsList()).catch(() => []);
+        const merged = (Array.isArray(listed) ? listed : listed?.projects || listed?.items || []).map((p) => ({ id: p.id, name: p.name, canvases: p.canvases, nodeIds: p.nodeIds }));
+        return { projects: [...await builtinCanvasList(), ...merged] };
       }
-      if (args.action === "read") return readCanvasInput(adapter, args);
+      if (args.action === "read") return readCanvasInput(await resolveCanvasAdapter(args.projectId, load), args);
       throw new Error("\u672A\u77E5\u753B\u5E03\u64CD\u4F5C");
     }
   };
@@ -5122,10 +5383,16 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
 
 // src/businesses/video/integrations/canvas-project.ts
 import { createHash as createHash6 } from "node:crypto";
-import { readFile as readFile10 } from "node:fs/promises";
-import path18 from "node:path";
+import { readFile as readFile11 } from "node:fs/promises";
+import path19 from "node:path";
 init_config();
 var digest2 = (value) => createHash6("sha256").update(JSON.stringify(value)).digest("hex");
+async function adapterForNewCanvas(binding, load, config) {
+  if (binding?.projectId) return resolveCanvasAdapter(binding.projectId, load);
+  if (load !== loadCanvasAdapter) return load();
+  if (binding?.backend === "original" || ref(config, "canvasBackend", BUILTIN_BACKEND) === "original") return load();
+  return builtinCanvasAdapter();
+}
 function scriptStoryboardShots(script) {
   const lines = script.split(/\r?\n/), shots = [];
   const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split(/(?<!\\)\|/).map((s) => s.trim().replace(/\\\|/g, "|"));
@@ -5187,7 +5454,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
       if (draft.specification?.canvas) return { status: "external", projectId: draft.specification.canvas.projectId, reason: "\u6CBF\u7528\u7528\u6237\u9009\u62E9\u7684\u539F\u753B\u5E03\uFF0C\u4E0D\u53E6\u5EFA\u9879\u76EE\u3002" };
       let adapter;
       try {
-        adapter = await load();
+        adapter = await adapterForNewCanvas(project.canvasAuto, load, config);
       } catch (error) {
         const reason = String(error?.message || "").trim() || "\u81EA\u52A8\u753B\u5E03\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u5B89\u88C5\u5E76\u542F\u7528\u539F\u7248\u65E0\u9650\u753B\u5E030.20.1 \u6216\u66F4\u65B0\u7248\u672C\u3002";
         return { status: "unavailable", reason: `${reason}\u521B\u4F5C\u9879\u76EE\u5DF2\u4FDD\u7559\uFF0C\u53EF\u67E5\u8BE2\u9879\u76EE\u72B6\u6001\u91CD\u8BD5\u540C\u6B65\u3002` };
@@ -5202,7 +5469,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
       const prefix = `mov_${project.id.replaceAll("-", "")}`;
       const baseName = conversationName || "MetaOntic \u521B\u4F5C\u753B\u5E03";
       if (!project.canvasAuto) {
-        project.canvasAuto = { version: 1, name: baseName, nodes: {}, links: {} };
+        project.canvasAuto = { version: 1, name: baseName, nodes: {}, links: {}, backend: adapter.backend === BUILTIN_BACKEND ? BUILTIN_BACKEND : "original" };
         await writeProject(project);
       }
       const binding = project.canvasAuto;
@@ -5218,9 +5485,9 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
       if (!doc?.nodes || doc.deleted) throw new Error("\u81EA\u52A8\u753B\u5E03\u5DF2\u5220\u9664\u6216\u4E0D\u53EF\u7528\uFF0C\u4E0D\u4F1A\u91CD\u65B0\u521B\u5EFA\u5DF2\u5220\u9664\u7684\u9879\u76EE\u3002");
       let script = "";
       if (draft.scriptPath) {
-        const scriptPath = path18.resolve(exec.agent.session.header?.cwd || process.cwd(), draft.scriptPath);
+        const scriptPath = path19.resolve(exec.agent.session.header?.cwd || process.cwd(), draft.scriptPath);
         if (!/\.md$/i.test(scriptPath)) throw new Error("\u81EA\u52A8\u540C\u6B65\u811A\u672C\u9700\u8981Markdown\u6587\u4EF6\u3002");
-        script = await readFile10(scriptPath, "utf8");
+        script = await readFile11(scriptPath, "utf8");
         if (script.length > 2e5) throw new Error("\u811A\u672C\u8FC7\u5927\uFF0C\u81EA\u52A8\u753B\u5E03\u672A\u8986\u76D6\u65E7\u8282\u70B9\u3002");
       }
       const specification = draft.specification || null;
@@ -5379,7 +5646,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
         if (!binding?.projectId) continue;
         try {
           await lockProject(`canvas:${project.id}`, async () => {
-            const adapter = await load();
+            const adapter = await adapterForNewCanvas(binding, load, config);
             const loc = { id: binding.projectId };
             const doc = await adapter.rpc.projectsGet(loc);
             if (!doc?.nodes || doc.deleted) return;
@@ -5428,9 +5695,9 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
 }
 
 // src/businesses/video/integrations/canvas-native.ts
-import path19 from "node:path";
-import { createHash as createHash8, randomUUID as randomUUID8 } from "node:crypto";
-import { mkdir as mkdir11, readFile as readFile11, writeFile as writeFile8, rename as rename9 } from "node:fs/promises";
+import path20 from "node:path";
+import { createHash as createHash8, randomUUID as randomUUID9 } from "node:crypto";
+import { mkdir as mkdir12, readFile as readFile12, writeFile as writeFile9, rename as rename10 } from "node:fs/promises";
 init_connection();
 
 // src/businesses/video/providers/seedance.ts
@@ -6184,26 +6451,26 @@ function planCanvasNative(input, config, operation = "generate", draft = {}) {
 }
 function createCanvasNativeService(liveConfig, options = {}) {
   const load = options.load || loadCanvasAdapter;
-  const directory2 = options.directory || path19.join(dshHome(), "metaontic-video", "canvas-native");
+  const directory2 = options.directory || path20.join(dshHome(), "metaontic-video", "canvas-native");
   const snapshots = /* @__PURE__ */ new Map(), running = /* @__PURE__ */ new Map(), locks2 = /* @__PURE__ */ new Set();
   const proposals = /* @__PURE__ */ new Map();
   let disposed = false;
   const file = (id) => {
     if (!validToken(id)) throw new Error("\u5236\u4F5C\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548\u3002");
-    return path19.join(directory2, `${id}.json`);
+    return path20.join(directory2, `${id}.json`);
   };
-  const pointer = (link) => path19.join(directory2, `node-${hash3([link.projectId, link.canvasId || "", link.nodeId])}.json`);
+  const pointer = (link) => path20.join(directory2, `node-${hash3([link.projectId, link.canvasId || "", link.nodeId])}.json`);
   async function save2(job) {
-    await mkdir11(directory2, { recursive: true, mode: 448 });
-    const dest = file(job.id), temp = `${dest}.${randomUUID8()}.tmp`;
-    await writeFile8(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
-    await rename9(temp, dest);
+    await mkdir12(directory2, { recursive: true, mode: 448 });
+    const dest = file(job.id), temp = `${dest}.${randomUUID9()}.tmp`;
+    await writeFile9(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
+    await rename10(temp, dest);
   }
-  const read = async (id) => JSON.parse(await readFile11(file(id), "utf8"));
+  const read = async (id) => JSON.parse(await readFile12(file(id), "utf8"));
   async function previous(link) {
     let id;
     try {
-      id = JSON.parse(await readFile11(pointer(link), "utf8")).id;
+      id = JSON.parse(await readFile12(pointer(link), "utf8")).id;
     } catch (e) {
       if (e.code === "ENOENT") return null;
       throw e;
@@ -6223,7 +6490,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
   async function sync(job) {
     if (!job.media?.length) throw new Error("\u6CA1\u6709\u53EF\u56DE\u586B\u7684\u6210\u679C\u3002");
     try {
-      job.sync = await (options.publish || publishCanvasResult)(await load(), {
+      job.sync = await (options.publish || publishCanvasResult)(await resolveCanvasAdapter(job.canvas?.projectId, load), {
         id: job.id,
         canvas: job.canvas,
         media: job.media,
@@ -6309,7 +6576,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       const config = snapshotConfig(liveConfig), plan = planCanvasNative(input, config, args.operation || "generate", args.draft || {});
       if (plan.kind === "image" && plan.args.ratio !== "1:1") throw new Error("\u672C\u7248\u56FE\u7247\u76F4\u63A5\u5236\u4F5C\u4EC5\u652F\u63011:1\uFF0C\u8BF7\u5148\u4FEE\u6539\u8282\u70B9\u753B\u5E45\u3002");
       assertConfigured(plan.kind === "image" ? imageConfig(config) : config, resolveApiKey(plan.kind === "image" ? imageConfig(config) : config));
-      const id = randomUUID8(), proposal = { id, canvas: input.canvas, plan, config, identity: hash3(config), expires: Date.now() + 10 * 6e4 };
+      const id = randomUUID9(), proposal = { id, canvas: input.canvas, plan, config, identity: hash3(config), expires: Date.now() + 10 * 6e4 };
       for (const [key, p] of proposals) if (p.expires < Date.now()) proposals.delete(key);
       if (proposals.size >= 100) throw new Error("\u5F85\u786E\u8BA4\u65B9\u6848\u8FC7\u591A\uFF0C\u8BF7\u5148\u5904\u7406\u5DF2\u6709\u65B9\u6848\u3002");
       proposals.set(id, proposal);
@@ -6329,7 +6596,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       } };
     }
     if (args.action === "latest") {
-      const input = await readCanvasInput(await load(), args);
+      const input = await readCanvasInput(await resolveCanvasAdapter(args?.projectId, load), args);
       const job2 = await previous(input.canvas);
       return { job: job2 ? view(job2) : null };
     }
@@ -6353,9 +6620,9 @@ function createCanvasNativeService(liveConfig, options = {}) {
         if (old && (!terminal.has(old.state) || old.media?.length && !old.reviewed || old.sync?.status === "pending")) return { job: view(old) };
         const job2 = { version: 1, id: p.id, canvas: p.canvas, plan: p.plan, identity: p.identity, createdAt: Date.now(), state: "running", reviewed: false };
         await save2(job2);
-        const temp = `${key}.${randomUUID8()}.tmp`;
-        await writeFile8(temp, JSON.stringify({ id: job2.id }), { mode: 384, flag: "wx" });
-        await rename9(temp, key);
+        const temp = `${key}.${randomUUID9()}.tmp`;
+        await writeFile9(temp, JSON.stringify({ id: job2.id }), { mode: 384, flag: "wx" });
+        await rename10(temp, key);
         proposals.delete(p.id);
         snapshots.set(job2.id, p.config);
         void perform(job2, p.config).catch(() => {
@@ -6461,14 +6728,14 @@ function approvedCharacterReferences(images, state) {
 
 // src/businesses/video/workflow/segment-run.ts
 init_config();
-import path21 from "node:path";
-import { stat as stat8 } from "node:fs/promises";
+import path22 from "node:path";
+import { stat as stat9 } from "node:fs/promises";
 
 // src/businesses/video/media/merge.ts
 init_config();
 init_connection();
-import { rm as rm8, mkdir as mkdir12, writeFile as writeFile9, rename as rename10, stat as stat7, copyFile as copyFile2 } from "node:fs/promises";
-import path20 from "node:path";
+import { rm as rm8, mkdir as mkdir13, writeFile as writeFile10, rename as rename11, stat as stat8, copyFile as copyFile2 } from "node:fs/promises";
+import path21 from "node:path";
 function evenNumber(value, fallback) {
   const number2 = Number(value);
   if (!Number.isFinite(number2) || number2 <= 0) return fallback;
@@ -6531,7 +6798,7 @@ async function cleanupSegmentTemps(temps) {
 }
 async function mergeClips(config, files, outPath, { signal } = {}) {
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  await mkdir12(path20.dirname(outPath), { recursive: true });
+  await mkdir13(path21.dirname(outPath), { recursive: true });
   const work = `${outPath}.${uniqueSuffix("work")}.mp4`;
   let copyError = "";
   let audioError = "";
@@ -6552,7 +6819,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
     if (mergeMode !== "reencode" && paramsMatch) {
       const listPath = `${work}.concat.txt`;
       const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
-      await writeFile9(listPath, `${lines}
+      await writeFile10(listPath, `${lines}
 `, "utf8");
       try {
         const { code: code2, stderr: stderr2 } = await runProcess(binary, [
@@ -6570,7 +6837,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
           work
         ], { signal });
         if (code2 === 0 && await exists(work)) {
-          await rename10(work, outPath);
+          await rename11(work, outPath);
           return { path: outPath, mode: "copy", trimmed };
         }
         copyError = stderr2.trim().slice(-400);
@@ -6606,7 +6873,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
       ].join(";");
       const { code: code2, stderr: stderr2 } = await encode(filter2, ["-map", "[v]", "-map", "[a]"], true);
       if (code2 === 0 && await exists(work)) {
-        await rename10(work, outPath);
+        await rename11(work, outPath);
         return { path: outPath, mode: "reencode", trimmed };
       }
       audioError = stderr2.trim().slice(-400);
@@ -6614,7 +6881,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
     const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(";");
     const { code, stderr } = await encode(filter, ["-map", "[v]"], false);
     if (code === 0 && await exists(work)) {
-      await rename10(work, outPath);
+      await rename11(work, outPath);
       return { path: outPath, mode: withAudio ? "reencode-video-only" : "reencode", trimmed };
     }
     const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
@@ -6712,7 +6979,7 @@ async function downloadSegmentsAndMerge(config, {
   const deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0);
   const ffmpegReady = segments.length > 1 ? await hasFfmpeg(config, signal) : true;
   let probeWarned = false;
-  const destOf = (segment) => path20.join(
+  const destOf = (segment) => path21.join(
     segmentsDir,
     `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`
   );
@@ -6753,7 +7020,7 @@ async function downloadSegmentsAndMerge(config, {
       index: segment.index,
       taskId: segment.taskId,
       path: dest,
-      bytes: (await stat7(dest)).size
+      bytes: (await stat8(dest)).size
     });
     const media = probed[index];
     if (media?.durationSeconds) {
@@ -6791,17 +7058,17 @@ async function downloadSegmentsAndMerge(config, {
       installHint: guide.hint
     };
   }
-  const finalPath = path20.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
+  const finalPath = path21.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
   try {
     if (files.length === 1 && keepSingleFile) {
       return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "segment", videoPath: files[0] };
     }
     if (files.length === 1) {
-      await mkdir12(path20.dirname(finalPath), { recursive: true });
+      await mkdir13(path21.dirname(finalPath), { recursive: true });
       const copy = `${finalPath}.${uniqueSuffix("copy")}.mp4`;
       try {
         await copyFile2(files[0], copy);
-        await rename10(copy, finalPath);
+        await rename11(copy, finalPath);
       } finally {
         await rm8(copy, { force: true }).catch(() => {
         });
@@ -6926,9 +7193,9 @@ async function runSegmentDelivery({
   const previewOnly = paused && !cumulativePreview;
   if (previewOnly) {
     for (const segment of completed.slice(0, -1)) {
-      const file = path21.join(segmentsDir, `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`);
+      const file = path22.join(segmentsDir, `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`);
       try {
-        if ((await stat8(file)).isFile()) segment.localPath = file;
+        if ((await stat9(file)).isFile()) segment.localPath = file;
       } catch {
       }
     }
@@ -7991,9 +8258,9 @@ function setupTool(config) {
 
 // src/businesses/video/internal/hyperframes.ts
 import { spawn as spawn2 } from "node:child_process";
-import path22 from "node:path";
+import path23 from "node:path";
 import { createRequire as createRequire3 } from "node:module";
-import { stat as stat9, mkdir as mkdir13 } from "node:fs/promises";
+import { stat as stat10, mkdir as mkdir14 } from "node:fs/promises";
 function runHyperframes(cli, args, cwd, config, signal) {
   return new Promise((resolve3, reject) => {
     if (signal?.aborted) return reject(new Error("Hyperframes \u5DF2\u53D6\u6D88\u3002"));
@@ -8008,7 +8275,7 @@ function runHyperframes(cli, args, cwd, config, signal) {
         ...Object.fromEntries([
           ["HYPERFRAMES_FFMPEG_PATH", resolveBinary(config, "ffmpegBinary", "ffmpeg")],
           ["HYPERFRAMES_FFPROBE_PATH", resolveBinary(config, "ffprobeBinary", "ffprobe")]
-        ].filter(([, binary]) => path22.isAbsolute(binary)))
+        ].filter(([, binary]) => path23.isAbsolute(binary)))
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true
@@ -8088,16 +8355,16 @@ function hyperframesTool(config, deps) {
       let cli;
       try {
         const require2 = createRequire3(import.meta.url);
-        cli = path22.join(path22.dirname(require2.resolve("hyperframes/package.json")), "bin/hyperframes.mjs");
+        cli = path23.join(path23.dirname(require2.resolve("hyperframes/package.json")), "bin/hyperframes.mjs");
       } catch {
         return { status: "dependency_missing", note: "Hyperframes \u4E3A\u5185\u90E8\u5F00\u53D1\u80FD\u529B\uFF0C\u516C\u5F00\u63D2\u4EF6\u5305\u4E0D\u5305\u542B\u8BE5\u4F9D\u8D56\uFF1B\u9700\u5728\u5F00\u53D1\u73AF\u5883\u5355\u72EC\u51C6\u5907\u3002" };
       }
       let cwd = process.cwd();
       if (deps.workdir && exec?.agent) cwd = await deps.workdir.ensure(exec.agent, exec.signal) || cwd;
-      const project = path22.resolve(cwd, args.projectDir || ".");
+      const project = path23.resolve(cwd, args.projectDir || ".");
       if (action !== "check") {
         if (!args.projectDir) throw new Error("lint/render \u5FC5\u987B\u6307\u5B9A projectDir\u3002");
-        if (!(await stat9(path22.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
+        if (!(await stat10(path23.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
       }
       let videoPath;
       let command = ["doctor", "--json"];
@@ -8105,23 +8372,23 @@ function hyperframesTool(config, deps) {
       if (action === "render") {
         if (args.fps !== void 0 && ![24, 25, 30, 50, 60].includes(args.fps)) throw new Error("\u4E0D\u652F\u6301\u7684\u5E27\u7387\u3002");
         const output = args.output || `renders/output-${Date.now()}.mp4`;
-        videoPath = path22.resolve(project, output);
-        const relative = path22.relative(project, videoPath);
-        if (!relative || relative === ".." || relative.startsWith(`..${path22.sep}`) || path22.isAbsolute(relative) || path22.extname(videoPath).toLowerCase() !== ".mp4") {
+        videoPath = path23.resolve(project, output);
+        const relative = path23.relative(project, videoPath);
+        if (!relative || relative === ".." || relative.startsWith(`..${path23.sep}`) || path23.isAbsolute(relative) || path23.extname(videoPath).toLowerCase() !== ".mp4") {
           throw new Error("\u8F93\u51FA\u5FC5\u987B\u662F\u9879\u76EE\u76EE\u5F55\u5185\u7684 .mp4 \u6587\u4EF6\u3002");
         }
         try {
-          await stat9(videoPath);
+          await stat10(videoPath);
           throw new Error("\u8F93\u51FA\u6587\u4EF6\u5DF2\u5B58\u5728\uFF0C\u8BF7\u6362\u4E00\u4E2A\u6587\u4EF6\u540D\u3002");
         } catch (error) {
           if (error.code !== "ENOENT") throw error;
         }
-        await mkdir13(path22.dirname(videoPath), { recursive: true });
+        await mkdir14(path23.dirname(videoPath), { recursive: true });
         command = ["render", project, "--output", videoPath, "--fps", String(args.fps || 30), "--workers", "1", "--strict"];
       }
       const result = await runHyperframes(cli, command, action === "check" ? cwd : project, config, exec?.signal);
       if (result.code !== 0) return { status: "failed", action, output: result.output, note: "\u68C0\u67E5\u8F93\u51FA\u4E2D\u7684\u73AF\u5883\u6216\u9879\u76EE\u9519\u8BEF\u540E\u91CD\u8BD5\uFF1B\u4E0D\u4F1A\u91CD\u590D\u63D0\u4EA4 Seedance \u4EFB\u52A1\u3002" };
-      if (videoPath && !(await stat9(videoPath)).size) throw new Error("Hyperframes \u672A\u751F\u6210\u6709\u6548\u7684 MP4 \u6587\u4EF6\u3002");
+      if (videoPath && !(await stat10(videoPath)).size) throw new Error("Hyperframes \u672A\u751F\u6210\u6709\u6548\u7684 MP4 \u6587\u4EF6\u3002");
       return { status: action === "render" ? "succeeded" : "checked", action, output: result.output, ...videoPath ? { videoPath } : {} };
     }
   };
@@ -8371,6 +8638,7 @@ function asDisposer(value) {
 function applyVideoBusiness(runtime) {
   const { ctx, config } = runtime;
   runtime.defer(registerCanvasNative(ctx, config));
+  runtime.defer(registerBuiltinCanvas(ctx));
   const deps = {};
   const segmentReview = createSegmentReview(ctx);
   const segmentObserver = ctx.on("session/event", segmentReview.observe);

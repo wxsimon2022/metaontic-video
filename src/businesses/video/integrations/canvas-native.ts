@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { dshHome } from '../../../core/paths.js';
-import { loadCanvasAdapter, readCanvasInput, publishCanvasResult } from './canvas.js';
+import { loadCanvasAdapter, readCanvasInput, publishCanvasResult, resolveCanvasAdapter } from './canvas.js';
 import { snapshotConfig, imageConfig, resolveApiKey, assertConfigured, resolveModel, isVolcengine, connectionLabel } from '../providers/connection.js';
 import { buildGenerationBody, buildRequestBody, runTask } from '../providers/seedance.js';
 import { generateSeedreamImage } from '../providers/seedream.js';
@@ -101,7 +101,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
   async function sync(job) {
     if (!job.media?.length) throw new Error('没有可回填的成果。');
     try {
-      job.sync = await (options.publish || publishCanvasResult)(await load(), { id: job.id, canvas: job.canvas, media: job.media, ratio: job.plan.args.ratio, phase: 'result_review', createdAt: job.createdAt,
+      job.sync = await (options.publish || publishCanvasResult)(await resolveCanvasAdapter(job.canvas?.projectId, load), { id: job.id, canvas: job.canvas, media: job.media, ratio: job.plan.args.ratio, phase: 'result_review', createdAt: job.createdAt,
         native: { taskId: job.taskId, videoUrl: job.media[0]?.kind === 'video' ? job.media[0].url : '', seconds: job.plan.args.duration, resolution: job.plan.args.resolution, prompt: job.plan.args.prompt } });
     } catch { job.sync = { status: 'pending' }; }
     await save(job);
@@ -173,7 +173,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       return { proposal: { id, kind: plan.kind, operation: plan.operation, prompt: plan.args.prompt, ratio: plan.args.ratio, duration: plan.args.duration, resolution: plan.args.resolution, generateAudio: plan.args.generateAudio, model: plan.model,
         references: plan.images.map(x => ({ port: x.port, nodeId: x.nodeId })), estimate: plan.estimate, notes: plan.notes } };
     }
-    if (args.action === 'latest') { const input = await readCanvasInput(await load(), args); const job = await previous(input.canvas); return { job: job ? view(job) : null }; }
+    if (args.action === 'latest') { const input = await readCanvasInput(await resolveCanvasAdapter(args?.projectId, load), args); const job = await previous(input.canvas); return { job: job ? view(job) : null }; }
     if (args.action === 'start') {
       const existing = await read(args.id).catch(e => { if (e.code === 'ENOENT') return null; throw e; });
       if (existing) return { job: view(existing) }; // 重复点击/响应丢失不再提交。

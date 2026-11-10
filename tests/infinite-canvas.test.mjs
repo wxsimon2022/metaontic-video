@@ -30,7 +30,7 @@ test('已有原版画布不重装，不覆盖目录链接或升级已有版本',
 test('安装仅调用固定正式npm包一次，成功后重新核对状态', async () => {
   let calls = 0, installedNow = false;
   const result = await api.installCanvas({ listBundles: async () => installedNow ? [installed] : [], installBundle: async (spec, options) => {
-    calls++; assert.equal(spec, '@ninkch/dsh-infinite-canvas@0.20.1'); assert.equal(options.enabled, true);
+    calls++; assert.equal(spec, '@ninkch/dsh-infinite-canvas@0.20.3'); assert.equal(options.enabled, true);
     installedNow = true; return { ok: true, value: { application: 'applied' } };
   } });
   assert.equal(result.available, true); assert.equal(result.restartRequired, false); assert.equal(calls, 1);

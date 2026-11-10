@@ -1,7 +1,8 @@
 /** 原版无限画布的伴随插件入口，不复制其源码或读写其私有数据。 */
 export const CANVAS_PACKAGE = '@ninkch/dsh-infinite-canvas';
-// 使用核对过的正式成品，避免 Git 默认分支及开发依赖安装。
-export const CANVAS_SPEC = `${CANVAS_PACKAGE}@0.20.1`;
+// 使用核对过的正式成品，避免 Git 默认分支及开发依赖安装。0.20.2 官方包缺 shot-segments.js 无法加载，
+// 本次固定到已核对完整的 0.20.3；适配器同时接受 0.20.1 起的版本。
+export const CANVAS_SPEC = `${CANVAS_PACKAGE}@0.20.3`;
 export function canvasBundleState(result: any) {
   const bundles = Array.isArray(result) ? result : result?.ok === true && Array.isArray(result.value) ? result.value : null;
   if (!bundles) throw new Error('无法读取插件列表，请到 Harness 插件管理检查安装状态。');

@@ -23,6 +23,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, copyFile, stat, open } from 'node:fs/promises';
 import path from 'node:path';
 import { dshHome } from '../../../core/paths.js';
+import { builtinCanvasAdapter, builtinCanvasExists, builtinCanvasList } from './canvas-builtin.js';
 import { readProject, sessionOwner } from '../workflow/project.js';
 import { mediaPreviewMeta } from '../workflow/media-preview.js';
 import { videoResultState } from '../workflow/result-state.js';
@@ -68,6 +69,12 @@ export async function loadCanvasAdapter() {
   if (!rpc?.projectsGet || !rpc?.projectsPut || !rpc?.assetsGet || !rpc?.assetCreate || !rpc?.projectDirGet || !rpc?.dataRootGet || !rpc?.projectsList) throw new Error(`原版无限画布 ${pkg.version} 缺少画布联动所需的接口；请确认安装的是原版 @ninkch/dsh-infinite-canvas，不会重新创建创作项目。`);
   return { rpc, assetPath: (root, asset) => asset.sha ? internal.objectAbsFor(root, asset.sha) : path.resolve(root, internal.physicalRel(asset.rel)),
     ...(typeof internal.canvasConnect === 'function' ? { connect: (args: any) => internal.canvasConnect(args) } : {}) };
+}
+/** 按画布项目标识选后端：内置存储里有这份文档就走内置画布，否则沿用原版适配器。
+ *  读、回填、补名都走这里，老项目继续留在原版，新建项目完全不需要原版在场。 */
+export async function resolveCanvasAdapter(projectId: any, load: any = loadCanvasAdapter) {
+  if (projectId && await builtinCanvasExists(projectId)) return builtinCanvasAdapter();
+  return load();
 }
 /** 有向上游、原顺序和端口一并保留；只输出创作字段，不读取原版供应商配置。 */
 export async function readCanvasInput(adapter, link) {
@@ -197,7 +204,7 @@ export function createCanvasBridge(load = loadCanvasAdapter, config: any = {}) {
     try {
       const record = JSON.parse(await readFile(resultFile(token), 'utf8'));
       if (record.owner !== sessionOwner(exec)) throw new Error('此成果不属于当前会话');
-      return await publishCanvasResult(await load(), record);
+      return await publishCanvasResult(await resolveCanvasAdapter(record?.canvas?.projectId, load), record);
     } finally { busy.delete(token); }
   }
   function wrap(tool) {
@@ -217,13 +224,13 @@ export function createCanvasBridge(load = loadCanvasAdapter, config: any = {}) {
       }
       if (canvas) {
         sessionOwner(exec);
-        const input = await readCanvasInput(await load(), canvas);
+        const input = await readCanvasInput(await resolveCanvasAdapter(canvas?.projectId, load), canvas);
         if (input.canvas.fingerprint !== canvas.fingerprint) throw new Error('画布内容或参考素材已修改，请重新读取并审核；未提交生成任务。');
       }
       const showState = async (text) => {
         if (!canvas || !['video_generate', 'video_extend'].includes(tool.name)) return;
         try {
-          const adapter = await load(), loc = location(canvas), doc = await adapter.rpc.projectsGet(loc);
+          const adapter = await resolveCanvasAdapter(canvas?.projectId, load), loc = location(canvas), doc = await adapter.rpc.projectsGet(loc);
           const source = doc.nodes?.[canvas.nodeId], id = `${canvas.nodeId}_state`;
           if (!source?.data?.metaonticAssistantManaged || doc.tombstones?.includes(id)) return;
           const previous = doc.nodes[id];
@@ -254,12 +261,12 @@ export function createCanvasBridge(load = loadCanvasAdapter, config: any = {}) {
     output: { schema: { type: 'object' }, render(_args, value) { return [{ type: 'text', text: JSON.stringify(value) }]; } },
     timeoutMs: 600000, isConcurrencySafe() { return false; }, async execute(args, exec) {
       if (args.action === 'sync') return sync(args.token, exec);
-      const adapter = await load();
       if (args.action === 'list') {
-        const listed = await adapter.rpc.projectsList();
-        return { projects: (Array.isArray(listed) ? listed : listed?.projects || listed?.items || []).map(p => ({ id: p.id, name: p.name, canvases: p.canvases, nodeIds: p.nodeIds })) };
+        const listed = await load().then(adapter => adapter.rpc.projectsList()).catch(() => []);
+        const merged = (Array.isArray(listed) ? listed : listed?.projects || listed?.items || []).map(p => ({ id: p.id, name: p.name, canvases: p.canvases, nodeIds: p.nodeIds }));
+        return { projects: [...await builtinCanvasList(), ...merged] };
       }
-      if (args.action === 'read') return readCanvasInput(adapter, args);
+      if (args.action === 'read') return readCanvasInput(await resolveCanvasAdapter(args.projectId, load), args);
       throw new Error('未知画布操作');
     } };
   return { wrap, tool };

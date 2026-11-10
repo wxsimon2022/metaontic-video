@@ -2067,7 +2067,7 @@
   }
 
   // src/businesses/video/client/panel.ts
-  function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID: PANEL_ID2, GUIDE_URL: GUIDE_URL2, LOGO_SVG, CanvasCompanion }) {
+  function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID: PANEL_ID2, GUIDE_URL: GUIDE_URL2, LOGO_SVG, CanvasCompanion, FlowCanvas }) {
     const LOGO_SRC = LOGO_SVG ? `data:image/svg+xml,${encodeURIComponent(LOGO_SVG)}` : "";
     const PANEL_CSS = `
       .mov-panel { width: 100%; max-width: 880px; margin: 0 auto; padding: 30px 32px 44px; display: flex; flex-direction: column; gap: 18px; }
@@ -2278,6 +2278,7 @@
           ])
         ]),
         CanvasCompanion && h(CanvasCompanion, { key: "canvas", manager: props.manager, openCanvas: props.openCanvas, openCanvasSettings: props.openCanvasSettings, startSession: props.startSession }),
+        FlowCanvas && h(FlowCanvas, { key: "flow-canvas" }),
         h("section", { key: "flow", className: "mov-section" }, [
           h("div", { key: "flow-label", className: "mov-section-title" }, t("panelFlow")),
           h("div", { key: "flow-steps", className: "mov-panel-flow" }, flowChildren)
@@ -2289,7 +2290,7 @@
 
   // src/client/infinite-canvas.ts
   var CANVAS_PACKAGE = "@ninkch/dsh-infinite-canvas";
-  var CANVAS_SPEC = `${CANVAS_PACKAGE}@0.20.1`;
+  var CANVAS_SPEC = `${CANVAS_PACKAGE}@0.20.3`;
   function canvasBundleState(result) {
     const bundles = Array.isArray(result) ? result : result?.ok === true && Array.isArray(result.value) ? result.value : null;
     if (!bundles) throw new Error("\u65E0\u6CD5\u8BFB\u53D6\u63D2\u4EF6\u5217\u8868\uFF0C\u8BF7\u5230 Harness \u63D2\u4EF6\u7BA1\u7406\u68C0\u67E5\u5B89\u88C5\u72B6\u6001\u3002");
@@ -2369,6 +2370,150 @@
       ]);
     }
     return { CanvasCompanion };
+  }
+
+  // src/businesses/video/client/canvas-view.ts
+  function createCanvasView({ React, h, TOKENS }) {
+    const rpc = async (method, args = {}) => {
+      const response = await fetch("/metaontic-video/canvas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ method, args }) });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body?.error) throw new Error(body?.error || "\u6D41\u7A0B\u753B\u5E03\u670D\u52A1\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u52A0\u8F7D\u72B6\u6001\u3002");
+      return body;
+    };
+    const mediaUrl = (assetId) => `/metaontic-video/canvas-media?assetId=${encodeURIComponent(assetId)}`;
+    const NODE_SIZE = { script: [420, 320], storyboard: [460, 340], text: [360, 200], video: [360, 300], image: [360, 300] };
+    const sizeOf = (node) => ({ w: Number(node?.w) || (NODE_SIZE[node?.type] || [360, 260])[0], h: Number(node?.h) || (NODE_SIZE[node?.type] || [360, 260])[1] });
+    const labelOf = (node) => String(node?.data?.label || { script: "\u5267\u672C", storyboard: "\u5206\u955C", text: "\u8BF4\u660E", video: "\u89C6\u9891", image: "\u56FE\u7247" }[node?.type] || "\u8282\u70B9");
+    const textOf = (node) => String(node?.data?.output || node?.data?.text || node?.data?.prompt || "");
+    const CSS = `
+.movc { display: flex; flex-direction: column; gap: 10px; }
+.movc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.movc-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.movc-chip { border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
+.movc-stage { position: relative; height: 460px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; overflow: hidden; cursor: grab; touch-action: none; }
+.movc-stage[data-panning="true"] { cursor: grabbing; }
+.movc-world { position: absolute; inset: 0; transform-origin: 0 0; }
+.movc-edge { stroke: ${TOKENS.primaryFill}; stroke-width: 2; fill: none; opacity: .75; }
+.movc-node { position: absolute; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid ${TOKENS.border}; border-radius: 10px; background: ${TOKENS.cardFill}; box-shadow: 0 1px 4px #0000000f; overflow: hidden; }
+.movc-node-head { display: flex; align-items: center; gap: 6px; }
+.movc-node-title { font-size: 12px; font-weight: 600; color: ${TOKENS.text}; }
+.movc-badge { margin-left: auto; font-size: 11px; color: ${TOKENS.muted}; }
+.movc-body { font-size: 11px; line-height: 1.6; color: ${TOKENS.muted}; white-space: pre-wrap; overflow: auto; flex: 1; }
+.movc-media { width: 100%; height: 100%; object-fit: contain; border-radius: 6px; background: #0001; }
+.movc-shots { margin: 0; padding-left: 16px; }
+`;
+    function nodeBody(node) {
+      const data = node?.data || {};
+      if (data.assetId) return h(node.type === "image" ? "img" : "video", {
+        key: "media",
+        className: "movc-media",
+        ...node.type === "image" ? { src: mediaUrl(data.assetId), alt: data.label || "" } : { src: mediaUrl(data.assetId), controls: true, preload: "metadata" }
+      });
+      if (node.type === "storyboard" && Array.isArray(data.shots) && data.shots.length) return h("div", { key: "shots", className: "movc-body" }, [
+        h("ul", { key: "list", className: "movc-shots" }, data.shots.slice(0, 12).map((shot, index) => h("li", { key: index }, `${shot?.index || index + 1}. ${String(shot?.visual || shot?.text || shot?.scene || "").slice(0, 60)}`))),
+        data.shots.length > 12 ? h("div", { key: "more" }, `\u2026\u5171 ${data.shots.length} \u4E2A\u955C\u5934`) : null
+      ]);
+      const text = textOf(node);
+      return h("div", { key: "text", className: "movc-body" }, text ? text.slice(0, 600) : "\uFF08\u6682\u65E0\u5185\u5BB9\uFF09");
+    }
+    function FlowCanvas() {
+      const [list, setList] = React.useState([]);
+      const [canvas, setCanvas] = React.useState(null);
+      const [error, setError] = React.useState("");
+      const [view, setView] = React.useState({ x: 30, y: 24, scale: 1 });
+      const [panning, setPanning] = React.useState(false);
+      const drag = React.useRef(null);
+      const open = React.useCallback(async (projectId) => {
+        try {
+          setError("");
+          const { canvases } = await rpc("list");
+          const wanted = projectId || canvases[0]?.projectId;
+          setList(canvases);
+          if (!wanted) {
+            setCanvas(null);
+            return;
+          }
+          const { canvas: doc } = await rpc("get", { projectId: wanted });
+          setCanvas(doc);
+        } catch (e) {
+          setError(e?.message || "\u6D41\u7A0B\u753B\u5E03\u8BFB\u53D6\u5931\u8D25");
+        }
+      }, []);
+      React.useEffect(() => {
+        void open();
+      }, [open]);
+      const onWheel = (event) => {
+        event.preventDefault();
+        const rect = event.currentTarget.getBoundingClientRect();
+        const scale = Math.min(2, Math.max(0.3, view.scale * (event.deltaY > 0 ? 0.92 : 1.08)));
+        const ratio = scale / view.scale;
+        setView({ scale, x: event.clientX - rect.left - (event.clientX - rect.left - view.x) * ratio, y: event.clientY - rect.top - (event.clientY - rect.top - view.y) * ratio });
+      };
+      const onPointerDown = (event) => {
+        if (event.button !== 0) return;
+        drag.current = { x: event.clientX, y: event.clientY, ox: view.x, oy: view.y };
+        setPanning(true);
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+      };
+      const onPointerMove = (event) => {
+        if (!drag.current) return;
+        setView((current) => ({ ...current, x: drag.current.ox + (event.clientX - drag.current.x), y: drag.current.oy + (event.clientY - drag.current.y) }));
+      };
+      const onPointerUp = () => {
+        drag.current = null;
+        setPanning(false);
+      };
+      const nodes = canvas ? Object.values(canvas.nodes || {}) : [];
+      const edges = canvas?.edges || [];
+      const geometry = (node) => ({ ...node, ...sizeOf(node) });
+      const at = (id) => geometry((canvas?.nodes || {})[id]);
+      return h("section", { className: "mov-section movc" }, [
+        h("style", { key: "css" }, CSS),
+        h("div", { key: "title", className: "mov-section-title" }, "\u6D41\u7A0B\u753B\u5E03"),
+        list.length ? h("div", { key: "list", className: "movc-list" }, list.map((item) => h(
+          "button",
+          { key: item.projectId, type: "button", className: "movc-chip", "data-active": String(canvas?.projectId === item.projectId), onClick: () => void open(item.projectId) },
+          `${item.name} \xB7 ${item.nodeCount} \u8282\u70B9`
+        ))) : null,
+        !list.length ? h("p", { key: "empty", className: "movc-hint" }, error || "\u8FD8\u6CA1\u6709\u6D41\u7A0B\u753B\u5E03\uFF1A\u786E\u8BA4\u521B\u4F5C\u9700\u6C42\u540E\u4F1A\u5728\u8FD9\u91CC\u81EA\u52A8\u5EFA\u7ACB\uFF0C\u811A\u672C\u5BA1\u6838\u540E\u540C\u6B65\u5206\u955C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\uFF0C\u751F\u6210\u6210\u679C\u81EA\u52A8\u56DE\u586B\u3002") : null,
+        error && list.length ? h("p", { key: "error", className: "movc-hint" }, error) : null,
+        canvas ? h(
+          "div",
+          { key: "stage", className: "movc-stage", "data-panning": String(panning), onWheel, onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp },
+          h("div", { key: "world", className: "movc-world", style: { transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` } }, [
+            h(
+              "svg",
+              { key: "edges", style: { position: "absolute", left: -4e3, top: -4e3, width: 8e3, height: 8e3, overflow: "visible", pointerEvents: "none" } },
+              h("g", { transform: "translate(4000 4000)" }, edges.map((edge) => {
+                const from = at(edge.fromNode), to = at(edge.toNode);
+                if (!from || !to) return null;
+                const x1 = from.x + from.w, y1 = from.y + from.h / 2, x2 = to.x, y2 = to.y + to.h / 2;
+                const bend = Math.max(40, Math.abs(x2 - x1) / 2);
+                return h("path", { key: edge.id || `${edge.fromNode}-${edge.toNode}`, className: "movc-edge", d: `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}` });
+              }))
+            ),
+            ...nodes.map((raw) => {
+              const node = geometry(raw);
+              return h("div", { key: node.id, className: "movc-node", style: { left: node.x, top: node.y, width: node.w, height: node.h } }, [
+                h("div", { key: "head", className: "movc-node-head" }, [
+                  h("span", { key: "label", className: "movc-node-title" }, labelOf(node)),
+                  h("span", { key: "status", className: "movc-badge" }, node.data?.status === "done" ? "\u5DF2\u5B8C\u6210" : "\u5F85\u5236\u4F5C")
+                ]),
+                nodeBody(node)
+              ]);
+            })
+          ])
+        ) : null,
+        canvas ? h("p", { key: "meta", className: "movc-hint" }, `\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF0C\u4E0D\u4F7F\u7528\u539F\u7248\u753B\u5E03\u6570\u636E\u6839\uFF09`) : null,
+        h("div", { key: "actions", className: "movc-bar" }, [
+          h("button", { key: "refresh", type: "button", className: "mov-btn", onClick: () => void open(canvas?.projectId) }, "\u5237\u65B0"),
+          h("button", { key: "reset", type: "button", className: "mov-btn", onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, "\u91CD\u7F6E\u89C6\u56FE")
+        ])
+      ]);
+    }
+    return { FlowCanvas };
   }
 
   // src/client/canvas-launcher.ts
@@ -2817,7 +2962,8 @@ ${selection.kind === "image" ? "1:1\u5355\u5F20\u56FE\u7247" : `\u5355\u6BB54\u2
         const Page = makePage({ form, t, manager: pluginManager });
         settings.register({ id: "video", namespace: NAMESPACE, locale: NS, Page });
         const { CanvasCompanion } = createCanvasCompanion({ React, h });
-        const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: icon_default, CanvasCompanion });
+        const { FlowCanvas } = createCanvasView({ React, h, TOKENS });
+        const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: icon_default, CanvasCompanion, FlowCanvas });
         ctx.effect(() => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
           name: "sidebar.panellist",
           id: PANEL_ID,

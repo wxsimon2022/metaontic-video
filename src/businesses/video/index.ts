@@ -17,6 +17,7 @@ import { submissionTool } from './tools/media-submission.js';
 import { createCanvasBridge } from './integrations/canvas.js';
 import { createCanvasProjectSync } from './integrations/canvas-project.js';
 import { registerCanvasNative } from './integrations/canvas-native.js';
+import { registerBuiltinCanvas } from './integrations/canvas-builtin.js';
 import { prepareImageTool } from './tools/video-prepare-image.js';
 import { videoTool } from './tools/video-generate.js';
 import { extendTool } from './tools/video-extend.js';
@@ -43,6 +44,7 @@ function asDisposer(value: unknown): (() => void) | undefined {
 function applyVideoBusiness(runtime: BusinessRuntime) {
   const { ctx, config } = runtime;
   runtime.defer(registerCanvasNative(ctx, config));
+  runtime.defer(registerBuiltinCanvas(ctx));
   // 可选服务的宿主对象（会话工作目录等），拿到就放进来
   const deps: Record<string, any> = {};
   const segmentReview = createSegmentReview(ctx);

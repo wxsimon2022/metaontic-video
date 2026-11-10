@@ -11,6 +11,7 @@ import { createUpdates } from '../../client/updates.js';
 import { createSettingsPage } from './client/settings.js';
 import { createSidebarPanel } from './client/panel.js';
 import { createCanvasCompanion, CANVAS_PACKAGE } from '../../client/infinite-canvas.js';
+import { createCanvasView } from './client/canvas-view.js';
 import { mountCanvasNative } from '../../client/canvas-native.js';
 import iconMark from '../../../icon.svg';
 
@@ -88,7 +89,8 @@ export function createVideoClient(require) {
         settings.register({ id: 'video', namespace: NAMESPACE, locale: NS, Page });
         // 面板组件要用当前配置快照与界面字典（form/t 在 apply 里才有），所以在这里构造。
         const { CanvasCompanion } = createCanvasCompanion({ React, h });
-        const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: iconMark, CanvasCompanion });
+        const { FlowCanvas } = createCanvasView({ React, h, TOKENS });
+        const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: iconMark, CanvasCompanion, FlowCanvas });
         // 左侧栏入口与面板本体是宿主 root 作用域的两个 slot，用同一个 id 关联：
         // sidebar.panellist 只放一行图标（收到 {size, active}），点它切到 main 里同 id 的面板。
         // 老版本宿主没有这两个 slot 时 inject 不会触发，其余界面与工具不受影响。

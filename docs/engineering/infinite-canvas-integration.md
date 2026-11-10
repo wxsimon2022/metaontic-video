@@ -123,3 +123,29 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 未覆盖：官方 0.20.2 无法加载（上游缺文件），未验证它在任何环境可用；桌面窗口内的建图到回填未复核；Windows 未实测；付费生成全链路未验证。
 
 本地成品：`.local/test/3.20.1-test.15/metaontic-video-3.20.1-test.15.tgz`，1204708 字节，SHA-256 `06d06de2f85e39c31b31a4bd4246edc0fa55984f2cef33aecee88deb0227dda7`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。desktop profile 已从 test.14 升级到 test.15，并核对包内构建产物含本次改动。
+
+## 上游 0.20.3 补齐与安装固定版本更新 3.20.1-test.16
+
+上游已发布 `0.20.3`（npm `latest`），它补上了 0.20.2 漏打包的 `shot-segments.js`，`index.js` 的本地依赖（index-core-skill-profile／skill-pack-loader／skill-pack／production／shot-segments）现在全部在包内。核对结果：host 半部可直接加载，`projectsGet/projectsPut/projectsList/assetsGet/assetCreate/projectDirGet/dataRootGet/canvasCreateProject` 与 `canvasConnect/objectAbsFor/physicalRel` 齐全；真实 0.20.3 临时环境复核自动创建命名、会话标题补名、2 条连线保存后保持、用户改名不被覆盖，未用用户数据根、无付费请求。
+
+因此插件安装入口的固定版本由 `0.20.1` 升到 `0.20.3`（`src/client/infinite-canvas.ts` 的 CANVAS_SPEC），适配器的版本门仍是「0.20.1 起」，老安装继续可用；已有安装依旧不替换、不升级。`.local/canvas-qa/version-gate.mjs` 现覆盖没装／版本过旧／装不全（官方 0.20.2 解包）／正常 0.20.1／正常 0.20.3 五种情况，`.local/canvas-qa/auto-name-0203.mjs` 用真实 0.20.3 复核与 0.20.1 相同的建图行为（该脚本需先 `apply` 原版插件，`_internals` 的 rpc 表在 apply 时才装配）。
+
+本机 desktop profile 已装原版 0.20.3，运行中的宿主画布接口恢复（dataRootGet 正常返回既有数据根）。验证：类型检查、构建、463 项自动测试、diff 检查通过。
+
+未覆盖：桌面窗口内从建图到回填的端到端未复核；Windows 未实测；付费生成全链路未验证。
+
+本地成品：`.local/test/3.20.1-test.16/metaontic-video-3.20.1-test.16.tgz`，1204708 字节，SHA-256 `88fe4dc572e525694830b94303199ba0a383ba4a80b30d1bd5c5b8c80fbc4b41`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。desktop profile 已从 test.15 升级到 test.16，并核对包内构建产物含本次改动。
+
+## 内置流程画布 3.20.1-test.17
+
+不再依赖原版：新增 `src/businesses/video/integrations/canvas-builtin.ts`，在插件自己的目录里实现与原版同形的 `projectsGet/projectsPut/projectsList/assetsGet/assetCreate/dataRootGet/projectDirGet/canvasCreateProject/canvasRename/canvasOpen` 与 `connect`（幂等连线）。因为接口同形，`readCanvasInput`、`publishCanvasResult`、`markCanvasChanged`、`canvas-project` 的建图与补名全部原样复用，没有第二套映射逻辑。
+
+后端选择规则（`resolveCanvasAdapter` / `adapterForNewCanvas`）：内置存储里有这份文档就走内置；老绑定（已有原版 projectId）继续留在原版；新建画布默认写内置，设置项 `canvasBackend: 'original'` 可强制回原版；显式注入的加载器（自动化检查、备用实现）优先。存储位置 `~/.dsh/metaontic-video/canvas/projects/<id>.json`，素材与成果在 `~/.dsh/metaontic-video/canvas/data/`，不再需要用户去原版画布设置数据根。
+
+界面：`src/businesses/video/client/canvas-view.ts` 在插件面板新增「流程画布」区，按画布列出（名字即会话标题）并渲染节点与连线（平移、缩放、重置），图片/视频成果用 `/metaontic-video/canvas-media` 回看；画布文档读取走 `/metaontic-video/canvas`，两个路由都与原版一样限定同源 POST／同源 GET。
+
+验证：类型检查、构建、464 项自动测试、diff 检查通过。新增 `tests/canvas-builtin.test.mjs` 在「原版画布完全不存在」的前提下（`loadCanvasAdapter` 断言必须失败）完成：建图（script/storyboard/两段制作计划/production + 2 条连线）、画布名与默认画布名等于会话标题且不含创作项目 id、重复同步幂等、标题事件补名、用户改名不被覆盖、`readCanvasInput` 读回、成果回填落到插件自己的数据根并登记资产。
+
+未覆盖：真实桌面窗口里的画布交互（需要宿主重载后复核）；画布节点上的「生成并确认费用」「审核」入口尚未接到内置画布（当前仍走助手与工具、原版节点捕获不变）；Windows 未实测；付费生成全链路未验证。
+
+本地成品：`.local/test/3.20.1-test.17/metaontic-video-3.20.1-test.17.tgz`，SHA-256 `7cce8ee7700649036b89c50b3b46ed26f3cfd7a740cf2162ec3d99942b10d801`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。desktop profile 已从 test.16 升级到 test.17；运行中的宿主尚未重载，`/metaontic-video/canvas` 仍返回 405（旧版本进程），重载后复核。
