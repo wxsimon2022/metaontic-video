@@ -63,8 +63,89 @@
   }
 
   // src/businesses/video/client/tool-result.ts
+  var SUMMARY_TOOLS = { video_project: "\u811A\u672C\u5BA1\u6838", video_estimate: "\u8D39\u7528\u8BD5\u7B97" };
+  var ACTION_LABELS = { prepare: "\u51C6\u5907\u9879\u76EE", review: "\u811A\u672C\u5BA1\u6838", review_segment: "\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838", status: "\u8BFB\u53D6\u9879\u76EE\u72B6\u6001" };
+  var STATUS_LABELS = { approved: "\u5DF2\u901A\u8FC7", draft: "\u5F85\u4FEE\u6539", pending: "\u5F85\u786E\u8BA4", blocked: "\u672A\u901A\u8FC7\u6821\u9A8C", running: "\u8FDB\u884C\u4E2D" };
+  var textOf = (block) => (Array.isArray(block?.content) ? block.content : []).filter((part) => part?.type === "text").map((part) => String(part.text || "")).join("\n").trim();
+  var money = (value) => Number.isFinite(Number(value)) ? `\xA5${(Math.round(Number(value) * 1e4) / 1e4).toFixed(4)}` : "";
+  function parseJson(text) {
+    const body = text.trim().replace(/^```[a-zA-Z]*\s*/, "").replace(/```$/, "").trim();
+    try {
+      const data = JSON.parse(body);
+      return data && typeof data === "object" ? data : null;
+    } catch {
+      return null;
+    }
+  }
+  function toolSummary(toolName, block) {
+    const title = SUMMARY_TOOLS[toolName];
+    if (!title) return null;
+    const raw = textOf(block);
+    if (!block || !("kind" in block)) {
+      const args = block?.args || {};
+      const rows2 = [];
+      if (args.action) rows2.push(["\u52A8\u4F5C", ACTION_LABELS[String(args.action)] || String(args.action)]);
+      if (args.duration) rows2.push(["\u76EE\u6807\u65F6\u957F", `${Number(args.duration)} \u79D2`]);
+      if (args.resolution) rows2.push(["\u6E05\u6670\u5EA6", String(args.resolution).toUpperCase()]);
+      return { title, state: "running", stateLabel: "\u8FDB\u884C\u4E2D", rows: rows2, raw: "" };
+    }
+    if (block.isError) return { title, state: "error", stateLabel: "\u672A\u5B8C\u6210", rows: [], raw };
+    const data = parseJson(raw);
+    if (!data) return { title, state: "done", stateLabel: "\u5DF2\u5B8C\u6210", rows: [], raw };
+    const rows = [];
+    const push = (label, value) => {
+      if (value !== void 0 && value !== null && String(value) !== "") rows.push([label, String(value)]);
+    };
+    if (toolName === "video_estimate") {
+      push("\u76EE\u6807\u65F6\u957F", data.duration ? `${data.duration} \u79D2` : "");
+      push("\u753B\u5E45 / \u6E05\u6670\u5EA6", [data.ratio, data.resolution && String(data.resolution).toUpperCase()].filter(Boolean).join(" \xB7 "));
+      push("\u706B\u5C71\u5B98\u65B9\u65B9\u6848", money(data.official?.cny));
+      push("\u63D2\u4EF6\u65B9\u6848", money(data.plugin?.cny));
+      push("\u4EF7\u76EE\u65E5\u671F", data.priceDate);
+      return { title, state: "ok", stateLabel: "\u5DF2\u8BD5\u7B97", rows, raw };
+    }
+    push("\u72B6\u6001", STATUS_LABELS[String(data.status)] || data.status);
+    push("\u9879\u76EE", data.projectId);
+    push("\u4E0B\u4E00\u6B65", data.nextAction);
+    push("\u8BF4\u660E", data.reason);
+    if (data.canvasProject?.status) push("\u753B\u5E03\u540C\u6B65", data.canvasProject.status === "synced" ? "\u5DF2\u540C\u6B65" : String(data.canvasProject.status));
+    const state = data.status === "approved" ? "ok" : ["draft", "blocked"].includes(String(data.status)) ? "warn" : "done";
+    return { title, state, stateLabel: STATUS_LABELS[String(data.status)] || "\u5DF2\u5B8C\u6210", rows, raw };
+  }
+  var SUMMARY_CSS = `
+  .mov-summary { box-sizing: border-box; width: 100%; min-width: 0; margin: 6px 0; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2,#dfe3eb); border-radius: 10px; color: inherit; }
+  .mov-summary-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .mov-summary-title { font-size: 13px; font-weight: 600; }
+  .mov-summary-rows { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; margin: 8px 0 0; font-size: 12.5px; }
+  .mov-summary-key { color: var(--dsw-alias-label-caption,#737b8b); }
+  .mov-summary-val { margin: 0; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .mov-summary-raw { margin-top: 8px; font-size: 12px; }
+  .mov-summary-raw > summary { color: var(--dsw-alias-label-caption,#737b8b); cursor: pointer; }
+  .mov-summary-text { margin-top: 6px; color: var(--dsw-alias-label-caption,#737b8b); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+`;
   function createToolResultView({ h, MediaPreview, VideoTaskProgress }) {
+    function summaryView(props) {
+      const summary = toolSummary(props?.toolName, props?.block);
+      if (!summary) return null;
+      const chip = summary.state === "ok" ? "mov-chip mov-chip-ok" : summary.state === "running" ? "mov-chip movc-badge" : "mov-chip mov-chip-bad";
+      return h("div", { className: "mov-summary", "data-field": "tool-summary" }, [
+        h("style", { key: "style" }, SUMMARY_CSS),
+        h("div", { key: "head", className: "mov-summary-head" }, [
+          h("span", { key: "title", className: "mov-summary-title" }, summary.title),
+          h("span", { key: "state", className: chip }, summary.stateLabel)
+        ]),
+        summary.rows.length ? h("dl", { key: "rows", className: "mov-summary-rows" }, summary.rows.flatMap(([key, value]) => [
+          h("dt", { key: `${key}-key`, className: "mov-summary-key" }, key),
+          h("dd", { key: `${key}-value`, className: "mov-summary-val" }, value)
+        ])) : null,
+        summary.raw ? h("details", { key: "raw", className: "mov-summary-raw" }, [
+          h("summary", { key: "label" }, "\u67E5\u770B\u5B8C\u6574\u8FD4\u56DE"),
+          h("div", { key: "text", className: "mov-summary-text" }, summary.raw)
+        ]) : null
+      ]);
+    }
     function ToolResultView(props) {
+      if (toolSummary(props?.toolName, props?.block)) return summaryView(props);
       if (props.block && "kind" in props.block) return h(MediaPreview, props);
       if (!["video_generate", "video_extend"].includes(props.toolName)) return null;
       return h(VideoTaskProgress, props);
@@ -2340,10 +2421,10 @@
     const NODE_SIZE = { script: [420, 320], storyboard: [460, 340], text: [360, 200], video: [360, 300], image: [360, 300] };
     const sizeOf = (node) => ({ w: Number(node?.w) || (NODE_SIZE[node?.type] || [360, 260])[0], h: Number(node?.h) || (NODE_SIZE[node?.type] || [360, 260])[1] });
     const labelOf = (node) => String(node?.data?.label || { script: "\u5267\u672C", storyboard: "\u5206\u955C", text: "\u8BF4\u660E", video: "\u89C6\u9891", image: "\u56FE\u7247" }[node?.type] || "\u8282\u70B9");
-    const textOf = (node) => String(node?.data?.output || node?.data?.text || node?.data?.prompt || "");
+    const textOf2 = (node) => String(node?.data?.output || node?.data?.text || node?.data?.prompt || "");
     const RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4"];
     const RESOLUTIONS = ["480p", "720p"];
-    const money = (value) => Number.isFinite(Number(value)) ? `\xA5${(Math.round(Number(value) * 1e4) / 1e4).toFixed(4)}` : "\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39";
+    const money2 = (value) => Number.isFinite(Number(value)) ? `\xA5${(Math.round(Number(value) * 1e4) / 1e4).toFixed(4)}` : "\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39";
     const phaseText = (state) => ({
       succeeded: "\u751F\u6210\u6210\u529F",
       running: "\u6B63\u5728\u5236\u4F5C",
@@ -2429,7 +2510,7 @@
         h("ul", { key: "list", className: "movc-shots" }, data.shots.slice(0, 12).map((shot, index) => h("li", { key: index }, `${shot?.index || index + 1}. ${String(shot?.visual || shot?.text || shot?.scene || "").slice(0, 60)}`))),
         data.shots.length > 12 ? h("div", { key: "more" }, `\u2026\u5171 ${data.shots.length} \u4E2A\u955C\u5934`) : null
       ]);
-      const text = textOf(node);
+      const text = textOf2(node);
       return h("div", { key: "text", className: "movc-body" }, text ? text.slice(0, 600) : "\uFF08\u6682\u65E0\u5185\u5BB9\uFF0C\u53EF\u5148\u7F16\u8F91\uFF09");
     }
     function FlowCanvas() {
@@ -2821,7 +2902,7 @@
         h("div", { key: "prompt", style: { whiteSpace: "pre-wrap", maxHeight: "26vh", overflow: "auto" } }, dialog.plan.prompt),
         h("div", { key: "spec" }, `${dialog.plan.model} \xB7 ${dialog.plan.ratio}${dialog.plan.duration ? ` \xB7 ${dialog.plan.duration}\u79D2 \xB7 ${String(dialog.plan.resolution).toUpperCase()} \xB7 \u97F3\u9891${dialog.plan.generateAudio ? "\u5F00" : "\u5173"}` : " \xB7 2048\xD72048"}`),
         h("div", { key: "refs" }, dialog.plan.references?.length ? `\u53C2\u8003\u7D20\u6750\uFF1A${dialog.plan.references.map((r) => `${r.port}\u2190${r.nodeId}`).join("\u3001")}` : "\u65E0\u53C2\u8003\u7D20\u6750\uFF08\u7EAF\u6587\u672C\u751F\u6210\uFF09"),
-        h("div", { key: "cost" }, dialog.plan.estimate ? `\u9884\u4F30\u8D39\u7528\uFF1A${money(dialog.plan.estimate.cny)}\uFF08\u57FA\u7840\u516C\u5F0F\u4F30\u4EF7\uFF0C\u5B9E\u9645\u6309\u6E20\u9053\u8D26\u5355\u7ED3\u7B97\uFF09` : "\u5F53\u524D\u4EF7\u76EE\u672A\u77E5\uFF1A\u786E\u8BA4\u540E\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39\uFF0C\u4E0D\u7F16\u9020\u91D1\u989D\u3002"),
+        h("div", { key: "cost" }, dialog.plan.estimate ? `\u9884\u4F30\u8D39\u7528\uFF1A${money2(dialog.plan.estimate.cny)}\uFF08\u57FA\u7840\u516C\u5F0F\u4F30\u4EF7\uFF0C\u5B9E\u9645\u6309\u6E20\u9053\u8D26\u5355\u7ED3\u7B97\uFF09` : "\u5F53\u524D\u4EF7\u76EE\u672A\u77E5\uFF1A\u786E\u8BA4\u540E\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39\uFF0C\u4E0D\u7F16\u9020\u91D1\u989D\u3002"),
         ...(dialog.plan.notes || []).map((note, index) => h("div", { key: `n${index}` }, note))
       ]) : null;
       const jobView = dialog?.stage === "job" && dialog.job ? h("div", { key: "job" }, [
@@ -3142,7 +3223,7 @@
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), "metaontic-video: dictionaries");
         ctx.effect(() => ctx.slots.inject("conversation.chat.node", () => registerAuthNotice(ctx, h, t)), "metaontic-video: friendly service authentication notice");
         const form = ctx.configForms.get(NAMESPACE);
-        for (const tool of ["video_generate", "video_extend", "video_status", "video_prepare_image"]) {
+        for (const tool of ["video_generate", "video_extend", "video_status", "video_prepare_image", "video_project", "video_estimate"]) {
           ctx.effect(
             () => ctx.slots.inject("tool.call.toolview", () => ctx.slots.register({ name: "tool.call.toolview", key: tool, locale: NS }, ToolResultView)),
             `metaontic-video: ${tool} progress`

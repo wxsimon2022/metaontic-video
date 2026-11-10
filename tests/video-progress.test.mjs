@@ -23,7 +23,7 @@ test('video views register immediately when the host declares the tool slot and 
     },
   });
   const disposers = waiting.filter(([name]) => name === 'tool.call.toolview').map(([, install]) => install());
-  assert.deepEqual([...registrations.keys()], ['video_generate', 'video_extend', 'video_status', 'video_prepare_image']);
+  assert.deepEqual([...registrations.keys()], ['video_generate', 'video_extend', 'video_status', 'video_prepare_image', 'video_project', 'video_estimate']);
   for (const dispose of disposers.reverse()) dispose();
   assert.equal(registrations.size, 0);
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -163,6 +163,39 @@ test('outside progress dock is visible only while the current session has active
   await assert.rejects(api.withGenerationProgress({}, async () => { throw Error('stopped'); }, report));
   assert.deepEqual(signals, ['start', 'end']);
  });
+
+test('脚本审核与费用试算走插件摘要卡片，不再落到宿主默认卡片（JSON 代码块）', () => {
+  const h = (tag, props, children) => ({ tag, props: props || {}, children: Array.isArray(children) ? children : children === undefined ? [] : [children] });
+  const MediaPreview = () => {}; const VideoTaskProgress = () => {};
+  const { ToolResultView } = api.createToolResultView({ h, MediaPreview, VideoTaskProgress });
+  const walk = (node, visit) => { if (!node || typeof node !== 'object') return; visit(node); for (const child of node.children || []) walk(child, visit); };
+  const texts = (tree) => { const out = []; walk(tree, (node) => { for (const child of node.children || []) if (typeof child === 'string') out.push(child); }); return out; };
+
+  // 审核等待中：卡片标题 + 动作说明，不显示 JSON。
+  const waiting = ToolResultView({ toolName: 'video_project', block: { phase: 'start', args: { action: 'review', projectId: 'p1' } } });
+  assert.equal(waiting.tag, 'div');
+  const waitingLabels = texts(waiting).filter((text) => !text.includes('.mov-summary'));
+  assert.deepEqual(waitingLabels, ['脚本审核', '进行中', '动作', '脚本审核']);
+  // 审核结果：关键字段分行展示，原始返回折叠在 details 里，没有 pre/code 代码块。
+  const reviewed = ToolResultView({ toolName: 'video_project', block: { kind: 'result', content: [{ type: 'text', text: JSON.stringify({ projectId: 'p1', status: 'approved', nextAction: '直接调用 video_generate' }) }] } });
+  const labels = texts(reviewed).filter((text) => !text.includes('.mov-summary'));
+  assert.ok(labels.includes('已通过'), labels.join('|'));
+  assert.ok(labels.includes('p1'));
+  assert.ok(labels.includes('直接调用 video_generate'));
+  assert.ok(labels.includes('查看完整返回'));
+  let code = null; walk(reviewed, (node) => { if (['pre', 'code'].includes(node.tag)) code = node.tag; });
+  assert.equal(code, null, '不能出现 pre/code 代码块');
+  // 费用试算：两个方案金额直接给出。
+  const estimate = ToolResultView({ toolName: 'video_estimate', block: { kind: 'result', content: [{ type: 'text', text: JSON.stringify({ duration: 30, ratio: '16:9', resolution: '720p', priceDate: '2026-11-07', official: { cny: 12.5 }, plugin: { cny: 8.75 } }) }] } });
+  const estimateLabels = texts(estimate).filter((text) => !text.includes('.mov-summary'));
+  for (const expected of ['费用试算', '已试算', '30 秒', '16:9 · 720P', '¥12.5000', '¥8.7500']) assert.ok(estimateLabels.includes(expected), `${expected} -> ${estimateLabels.join('|')}`);
+  // 其它工具不受影响。
+  assert.equal(ToolResultView({ toolName: 'video_generate', block: { kind: 'result' } }).tag, MediaPreview);
+  assert.equal(ToolResultView({ toolName: 'video_status', block: { phase: 'start' } }), null);
+  // 非法 JSON 时退回原文，不猜结论。
+  const broken = ToolResultView({ toolName: 'video_project', block: { kind: 'result', content: [{ type: 'text', text: 'not json' }] } });
+  assert.ok(texts(broken).some((text) => text.trim() === 'not json'));
+});
 
 test('tool results route to media while progress is restricted to unfinished video calls', () => {
  const h=(tag,props)=>({tag,props});
