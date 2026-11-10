@@ -4779,7 +4779,7 @@ async function allDocs() {
   const docs = [];
   for (const name of names) if (name.endsWith(".json")) {
     const doc = await readJson(path16.join(docsDir(), name));
-    if (doc?.id) docs.push(doc);
+    if (doc?.id && !doc.deleted) docs.push(doc);
   }
   return docs.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
@@ -4937,6 +4937,11 @@ async function builtinCanvasHandle(args) {
   const params = args?.args || {};
   if (method === "list") return { canvases: await builtinCanvasList() };
   if (method === "create") return await builtinCanvasCreate(params.name);
+  if (method === "delete") {
+    const doc = await requireDoc(params.projectId);
+    await writeDoc(doc.id, { id: doc.id, name: doc.name, deleted: true, nodes: {}, edges: [], createdAt: doc.createdAt, updatedAt: Date.now() });
+    return { canvas: { projectId: doc.id, name: doc.name, deleted: true } };
+  }
   if (method === "get") {
     const doc = await readDoc(params.projectId);
     if (!doc || doc.deleted) throw new Error("\u753B\u5E03\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");

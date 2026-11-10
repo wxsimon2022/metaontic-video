@@ -2402,6 +2402,7 @@
       const [connectFrom, setConnectFrom] = React.useState("");
       const [inline, setInline] = React.useState(null);
       const [createDialog, setCreateDialog] = React.useState(null);
+      const [confirmDelete, setConfirmDelete] = React.useState(false);
       const [dialog, setDialog] = React.useState(null);
       const pan = React.useRef(null);
       const moving = React.useRef(null);
@@ -2507,6 +2508,21 @@
         await rpc("edgeDelete", { projectId: canvas.projectId, edgeId: id });
         await refresh();
       }, [canvas, refresh]);
+      const deleteCanvas = React.useCallback(async () => {
+        if (!canvas) return;
+        try {
+          setError("");
+          const gone = canvas.projectId;
+          await rpc("delete", { projectId: gone });
+          setConfirmDelete(false);
+          const next = list.find((item) => item.projectId !== gone)?.projectId;
+          await load(next);
+          setNotice("\u753B\u5E03\u5DF2\u5220\u9664\uFF1B\u5DF2\u751F\u6210\u7684\u6210\u679C\u7D20\u6750\u6587\u4EF6\u4ECD\u4FDD\u7559\u5728\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\uFF0C\u4FBF\u4E8E\u53E6\u884C\u53D6\u7528\u3002");
+        } catch (e) {
+          setConfirmDelete(false);
+          setError(e?.message || "\u5220\u9664\u753B\u5E03\u5931\u8D25");
+        }
+      }, [canvas, list, load]);
       const commitRename = React.useCallback(async () => {
         if (!canvas || !inline) return;
         const name = String(inline.value || "").trim();
@@ -2927,11 +2943,26 @@
           h("button", { key: "refresh", type: "button", className: "mov-btn", onClick: () => void refresh() }, "\u5237\u65B0"),
           h("button", { key: "reset", type: "button", className: "mov-btn", onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, "\u91CD\u7F6E\u89C6\u56FE"),
           h("button", { key: "export", type: "button", className: "mov-btn", onClick: () => exportCanvas() }, "\u5BFC\u51FA JSON"),
+          h("button", { key: "del-canvas", type: "button", className: "mov-btn", onClick: () => setConfirmDelete(true) }, "\u5220\u9664\u753B\u5E03"),
           selectedIds.length ? h("button", { key: "del-selected", type: "button", className: "mov-btn", onClick: () => void removeNodes(selectedIds) }, `\u5220\u9664\u9009\u4E2D\uFF08${selectedIds.length}\uFF09`) : null,
           typeof onOpenPage === "function" ? h("button", { key: "page", type: "button", className: "mov-btn", onClick: () => onOpenPage() }, "\u6253\u5F00\u72EC\u7ACB\u9875\u9762") : null
         ]) : null,
         canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D\uFF08Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
         connectFrom ? h("p", { key: "connect", className: "movc-hint" }, "\u8FDE\u7EBF\u6A21\u5F0F\uFF1A\u70B9\u51FB\u76EE\u6807\u8282\u70B9\u5B8C\u6210\u8FDE\u63A5\uFF0C\u70B9\u7A7A\u767D\u5904\u53D6\u6D88\u3002") : null,
+        confirmDelete ? h(
+          "div",
+          { key: "delete-modal", className: "movc-modal", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
+            if (e.target === e.currentTarget) setConfirmDelete(false);
+          } },
+          h("div", { key: "body", className: "movc-modal-body", style: { width: "min(420px, calc(100vw - 32px))" } }, [
+            h("h4", { key: "h" }, "\u5220\u9664\u753B\u5E03"),
+            h("p", { key: "ask", className: "movc-status" }, `\u786E\u5B9A\u5220\u9664\u300C${canvas?.name || ""}\u300D\u5417\uFF1F\u753B\u5E03\u4E0A\u7684\u8282\u70B9\u4E0E\u8FDE\u7EBF\u4F1A\u4E00\u8D77\u5220\u9664\uFF0C\u4E14\u4E0D\u4F1A\u81EA\u52A8\u91CD\u5EFA\uFF1B\u5DF2\u751F\u6210\u7684\u6210\u679C\u7D20\u6750\u6587\u4EF6\u4ECD\u4FDD\u7559\u5728\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\u3002`),
+            h("div", { key: "ops", className: "movc-bar" }, [
+              h("button", { key: "cancel", type: "button", className: "mov-btn", onClick: () => setConfirmDelete(false) }, "\u53D6\u6D88"),
+              h("button", { key: "ok", type: "button", className: "mov-btn", onClick: () => void deleteCanvas() }, "\u786E\u8BA4\u5220\u9664")
+            ])
+          ])
+        ) : null,
         createDialog ? h(
           "div",
           { key: "create-modal", className: "movc-modal", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {

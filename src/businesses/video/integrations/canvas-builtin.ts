@@ -37,7 +37,8 @@ async function allDocs() {
   const docs = [];
   for (const name of names) if (name.endsWith('.json')) {
     const doc = await readJson(path.join(docsDir(), name));
-    if (doc?.id) docs.push(doc);
+    // 已删除的画布不再出现在列表里；文档本体保留，便于区分「删过」与「从没有过」。
+    if (doc?.id && !doc.deleted) docs.push(doc);
   }
   return docs.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
@@ -181,6 +182,11 @@ export async function builtinCanvasHandle(args: any) {
   const params = args?.args || {};
   if (method === 'list') return { canvases: await builtinCanvasList() };
   if (method === 'create') return await builtinCanvasCreate(params.name);
+  if (method === 'delete') {
+    const doc = await requireDoc(params.projectId);
+    await writeDoc(doc.id, { id: doc.id, name: doc.name, deleted: true, nodes: {}, edges: [], createdAt: doc.createdAt, updatedAt: Date.now() });
+    return { canvas: { projectId: doc.id, name: doc.name, deleted: true } };
+  }
   if (method === 'get') {
     const doc = await readDoc(params.projectId);
     if (!doc || doc.deleted) throw new Error('画布不存在或已删除。');

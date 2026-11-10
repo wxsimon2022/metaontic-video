@@ -112,6 +112,7 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
     const [connectFrom, setConnectFrom] = React.useState('');
     const [inline, setInline] = React.useState(null as any);
     const [createDialog, setCreateDialog] = React.useState(null as any);
+    const [confirmDelete, setConfirmDelete] = React.useState(false);
     const [dialog, setDialog] = React.useState(null as any);
     const pan = React.useRef(null as any);
     const moving = React.useRef(null as any);
@@ -204,6 +205,20 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
       await rpc('edgeDelete', { projectId: canvas.projectId, edgeId: id });
       await refresh();
     }, [canvas, refresh]);
+
+    /** 删除整张画布要二次确认：删掉的是这份文档，成果素材文件仍留在插件数据目录里。 */
+    const deleteCanvas = React.useCallback(async () => {
+      if (!canvas) return;
+      try {
+        setError('');
+        const gone = canvas.projectId;
+        await rpc('delete', { projectId: gone });
+        setConfirmDelete(false);
+        const next = list.find(item => item.projectId !== gone)?.projectId;
+        await load(next);
+        setNotice('画布已删除；已生成的成果素材文件仍保留在插件数据目录，便于另行取用。');
+      } catch (e: any) { setConfirmDelete(false); setError(e?.message || '删除画布失败'); }
+    }, [canvas, list, load]);
 
     /** 就地改名：空名放弃本次编辑（保留原名），重名或保存失败时显示原因并退出编辑。 */
     const commitRename = React.useCallback(async () => {
@@ -507,11 +522,21 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
         h('button', { key: 'refresh', type: 'button', className: 'mov-btn', onClick: () => void refresh() }, '刷新'),
         h('button', { key: 'reset', type: 'button', className: 'mov-btn', onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, '重置视图'),
         h('button', { key: 'export', type: 'button', className: 'mov-btn', onClick: () => exportCanvas() }, '导出 JSON'),
+        h('button', { key: 'del-canvas', type: 'button', className: 'mov-btn', onClick: () => setConfirmDelete(true) }, '删除画布'),
         selectedIds.length ? h('button', { key: 'del-selected', type: 'button', className: 'mov-btn', onClick: () => void removeNodes(selectedIds) }, `删除选中（${selectedIds.length}）`) : null,
         typeof onOpenPage === 'function' ? h('button', { key: 'page', type: 'button', className: 'mov-btn', onClick: () => onOpenPage() }, '打开独立页面') : null,
       ]) : null,
       canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `双击画布名重命名（Enter 保存，Esc 取消）；拖动空白处平移、滚轮缩放；拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
       connectFrom ? h('p', { key: 'connect', className: 'movc-hint' }, '连线模式：点击目标节点完成连接，点空白处取消。') : null,
+      confirmDelete ? h('div', { key: 'delete-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget) setConfirmDelete(false); } },
+        h('div', { key: 'body', className: 'movc-modal-body', style: { width: 'min(420px, calc(100vw - 32px))' } }, [
+          h('h4', { key: 'h' }, '删除画布'),
+          h('p', { key: 'ask', className: 'movc-status' }, `确定删除「${canvas?.name || ''}」吗？画布上的节点与连线会一起删除，且不会自动重建；已生成的成果素材文件仍保留在插件数据目录。`),
+          h('div', { key: 'ops', className: 'movc-bar' }, [
+            h('button', { key: 'cancel', type: 'button', className: 'mov-btn', onClick: () => setConfirmDelete(false) }, '取消'),
+            h('button', { key: 'ok', type: 'button', className: 'mov-btn', onClick: () => void deleteCanvas() }, '确认删除'),
+          ]),
+        ])) : null,
       createDialog ? h('div', { key: 'create-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget) setCreateDialog(null); } },
         h('div', { key: 'body', className: 'movc-modal-body', style: { width: 'min(420px, calc(100vw - 32px))' } }, [
           h('h4', { key: 'h' }, '新建画布'),

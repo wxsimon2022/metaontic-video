@@ -196,3 +196,18 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 未覆盖：真实桌面窗口里的框选/整组拖动、导出下载与新建画布点击（需宿主重载后人工复核）；Windows 未实测。
 
 本地成品：`.local/test/3.20.1-test.20/metaontic-video-3.20.1-test.20.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+
+## 新建/改名/删除画布的完整链路 3.20.1-test.21
+
+对照原版无限画布的口径补齐画布生命周期（原版：`新建画布…` 走命名弹窗且必须命名、同范围内不许重名；`重命名画布` 双击就地编辑，Enter 提交、Esc 取消、空名保留原名）：
+
+- 新建画布：面板「新建画布…」弹命名窗口（标题「新建画布」/字段「画布名称」，Enter 提交、Esc 关闭、点遮罩关闭），空名与重名都留在窗口里显示原因（沿用原版措辞「画布名不能为空」「同名画布已存在」）。服务端 `builtinCanvasCreate` 先过 `assertCanvasName`，再 `newId()` 建新文档，不复用同名的自动建图画布。
+- 改名：画布名改为就地编辑（双击名称或点 ✎ → input，Enter/失焦提交、Esc 取消）；空名放弃本次编辑并提示，重名或保存失败显示原因并保留原名。`builtinCanvasHandle({method:'rename'})` 同样走 `assertCanvasName`（排除自身，改成原名是幂等的）。
+- 删除画布：`builtinCanvasHandle({method:'delete'})` 写 `{deleted:true}` 墓碑文档，`allDocs()` 过滤已删除项，因此列表不再出现、`get/rename/nodeSave` 一律以「画布不存在或已删除」停住；面板通过二次确认弹窗触发，删除后自动切到列表里的下一张画布，并说明成果素材文件仍保留在插件数据目录。
+- 自动建图路径不受影响：`canvasCreateProject`/`projectsPut` 不经过 `assertCanvasName`，会话标题重名不会把自动同步卡死。
+
+验证：类型检查、构建、458 项自动测试、diff 检查通过。链路测试（`tests/canvas-builtin.test.mjs`）现在从面板「新建画布（命名）」开始：建空画布 → 建节点 → 生成 → 结果审核 → 审核后准备续拍方案 → 改名 → 列表可见 → 删除后列表消失且 `get/rename` 拒绝；另有重名/空名拒绝、幂等改回原名、`allDocs` 过滤墓碑的断言。
+
+未覆盖：真实桌面窗口里的命名弹窗、双击改名、删除确认与下载导出（需宿主重载后人工复核）；Windows 未实测。
+
+本地成品：`.local/test/3.20.1-test.21/metaontic-video-3.20.1-test.21.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。

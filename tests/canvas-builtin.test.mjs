@@ -118,8 +118,10 @@ test('内置画布节点可直接制作：按项目解析适配器，成果回�
  const root=await mkdtemp(path.join(os.tmpdir(),'内置画布制作 ')),old=process.env.DSH_HOME;
  process.env.DSH_HOME=root;
  try {
-  const made=await api.builtinRpc().canvasCreateProject({name:'制作画布'});
+  // 整条链路从面板的「新建画布（必须命名）」开始。
+  const made=(await api.builtinCanvasHandle({method:'create',args:{name:'制作画布'}})).canvas;
   const projectId=made.projectId;
+  assert.deepEqual(made.nodes,{});assert.deepEqual(made.edges,[]);
   await api.builtinCanvasHandle({method:'nodeSave',args:{projectId,node:{id:'usr_video',type:'video',x:0,y:0,data:{label:'视频节点',prompt:'海面日出',ratio:'9:16',duration:5,resolution:'720p'}}}});
   const directory=path.join(root,'native');
   // 生成结果只可能来自渠道URL；测试用本地成品代替下载，回填路径与线上一致（只新增成果节点）。
@@ -151,7 +153,20 @@ test('内置画布节点可直接制作：按项目解析适配器，成果回�
    assert.equal(result.data.metaonticVideoUrl,'https://example.invalid/a.mp4');
    // 审核前不允许续拍：审核事实保存在插件自己的记录里。
    await assert.rejects(service.handle({action:'prepare',projectId,nodeId:result.id,operation:'extend'}),/审核上一段/);
-   await service.handle({action:'review',id:proposal.id,accept:true});
+   const {job:reviewed}=await service.handle({action:'review',id:proposal.id,accept:true});
+   assert.equal(reviewed.reviewed,true);
+   // 审核通过后再续拍：方案仍然只针对本段，费用单独确认（这里只准备方案，不提交付费）。
+   const extended=await service.handle({action:'prepare',projectId,nodeId:result.id,operation:'extend',draft:{transitionDescription:'镜头推近，海鸥掠过画面',duration:4}});
+   assert.equal(extended.proposal.operation,'extend');
+   assert.equal(extended.proposal.duration,4);
+   // 链路收尾：改名、列表可见、删除后不再列出且不能再用。
+   assert.equal((await api.builtinCanvasHandle({method:'rename',args:{projectId,name:'制作画布（定稿）'}})).canvas.name,'制作画布（定稿）');
+   const listed=await api.builtinCanvasHandle({method:'list'});
+   assert.ok(listed.canvases.some(c=>c.projectId===projectId&&c.name==='制作画布（定稿）'));
+   await api.builtinCanvasHandle({method:'delete',args:{projectId}});
+   assert.equal((await api.builtinCanvasHandle({method:'list'})).canvases.some(c=>c.projectId===projectId),false);
+   await assert.rejects(api.builtinCanvasHandle({method:'get',args:{projectId}}),/不存在或已删除/);
+   await assert.rejects(api.builtinCanvasHandle({method:'rename',args:{projectId,name:'改不回去'}}),/不存在或已删除/);
   } finally { service.dispose(); }
  } finally { if(old===undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME=old; await rm(root,{recursive:true,force:true}); }
 });
