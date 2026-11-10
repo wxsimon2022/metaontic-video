@@ -7,7 +7,7 @@ export async function canvasNativeRpc(args, fetcher = fetch) {
   return body;
 }
 
-/** 捕获原版0.20.1节点发送/重新生成；不修改宿主或原版文件，不创建聊天草稿。 */
+/** 捕获原版0.20.1起节点发送/重新生成；不修改宿主或原版文件，不创建聊天草稿。 */
 export function mountCanvasNative({ document: doc, MutationObserver: Observer, rpc = canvasNativeRpc, resolve = resolveCanvasSelection }) {
   if (!doc?.body || !Observer) return () => {};
   let disposed = false, dialog: any, timer: any, target: any, current: any, busy = false;

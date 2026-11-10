@@ -1,4 +1,4 @@
-/** 原版0.20.1的界面伴随入口；只读取DOM选择与只读RPC，不改写原版源码/配置。 */
+/** 原版0.20.1起的界面伴随入口；只读取DOM选择与只读RPC，不改写原版源码/配置。 */
 const ID = /^[A-Za-z0-9_-]{1,100}$/;
 export async function canvasReadRpc(method, args = {}, fetcher = fetch) {
   if (!['projectsList', 'projectsGet'].includes(method)) throw new Error('不支持的画布读取操作');

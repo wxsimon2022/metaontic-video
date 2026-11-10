@@ -16,7 +16,7 @@ export async function markCanvasChanged(adapter: any, projectId: string, candida
   return false;
 }
 
-/** 与原版画布0.20.1互操作；生成始终经过既有工具及宿主审批。 */
+/** 与原版画布0.20.1起互操作（含原版自更新到的0.20.x）；生成始终经过既有工具及宿主审批。 */
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
@@ -39,18 +39,27 @@ function location(link) {
   if (!validId(link?.projectId) || !validId(link?.nodeId) || (link.canvasId && !validId(link.canvasId))) throw new Error('画布项目或节点标识无效');
   return { id: link.projectId, ...(link.canvasId ? { canvasId: link.canvasId } : {}) };
 }
+/** 原版画布自带的升级入口会把它推到更高的0.20.x；锁死单版本会让已安装的0.20.2直接不可用。
+ *  版本仍设下限（0.20.1，私有接口首个核对版本），真正的开关是下面的 rpc/_internals 能力核对。 */
+export function canvasVersionSupported(version: any) {
+  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(String(version ?? '').trim());
+  if (!match) return false;
+  const [major, minor, patch] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (major !== 0) return major > 0;
+  return minor > 20 || (minor === 20 && patch >= 1);
+}
 export async function loadCanvasAdapter() {
   try {
     const require = createRequire(import.meta.url);
     const pkg = require('@ninkch/dsh-infinite-canvas/package.json');
-    if (pkg.version !== '0.20.1') throw new Error('version');
+    if (!canvasVersionSupported(pkg.version)) throw new Error('version');
     const module = await import(pathToFileURL(require.resolve('@ninkch/dsh-infinite-canvas')).href);
     const internal = module._internals;
     const rpc = internal?.rpcMethods?.();
     if (!rpc?.projectsGet || !rpc?.projectsPut || !rpc?.assetsGet || !rpc?.assetCreate || !rpc?.projectDirGet || !rpc?.dataRootGet || !rpc?.projectsList) throw new Error('not-ready');
     return { rpc, assetPath: (root, asset) => asset.sha ? internal.objectAbsFor(root, asset.sha) : path.resolve(root, internal.physicalRel(asset.rel)),
       ...(typeof internal.canvasConnect === 'function' ? { connect: (args: any) => internal.canvasConnect(args) } : {}) };
-  } catch { throw new Error('画布联动需要已启用的原版 @ninkch/dsh-infinite-canvas 0.20.1；请在插件详情核对安装和启用状态，不会改写画布配置。'); }
+  } catch { throw new Error('画布联动需要已启用的原版 @ninkch/dsh-infinite-canvas 0.20.1 或更新版本；请在插件详情核对安装和启用状态，不会改写画布配置。'); }
 }
 /** 有向上游、原顺序和端口一并保留；只输出创作字段，不读取原版供应商配置。 */
 export async function readCanvasInput(adapter, link) {

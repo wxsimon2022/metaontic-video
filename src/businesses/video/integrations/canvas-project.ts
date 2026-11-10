@@ -78,7 +78,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       if (draft.specification?.canvas) return { status: 'external', projectId: draft.specification.canvas.projectId, reason: '沿用用户选择的原画布，不另建项目。' };
       let adapter;
       try { adapter = await load(); }
-      catch { return { status: 'unavailable', reason: '自动画布尚未就绪，请安装并启用原版无限画布0.20.1；创作项目已保留。' }; }
+      catch { return { status: 'unavailable', reason: '自动画布尚未就绪，请安装并启用原版无限画布0.20.1 或更新版本；创作项目已保留。' }; }
       const rpc = adapter.rpc;
       let conversationName = '';
       try { conversationName = String(sessionTitle?.get(exec.agent.session)?.title || '').trim().slice(0, 80); } catch { /* 宿主未提供标题时保留原名 */ }

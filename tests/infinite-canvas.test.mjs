@@ -10,6 +10,18 @@ test('画布安装检测兼容宿主两种回包，异常失败关闭', () => {
   assert.equal(api.canvasBundleState([{ ...installed, availability: 'missing' }]).available, false);
   assert.throws(() => api.canvasBundleState({ ok: false }));
 });
+test('画布适配接受0.20.1起的0.20.x（原版自带升级会推到0.20.2），拒绝更早或无效版本', () => {
+  assert.equal(api.canvasVersionSupported('0.20.1'), true);
+  assert.equal(api.canvasVersionSupported('0.20.2'), true);
+  assert.equal(api.canvasVersionSupported('0.20.17'), true);
+  assert.equal(api.canvasVersionSupported('0.21.0'), true);
+  assert.equal(api.canvasVersionSupported('1.0.0'), true);
+  assert.equal(api.canvasVersionSupported('0.20.0'), false);
+  assert.equal(api.canvasVersionSupported('0.19.9'), false);
+  assert.equal(api.canvasVersionSupported(''), false);
+  assert.equal(api.canvasVersionSupported(undefined), false);
+  assert.equal(api.canvasVersionSupported('v0.20.2'), false);
+});
 test('已有原版画布不重装，不覆盖目录链接或升级已有版本', async () => {
   let installs = 0;
   const result = await api.installCanvas({ listBundles: async () => [installed], installBundle: async () => installs++ });
