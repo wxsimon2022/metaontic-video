@@ -181,3 +181,18 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 未覆盖：真实桌面窗口里点左侧栏切页与画布交互（需宿主重载后人工复核）；Windows 未实测。
 
 本地成品：`.local/test/3.20.1-test.19/metaontic-video-3.20.1-test.19.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+
+## 画布操作完善与新建画布 3.20.1-test.20
+
+补齐画布上的操作，并新增「新建画布」：
+
+- 新建画布：`builtinCanvasHandle({method:'create'})` 走新的 `builtinCanvasCreate`，每次强制新建一份空白文档（`newId()`），不套用自动建图的「同名空画布复用」规则；面板工具条「新建画布」用名称输入框的值，空则用「新建流程画布 N」。
+- 复制节点：新增纯函数 `duplicateNodePayload(node, spot)`（`canvas-view.ts`），只带走 `label/prompt/text/output/script/requirement/ratio/resolution/duration`，成果素材（`assetId`）、任务标识（`metaonticTaskId/metaonticNativeJob/metaonticVideoUrl/metaonticSeconds`）、来源关系与 `status` 都不复制，定位在原节点右下 +40px。
+- 多选与框选：`selected` 改为 `selectedIds` 数组；Shift+拖空白=框选（普通拖空白仍是平移），Shift+点节点=加选/取消；拖动已选中的任一节点整组移动，工具条出现「删除选中（n）」；框选结束后的一次点击不再误清空选择。
+- 导出：工具条「导出 JSON」把 `{name, projectId, view, nodes, edges, exportedAt}` 下载成文件；只读导出，不含API密钥，不改画布。
+
+验证：类型检查、构建、458 项自动测试、diff 检查通过。新增测试：`create` 同名各建一份、空节点/空连线、数据根在插件目录、列表可见、默认名；`duplicateNodePayload` 断言复制内容不含成果素材与 `https://example.invalid` 等任务标识。面板提示文案同步说明框选与多选。
+
+未覆盖：真实桌面窗口里的框选/整组拖动、导出下载与新建画布点击（需宿主重载后人工复核）；Windows 未实测。
+
+本地成品：`.local/test/3.20.1-test.20/metaontic-video-3.20.1-test.20.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。

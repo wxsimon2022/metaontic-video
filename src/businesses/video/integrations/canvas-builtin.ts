@@ -156,11 +156,31 @@ async function requireDoc(projectId: any) {
   if (!doc || doc.deleted) throw new Error('画布不存在或已删除。');
   return doc;
 }
+/** 画布名不能为空、也不能和别的画布重名（对照原版：同范围内名称唯一）。
+ *  自动建图走 projectsPut，不经过这里，所以会话标题重名不会把自动流程卡住。 */
+async function assertCanvasName(name: any, exceptId?: any) {
+  const label = String(name || '').trim().slice(0, 80);
+  if (!label) throw new Error('画布名不能为空。');
+  const taken = (await allDocs()).some(doc => doc.id !== exceptId && String(doc.name || '').trim() === label);
+  if (taken) throw new Error('同名画布已存在，请换一个名称。');
+  return label;
+}
+
+/** 面板「新建画布」：始终新建一份空白文档，不套用自动建图的同名复用规则（用户点一次就该有一份新的）。 */
+export async function builtinCanvasCreate(name: any) {
+  const label = await assertCanvasName(name);
+  const id = newId();
+  const doc = { id, createdAt: Date.now(), updatedAt: Date.now(), name: label, nodes: {}, edges: [], view: { x: 60, y: 40, scale: 1 }, rev: 1 };
+  await writeDoc(id, doc);
+  return { canvas: { projectId: id, name: label, updatedAt: doc.updatedAt, view: doc.view, nodes: {}, edges: [], dataRoot: dataRootOf() } };
+}
+
 /** 面板读取/编辑用的接口：只暴露内置画布自己的文档，不碰其他插件的存储与配置。 */
 export async function builtinCanvasHandle(args: any) {
   const method = String(args?.method || '');
   const params = args?.args || {};
   if (method === 'list') return { canvases: await builtinCanvasList() };
+  if (method === 'create') return await builtinCanvasCreate(params.name);
   if (method === 'get') {
     const doc = await readDoc(params.projectId);
     if (!doc || doc.deleted) throw new Error('画布不存在或已删除。');
@@ -168,10 +188,9 @@ export async function builtinCanvasHandle(args: any) {
       nodes: doc.nodes || {}, edges: doc.edges || [], dataRoot: dataRootOf() } };
   }
   if (method === 'rename') {
-    const doc = await readDoc(params.projectId);
-    if (!doc) throw new Error('画布不存在或已删除。');
-    const name = String(params.name || '').trim().slice(0, 80);
-    if (!name) throw new Error('画布名不能为空。');
+    const doc = await requireDoc(params.projectId);
+    const name = await assertCanvasName(params.name, doc.id);
+    if (name === doc.name) return { canvas: { projectId: doc.id, name: doc.name } };
     doc.name = name; doc.updatedAt = Date.now(); doc.rev = (doc.rev || 0) + 1;
     await writeDoc(doc.id, doc);
     return { canvas: { projectId: doc.id, name: doc.name } };

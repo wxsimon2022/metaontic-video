@@ -4918,10 +4918,25 @@ async function requireDoc(projectId) {
   if (!doc || doc.deleted) throw new Error("\u753B\u5E03\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");
   return doc;
 }
+async function assertCanvasName(name, exceptId) {
+  const label = String(name || "").trim().slice(0, 80);
+  if (!label) throw new Error("\u753B\u5E03\u540D\u4E0D\u80FD\u4E3A\u7A7A\u3002");
+  const taken = (await allDocs()).some((doc) => doc.id !== exceptId && String(doc.name || "").trim() === label);
+  if (taken) throw new Error("\u540C\u540D\u753B\u5E03\u5DF2\u5B58\u5728\uFF0C\u8BF7\u6362\u4E00\u4E2A\u540D\u79F0\u3002");
+  return label;
+}
+async function builtinCanvasCreate(name) {
+  const label = await assertCanvasName(name);
+  const id = newId();
+  const doc = { id, createdAt: Date.now(), updatedAt: Date.now(), name: label, nodes: {}, edges: [], view: { x: 60, y: 40, scale: 1 }, rev: 1 };
+  await writeDoc(id, doc);
+  return { canvas: { projectId: id, name: label, updatedAt: doc.updatedAt, view: doc.view, nodes: {}, edges: [], dataRoot: dataRootOf() } };
+}
 async function builtinCanvasHandle(args) {
   const method = String(args?.method || "");
   const params = args?.args || {};
   if (method === "list") return { canvases: await builtinCanvasList() };
+  if (method === "create") return await builtinCanvasCreate(params.name);
   if (method === "get") {
     const doc = await readDoc(params.projectId);
     if (!doc || doc.deleted) throw new Error("\u753B\u5E03\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");
@@ -4936,10 +4951,9 @@ async function builtinCanvasHandle(args) {
     } };
   }
   if (method === "rename") {
-    const doc = await readDoc(params.projectId);
-    if (!doc) throw new Error("\u753B\u5E03\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");
-    const name = String(params.name || "").trim().slice(0, 80);
-    if (!name) throw new Error("\u753B\u5E03\u540D\u4E0D\u80FD\u4E3A\u7A7A\u3002");
+    const doc = await requireDoc(params.projectId);
+    const name = await assertCanvasName(params.name, doc.id);
+    if (name === doc.name) return { canvas: { projectId: doc.id, name: doc.name } };
     doc.name = name;
     doc.updatedAt = Date.now();
     doc.rev = (doc.rev || 0) + 1;

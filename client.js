@@ -2301,6 +2301,13 @@
     if (!response.ok || body?.error) throw new Error(body?.error || "\u5236\u4F5C\u8BF7\u6C42\u672A\u5B8C\u6210\uFF0C\u8BF7\u67E5\u8BE2\u539F\u8BB0\u5F55\uFF0C\u4E0D\u8981\u91CD\u590D\u751F\u6210\u3002");
     return body;
   }
+  function duplicateNodePayload(node, spot) {
+    const data = {};
+    for (const key of ["label", "prompt", "text", "output", "script", "requirement", "ratio", "resolution", "duration"]) {
+      if (node?.data?.[key] !== void 0) data[key] = node.data[key];
+    }
+    return { type: node?.type || "text", x: Number(spot?.x || 0) + 40, y: Number(spot?.y || 0) + 40, w: spot?.w, h: spot?.h, data };
+  }
   function createCanvasView({ React, h, TOKENS, stageHeight = 460 }) {
     const rpc = async (method, args = {}) => {
       const response = await fetch("/metaontic-video/canvas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ method, args }) });
@@ -2361,6 +2368,12 @@
 .movc-status { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
 .movc-status[data-error="true"] { color: #c0392b; }
 .movc-plan { font-size: 12px; line-height: 1.7; background: ${TOKENS.controlFill}; border-radius: 8px; padding: 10px 12px; }
+.movc-marquee { position: absolute; border: 1px dashed ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}1f; pointer-events: none; border-radius: 4px; }
+.movc-name { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 160px; min-width: 0; }
+.movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
+.movc-name-text:hover { border-color: ${TOKENS.border}; }
+.movc-name input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 13px; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.primaryFill}; border-radius: 8px; padding: 5px 8px; }
+.movc-name-err { flex: 1 1 100%; font-size: 12px; color: #c0392b; }
 `;
     function nodeBody(node) {
       const data = node?.data || {};
@@ -2384,12 +2397,15 @@
       const [view, setView] = React.useState({ x: 30, y: 24, scale: 1 });
       const [panning, setPanning] = React.useState(false);
       const [positions, setPositions] = React.useState({});
-      const [selected, setSelected] = React.useState("");
+      const [selectedIds, setSelectedIds] = React.useState([]);
+      const [marquee, setMarquee] = React.useState(null);
       const [connectFrom, setConnectFrom] = React.useState("");
-      const [nameDraft, setNameDraft] = React.useState("");
+      const [inline, setInline] = React.useState(null);
+      const [createDialog, setCreateDialog] = React.useState(null);
       const [dialog, setDialog] = React.useState(null);
       const pan = React.useRef(null);
       const moving = React.useRef(null);
+      const marqueeDone = React.useRef(false);
       const timer = React.useRef(null);
       const alive = React.useRef(true);
       React.useEffect(() => () => {
@@ -2404,14 +2420,15 @@
           setList(canvases);
           if (!wanted) {
             setCanvas(null);
-            setNameDraft("");
+            setInline(null);
             return;
           }
           const { canvas: doc } = await rpc("get", { projectId: wanted });
           setCanvas(doc);
-          setNameDraft(doc.name || "");
+          setInline(null);
           setPositions({});
-          setSelected("");
+          setSelectedIds([]);
+          setMarquee(null);
         } catch (e) {
           setError(e?.message || "\u6D41\u7A0B\u753B\u5E03\u8BFB\u53D6\u5931\u8D25");
         }
@@ -2440,16 +2457,41 @@
         const [w, hh] = NODE_SIZE[type] || [360, 260];
         const data = type === "video" || type === "image" ? { label: type === "video" ? "\u89C6\u9891\u8282\u70B9" : "\u56FE\u7247\u8282\u70B9", prompt: "", ratio: type === "image" ? "1:1" : "16:9", resolution: "720p", ...type === "video" ? { duration: 5 } : { imageCount: 1 } } : { label: type === "script" ? "\u5267\u672C" : "\u8BF4\u660E", text: "" };
         await saveNode(id, { type, x: 60 + count % 4 * 420, y: 60 + Math.floor(count / 4) * 360, w, h: hh, data });
-        setSelected(id);
+        setSelectedIds([id]);
         setNotice("\u5DF2\u65B0\u5EFA\u8282\u70B9\uFF1A\u5148\u5728\u8282\u70B9\u91CC\u586B\u5199\u5185\u5BB9\uFF0C\u518D\u751F\u6210\uFF1B\u751F\u6210\u524D\u4F1A\u5355\u72EC\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002");
       }, [canvas, saveNode]);
-      const removeNode = React.useCallback(async (id) => {
-        if (!canvas) return;
-        await rpc("nodeDelete", { projectId: canvas.projectId, nodeId: id });
-        setSelected("");
-        if (connectFrom === id) setConnectFrom("");
+      const removeNodes = React.useCallback(async (ids) => {
+        if (!canvas || !ids.length) return;
+        for (const id of ids) await rpc("nodeDelete", { projectId: canvas.projectId, nodeId: id });
+        setSelectedIds((all) => all.filter((id) => !ids.includes(id)));
+        if (connectFrom && ids.includes(connectFrom)) setConnectFrom("");
         await refresh();
       }, [canvas, connectFrom, refresh]);
+      const duplicateNode = React.useCallback(async (node) => {
+        if (!canvas) return;
+        const spot = { ...sizeOf(node), ...positions[node.id] || {} };
+        const id = `usr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        await saveNode(id, duplicateNodePayload(node, spot));
+        setSelectedIds([id]);
+        setNotice("\u5DF2\u590D\u5236\u8282\u70B9\uFF08\u4E0D\u542B\u6210\u679C\u7D20\u6750\u4E0E\u539F\u4EFB\u52A1\u6807\u8BC6\uFF09\uFF1B\u6539\u5B8C\u5185\u5BB9\u518D\u751F\u6210\uFF0C\u8D39\u7528\u7167\u5E38\u5355\u72EC\u786E\u8BA4\u3002");
+      }, [canvas, positions, saveNode]);
+      const exportCanvas = React.useCallback(() => {
+        if (!canvas || typeof document === "undefined") return;
+        try {
+          const payload = { name: canvas.name, projectId: canvas.projectId, view: canvas.view, nodes: canvas.nodes, edges: canvas.edges, exportedAt: (/* @__PURE__ */ new Date()).toISOString() };
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `${String(canvas.name || canvas.projectId).replace(/[\\/:*?"<>|]/g, "_")}.canvas.json`;
+          document.body.append(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1e3);
+        } catch (e) {
+          setError(e?.message || "\u5BFC\u51FA\u753B\u5E03\u5931\u8D25");
+        }
+      }, [canvas]);
       const connectTo = React.useCallback(async (to) => {
         if (!canvas || !connectFrom || connectFrom === to) return;
         const from = (canvas.nodes || {})[connectFrom];
@@ -2465,11 +2507,44 @@
         await rpc("edgeDelete", { projectId: canvas.projectId, edgeId: id });
         await refresh();
       }, [canvas, refresh]);
-      const rename = React.useCallback(async () => {
-        if (!canvas || !nameDraft.trim()) return;
-        await rpc("rename", { projectId: canvas.projectId, name: nameDraft.trim() });
-        await refresh();
-      }, [canvas, nameDraft, refresh]);
+      const commitRename = React.useCallback(async () => {
+        if (!canvas || !inline) return;
+        const name = String(inline.value || "").trim();
+        if (!name) {
+          setInline(null);
+          setError("\u753B\u5E03\u540D\u4E0D\u80FD\u4E3A\u7A7A\uFF0C\u5DF2\u4FDD\u7559\u539F\u540D\u3002");
+          return;
+        }
+        if (name === canvas.name) {
+          setInline(null);
+          return;
+        }
+        try {
+          await rpc("rename", { projectId: canvas.projectId, name });
+          setInline(null);
+          setError("");
+          await refresh();
+        } catch (e) {
+          setInline(null);
+          setError(e?.message || "\u6539\u540D\u672A\u4FDD\u5B58\uFF0C\u5DF2\u4FDD\u7559\u539F\u540D\u3002");
+        }
+      }, [canvas, inline, refresh]);
+      const submitCreate = React.useCallback(async () => {
+        if (!createDialog) return;
+        const name = String(createDialog.value || "").trim();
+        if (!name) {
+          setCreateDialog({ ...createDialog, error: "\u753B\u5E03\u540D\u4E0D\u80FD\u4E3A\u7A7A" });
+          return;
+        }
+        try {
+          const { canvas: made } = await rpc("create", { name });
+          setCreateDialog(null);
+          await load(made.projectId);
+          setNotice("\u5DF2\u65B0\u5EFA\u6D41\u7A0B\u753B\u5E03\uFF1A\u53EF\u4EE5\u52A0\u8282\u70B9\u5F00\u59CB\u753B\u5E03\u5185\u7684\u5236\u4F5C\uFF0C\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7528\u4E8E\u65E2\u6709\u521B\u4F5C\u9879\u76EE\u3002");
+        } catch (e) {
+          setCreateDialog({ ...createDialog, error: e?.message || "\u65B0\u5EFA\u753B\u5E03\u672A\u5B8C\u6210\u3002" });
+        }
+      }, [createDialog, load]);
       const stopPolling = React.useCallback(() => {
         if (timer.current) {
           clearInterval(timer.current);
@@ -2594,25 +2669,56 @@
       };
       const onPointerDown = (event) => {
         if (event.button !== 0) return;
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        if (event.shiftKey) {
+          const rect = event.currentTarget.getBoundingClientRect();
+          const local = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+          setMarquee({ x1: local.x, y1: local.y, x2: local.x, y2: local.y });
+          return;
+        }
         pan.current = { x: event.clientX, y: event.clientY, ox: view.x, oy: view.y };
         setPanning(true);
-        event.currentTarget.setPointerCapture?.(event.pointerId);
       };
       const onPointerMove = (event) => {
         if (moving.current) {
-          const { id, x, y, ox, oy } = moving.current;
-          setPositions((all) => ({ ...all, [id]: { x: ox + (event.clientX - x) / view.scale, y: oy + (event.clientY - y) / view.scale } }));
+          const { ids, x, y, origins } = moving.current;
+          setPositions((all) => {
+            const next = { ...all };
+            for (const id of ids) {
+              const origin = origins[id];
+              if (!origin) continue;
+              next[id] = { x: origin.x + (event.clientX - x) / view.scale, y: origin.y + (event.clientY - y) / view.scale };
+            }
+            return next;
+          });
+          return;
+        }
+        if (marquee) {
+          const rect = event.currentTarget.getBoundingClientRect();
+          setMarquee((current) => current ? { ...current, x2: event.clientX - rect.left, y2: event.clientY - rect.top } : current);
           return;
         }
         if (!pan.current) return;
         setView((current) => ({ ...current, x: pan.current.ox + (event.clientX - pan.current.x), y: pan.current.oy + (event.clientY - pan.current.y) }));
       };
       const onPointerUp = () => {
+        if (marquee) {
+          const world = (value, offset) => (value - offset) / view.scale;
+          const left = world(Math.min(marquee.x1, marquee.x2), view.x), top = world(Math.min(marquee.y1, marquee.y2), view.y);
+          const right = world(Math.max(marquee.x1, marquee.x2), view.x), bottom = world(Math.max(marquee.y1, marquee.y2), view.y);
+          const hits = nodes.map((raw) => geometry(raw)).filter((node) => node.x < right && node.x + node.w > left && node.y < bottom && node.y + node.h > top).map((node) => node.id);
+          if (hits.length) {
+            setSelectedIds(hits);
+            marqueeDone.current = true;
+          }
+          setMarquee(null);
+          return;
+        }
         if (moving.current) {
-          const { id } = moving.current;
-          const spot = positions[id];
+          const { ids } = moving.current;
+          const spots = ids.map((id) => [id, positions[id]]).filter(([, spot]) => spot);
           moving.current = null;
-          if (spot) void saveNode(id, { x: spot.x, y: spot.y });
+          for (const [id, spot] of spots) void saveNode(id, { x: spot.x, y: spot.y });
           return;
         }
         pan.current = null;
@@ -2621,7 +2727,16 @@
       const startMove = (event, node) => {
         if (event.button !== 0) return;
         event.stopPropagation();
-        moving.current = { id: node.id, x: event.clientX, y: event.clientY, ox: node.x, oy: node.y };
+        const ids = selectedIds.includes(node.id) ? selectedIds : [node.id];
+        if (!selectedIds.includes(node.id)) setSelectedIds([node.id]);
+        const origins = {};
+        for (const id of ids) {
+          const raw = (canvas?.nodes || {})[id];
+          if (!raw) continue;
+          const spot = { ...sizeOf(raw), ...positions[id] || {} };
+          origins[id] = { x: spot.x || 0, y: spot.y || 0 };
+        }
+        moving.current = { ids, x: event.clientX, y: event.clientY, origins };
         event.currentTarget.setPointerCapture?.(event.pointerId);
       };
       const nodes = canvas ? Object.values(canvas.nodes || {}) : [];
@@ -2688,8 +2803,16 @@
             className: "movc-stage",
             "data-panning": String(panning),
             "data-connect": String(Boolean(connectFrom)),
-            onClick: () => {
-              if (connectFrom) setConnectFrom("");
+            onClick: (event) => {
+              if (connectFrom) {
+                setConnectFrom("");
+                return;
+              }
+              if (marqueeDone.current) {
+                marqueeDone.current = false;
+                return;
+              }
+              if (!event?.shiftKey) setSelectedIds([]);
             },
             onWheel,
             onPointerDown,
@@ -2726,13 +2849,17 @@
               return h("div", {
                 key: node.id,
                 className: "movc-node",
-                "data-selected": String(selected === node.id),
+                "data-selected": String(selectedIds.includes(node.id)),
                 style: { left: node.x, top: node.y, width: node.w, height: node.h },
                 onPointerDown: (e) => startMove(e, node),
                 onClick: (e) => {
                   e.stopPropagation();
-                  if (connectFrom && connectFrom !== node.id) void connectTo(node.id);
-                  else setSelected(node.id);
+                  if (connectFrom && connectFrom !== node.id) {
+                    void connectTo(node.id);
+                    return;
+                  }
+                  if (e.shiftKey) setSelectedIds((all) => all.includes(node.id) ? all.filter((id) => id !== node.id) : [...all, node.id]);
+                  else setSelectedIds([node.id]);
                 }
               }, [
                 h("div", { key: "head", className: "movc-node-head" }, [
@@ -2743,34 +2870,100 @@
                       e.stopPropagation();
                       void openDialog(node);
                     } }, media ? "\u5236\u4F5C" : "\u7F16\u8F91"),
+                    h("button", { key: "copy", type: "button", className: "movc-mini", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
+                      e.stopPropagation();
+                      void duplicateNode(node);
+                    } }, "\u590D\u5236"),
                     h("button", { key: "link", type: "button", className: "movc-mini", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
                       e.stopPropagation();
                       setConnectFrom(connectFrom === node.id ? "" : node.id);
-                      setSelected(node.id);
+                      setSelectedIds([node.id]);
                     } }, connectFrom === node.id ? "\u53D6\u6D88\u8FDE\u7EBF" : "\u8FDE\u7EBF"),
                     h("button", { key: "del", type: "button", className: "movc-mini", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
                       e.stopPropagation();
-                      void removeNode(node.id);
+                      void removeNodes([node.id]);
                     } }, "\u5220\u9664")
                   ])
                 ]),
                 nodeBody(node)
               ]);
             })
-          ])
+          ]),
+          marquee ? h("div", { key: "marquee", className: "movc-marquee", style: {
+            left: Math.min(marquee.x1, marquee.x2),
+            top: Math.min(marquee.y1, marquee.y2),
+            width: Math.abs(marquee.x2 - marquee.x1),
+            height: Math.abs(marquee.y2 - marquee.y1)
+          } }) : null
         ) : null,
         canvas ? h("div", { key: "meta", className: "movc-bar" }, [
-          h("input", { key: "name", value: nameDraft, onChange: (e) => setNameDraft(e.target.value), style: { flex: "1 1 160px" }, "aria-label": "\u753B\u5E03\u540D\u79F0" }),
-          h("button", { key: "rename", type: "button", className: "mov-btn", onClick: () => void rename() }, "\u91CD\u547D\u540D"),
+          h("span", { key: "name", className: "movc-name" }, inline ? [
+            h("input", {
+              key: "input",
+              autoFocus: true,
+              value: inline.value,
+              "aria-label": "\u753B\u5E03\u540D\u79F0",
+              onChange: (e) => setInline({ value: e.target.value, error: "" }),
+              onKeyDown: (e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void commitRename();
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setInline(null);
+                }
+              },
+              onBlur: () => void commitRename()
+            })
+          ] : [
+            h("button", { key: "text", type: "button", className: "movc-name-text", title: "\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D", onDoubleClick: () => setInline({ value: canvas.name || "", error: "" }) }, canvas.name || canvas.projectId),
+            h("button", { key: "edit", type: "button", className: "movc-mini", title: "\u91CD\u547D\u540D", onClick: () => setInline({ value: canvas.name || "", error: "" }) }, "\u270E")
+          ]),
+          h("button", { key: "new-canvas", type: "button", className: "mov-btn", onClick: () => setCreateDialog({ value: "", error: "" }) }, "\u65B0\u5EFA\u753B\u5E03\u2026"),
           h("button", { key: "text", type: "button", className: "mov-btn", onClick: () => void newNode("text") }, "+ \u6587\u672C"),
           h("button", { key: "image", type: "button", className: "mov-btn", onClick: () => void newNode("image") }, "+ \u56FE\u7247"),
           h("button", { key: "video", type: "button", className: "mov-btn", onClick: () => void newNode("video") }, "+ \u89C6\u9891"),
           h("button", { key: "refresh", type: "button", className: "mov-btn", onClick: () => void refresh() }, "\u5237\u65B0"),
           h("button", { key: "reset", type: "button", className: "mov-btn", onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, "\u91CD\u7F6E\u89C6\u56FE"),
+          h("button", { key: "export", type: "button", className: "mov-btn", onClick: () => exportCanvas() }, "\u5BFC\u51FA JSON"),
+          selectedIds.length ? h("button", { key: "del-selected", type: "button", className: "mov-btn", onClick: () => void removeNodes(selectedIds) }, `\u5220\u9664\u9009\u4E2D\uFF08${selectedIds.length}\uFF09`) : null,
           typeof onOpenPage === "function" ? h("button", { key: "page", type: "button", className: "mov-btn", onClick: () => onOpenPage() }, "\u6253\u5F00\u72EC\u7ACB\u9875\u9762") : null
         ]) : null,
-        canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
+        canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D\uFF08Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
         connectFrom ? h("p", { key: "connect", className: "movc-hint" }, "\u8FDE\u7EBF\u6A21\u5F0F\uFF1A\u70B9\u51FB\u76EE\u6807\u8282\u70B9\u5B8C\u6210\u8FDE\u63A5\uFF0C\u70B9\u7A7A\u767D\u5904\u53D6\u6D88\u3002") : null,
+        createDialog ? h(
+          "div",
+          { key: "create-modal", className: "movc-modal", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
+            if (e.target === e.currentTarget) setCreateDialog(null);
+          } },
+          h("div", { key: "body", className: "movc-modal-body", style: { width: "min(420px, calc(100vw - 32px))" } }, [
+            h("h4", { key: "h" }, "\u65B0\u5EFA\u753B\u5E03"),
+            h("label", { key: "name", className: "movc-field" }, ["\u753B\u5E03\u540D\u79F0", h("input", {
+              autoFocus: true,
+              value: createDialog.value,
+              placeholder: "\u753B\u5E03\u540D\u79F0",
+              onChange: (e) => setCreateDialog({ ...createDialog, value: e.target.value, error: "" }),
+              onKeyDown: (e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void submitCreate();
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setCreateDialog(null);
+                }
+              }
+            })]),
+            createDialog.error ? h("p", { key: "err", className: "movc-status", "data-error": "true" }, createDialog.error) : null,
+            h("p", { key: "note", className: "movc-status" }, "\u65B0\u753B\u5E03\u662F\u4E00\u4EFD\u7A7A\u767D\u6587\u6863\uFF0C\u4E0E\u81EA\u52A8\u521B\u5EFA\u7684\u753B\u5E03\u5E76\u5B58\uFF1B\u540D\u79F0\u4E0D\u80FD\u4E3A\u7A7A\uFF0C\u4E5F\u4E0D\u80FD\u548C\u5DF2\u6709\u753B\u5E03\u91CD\u540D\u3002"),
+            h("div", { key: "ops", className: "movc-bar" }, [
+              h("button", { key: "cancel", type: "button", className: "mov-btn", onClick: () => setCreateDialog(null) }, "\u53D6\u6D88"),
+              h("button", { key: "ok", type: "button", className: "mov-btn mov-btn-primary", onClick: () => void submitCreate() }, "\u65B0\u5EFA\u753B\u5E03")
+            ])
+          ])
+        ) : null,
+        selectedIds.length > 1 ? h("p", { key: "multi", className: "movc-hint" }, `\u5DF2\u9009\u4E2D ${selectedIds.length} \u4E2A\u8282\u70B9\uFF1A\u53EF\u6574\u7EC4\u62D6\u52A8\u6216\u5220\u9664\u3002`) : null,
         notice ? h("p", { key: "notice", className: "movc-hint" }, notice) : null,
         dialog ? h(
           "div",

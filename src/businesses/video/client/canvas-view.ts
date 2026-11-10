@@ -10,6 +10,16 @@ export async function canvasNativeRpc(args: any, fetcher: any = fetch) {
   return body;
 }
 
+/** 复制节点时只带走可编辑内容：成果素材、原任务标识与来源关系不复制，
+ *  否则复制出来的节点会被当成已有成果，续拍与审核都会指向别人的结果。 */
+export function duplicateNodePayload(node: any, spot: any) {
+  const data: any = {};
+  for (const key of ['label', 'prompt', 'text', 'output', 'script', 'requirement', 'ratio', 'resolution', 'duration']) {
+    if (node?.data?.[key] !== undefined) data[key] = node.data[key];
+  }
+  return { type: node?.type || 'text', x: Number(spot?.x || 0) + 40, y: Number(spot?.y || 0) + 40, w: spot?.w, h: spot?.h, data };
+}
+
 export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
   const rpc = async (method: string, args: any = {}) => {
     const response = await fetch('/metaontic-video/canvas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ method, args }) });
@@ -66,6 +76,12 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
 .movc-status { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
 .movc-status[data-error="true"] { color: #c0392b; }
 .movc-plan { font-size: 12px; line-height: 1.7; background: ${TOKENS.controlFill}; border-radius: 8px; padding: 10px 12px; }
+.movc-marquee { position: absolute; border: 1px dashed ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}1f; pointer-events: none; border-radius: 4px; }
+.movc-name { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 160px; min-width: 0; }
+.movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
+.movc-name-text:hover { border-color: ${TOKENS.border}; }
+.movc-name input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 13px; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.primaryFill}; border-radius: 8px; padding: 5px 8px; }
+.movc-name-err { flex: 1 1 100%; font-size: 12px; color: #c0392b; }
 `;
 
   function nodeBody(node: any) {
@@ -91,12 +107,15 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
     const [view, setView] = React.useState({ x: 30, y: 24, scale: 1 });
     const [panning, setPanning] = React.useState(false);
     const [positions, setPositions] = React.useState({} as any);
-    const [selected, setSelected] = React.useState('');
+    const [selectedIds, setSelectedIds] = React.useState([] as string[]);
+    const [marquee, setMarquee] = React.useState(null as any);
     const [connectFrom, setConnectFrom] = React.useState('');
-    const [nameDraft, setNameDraft] = React.useState('');
+    const [inline, setInline] = React.useState(null as any);
+    const [createDialog, setCreateDialog] = React.useState(null as any);
     const [dialog, setDialog] = React.useState(null as any);
     const pan = React.useRef(null as any);
     const moving = React.useRef(null as any);
+    const marqueeDone = React.useRef(false);
     const timer = React.useRef(null as any);
     const alive = React.useRef(true);
     React.useEffect(() => () => { alive.current = false; if (timer.current) clearInterval(timer.current); }, []);
@@ -107,9 +126,9 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
         const { canvases } = await rpc('list');
         const wanted = projectId || canvases[0]?.projectId;
         setList(canvases);
-        if (!wanted) { setCanvas(null); setNameDraft(''); return; }
+        if (!wanted) { setCanvas(null); setInline(null); return; }
         const { canvas: doc } = await rpc('get', { projectId: wanted });
-        setCanvas(doc); setNameDraft(doc.name || ''); setPositions({}); setSelected('');
+        setCanvas(doc); setInline(null); setPositions({}); setSelectedIds([]); setMarquee(null);
       } catch (e: any) { setError(e?.message || '流程画布读取失败'); }
     }, []);
     React.useEffect(() => { void load(); }, [load]);
@@ -132,16 +151,42 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
         ? { label: type === 'video' ? '视频节点' : '图片节点', prompt: '', ratio: type === 'image' ? '1:1' : '16:9', resolution: '720p', ...(type === 'video' ? { duration: 5 } : { imageCount: 1 }) }
         : { label: type === 'script' ? '剧本' : '说明', text: '' };
       await saveNode(id, { type, x: 60 + (count % 4) * 420, y: 60 + Math.floor(count / 4) * 360, w, h: hh, data });
-      setSelected(id);
+      setSelectedIds([id]);
       setNotice('已新建节点：先在节点里填写内容，再生成；生成前会单独确认方案与费用。');
     }, [canvas, saveNode]);
 
-    const removeNode = React.useCallback(async (id: string) => {
-      if (!canvas) return;
-      await rpc('nodeDelete', { projectId: canvas.projectId, nodeId: id });
-      setSelected(''); if (connectFrom === id) setConnectFrom('');
+    const removeNodes = React.useCallback(async (ids: string[]) => {
+      if (!canvas || !ids.length) return;
+      for (const id of ids) await rpc('nodeDelete', { projectId: canvas.projectId, nodeId: id });
+      setSelectedIds(all => all.filter(id => !ids.includes(id)));
+      if (connectFrom && ids.includes(connectFrom)) setConnectFrom('');
       await refresh();
     }, [canvas, connectFrom, refresh]);
+
+    /** 复制节点只带可编辑内容：成果素材、原任务标识与来源关系不复制，避免把别人的成果当成本节点结果。 */
+    const duplicateNode = React.useCallback(async (node: any) => {
+      if (!canvas) return;
+      const spot = { ...sizeOf(node), ...(positions[node.id] || {}) };
+      const id = `usr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+      await saveNode(id, duplicateNodePayload(node, spot));
+      setSelectedIds([id]);
+      setNotice('已复制节点（不含成果素材与原任务标识）；改完内容再生成，费用照常单独确认。');
+    }, [canvas, positions, saveNode]);
+
+    /** 导出当前画布文档（节点、连线、视图与名字），只读导出，不改画布也不含API密钥。 */
+    const exportCanvas = React.useCallback(() => {
+      if (!canvas || typeof document === 'undefined') return;
+      try {
+        const payload = { name: canvas.name, projectId: canvas.projectId, view: canvas.view, nodes: canvas.nodes, edges: canvas.edges, exportedAt: new Date().toISOString() };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${String(canvas.name || canvas.projectId).replace(/[\\/:*?"<>|]/g, '_')}.canvas.json`;
+        document.body.append(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e: any) { setError(e?.message || '导出画布失败'); }
+    }, [canvas])
 
     const connectTo = React.useCallback(async (to: string) => {
       if (!canvas || !connectFrom || connectFrom === to) return;
@@ -160,11 +205,35 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
       await refresh();
     }, [canvas, refresh]);
 
-    const rename = React.useCallback(async () => {
-      if (!canvas || !nameDraft.trim()) return;
-      await rpc('rename', { projectId: canvas.projectId, name: nameDraft.trim() });
-      await refresh();
-    }, [canvas, nameDraft, refresh]);
+    /** 就地改名：空名放弃本次编辑（保留原名），重名或保存失败时显示原因并退出编辑。 */
+    const commitRename = React.useCallback(async () => {
+      if (!canvas || !inline) return;
+      const name = String(inline.value || '').trim();
+      if (!name) { setInline(null); setError('画布名不能为空，已保留原名。'); return; }
+      if (name === canvas.name) { setInline(null); return; }
+      try {
+        await rpc('rename', { projectId: canvas.projectId, name });
+        setInline(null); setError('');
+        await refresh();
+      } catch (e: any) {
+        setInline(null);
+        setError(e?.message || '改名未保存，已保留原名。');
+      }
+    }, [canvas, inline, refresh]);
+
+    const submitCreate = React.useCallback(async () => {
+      if (!createDialog) return;
+      const name = String(createDialog.value || '').trim();
+      if (!name) { setCreateDialog({ ...createDialog, error: '画布名不能为空' }); return; }
+      try {
+        const { canvas: made } = await rpc('create', { name });
+        setCreateDialog(null);
+        await load(made.projectId);
+        setNotice('已新建流程画布：可以加节点开始画布内的制作，也可以直接用于既有创作项目。');
+      } catch (e: any) {
+        setCreateDialog({ ...createDialog, error: e?.message || '新建画布未完成。' });
+      }
+    }, [createDialog, load]);
 
     const stopPolling = React.useCallback(() => { if (timer.current) { clearInterval(timer.current); timer.current = undefined; } }, []);
     const closeDialog = React.useCallback(() => { stopPolling(); setDialog(null); }, [stopPolling]);
@@ -248,25 +317,54 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
     };
     const onPointerDown = (event: any) => {
       if (event.button !== 0) return;
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      // Shift+拖空白 = 框选；普通拖空白仍然平移。
+      if (event.shiftKey) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const local = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        setMarquee({ x1: local.x, y1: local.y, x2: local.x, y2: local.y });
+        return;
+      }
       pan.current = { x: event.clientX, y: event.clientY, ox: view.x, oy: view.y };
       setPanning(true);
-      event.currentTarget.setPointerCapture?.(event.pointerId);
     };
     const onPointerMove = (event: any) => {
       if (moving.current) {
-        const { id, x, y, ox, oy } = moving.current;
-        setPositions((all: any) => ({ ...all, [id]: { x: ox + (event.clientX - x) / view.scale, y: oy + (event.clientY - y) / view.scale } }));
+        const { ids, x, y, origins } = moving.current;
+        setPositions((all: any) => {
+          const next = { ...all };
+          for (const id of ids) {
+            const origin = origins[id];
+            if (!origin) continue;
+            next[id] = { x: origin.x + (event.clientX - x) / view.scale, y: origin.y + (event.clientY - y) / view.scale };
+          }
+          return next;
+        });
+        return;
+      }
+      if (marquee) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        setMarquee((current: any) => current ? { ...current, x2: event.clientX - rect.left, y2: event.clientY - rect.top } : current);
         return;
       }
       if (!pan.current) return;
       setView((current: any) => ({ ...current, x: pan.current.ox + (event.clientX - pan.current.x), y: pan.current.oy + (event.clientY - pan.current.y) }));
     };
     const onPointerUp = () => {
+      if (marquee) {
+        const world = (value: number, offset: number) => (value - offset) / view.scale;
+        const left = world(Math.min(marquee.x1, marquee.x2), view.x), top = world(Math.min(marquee.y1, marquee.y2), view.y);
+        const right = world(Math.max(marquee.x1, marquee.x2), view.x), bottom = world(Math.max(marquee.y1, marquee.y2), view.y);
+        const hits = nodes.map(raw => geometry(raw)).filter(node => node.x < right && node.x + node.w > left && node.y < bottom && node.y + node.h > top).map(node => node.id);
+        if (hits.length) { setSelectedIds(hits); marqueeDone.current = true; }
+        setMarquee(null);
+        return;
+      }
       if (moving.current) {
-        const { id } = moving.current;
-        const spot = positions[id];
+        const { ids } = moving.current;
+        const spots = ids.map((id: string) => [id, positions[id]]).filter(([, spot]: any) => spot);
         moving.current = null;
-        if (spot) void saveNode(id, { x: spot.x, y: spot.y });
+        for (const [id, spot] of spots as any) void saveNode(id, { x: spot.x, y: spot.y });
         return;
       }
       pan.current = null; setPanning(false);
@@ -274,7 +372,17 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
     const startMove = (event: any, node: any) => {
       if (event.button !== 0) return;
       event.stopPropagation();
-      moving.current = { id: node.id, x: event.clientX, y: event.clientY, ox: node.x, oy: node.y };
+      // 选中多个时拖动其中任意一个，整组一起移动。
+      const ids = selectedIds.includes(node.id) ? selectedIds : [node.id];
+      if (!selectedIds.includes(node.id)) setSelectedIds([node.id]);
+      const origins: any = {};
+      for (const id of ids) {
+        const raw = (canvas?.nodes || {})[id];
+        if (!raw) continue;
+        const spot = { ...sizeOf(raw), ...(positions[id] || {}) };
+        origins[id] = { x: spot.x || 0, y: spot.y || 0 };
+      }
+      moving.current = { ids, x: event.clientX, y: event.clientY, origins };
       event.currentTarget.setPointerCapture?.(event.pointerId);
     };
 
@@ -334,7 +442,11 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
       !list.length ? h('p', { key: 'empty', className: 'movc-hint' }, error || '还没有流程画布：确认创作需求后会在这里自动建立，脚本审核后同步分镜与制作段计划，生成成果自动回填。') : null,
       error && list.length ? h('p', { key: 'error', className: 'movc-hint' }, error) : null,
       canvas ? h('div', { key: 'stage', className: 'movc-stage', 'data-panning': String(panning), 'data-connect': String(Boolean(connectFrom)),
-        onClick: () => { if (connectFrom) setConnectFrom(''); },
+        onClick: (event: any) => {
+          if (connectFrom) { setConnectFrom(''); return; }
+          if (marqueeDone.current) { marqueeDone.current = false; return; }
+          if (!event?.shiftKey) setSelectedIds([]);
+        },
         onWheel, onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp },
         h('div', { key: 'world', className: 'movc-world', style: { transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` } }, [
           h('svg', { key: 'edges', style: { position: 'absolute', left: -4000, top: -4000, width: 8000, height: 8000, overflow: 'visible' } },
@@ -353,33 +465,69 @@ export function createCanvasView({ React, h, TOKENS, stageHeight = 460 }: any) {
           ...nodes.map(raw => {
             const node: any = geometry(raw);
             const media = ['image', 'video'].includes(node.type);
-            return h('div', { key: node.id, className: 'movc-node', 'data-selected': String(selected === node.id), style: { left: node.x, top: node.y, width: node.w, height: node.h },
-              onPointerDown: (e: any) => startMove(e, node), onClick: (e: any) => { e.stopPropagation(); if (connectFrom && connectFrom !== node.id) void connectTo(node.id); else setSelected(node.id); } }, [
+            return h('div', { key: node.id, className: 'movc-node', 'data-selected': String(selectedIds.includes(node.id)), style: { left: node.x, top: node.y, width: node.w, height: node.h },
+              onPointerDown: (e: any) => startMove(e, node), onClick: (e: any) => {
+                e.stopPropagation();
+                if (connectFrom && connectFrom !== node.id) { void connectTo(node.id); return; }
+                if (e.shiftKey) setSelectedIds(all => all.includes(node.id) ? all.filter(id => id !== node.id) : [...all, node.id]);
+                else setSelectedIds([node.id]);
+              } }, [
               h('div', { key: 'head', className: 'movc-node-head' }, [
                 h('span', { key: 'label', className: 'movc-node-title' }, labelOf(node)),
                 h('span', { key: 'status', className: 'movc-badge' }, node.data?.status === 'done' ? '已完成' : '待制作'),
                 h('span', { key: 'actions', className: 'movc-actions' }, [
                   h('button', { key: 'edit', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void openDialog(node); } }, media ? '制作' : '编辑'),
-                  h('button', { key: 'link', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); setConnectFrom(connectFrom === node.id ? '' : node.id); setSelected(node.id); } }, connectFrom === node.id ? '取消连线' : '连线'),
-                  h('button', { key: 'del', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void removeNode(node.id); } }, '删除'),
+                  h('button', { key: 'copy', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void duplicateNode(node); } }, '复制'),
+                  h('button', { key: 'link', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); setConnectFrom(connectFrom === node.id ? '' : node.id); setSelectedIds([node.id]); } }, connectFrom === node.id ? '取消连线' : '连线'),
+                  h('button', { key: 'del', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void removeNodes([node.id]); } }, '删除'),
                 ]),
               ]),
               nodeBody(node),
             ]);
           }),
-        ])) : null,
+        ]),
+        marquee ? h('div', { key: 'marquee', className: 'movc-marquee', style: {
+          left: Math.min(marquee.x1, marquee.x2), top: Math.min(marquee.y1, marquee.y2),
+          width: Math.abs(marquee.x2 - marquee.x1), height: Math.abs(marquee.y2 - marquee.y1),
+        } }) : null) : null,
       canvas ? h('div', { key: 'meta', className: 'movc-bar' }, [
-        h('input', { key: 'name', value: nameDraft, onChange: (e: any) => setNameDraft(e.target.value), style: { flex: '1 1 160px' }, 'aria-label': '画布名称' }),
-        h('button', { key: 'rename', type: 'button', className: 'mov-btn', onClick: () => void rename() }, '重命名'),
+        h('span', { key: 'name', className: 'movc-name' }, inline ? [
+          h('input', { key: 'input', autoFocus: true, value: inline.value, 'aria-label': '画布名称',
+            onChange: (e: any) => setInline({ value: e.target.value, error: '' }),
+            onKeyDown: (e: any) => { if (e.key === 'Enter') { e.preventDefault(); void commitRename(); } if (e.key === 'Escape') { e.preventDefault(); setInline(null); } },
+            onBlur: () => void commitRename() }),
+        ] : [
+          h('button', { key: 'text', type: 'button', className: 'movc-name-text', title: '双击画布名重命名', onDoubleClick: () => setInline({ value: canvas.name || '', error: '' }) }, canvas.name || canvas.projectId),
+          h('button', { key: 'edit', type: 'button', className: 'movc-mini', title: '重命名', onClick: () => setInline({ value: canvas.name || '', error: '' }) }, '✎'),
+        ]),
+        h('button', { key: 'new-canvas', type: 'button', className: 'mov-btn', onClick: () => setCreateDialog({ value: '', error: '' }) }, '新建画布…'),
         h('button', { key: 'text', type: 'button', className: 'mov-btn', onClick: () => void newNode('text') }, '+ 文本'),
         h('button', { key: 'image', type: 'button', className: 'mov-btn', onClick: () => void newNode('image') }, '+ 图片'),
         h('button', { key: 'video', type: 'button', className: 'mov-btn', onClick: () => void newNode('video') }, '+ 视频'),
         h('button', { key: 'refresh', type: 'button', className: 'mov-btn', onClick: () => void refresh() }, '刷新'),
         h('button', { key: 'reset', type: 'button', className: 'mov-btn', onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, '重置视图'),
+        h('button', { key: 'export', type: 'button', className: 'mov-btn', onClick: () => exportCanvas() }, '导出 JSON'),
+        selectedIds.length ? h('button', { key: 'del-selected', type: 'button', className: 'mov-btn', onClick: () => void removeNodes(selectedIds) }, `删除选中（${selectedIds.length}）`) : null,
         typeof onOpenPage === 'function' ? h('button', { key: 'page', type: 'button', className: 'mov-btn', onClick: () => onOpenPage() }, '打开独立页面') : null,
       ]) : null,
-      canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `拖动空白处平移、滚轮缩放；拖动节点移动，点「连线」后再点目标节点连接（点连线可断开）。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
+      canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `双击画布名重命名（Enter 保存，Esc 取消）；拖动空白处平移、滚轮缩放；拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
       connectFrom ? h('p', { key: 'connect', className: 'movc-hint' }, '连线模式：点击目标节点完成连接，点空白处取消。') : null,
+      createDialog ? h('div', { key: 'create-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget) setCreateDialog(null); } },
+        h('div', { key: 'body', className: 'movc-modal-body', style: { width: 'min(420px, calc(100vw - 32px))' } }, [
+          h('h4', { key: 'h' }, '新建画布'),
+          h('label', { key: 'name', className: 'movc-field' }, ['画布名称', h('input', {
+            autoFocus: true, value: createDialog.value, placeholder: '画布名称',
+            onChange: (e: any) => setCreateDialog({ ...createDialog, value: e.target.value, error: '' }),
+            onKeyDown: (e: any) => { if (e.key === 'Enter') { e.preventDefault(); void submitCreate(); } if (e.key === 'Escape') { e.preventDefault(); setCreateDialog(null); } },
+          })]),
+          createDialog.error ? h('p', { key: 'err', className: 'movc-status', 'data-error': 'true' }, createDialog.error) : null,
+          h('p', { key: 'note', className: 'movc-status' }, '新画布是一份空白文档，与自动创建的画布并存；名称不能为空，也不能和已有画布重名。'),
+          h('div', { key: 'ops', className: 'movc-bar' }, [
+            h('button', { key: 'cancel', type: 'button', className: 'mov-btn', onClick: () => setCreateDialog(null) }, '取消'),
+            h('button', { key: 'ok', type: 'button', className: 'mov-btn mov-btn-primary', onClick: () => void submitCreate() }, '新建画布'),
+          ]),
+        ])) : null,
+      selectedIds.length > 1 ? h('p', { key: 'multi', className: 'movc-hint' }, `已选中 ${selectedIds.length} 个节点：可整组拖动或删除。`) : null,
       notice ? h('p', { key: 'notice', className: 'movc-hint' }, notice) : null,
       dialog ? h('div', { key: 'modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget) closeDialog(); } },
         h('div', { key: 'body', className: 'movc-modal-body' }, [

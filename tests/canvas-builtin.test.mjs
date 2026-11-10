@@ -155,3 +155,34 @@ test('内置画布节点可直接制作：按项目解析适配器，成果回�
   } finally { service.dispose(); }
  } finally { if(old===undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME=old; await rm(root,{recursive:true,force:true}); }
 });
+
+/** 面板「新建画布」：点一次就新建一份空白文档，即使名字一样也不复用别人/自动建图的同名画布。 */
+test('新建画布总是新建空白文档并在列表里可见',async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'内置画布新建 ')),old=process.env.DSH_HOME;
+ process.env.DSH_HOME=root;
+ try {
+  const first=await api.builtinCanvasHandle({method:'create',args:{name:'同名画布'}});
+  const second=await api.builtinCanvasHandle({method:'create',args:{name:'同名画布'}});
+  assert.notEqual(first.canvas.projectId,second.canvas.projectId,'同名也要各自新建，不复用');
+  for(const made of [first,second]){
+   assert.deepEqual(made.canvas.nodes,{});assert.deepEqual(made.canvas.edges,[]);
+   assert.ok(made.canvas.dataRoot.startsWith(root),'画布数据根指向插件自己的目录');
+  }
+  const names=(await api.builtinCanvasHandle({method:'list'})).canvases.map(c=>c.name);
+  assert.deepEqual(names.sort(),['同名画布','同名画布']);
+  const created=await api.builtinCanvasHandle({method:'create',args:{}});
+  assert.equal(created.canvas.name,'新建流程画布');
+ } finally { if(old===undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME=old; await rm(root,{recursive:true,force:true}); }
+});
+
+/** 复制节点只带可编辑内容：成果素材与任务标识不会被复制成“别人的成果”。 */
+test('复制节点payload不带成果素材、任务标识与来源关系',()=>{
+ const node={id:'seg_1',type:'video',data:{label:'视频制作',prompt:'海面日出',ratio:'16:9',duration:8,resolution:'720p',
+  assetId:'a1',metaonticNativeJob:'22222222-2222-4222-8222-222222222222',metaonticTaskId:'task-1',metaonticVideoUrl:'https://example.invalid/a.mp4',metaonticSeconds:5,metaonticSourceNode:'seg_1',status:'done'}};
+ const payload=api.duplicateNodePayload(node,{x:100,y:200,w:360,h:300});
+ assert.equal(payload.type,'video');assert.equal(payload.x,140);assert.equal(payload.y,240);
+ assert.deepEqual(Object.keys(payload.data).sort(),['duration','label','prompt','ratio','resolution']);
+ assert.equal(payload.data.assetId,undefined);assert.equal(payload.data.metaonticTaskId,undefined);
+ assert.equal(payload.data.metaonticNativeJob,undefined);assert.equal(payload.data.metaonticVideoUrl,undefined);
+ assert.equal(JSON.stringify(payload).includes('https://example.invalid'),false);
+});
