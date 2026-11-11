@@ -291,6 +291,11 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       priceDate: chain.segments[0]?.priceDate || null, job: job ? view(job) : null };
   }
 
+  /** 判断两次连拍方案是不是同一版：节点、参数、提示词和对齐的指纹都一致才算没变。 */
+  function chainSignature(segments) {
+    return JSON.stringify((segments || []).map(x => [x.nodeId, x.operation, x.prompt, x.transition || '', x.seconds, x.ratio, x.resolution, x.fingerprint || '']));
+  }
+
   async function perform(job, config, query = false) {
     const ctl = new AbortController(); running.set(job.id, ctl);
     try {
@@ -355,6 +360,8 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       const existing = await previousChain(link);
       if (existing && ['running', 'review'].includes(chainStateOf(existing, await currentJob(existing)))) return { chain: chainView(existing, await currentJob(existing)) };
       const segments = await chainPlan(adapter, args.projectId, config);
+      // 内容与参数和上次完全一致时按同一条记录说话：已经生成过的段落不再重复提交费用。
+      if (existing && chainSignature(existing.segments) === chainSignature(segments)) return { chain: chainView(existing, await currentJob(existing)) };
       const chain: any = { version: 1, id: randomUUID(), projectId: args.projectId, ...(args.canvasId ? { canvasId: args.canvasId } : {}),
         identity: hash(config), createdAt: Date.now(), index: 0, jobs: [], carry: null, state: 'running', message: '', segments };
       await saveChain(chain);
