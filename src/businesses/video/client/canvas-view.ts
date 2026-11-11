@@ -245,6 +245,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
     const [connectFrom, setConnectFrom] = React.useState('');
     const [inline, setInline] = React.useState(null as any);
     const [createDialog, setCreateDialog] = React.useState(null as any);
+    const [scriptDialog, setScriptDialog] = React.useState(null as any);
     const [confirmDelete, setConfirmDelete] = React.useState(false);
     const [dialog, setDialog] = React.useState(null as any);
     const pan = React.useRef(null as any);
@@ -323,32 +324,111 @@ export function createCanvasView({ React, h, TOKENS }: any) {
       } catch (e: any) { setError(e?.message || '导出画布失败'); }
     }, [canvas])
 
+    /** 落库一版按连线排好的坐标：只写 x/y，不动内容与连线。 */
+    const applyLayout = React.useCallback(async (doc: any) => {
+      const { positions: spots, moved } = tidyLayout(doc);
+      for (const node of Object.values(doc?.nodes || {}) as any[]) {
+        const spot = spots[node.id];
+        if (!spot) continue;
+        if (Math.round(Number(node.x) || 0) === spot.x && Math.round(Number(node.y) || 0) === spot.y) continue;
+        await rpc('nodeSave', { projectId: doc.projectId, node: { id: node.id, x: spot.x, y: spot.y } });
+      }
+      return { spots, moved };
+    }, []);
+
+    /** 把整张图（按排好的坐标）缩放居中到画布区，排完版一眼能看到全貌。 */
+    const fitStage = React.useCallback((doc: any, spots: any) => {
+      const rect = stageRef.current?.getBoundingClientRect?.();
+      if (!rect?.width || !rect?.height) return;
+      const boxes = (Object.values(doc?.nodes || {}) as any[]).map(node => ({ ...nodeSize(node), ...(spots[node.id] || { x: Number(node.x) || 0, y: Number(node.y) || 0 }) }));
+      if (!boxes.length) return;
+      const left = Math.min(...boxes.map(box => box.x)), top = Math.min(...boxes.map(box => box.y));
+      const spanX = Math.max(1, Math.max(...boxes.map(box => box.x + box.w)) - left), spanY = Math.max(1, Math.max(...boxes.map(box => box.y + box.h)) - top);
+      const scale = Math.min(1, Math.max(0.3, Math.min((rect.width - 80) / spanX, (rect.height - 80) / spanY)));
+      setView({ scale, x: 40 - left * scale + Math.max(0, (rect.width - 80 - spanX * scale) / 2), y: 30 - top * scale + Math.max(0, (rect.height - 80 - spanY * scale) / 2) });
+    }, []);
+
     /** 一键美化：按连线重排节点坐标（不动内容与连线），随后把整张图适配进画布区。 */
     const tidy = React.useCallback(async () => {
       if (!canvas) return;
       try {
         setError('');
-        const { positions: spots, moved } = tidyLayout(canvas);
+        const { canvas: doc } = await rpc('get', { projectId: canvas.projectId });
+        const { spots, moved } = await applyLayout(doc);
         if (!moved) { setNotice('当前布局已经整齐，无需调整。'); return; }
-        for (const node of Object.values(canvas.nodes || {}) as any[]) {
-          const spot = spots[node.id];
-          if (!spot) continue;
-          if (Math.round(Number(node.x) || 0) === spot.x && Math.round(Number(node.y) || 0) === spot.y) continue;
-          await rpc('nodeSave', { projectId: canvas.projectId, node: { id: node.id, x: spot.x, y: spot.y } });
-        }
         setPositions({});
         await refresh();
-        const rect = stageRef.current?.getBoundingClientRect?.();
-        if (rect?.width && rect?.height) {
-          const boxes = (Object.values(canvas.nodes || {}) as any[]).map(node => ({ ...nodeSize(node), ...(spots[node.id] || { x: Number(node.x) || 0, y: Number(node.y) || 0 }) }));
-          const left = Math.min(...boxes.map(box => box.x)), top = Math.min(...boxes.map(box => box.y));
-          const spanX = Math.max(1, Math.max(...boxes.map(box => box.x + box.w)) - left), spanY = Math.max(1, Math.max(...boxes.map(box => box.y + box.h)) - top);
-          const scale = Math.min(1, Math.max(0.3, Math.min((rect.width - 80) / spanX, (rect.height - 80) / spanY)));
-          setView({ scale, x: 40 - left * scale + Math.max(0, (rect.width - 80 - spanX * scale) / 2), y: 30 - top * scale + Math.max(0, (rect.height - 80 - spanY * scale) / 2) });
-        }
+        fitStage(doc, spots);
         setNotice(`已美化布局：${moved} 个节点按连线重排；内容与连线没动，之后仍可手动微调。`);
       } catch (e: any) { setError(e?.message || '美化布局失败'); }
-    }, [canvas, refresh]);
+    }, [canvas, refresh, applyLayout, fitStage]);
+
+    const patchScriptDialog = React.useCallback((patch: any) => setScriptDialog((current: any) => current ? { ...current, ...patch } : current), []);
+
+    /** 「写脚本…」：默认值按当前模型上限来，打开时问一次服务端就够。 */
+    const openScript = React.useCallback(async () => {
+      setError('');
+      setScriptDialog({ text: '', totalSeconds: 15, segmentSeconds: 15, singleMax: 15, ratio: '16:9', resolution: '720p', busy: false, error: '', plan: null });
+      try {
+        const info = await canvasNativeRpc({ action: 'info' });
+        if (!alive.current) return;
+        patchScriptDialog({ singleMax: info?.singleMax || 15, totalSeconds: Math.min(15, info?.singleMax || 15), segmentSeconds: info?.singleMax || 15,
+          ...(info?.videoReady === false ? { error: '还没配置视频API密钥，可以先铺节点，配置好再生成。' } : {}) });
+      } catch (e: any) { if (alive.current) patchScriptDialog({ error: e?.message || '制作服务尚未就绪。' }); }
+    }, [patchScriptDialog]);
+
+    /** 先出计划：让用户看清会被拆成几段、每段多少秒、每段提示词是什么，再决定要不要建节点。 */
+    const previewScript = React.useCallback(async () => {
+      if (!canvas || !scriptDialog) return;
+      const text = String(scriptDialog.text || '').trim();
+      if (!text) { patchScriptDialog({ error: '请先写下脚本内容。' }); return; }
+      patchScriptDialog({ busy: true, error: '', plan: null });
+      try {
+        const plan = await canvasNativeRpc({ action: 'plan', projectId: canvas.projectId, script: text,
+          totalSeconds: scriptDialog.totalSeconds, segmentSeconds: scriptDialog.segmentSeconds });
+        if (!alive.current) return;
+        patchScriptDialog({ busy: false, plan });
+      } catch (e: any) { if (alive.current) patchScriptDialog({ busy: false, error: e?.message || '分段计划没算出来。' }); }
+    }, [canvas, scriptDialog, patchScriptDialog]);
+
+    /** 写脚本 → 铺开制作节点：剧本（+分镜）→ 每段一个视频节点，全部连线并自动排版。 */
+    const createFromScript = React.useCallback(async () => {
+      if (!canvas || !scriptDialog) return;
+      const text = String(scriptDialog.text || '').trim();
+      if (!text) { patchScriptDialog({ error: '请先写下脚本内容。' }); return; }
+      patchScriptDialog({ busy: true, error: '' });
+      try {
+        const projectId = canvas.projectId;
+        const plan = await canvasNativeRpc({ action: 'plan', projectId, script: text,
+          totalSeconds: scriptDialog.totalSeconds, segmentSeconds: scriptDialog.segmentSeconds });
+        const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+        const ratio = scriptDialog.ratio, resolution = scriptDialog.resolution;
+        const count = Object.keys(canvas.nodes || {}).length;
+        const baseX = 60 + (count % 3) * 60, baseY = 60 + (count % 3) * 60;
+        const scriptId = `usr_${stamp}_script`;
+        await saveNode(scriptId, { type: 'script', x: baseX, y: baseY, w: 420, h: 320, data: { label: '剧本', text } });
+        let upstream = scriptId;
+        if (plan.shots?.length) {
+          const boardId = `usr_${stamp}_board`;
+          const shots = plan.shots.map((shot: any) => ({ index: shot.index, visual: shot.visual, ...(shot.camera ? { camera: shot.camera } : {}), ...(shot.sfx ? { sfx: shot.sfx } : {}), ...(shot.duration ? { duration: shot.duration } : {}) }));
+          await saveNode(boardId, { type: 'storyboard', x: baseX + 560, y: baseY, w: 460, h: 340, data: { label: '分镜', shots } });
+          await rpc('edgeAdd', { projectId, fromNode: scriptId, toNode: boardId, fromPort: 'out', toPort: 'script' });
+          upstream = boardId;
+        }
+        for (const [index, segment] of plan.segments.entries()) {
+          const id = `usr_${stamp}_seg${index + 1}`;
+          await saveNode(id, { type: 'video', x: baseX + 1160, y: baseY + index * 340, w: 360, h: 300,
+            data: { label: `第${index + 1}段 · ${segment.seconds}秒`, prompt: segment.prompt, ratio, resolution, duration: segment.seconds } });
+          await rpc('edgeAdd', { projectId, fromNode: upstream, toNode: id, fromPort: 'out', toPort: 'prompt' });
+        }
+        const { canvas: doc } = await rpc('get', { projectId });
+        const { spots } = await applyLayout(doc);
+        await refresh();
+        fitStage(doc, spots);
+        setScriptDialog(null);
+        setNotice(`已按脚本铺开 ${plan.segments.length} 段制作节点：先核对每段提示词，再点上面「制作「…」」按顺序逐段生成，每段单独确认方案与费用。`);
+      } catch (e: any) { if (alive.current) patchScriptDialog({ busy: false, error: e?.message || '脚本节点没建出来。' }); }
+    }, [canvas, scriptDialog, patchScriptDialog, saveNode, applyLayout, refresh, fitStage]);
 
     const connectTo = React.useCallback(async (to: string) => {
       if (!canvas || !connectFrom || connectFrom === to) return;
@@ -630,9 +710,11 @@ export function createCanvasView({ React, h, TOKENS }: any) {
           h('span', { key: 'sep-a', className: 'movc-sep' }),
           h('button', { key: 'new-canvas', type: 'button', className: 'mov-btn mov-btn-primary', onClick: () => setCreateDialog({ value: '', error: '' }) }, '新建画布…'),
           canvas ? h('span', { key: 'sep-b', className: 'movc-sep' }) : null,
+          canvas ? h('button', { key: 'script-node', type: 'button', className: 'mov-btn', title: '新建一个剧本节点，自己写脚本', onClick: () => void newNode('script') }, '+ 剧本') : null,
           canvas ? h('button', { key: 'text-node', type: 'button', className: 'mov-btn', onClick: () => void newNode('text') }, '+ 文本') : null,
           canvas ? h('button', { key: 'image', type: 'button', className: 'mov-btn', onClick: () => void newNode('image') }, '+ 图片') : null,
           canvas ? h('button', { key: 'video', type: 'button', className: 'mov-btn', onClick: () => void newNode('video') }, '+ 视频') : null,
+          canvas ? h('button', { key: 'write-script', type: 'button', className: 'mov-btn movc-run', title: '写下脚本与目标时长，自动铺开剧本、分镜与每段制作节点', onClick: () => void openScript() }, '写脚本…') : null,
           canvas ? h('span', { key: 'sep-flow', className: 'movc-sep' }) : null,
           canvas ? h('button', { key: 'run-next', type: 'button', className: 'mov-btn movc-run', disabled: !nextStep,
             title: nextStep ? `当前读取节点内容并沿上游拼接提示词，生成前仍需确认方案与费用` : '流程里的制作节点都已有成果',
@@ -710,7 +792,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
       canvas && steps.length ? h('p', { key: 'flow-hint', className: 'movc-hint' }, nextStep
         ? `流程：按连线顺序逐个制作，当前轮到「${nextStep.label}」（画布上虚线框标出）。点上面的「制作」按钮会读取节点内容与上游剧本/分镜拼出提示词，仍然要先核对制作方案、单独确认费用才会调用模型。`
         : `流程：${steps.length} 个制作节点都已有回填成果。要重做某一段，点该节点里的「制作」，重新核对方案并确认费用。`) : null,
-      canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `双击画布名重命名（Enter 保存，Esc 取消）；拖动空白处平移、滚轮缩放；拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）；节点摆乱了点「美化布局」按连线一键重排。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
+      canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `双击画布名重命名（Enter 保存，Esc 取消）；拖动空白处平移、滚轮缩放；拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）；节点摆乱了点「美化布局」按连线一键重排；想按脚本铺开制作节点就点「写脚本…」。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
       connectFrom ? h('p', { key: 'connect', className: 'movc-hint' }, '连线模式：点击目标节点完成连接，点空白处取消。') : null,
       confirmDelete ? h('div', { key: 'delete-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget) setConfirmDelete(false); } },
         h('div', { key: 'body', className: 'movc-modal-body', style: { width: 'min(420px, calc(100vw - 32px))' } }, [
@@ -719,6 +801,32 @@ export function createCanvasView({ React, h, TOKENS }: any) {
           h('div', { key: 'ops', className: 'movc-bar' }, [
             h('button', { key: 'cancel', type: 'button', className: 'mov-btn', onClick: () => setConfirmDelete(false) }, '取消'),
             h('button', { key: 'ok', type: 'button', className: 'mov-btn', onClick: () => void deleteCanvas() }, '确认删除'),
+          ]),
+        ])) : null,
+      scriptDialog ? h('div', { key: 'script-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget && !scriptDialog.busy) setScriptDialog(null); } },
+        h('div', { key: 'body', className: 'movc-modal-body' }, [
+          h('h4', { key: 'h' }, '写脚本并生成制作节点'),
+          h('label', { key: 'text', className: 'movc-field' }, ['脚本内容', h('textarea', { autoFocus: true, value: scriptDialog.text,
+            placeholder: '写下要拍的内容。写成 Markdown 分镜表（表头含「镜头」「画面」两列）时会按分镜切段；否则按句子、段落按字数均分。写多少拆多少，不自动编内容。',
+            onChange: (e: any) => patchScriptDialog({ text: e.target.value, error: '' }) })]),
+          h('div', { key: 'spec', className: 'movc-row' }, [
+            h('label', { key: 'total', className: 'movc-field' }, ['目标总时长（秒）', h('input', { type: 'number', min: 4, max: 120, value: scriptDialog.totalSeconds, onChange: (e: any) => patchScriptDialog({ totalSeconds: e.target.value }) })]),
+            h('label', { key: 'segment', className: 'movc-field' }, ['每段时长（秒）', h('input', { type: 'number', min: 4, max: scriptDialog.singleMax || 15, value: scriptDialog.segmentSeconds, onChange: (e: any) => patchScriptDialog({ segmentSeconds: e.target.value }) })]),
+          ]),
+          h('div', { key: 'spec2', className: 'movc-row' }, [
+            h('label', { key: 'ratio', className: 'movc-field' }, ['画幅', h('select', { value: scriptDialog.ratio, onChange: (e: any) => patchScriptDialog({ ratio: e.target.value }) }, RATIOS.map(r => h('option', { key: r, value: r }, r)))]),
+            h('label', { key: 'resolution', className: 'movc-field' }, ['清晰度', h('select', { value: scriptDialog.resolution, onChange: (e: any) => patchScriptDialog({ resolution: e.target.value }) }, RESOLUTIONS.map(r => h('option', { key: r, value: r }, r.toUpperCase())))]),
+          ]),
+          h('p', { key: 'note', className: 'movc-status' }, `当前模型单段上限 ${scriptDialog.singleMax || 15} 秒：目标时长不超过上限只建一段，超过才按每段时长排续拍段。节点建好后仍要逐段核对方案、单独确认费用。`),
+          scriptDialog.plan ? h('div', { key: 'plan', className: 'movc-plan' }, [
+            h('div', { key: 'head' }, `分段计划：${scriptDialog.plan.segments.length} 段 · 共 ${scriptDialog.plan.totalSeconds} 秒${scriptDialog.plan.shots?.length ? ` · 识别到 ${scriptDialog.plan.shots.length} 个分镜` : ''}`),
+            ...scriptDialog.plan.segments.map((segment: any, index: number) => h('div', { key: `s${index}` }, `第${index + 1}段 ${segment.seconds} 秒（${segment.kind === 'extend' ? '续拍' : '首段'}）：${String(segment.prompt).slice(0, 90)}${String(segment.prompt).length > 90 ? '…' : ''}`)),
+          ]) : null,
+          scriptDialog.error ? h('p', { key: 'err', className: 'movc-status', 'data-error': 'true' }, scriptDialog.error) : null,
+          h('div', { key: 'ops', className: 'movc-bar' }, [
+            h('button', { key: 'cancel', type: 'button', className: 'mov-btn', disabled: scriptDialog.busy, onClick: () => setScriptDialog(null) }, '取消'),
+            h('button', { key: 'preview', type: 'button', className: 'mov-btn', disabled: scriptDialog.busy, onClick: () => void previewScript() }, '预览分段'),
+            h('button', { key: 'ok', type: 'button', className: 'mov-btn mov-btn-primary', disabled: scriptDialog.busy, onClick: () => void createFromScript() }, '生成制作节点'),
           ]),
         ])) : null,
       createDialog ? h('div', { key: 'create-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget) setCreateDialog(null); } },

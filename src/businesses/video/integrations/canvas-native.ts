@@ -11,12 +11,48 @@ import { waitForCompletion } from '../providers/transport.js';
 import { finishKnownTask } from '../providers/submissions.js';
 import { resolveImageInput } from '../media/references.js';
 import { IMAGE_MODEL } from '../connection-defaults.js';
-import { modelMaxSeconds } from '../workflow/planning.js';
+import { modelMaxSeconds, planVideoSegments, resolveSegmentSeconds } from '../workflow/planning.js';
 import { estimateSegmentCosts } from '../tools/video-estimate.js';
+import { canvasScriptPreview, scriptStoryboardShots } from './canvas-project.js';
+import { clampInteger } from '../../../core/utils/validation.js';
+import { MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_TOTAL_SECONDS } from '../config.js';
 
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const validToken = value => /^[a-f0-9-]{36}$/.test(String(value || ''));
 const terminal = new Set(['succeeded', 'failed', 'cancelled']);
+
+/** 把条目尽量均匀地分成 count 组：按字符数配平，并保证每组至少一条。 */
+function splitEvenly(items: string[], count: number) {
+  const groups: string[][] = [];
+  const total = items.reduce((sum, item) => sum + item.length, 0);
+  let index = 0, used = 0;
+  for (let group = 0; group < count; group += 1) {
+    const target = total * (group + 1) / count;
+    const current: string[] = [];
+    while (index < items.length && items.length - index >= count - group && (current.length === 0 || used < target)) {
+      current.push(items[index]); used += items[index].length; index += 1;
+    }
+    groups.push(current);
+  }
+  while (index < items.length) groups[count - 1].push(items[index++]);
+  return groups;
+}
+
+/** 写脚本 → 逐段提示词：有分镜表就按画面列切，否则按句子/段落按字数均分。
+ *  只做切分，不编造内容；内容不够拆成这么多段时直接报错，让用户补脚本或缩短时长。 */
+export function splitScriptPrompts(script: any, count: any, shots: any[] = []) {
+  const raw = String(script ?? '').trim();
+  if (!raw) throw new Error('请先写下脚本内容，再生成制作节点。');
+  if (!Number.isInteger(count) || count < 1) throw new Error('分段数量无效。');
+  const visuals = (Array.isArray(shots) ? shots : []).map(shot => String(shot?.visual || shot?.title || '').trim()).filter(Boolean);
+  if (visuals.length >= count && count > 1) return splitEvenly(visuals, count).map(group => group.join('\n'));
+  const body = canvasScriptPreview(raw);
+  if (!body) throw new Error('脚本里没有可用于制作的正文，请补充内容。');
+  if (count === 1) return [body];
+  const sentences = body.split(/(?<=[。！？!?；;])\s*|\s*\n+/).map(part => part.trim()).filter(Boolean);
+  if (sentences.length < count) throw new Error(`脚本正文只够拆成 ${sentences.length} 段，请补充脚本或缩短目标时长。`);
+  return splitEvenly(sentences, count).map(group => group.join(''));
+}
 
 /** 端口语义无法无损表达时停止，不能把尾帧/音频/视频当普通参考图。 */
 export function planCanvasNative(input, config, operation = 'generate', draft: any = {}) {
@@ -148,6 +184,20 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       let imageReady = false;
       try { const c = imageConfig(config); imageReady = !isVolcengine(c) && Boolean(resolveApiKey(c)); } catch { /* 缺少独立图片密钥 */ }
       return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: Boolean(resolveApiKey(config)), imageReady, singleMax: modelMaxSeconds(config) };
+    }
+    // 写脚本 → 分段计划：只算方案，不建节点、不接触模型费用。
+    if (args.action === 'plan') {
+      const config = snapshotConfig(liveConfig);
+      const singleMax = modelMaxSeconds(config);
+      const totalSeconds = clampInteger(args.totalSeconds, MIN_SECONDS, MAX_TOTAL_SECONDS, Math.min(15, singleMax));
+      const segmentSeconds = resolveSegmentSeconds(config, args.segmentSeconds);
+      const steps = planVideoSegments(totalSeconds, singleMax, segmentSeconds);
+      const script = String(args.script ?? '');
+      const shots = scriptStoryboardShots(script);
+      const prompts = splitScriptPrompts(script, steps.length, shots);
+      return { videoReady: Boolean(resolveApiKey(config)), videoModel: resolveModel(config), singleMax, totalSeconds, segmentSeconds,
+        segments: steps.map((step, index) => ({ kind: step.kind, seconds: step.seconds, prompt: prompts[index] })),
+        shots: shots.slice(0, 60).map((shot, index) => ({ index: index + 1, visual: String(shot?.visual || shot?.title || ''), camera: shot?.camera || '', sfx: shot?.sfx || '', ...(shot?.duration ? { duration: shot.duration } : {}) })) };
     }
     if (args.action === 'prepare') {
       const adapter = await adapterFor(args), input = await readCanvasInput(adapter, args);

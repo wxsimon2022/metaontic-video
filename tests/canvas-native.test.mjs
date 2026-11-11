@@ -94,3 +94,38 @@ test('extension cannot trust result node metadata as a substitute for real revie
 test('native RPC uses same-origin POST and fails closed on non-json service response', async () => {
   await assert.rejects(api.canvasNativeRpc({ action: 'prepare' }, async (url, options) => { assert.equal(url, '/metaontic-video/canvas-native'); assert.equal(options.method, 'POST'); return { json: async () => { throw Error(); } }; }), /尚未就绪/);
 });
+test('写脚本分段：按分镜表或句子切分，内容不足直接报错而不是编造', () => {
+  const script = '清晨的天台安静下来。旅舍前台亮起第一盏灯。行李轮子碾过地面。';
+  assert.equal(api.splitScriptPrompts(script, 1)[0].includes('清晨的天台'), true);
+  const two = api.splitScriptPrompts(script, 2);
+  assert.equal(two.length, 2);
+  assert.ok(two[0].includes('清晨的天台') && !two[0].includes('行李轮子'), '按句子顺序切，不交叉');
+  assert.ok(two[1].includes('行李轮子'));
+  const storyboard = ['# 剧本', '', '| 镜头 | 画面 | 时长 |', '| --- | --- | --- |', '| 1 | 清晨天台的城市天际线 | 5秒 |', '| 2 | 前台接待与行李特写 | 5秒 |'].join('\n');
+  const shots = api.scriptStoryboardShots(storyboard);
+  assert.equal(shots.length, 2);
+  const split = api.splitScriptPrompts(storyboard, 2, shots);
+  assert.ok(split[0].includes('清晨天台') && !split[0].includes('前台接待'));
+  assert.ok(split[1].includes('前台接待'));
+  assert.throws(() => api.splitScriptPrompts('只有一句话。', 2), /只够拆成 1 段/);
+  assert.throws(() => api.splitScriptPrompts('   ', 1), /先写下脚本内容/);
+});
+
+test('写脚本计划只算方案：不超过单段上限只建一段，超过按每段时长排续拍段', async () => {
+  const s = await service();
+  const script = '第一句。第二句。第三句。第四句。';
+  const one = await s.handle({ action: 'plan', script, totalSeconds: 15, segmentSeconds: 15 });
+  assert.equal(one.segments.length, 1);
+  assert.equal(one.segments[0].kind, 'generate');
+  assert.equal(one.segments[0].seconds, 15);
+  assert.equal(s.calls(), 0, '计划阶段不调用模型');
+  const long = await s.handle({ action: 'plan', script, totalSeconds: 30, segmentSeconds: 15 });
+  assert.deepEqual(long.segments.map(x => [x.kind, x.seconds]), [['generate', 15], ['extend', 15]]);
+  assert.ok(long.segments[0].prompt.includes('第一句') && !long.segments[0].prompt.includes('第四句'));
+  assert.ok(long.segments[1].prompt.includes('第四句'));
+  const capped = await s.handle({ action: 'plan', script, totalSeconds: 999, segmentSeconds: 99 });
+  assert.equal(capped.totalSeconds, 120);
+  assert.equal(capped.segmentSeconds, 15);
+  await assert.rejects(() => s.handle({ action: 'plan', script: '只有一句话。', totalSeconds: 30, segmentSeconds: 15 }), /只够拆成 1 段/);
+  s.dispose();
+});
