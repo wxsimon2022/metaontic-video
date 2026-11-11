@@ -284,3 +284,25 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 未覆盖：真实 Harness 桌面窗口里的观感与点击（需宿主重载后人工复核）；Windows 未实测。
 
 本地成品：`.local/test/3.20.1-test.26/metaontic-video-3.20.1-test.26.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+
+## 一键美化布局 + 画布内写脚本铺制作链 3.20.1-test.27
+
+需求：顶部按钮圆角收敛之后，用户提「加个一键美化画布布局」与「需要支持画布里面也能像对话那样写脚本 生成视频」。插件自己没有文本模型（脚本在对话里是助手写的），所以画布侧只做**确定性**的两件事：排版，和把用户写好的脚本按插件既有分段规则铺成制作节点，绝不自动编内容。
+
+- 一键美化布局（`canvas-view.ts` 纯函数 `tidyLayout(canvas)`）：
+  - 分层用入度归零逐层推平（最长路径），互相连线（环）按原顺序就地断开一层，不会死循环；空列会被压掉。
+  - 同层按上下游节点纵向重心排序，来回扫 3 轮减少交叉；每列整体竖直居中；坐标对齐 10px 网格；列宽取该列最宽节点 + 140px、行距 56px、外边距 60px。
+  - 只算坐标、只写 x/y（`nodeSave` 只带 `{ id, x, y }`，不带 `data`/`type`，内容与连线不动）；排完把整张图缩放居中进画布区（`fitStage`，按 stage rect 实测，0.3–1 倍）。
+  - 工具条新增「美化布局」按钮；已整齐时提示「无需调整」。
+- 画布内写脚本（工具条「写脚本…」+「+ 剧本」）：
+  - 服务端新动作 `canvas-native { action: 'plan' }`：只算方案、不建节点、不碰模型。用 `modelMaxSeconds` 拿单段上限，`resolveSegmentSeconds` 收敛每段时长，`planVideoSegments` 排 generate/extend 段，`scriptStoryboardShots` 解析 Markdown 分镜表，`splitScriptPrompts` 生成逐段提示词。总时长封顶 120 秒、每段封顶模型上限。
+  - `splitScriptPrompts(script, count, shots)`：有分镜表且画面列条数够时按分镜切；否则用 `canvasScriptPreview` 去掉表格/装饰后按句子、段落按字数均分（`splitEvenly` 保证每组至少一条）。正文不够拆成这么多段时直接报错（「只够拆成 N 段，请补充脚本或缩短目标时长」），不编造镜头。
+  - 前端弹窗：脚本内容 + 目标总时长 + 每段时长（上限按 `info.singleMax`）+ 画幅 + 清晰度；「预览分段」先展示段数、秒数与每段提示词，「生成制作节点」才落库：剧本节点（`usr_*_script`）→ 识别到分镜表时再建分镜节点 → 每段一个视频节点（prompt/时长/画幅/清晰度已填好），剧本→分镜（`script` 口）、分镜（或剧本）→各段（`prompt` 口）连线，最后复用 `applyLayout` + `fitStage` 自动排版并适配视图。
+  - 没有分镜表时不建分镜节点，剧本直接连到各段；脚本节点仍可用节点内「编辑」随时改。
+- 生成链路不变：节点建好后仍由「制作「节点名」」逐段走方案 → 费用 → 生成的既有确认流程，多段之间用成果节点的「续拍下一段」衔接。
+
+验证：类型检查、构建、469 项自动测试、`git diff --check` 通过。新增测试：`tidyLayout` 分层/不重叠/网格对齐/重复排版稳定/空画布/互相连线不卡死；点「美化布局」只写 x/y 且不动 data/type；`splitScriptPrompts` 按句子与分镜表切分、内容不足报错；`action: 'plan'` 单段/续拍段/封顶/不调用模型；写脚本弹窗预览不落库、生成后剧本/分镜/分段节点与连线齐全、无分镜表时走剧本直连。另用 Chrome 无头渲染截图核对弹窗、分段计划与排版效果（`/tmp/canvas-write-script.png`、`/tmp/canvas-tidy-after.png`）。
+
+未覆盖：真实 Harness 桌面窗口里的观感与点击（需宿主重载后人工复核）；画布内的付费生成链路未实跑（仍走既有确认流程）；Windows 未实测。
+
+本地成品：`.local/test/3.20.1-test.27/metaontic-video-3.20.1-test.27.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
