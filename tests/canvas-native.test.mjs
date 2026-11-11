@@ -123,9 +123,11 @@ test('写脚本计划只算方案：不超过单段上限只建一段，超过�
   assert.deepEqual(long.segments.map(x => [x.kind, x.seconds]), [['generate', 15], ['extend', 15]]);
   assert.ok(long.segments[0].prompt.includes('第一句') && !long.segments[0].prompt.includes('第四句'));
   assert.ok(long.segments[1].prompt.includes('第四句'));
-  const capped = await s.handle({ action: 'plan', script, totalSeconds: 999, segmentSeconds: 99 });
-  assert.equal(capped.totalSeconds, 120);
-  assert.equal(capped.segmentSeconds, 15);
+  const longer = Array.from({ length: 8 }, (_, i) => `第${i + 1}句。`).join('');
+  const capped = await s.handle({ action: 'plan', script: longer, totalSeconds: 999, segmentSeconds: 99 });
+  assert.equal(capped.totalSeconds, 120, '总时长封顶 120 秒');
+  assert.equal(capped.segmentSeconds, 15, '每段时长封顶到模型上限');
+  assert.equal(capped.segments.length, 8, '120 秒按每段 15 秒排成 8 段');
   await assert.rejects(() => s.handle({ action: 'plan', script: '只有一句话。', totalSeconds: 30, segmentSeconds: 15 }), /只够拆成 1 段/);
   s.dispose();
 });

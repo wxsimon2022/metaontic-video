@@ -2618,6 +2618,7 @@
       const [connectFrom, setConnectFrom] = React.useState("");
       const [inline, setInline] = React.useState(null);
       const [createDialog, setCreateDialog] = React.useState(null);
+      const [scriptDialog, setScriptDialog] = React.useState(null);
       const [confirmDelete, setConfirmDelete] = React.useState(false);
       const [dialog, setDialog] = React.useState(null);
       const pan = React.useRef(null);
@@ -2710,36 +2711,136 @@
           setError(e?.message || "\u5BFC\u51FA\u753B\u5E03\u5931\u8D25");
         }
       }, [canvas]);
+      const applyLayout = React.useCallback(async (doc) => {
+        const { positions: spots, moved } = tidyLayout(doc);
+        for (const node of Object.values(doc?.nodes || {})) {
+          const spot = spots[node.id];
+          if (!spot) continue;
+          if (Math.round(Number(node.x) || 0) === spot.x && Math.round(Number(node.y) || 0) === spot.y) continue;
+          await rpc("nodeSave", { projectId: doc.projectId, node: { id: node.id, x: spot.x, y: spot.y } });
+        }
+        return { spots, moved };
+      }, []);
+      const fitStage = React.useCallback((doc, spots) => {
+        const rect = stageRef.current?.getBoundingClientRect?.();
+        if (!rect?.width || !rect?.height) return;
+        const boxes = Object.values(doc?.nodes || {}).map((node) => ({ ...nodeSize(node), ...spots[node.id] || { x: Number(node.x) || 0, y: Number(node.y) || 0 } }));
+        if (!boxes.length) return;
+        const left = Math.min(...boxes.map((box) => box.x)), top = Math.min(...boxes.map((box) => box.y));
+        const spanX = Math.max(1, Math.max(...boxes.map((box) => box.x + box.w)) - left), spanY = Math.max(1, Math.max(...boxes.map((box) => box.y + box.h)) - top);
+        const scale = Math.min(1, Math.max(0.3, Math.min((rect.width - 80) / spanX, (rect.height - 80) / spanY)));
+        setView({ scale, x: 40 - left * scale + Math.max(0, (rect.width - 80 - spanX * scale) / 2), y: 30 - top * scale + Math.max(0, (rect.height - 80 - spanY * scale) / 2) });
+      }, []);
       const tidy = React.useCallback(async () => {
         if (!canvas) return;
         try {
           setError("");
-          const { positions: spots, moved } = tidyLayout(canvas);
+          const { canvas: doc } = await rpc("get", { projectId: canvas.projectId });
+          const { spots, moved } = await applyLayout(doc);
           if (!moved) {
             setNotice("\u5F53\u524D\u5E03\u5C40\u5DF2\u7ECF\u6574\u9F50\uFF0C\u65E0\u9700\u8C03\u6574\u3002");
             return;
           }
-          for (const node of Object.values(canvas.nodes || {})) {
-            const spot = spots[node.id];
-            if (!spot) continue;
-            if (Math.round(Number(node.x) || 0) === spot.x && Math.round(Number(node.y) || 0) === spot.y) continue;
-            await rpc("nodeSave", { projectId: canvas.projectId, node: { id: node.id, x: spot.x, y: spot.y } });
-          }
           setPositions({});
           await refresh();
-          const rect = stageRef.current?.getBoundingClientRect?.();
-          if (rect?.width && rect?.height) {
-            const boxes = Object.values(canvas.nodes || {}).map((node) => ({ ...nodeSize(node), ...spots[node.id] || { x: Number(node.x) || 0, y: Number(node.y) || 0 } }));
-            const left = Math.min(...boxes.map((box) => box.x)), top = Math.min(...boxes.map((box) => box.y));
-            const spanX = Math.max(1, Math.max(...boxes.map((box) => box.x + box.w)) - left), spanY = Math.max(1, Math.max(...boxes.map((box) => box.y + box.h)) - top);
-            const scale = Math.min(1, Math.max(0.3, Math.min((rect.width - 80) / spanX, (rect.height - 80) / spanY)));
-            setView({ scale, x: 40 - left * scale + Math.max(0, (rect.width - 80 - spanX * scale) / 2), y: 30 - top * scale + Math.max(0, (rect.height - 80 - spanY * scale) / 2) });
-          }
+          fitStage(doc, spots);
           setNotice(`\u5DF2\u7F8E\u5316\u5E03\u5C40\uFF1A${moved} \u4E2A\u8282\u70B9\u6309\u8FDE\u7EBF\u91CD\u6392\uFF1B\u5185\u5BB9\u4E0E\u8FDE\u7EBF\u6CA1\u52A8\uFF0C\u4E4B\u540E\u4ECD\u53EF\u624B\u52A8\u5FAE\u8C03\u3002`);
         } catch (e) {
           setError(e?.message || "\u7F8E\u5316\u5E03\u5C40\u5931\u8D25");
         }
-      }, [canvas, refresh]);
+      }, [canvas, refresh, applyLayout, fitStage]);
+      const patchScriptDialog = React.useCallback((patch) => setScriptDialog((current) => current ? { ...current, ...patch } : current), []);
+      const openScript = React.useCallback(async () => {
+        setError("");
+        setScriptDialog({ text: "", totalSeconds: 15, segmentSeconds: 15, singleMax: 15, ratio: "16:9", resolution: "720p", busy: false, error: "", plan: null });
+        try {
+          const info = await canvasNativeRpc({ action: "info" });
+          if (!alive.current) return;
+          patchScriptDialog({
+            singleMax: info?.singleMax || 15,
+            totalSeconds: Math.min(15, info?.singleMax || 15),
+            segmentSeconds: info?.singleMax || 15,
+            ...info?.videoReady === false ? { error: "\u8FD8\u6CA1\u914D\u7F6E\u89C6\u9891API\u5BC6\u94A5\uFF0C\u53EF\u4EE5\u5148\u94FA\u8282\u70B9\uFF0C\u914D\u7F6E\u597D\u518D\u751F\u6210\u3002" } : {}
+          });
+        } catch (e) {
+          if (alive.current) patchScriptDialog({ error: e?.message || "\u5236\u4F5C\u670D\u52A1\u5C1A\u672A\u5C31\u7EEA\u3002" });
+        }
+      }, [patchScriptDialog]);
+      const previewScript = React.useCallback(async () => {
+        if (!canvas || !scriptDialog) return;
+        const text = String(scriptDialog.text || "").trim();
+        if (!text) {
+          patchScriptDialog({ error: "\u8BF7\u5148\u5199\u4E0B\u811A\u672C\u5185\u5BB9\u3002" });
+          return;
+        }
+        patchScriptDialog({ busy: true, error: "", plan: null });
+        try {
+          const plan = await canvasNativeRpc({
+            action: "plan",
+            projectId: canvas.projectId,
+            script: text,
+            totalSeconds: scriptDialog.totalSeconds,
+            segmentSeconds: scriptDialog.segmentSeconds
+          });
+          if (!alive.current) return;
+          patchScriptDialog({ busy: false, plan });
+        } catch (e) {
+          if (alive.current) patchScriptDialog({ busy: false, error: e?.message || "\u5206\u6BB5\u8BA1\u5212\u6CA1\u7B97\u51FA\u6765\u3002" });
+        }
+      }, [canvas, scriptDialog, patchScriptDialog]);
+      const createFromScript = React.useCallback(async () => {
+        if (!canvas || !scriptDialog) return;
+        const text = String(scriptDialog.text || "").trim();
+        if (!text) {
+          patchScriptDialog({ error: "\u8BF7\u5148\u5199\u4E0B\u811A\u672C\u5185\u5BB9\u3002" });
+          return;
+        }
+        patchScriptDialog({ busy: true, error: "" });
+        try {
+          const projectId = canvas.projectId;
+          const plan = await canvasNativeRpc({
+            action: "plan",
+            projectId,
+            script: text,
+            totalSeconds: scriptDialog.totalSeconds,
+            segmentSeconds: scriptDialog.segmentSeconds
+          });
+          const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+          const ratio = scriptDialog.ratio, resolution = scriptDialog.resolution;
+          const count = Object.keys(canvas.nodes || {}).length;
+          const baseX = 60 + count % 3 * 60, baseY = 60 + count % 3 * 60;
+          const scriptId = `usr_${stamp}_script`;
+          await saveNode(scriptId, { type: "script", x: baseX, y: baseY, w: 420, h: 320, data: { label: "\u5267\u672C", text } });
+          let upstream = scriptId;
+          if (plan.shots?.length) {
+            const boardId = `usr_${stamp}_board`;
+            const shots = plan.shots.map((shot) => ({ index: shot.index, visual: shot.visual, ...shot.camera ? { camera: shot.camera } : {}, ...shot.sfx ? { sfx: shot.sfx } : {}, ...shot.duration ? { duration: shot.duration } : {} }));
+            await saveNode(boardId, { type: "storyboard", x: baseX + 560, y: baseY, w: 460, h: 340, data: { label: "\u5206\u955C", shots } });
+            await rpc("edgeAdd", { projectId, fromNode: scriptId, toNode: boardId, fromPort: "out", toPort: "script" });
+            upstream = boardId;
+          }
+          for (const [index, segment] of plan.segments.entries()) {
+            const id = `usr_${stamp}_seg${index + 1}`;
+            await saveNode(id, {
+              type: "video",
+              x: baseX + 1160,
+              y: baseY + index * 340,
+              w: 360,
+              h: 300,
+              data: { label: `\u7B2C${index + 1}\u6BB5 \xB7 ${segment.seconds}\u79D2`, prompt: segment.prompt, ratio, resolution, duration: segment.seconds }
+            });
+            await rpc("edgeAdd", { projectId, fromNode: upstream, toNode: id, fromPort: "out", toPort: "prompt" });
+          }
+          const { canvas: doc } = await rpc("get", { projectId });
+          const { spots } = await applyLayout(doc);
+          await refresh();
+          fitStage(doc, spots);
+          setScriptDialog(null);
+          setNotice(`\u5DF2\u6309\u811A\u672C\u94FA\u5F00 ${plan.segments.length} \u6BB5\u5236\u4F5C\u8282\u70B9\uFF1A\u5148\u6838\u5BF9\u6BCF\u6BB5\u63D0\u793A\u8BCD\uFF0C\u518D\u70B9\u4E0A\u9762\u300C\u5236\u4F5C\u300C\u2026\u300D\u300D\u6309\u987A\u5E8F\u9010\u6BB5\u751F\u6210\uFF0C\u6BCF\u6BB5\u5355\u72EC\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002`);
+        } catch (e) {
+          if (alive.current) patchScriptDialog({ busy: false, error: e?.message || "\u811A\u672C\u8282\u70B9\u6CA1\u5EFA\u51FA\u6765\u3002" });
+        }
+      }, [canvas, scriptDialog, patchScriptDialog, saveNode, applyLayout, refresh, fitStage]);
       const connectTo = React.useCallback(async (to) => {
         if (!canvas || !connectFrom || connectFrom === to) return;
         const from = (canvas.nodes || {})[connectFrom];
@@ -3084,9 +3185,11 @@
             h("span", { key: "sep-a", className: "movc-sep" }),
             h("button", { key: "new-canvas", type: "button", className: "mov-btn mov-btn-primary", onClick: () => setCreateDialog({ value: "", error: "" }) }, "\u65B0\u5EFA\u753B\u5E03\u2026"),
             canvas ? h("span", { key: "sep-b", className: "movc-sep" }) : null,
+            canvas ? h("button", { key: "script-node", type: "button", className: "mov-btn", title: "\u65B0\u5EFA\u4E00\u4E2A\u5267\u672C\u8282\u70B9\uFF0C\u81EA\u5DF1\u5199\u811A\u672C", onClick: () => void newNode("script") }, "+ \u5267\u672C") : null,
             canvas ? h("button", { key: "text-node", type: "button", className: "mov-btn", onClick: () => void newNode("text") }, "+ \u6587\u672C") : null,
             canvas ? h("button", { key: "image", type: "button", className: "mov-btn", onClick: () => void newNode("image") }, "+ \u56FE\u7247") : null,
             canvas ? h("button", { key: "video", type: "button", className: "mov-btn", onClick: () => void newNode("video") }, "+ \u89C6\u9891") : null,
+            canvas ? h("button", { key: "write-script", type: "button", className: "mov-btn movc-run", title: "\u5199\u4E0B\u811A\u672C\u4E0E\u76EE\u6807\u65F6\u957F\uFF0C\u81EA\u52A8\u94FA\u5F00\u5267\u672C\u3001\u5206\u955C\u4E0E\u6BCF\u6BB5\u5236\u4F5C\u8282\u70B9", onClick: () => void openScript() }, "\u5199\u811A\u672C\u2026") : null,
             canvas ? h("span", { key: "sep-flow", className: "movc-sep" }) : null,
             canvas ? h(
               "button",
@@ -3228,7 +3331,7 @@
           } }) : null
         ) : null,
         canvas && steps.length ? h("p", { key: "flow-hint", className: "movc-hint" }, nextStep ? `\u6D41\u7A0B\uFF1A\u6309\u8FDE\u7EBF\u987A\u5E8F\u9010\u4E2A\u5236\u4F5C\uFF0C\u5F53\u524D\u8F6E\u5230\u300C${nextStep.label}\u300D\uFF08\u753B\u5E03\u4E0A\u865A\u7EBF\u6846\u6807\u51FA\uFF09\u3002\u70B9\u4E0A\u9762\u7684\u300C\u5236\u4F5C\u300D\u6309\u94AE\u4F1A\u8BFB\u53D6\u8282\u70B9\u5185\u5BB9\u4E0E\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u62FC\u51FA\u63D0\u793A\u8BCD\uFF0C\u4ECD\u7136\u8981\u5148\u6838\u5BF9\u5236\u4F5C\u65B9\u6848\u3001\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u624D\u4F1A\u8C03\u7528\u6A21\u578B\u3002` : `\u6D41\u7A0B\uFF1A${steps.length} \u4E2A\u5236\u4F5C\u8282\u70B9\u90FD\u5DF2\u6709\u56DE\u586B\u6210\u679C\u3002\u8981\u91CD\u505A\u67D0\u4E00\u6BB5\uFF0C\u70B9\u8BE5\u8282\u70B9\u91CC\u7684\u300C\u5236\u4F5C\u300D\uFF0C\u91CD\u65B0\u6838\u5BF9\u65B9\u6848\u5E76\u786E\u8BA4\u8D39\u7528\u3002`) : null,
-        canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D\uFF08Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\uFF1B\u8282\u70B9\u6446\u4E71\u4E86\u70B9\u300C\u7F8E\u5316\u5E03\u5C40\u300D\u6309\u8FDE\u7EBF\u4E00\u952E\u91CD\u6392\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
+        canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D\uFF08Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\uFF1B\u8282\u70B9\u6446\u4E71\u4E86\u70B9\u300C\u7F8E\u5316\u5E03\u5C40\u300D\u6309\u8FDE\u7EBF\u4E00\u952E\u91CD\u6392\uFF1B\u60F3\u6309\u811A\u672C\u94FA\u5F00\u5236\u4F5C\u8282\u70B9\u5C31\u70B9\u300C\u5199\u811A\u672C\u2026\u300D\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
         connectFrom ? h("p", { key: "connect", className: "movc-hint" }, "\u8FDE\u7EBF\u6A21\u5F0F\uFF1A\u70B9\u51FB\u76EE\u6807\u8282\u70B9\u5B8C\u6210\u8FDE\u63A5\uFF0C\u70B9\u7A7A\u767D\u5904\u53D6\u6D88\u3002") : null,
         confirmDelete ? h(
           "div",
@@ -3241,6 +3344,40 @@
             h("div", { key: "ops", className: "movc-bar" }, [
               h("button", { key: "cancel", type: "button", className: "mov-btn", onClick: () => setConfirmDelete(false) }, "\u53D6\u6D88"),
               h("button", { key: "ok", type: "button", className: "mov-btn", onClick: () => void deleteCanvas() }, "\u786E\u8BA4\u5220\u9664")
+            ])
+          ])
+        ) : null,
+        scriptDialog ? h(
+          "div",
+          { key: "script-modal", className: "movc-modal", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
+            if (e.target === e.currentTarget && !scriptDialog.busy) setScriptDialog(null);
+          } },
+          h("div", { key: "body", className: "movc-modal-body" }, [
+            h("h4", { key: "h" }, "\u5199\u811A\u672C\u5E76\u751F\u6210\u5236\u4F5C\u8282\u70B9"),
+            h("label", { key: "text", className: "movc-field" }, ["\u811A\u672C\u5185\u5BB9", h("textarea", {
+              autoFocus: true,
+              value: scriptDialog.text,
+              placeholder: "\u5199\u4E0B\u8981\u62CD\u7684\u5185\u5BB9\u3002\u5199\u6210 Markdown \u5206\u955C\u8868\uFF08\u8868\u5934\u542B\u300C\u955C\u5934\u300D\u300C\u753B\u9762\u300D\u4E24\u5217\uFF09\u65F6\u4F1A\u6309\u5206\u955C\u5207\u6BB5\uFF1B\u5426\u5219\u6309\u53E5\u5B50\u3001\u6BB5\u843D\u6309\u5B57\u6570\u5747\u5206\u3002\u5199\u591A\u5C11\u62C6\u591A\u5C11\uFF0C\u4E0D\u81EA\u52A8\u7F16\u5185\u5BB9\u3002",
+              onChange: (e) => patchScriptDialog({ text: e.target.value, error: "" })
+            })]),
+            h("div", { key: "spec", className: "movc-row" }, [
+              h("label", { key: "total", className: "movc-field" }, ["\u76EE\u6807\u603B\u65F6\u957F\uFF08\u79D2\uFF09", h("input", { type: "number", min: 4, max: 120, value: scriptDialog.totalSeconds, onChange: (e) => patchScriptDialog({ totalSeconds: e.target.value }) })]),
+              h("label", { key: "segment", className: "movc-field" }, ["\u6BCF\u6BB5\u65F6\u957F\uFF08\u79D2\uFF09", h("input", { type: "number", min: 4, max: scriptDialog.singleMax || 15, value: scriptDialog.segmentSeconds, onChange: (e) => patchScriptDialog({ segmentSeconds: e.target.value }) })])
+            ]),
+            h("div", { key: "spec2", className: "movc-row" }, [
+              h("label", { key: "ratio", className: "movc-field" }, ["\u753B\u5E45", h("select", { value: scriptDialog.ratio, onChange: (e) => patchScriptDialog({ ratio: e.target.value }) }, RATIOS.map((r) => h("option", { key: r, value: r }, r)))]),
+              h("label", { key: "resolution", className: "movc-field" }, ["\u6E05\u6670\u5EA6", h("select", { value: scriptDialog.resolution, onChange: (e) => patchScriptDialog({ resolution: e.target.value }) }, RESOLUTIONS.map((r) => h("option", { key: r, value: r }, r.toUpperCase())))])
+            ]),
+            h("p", { key: "note", className: "movc-status" }, `\u5F53\u524D\u6A21\u578B\u5355\u6BB5\u4E0A\u9650 ${scriptDialog.singleMax || 15} \u79D2\uFF1A\u76EE\u6807\u65F6\u957F\u4E0D\u8D85\u8FC7\u4E0A\u9650\u53EA\u5EFA\u4E00\u6BB5\uFF0C\u8D85\u8FC7\u624D\u6309\u6BCF\u6BB5\u65F6\u957F\u6392\u7EED\u62CD\u6BB5\u3002\u8282\u70B9\u5EFA\u597D\u540E\u4ECD\u8981\u9010\u6BB5\u6838\u5BF9\u65B9\u6848\u3001\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u3002`),
+            scriptDialog.plan ? h("div", { key: "plan", className: "movc-plan" }, [
+              h("div", { key: "head" }, `\u5206\u6BB5\u8BA1\u5212\uFF1A${scriptDialog.plan.segments.length} \u6BB5 \xB7 \u5171 ${scriptDialog.plan.totalSeconds} \u79D2${scriptDialog.plan.shots?.length ? ` \xB7 \u8BC6\u522B\u5230 ${scriptDialog.plan.shots.length} \u4E2A\u5206\u955C` : ""}`),
+              ...scriptDialog.plan.segments.map((segment, index) => h("div", { key: `s${index}` }, `\u7B2C${index + 1}\u6BB5 ${segment.seconds} \u79D2\uFF08${segment.kind === "extend" ? "\u7EED\u62CD" : "\u9996\u6BB5"}\uFF09\uFF1A${String(segment.prompt).slice(0, 90)}${String(segment.prompt).length > 90 ? "\u2026" : ""}`))
+            ]) : null,
+            scriptDialog.error ? h("p", { key: "err", className: "movc-status", "data-error": "true" }, scriptDialog.error) : null,
+            h("div", { key: "ops", className: "movc-bar" }, [
+              h("button", { key: "cancel", type: "button", className: "mov-btn", disabled: scriptDialog.busy, onClick: () => setScriptDialog(null) }, "\u53D6\u6D88"),
+              h("button", { key: "preview", type: "button", className: "mov-btn", disabled: scriptDialog.busy, onClick: () => void previewScript() }, "\u9884\u89C8\u5206\u6BB5"),
+              h("button", { key: "ok", type: "button", className: "mov-btn mov-btn-primary", disabled: scriptDialog.busy, onClick: () => void createFromScript() }, "\u751F\u6210\u5236\u4F5C\u8282\u70B9")
             ])
           ])
         ) : null,

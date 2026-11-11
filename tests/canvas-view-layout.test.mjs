@@ -31,10 +31,21 @@ function makeReact() {
   };
 }
 
-function harness(documents) {
+function harness(documents, native = {}) {
   const context = vm.createContext({
+    // canvasNativeRpc 用 AbortSignal.timeout 兜底；VM 上下文里要显式给。
+    AbortSignal,
+    setInterval,
+    clearInterval,
     fetch: async (url, options = {}) => {
-      const { method, args } = JSON.parse(options.body || '{}');
+      const body = JSON.parse(options.body || '{}');
+      if (String(url).includes('canvas-native')) {
+        const served = native[body.action];
+        if (!served) return { ok: false, json: async () => ({ error: `未支持的画布制作操作：${body.action}` }) };
+        try { return { ok: true, json: async () => (typeof served === 'function' ? served(body) : served) }; }
+        catch (e) { return { ok: false, json: async () => ({ error: e?.message || '制作请求未完成' }) }; }
+      }
+      const { method, args } = body;
       const served = documents[method];
       if (!served) return { ok: false, json: async () => ({ error: `未支持的画布方法：${method}` }) };
       return { ok: true, json: async () => (typeof served === 'function' ? served(args) : served) };
@@ -211,6 +222,79 @@ test('点「美化布局」把新坐标写回画布，不改内容与连线', as
     assert.equal(node.x % 10, 0, '坐标对齐 10px 网格');
   }
   assert.ok(saved.find((node) => node.id === 'a').x < saved.find((node) => node.id === 'b').x, '上游节点排在前面');
+});
+
+test('画布内写脚本：按脚本铺开剧本/分镜/分段视频节点并自动连线排版', async () => {
+  const calls = { nodes: [], edges: [], plans: [] };
+  const doc = { projectId: 'p1', name: '青旅宣传片', dataRoot: '/tmp/canvas', nodes: {}, edges: [] };
+  const { FlowCanvas, mini } = harness({
+    list: { canvases: [{ projectId: 'p1', name: '青旅宣传片', nodeCount: 0 }] },
+    get: () => ({ canvas: { ...doc, nodes: { ...doc.nodes }, edges: [...doc.edges] } }),
+    nodeSave: (args) => { const node = { ...(doc.nodes[args.node.id] || {}), ...args.node }; doc.nodes[args.node.id] = node; calls.nodes.push(args.node); return { canvas: { projectId: 'p1', node } }; },
+    edgeAdd: (args) => { const edge = { id: `e${calls.edges.length + 1}`, ...args }; doc.edges.push(edge); calls.edges.push(edge); return { canvas: { projectId: 'p1', edge } }; },
+  }, {
+    info: { singleMax: 15, videoReady: true },
+    plan: (body) => {
+      calls.plans.push(body);
+      const shots = body.script.includes('|') ? [{ index: 1, visual: '镜头：1\n画面：清晨天台' }, { index: 2, visual: '镜头：2\n画面：前台接待' }] : [];
+      return { totalSeconds: 30, segmentSeconds: 15, singleMax: 15,
+        segments: [{ kind: 'generate', seconds: 15, prompt: '第一句。' }, { kind: 'extend', seconds: 15, prompt: '第二句。' }], shots };
+    },
+  });
+  const flush = async (rounds = 40) => { for (let i = 0; i < rounds; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
+  mini.begin(); FlowCanvas();
+  await mini.flush();
+  mini.begin();
+  let tree = FlowCanvas();
+  const opsLabels = texts(find(tree, (node) => node.props.key === 'ops'));
+  assert.ok(opsLabels.includes('写脚本…') && opsLabels.includes('+ 剧本'), `操作行要有写脚本入口：${opsLabels.join('、')}`);
+  find(tree, (node) => node.props.key === 'write-script').props.onClick();
+  await flush();
+  mini.begin(); tree = FlowCanvas();
+  const modal = find(tree, (node) => node.props.key === 'script-modal');
+  assert.ok(modal, '点「写脚本…」应打开弹窗');
+  find(modal, (node) => node.type === 'textarea').props.onChange({ target: { value: '# 剧本\n\n| 镜头 | 画面 |\n| --- | --- |\n| 1 | 清晨天台 |\n| 2 | 前台接待 |' } });
+  mini.begin(); tree = FlowCanvas();
+  const button = (key) => find(find(tree, (node) => node.props.key === 'script-modal'), (node) => node.props.key === key);
+  button('preview').props.onClick();
+  await flush();
+  mini.begin(); tree = FlowCanvas();
+  const preview = find(find(tree, (node) => node.props.key === 'script-modal'), (node) => node.props.key === 'plan');
+  assert.ok(preview, '「预览分段」应显示分段计划');
+  assert.ok(texts(preview).join(' ').includes('2 段'), texts(preview).join(' '));
+  assert.equal(calls.nodes.length, 0, '只预览时不写画布');
+  button('ok').props.onClick();
+  await flush();
+  const types = calls.nodes.map((node) => node.type);
+  assert.deepEqual(types.filter((type) => type === 'script').length, 1, '建了一个剧本节点');
+  assert.ok(types.includes('storyboard'), '识别到分镜表时同时建分镜节点');
+  const segments = calls.nodes.filter((node) => node.type === 'video');
+  assert.equal(segments.length, 2, '每段一个视频节点');
+  assert.deepEqual(segments.map((node) => node.data.duration), [15, 15]);
+  assert.deepEqual(segments.map((node) => node.data.prompt), ['第一句。', '第二句。']);
+  assert.deepEqual(segments.map((node) => node.data.label), ['第1段 · 15秒', '第2段 · 15秒']);
+  for (const node of segments) assert.equal(node.data.ratio, '16:9', '画幅写进节点');
+  const scriptId = calls.nodes.find((node) => node.type === 'script').id;
+  const boardId = calls.nodes.find((node) => node.type === 'storyboard').id;
+  assert.deepEqual(calls.edges.map((edge) => [edge.fromNode, edge.toNode, edge.toPort]),
+    [[scriptId, boardId, 'script'], [boardId, segments.map((node) => node.id)[0], 'prompt'], [boardId, segments.map((node) => node.id)[1], 'prompt']],
+    '剧本 → 分镜 → 每段视频节点');
+  // 建完节点后自动排版：所有节点坐标都对齐 10px 网格。
+  for (const node of Object.values(doc.nodes)) assert.equal(node.x % 10, 0, `${node.id} 的 x 对齐网格`);
+  mini.begin(); tree = FlowCanvas();
+  assert.ok(texts(tree).some((line) => line.includes('已按脚本铺开 2 段')), '建好后给出下一步提示');
+  // 没有分镜表的脚本：不建分镜节点，剧本直接连到各段视频节点。
+  const before = { nodes: calls.nodes.length, edges: calls.edges.length };
+  find(tree, (node) => node.props.key === 'write-script').props.onClick();
+  await flush();
+  mini.begin(); tree = FlowCanvas();
+  find(find(tree, (node) => node.props.key === 'script-modal'), (node) => node.type === 'textarea').props.onChange({ target: { value: '第一句。第二句。' } });
+  mini.begin(); tree = FlowCanvas();
+  find(find(tree, (node) => node.props.key === 'script-modal'), (node) => node.props.key === 'ok').props.onClick();
+  await flush();
+  const created = calls.nodes.slice(before.nodes).filter((node) => node.type); // 排版只写坐标，这里只看建节点的调用
+  assert.deepEqual(created.map((node) => node.type), ['script', 'video', 'video'], '没有分镜表时不建分镜节点');
+  assert.deepEqual(calls.edges.slice(before.edges).map((edge) => [edge.fromNode, edge.toNode]), [[created[0].id, created[1].id], [created[0].id, created[2].id]], '剧本直接连到每段视频节点');
 });
 
 test('工具条给出流程主行动与进度，未完成节点标虚线框', async () => {

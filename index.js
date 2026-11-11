@@ -6452,9 +6452,40 @@ async function runTask(liveConfig, body, signal, progress = {}) {
 
 // src/businesses/video/integrations/canvas-native.ts
 init_connection_defaults();
+init_config();
 var hash3 = (value) => createHash8("sha256").update(JSON.stringify(value)).digest("hex");
 var validToken = (value) => /^[a-f0-9-]{36}$/.test(String(value || ""));
 var terminal = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled"]);
+function splitEvenly(items, count) {
+  const groups = [];
+  const total = items.reduce((sum, item) => sum + item.length, 0);
+  let index = 0, used = 0;
+  for (let group = 0; group < count; group += 1) {
+    const target = total * (group + 1) / count;
+    const current = [];
+    while (index < items.length && items.length - index >= count - group && (current.length === 0 || used < target)) {
+      current.push(items[index]);
+      used += items[index].length;
+      index += 1;
+    }
+    groups.push(current);
+  }
+  while (index < items.length) groups[count - 1].push(items[index++]);
+  return groups;
+}
+function splitScriptPrompts(script, count, shots = []) {
+  const raw = String(script ?? "").trim();
+  if (!raw) throw new Error("\u8BF7\u5148\u5199\u4E0B\u811A\u672C\u5185\u5BB9\uFF0C\u518D\u751F\u6210\u5236\u4F5C\u8282\u70B9\u3002");
+  if (!Number.isInteger(count) || count < 1) throw new Error("\u5206\u6BB5\u6570\u91CF\u65E0\u6548\u3002");
+  const visuals = (Array.isArray(shots) ? shots : []).map((shot) => String(shot?.visual || shot?.title || "").trim()).filter(Boolean);
+  if (visuals.length >= count && count > 1) return splitEvenly(visuals, count).map((group) => group.join("\n"));
+  const body = canvasScriptPreview(raw);
+  if (!body) throw new Error("\u811A\u672C\u91CC\u6CA1\u6709\u53EF\u7528\u4E8E\u5236\u4F5C\u7684\u6B63\u6587\uFF0C\u8BF7\u8865\u5145\u5185\u5BB9\u3002");
+  if (count === 1) return [body];
+  const sentences = body.split(/(?<=[。！？!?；;])\s*|\s*\n+/).map((part) => part.trim()).filter(Boolean);
+  if (sentences.length < count) throw new Error(`\u811A\u672C\u6B63\u6587\u53EA\u591F\u62C6\u6210 ${sentences.length} \u6BB5\uFF0C\u8BF7\u8865\u5145\u811A\u672C\u6216\u7F29\u77ED\u76EE\u6807\u65F6\u957F\u3002`);
+  return splitEvenly(sentences, count).map((group) => group.join(""));
+}
 function planCanvasNative(input, config, operation = "generate", draft = {}) {
   if (!["generate", "extend"].includes(operation)) throw new Error("\u4E0D\u652F\u6301\u7684\u753B\u5E03\u5236\u4F5C\u64CD\u4F5C\u3002");
   const node = input.nodes.find((n) => n.id === input.canvas.nodeId);
@@ -6628,6 +6659,25 @@ function createCanvasNativeService(liveConfig, options = {}) {
       } catch {
       }
       return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: Boolean(resolveApiKey(config)), imageReady, singleMax: modelMaxSeconds(config) };
+    }
+    if (args.action === "plan") {
+      const config = snapshotConfig(liveConfig);
+      const singleMax = modelMaxSeconds(config);
+      const totalSeconds = clampInteger(args.totalSeconds, MIN_SECONDS, MAX_TOTAL_SECONDS, Math.min(15, singleMax));
+      const segmentSeconds = resolveSegmentSeconds(config, args.segmentSeconds);
+      const steps = planVideoSegments(totalSeconds, singleMax, segmentSeconds);
+      const script = String(args.script ?? "");
+      const shots = scriptStoryboardShots(script);
+      const prompts = splitScriptPrompts(script, steps.length, shots);
+      return {
+        videoReady: Boolean(resolveApiKey(config)),
+        videoModel: resolveModel(config),
+        singleMax,
+        totalSeconds,
+        segmentSeconds,
+        segments: steps.map((step, index) => ({ kind: step.kind, seconds: step.seconds, prompt: prompts[index] })),
+        shots: shots.slice(0, 60).map((shot, index) => ({ index: index + 1, visual: String(shot?.visual || shot?.title || ""), camera: shot?.camera || "", sfx: shot?.sfx || "", ...shot?.duration ? { duration: shot.duration } : {} }))
+      };
     }
     if (args.action === "prepare") {
       const adapter = await adapterFor(args), input = await readCanvasInput(adapter, args);
