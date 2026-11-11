@@ -38,11 +38,12 @@ function resolveImageModel(value) {
   if (!model || RETIRED_IMAGE_MODELS.includes(model)) return IMAGE_MODEL;
   return model;
 }
-var METAONTIC_BASE_URL, IMAGE_MODEL, RETIRED_IMAGE_MODELS;
+var METAONTIC_BASE_URL, IMAGE_MODEL, TEXT_MODEL, RETIRED_IMAGE_MODELS;
 var init_connection_defaults = __esm({
   "src/businesses/video/connection-defaults.ts"() {
     METAONTIC_BASE_URL = "https://ai.bileego.com";
     IMAGE_MODEL = "doubao-seedream-5-0-pro-260628";
+    TEXT_MODEL = "doubao-seed-1-6-250615";
     RETIRED_IMAGE_MODELS = ["doubao-seedream-5-0-260128"];
   }
 });
@@ -958,6 +959,7 @@ var init_config = __esm({
       // 图片模型：doubao-seedream-5-0-260128 已下线，默认改用在售的 pro 版；旧型号仍允许写入校验，
       // 读取时由 connection-defaults 的 resolveImageModel 归一到在售型号。
       imageModel: Schema.union(["doubao-seedream-5-0-pro-260628", "doubao-seedream-5-0-260128"]).default("doubao-seedream-5-0-pro-260628").description("A/B \u771F\u4EBA\u53C2\u8003\u56FE\u975E\u771F\u4EBA\u5316\u4F7F\u7528\u7684\u56FE\u7247\u6A21\u578B\uFF08\u65E7\u578B\u53F7\u5DF2\u4E0B\u7EBF\uFF0C\u6309 pro \u7248\u8C03\u7528\uFF09").volatile(),
+      textModel: Schema.string().default("").description("\u5199\u811A\u672C\u7528\u7684\u6587\u672C\u6A21\u578B\uFF08OpenAI \u517C\u5BB9 /v1/chat/completions\uFF09\uFF1B\u7559\u7A7A\u8BFB NEWAPI_TEXT_MODEL \u6216\u5185\u7F6E\u9ED8\u8BA4\u503C").volatile(),
       model: Schema.string().default("").description("\u89C6\u9891\u751F\u6210\u7528\u7684\u6A21\u578B ID\uFF08seedance 2.0 / 2.5 \u7CFB\u5217\uFF09\uFF1B\u7559\u7A7A\u8BFB NEWAPI_VIDEO_MODEL \u6216\u5185\u7F6E\u9ED8\u8BA4\u503C").volatile(),
       estimateGroupRatio: Schema.number().min(0).max(10).default(0.8).description("\u9884\u4F30\u8D39\u7528\u7528\u7684\u5206\u7EC4\u6298\u6263\uFF08\u4E2D\u8F6C\u7AD9 group_ratio\uFF1Avideosvip=0.8\u3001default=1\uFF09").volatile(),
       duration: Schema.number().step(1).min(4).max(30).default(15).description("\u517C\u5BB9\u65E7\u914D\u7F6E\uFF1B\u5206\u6BB5\u9ED8\u8BA4\u6309\u6A21\u578B\u4E0A\u9650\u6620\u5C04\uFF1A2.0 \u4E3A 15 \u79D2\u30012.5 \u4E3A 30 \u79D2\u3002\u9700\u7F29\u77ED\u5206\u6BB5\u65F6\u5728\u5DE5\u5177\u8C03\u7528\u4E2D\u6307\u5B9A\u3002").volatile(),
@@ -1002,7 +1004,8 @@ var init_config = __esm({
       queryPath: "/doubao/api/v3/contents/generations/tasks/{task_id}",
       model: DEFAULT_MODEL,
       baseEnv: ["NEWAPI_VIDEO_BASE_URL", "NEWAPI_BASE_URL"],
-      modelEnv: ["NEWAPI_VIDEO_MODEL"]
+      modelEnv: ["NEWAPI_VIDEO_MODEL"],
+      textModelEnv: ["NEWAPI_TEXT_MODEL"]
     };
     SUCCESS_STATES = /* @__PURE__ */ new Set(["succeeded", "success", "completed", "complete", "done", "finished"]);
     FAILED_STATES = /* @__PURE__ */ new Set(["failed", "failure", "error", "cancelled", "canceled", "expired"]);
@@ -1058,6 +1061,7 @@ __export(connection_exports, {
   resolveModel: () => resolveModel,
   resolveQueryPath: () => resolveQueryPath,
   resolveSubmitPath: () => resolveSubmitPath,
+  resolveTextModel: () => resolveTextModel,
   snapshotConfig: () => snapshotConfig
 });
 function relayPreset() {
@@ -1098,6 +1102,11 @@ function resolveModel(config) {
   const preset = relayPreset();
   return String(ref(config, "model", "")).trim() || envValue(preset.modelEnv) || preset.model;
 }
+function resolveTextModel(config) {
+  const preset = relayPreset();
+  const model = String(ref(config, "textModel", "")).trim() || envValue(preset.textModelEnv) || TEXT_MODEL;
+  return String(model).trim();
+}
 function isOmniExtendModel(model) {
   const lowered = String(model).toLowerCase();
   return lowered.includes("seedance-2-5") || lowered.includes("seedance-2.5");
@@ -1135,6 +1144,7 @@ function snapshotConfig(config) {
   snapshot2.baseUrl = resolveBaseUrl(config);
   snapshot2.model = resolveModel(config);
   snapshot2.imageModel = resolveImageModel(ref(config, "imageModel", IMAGE_MODEL));
+  snapshot2.textModel = resolveTextModel(config);
   snapshot2.submitPath = resolveSubmitPath(config);
   snapshot2.queryPath = isVolcengine(config) ? "/api/v3/contents/generations/tasks/{task_id}" : String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
   return Object.freeze(snapshot2);
@@ -6452,6 +6462,74 @@ async function runTask(liveConfig, body, signal, progress = {}) {
 
 // src/businesses/video/integrations/canvas-native.ts
 init_connection_defaults();
+
+// src/businesses/video/providers/text.ts
+init_connection();
+init_config();
+var TEXT_TIMEOUT_MS = 12e4;
+var MAX_BRIEF_CHARS = 4e3;
+function stripFence(text) {
+  const raw = String(text ?? "").trim();
+  const fenced = raw.match(/^```[a-zA-Z]*\r?\n([\s\S]*?)\r?\n?```$/);
+  return (fenced ? fenced[1] : raw).trim();
+}
+function scriptPrompt(brief2) {
+  const total = Number(brief2?.totalSeconds) || 15, segments = Math.max(1, Number(brief2?.segments) || 1);
+  const segmentSeconds = Number(brief2?.segmentSeconds) || 15;
+  const ratio = String(brief2?.ratio || "16:9");
+  const idea = String(brief2?.idea ?? "").trim().slice(0, MAX_BRIEF_CHARS);
+  if (!idea) throw new Error("\u8BF7\u5148\u5199\u4E0B\u60F3\u62CD\u4EC0\u4E48\uFF0C\u518D\u8BA9\u6587\u672C\u6A21\u578B\u5199\u811A\u672C\u3002");
+  return [
+    "\u4F60\u662F\u77ED\u89C6\u9891\u7F16\u5267\u517C\u5206\u955C\u5E08\u3002\u8BF7\u628A\u4E0B\u9762\u7684\u60F3\u6CD5\u5199\u6210\u4E00\u4EFD\u53EF\u76F4\u63A5\u5F00\u62CD\u7684\u77ED\u7247\u5267\u672C\uFF08Markdown\uFF09\u3002",
+    "",
+    `\u3010\u60F3\u6CD5\u3011${idea}`,
+    `\u3010\u753B\u5E45\u3011${ratio}`,
+    `\u3010\u603B\u65F6\u957F\u3011${Math.min(total, MAX_TOTAL_SECONDS)} \u79D2\uFF0C\u5206\u6210 ${segments} \u6BB5\uFF0C\u6BCF\u6BB5 ${segmentSeconds} \u79D2`,
+    "",
+    "\u8981\u6C42\uFF1A",
+    `1. \u7B2C\u4E00\u884C\u662F\u300C# \u300D\u5F00\u5934\u7684\u7247\u540D\uFF0C\u7B2C\u4E8C\u6BB5\u7528\u4E00\u53E5\u8BDD\u5199\u6E05\u4E3B\u9898\u4E0E\u6574\u4F53\u57FA\u8C03\u3002`,
+    `2. \u5FC5\u987B\u8F93\u51FA\u4E00\u4E2A Markdown \u5206\u955C\u8868\uFF0C\u8868\u5934\u56FA\u5B9A\u4E3A | \u955C\u5934 | \u753B\u9762 | \u65F6\u957F | \u53F0\u8BCD |\uFF0C\u5206\u5272\u884C\u662F | --- | --- | --- | --- |\u3002`,
+    `3. \u5206\u955C\u8868\u5FC5\u987B\u6B63\u597D ${segments} \u884C\uFF0C\u6BCF\u884C\u5BF9\u5E94\u4E00\u6BB5\uFF1A\u955C\u5934\u5217\u5199\u5E8F\u53F7\uFF0C\u65F6\u957F\u5217\u5199\u8BE5\u6BB5\u79D2\u6570\uFF08\u5408\u8BA1 ${Math.min(total, MAX_TOTAL_SECONDS)} \u79D2\uFF09\u3002`,
+    "4. \u753B\u9762\u5217\u5199\u8FD9\u4E00\u6BB5\u8981\u62CD\u7684\u753B\u9762\uFF1A\u4E3B\u4F53\u3001\u52A8\u4F5C\u3001\u955C\u5934\u8FD0\u52A8\u3001\u5149\u7EBF\u4E0E\u6C1B\u56F4\uFF0C\u4E00\u53E5\u8BDD\u8BB2\u5B8C\uFF0C\u4E0D\u8981\u51FA\u73B0\u300C\u540C\u4E0A\u300D\u300C\u627F\u63A5\u4E0A\u6BB5\u300D\u8FD9\u7C7B\u6307\u4EE3\u3002",
+    "5. \u53F0\u8BCD\u5217\u6CA1\u6709\u5BF9\u767D\u5C31\u5199\u300C\u2014\u300D\u3002",
+    "6. \u8868\u540E\u53E6\u8D77\u4E00\u8282\u300C## \u5236\u4F5C\u8BF4\u660E\u300D\uFF0C\u7528 2\u20134 \u6761\u77ED\u53E5\u5199\u6E05\u695A\u8854\u63A5\u3001\u97F3\u4E50\u4E0E\u9700\u8981\u6CE8\u610F\u7684\u7EC6\u8282\u3002",
+    "\u53EA\u8F93\u51FA\u8FD9\u4EFD Markdown\uFF0C\u4E0D\u8981\u89E3\u91CA\u3001\u4E0D\u8981\u989D\u5916\u5BD2\u6684\u3001\u4E0D\u8981\u7528\u4EE3\u7801\u5757\u5305\u8D77\u6765\u3002"
+  ].join("\n");
+}
+function textEndpoint(config) {
+  const base = resolveBaseUrl(config).replace(/\/+$/, "");
+  return /\/v\d+$/.test(base) ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
+}
+async function writeScript(config, brief2, options = {}) {
+  const apiKey = resolveApiKey(config);
+  assertConfigured(config, apiKey);
+  const model = resolveTextModel(config);
+  if (!model) throw new Error("\u8BF7\u5728\u8BBE\u7F6E\u9875\u586B\u5199\u6587\u672C\u6A21\u578B\uFF0C\u518D\u8BA9\u6587\u672C\u6A21\u578B\u5199\u811A\u672C\u3002");
+  const fetcher = options.fetcher || fetch;
+  const signal = options.signal || AbortSignal.timeout(TEXT_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetcher(textEndpoint(config), {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, temperature: 0.6, messages: [
+        { role: "system", content: "\u4F60\u53EA\u8F93\u51FA Markdown \u5267\u672C\u6B63\u6587\uFF0C\u4E0D\u89E3\u91CA\u8FC7\u7A0B\uFF0C\u4E0D\u4F7F\u7528\u4EE3\u7801\u5757\u3002" },
+        { role: "user", content: scriptPrompt(brief2) }
+      ] }),
+      signal
+    });
+  } catch (error) {
+    throw new Error(`\u6587\u672C\u6A21\u578B\u6CA1\u6709\u8FD4\u56DE\u7ED3\u679C\uFF1A${String(error?.message || "\u8BF7\u6C42\u5931\u8D25").slice(0, 120)}`);
+  }
+  const body = await response.json().catch(() => null);
+  if (!response.ok || body?.error) throw new Error(`\u6587\u672C\u6A21\u578B\u8C03\u7528\u5931\u8D25\uFF1A${String(body?.error?.message || body?.error || response.status).slice(0, 200)}`);
+  const content = body?.choices?.[0]?.message?.content;
+  const script = stripFence(Array.isArray(content) ? content.map((part) => part?.text || "").join("") : content);
+  if (!script) throw new Error("\u6587\u672C\u6A21\u578B\u8FD4\u56DE\u4E86\u7A7A\u811A\u672C\uFF0C\u8BF7\u91CD\u8BD5\u6216\u6362\u4E2A\u6587\u672C\u6A21\u578B\u3002");
+  return { script, model: String(body?.model || model), usage: { promptTokens: Number(body?.usage?.prompt_tokens) || 0, completionTokens: Number(body?.usage?.completion_tokens) || 0 } };
+}
+
+// src/businesses/video/integrations/canvas-native.ts
 init_config();
 var hash3 = (value) => createHash8("sha256").update(JSON.stringify(value)).digest("hex");
 var validToken = (value) => /^[a-f0-9-]{36}$/.test(String(value || ""));
@@ -6473,11 +6551,16 @@ function splitEvenly(items, count) {
   while (index < items.length) groups[count - 1].push(items[index++]);
   return groups;
 }
+function shotPrompt(shot) {
+  const visual = String(shot?.visual || shot?.title || "").trim();
+  const line = visual.split(/\r?\n/).map((part) => part.trim()).find((part) => /^(?:画面|visual)[:：]/.test(part));
+  return (line ? line.replace(/^(?:画面|visual)[:：]\s*/, "") : visual).trim();
+}
 function splitScriptPrompts(script, count, shots = []) {
   const raw = String(script ?? "").trim();
   if (!raw) throw new Error("\u8BF7\u5148\u5199\u4E0B\u811A\u672C\u5185\u5BB9\uFF0C\u518D\u751F\u6210\u5236\u4F5C\u8282\u70B9\u3002");
   if (!Number.isInteger(count) || count < 1) throw new Error("\u5206\u6BB5\u6570\u91CF\u65E0\u6548\u3002");
-  const visuals = (Array.isArray(shots) ? shots : []).map((shot) => String(shot?.visual || shot?.title || "").trim()).filter(Boolean);
+  const visuals = (Array.isArray(shots) ? shots : []).map(shotPrompt).filter(Boolean);
   if (visuals.length >= count && count > 1) return splitEvenly(visuals, count).map((group) => group.join("\n"));
   const body = canvasScriptPreview(raw);
   if (!body) throw new Error("\u811A\u672C\u91CC\u6CA1\u6709\u53EF\u7528\u4E8E\u5236\u4F5C\u7684\u6B63\u6587\uFF0C\u8BF7\u8865\u5145\u5185\u5BB9\u3002");
@@ -6658,7 +6741,24 @@ function createCanvasNativeService(liveConfig, options = {}) {
         imageReady = !isVolcengine(c) && Boolean(resolveApiKey(c));
       } catch {
       }
-      return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: Boolean(resolveApiKey(config)), imageReady, singleMax: modelMaxSeconds(config) };
+      let textModel = "", textReady = false;
+      try {
+        textModel = resolveTextModel(config);
+        textReady = Boolean(resolveApiKey(config));
+      } catch {
+      }
+      return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: Boolean(resolveApiKey(config)), imageReady, singleMax: modelMaxSeconds(config), textModel, textReady };
+    }
+    if (args.action === "write") {
+      const config = snapshotConfig(liveConfig);
+      const singleMax = modelMaxSeconds(config);
+      const totalSeconds = clampInteger(args.totalSeconds, MIN_SECONDS, MAX_TOTAL_SECONDS, Math.min(15, singleMax));
+      const segmentSeconds = resolveSegmentSeconds(config, args.segmentSeconds);
+      const count = planVideoSegments(totalSeconds, singleMax, segmentSeconds).length;
+      assertConfigured(config, resolveApiKey(config));
+      const writer = options.writeScript || writeScript;
+      const result = await writer(config, { idea: args.idea, totalSeconds, segmentSeconds, segments: count, ratio: args.ratio || "16:9" }, {});
+      return { script: result.script, model: result.model, usage: result.usage, totalSeconds, segmentSeconds, segments: count };
     }
     if (args.action === "plan") {
       const config = snapshotConfig(liveConfig);
@@ -8529,6 +8629,7 @@ var CONFIG_FIELDS = [
   "queryPath",
   "model",
   "imageModel",
+  "textModel",
   "imageUseVideoKey",
   "imageApiKey",
   "duration",
@@ -8570,6 +8671,7 @@ function configView(config) {
       model: resolveModel(config),
       imageUseVideoKey: !isMetaontic(config) || ref(config, "imageUseVideoKey", true),
       imageModel: resolveImageModel(ref(config, "imageModel", IMAGE_MODEL)),
+      textModel: resolveTextModel(config),
       apiKeySource: resolveApiKey(config) ? isVolcengine(config) ? "volcengine" : "metaontic" : "missing"
     }
   };
@@ -8577,7 +8679,7 @@ function configView(config) {
 function configTool(config, settings) {
   return {
     name: "video_config",
-    description: "\u53EA\u8BFB\u67E5\u770B MetaOnticVideo \u63D2\u4EF6\u81EA\u5DF1\u7684\u914D\u7F6E\uFF08baseUrl\u3001submitPath\u3001queryPath\u3001model\u3001imageModel\u3001duration\u3001singleMaxSeconds\u3001ratio\u3001generateAudio\u3001watermark\u3001extraParams\u3001pollIntervalMs\u3001maxWaitMs\u3001mergeMode\u3001outputDir\u3001resumeLockStaleMinutes\u3001ffmpegBinary\u3001ffprobeBinary\u3001estimateGroupRatio\uFF09\u3002\u5BF9\u8BDD\u91CC\u7981\u6B62\u6539\u914D\u7F6E\uFF1A\u63A5\u5165\u65B9\u5F0F\u3001API\u5BC6\u94A5\u3001\u6A21\u578B\u3001\u5730\u5740\u7B49\u4EFB\u4F55\u4E00\u9879\u90FD\u53EA\u80FD\u7531\u7528\u6237\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\uFF08\u300C\u63D2\u4EF6 \u2192 \u5DF2\u5B89\u88C5\u63D2\u4EF6 \u2192 MetaOnticVideo \u2192 \u67E5\u770B\u300D\uFF09\u4FEE\u6539\u5E76\u4FDD\u5B58\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u540E\u751F\u6548\uFF1B\u672C\u5DE5\u5177\u6CA1\u6709\u4FEE\u6539\u80FD\u529B\uFF0Caction=set \u4F1A\u88AB\u76F4\u63A5\u62D2\u7EDD\u3002\u7528\u6237\u8981\u6539\u914D\u7F6E\u65F6\uFF0C\u8BF4\u660E\u6539\u7684\u662F\u54EA\u4E00\u9879\u5E76\u5F15\u5BFC\u4ED6\u53BB\u8BBE\u7F6E\u9875\u6539\uFF0C\u4E0D\u8981\u4EE3\u6539\u3001\u4E0D\u8981\u7D22\u53D6\u6216\u5C55\u793A API\u5BC6\u94A5\u3002\u770B\u5F53\u524D\u503C\u7528 action=get\uFF1Bduration \u662F\u6BCF\u6BB5\u65B0\u589E\u79D2\u6570\u4E0A\u9650\uFF084 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09\uFF0C\u9ED8\u8BA4\u6309\u6A21\u578B\u4E0A\u9650\u3001\u6BB5\u6570\u6700\u5C11\uFF09\uFF0CsingleMaxSeconds \u4E3A\u517C\u5BB9\u65E7\u914D\u7F6E\u4FDD\u7559\uFF0C\u76F4\u51FA\u4E0A\u9650\u7531\u6A21\u578B\u6620\u5C04\u3002",
+    description: "\u53EA\u8BFB\u67E5\u770B MetaOnticVideo \u63D2\u4EF6\u81EA\u5DF1\u7684\u914D\u7F6E\uFF08baseUrl\u3001submitPath\u3001queryPath\u3001model\u3001imageModel\u3001textModel\u3001duration\u3001singleMaxSeconds\u3001ratio\u3001generateAudio\u3001watermark\u3001extraParams\u3001pollIntervalMs\u3001maxWaitMs\u3001mergeMode\u3001outputDir\u3001resumeLockStaleMinutes\u3001ffmpegBinary\u3001ffprobeBinary\u3001estimateGroupRatio\uFF09\u3002\u5BF9\u8BDD\u91CC\u7981\u6B62\u6539\u914D\u7F6E\uFF1A\u63A5\u5165\u65B9\u5F0F\u3001API\u5BC6\u94A5\u3001\u6A21\u578B\u3001\u5730\u5740\u7B49\u4EFB\u4F55\u4E00\u9879\u90FD\u53EA\u80FD\u7531\u7528\u6237\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\uFF08\u300C\u63D2\u4EF6 \u2192 \u5DF2\u5B89\u88C5\u63D2\u4EF6 \u2192 MetaOnticVideo \u2192 \u67E5\u770B\u300D\uFF09\u4FEE\u6539\u5E76\u4FDD\u5B58\uFF0C\u5BBF\u4E3B\u91CD\u8F7D\u540E\u751F\u6548\uFF1B\u672C\u5DE5\u5177\u6CA1\u6709\u4FEE\u6539\u80FD\u529B\uFF0Caction=set \u4F1A\u88AB\u76F4\u63A5\u62D2\u7EDD\u3002\u7528\u6237\u8981\u6539\u914D\u7F6E\u65F6\uFF0C\u8BF4\u660E\u6539\u7684\u662F\u54EA\u4E00\u9879\u5E76\u5F15\u5BFC\u4ED6\u53BB\u8BBE\u7F6E\u9875\u6539\uFF0C\u4E0D\u8981\u4EE3\u6539\u3001\u4E0D\u8981\u7D22\u53D6\u6216\u5C55\u793A API\u5BC6\u94A5\u3002\u770B\u5F53\u524D\u503C\u7528 action=get\uFF1Bduration \u662F\u6BCF\u6BB5\u65B0\u589E\u79D2\u6570\u4E0A\u9650\uFF084 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09\uFF0C\u9ED8\u8BA4\u6309\u6A21\u578B\u4E0A\u9650\u3001\u6BB5\u6570\u6700\u5C11\uFF09\uFF0CsingleMaxSeconds \u4E3A\u517C\u5BB9\u65E7\u914D\u7F6E\u4FDD\u7559\uFF0C\u76F4\u51FA\u4E0A\u9650\u7531\u6A21\u578B\u6620\u5C04\u3002",
     parameters: {
       type: "object",
       properties: {
@@ -8601,6 +8703,7 @@ function configTool(config, settings) {
         imageApiKey: { type: "string", description: "\u5173\u95ED\u5171\u7528\u65F6\u5FC5\u987B\u586B\u5199\u7684\u56FE\u7247\u6A21\u578B API\u5BC6\u94A5\uFF0C\u5730\u5740\u4ECD\u6CBF\u7528\u5F53\u524D MetaOntic AI \u8FDE\u63A5" },
         imageModel: { type: "string", enum: [IMAGE_MODEL], description: "MetaOntic AI \u771F\u4EBA\u53C2\u8003\u56FE\u975E\u771F\u4EBA\u5316\u6A21\u578B\uFF08\u65E7\u578B\u53F7\u5DF2\u4E0B\u7EBF\uFF0C\u6309 pro \u7248\u8C03\u7528\uFF09" },
         model: { type: "string", description: "\u6A21\u578B ID\uFF0C\u4F8B\u5982 doubao-seedance-2-0-mini-260615\u3002" },
+        textModel: { type: "string", description: "\u5199\u811A\u672C\u7528\u7684\u6587\u672C\u6A21\u578B ID\uFF08\u8D70\u540C\u4E00\u4E2D\u8F6C\u7AD9\u7684 /v1/chat/completions\uFF09\uFF1B\u7559\u7A7A\u7528\u5185\u7F6E\u9ED8\u8BA4\u503C\u3002" },
         duration: { type: "integer", minimum: 4, maximum: modelMaxSeconds(config), description: "\u6BCF\u6BB5\u65B0\u589E\u79D2\u6570\u4E0A\u9650\uFF084 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09 \u7684\u6574\u6570\uFF0C\u9ED8\u8BA4\u6309\u6A21\u578B\u4E0A\u9650\u3001\u6BB5\u6570\u6700\u5C11\uFF09\u3002" },
         ratio: {
           type: "string",

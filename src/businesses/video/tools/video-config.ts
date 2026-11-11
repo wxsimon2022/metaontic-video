@@ -1,12 +1,12 @@
 import { VOLCENGINE_MODE_AVAILABLE, IMAGE_MODEL, resolveImageModel } from '../connection-defaults.js';
 /** tools/video-config：从宿主入口拆出的独立职责模块。 */
 import { ref } from '../config.js';
-import { isMetaontic, isVolcengine, resolveBaseUrl, resolveSubmitPath, relayPreset, resolveModel, resolveApiKey } from '../providers/connection.js';
+import { isMetaontic, isVolcengine, resolveBaseUrl, resolveSubmitPath, relayPreset, resolveModel, resolveApiKey, resolveTextModel } from '../providers/connection.js';
 import { modelMaxSeconds } from '../workflow/planning.js';
 
 /** 用户可在插件内改的配置字段。 */
 export const CONFIG_FIELDS = [
-  'autoCreateCanvas', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel', 'imageUseVideoKey', 'imageApiKey',
+  'autoCreateCanvas', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel', 'textModel', 'imageUseVideoKey', 'imageApiKey',
   'duration', 'singleMaxSeconds', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'pollErrorRetries',
@@ -42,6 +42,7 @@ export function configView(config) {
       model: resolveModel(config),
       imageUseVideoKey: !isMetaontic(config) || ref(config, 'imageUseVideoKey', true),
       imageModel: resolveImageModel(ref(config, 'imageModel', IMAGE_MODEL)),
+      textModel: resolveTextModel(config),
       apiKeySource: resolveApiKey(config) ? (isVolcengine(config) ? 'volcengine' : 'metaontic') : 'missing',
     },
   };
@@ -51,7 +52,7 @@ export function configTool(config, settings) {
   return {
     name: 'video_config',
     description:
-      '只读查看 MetaOnticVideo 插件自己的配置（baseUrl、submitPath、queryPath、model、imageModel、'
+      '只读查看 MetaOnticVideo 插件自己的配置（baseUrl、submitPath、queryPath、model、imageModel、textModel、'
       + 'duration、singleMaxSeconds、ratio、generateAudio、'
       + 'watermark、extraParams、pollIntervalMs、maxWaitMs、mergeMode、'
       + 'outputDir、resumeLockStaleMinutes、'
@@ -84,6 +85,7 @@ export function configTool(config, settings) {
         imageApiKey: { type: 'string', description: '关闭共用时必须填写的图片模型 API密钥，地址仍沿用当前 MetaOntic AI 连接' },
         imageModel: { type: 'string', enum: [IMAGE_MODEL], description: 'MetaOntic AI 真人参考图非真人化模型（旧型号已下线，按 pro 版调用）' },
         model: { type: 'string', description: '模型 ID，例如 doubao-seedance-2-0-mini-260615。' },
+        textModel: { type: 'string', description: '写脚本用的文本模型 ID（走同一中转站的 /v1/chat/completions）；留空用内置默认值。' },
         duration: { type: 'integer', minimum: 4, maximum: modelMaxSeconds(config), description: '每段新增秒数上限（4 至模型上限（2.0 为 15、2.5 为 30） 的整数，默认按模型上限、段数最少）。' },
         ratio: {
           type: 'string',

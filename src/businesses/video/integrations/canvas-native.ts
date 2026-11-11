@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { dshHome } from '../../../core/paths.js';
 import { loadCanvasAdapter, readCanvasInput, publishCanvasResult, resolveCanvasAdapter } from './canvas.js';
-import { snapshotConfig, imageConfig, resolveApiKey, assertConfigured, resolveModel, isVolcengine, connectionLabel } from '../providers/connection.js';
+import { snapshotConfig, imageConfig, resolveApiKey, assertConfigured, resolveModel, resolveTextModel, isVolcengine, connectionLabel } from '../providers/connection.js';
 import { buildGenerationBody, buildRequestBody, runTask } from '../providers/seedance.js';
 import { generateSeedreamImage } from '../providers/seedream.js';
 import { waitForCompletion } from '../providers/transport.js';
@@ -13,6 +13,7 @@ import { resolveImageInput } from '../media/references.js';
 import { IMAGE_MODEL } from '../connection-defaults.js';
 import { modelMaxSeconds, planVideoSegments, resolveSegmentSeconds } from '../workflow/planning.js';
 import { estimateSegmentCosts } from '../tools/video-estimate.js';
+import { writeScript } from '../providers/text.js';
 import { canvasScriptPreview, scriptStoryboardShots } from './canvas-project.js';
 import { clampInteger } from '../../../core/utils/validation.js';
 import { MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_TOTAL_SECONDS } from '../config.js';
@@ -40,11 +41,18 @@ function splitEvenly(items: string[], count: number) {
 
 /** 写脚本 → 逐段提示词：有分镜表就按画面列切，否则按句子/段落按字数均分。
  *  只做切分，不编造内容；内容不够拆成这么多段时直接报错，让用户补脚本或缩短时长。 */
+/** 分镜行的「画面」列就是要拍的镜头；没有画面列时才退回整行文本。 */
+export function shotPrompt(shot: any) {
+  const visual = String(shot?.visual || shot?.title || '').trim();
+  const line = visual.split(/\r?\n/).map(part => part.trim()).find(part => /^(?:画面|visual)[:：]/.test(part));
+  return (line ? line.replace(/^(?:画面|visual)[:：]\s*/, '') : visual).trim();
+}
+
 export function splitScriptPrompts(script: any, count: any, shots: any[] = []) {
   const raw = String(script ?? '').trim();
   if (!raw) throw new Error('请先写下脚本内容，再生成制作节点。');
   if (!Number.isInteger(count) || count < 1) throw new Error('分段数量无效。');
-  const visuals = (Array.isArray(shots) ? shots : []).map(shot => String(shot?.visual || shot?.title || '').trim()).filter(Boolean);
+  const visuals = (Array.isArray(shots) ? shots : []).map(shotPrompt).filter(Boolean);
   if (visuals.length >= count && count > 1) return splitEvenly(visuals, count).map(group => group.join('\n'));
   const body = canvasScriptPreview(raw);
   if (!body) throw new Error('脚本里没有可用于制作的正文，请补充内容。');
@@ -54,8 +62,27 @@ export function splitScriptPrompts(script: any, count: any, shots: any[] = []) {
   return splitEvenly(sentences, count).map(group => group.join(''));
 }
 
+/** 连拍顺序：待制作的视频节点按连线从上游排到下游；成果节点与已产出节点不参与。
+ *  与画布界面 flowSteps 同一套规则，保证「制作「…」」的顺序和连拍一致。 */
+export function pendingVideoOrder(doc: any) {
+  const nodes: any[] = Object.values(doc?.nodes || {});
+  const author = nodes.filter(n => n?.type === 'video' && !n?.metaonticSourceNode && !n?.data?.assetId);
+  const byId = new Map(author.map(n => [n.id, n]));
+  const inbound = new Map(author.map(n => [n.id, [] as string[]]));
+  for (const edge of doc?.edges || []) {
+    if (edge?.metaonticResult) continue;
+    if (byId.has(edge?.toNode) && byId.has(edge?.fromNode)) inbound.get(edge.toNode)!.push(edge.fromNode);
+  }
+  const ordered: any[] = [], seen = new Set<string>();
+  const visit = (node: any) => { if (!node || seen.has(node.id)) return; seen.add(node.id); for (const up of inbound.get(node.id) || []) visit(byId.get(up)); ordered.push(node); };
+  for (const node of author) visit(node);
+  return ordered.map(node => ({ id: node.id, label: String(node?.data?.label || '视频节点'), prompt: String(node?.data?.prompt || ''),
+    transition: String(node?.data?.transition || '').trim(), duration: node?.data?.duration ?? null,
+    ratio: String(node?.data?.ratio || ''), resolution: String(node?.data?.resolution || '').toLowerCase(), generateAudio: node?.data?.generateAudio === true }));
+}
+
 /** 端口语义无法无损表达时停止，不能把尾帧/音频/视频当普通参考图。 */
-export function planCanvasNative(input, config, operation = 'generate', draft: any = {}) {
+export function planCanvasNative(input, config, operation = 'generate', draft: any = {}, carry: any = null) {
   if (!['generate', 'extend'].includes(operation)) throw new Error('不支持的画布制作操作。');
   const node = input.nodes.find(n => n.id === input.canvas.nodeId);
   if (!node || !['image', 'video'].includes(node.type)) throw new Error('直接制作目前支持图片和视频节点。');
@@ -99,8 +126,11 @@ export function planCanvasNative(input, config, operation = 'generate', draft: a
   args.resolution = String(draft.resolution ?? node.resolution).toLowerCase();
   if (!['480p', '720p'].includes(args.resolution)) throw new Error('请在节点明确选择480P或720P。');
   if (operation === 'extend') {
-    if (!node.metaonticTaskId || !node.metaonticVideoUrl || !Number.isFinite(node.metaonticSeconds) || node.metaonticSeconds <= 0) throw new Error('续拍需选中本插件直接制作并已审核的视频成果节点。');
-    args.videoUrl = node.metaonticVideoUrl; args.inputVideoSeconds = node.metaonticSeconds;
+    // 连拍时上段成果还在内存记录里（成果节点是刚刚回填出来的），用 carry 传进来，语义与节点字段完全一致。
+    const from = carry?.videoUrl ? { videoUrl: String(carry.videoUrl), seconds: Number(carry.seconds) } : null;
+    if (from ? !from.videoUrl || !Number.isFinite(from.seconds) || from.seconds <= 0
+      : !node.metaonticTaskId || !node.metaonticVideoUrl || !Number.isFinite(node.metaonticSeconds) || node.metaonticSeconds <= 0) throw new Error('续拍需选中本插件直接制作并已审核的视频成果节点。');
+    args.videoUrl = from ? from.videoUrl : node.metaonticVideoUrl; args.inputVideoSeconds = from ? from.seconds : node.metaonticSeconds;
     args.transitionDescription = String(draft.transitionDescription || '').trim();
     if (!args.transitionDescription) throw new Error('请填写上一段结尾到本段动作、镜头与声音的衔接描述。');
     if (images.some(x => x.port === 'frame')) throw new Error('续拍以视频为输入，请移除首帧连接。');
@@ -120,6 +150,8 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
   const directory = options.directory || path.join(dshHome(), 'metaontic-video', 'canvas-native');
   const snapshots = new Map<string, any>(), running = new Map<string, AbortController>(), locks = new Set<string>();
   const proposals = new Map<string, any>();
+  // 连拍记录与待确认方案分开存：一条画布同时只允许一条在跑的连拍。
+  const chainDirectory = options.chainDirectory || path.join(directory, 'chains');
   let disposed = false;
   const file = id => { if (!validToken(id)) throw new Error('制作记录标识无效。'); return path.join(directory, `${id}.json`); };
   const pointer = link => path.join(directory, `node-${hash([link.projectId, link.canvasId || '', link.nodeId])}.json`);
@@ -129,6 +161,19 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
     await writeFile(temp, JSON.stringify(job), { mode: 0o600, flag: 'wx' }); await rename(temp, dest);
   }
   const read = async id => JSON.parse(await readFile(file(id), 'utf8'));
+  const chainFile = id => { if (!validToken(id)) throw new Error('连拍记录标识无效。'); return path.join(chainDirectory, `${id}.json`); };
+  const chainPointer = link => path.join(chainDirectory, `canvas-${hash([link.projectId, link.canvasId || ''])}.json`);
+  async function saveChain(chain) {
+    await mkdir(chainDirectory, { recursive: true, mode: 0o700 });
+    const dest = chainFile(chain.id), temp = `${dest}.${randomUUID()}.tmp`;
+    await writeFile(temp, JSON.stringify(chain), { mode: 0o600, flag: 'wx' }); await rename(temp, dest);
+  }
+  const readChain = async id => JSON.parse(await readFile(chainFile(id), 'utf8'));
+  async function previousChain(link) {
+    let id;
+    try { id = JSON.parse(await readFile(chainPointer(link), 'utf8')).id; } catch (e) { if (e.code === 'ENOENT') return null; throw e; }
+    return readChain(id);
+  }
   async function previous(link) {
     let id;
     try { id = JSON.parse(await readFile(pointer(link), 'utf8')).id; } catch (e) { if (e.code === 'ENOENT') return null; throw e; }
@@ -144,6 +189,108 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
     } catch { job.sync = { status: 'pending' }; }
     await save(job);
   }
+  /** 连拍计划：逐段排方案。第 1 段直出，其余以上一段成果续拍；只算方案与估价，不提交。
+   *  续拍的输入视频在真正开跑时才有，所以计划阶段用占位地址，方案里的时长/画幅/提示词是最终值。 */
+  async function chainPlan(adapter, projectId, config) {
+    const doc = await adapter.rpc.projectsGet({ id: projectId });
+    if (!doc?.nodes) throw new Error('画布不存在或已删除。');
+    const order = pendingVideoOrder(doc);
+    if (!order.length) throw new Error('画布上没有待制作的视频节点：先点「写脚本…」铺开，或新建一个视频节点。');
+    const segments: any[] = [];
+    let carry = null;
+    for (const [index, node] of order.entries()) {
+      const link = { projectId, nodeId: node.id };
+      const input = await readCanvasInput(adapter, link);
+      const operation = index === 0 ? 'generate' : 'extend';
+      const draft: any = { prompt: node.prompt, duration: node.duration, resolution: node.resolution, ratio: node.ratio, generateAudio: node.generateAudio };
+      if (operation === 'extend') draft.transitionDescription = node.transition || node.prompt;
+      const plan = planCanvasNative(input, config, operation, draft, carry);
+      const segment = { index, nodeId: node.id, label: node.label, operation, prompt: String(plan.args.prompt), transition: String(plan.args.transitionDescription || ''),
+        seconds: plan.args.duration, ratio: plan.args.ratio, resolution: plan.args.resolution, cny: plan.estimate?.cny ?? null, priceDate: plan.estimate?.priceDate ?? null,
+        fingerprint: input.canvas.fingerprint, snapshot: { prompt: node.prompt, duration: node.duration, ratio: node.ratio, resolution: node.resolution } };
+      segments.push(segment);
+      carry = { videoUrl: 'pending-previous-segment', seconds: plan.args.duration };
+    }
+    return segments;
+  }
+
+  /** 按当前记录里的字段重新核对节点：对得上才允许提交，避免花的是没核对过的那一版。 */
+  function assertSegmentMatches(node, segment) {
+    const same = node && node.prompt === segment.snapshot.prompt && (node.duration ?? null) === segment.snapshot.duration
+      && node.ratio === segment.snapshot.ratio && String(node.resolution).toLowerCase() === segment.snapshot.resolution;
+    if (!same) throw new Error(`第 ${segment.index + 1} 段内容或参数已改动，请重新预览连拍方案再开始。`);
+  }
+
+  async function planChainSegment(adapter, projectId, segment, carry, config) {
+    const input = await readCanvasInput(adapter, { projectId, nodeId: segment.nodeId });
+    const node = input.nodes.find(n => n.id === segment.nodeId);
+    assertSegmentMatches(node, segment);
+    const draft: any = { prompt: segment.prompt, duration: segment.seconds, resolution: segment.resolution, ratio: segment.ratio };
+    if (segment.operation === 'extend') draft.transitionDescription = segment.transition || segment.prompt;
+    return { canvas: input.canvas, plan: planCanvasNative(input, config, segment.operation, draft, carry) };
+  }
+
+  /** 真正提交一段：与单节点「确认并开始」共用同一套落盘、指针与互斥。 */
+  async function launchSegment(chain, segment, planned, config) {
+    const { canvas, plan } = planned;
+    const key = pointer(canvas);
+    if (locks.has(key)) throw new Error('此节点正在确认制作。');
+    locks.add(key);
+    try {
+      const old = await previous(canvas);
+      if (old && (!terminal.has(old.state) || (old.media?.length && !old.reviewed) || old.sync?.status === 'pending')) return old;
+      const job: any = { version: 1, id: randomUUID(), canvas, plan, identity: chain.identity, createdAt: Date.now(), state: 'running', reviewed: false, chain: chain.id };
+      await save(job);
+      const temp = `${key}.${randomUUID()}.tmp`; await writeFile(temp, JSON.stringify({ id: job.id }), { mode: 0o600, flag: 'wx' }); await rename(temp, key);
+      snapshots.set(job.id, config);
+      void perform(job, config).catch(() => {});
+      return job;
+    } finally { locks.delete(key); }
+  }
+
+  async function runChainSegment(chain, config) {
+    const segment = chain.segments[chain.index];
+    if (!segment) throw new Error('连拍段位越界，请重新预览方案。');
+    const adapter = await adapterFor({ projectId: chain.projectId, ...(chain.canvasId ? { canvasId: chain.canvasId } : {}) });
+    const carry = chain.index > 0 ? chain.carry : null;
+    const planned = await planChainSegment(adapter, chain.projectId, segment, carry, config);
+    const job = await launchSegment(chain, segment, planned, config);
+    chain.jobs[chain.index] = job.id;
+    chain.state = 'running';
+    chain.message = '';
+    await saveChain(chain);
+    return job;
+  }
+
+  /** 连拍当前段的制作记录：刚开跑时可能还没落盘，读不到就是 null。 */
+  async function currentJob(chain) {
+    const id = chain?.jobs?.[chain.index];
+    if (!id) return null;
+    return read(id).catch(() => null);
+  }
+
+  /** 连拍对外状态：记录状态 + 当前段的状态合成一个，界面只认这一个。 */
+  function chainStateOf(chain, job) {
+    if (!chain) return 'none';
+    if (chain.state === 'done' || chain.state === 'stopped' || chain.state === 'stale') return chain.state;
+    if (!job) return 'running';
+    if (job.state === 'running') return 'running';
+    // 只有拿到成果的分段才谈得上审核；失败、待确认、中断都停下来让用户处理当前段。
+    if (job.state === 'succeeded' && job.media?.length) return 'review';
+    return 'stopped';
+  }
+
+  function chainView(chain, job) {
+    if (!chain) return null;
+    const state = chainStateOf(chain, job);
+    const done = chain.segments.slice(0, chain.index).length;
+    return { id: chain.id, projectId: chain.projectId, state, message: chain.message || '', index: chain.index, total: chain.segments.length, done,
+      segments: chain.segments.map(segment => ({ index: segment.index, label: segment.label, nodeId: segment.nodeId, operation: segment.operation, seconds: segment.seconds,
+        ratio: segment.ratio, resolution: segment.resolution, prompt: segment.prompt, cny: segment.cny })),
+      cny: chain.segments.every((x: any) => x.cny !== null) ? chain.segments.reduce((sum: number, x: any) => sum + x.cny, 0) : null,
+      priceDate: chain.segments[0]?.priceDate || null, job: job ? view(job) : null };
+  }
+
   async function perform(job, config, query = false) {
     const ctl = new AbortController(); running.set(job.id, ctl);
     try {
@@ -183,7 +330,84 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       const config = snapshotConfig(liveConfig);
       let imageReady = false;
       try { const c = imageConfig(config); imageReady = !isVolcengine(c) && Boolean(resolveApiKey(c)); } catch { /* 缺少独立图片密钥 */ }
-      return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: Boolean(resolveApiKey(config)), imageReady, singleMax: modelMaxSeconds(config) };
+      let textModel = '', textReady = false;
+      try { textModel = resolveTextModel(config); textReady = Boolean(resolveApiKey(config)); } catch { /* 接入方式未配好 */ }
+      return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: Boolean(resolveApiKey(config)), imageReady, singleMax: modelMaxSeconds(config), textModel, textReady };
+    }
+    // 连拍：一次确认整条链路的方案与总费用，之后逐段生成，每段结果仍要人工审核才继续。
+    if (args.action === 'chainPlan') {
+      const config = snapshotConfig(liveConfig);
+      assertConfigured(config, resolveApiKey(config));
+      const adapter = await adapterFor({ projectId: args.projectId });
+      const segments = await chainPlan(adapter, args.projectId, config);
+      const active = await previousChain({ projectId: args.projectId, ...(args.canvasId ? { canvasId: args.canvasId } : {}) }).catch(() => null);
+      const alive = active && ['running', 'review'].includes(chainStateOf(active, await currentJob(active))) ? chainView(active, await currentJob(active)) : null;
+      return { segments, cny: segments.every(x => x.cny !== null) ? segments.reduce((sum, x) => sum + x.cny, 0) : null,
+        priceDate: segments[0]?.priceDate || null, identity: hash(config), active: alive };
+    }
+    // 开始连拍：确认一次方案与费用，之后按段推进；每段生成完停下来等用户审核。
+    if (args.action === 'chainStart') {
+      const config = snapshotConfig(liveConfig);
+      if (args.confirmPlan !== true || args.confirmCost !== true) throw new Error('请先分别确认整条连拍的制作方案与费用。');
+      if (args.identity && args.identity !== hash(config)) throw new Error('插件配置已变，请重新预览连拍方案。');
+      const link = { projectId: args.projectId, ...(args.canvasId ? { canvasId: args.canvasId } : {}) };
+      const adapter = await adapterFor(link);
+      const existing = await previousChain(link);
+      if (existing && ['running', 'review'].includes(chainStateOf(existing, await currentJob(existing)))) return { chain: chainView(existing, await currentJob(existing)) };
+      const segments = await chainPlan(adapter, args.projectId, config);
+      const chain: any = { version: 1, id: randomUUID(), projectId: args.projectId, ...(args.canvasId ? { canvasId: args.canvasId } : {}),
+        identity: hash(config), createdAt: Date.now(), index: 0, jobs: [], carry: null, state: 'running', message: '', segments };
+      await saveChain(chain);
+      await mkdir(chainDirectory, { recursive: true, mode: 0o700 });
+      const temp = `${chainPointer(link)}.${randomUUID()}.tmp`;
+      await writeFile(temp, JSON.stringify({ id: chain.id }), { mode: 0o600, flag: 'wx' }); await rename(temp, chainPointer(link));
+      try { await runChainSegment(chain, config); }
+      catch (error: any) { chain.state = 'stale'; chain.message = String(error?.message || '连拍未开始。'); await saveChain(chain); throw error; }
+      return { chain: chainView(chain, await currentJob(chain)) };
+    }
+    if (args.action === 'chainStatus') {
+      const chain = args.id ? await readChain(args.id) : await previousChain({ projectId: args.projectId, ...(args.canvasId ? { canvasId: args.canvasId } : {}) });
+      if (!chain) return { chain: null };
+      const job = await currentJob(chain);
+      return { chain: chainView(chain, job), job: job ? view(job) : null };
+    }
+    if (args.action === 'chainNext') {
+      const chain = await readChain(args.id);
+      const job = await currentJob(chain);
+      if (chain.state !== 'running' && chain.state !== 'review') throw new Error('这条连拍已经结束，请重新预览方案。');
+      if (args.accept !== true) { chain.state = 'stopped'; chain.message = '已停止连拍；已生成的分段成果保留。'; await saveChain(chain); return { chain: chainView(chain, job) }; }
+      if (!job) throw new Error('没有正在推进的连拍分段。');
+      if (job.state !== 'succeeded' || !job.media?.length) throw new Error('这一段还没有可审核的成果，先查询原任务或重新生成。');
+      if (job.sync?.status === 'pending' || !job.sync) throw new Error('这一段成果还没回填到画布，先点「补回填画布」。');
+      const accepted = await read(job.id).catch(() => null);
+      if (accepted && accepted.reviewed !== true) { accepted.reviewed = true; await save(accepted); }
+      const config = snapshotConfig(liveConfig);
+      if (hash(config) !== chain.identity) throw new Error('插件配置已变，请重新预览连拍方案。');
+      chain.carry = { videoUrl: job.media[0].url, seconds: job.plan.args.duration };
+      chain.index += 1;
+      if (chain.index >= chain.segments.length) { chain.state = 'done'; chain.message = '全部段落都已有成果。'; await saveChain(chain); return { chain: chainView(chain, null), job: null }; }
+      try { await runChainSegment(chain, config); }
+      catch (error: any) { chain.state = 'stale'; chain.message = String(error?.message || '下一段未能开始。'); await saveChain(chain); throw error; }
+      return { chain: chainView(chain, await currentJob(chain)) };
+    }
+    if (args.action === 'chainStop') {
+      const chain = await readChain(args.id);
+      chain.state = 'stopped';
+      chain.message = '已停止连拍；已提交的那一段仍会跑完并回填。';
+      await saveChain(chain);
+      return { chain: chainView(chain, await currentJob(chain)) };
+    }
+    // 文本模型写脚本：一次调用，返回 Markdown 剧本；不建节点、不碰视频模型。
+    if (args.action === 'write') {
+      const config = snapshotConfig(liveConfig);
+      const singleMax = modelMaxSeconds(config);
+      const totalSeconds = clampInteger(args.totalSeconds, MIN_SECONDS, MAX_TOTAL_SECONDS, Math.min(15, singleMax));
+      const segmentSeconds = resolveSegmentSeconds(config, args.segmentSeconds);
+      const count = planVideoSegments(totalSeconds, singleMax, segmentSeconds).length;
+      assertConfigured(config, resolveApiKey(config));
+      const writer = options.writeScript || writeScript;
+      const result = await writer(config, { idea: args.idea, totalSeconds, segmentSeconds, segments: count, ratio: args.ratio || '16:9' }, {});
+      return { script: result.script, model: result.model, usage: result.usage, totalSeconds, segmentSeconds, segments: count };
     }
     // 写脚本 → 分段计划：只算方案，不建节点、不接触模型费用。
     if (args.action === 'plan') {

@@ -150,6 +150,7 @@ function makePage({ form, t, manager }) {
           volcengineApiKey: t('volcengineKeyHint'),
           model: t('modelHint'),
           imageModel: t('imageModelHint'),
+          textModel: t('textModelHint'),
           seamTrimSeconds: t('seamTrimSecondsHint'),
           autoCreateCanvas: t('autoCreateCanvasHint'),
           maxWaitMs: t('waitSecondsHint'),
@@ -176,7 +177,8 @@ function makePage({ form, t, manager }) {
             const shared = (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
             const common = !directMode
               ? [fieldCell(FIELD_BY_KEY.imageUseVideoKey), ...(shared ? [fieldCell(FIELD_BY_KEY.metaonticApiKey)] : [])] : [];
-            const videoFields = ['model', ...((directMode || !shared) ? [directMode ? 'volcengineApiKey' : 'metaonticApiKey'] : [])];
+            // 文本模型（写脚本）跟视频模型同一把密钥、同一中转站，放同一张卡片里
+            const videoFields = ['model', 'textModel', ...((directMode || !shared) ? [directMode ? 'volcengineApiKey' : 'metaonticApiKey'] : [])];
             const imageFields = ['imageModel', ...(!shared ? ['imageApiKey'] : [])];
             return h('div', { key: section.key, className: 'mov-model-settings' }, [
               ...common,

@@ -306,3 +306,18 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 未覆盖：真实 Harness 桌面窗口里的观感与点击（需宿主重载后人工复核）；画布内的付费生成链路未实跑（仍走既有确认流程）；Windows 未实测。
 
 本地成品：`.local/test/3.20.1-test.27/metaontic-video-3.20.1-test.27.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+
+## 画布内接文本模型写脚本 3.20.1-test.28
+
+需求：「插件加上文本模型」——画布里的「写脚本…」不该只让人手写，也要能像对话里那样由模型把想法写成剧本与分镜表。
+
+- 配置：新增 `textModel`（`connection-defaults.TEXT_MODEL = 'doubao-seed-1-6-250615'` 为内置默认值，环境变量 `NEWAPI_TEXT_MODEL` 次之，设置页填写的型号优先）。设置页把它放在视频模型卡片里（与视频同一把 API密钥、同一中转站），文案为「文本模型（写脚本）」；`video_config` 只读视图、`CONFIG_FIELDS`、`PLUGIN_OWNED_KEYS`、`snapshotConfig` 同步带上该字段。留空即用默认值，填别的型号就按填的调。
+- 新模块 `providers/text.ts`：`writeScript(config, brief)` 调同一中转站的 OpenAI 兼容 `/v1/chat/completions`（baseUrl 已带 `/v1` 就不重复拼），120 秒超时，`stripFence` 去掉整段代码块围栏，返回 `{ script, model, usage }`；空想法、缺密钥、上游报错、空正文都直接抛错，不伪造脚本。`scriptPrompt(brief)` 把表头 `| 镜头 | 画面 | 时长 | 台词 |`、段数与每段秒数写死，并要求「正好 N 行、画面列自包含、不写指代」，因为分段解析（`scriptStoryboardShots` → `splitScriptPrompts`）只认这张表。
+- 画布动作 `canvas-native { action: 'write' }`：只调用一次文本模型，返回 Markdown 剧本；不建节点、不碰视频模型。`createCanvasNativeService` 新增 `options.writeScript` 注入点；`action: 'info'` 额外返回 `textModel` / `textReady`。
+- 画布弹窗：新增「想拍什么（交给文本模型写成脚本）」输入与「AI 写脚本」按钮，按钮把返回正文填回脚本文本区（可直接改），提示里写明会用哪个文本模型、单独按文本计费；`splitScriptPrompts` 改为优先取分镜行的「画面」列，避免把「镜头：1／时长：5秒」一起当提示词。
+
+验证：类型检查、构建、473 项自动测试、`git diff --check` 通过。新增测试：写脚本请求的地址/密钥/模型与提示词关键约束、围栏剥离、usage 透传、空想法/缺密钥/上游报错/空正文四类失败；`action: 'write'` 注入桩的 brief 组装、info 的 textModel/textReady、失败透传；弹窗里「AI 写脚本」把正文填回文本区。另用 Chrome 无头渲染截图核对弹窗（`/tmp/canvas-ai-script.png`）。
+
+未覆盖：真实中转站的文本模型可用性与计费（需要用户自己的 API密钥）；真实 Harness 桌面窗口里的观感（需宿主重载后人工复核）；Windows 未实测。
+
+本地成品：`.local/test/3.20.1-test.28/metaontic-video-3.20.1-test.28.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。

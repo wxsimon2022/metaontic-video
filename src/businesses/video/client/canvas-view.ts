@@ -232,6 +232,15 @@ export function createCanvasView({ React, h, TOKENS }: any) {
     return h('div', { key: 'text', className: 'movc-body' }, text ? text.slice(0, 600) : '（暂无内容，可先编辑）');
   }
 
+  /** 连拍状态一句话，界面与提示共用，避免各处写不一样的措辞。 */
+  const chainStatusText = (chain: any) => ({
+    running: `连拍进行中：第 ${chain.index + 1}/${chain.total} 段生成中…`,
+    review: `第 ${chain.index + 1}/${chain.total} 段已有成果，等你审核`,
+    done: `连拍完成：${chain.total} 段都已有成果`,
+    stopped: `连拍已停止：已完成 ${chain.done}/${chain.total} 段`,
+    stale: `连拍需要重排：已完成 ${chain.done}/${chain.total} 段`,
+  }[chain.state] || `连拍状态：${chain.state}`);
+
   function FlowCanvas() {
     const [list, setList] = React.useState([] as any[]);
     const [canvas, setCanvas] = React.useState(null as any);
@@ -246,15 +255,17 @@ export function createCanvasView({ React, h, TOKENS }: any) {
     const [inline, setInline] = React.useState(null as any);
     const [createDialog, setCreateDialog] = React.useState(null as any);
     const [scriptDialog, setScriptDialog] = React.useState(null as any);
+    const [chainDialog, setChainDialog] = React.useState(null as any);
     const [confirmDelete, setConfirmDelete] = React.useState(false);
     const [dialog, setDialog] = React.useState(null as any);
     const pan = React.useRef(null as any);
     const moving = React.useRef(null as any);
     const marqueeDone = React.useRef(false);
     const timer = React.useRef(null as any);
+    const chainTimer = React.useRef(null as any);
     const alive = React.useRef(true);
     const stageRef = React.useRef(null as any);
-    React.useEffect(() => () => { alive.current = false; if (timer.current) clearInterval(timer.current); }, []);
+    React.useEffect(() => () => { alive.current = false; if (timer.current) clearInterval(timer.current); if (chainTimer.current) clearInterval(chainTimer.current); }, []);
 
     const load = React.useCallback(async (projectId?: string) => {
       try {
@@ -348,6 +359,88 @@ export function createCanvasView({ React, h, TOKENS }: any) {
       setView({ scale, x: 40 - left * scale + Math.max(0, (rect.width - 80 - spanX * scale) / 2), y: 30 - top * scale + Math.max(0, (rect.height - 80 - spanY * scale) / 2) });
     }, []);
 
+    const patchChainDialog = React.useCallback((patch: any) => setChainDialog((current: any) => current ? { ...current, ...patch } : current), []);
+
+    const stopChainPolling = React.useCallback(() => { if (chainTimer.current) { clearInterval(chainTimer.current); chainTimer.current = undefined; } }, []);
+
+    /** 连拍状态：让界面跟着服务端记录走（换窗口、刷新后都还能接着看）。 */
+    const pullChain = React.useCallback(async (id?: string) => {
+      try {
+        const data = await canvasNativeRpc({ action: 'chainStatus', ...(id ? { id } : { projectId: canvas?.projectId }) });
+        if (!alive.current) return null;
+        patchChainDialog({ chain: data?.chain || null, busy: false });
+        if (!data?.chain || !['running'].includes(data.chain.state)) stopChainPolling();
+        if (data?.chain && !['running', 'review'].includes(data.chain.state)) await refresh();
+        return data?.chain || null;
+      } catch (e: any) { if (alive.current) patchChainDialog({ busy: false, error: e?.message || '连拍状态没读到。' }); return null; }
+    }, [canvas, patchChainDialog, refresh, stopChainPolling]);
+
+    const watchChain = React.useCallback((id?: string) => {
+      stopChainPolling();
+      chainTimer.current = setInterval(() => { void pullChain(id); }, 3000);
+    }, [pullChain, stopChainPolling]);
+
+    /** 「连拍」：先出整条链路的方案（每段几秒、提示词、估价与合计），确认一次再开跑。 */
+    const openChain = React.useCallback(async () => {
+      if (!canvas) return;
+      setError('');
+      setChainDialog({ loading: true, busy: false, error: '', chain: null, plan: null, confirm: { plan: false, cost: false } });
+      try {
+        const data = await canvasNativeRpc({ action: 'chainPlan', projectId: canvas.projectId });
+        if (!alive.current) return;
+        patchChainDialog({ loading: false, plan: data, chain: data?.active || null });
+        if (data?.active && data.active.state === 'running') watchChain(data.active.id);
+        else if (data?.active && ['done', 'stopped', 'stale'].includes(data.active.state)) { await pullChain(data.active.id); }
+      } catch (e: any) { if (alive.current) patchChainDialog({ loading: false, error: e?.message || '连拍方案没算出来。' }); }
+    }, [canvas, patchChainDialog, pullChain, watchChain]);
+
+    const startChain = React.useCallback(async () => {
+      if (!canvas || !chainDialog?.plan) return;
+      patchChainDialog({ busy: true, error: '' });
+      try {
+        const { chain } = await canvasNativeRpc({ action: 'chainStart', projectId: canvas.projectId, confirmPlan: true, confirmCost: true, identity: chainDialog.plan.identity });
+        if (!alive.current) return;
+        patchChainDialog({ chain, busy: false });
+        watchChain(chain?.id);
+        setNotice('连拍已开始：会按顺序逐段生成，每段出成果后停下来等你审核，确认无误再继续下一段。');
+      } catch (e: any) { if (alive.current) patchChainDialog({ busy: false, error: e?.message || '连拍没开始。' }); }
+    }, [canvas, chainDialog, patchChainDialog, watchChain]);
+
+    const advanceChain = React.useCallback(async (accept: boolean) => {
+      if (!chainDialog?.chain) return;
+      patchChainDialog({ busy: true, error: '' });
+      try {
+        const { chain } = await canvasNativeRpc({ action: 'chainNext', id: chainDialog.chain.id, accept });
+        if (!alive.current) return;
+        patchChainDialog({ chain, busy: false });
+        await refresh();
+        if (chain?.state === 'running') watchChain(chain.id); else stopChainPolling();
+      } catch (e: any) { if (alive.current) patchChainDialog({ busy: false, error: e?.message || '这一段没能继续。' }); }
+    }, [chainDialog, patchChainDialog, refresh, stopChainPolling, watchChain]);
+
+    const stopChain = React.useCallback(async () => {
+      if (!chainDialog?.chain) return;
+      patchChainDialog({ busy: true, error: '' });
+      try {
+        const { chain } = await canvasNativeRpc({ action: 'chainStop', id: chainDialog.chain.id });
+        if (!alive.current) return;
+        stopChainPolling();
+        patchChainDialog({ chain, busy: false });
+      } catch (e: any) { if (alive.current) patchChainDialog({ busy: false, error: e?.message || '连拍没能停下。' }); }
+    }, [chainDialog, patchChainDialog, stopChainPolling]);
+
+    /** 当前段成果还没回填时补一次回填；回填只新增成果节点，不重新生成。 */
+    const syncChainSegment = React.useCallback(async () => {
+      const job = chainDialog?.chain?.job;
+      if (!job) return;
+      patchChainDialog({ busy: true, error: '' });
+      try {
+        await canvasNativeRpc({ action: 'sync', id: job.id });
+        await refresh();
+        await pullChain(chainDialog.chain.id);
+      } catch (e: any) { if (alive.current) patchChainDialog({ busy: false, error: e?.message || '补回填没完成。' }); }
+    }, [chainDialog, patchChainDialog, pullChain, refresh]);
+
     /** 一键美化：按连线重排节点坐标（不动内容与连线），随后把整张图适配进画布区。 */
     const tidy = React.useCallback(async () => {
       if (!canvas) return;
@@ -368,14 +461,30 @@ export function createCanvasView({ React, h, TOKENS }: any) {
     /** 「写脚本…」：默认值按当前模型上限来，打开时问一次服务端就够。 */
     const openScript = React.useCallback(async () => {
       setError('');
-      setScriptDialog({ text: '', totalSeconds: 15, segmentSeconds: 15, singleMax: 15, ratio: '16:9', resolution: '720p', busy: false, error: '', plan: null });
+      setScriptDialog({ text: '', idea: '', totalSeconds: 15, segmentSeconds: 15, singleMax: 15, ratio: '16:9', resolution: '720p', busy: false, error: '', plan: null });
       try {
         const info = await canvasNativeRpc({ action: 'info' });
         if (!alive.current) return;
-        patchScriptDialog({ singleMax: info?.singleMax || 15, totalSeconds: Math.min(15, info?.singleMax || 15), segmentSeconds: info?.singleMax || 15,
+        patchScriptDialog({ singleMax: info?.singleMax || 15, textModel: info?.textModel || '', textReady: info?.textReady !== false,
+          totalSeconds: Math.min(15, info?.singleMax || 15), segmentSeconds: info?.singleMax || 15,
           ...(info?.videoReady === false ? { error: '还没配置视频API密钥，可以先铺节点，配置好再生成。' } : {}) });
       } catch (e: any) { if (alive.current) patchScriptDialog({ error: e?.message || '制作服务尚未就绪。' }); }
     }, [patchScriptDialog]);
+
+    /** 让文本模型把一句想法写成剧本与分镜表：写回来的正文仍要用户过一遍再建节点。 */
+    const writeWithModel = React.useCallback(async () => {
+      if (!canvas || !scriptDialog) return;
+      const idea = String(scriptDialog.idea || '').trim();
+      if (!idea) { patchScriptDialog({ error: '先写一句想拍什么，文本模型才有得写。' }); return; }
+      patchScriptDialog({ busy: true, error: '', plan: null });
+      try {
+        const result = await canvasNativeRpc({ action: 'write', projectId: canvas.projectId, idea,
+          totalSeconds: scriptDialog.totalSeconds, segmentSeconds: scriptDialog.segmentSeconds, ratio: scriptDialog.ratio });
+        if (!alive.current) return;
+        patchScriptDialog({ busy: false, text: result.script, error: '' });
+        setNotice(`文本模型（${result.model}）已写出剧本：核对分镜表后点「预览分段」，再生成制作节点。`);
+      } catch (e: any) { if (alive.current) patchScriptDialog({ busy: false, error: e?.message || '文本模型没有写出脚本。' }); }
+    }, [canvas, scriptDialog, patchScriptDialog]);
 
     /** 先出计划：让用户看清会被拆成几段、每段多少秒、每段提示词是什么，再决定要不要建节点。 */
     const previewScript = React.useCallback(async () => {
@@ -715,6 +824,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
           canvas ? h('button', { key: 'image', type: 'button', className: 'mov-btn', onClick: () => void newNode('image') }, '+ 图片') : null,
           canvas ? h('button', { key: 'video', type: 'button', className: 'mov-btn', onClick: () => void newNode('video') }, '+ 视频') : null,
           canvas ? h('button', { key: 'write-script', type: 'button', className: 'mov-btn movc-run', title: '写下脚本与目标时长，自动铺开剧本、分镜与每段制作节点', onClick: () => void openScript() }, '写脚本…') : null,
+          canvas ? h('button', { key: 'chain', type: 'button', className: 'mov-btn', title: '一次确认整条链路的方案与总费用，按顺序逐段生成；每段成果仍需你审核', onClick: () => void openChain() }, '连拍') : null,
           canvas ? h('span', { key: 'sep-flow', className: 'movc-sep' }) : null,
           canvas ? h('button', { key: 'run-next', type: 'button', className: 'mov-btn movc-run', disabled: !nextStep,
             title: nextStep ? `当前读取节点内容并沿上游拼接提示词，生成前仍需确认方案与费用` : '流程里的制作节点都已有成果',
@@ -792,7 +902,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
       canvas && steps.length ? h('p', { key: 'flow-hint', className: 'movc-hint' }, nextStep
         ? `流程：按连线顺序逐个制作，当前轮到「${nextStep.label}」（画布上虚线框标出）。点上面的「制作」按钮会读取节点内容与上游剧本/分镜拼出提示词，仍然要先核对制作方案、单独确认费用才会调用模型。`
         : `流程：${steps.length} 个制作节点都已有回填成果。要重做某一段，点该节点里的「制作」，重新核对方案并确认费用。`) : null,
-      canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `双击画布名重命名（Enter 保存，Esc 取消）；拖动空白处平移、滚轮缩放；拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）；节点摆乱了点「美化布局」按连线一键重排；想按脚本铺开制作节点就点「写脚本…」。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
+      canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `双击画布名重命名（Enter 保存，Esc 取消）；拖动空白处平移、滚轮缩放；拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）；节点摆乱了点「美化布局」按连线一键重排；想按脚本铺开制作节点就点「写脚本…」，想一次确认整条链路再逐段生成就点「连拍」。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
       connectFrom ? h('p', { key: 'connect', className: 'movc-hint' }, '连线模式：点击目标节点完成连接，点空白处取消。') : null,
       confirmDelete ? h('div', { key: 'delete-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget) setConfirmDelete(false); } },
         h('div', { key: 'body', className: 'movc-modal-body', style: { width: 'min(420px, calc(100vw - 32px))' } }, [
@@ -803,10 +913,50 @@ export function createCanvasView({ React, h, TOKENS }: any) {
             h('button', { key: 'ok', type: 'button', className: 'mov-btn', onClick: () => void deleteCanvas() }, '确认删除'),
           ]),
         ])) : null,
+      chainDialog ? h('div', { key: 'chain-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget && !chainDialog.busy) { stopChainPolling(); setChainDialog(null); } } },
+        h('div', { key: 'body', className: 'movc-modal-body' }, [
+          h('h4', { key: 'h' }, '连拍：一次确认，逐段生成'),
+          chainDialog.loading ? h('p', { key: 'loading', className: 'movc-status' }, '正在按画布上的视频节点排连拍方案…') : null,
+          chainDialog.plan ? h('div', { key: 'plan', className: 'movc-plan' }, [
+            h('div', { key: 'head' }, `连拍方案：${chainDialog.plan.segments.length} 段${chainDialog.plan.cny !== null ? ` · 预估 ¥${(Math.round(chainDialog.plan.cny * 10000) / 10000).toFixed(4)}（基础公式，按渠道账单结算）` : ' · 按实际调用计费'}${chainDialog.plan.priceDate ? ` · 价目 ${chainDialog.plan.priceDate}` : ''}`),
+            ...chainDialog.plan.segments.map((segment: any) => h('div', { key: `s${segment.index}` },
+              `第${segment.index + 1}段「${segment.label}」${segment.seconds}秒 · ${segment.operation === 'extend' ? '续拍上一段' : '首段直出'} · ${segment.ratio} ${String(segment.resolution).toUpperCase()}：${String(segment.prompt).slice(0, 70)}${String(segment.prompt).length > 70 ? '…' : ''}`)),
+            h('div', { key: 'note' }, '第 1 段直出，其余段以上一段成果续拍；每段出成果后都会停下来等你审核，审核通过才继续下一段。'),
+          ]) : null,
+          chainDialog.chain ? h('div', { key: 'chain', className: 'movc-plan' }, [
+            h('div', { key: 'head' }, `${chainStatusText(chainDialog.chain)}`),
+            chainDialog.chain.segments.map((segment: any) => h('div', { key: `c${segment.index}` },
+              `${segment.index < chainDialog.chain.done ? '✓ ' : segment.index === chainDialog.chain.index ? '▶ ' : '· '}第${segment.index + 1}段「${segment.label}」${segment.seconds}秒${segment.index < chainDialog.chain.done ? '：已有成果' : ''}`)),
+            chainDialog.chain.message ? h('div', { key: 'msg' }, chainDialog.chain.message) : null,
+          ]) : null,
+          chainDialog.chain?.job?.media?.length && chainDialog.chain.state === 'review' ? h('div', { key: 'media' },
+            chainDialog.chain.job.media.map((media: any, index: number) => h(media.kind === 'image' ? 'img' : 'video', {
+              key: `m${index}`, src: media.url, alt: media.label || '', controls: media.kind === 'video', preload: 'metadata', className: 'movc-media', style: { maxHeight: '38vh' },
+            }))) : null,
+          chainDialog.chain && chainDialog.chain.state === 'review' ? h('p', { key: 'review-note', className: 'movc-status' }, '先看这一段：满意就「确认并继续下一段」，不满意可以停止连拍，已生成的成果都保留在画布上。') : null,
+          chainDialog.error ? h('p', { key: 'err', className: 'movc-status', 'data-error': 'true' }, chainDialog.error) : null,
+          chainDialog.plan && !chainDialog.chain ? h('div', { key: 'confirms' }, [
+            h('label', { key: 'p', className: 'movc-check' }, [h('input', { type: 'checkbox', checked: chainDialog.confirm.plan === true, onChange: (e: any) => patchChainDialog({ confirm: { ...chainDialog.confirm, plan: e.target.checked } }) }), ' 我已核对整条链路的方案（每段提示词、时长、画幅与清晰度）']),
+            h('label', { key: 'c', className: 'movc-check' }, [h('input', { type: 'checkbox', checked: chainDialog.confirm.cost === true, onChange: (e: any) => patchChainDialog({ confirm: { ...chainDialog.confirm, cost: e.target.checked } }) }), ' 我已确认整条链路的预估费用，按渠道账单结算']),
+          ]) : null,
+          h('div', { key: 'ops', className: 'movc-bar' }, [
+            h('button', { key: 'close', type: 'button', className: 'mov-btn', disabled: chainDialog.busy, onClick: () => { stopChainPolling(); setChainDialog(null); } }, '关闭'),
+            chainDialog.chain?.state === 'running' ? h('button', { key: 'stop', type: 'button', className: 'mov-btn movc-danger', disabled: chainDialog.busy, onClick: () => void stopChain() }, '停止连拍') : null,
+            chainDialog.chain?.state === 'review' && chainDialog.chain.job?.sync?.status !== 'synced' ? h('button', { key: 'sync', type: 'button', className: 'mov-btn', disabled: chainDialog.busy, onClick: () => void syncChainSegment() }, '补回填画布') : null,
+            chainDialog.chain?.state === 'review' ? h('button', { key: 'stop2', type: 'button', className: 'mov-btn movc-danger', disabled: chainDialog.busy, onClick: () => void stopChain() }, '停止连拍') : null,
+            chainDialog.chain?.state === 'review' ? h('button', { key: 'next', type: 'button', className: 'mov-btn mov-btn-primary', disabled: chainDialog.busy, onClick: () => void advanceChain(true) }, '确认并继续下一段') : null,
+            chainDialog.plan && !chainDialog.chain ? h('button', { key: 'start', type: 'button', className: 'mov-btn mov-btn-primary', disabled: chainDialog.busy || !(chainDialog.confirm.plan && chainDialog.confirm.cost), onClick: () => void startChain() }, '确认并开始连拍') : null,
+            chainDialog.chain && ['done', 'stopped', 'stale'].includes(chainDialog.chain.state) && chainDialog.plan ? h('button', { key: 'again', type: 'button', className: 'mov-btn', disabled: chainDialog.busy, onClick: () => void openChain() }, '重新看方案') : null,
+            chainDialog.chain && chainDialog.chain.state === 'done' ? h('button', { key: 'close2', type: 'button', className: 'mov-btn', disabled: chainDialog.busy, onClick: () => { stopChainPolling(); setChainDialog(null); } }, '完成') : null,
+          ]),
+        ])) : null,
       scriptDialog ? h('div', { key: 'script-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget && !scriptDialog.busy) setScriptDialog(null); } },
         h('div', { key: 'body', className: 'movc-modal-body' }, [
           h('h4', { key: 'h' }, '写脚本并生成制作节点'),
-          h('label', { key: 'text', className: 'movc-field' }, ['脚本内容', h('textarea', { autoFocus: true, value: scriptDialog.text,
+          h('label', { key: 'idea', className: 'movc-field' }, ['想拍什么（交给文本模型写成脚本）', h('input', { value: scriptDialog.idea,
+            placeholder: '一句话就够，例如：青旅天台的清晨，一个人拖着行李住进城市。',
+            onChange: (e: any) => patchScriptDialog({ idea: e.target.value, error: '' }) })]),
+          h('label', { key: 'text', className: 'movc-field' }, ['脚本内容（可以直接写，也可以让文本模型写）', h('textarea', { value: scriptDialog.text,
             placeholder: '写下要拍的内容。写成 Markdown 分镜表（表头含「镜头」「画面」两列）时会按分镜切段；否则按句子、段落按字数均分。写多少拆多少，不自动编内容。',
             onChange: (e: any) => patchScriptDialog({ text: e.target.value, error: '' }) })]),
           h('div', { key: 'spec', className: 'movc-row' }, [
@@ -817,7 +967,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
             h('label', { key: 'ratio', className: 'movc-field' }, ['画幅', h('select', { value: scriptDialog.ratio, onChange: (e: any) => patchScriptDialog({ ratio: e.target.value }) }, RATIOS.map(r => h('option', { key: r, value: r }, r)))]),
             h('label', { key: 'resolution', className: 'movc-field' }, ['清晰度', h('select', { value: scriptDialog.resolution, onChange: (e: any) => patchScriptDialog({ resolution: e.target.value }) }, RESOLUTIONS.map(r => h('option', { key: r, value: r }, r.toUpperCase())))]),
           ]),
-          h('p', { key: 'note', className: 'movc-status' }, `当前模型单段上限 ${scriptDialog.singleMax || 15} 秒：目标时长不超过上限只建一段，超过才按每段时长排续拍段。节点建好后仍要逐段核对方案、单独确认费用。`),
+          h('p', { key: 'note', className: 'movc-status' }, `当前模型单段上限 ${scriptDialog.singleMax || 15} 秒：目标时长不超过上限只建一段，超过才按每段时长排续拍段。节点建好后仍要逐段核对方案、单独确认费用。「AI 写脚本」会按设置页的文本模型（${scriptDialog.textModel || '文本模型'}）调用一次，单独按文本计费。`),
           scriptDialog.plan ? h('div', { key: 'plan', className: 'movc-plan' }, [
             h('div', { key: 'head' }, `分段计划：${scriptDialog.plan.segments.length} 段 · 共 ${scriptDialog.plan.totalSeconds} 秒${scriptDialog.plan.shots?.length ? ` · 识别到 ${scriptDialog.plan.shots.length} 个分镜` : ''}`),
             ...scriptDialog.plan.segments.map((segment: any, index: number) => h('div', { key: `s${index}` }, `第${index + 1}段 ${segment.seconds} 秒（${segment.kind === 'extend' ? '续拍' : '首段'}）：${String(segment.prompt).slice(0, 90)}${String(segment.prompt).length > 90 ? '…' : ''}`)),
@@ -825,6 +975,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
           scriptDialog.error ? h('p', { key: 'err', className: 'movc-status', 'data-error': 'true' }, scriptDialog.error) : null,
           h('div', { key: 'ops', className: 'movc-bar' }, [
             h('button', { key: 'cancel', type: 'button', className: 'mov-btn', disabled: scriptDialog.busy, onClick: () => setScriptDialog(null) }, '取消'),
+            h('button', { key: 'write', type: 'button', className: 'mov-btn', disabled: scriptDialog.busy, title: '用设置页里配置的文本模型把「想拍什么」写成剧本与分镜表，会调用一次文本模型', onClick: () => void writeWithModel() }, 'AI 写脚本'),
             h('button', { key: 'preview', type: 'button', className: 'mov-btn', disabled: scriptDialog.busy, onClick: () => void previewScript() }, '预览分段'),
             h('button', { key: 'ok', type: 'button', className: 'mov-btn mov-btn-primary', disabled: scriptDialog.busy, onClick: () => void createFromScript() }, '生成制作节点'),
           ]),

@@ -35,6 +35,10 @@ export const videoConfigFields = {
   // 图片模型：doubao-seedream-5-0-260128 已下线，默认改用在售的 pro 版；旧型号仍允许写入校验，
   // 读取时由 connection-defaults 的 resolveImageModel 归一到在售型号。
   imageModel: z.union(['doubao-seedream-5-0-pro-260628', 'doubao-seedream-5-0-260128']).default('doubao-seedream-5-0-pro-260628').description('A/B 真人参考图非真人化使用的图片模型（旧型号已下线，按 pro 版调用）').volatile(),
+  textModel: z.string()
+    .default('')
+    .description('写脚本用的文本模型（OpenAI 兼容 /v1/chat/completions）；留空读 NEWAPI_TEXT_MODEL 或内置默认值')
+    .volatile(),
   model: z.string()
     .default('')
     .description('视频生成用的模型 ID（seedance 2.0 / 2.5 系列）；留空读 NEWAPI_VIDEO_MODEL 或内置默认值')
@@ -193,6 +197,7 @@ export const RELAY_PRESET = {
     model: DEFAULT_MODEL,
     baseEnv: ['NEWAPI_VIDEO_BASE_URL', 'NEWAPI_BASE_URL'],
   modelEnv: ['NEWAPI_VIDEO_MODEL'],
+  textModelEnv: ['NEWAPI_TEXT_MODEL'],
 };
 
 export const SUCCESS_STATES = new Set(['succeeded', 'success', 'completed', 'complete', 'done', 'finished']);

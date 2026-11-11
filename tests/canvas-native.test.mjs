@@ -111,6 +111,100 @@ test('写脚本分段：按分镜表或句子切分，内容不足直接报错�
   assert.throws(() => api.splitScriptPrompts('   ', 1), /先写下脚本内容/);
 });
 
+const chainDoc = () => ({ name: 'test', nodes: {
+  s: { id: 's', type: 'script', x: 0, y: 0, w: 420, h: 320, data: { label: '剧本', text: '第一句。第二句。' } },
+  a: { id: 'a', type: 'video', x: 600, y: 0, w: 360, h: 300, data: { label: '第1段', prompt: '天台晨光', ratio: '16:9', resolution: '720p', duration: 15 } },
+  b: { id: 'b', type: 'video', x: 600, y: 340, w: 360, h: 300, data: { label: '第2段', prompt: '前台接待', ratio: '16:9', resolution: '720p', duration: 15 } },
+}, edges: [{ id: 'e1', fromNode: 's', toNode: 'a', fromPort: 'out', toPort: 'prompt' }, { id: 'e2', fromNode: 's', toNode: 'b', fromPort: 'out', toPort: 'prompt' }] });
+
+async function chainService() {
+  const doc = chainDoc(), directory = await mkdtemp(path.join(temp, 'chain-')), bodies = [];
+  const adapter = { rpc: { projectsGet: async () => structuredClone(doc), projectsPut: async () => ({ ok: true }), assetsGet: async () => ({ items: [] }), dataRootGet: async () => ({ dataRoot: temp }) } };
+  const s = api.createCanvasNativeService(config, { directory, load: async () => adapter,
+    video: async (_cfg, body, _signal, progress) => { bodies.push(body); await progress.onCreated(`task-${bodies.length}`); return { status: 'succeeded', taskId: `task-${bodies.length}`, videoUrl: `https://example.invalid/seg${bodies.length}.mp4` }; },
+    publish: async () => ({ status: 'synced' }) });
+  return { s, bodies, doc };
+}
+
+const waitChain = async (s, id, want) => {
+  for (let n = 0; n < 300; n += 1) {
+    const { chain } = await s.handle({ action: 'chainStatus', id });
+    if (chain.state === want) return chain;
+    if (['failed', 'stopped'].includes(chain.state) && want !== chain.state) throw new Error(`chain stopped early: ${JSON.stringify(chain)}`);
+    await new Promise(r => setTimeout(r, 10));
+  }
+  throw new Error(`chain did not reach ${want}`);
+};
+
+test('连拍：一次确认后逐段生成，每段停下等审核，续拍带上上一段成果', async () => {
+  const { s, bodies } = await chainService();
+  const plan = await s.handle({ action: 'chainPlan', projectId: 'p' });
+  assert.deepEqual(plan.segments.map(x => [x.operation, x.seconds]), [['generate', 15], ['extend', 15]], '首段直出，其余续拍');
+  assert.deepEqual(plan.segments.map(x => x.prompt), ['天台晨光', '前台接待']);
+  assert.equal(typeof plan.cny, 'number', '给得出估价时给出合计');
+  const refused = await s.handle({ action: 'chainStart', projectId: 'p', confirmPlan: true }).catch(e => e.message);
+  assert.match(refused, /确认整条连拍/, '没确认费用不启动');
+  const { chain } = await s.handle({ action: 'chainStart', projectId: 'p', confirmPlan: true, confirmCost: true });
+  assert.equal(chain.state, 'running'); assert.equal(chain.total, 2);
+  const review = await waitChain(s, chain.id, 'review');
+  assert.equal(review.index, 0); assert.equal(review.done, 0);
+  assert.equal(review.job.media.length, 1);
+  assert.equal(bodies.length, 1);
+  const advanced = await s.handle({ action: 'chainNext', id: chain.id, accept: true });
+  assert.equal(advanced.chain.state, 'running');
+  const second = await waitChain(s, chain.id, 'review');
+  assert.equal(second.index, 1);
+  assert.equal(bodies.length, 2);
+  assert.ok(JSON.stringify(bodies[1]).includes('seg1.mp4'), '第二段以上一段成果为输入续拍');
+  const done = await s.handle({ action: 'chainNext', id: chain.id, accept: true });
+  assert.equal(done.chain.state, 'done');
+  assert.equal(done.chain.done, 2);
+  // 结束后再推进或重开都按记录说话，不会重复提交。
+  await assert.rejects(() => s.handle({ action: 'chainNext', id: chain.id, accept: true }), /已经结束/);
+  const again = await s.handle({ action: 'chainStart', projectId: 'p', confirmPlan: true, confirmCost: true });
+  assert.equal(again.chain.id, chain.id, '已完成链路不会重复新建');
+  assert.equal(bodies.length, 2, '没有重复调用模型');
+  s.dispose();
+});
+
+test('连拍：可以中途停下，节点内容改动后不提交没核对过的那一版', async () => {
+  const { s, bodies, doc } = await chainService();
+  const { chain } = await s.handle({ action: 'chainStart', projectId: 'p', confirmPlan: true, confirmCost: true });
+  await waitChain(s, chain.id, 'review');
+  const stopped = await s.handle({ action: 'chainNext', id: chain.id, accept: false });
+  assert.equal(stopped.chain.state, 'stopped');
+  assert.equal(bodies.length, 1, '停下后不再提交下一段');
+  // 第 2 段内容被改：重新核对前不允许提交。
+  const other = await chainService();
+  const started = await other.s.handle({ action: 'chainStart', projectId: 'p', confirmPlan: true, confirmCost: true });
+  await waitChain(other.s, started.chain.id, 'review');
+  other.doc.nodes.b.data.prompt = '改过的第二段';
+  other.doc.nodes.b.data.duration = 10;
+  await assert.rejects(() => other.s.handle({ action: 'chainNext', id: started.chain.id, accept: true }), /已改动/);
+  assert.equal(other.bodies.length, 1, '改动后没有提交');
+  other.s.dispose();
+  s.dispose();
+});
+
+test('画布内 AI 写脚本：走文本模型一次，把段数与画幅带进提示词，失败原样报错', async () => {
+  const briefs = [];
+  const s = await service({ writeScript: async (_config, brief) => { briefs.push(brief); return { script: '# 片名\n\n| 镜头 | 画面 | 时长 | 台词 |\n| --- | --- | --- | --- |', model: 'doubao-seed-1-6-250615', usage: { promptTokens: 1, completionTokens: 2 } }; } });
+  const made = await s.handle({ action: 'write', idea: '青旅天台的清晨', totalSeconds: 30, segmentSeconds: 15, ratio: '9:16' });
+  assert.equal(briefs.length, 1);
+  assert.deepEqual(briefs[0], { idea: '青旅天台的清晨', totalSeconds: 30, segmentSeconds: 15, segments: 2, ratio: '9:16' });
+  assert.equal(made.script.startsWith('# 片名'), true);
+  assert.equal(made.model, 'doubao-seed-1-6-250615');
+  assert.equal(made.segments, 2);
+  assert.equal(s.calls(), 0, '写脚本不触发视频生成');
+  const info = await s.handle({ action: 'info' });
+  assert.equal(info.textModel.startsWith('doubao-'), true);
+  assert.equal(info.textReady, true);
+  s.dispose();
+  const broken = await service({ writeScript: async () => { throw new Error('文本模型调用失败：model not found'); } });
+  await assert.rejects(() => broken.handle({ action: 'write', idea: 'x' }), /model not found/);
+  broken.dispose();
+});
+
 test('写脚本计划只算方案：不超过单段上限只建一段，超过按每段时长排续拍段', async () => {
   const s = await service();
   const script = '第一句。第二句。第三句。第四句。';

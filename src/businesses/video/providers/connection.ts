@@ -1,6 +1,6 @@
 /** providers/connection：从宿主入口拆出的独立职责模块。 */
 import { RELAY_PRESET, ref, envValue } from '../config.js';
-import { IMAGE_MODEL, resolveImageModel } from '../connection-defaults.js';
+import { IMAGE_MODEL, TEXT_MODEL, resolveImageModel } from '../connection-defaults.js';
 
 export function relayPreset() {
   // 只走 New API 中转站，路径/模型都取这一份预设。
@@ -53,6 +53,13 @@ export function resolveModel(config) {
 }
 
 /** seedance 2.5 的延长走 omni 参考模式，需要固定 ratio 与任务类型。 */
+/** 文本模型：设置页填的型号优先，其次环境变量，最后内置默认值；不允许空着调用。 */
+export function resolveTextModel(config) {
+  const preset = relayPreset();
+  const model = String(ref(config, 'textModel', '')).trim() || envValue(preset.textModelEnv) || TEXT_MODEL;
+  return String(model).trim();
+}
+
 export function isOmniExtendModel(model) {
   const lowered = String(model).toLowerCase();
   return lowered.includes('seedance-2-5') || lowered.includes('seedance-2.5');
@@ -94,6 +101,7 @@ export function snapshotConfig(config) {
   snapshot.baseUrl = resolveBaseUrl(config);
   snapshot.model = resolveModel(config);
   snapshot.imageModel = resolveImageModel(ref(config, 'imageModel', IMAGE_MODEL));
+  snapshot.textModel = resolveTextModel(config);
   snapshot.submitPath = resolveSubmitPath(config);
   snapshot.queryPath = isVolcengine(config) ? '/api/v3/contents/generations/tasks/{task_id}' : String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath;
   return Object.freeze(snapshot);

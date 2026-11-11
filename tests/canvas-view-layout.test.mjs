@@ -233,7 +233,8 @@ test('画布内写脚本：按脚本铺开剧本/分镜/分段视频节点并自
     nodeSave: (args) => { const node = { ...(doc.nodes[args.node.id] || {}), ...args.node }; doc.nodes[args.node.id] = node; calls.nodes.push(args.node); return { canvas: { projectId: 'p1', node } }; },
     edgeAdd: (args) => { const edge = { id: `e${calls.edges.length + 1}`, ...args }; doc.edges.push(edge); calls.edges.push(edge); return { canvas: { projectId: 'p1', edge } }; },
   }, {
-    info: { singleMax: 15, videoReady: true },
+    info: { singleMax: 15, videoReady: true, textModel: 'doubao-seed-1-6-250615', textReady: true },
+    write: (body) => ({ script: `# 青旅的清晨\n\n${body.idea}`, model: 'doubao-seed-1-6-250615', usage: { promptTokens: 1, completionTokens: 2 } }),
     plan: (body) => {
       calls.plans.push(body);
       const shots = body.script.includes('|') ? [{ index: 1, visual: '镜头：1\n画面：清晨天台' }, { index: 2, visual: '镜头：2\n画面：前台接待' }] : [];
@@ -253,7 +254,17 @@ test('画布内写脚本：按脚本铺开剧本/分镜/分段视频节点并自
   mini.begin(); tree = FlowCanvas();
   const modal = find(tree, (node) => node.props.key === 'script-modal');
   assert.ok(modal, '点「写脚本…」应打开弹窗');
-  find(modal, (node) => node.type === 'textarea').props.onChange({ target: { value: '# 剧本\n\n| 镜头 | 画面 |\n| --- | --- |\n| 1 | 清晨天台 |\n| 2 | 前台接待 |' } });
+  // 先说一句想法交给文本模型，再把返回的脚本写进正文。
+  const idea = find(modal, (node) => node.type === 'input');
+  const setIdea = (value) => { idea.props.onChange({ target: { value } }); mini.begin(); return FlowCanvas(); };
+  let withIdea = setIdea('青旅天台的清晨');
+  find(find(withIdea, (node) => node.props.key === 'script-modal'), (node) => node.props.key === 'write').props.onClick();
+  await flush();
+  mini.begin(); withIdea = FlowCanvas();
+  const written = find(find(withIdea, (node) => node.props.key === 'script-modal'), (node) => node.type === 'textarea');
+  assert.ok(written.props.value.includes('青旅天台的清晨'), `AI 写脚本应把正文填回来：${written.props.value}`);
+  assert.ok(texts(withIdea).some((line) => line.includes('文本模型')), '给出文本模型提示');
+  written.props.onChange({ target: { value: '# 剧本\n\n| 镜头 | 画面 |\n| --- | --- |\n| 1 | 清晨天台 |\n| 2 | 前台接待 |' } });
   mini.begin(); tree = FlowCanvas();
   const button = (key) => find(find(tree, (node) => node.props.key === 'script-modal'), (node) => node.props.key === key);
   button('preview').props.onClick();

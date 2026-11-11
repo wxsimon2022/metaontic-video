@@ -17,6 +17,10 @@ export const VOLCENGINE_MODE_AVAILABLE = false;
  * 保持原值只会让图片任务直接失败。归一只改生效值，不写回磁盘，用户不动它也不会丢配置。
  */
 export const IMAGE_MODEL = 'doubao-seedream-5-0-pro-260628';
+
+/** 文本模型（写脚本、分镜与逐段提示词）：与视频模型同一中转站、同一个 API密钥，按 /v1/chat/completions 调用。
+ *  中转站上架的型号各不相同，留空就用这里的默认值；填了别的型号就按填的调。 */
+export const TEXT_MODEL = 'doubao-seed-1-6-250615';
 const RETIRED_IMAGE_MODELS = ['doubao-seedream-5-0-260128'];
 export function resolveImageModel(value) {
   const model = String(value ?? '').trim();
@@ -34,6 +38,7 @@ export function connectionDefaults(values) {
     queryPath: volc ? '/api/v3/contents/generations/tasks/{task_id}' : text('queryPath', '/doubao/api/v3/contents/generations/tasks/{task_id}'),
     model: text('model', 'doubao-seedance-2-0-mini-260615'),
     imageModel: resolveImageModel(text('imageModel', IMAGE_MODEL)),
+    textModel: text('textModel', TEXT_MODEL),
     imageUseVideoKey: values.imageUseVideoKey !== false,
   };
 }

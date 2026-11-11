@@ -569,6 +569,7 @@
   var METAONTIC_BASE_URL = "https://ai.bileego.com";
   var VOLCENGINE_MODE_AVAILABLE = false;
   var IMAGE_MODEL = "doubao-seedream-5-0-pro-260628";
+  var TEXT_MODEL = "doubao-seed-1-6-250615";
   var RETIRED_IMAGE_MODELS = ["doubao-seedream-5-0-260128"];
   function resolveImageModel(value) {
     const model = String(value ?? "").trim();
@@ -584,6 +585,7 @@
       queryPath: volc ? "/api/v3/contents/generations/tasks/{task_id}" : text("queryPath", "/doubao/api/v3/contents/generations/tasks/{task_id}"),
       model: text("model", "doubao-seedance-2-0-mini-260615"),
       imageModel: resolveImageModel(text("imageModel", IMAGE_MODEL)),
+      textModel: text("textModel", TEXT_MODEL),
       imageUseVideoKey: values.imageUseVideoKey !== false
     };
   }
@@ -607,7 +609,7 @@
     };
     const SECTIONS = [
       { key: "sectionConnection", fields: ["connectionMode"] },
-      { key: "sectionModels", fields: ["imageUseVideoKey", "model", "metaonticApiKey", "volcengineApiKey", "imageModel", "imageApiKey"] },
+      { key: "sectionModels", fields: ["imageUseVideoKey", "model", "metaonticApiKey", "volcengineApiKey", "imageModel", "imageApiKey", "textModel"] },
       { key: "sectionVideo", fields: ["ratio", "generateAudio"] },
       { key: "sectionCanvas", fields: ["autoCreateCanvas"] }
     ];
@@ -618,6 +620,8 @@
       // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
       { key: "model", kind: "select", wide: true },
       { key: "imageModel", kind: "select", wide: true },
+      // 文本模型（写脚本）：中转站上架的型号不一，做成自由填写，留空用内置默认值
+      { key: "textModel", kind: "text", wide: true },
       { key: "imageUseVideoKey", kind: "switch", wide: true },
       { key: "imageApiKey", kind: "text", secret: true, wide: true },
       { key: "ratio", kind: "select" },
@@ -646,6 +650,7 @@
       "imageUseVideoKey",
       "imageApiKey",
       "imageModel",
+      "textModel",
       "model",
       "estimateGroupRatio",
       "duration",
@@ -758,12 +763,14 @@
       resetConfirm: "\u786E\u5B9A\u91CD\u7F6E\u63D2\u4EF6\u5417\uFF1F\u8FD9\u4F1A\u6E05\u9664\u672C\u63D2\u4EF6\u4FDD\u5B58\u7684\u914D\u7F6E\u548CAPI\u5BC6\u94A5\uFF0C\u9700\u8981\u91CD\u65B0\u914D\u7F6E\u3002\u5DF2\u751F\u6210\u7684\u89C6\u9891\u4E0D\u4F1A\u5220\u9664\u3002",
       model: "\u89C6\u9891\u6A21\u578B",
       imageModel: "\u56FE\u7247\u6A21\u578B",
+      textModel: "\u6587\u672C\u6A21\u578B\uFF08\u5199\u811A\u672C\uFF09",
       imageUseVideoKey: "\u56FE\u7247\u6A21\u578B\u4E0E\u89C6\u9891\u6A21\u578B\u5171\u7528 API\u5BC6\u94A5",
       sharedModelKey: "\u5171\u7528 API\u5BC6\u94A5",
       videoModelKey: "\u89C6\u9891\u6A21\u578B API\u5BC6\u94A5",
       imageApiKey: "\u56FE\u7247\u6A21\u578B API\u5BC6\u94A5",
       resolution: "\u89C6\u9891\u6E05\u6670\u5EA6",
       imageModelHint: "Seedream\u53EF\u751F\u6210\u89D2\u8272\u56FE\uFF1B\u9047\u771F\u4EBA\u9650\u5236\u65F6\uFF0C\u7ECF\u540C\u610F\u53EF\u8F6C\u6362\u53C2\u8003\u56FE\u3002\u56FE\u7247\u8C03\u7528\u5355\u72EC\u8BA1\u8D39\uFF0C\u7ED3\u679C\u9700\u5BA1\u6838\u3002",
+      textModelHint: "\u753B\u5E03\u300C\u5199\u811A\u672C\u2026\u300D\u7528\u8FD9\u4E2A\u578B\u53F7\u628A\u4E00\u6BB5\u60F3\u6CD5\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF1B\u8D70\u540C\u4E00\u4E2D\u8F6C\u7AD9\u7684 /v1/chat/completions\uFF0C\u5355\u72EC\u6309\u6587\u672C\u8BA1\u8D39\u3002\u7559\u7A7A\u7528\u5185\u7F6E\u9ED8\u8BA4\u578B\u53F7\u3002",
       modelHint: "mini \u4FA7\u91CD\u6210\u672C\uFF0Cfast \u4FA7\u91CD\u751F\u6210\u901F\u5EA6\u3002\u5B9E\u9645\u4EF7\u683C\u4EE5\u6240\u9009\u6E20\u9053\u4E3A\u51C6\u3002",
       mergeMode: "\u5408\u5E76\u65B9\u5F0F",
       mergeModeSeamless: "\u76F4\u63A5\u62FC\u63A5\uFF08\u65E7\u914D\u7F6E\u517C\u5BB9\uFF09",
@@ -909,12 +916,14 @@
       resetConfirm: "Reset this plugin? Saved settings, API keys and login state will be cleared. Generated videos will be kept.",
       model: "Video model",
       imageModel: "Image model",
+      textModel: "Text model (scripting)",
       imageUseVideoKey: "Use video API key for images",
       sharedModelKey: "Shared key",
       videoModelKey: "Video model key",
       imageApiKey: "Image model key",
       resolution: "Video resolution",
       imageModelHint: "Seedream creates character images or, with consent after a real-person restriction, stylizes references. Image calls are billed separately and results require review.",
+      textModelHint: 'Used by the canvas "Write script" action to turn a brief into a script and storyboard table through the same relay (/v1/chat/completions); text calls are billed separately. Leave empty for the built-in default.',
       modelHint: "mini focuses on cost; fast focuses on generation speed. Actual prices depend on your provider.",
       mergeMode: "Merge mode",
       mergeModeSeamless: "Direct concat (legacy setting)",
@@ -1903,6 +1912,7 @@
           volcengineApiKey: t("volcengineKeyHint"),
           model: t("modelHint"),
           imageModel: t("imageModelHint"),
+          textModel: t("textModelHint"),
           seamTrimSeconds: t("seamTrimSecondsHint"),
           autoCreateCanvas: t("autoCreateCanvasHint"),
           maxWaitMs: t("waitSecondsHint")
@@ -1921,7 +1931,7 @@
           if (section.key === "sectionModels") {
             const shared2 = (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
             const common = !directMode ? [fieldCell(FIELD_BY_KEY.imageUseVideoKey), ...shared2 ? [fieldCell(FIELD_BY_KEY.metaonticApiKey)] : []] : [];
-            const videoFields = ["model", ...directMode || !shared2 ? [directMode ? "volcengineApiKey" : "metaonticApiKey"] : []];
+            const videoFields = ["model", "textModel", ...directMode || !shared2 ? [directMode ? "volcengineApiKey" : "metaonticApiKey"] : []];
             const imageFields = ["imageModel", ...!shared2 ? ["imageApiKey"] : []];
             return h("div", { key: section.key, className: "mov-model-settings" }, [
               ...common,
@@ -2752,12 +2762,14 @@
       const patchScriptDialog = React.useCallback((patch) => setScriptDialog((current) => current ? { ...current, ...patch } : current), []);
       const openScript = React.useCallback(async () => {
         setError("");
-        setScriptDialog({ text: "", totalSeconds: 15, segmentSeconds: 15, singleMax: 15, ratio: "16:9", resolution: "720p", busy: false, error: "", plan: null });
+        setScriptDialog({ text: "", idea: "", totalSeconds: 15, segmentSeconds: 15, singleMax: 15, ratio: "16:9", resolution: "720p", busy: false, error: "", plan: null });
         try {
           const info = await canvasNativeRpc({ action: "info" });
           if (!alive.current) return;
           patchScriptDialog({
             singleMax: info?.singleMax || 15,
+            textModel: info?.textModel || "",
+            textReady: info?.textReady !== false,
             totalSeconds: Math.min(15, info?.singleMax || 15),
             segmentSeconds: info?.singleMax || 15,
             ...info?.videoReady === false ? { error: "\u8FD8\u6CA1\u914D\u7F6E\u89C6\u9891API\u5BC6\u94A5\uFF0C\u53EF\u4EE5\u5148\u94FA\u8282\u70B9\uFF0C\u914D\u7F6E\u597D\u518D\u751F\u6210\u3002" } : {}
@@ -2766,6 +2778,30 @@
           if (alive.current) patchScriptDialog({ error: e?.message || "\u5236\u4F5C\u670D\u52A1\u5C1A\u672A\u5C31\u7EEA\u3002" });
         }
       }, [patchScriptDialog]);
+      const writeWithModel = React.useCallback(async () => {
+        if (!canvas || !scriptDialog) return;
+        const idea = String(scriptDialog.idea || "").trim();
+        if (!idea) {
+          patchScriptDialog({ error: "\u5148\u5199\u4E00\u53E5\u60F3\u62CD\u4EC0\u4E48\uFF0C\u6587\u672C\u6A21\u578B\u624D\u6709\u5F97\u5199\u3002" });
+          return;
+        }
+        patchScriptDialog({ busy: true, error: "", plan: null });
+        try {
+          const result = await canvasNativeRpc({
+            action: "write",
+            projectId: canvas.projectId,
+            idea,
+            totalSeconds: scriptDialog.totalSeconds,
+            segmentSeconds: scriptDialog.segmentSeconds,
+            ratio: scriptDialog.ratio
+          });
+          if (!alive.current) return;
+          patchScriptDialog({ busy: false, text: result.script, error: "" });
+          setNotice(`\u6587\u672C\u6A21\u578B\uFF08${result.model}\uFF09\u5DF2\u5199\u51FA\u5267\u672C\uFF1A\u6838\u5BF9\u5206\u955C\u8868\u540E\u70B9\u300C\u9884\u89C8\u5206\u6BB5\u300D\uFF0C\u518D\u751F\u6210\u5236\u4F5C\u8282\u70B9\u3002`);
+        } catch (e) {
+          if (alive.current) patchScriptDialog({ busy: false, error: e?.message || "\u6587\u672C\u6A21\u578B\u6CA1\u6709\u5199\u51FA\u811A\u672C\u3002" });
+        }
+      }, [canvas, scriptDialog, patchScriptDialog]);
       const previewScript = React.useCallback(async () => {
         if (!canvas || !scriptDialog) return;
         const text = String(scriptDialog.text || "").trim();
@@ -3354,8 +3390,12 @@
           } },
           h("div", { key: "body", className: "movc-modal-body" }, [
             h("h4", { key: "h" }, "\u5199\u811A\u672C\u5E76\u751F\u6210\u5236\u4F5C\u8282\u70B9"),
-            h("label", { key: "text", className: "movc-field" }, ["\u811A\u672C\u5185\u5BB9", h("textarea", {
-              autoFocus: true,
+            h("label", { key: "idea", className: "movc-field" }, ["\u60F3\u62CD\u4EC0\u4E48\uFF08\u4EA4\u7ED9\u6587\u672C\u6A21\u578B\u5199\u6210\u811A\u672C\uFF09", h("input", {
+              value: scriptDialog.idea,
+              placeholder: "\u4E00\u53E5\u8BDD\u5C31\u591F\uFF0C\u4F8B\u5982\uFF1A\u9752\u65C5\u5929\u53F0\u7684\u6E05\u6668\uFF0C\u4E00\u4E2A\u4EBA\u62D6\u7740\u884C\u674E\u4F4F\u8FDB\u57CE\u5E02\u3002",
+              onChange: (e) => patchScriptDialog({ idea: e.target.value, error: "" })
+            })]),
+            h("label", { key: "text", className: "movc-field" }, ["\u811A\u672C\u5185\u5BB9\uFF08\u53EF\u4EE5\u76F4\u63A5\u5199\uFF0C\u4E5F\u53EF\u4EE5\u8BA9\u6587\u672C\u6A21\u578B\u5199\uFF09", h("textarea", {
               value: scriptDialog.text,
               placeholder: "\u5199\u4E0B\u8981\u62CD\u7684\u5185\u5BB9\u3002\u5199\u6210 Markdown \u5206\u955C\u8868\uFF08\u8868\u5934\u542B\u300C\u955C\u5934\u300D\u300C\u753B\u9762\u300D\u4E24\u5217\uFF09\u65F6\u4F1A\u6309\u5206\u955C\u5207\u6BB5\uFF1B\u5426\u5219\u6309\u53E5\u5B50\u3001\u6BB5\u843D\u6309\u5B57\u6570\u5747\u5206\u3002\u5199\u591A\u5C11\u62C6\u591A\u5C11\uFF0C\u4E0D\u81EA\u52A8\u7F16\u5185\u5BB9\u3002",
               onChange: (e) => patchScriptDialog({ text: e.target.value, error: "" })
@@ -3368,7 +3408,7 @@
               h("label", { key: "ratio", className: "movc-field" }, ["\u753B\u5E45", h("select", { value: scriptDialog.ratio, onChange: (e) => patchScriptDialog({ ratio: e.target.value }) }, RATIOS.map((r) => h("option", { key: r, value: r }, r)))]),
               h("label", { key: "resolution", className: "movc-field" }, ["\u6E05\u6670\u5EA6", h("select", { value: scriptDialog.resolution, onChange: (e) => patchScriptDialog({ resolution: e.target.value }) }, RESOLUTIONS.map((r) => h("option", { key: r, value: r }, r.toUpperCase())))])
             ]),
-            h("p", { key: "note", className: "movc-status" }, `\u5F53\u524D\u6A21\u578B\u5355\u6BB5\u4E0A\u9650 ${scriptDialog.singleMax || 15} \u79D2\uFF1A\u76EE\u6807\u65F6\u957F\u4E0D\u8D85\u8FC7\u4E0A\u9650\u53EA\u5EFA\u4E00\u6BB5\uFF0C\u8D85\u8FC7\u624D\u6309\u6BCF\u6BB5\u65F6\u957F\u6392\u7EED\u62CD\u6BB5\u3002\u8282\u70B9\u5EFA\u597D\u540E\u4ECD\u8981\u9010\u6BB5\u6838\u5BF9\u65B9\u6848\u3001\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u3002`),
+            h("p", { key: "note", className: "movc-status" }, `\u5F53\u524D\u6A21\u578B\u5355\u6BB5\u4E0A\u9650 ${scriptDialog.singleMax || 15} \u79D2\uFF1A\u76EE\u6807\u65F6\u957F\u4E0D\u8D85\u8FC7\u4E0A\u9650\u53EA\u5EFA\u4E00\u6BB5\uFF0C\u8D85\u8FC7\u624D\u6309\u6BCF\u6BB5\u65F6\u957F\u6392\u7EED\u62CD\u6BB5\u3002\u8282\u70B9\u5EFA\u597D\u540E\u4ECD\u8981\u9010\u6BB5\u6838\u5BF9\u65B9\u6848\u3001\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u3002\u300CAI \u5199\u811A\u672C\u300D\u4F1A\u6309\u8BBE\u7F6E\u9875\u7684\u6587\u672C\u6A21\u578B\uFF08${scriptDialog.textModel || "\u6587\u672C\u6A21\u578B"}\uFF09\u8C03\u7528\u4E00\u6B21\uFF0C\u5355\u72EC\u6309\u6587\u672C\u8BA1\u8D39\u3002`),
             scriptDialog.plan ? h("div", { key: "plan", className: "movc-plan" }, [
               h("div", { key: "head" }, `\u5206\u6BB5\u8BA1\u5212\uFF1A${scriptDialog.plan.segments.length} \u6BB5 \xB7 \u5171 ${scriptDialog.plan.totalSeconds} \u79D2${scriptDialog.plan.shots?.length ? ` \xB7 \u8BC6\u522B\u5230 ${scriptDialog.plan.shots.length} \u4E2A\u5206\u955C` : ""}`),
               ...scriptDialog.plan.segments.map((segment, index) => h("div", { key: `s${index}` }, `\u7B2C${index + 1}\u6BB5 ${segment.seconds} \u79D2\uFF08${segment.kind === "extend" ? "\u7EED\u62CD" : "\u9996\u6BB5"}\uFF09\uFF1A${String(segment.prompt).slice(0, 90)}${String(segment.prompt).length > 90 ? "\u2026" : ""}`))
@@ -3376,6 +3416,7 @@
             scriptDialog.error ? h("p", { key: "err", className: "movc-status", "data-error": "true" }, scriptDialog.error) : null,
             h("div", { key: "ops", className: "movc-bar" }, [
               h("button", { key: "cancel", type: "button", className: "mov-btn", disabled: scriptDialog.busy, onClick: () => setScriptDialog(null) }, "\u53D6\u6D88"),
+              h("button", { key: "write", type: "button", className: "mov-btn", disabled: scriptDialog.busy, title: "\u7528\u8BBE\u7F6E\u9875\u91CC\u914D\u7F6E\u7684\u6587\u672C\u6A21\u578B\u628A\u300C\u60F3\u62CD\u4EC0\u4E48\u300D\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF0C\u4F1A\u8C03\u7528\u4E00\u6B21\u6587\u672C\u6A21\u578B", onClick: () => void writeWithModel() }, "AI \u5199\u811A\u672C"),
               h("button", { key: "preview", type: "button", className: "mov-btn", disabled: scriptDialog.busy, onClick: () => void previewScript() }, "\u9884\u89C8\u5206\u6BB5"),
               h("button", { key: "ok", type: "button", className: "mov-btn mov-btn-primary", disabled: scriptDialog.busy, onClick: () => void createFromScript() }, "\u751F\u6210\u5236\u4F5C\u8282\u70B9")
             ])
