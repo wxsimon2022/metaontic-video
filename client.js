@@ -2409,6 +2409,99 @@
     for (const node of author) visit(node);
     return ordered.map((node) => ({ id: node.id, type: node.type, label: String(node?.data?.label || (node.type === "image" ? "\u56FE\u7247" : "\u89C6\u9891")), done: produced.has(node.id) }));
   }
+  var NODE_SIZE = { script: [420, 320], storyboard: [460, 340], text: [360, 200], video: [360, 300], image: [360, 300] };
+  function nodeSize(node) {
+    const fallback = NODE_SIZE[node?.type] || [360, 260];
+    return { w: Number(node?.w) || fallback[0], h: Number(node?.h) || fallback[1] };
+  }
+  function tidyLayout(canvas) {
+    const nodes = Object.values(canvas?.nodes || {});
+    const positions = {};
+    if (!nodes.length) return { positions, moved: 0, width: 0, height: 0 };
+    const GAP_X = 140, GAP_Y = 56, MARGIN = 60, GRID = 10;
+    const ids = new Set(nodes.map((node) => node.id));
+    const links = (Array.isArray(canvas?.edges) ? canvas.edges : []).filter((edge) => ids.has(edge?.fromNode) && ids.has(edge?.toNode) && edge.fromNode !== edge.toNode);
+    const inbound = new Map(nodes.map((node) => [node.id, []]));
+    const outbound = new Map(nodes.map((node) => [node.id, []]));
+    for (const edge of links) {
+      inbound.get(edge.toNode).push(edge.fromNode);
+      outbound.get(edge.fromNode).push(edge.toNode);
+    }
+    const layer = new Map(nodes.map((node) => [node.id, 0]));
+    const indegree = new Map(nodes.map((node) => [node.id, (inbound.get(node.id) || []).length]));
+    const queue = nodes.filter((node) => (indegree.get(node.id) || 0) === 0).map((node) => node.id);
+    const settled = /* @__PURE__ */ new Set();
+    const settle = (id) => {
+      if (settled.has(id)) return;
+      settled.add(id);
+      for (const down of outbound.get(id) || []) {
+        if (settled.has(down)) continue;
+        layer.set(down, Math.max(layer.get(down) || 0, (layer.get(id) || 0) + 1));
+        indegree.set(down, (indegree.get(down) || 0) - 1);
+        if ((indegree.get(down) || 0) <= 0) queue.push(down);
+      }
+    };
+    const drain = () => {
+      while (queue.length) settle(queue.shift());
+    };
+    drain();
+    for (const node of nodes) {
+      if (!settled.has(node.id)) {
+        settle(node.id);
+        drain();
+      }
+    }
+    const ranks = [...new Set(nodes.map((node) => layer.get(node.id) || 0))].sort((a, b) => a - b);
+    const columnOf = new Map(ranks.map((rank, index) => [rank, index]));
+    const columns = ranks.map(() => []);
+    for (const node of nodes) columns[columnOf.get(layer.get(node.id) || 0)].push(node);
+    const widthOfColumn = columns.map((column) => Math.max(...column.map((node) => nodeSize(node).w)));
+    const lefts = [];
+    let cursor = MARGIN;
+    for (const width2 of widthOfColumn) {
+      lefts.push(cursor);
+      cursor += width2 + GAP_X;
+    }
+    const width = cursor - GAP_X + MARGIN;
+    const stack = (order2) => {
+      const tops = /* @__PURE__ */ new Map();
+      let height = 0;
+      for (const column of order2) {
+        let y = MARGIN;
+        for (const node of column) {
+          tops.set(node.id, y);
+          y += nodeSize(node).h + GAP_Y;
+        }
+        height = Math.max(height, y - GAP_Y + MARGIN);
+      }
+      const centers = /* @__PURE__ */ new Map();
+      for (const column of order2) for (const node of column) centers.set(node.id, (tops.get(node.id) || 0) + nodeSize(node).h / 2);
+      return { tops, centers, height };
+    };
+    const barycenter = (node, centers) => {
+      const around = [...inbound.get(node.id) || [], ...outbound.get(node.id) || []].map((id) => centers.get(id)).filter((value) => typeof value === "number");
+      return around.length ? around.reduce((sum, value) => sum + value, 0) / around.length : Number.POSITIVE_INFINITY;
+    };
+    let order = columns;
+    let draft = stack(order);
+    for (let round = 0; round < 3; round += 1) {
+      order = order.map((column) => [...column].sort((a, b) => barycenter(a, draft.centers) - barycenter(b, draft.centers) || String(a.id).localeCompare(String(b.id))));
+      draft = stack(order);
+    }
+    const snap = (value) => Math.round(value / GRID) * GRID;
+    let moved = 0;
+    order.forEach((column, index) => {
+      const columnHeight = column.reduce((sum, node) => sum + nodeSize(node).h + GAP_Y, -GAP_Y);
+      const offset = snap((draft.height - columnHeight) / 2);
+      for (const node of column) {
+        const x = snap(lefts[index]);
+        const y = snap((draft.tops.get(node.id) || 0) + offset);
+        positions[node.id] = { x, y };
+        if (Math.round(Number(node.x) || 0) !== x || Math.round(Number(node.y) || 0) !== y) moved += 1;
+      }
+    });
+    return { positions, moved, width, height: draft.height };
+  }
   function createCanvasView({ React, h, TOKENS }) {
     const ROOT_CLASS = "mov-section movc";
     const rpc = async (method, args = {}) => {
@@ -2418,8 +2511,7 @@
       return body;
     };
     const mediaUrl = (assetId) => `/metaontic-video/canvas-media?assetId=${encodeURIComponent(assetId)}`;
-    const NODE_SIZE = { script: [420, 320], storyboard: [460, 340], text: [360, 200], video: [360, 300], image: [360, 300] };
-    const sizeOf = (node) => ({ w: Number(node?.w) || (NODE_SIZE[node?.type] || [360, 260])[0], h: Number(node?.h) || (NODE_SIZE[node?.type] || [360, 260])[1] });
+    const sizeOf = (node) => nodeSize(node);
     const labelOf = (node) => String(node?.data?.label || { script: "\u5267\u672C", storyboard: "\u5206\u955C", text: "\u8BF4\u660E", video: "\u89C6\u9891", image: "\u56FE\u7247" }[node?.type] || "\u8282\u70B9");
     const textOf2 = (node) => String(node?.data?.output || node?.data?.text || node?.data?.prompt || "");
     const RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4"];
@@ -2443,7 +2535,7 @@
 .movc-name-empty { font-size: 13px; font-weight: 600; color: ${TOKENS.muted}; }
 /* \u5DE5\u5177\u6761\u6309\u94AE\uFF1A\u6CBF\u7528 .mov-btn \u7684 8px \u5706\u89D2\u3001\u63CF\u8FB9\u4E0E\u4E3B\u8272\uFF0C\u53EA\u628A\u56FA\u5B9A 120px \u5BBD\u6539\u6210\u6309\u5185\u5BB9\u6392\u5E03\u3002 */
 .movc-ops { flex: 1 1 auto; min-width: 0; gap: 6px; row-gap: 8px; container-type: inline-size; }
-.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 32px; min-height: 32px; padding: 0 12px; font-size: 12px; white-space: nowrap; overflow-wrap: normal; }
+.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 32px; min-height: 32px; padding: 0 14px; border-radius: 8px; font-size: 12px; white-space: nowrap; overflow-wrap: normal; }
 .movc-ops .movc-danger:hover:not(:disabled) { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
 .movc-flow { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; white-space: nowrap; }
 /* \u6D41\u7A0B\u4E3B\u884C\u52A8\uFF1A\u7528\u4E3B\u8272\u63CF\u8FB9\u7A81\u51FA\uFF0C\u4F46\u4E0D\u548C\u300C\u65B0\u5EFA\u753B\u5E03\u2026\u300D\u7684\u5B9E\u5FC3\u4E3B\u6309\u94AE\u62A2\u6CE8\u610F\u529B\u3002 */
@@ -2454,7 +2546,7 @@
 @container (max-width: 460px) { .movc-sep { display: none; } }
 .movc-ops .mov-btn:focus-visible, .movc-chip:focus-visible, .movc-mini:focus-visible, .movc-name-text:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
 .movc-ops .mov-btn:active:not(:disabled), .movc-chip:active, .movc-mini:active { opacity: .82; }
-.movc-chip { display: inline-flex; align-items: center; box-sizing: border-box; height: 30px; padding: 0 10px; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.movc-chip { display: inline-flex; align-items: center; box-sizing: border-box; height: 30px; padding: 0 14px; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
 .movc-chip:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
 .movc-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
@@ -2472,7 +2564,7 @@
 .movc-node-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
 .movc-badge { color: ${TOKENS.muted}; }
 .movc-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
-.movc-mini { flex: 0 0 auto; font: inherit; font-size: 11px; padding: 2px 8px; border: 1px solid ${TOKENS.border}; border-radius: 6px; background: transparent; color: ${TOKENS.text}; cursor: pointer; transition: border-color .15s, color .15s, opacity .15s; }
+.movc-mini { flex: 0 0 auto; font: inherit; font-size: 11px; padding: 3px 10px; border: 1px solid ${TOKENS.border}; border-radius: 6px; background: transparent; color: ${TOKENS.text}; cursor: pointer; transition: border-color .15s, color .15s, opacity .15s; }
 .movc-mini:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-mini-danger:hover { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
 .movc-body { font-size: 12px; line-height: 1.6; color: ${TOKENS.muted}; white-space: pre-wrap; overflow: auto; flex: 1; }
@@ -2492,12 +2584,12 @@
 .movc-plan { font-size: 12px; line-height: 1.7; background: ${TOKENS.controlFill}; border-radius: 8px; padding: 10px 12px; }
 .movc-marquee { position: absolute; border: 1px dashed ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}1f; pointer-events: none; border-radius: 4px; }
 .movc-name { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 160px; min-width: 0; }
-.movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; font-size: 14px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
+.movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 12px; font-size: 14px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
 .movc-name-text:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
-.movc-name input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 13px; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.primaryFill}; border-radius: 8px; padding: 5px 8px; }
+.movc-name input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 13px; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.primaryFill}; border-radius: 8px; padding: 5px 12px; }
 .movc-name-err { flex: 1 1 100%; font-size: 12px; color: #c0392b; }
 /* \u5F39\u7A97\u91CC\u7684\u6309\u94AE\u6309\u5185\u5BB9\u81EA\u9002\u5E94\uFF0C\u4E0D\u6491\u6210\u8BBE\u7F6E\u9875\u90A3\u79CD 120px \u65B9\u5757\u3002 */
-.movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; white-space: nowrap; overflow-wrap: normal; }
+.movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; border-radius: 8px; white-space: nowrap; overflow-wrap: normal; }
 `;
     function nodeBody(node) {
       const data = node?.data || {};
@@ -2533,6 +2625,7 @@
       const marqueeDone = React.useRef(false);
       const timer = React.useRef(null);
       const alive = React.useRef(true);
+      const stageRef = React.useRef(null);
       React.useEffect(() => () => {
         alive.current = false;
         if (timer.current) clearInterval(timer.current);
@@ -2617,6 +2710,36 @@
           setError(e?.message || "\u5BFC\u51FA\u753B\u5E03\u5931\u8D25");
         }
       }, [canvas]);
+      const tidy = React.useCallback(async () => {
+        if (!canvas) return;
+        try {
+          setError("");
+          const { positions: spots, moved } = tidyLayout(canvas);
+          if (!moved) {
+            setNotice("\u5F53\u524D\u5E03\u5C40\u5DF2\u7ECF\u6574\u9F50\uFF0C\u65E0\u9700\u8C03\u6574\u3002");
+            return;
+          }
+          for (const node of Object.values(canvas.nodes || {})) {
+            const spot = spots[node.id];
+            if (!spot) continue;
+            if (Math.round(Number(node.x) || 0) === spot.x && Math.round(Number(node.y) || 0) === spot.y) continue;
+            await rpc("nodeSave", { projectId: canvas.projectId, node: { id: node.id, x: spot.x, y: spot.y } });
+          }
+          setPositions({});
+          await refresh();
+          const rect = stageRef.current?.getBoundingClientRect?.();
+          if (rect?.width && rect?.height) {
+            const boxes = Object.values(canvas.nodes || {}).map((node) => ({ ...nodeSize(node), ...spots[node.id] || { x: Number(node.x) || 0, y: Number(node.y) || 0 } }));
+            const left = Math.min(...boxes.map((box) => box.x)), top = Math.min(...boxes.map((box) => box.y));
+            const spanX = Math.max(1, Math.max(...boxes.map((box) => box.x + box.w)) - left), spanY = Math.max(1, Math.max(...boxes.map((box) => box.y + box.h)) - top);
+            const scale = Math.min(1, Math.max(0.3, Math.min((rect.width - 80) / spanX, (rect.height - 80) / spanY)));
+            setView({ scale, x: 40 - left * scale + Math.max(0, (rect.width - 80 - spanX * scale) / 2), y: 30 - top * scale + Math.max(0, (rect.height - 80 - spanY * scale) / 2) });
+          }
+          setNotice(`\u5DF2\u7F8E\u5316\u5E03\u5C40\uFF1A${moved} \u4E2A\u8282\u70B9\u6309\u8FDE\u7EBF\u91CD\u6392\uFF1B\u5185\u5BB9\u4E0E\u8FDE\u7EBF\u6CA1\u52A8\uFF0C\u4E4B\u540E\u4ECD\u53EF\u624B\u52A8\u5FAE\u8C03\u3002`);
+        } catch (e) {
+          setError(e?.message || "\u7F8E\u5316\u5E03\u5C40\u5931\u8D25");
+        }
+      }, [canvas, refresh]);
       const connectTo = React.useCallback(async (to) => {
         if (!canvas || !connectFrom || connectFrom === to) return;
         const from = (canvas.nodes || {})[connectFrom];
@@ -2983,6 +3106,7 @@
             canvas && steps.length ? h("span", { key: "flow-progress", className: "movc-flow" }, `\u6D41\u7A0B\u8FDB\u5EA6 ${doneSteps}/${steps.length}${nextStep ? "" : " \xB7 \u5168\u90E8\u6709\u6210\u679C"}`) : null,
             canvas ? h("span", { key: "sep-c", className: "movc-sep" }) : null,
             canvas ? h("button", { key: "refresh", type: "button", className: "mov-btn", onClick: () => void refresh() }, "\u5237\u65B0") : null,
+            canvas ? h("button", { key: "tidy", type: "button", className: "mov-btn", title: "\u6309\u8FDE\u7EBF\u91CD\u6392\u8282\u70B9\u3001\u81EA\u52A8\u7559\u767D\u5BF9\u9F50\u5E76\u9002\u914D\u89C6\u56FE\uFF0C\u4E0D\u6539\u5185\u5BB9\u4E0E\u8FDE\u7EBF", onClick: () => void tidy() }, "\u7F8E\u5316\u5E03\u5C40") : null,
             canvas ? h("button", { key: "reset", type: "button", className: "mov-btn", onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, "\u91CD\u7F6E\u89C6\u56FE") : null,
             canvas ? h("button", { key: "export", type: "button", className: "mov-btn", onClick: () => exportCanvas() }, "\u5BFC\u51FA JSON") : null,
             canvas ? h("span", { key: "sep-d", className: "movc-sep" }) : null,
@@ -3004,6 +3128,7 @@
           "div",
           {
             key: "stage",
+            ref: stageRef,
             className: "movc-stage",
             "data-panning": String(panning),
             "data-connect": String(Boolean(connectFrom)),
@@ -3103,7 +3228,7 @@
           } }) : null
         ) : null,
         canvas && steps.length ? h("p", { key: "flow-hint", className: "movc-hint" }, nextStep ? `\u6D41\u7A0B\uFF1A\u6309\u8FDE\u7EBF\u987A\u5E8F\u9010\u4E2A\u5236\u4F5C\uFF0C\u5F53\u524D\u8F6E\u5230\u300C${nextStep.label}\u300D\uFF08\u753B\u5E03\u4E0A\u865A\u7EBF\u6846\u6807\u51FA\uFF09\u3002\u70B9\u4E0A\u9762\u7684\u300C\u5236\u4F5C\u300D\u6309\u94AE\u4F1A\u8BFB\u53D6\u8282\u70B9\u5185\u5BB9\u4E0E\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u62FC\u51FA\u63D0\u793A\u8BCD\uFF0C\u4ECD\u7136\u8981\u5148\u6838\u5BF9\u5236\u4F5C\u65B9\u6848\u3001\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u624D\u4F1A\u8C03\u7528\u6A21\u578B\u3002` : `\u6D41\u7A0B\uFF1A${steps.length} \u4E2A\u5236\u4F5C\u8282\u70B9\u90FD\u5DF2\u6709\u56DE\u586B\u6210\u679C\u3002\u8981\u91CD\u505A\u67D0\u4E00\u6BB5\uFF0C\u70B9\u8BE5\u8282\u70B9\u91CC\u7684\u300C\u5236\u4F5C\u300D\uFF0C\u91CD\u65B0\u6838\u5BF9\u65B9\u6848\u5E76\u786E\u8BA4\u8D39\u7528\u3002`) : null,
-        canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D\uFF08Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
+        canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D\uFF08Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\uFF1B\u8282\u70B9\u6446\u4E71\u4E86\u70B9\u300C\u7F8E\u5316\u5E03\u5C40\u300D\u6309\u8FDE\u7EBF\u4E00\u952E\u91CD\u6392\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
         connectFrom ? h("p", { key: "connect", className: "movc-hint" }, "\u8FDE\u7EBF\u6A21\u5F0F\uFF1A\u70B9\u51FB\u76EE\u6807\u8282\u70B9\u5B8C\u6210\u8FDE\u63A5\uFF0C\u70B9\u7A7A\u767D\u5904\u53D6\u6D88\u3002") : null,
         confirmDelete ? h(
           "div",

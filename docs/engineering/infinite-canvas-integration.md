@@ -255,3 +255,32 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 未覆盖：真实 Harness 桌面窗口里的观感与点击（需宿主重载后人工复核）；画布内付费生成链路未实跑；Windows 未实测。
 
 本地成品：`.local/test/3.20.1-test.24/metaontic-video-3.20.1-test.24.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+
+## 脚本审核/费用试算改成插件摘要卡片 3.20.1-test.25
+
+用户反馈"脚本审核时出现了代码块"：插件只给 `video_generate/video_extend/video_status/video_prepare_image` 注册了 `tool.call.toolview`，而卡片里真正自绘的只有 `video_generate/video_extend`；脚本审核用的 `video_project`（prepare/review/review_segment/status）和费用试算 `video_estimate` 没有自定义视图，于是落到宿主默认卡片，把工具返回的 JSON 铺成代码块。
+
+- `client/tool-result.ts` 新增纯函数 `toolSummary(toolName, block)` 与摘要卡片 `summaryView`，并给 `video_project`、`video_estimate` 注册 `tool.call.toolview`：
+  - 等待中（无 `kind`）：标题「脚本审核 / 费用试算」+「进行中」胶囊 + 动作/目标时长/清晰度等参数行。
+  - 有结果：解析返回 JSON，只列关键结论（项目、状态、下一步、说明、画布同步；试算则给目标时长、画幅/清晰度、两个方案金额与价目日期），状态胶囊用宿主结果标签语言（`mov-chip` / `mov-chip-ok` / `mov-chip-bad`）。原始返回折叠在 `details` 里，按普通正文 `white-space: pre-wrap` 显示，不用 `pre/code`，因此默认视图不再出现代码块。
+  - JSON 解析失败或工具报错时只显示原文/错误态，不编结论；非摘要工具（含 `video_generate` 结果 → 媒体预览、未完成 → 进度条）行为不变。
+- 摘要卡片样式自带（`SUMMARY_CSS`），沿用宿主卡片描边、10px 圆角与 `--dsw-alias-*` 变量，不依赖其它组件的样式是否渲染。
+
+验证：类型检查、构建、464 项自动测试、diff 检查通过。新增测试：等待中卡片结构、审核通过结果的关键行与状态胶囊、原始返回在 `details` 内且整棵卡片树没有 `pre/code`、费用试算两个方案金额、非法 JSON 退回原文、非摘要工具仍走媒体预览/进度；`video views register…` 断言注册键扩到六个工具。另用 Chrome 无头渲染四张卡片截图核对（`/tmp/canvas-toolcard.png`）。
+
+未覆盖：真实宿主对话里的实际渲染（需宿主重载后人工复核）；Windows 未实测。
+
+本地成品：`.local/test/3.20.1-test.25/metaontic-video-3.20.1-test.25.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+
+## 顶部工具条圆角收敛成 8px 3.20.1-test.26
+
+用户反馈顶部按钮"还是有点丑""带上圆角"后又说"圆角小一点""我指的是顶部的按钮"：上一版把工具条按钮、「选择画布」胶囊和节点小按钮都改成了 999px 全圆角，顶部一行看下来偏"药丸"，与宿主按钮语言不一致。
+
+- `canvas-view.ts` 顶部工具条（`.movc-ops .mov-btn`、弹窗按钮、画布名输入）统一回宿主 `.mov-btn` 的 `border-radius: 8px`；「选择画布」胶囊 `.movc-chip` 同为 8px；节点上用的小按钮 `.movc-mini` 收成 6px。高度、内距、描边与配色不变。
+- 测试 `canvas-view-layout` 的断言从"不用胶囊"改为显式校验 `border-radius: 8px`，并禁止画布样式里再出现 `999px`。
+
+验证：类型检查、构建、464 项自动测试、`git diff --check` 通过；用 `.local/canvas-qa/style-preview` 重新构建预览并 Chrome 无头截图（`/tmp/canvas-round8.png`）核对顶部两行按钮圆角。
+
+未覆盖：真实 Harness 桌面窗口里的观感与点击（需宿主重载后人工复核）；Windows 未实测。
+
+本地成品：`.local/test/3.20.1-test.26/metaontic-video-3.20.1-test.26.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。

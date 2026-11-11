@@ -78,7 +78,7 @@ test('画布操作在画布上方：先操作行、再选择画布、最后才�
   assert.ok(find(picker, (node) => node.props.key === 'list'), '画布芯片放在选择画布行里');
 
   const opsLabels = texts(ops);
-  for (const label of ['新建画布…', '+ 文本', '+ 图片', '+ 视频', '刷新', '重置视图', '导出 JSON', '删除画布']) {
+  for (const label of ['新建画布…', '+ 文本', '+ 图片', '+ 视频', '刷新', '美化布局', '重置视图', '导出 JSON', '删除画布']) {
     assert.ok(opsLabels.includes(label), `操作行应有「${label}」：${opsLabels.join('、')}`);
   }
   const pickerLabels = texts(picker);
@@ -107,7 +107,8 @@ test('独立页面样式：工具条两行（操作 + 选择画布），画布�
   const tree = FlowCanvas();
   const css = find(tree, (node) => node.type === 'style').children.join('');
   assert.match(css, /\.movc-ops \.mov-btn \{[^}]*height: 32px/, '工具条按钮按内容排布');
-  assert.doesNotMatch(css, /\.movc-ops \.mov-btn \{[^}]*border-radius: 999px/, '按钮沿用宿主 8px 圆角，不用胶囊');
+  assert.match(css, /\.movc-ops \.mov-btn \{[^}]*border-radius: 8px/, '按钮沿用宿主 8px 圆角，不用胶囊');
+  assert.doesNotMatch(css, /border-radius: 999px/, '画布内的控件不用胶囊圆角');
   assert.match(css, /\.movc-stage \{[^}]*height: clamp\(520px, calc\(100vh - 320px\), 1400px\)/, '画布区按视口高度撑开');
   assert.match(css, /\.movc-top \{[^}]*flex-direction: column/, '操作行与选择画布行上下排布');
   assert.ok(!/打开独立页面/.test(texts(tree).join('')), '独立页面里不再有「打开独立页面」按钮');
@@ -135,6 +136,81 @@ test('流程顺序：按连线从上游排队，成果节点不参与，已产�
   assert.equal(steps[0].done, true, '有成果节点指回 v1');
   assert.equal(steps[1].done, false);
   assert.equal(context.flowSteps(null).length, 0);
+});
+
+test('一键美化布局：按连线分层、上下游不重叠、成果节点排在源节点右侧', () => {
+  const context = vm.createContext({});
+  vm.runInContext(sourceOf('businesses/video/client/canvas-view'), context);
+  const boxes = (positions, nodes) => Object.entries(positions).map(([id, spot]) => {
+    const node = nodes[id];
+    const w = Number(node.w) || 360, h = Number(node.h) || 300;
+    return { id, x: spot.x, y: spot.y, w, h };
+  });
+  const canvas = {
+    nodes: {
+      script: { id: 'script', type: 'script', x: 900, y: 0, w: 420, h: 320, data: { text: '剧本' } },
+      v1: { id: 'v1', type: 'video', x: 40, y: 700, w: 360, h: 300, data: { label: '第一段' } },
+      v2: { id: 'v2', type: 'video', x: 0, y: 0, w: 360, h: 300, data: { label: '第二段' } },
+      out: { id: 'out', type: 'video', x: 5, y: 5, w: 360, h: 280, metaonticSourceNode: 'v1', data: { assetId: 'a1' } },
+    },
+    edges: [
+      { id: 'e1', fromNode: 'script', toNode: 'v1', fromPort: 'out', toPort: 'prompt' },
+      { id: 'e2', fromNode: 'v1', toNode: 'v2', fromPort: 'out', toPort: 'prompt' },
+      { id: 'e3', fromNode: 'v1', toNode: 'out', fromPort: 'out', toPort: 'prompt', metaonticResult: true },
+    ],
+  };
+  const { positions, moved } = context.tidyLayout(canvas);
+  assert.equal(moved, 4, '四个节点原本都摆乱了，应该都被重排');
+  assert.ok(positions.script.x < positions.v1.x, '剧本排在制作节点左侧');
+  assert.ok(positions.v1.x < positions.v2.x, '按连线从左到右分层');
+  assert.ok(positions.v1.x < positions.out.x, '成果节点排在源节点右侧');
+  const spots = boxes(positions, canvas.nodes);
+  for (const a of spots) for (const b of spots) {
+    if (a.id === b.id) continue;
+    const overlap = a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    assert.ok(!overlap, `${a.id} 与 ${b.id} 不该重叠`);
+  }
+  for (const spot of spots) assert.equal(spot.x % 10, 0, '坐标对齐到 10px 网格');
+  // 再排一次应当认为已经整齐，且结果稳定。
+  const again = context.tidyLayout({ ...canvas, nodes: Object.fromEntries(Object.entries(canvas.nodes).map(([id, node]) => [id, { ...node, ...positions[id] }])) });
+  assert.equal(again.moved, 0, '已经整齐时不再挪动');
+  assert.deepEqual(JSON.parse(JSON.stringify(again.positions)), JSON.parse(JSON.stringify(positions)), '重复排版结果一致');
+  assert.deepEqual(JSON.parse(JSON.stringify(context.tidyLayout({ nodes: {}, edges: [] }))), { positions: {}, moved: 0, width: 0, height: 0 }, '空画布不产生坐标');
+  // 环上也要能收口：两个节点互连时不会卡死，仍然分配坐标。
+  const loop = context.tidyLayout({ nodes: { a: { id: 'a', type: 'video', w: 360, h: 300 }, b: { id: 'b', type: 'video', w: 360, h: 300 } }, edges: [{ id: 'e', fromNode: 'a', toNode: 'b' }, { id: 'f', fromNode: 'b', toNode: 'a' }] });
+  assert.equal(Object.keys(loop.positions).length, 2, '互相连线也能排出版式');
+});
+
+test('点「美化布局」把新坐标写回画布，不改内容与连线', async () => {
+  const saved = [];
+  const doc = () => ({ canvas: { projectId: 'p1', name: '青旅宣传片', dataRoot: '/tmp/canvas',
+    nodes: {
+      a: { id: 'a', type: 'video', x: 800, y: 640, w: 360, h: 300, data: { label: '第一段', prompt: 'A' } },
+      b: { id: 'b', type: 'video', x: 0, y: 0, w: 360, h: 300, data: { label: '第二段', prompt: 'B' } },
+    },
+    edges: [{ id: 'e1', fromNode: 'a', toNode: 'b', fromPort: 'out', toPort: 'prompt' }] } });
+  const { FlowCanvas, mini } = harness({
+    list: { canvases: [{ projectId: 'p1', name: '青旅宣传片', nodeCount: 2 }] },
+    get: doc,
+    nodeSave: (args) => { saved.push(args.node); return { canvas: { projectId: 'p1', node: { ...args.node, type: (doc().canvas.nodes)[args.node.id].type, data: {} } } }; },
+  });
+  mini.begin(); FlowCanvas();
+  await mini.flush();
+  mini.begin();
+  const tree = FlowCanvas();
+  const button = find(tree, (node) => node.props.key === 'tidy');
+  assert.ok(button, '操作行应有「美化布局」按钮');
+  assert.ok(texts(button).includes('美化布局'), '按钮文案是「美化布局」');
+  button.props.onClick();
+  for (let i = 0; i < 40 && saved.length < 2; i += 1) await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(saved.length, 2, '两个节点都写回了新坐标');
+  assert.deepEqual(saved.map((node) => node.id).sort(), ['a', 'b']);
+  for (const node of saved) {
+    assert.equal(node.data, undefined, '只写坐标，不动节点内容');
+    assert.equal(node.type, undefined, '不重写节点类型');
+    assert.equal(node.x % 10, 0, '坐标对齐 10px 网格');
+  }
+  assert.ok(saved.find((node) => node.id === 'a').x < saved.find((node) => node.id === 'b').x, '上游节点排在前面');
 });
 
 test('工具条给出流程主行动与进度，未完成节点标虚线框', async () => {

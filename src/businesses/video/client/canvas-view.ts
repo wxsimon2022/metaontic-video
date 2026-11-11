@@ -44,6 +44,92 @@ export function flowSteps(canvas: any) {
   return ordered.map(node => ({ id: node.id, type: node.type, label: String(node?.data?.label || (node.type === 'image' ? '图片' : '视频')), done: produced.has(node.id) }));
 }
 
+/** 节点默认尺寸：新建节点、复制节点与自动排版都用同一份，避免各处写死不一样。 */
+export const NODE_SIZE: any = { script: [420, 320], storyboard: [460, 340], text: [360, 200], video: [360, 300], image: [360, 300] };
+export function nodeSize(node: any) {
+  const fallback = NODE_SIZE[node?.type] || [360, 260];
+  return { w: Number(node?.w) || fallback[0], h: Number(node?.h) || fallback[1] };
+}
+
+/** 一键美化布局：按连线从左到右分层、同层按上下游重心排序、整列竖直居中，再对齐到 10px 网格。
+ *  只算坐标，不改内容与连线；是否落库由界面决定。 */
+export function tidyLayout(canvas: any) {
+  const nodes: any[] = Object.values(canvas?.nodes || {});
+  const positions: any = {};
+  if (!nodes.length) return { positions, moved: 0, width: 0, height: 0 };
+  const GAP_X = 140, GAP_Y = 56, MARGIN = 60, GRID = 10;
+  const ids = new Set(nodes.map(node => node.id));
+  const links = (Array.isArray(canvas?.edges) ? canvas.edges : [])
+    .filter((edge: any) => ids.has(edge?.fromNode) && ids.has(edge?.toNode) && edge.fromNode !== edge.toNode);
+  const inbound = new Map<string, string[]>(nodes.map(node => [node.id, []]));
+  const outbound = new Map<string, string[]>(nodes.map(node => [node.id, []]));
+  for (const edge of links) { inbound.get(edge.toNode)!.push(edge.fromNode); outbound.get(edge.fromNode)!.push(edge.toNode); }
+  // 分层：按入度归零逐层推平（最长路径）；互相连线（环）按原顺序就地断开一层，保证排版不会卡死。
+  const layer = new Map<string, number>(nodes.map(node => [node.id, 0]));
+  const indegree = new Map<string, number>(nodes.map(node => [node.id, (inbound.get(node.id) || []).length]));
+  const queue: string[] = nodes.filter(node => (indegree.get(node.id) || 0) === 0).map(node => node.id);
+  const settled = new Set<string>();
+  const settle = (id: string) => {
+    if (settled.has(id)) return;
+    settled.add(id);
+    for (const down of outbound.get(id) || []) {
+      if (settled.has(down)) continue; // 回边（环）不再回推，避免层级被越推越高
+      layer.set(down, Math.max(layer.get(down) || 0, (layer.get(id) || 0) + 1));
+      indegree.set(down, (indegree.get(down) || 0) - 1);
+      if ((indegree.get(down) || 0) <= 0) queue.push(down);
+    }
+  };
+  const drain = () => { while (queue.length) settle(queue.shift()!); };
+  drain();
+  for (const node of nodes) { if (!settled.has(node.id)) { settle(node.id); drain(); } }
+  const ranks = [...new Set(nodes.map(node => layer.get(node.id) || 0))].sort((a, b) => a - b);
+  const columnOf = new Map(ranks.map((rank, index) => [rank, index]));
+  const columns: any[][] = ranks.map(() => []);
+  for (const node of nodes) columns[columnOf.get(layer.get(node.id) || 0)!].push(node);
+  const widthOfColumn = columns.map(column => Math.max(...column.map(node => nodeSize(node).w)));
+  const lefts: number[] = [];
+  let cursor = MARGIN;
+  for (const width of widthOfColumn) { lefts.push(cursor); cursor += width + GAP_X; }
+  const width = cursor - GAP_X + MARGIN;
+  // 排一版：每列从顶部堆叠；重心用于同层排序（父/子节点的纵向中心）。
+  const stack = (order: any[][]) => {
+    const tops = new Map<string, number>();
+    let height = 0;
+    for (const column of order) {
+      let y = MARGIN;
+      for (const node of column) { tops.set(node.id, y); y += nodeSize(node).h + GAP_Y; }
+      height = Math.max(height, y - GAP_Y + MARGIN);
+    }
+    const centers = new Map<string, number>();
+    for (const column of order) for (const node of column) centers.set(node.id, (tops.get(node.id) || 0) + nodeSize(node).h / 2);
+    return { tops, centers, height };
+  };
+  const barycenter = (node: any, centers: Map<string, number>) => {
+    const around = [...(inbound.get(node.id) || []), ...(outbound.get(node.id) || [])]
+      .map(id => centers.get(id)).filter((value): value is number => typeof value === 'number');
+    return around.length ? around.reduce((sum, value) => sum + value, 0) / around.length : Number.POSITIVE_INFINITY;
+  };
+  let order = columns;
+  let draft = stack(order);
+  for (let round = 0; round < 3; round += 1) {
+    order = order.map(column => [...column].sort((a, b) => barycenter(a, draft.centers) - barycenter(b, draft.centers) || String(a.id).localeCompare(String(b.id))));
+    draft = stack(order);
+  }
+  const snap = (value: number) => Math.round(value / GRID) * GRID;
+  let moved = 0;
+  order.forEach((column, index) => {
+    const columnHeight = column.reduce((sum, node) => sum + nodeSize(node).h + GAP_Y, -GAP_Y);
+    const offset = snap((draft.height - columnHeight) / 2);
+    for (const node of column) {
+      const x = snap(lefts[index]);
+      const y = snap((draft.tops.get(node.id) || 0) + offset);
+      positions[node.id] = { x, y };
+      if (Math.round(Number(node.x) || 0) !== x || Math.round(Number(node.y) || 0) !== y) moved += 1;
+    }
+  });
+  return { positions, moved, width, height: draft.height };
+}
+
 export function createCanvasView({ React, h, TOKENS }: any) {
   // 流程画布只作为插件自己的独立页面渲染，空间大，工具条与画布区按整页尺寸排布。
   const ROOT_CLASS = 'mov-section movc';
@@ -54,8 +140,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
     return body;
   };
   const mediaUrl = (assetId: string) => `/metaontic-video/canvas-media?assetId=${encodeURIComponent(assetId)}`;
-  const NODE_SIZE = { script: [420, 320], storyboard: [460, 340], text: [360, 200], video: [360, 300], image: [360, 300] };
-  const sizeOf = (node: any) => ({ w: Number(node?.w) || (NODE_SIZE[node?.type] || [360, 260])[0], h: Number(node?.h) || (NODE_SIZE[node?.type] || [360, 260])[1] });
+  const sizeOf = (node: any) => nodeSize(node);
   const labelOf = (node: any) => String(node?.data?.label || { script: '剧本', storyboard: '分镜', text: '说明', video: '视频', image: '图片' }[node?.type] || '节点');
   const textOf = (node: any) => String(node?.data?.output || node?.data?.text || node?.data?.prompt || '');
   const RATIOS = ['16:9', '9:16', '1:1', '4:3', '3:4'];
@@ -75,7 +160,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
 .movc-name-empty { font-size: 13px; font-weight: 600; color: ${TOKENS.muted}; }
 /* 工具条按钮：沿用 .mov-btn 的 8px 圆角、描边与主色，只把固定 120px 宽改成按内容排布。 */
 .movc-ops { flex: 1 1 auto; min-width: 0; gap: 6px; row-gap: 8px; container-type: inline-size; }
-.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 32px; min-height: 32px; padding: 0 12px; font-size: 12px; white-space: nowrap; overflow-wrap: normal; }
+.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 32px; min-height: 32px; padding: 0 14px; border-radius: 8px; font-size: 12px; white-space: nowrap; overflow-wrap: normal; }
 .movc-ops .movc-danger:hover:not(:disabled) { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
 .movc-flow { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; white-space: nowrap; }
 /* 流程主行动：用主色描边突出，但不和「新建画布…」的实心主按钮抢注意力。 */
@@ -86,7 +171,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
 @container (max-width: 460px) { .movc-sep { display: none; } }
 .movc-ops .mov-btn:focus-visible, .movc-chip:focus-visible, .movc-mini:focus-visible, .movc-name-text:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
 .movc-ops .mov-btn:active:not(:disabled), .movc-chip:active, .movc-mini:active { opacity: .82; }
-.movc-chip { display: inline-flex; align-items: center; box-sizing: border-box; height: 30px; padding: 0 10px; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.movc-chip { display: inline-flex; align-items: center; box-sizing: border-box; height: 30px; padding: 0 14px; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
 .movc-chip:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
 .movc-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
@@ -104,7 +189,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
 .movc-node-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
 .movc-badge { color: ${TOKENS.muted}; }
 .movc-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
-.movc-mini { flex: 0 0 auto; font: inherit; font-size: 11px; padding: 2px 8px; border: 1px solid ${TOKENS.border}; border-radius: 6px; background: transparent; color: ${TOKENS.text}; cursor: pointer; transition: border-color .15s, color .15s, opacity .15s; }
+.movc-mini { flex: 0 0 auto; font: inherit; font-size: 11px; padding: 3px 10px; border: 1px solid ${TOKENS.border}; border-radius: 6px; background: transparent; color: ${TOKENS.text}; cursor: pointer; transition: border-color .15s, color .15s, opacity .15s; }
 .movc-mini:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-mini-danger:hover { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
 .movc-body { font-size: 12px; line-height: 1.6; color: ${TOKENS.muted}; white-space: pre-wrap; overflow: auto; flex: 1; }
@@ -124,12 +209,12 @@ export function createCanvasView({ React, h, TOKENS }: any) {
 .movc-plan { font-size: 12px; line-height: 1.7; background: ${TOKENS.controlFill}; border-radius: 8px; padding: 10px 12px; }
 .movc-marquee { position: absolute; border: 1px dashed ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}1f; pointer-events: none; border-radius: 4px; }
 .movc-name { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 160px; min-width: 0; }
-.movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; font-size: 14px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
+.movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 12px; font-size: 14px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
 .movc-name-text:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
-.movc-name input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 13px; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.primaryFill}; border-radius: 8px; padding: 5px 8px; }
+.movc-name input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 13px; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.primaryFill}; border-radius: 8px; padding: 5px 12px; }
 .movc-name-err { flex: 1 1 100%; font-size: 12px; color: #c0392b; }
 /* 弹窗里的按钮按内容自适应，不撑成设置页那种 120px 方块。 */
-.movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; white-space: nowrap; overflow-wrap: normal; }
+.movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; border-radius: 8px; white-space: nowrap; overflow-wrap: normal; }
 `;
 
   function nodeBody(node: any) {
@@ -167,6 +252,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
     const marqueeDone = React.useRef(false);
     const timer = React.useRef(null as any);
     const alive = React.useRef(true);
+    const stageRef = React.useRef(null as any);
     React.useEffect(() => () => { alive.current = false; if (timer.current) clearInterval(timer.current); }, []);
 
     const load = React.useCallback(async (projectId?: string) => {
@@ -236,6 +322,33 @@ export function createCanvasView({ React, h, TOKENS }: any) {
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       } catch (e: any) { setError(e?.message || '导出画布失败'); }
     }, [canvas])
+
+    /** 一键美化：按连线重排节点坐标（不动内容与连线），随后把整张图适配进画布区。 */
+    const tidy = React.useCallback(async () => {
+      if (!canvas) return;
+      try {
+        setError('');
+        const { positions: spots, moved } = tidyLayout(canvas);
+        if (!moved) { setNotice('当前布局已经整齐，无需调整。'); return; }
+        for (const node of Object.values(canvas.nodes || {}) as any[]) {
+          const spot = spots[node.id];
+          if (!spot) continue;
+          if (Math.round(Number(node.x) || 0) === spot.x && Math.round(Number(node.y) || 0) === spot.y) continue;
+          await rpc('nodeSave', { projectId: canvas.projectId, node: { id: node.id, x: spot.x, y: spot.y } });
+        }
+        setPositions({});
+        await refresh();
+        const rect = stageRef.current?.getBoundingClientRect?.();
+        if (rect?.width && rect?.height) {
+          const boxes = (Object.values(canvas.nodes || {}) as any[]).map(node => ({ ...nodeSize(node), ...(spots[node.id] || { x: Number(node.x) || 0, y: Number(node.y) || 0 }) }));
+          const left = Math.min(...boxes.map(box => box.x)), top = Math.min(...boxes.map(box => box.y));
+          const spanX = Math.max(1, Math.max(...boxes.map(box => box.x + box.w)) - left), spanY = Math.max(1, Math.max(...boxes.map(box => box.y + box.h)) - top);
+          const scale = Math.min(1, Math.max(0.3, Math.min((rect.width - 80) / spanX, (rect.height - 80) / spanY)));
+          setView({ scale, x: 40 - left * scale + Math.max(0, (rect.width - 80 - spanX * scale) / 2), y: 30 - top * scale + Math.max(0, (rect.height - 80 - spanY * scale) / 2) });
+        }
+        setNotice(`已美化布局：${moved} 个节点按连线重排；内容与连线没动，之后仍可手动微调。`);
+      } catch (e: any) { setError(e?.message || '美化布局失败'); }
+    }, [canvas, refresh]);
 
     const connectTo = React.useCallback(async (to: string) => {
       if (!canvas || !connectFrom || connectFrom === to) return;
@@ -528,6 +641,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
           canvas && steps.length ? h('span', { key: 'flow-progress', className: 'movc-flow' }, `流程进度 ${doneSteps}/${steps.length}${nextStep ? '' : ' · 全部有成果'}`) : null,
           canvas ? h('span', { key: 'sep-c', className: 'movc-sep' }) : null,
           canvas ? h('button', { key: 'refresh', type: 'button', className: 'mov-btn', onClick: () => void refresh() }, '刷新') : null,
+          canvas ? h('button', { key: 'tidy', type: 'button', className: 'mov-btn', title: '按连线重排节点、自动留白对齐并适配视图，不改内容与连线', onClick: () => void tidy() }, '美化布局') : null,
           canvas ? h('button', { key: 'reset', type: 'button', className: 'mov-btn', onClick: () => setView({ x: 30, y: 24, scale: 1 }) }, '重置视图') : null,
           canvas ? h('button', { key: 'export', type: 'button', className: 'mov-btn', onClick: () => exportCanvas() }, '导出 JSON') : null,
           canvas ? h('span', { key: 'sep-d', className: 'movc-sep' }) : null,
@@ -543,7 +657,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
       ]),
       error ? h('p', { key: 'error', className: 'movc-hint' }, error) : null,
       !list.length ? h('p', { key: 'empty', className: 'movc-hint' }, '还没有流程画布：确认创作需求后会在这里自动建立，脚本审核后同步分镜与制作段计划，生成成果自动回填；也可以直接「新建画布…」。') : null,
-      canvas ? h('div', { key: 'stage', className: 'movc-stage', 'data-panning': String(panning), 'data-connect': String(Boolean(connectFrom)),
+      canvas ? h('div', { key: 'stage', ref: stageRef, className: 'movc-stage', 'data-panning': String(panning), 'data-connect': String(Boolean(connectFrom)),
         onClick: (event: any) => {
           if (connectFrom) { setConnectFrom(''); return; }
           if (marqueeDone.current) { marqueeDone.current = false; return; }
@@ -596,7 +710,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
       canvas && steps.length ? h('p', { key: 'flow-hint', className: 'movc-hint' }, nextStep
         ? `流程：按连线顺序逐个制作，当前轮到「${nextStep.label}」（画布上虚线框标出）。点上面的「制作」按钮会读取节点内容与上游剧本/分镜拼出提示词，仍然要先核对制作方案、单独确认费用才会调用模型。`
         : `流程：${steps.length} 个制作节点都已有回填成果。要重做某一段，点该节点里的「制作」，重新核对方案并确认费用。`) : null,
-      canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `双击画布名重命名（Enter 保存，Esc 取消）；拖动空白处平移、滚轮缩放；拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
+      canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `双击画布名重命名（Enter 保存，Esc 取消）；拖动空白处平移、滚轮缩放；拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）；节点摆乱了点「美化布局」按连线一键重排。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
       connectFrom ? h('p', { key: 'connect', className: 'movc-hint' }, '连线模式：点击目标节点完成连接，点空白处取消。') : null,
       confirmDelete ? h('div', { key: 'delete-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget) setConfirmDelete(false); } },
         h('div', { key: 'body', className: 'movc-modal-body', style: { width: 'min(420px, calc(100vw - 32px))' } }, [
