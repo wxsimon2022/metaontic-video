@@ -2,8 +2,8 @@
  *  并在图片/视频节点内完成「生成 → 费用确认 → 结果审核 → 续拍」，不依赖任何第三方画布插件。 */
 
 /** 画布内制作服务：与内置画布同一个插件、同一份配置，费用确认沿用插件设置里的API密钥。 */
-export async function canvasNativeRpc(args: any, fetcher: any = fetch) {
-  const response = await fetcher('/metaontic-video/canvas-native', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(args), signal: AbortSignal.timeout(20000) });
+export async function canvasNativeRpc(args: any, fetcher: any = fetch, timeoutMs = 20000) {
+  const response = await fetcher('/metaontic-video/canvas-native', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(args), signal: AbortSignal.timeout(timeoutMs) });
   let body;
   try { body = await response.json(); } catch { throw new Error('画布制作服务尚未就绪，请核对插件加载状态。'); }
   if (!response.ok || body?.error) throw new Error(body?.error || '制作请求未完成，请查询原记录，不要重复生成。');
@@ -47,6 +47,16 @@ export function flowSteps(canvas: any) {
   };
   for (const node of author) visit(node);
   return ordered.map(node => ({ id: node.id, type: node.type, label: String(node?.data?.label || (node.type === 'image' ? '图片' : '视频')), done: produced.has(node.id) }));
+}
+
+/** 成片可合成性：视频制作节点按连线顺序每个都要有成果视频，缺哪段单独列出来。
+ *  与界面「合成成片」按钮和服务端的合并规则同一套判断。 */
+export function filmStatus(canvas: any) {
+  const nodes: any[] = Object.values(canvas?.nodes || {});
+  const order = flowSteps(canvas).filter(step => step.type === 'video');
+  const missing = order.filter(step => !nodes.some(node => node?.metaonticSourceNode === step.id && node?.type === 'video'
+    && (node?.data?.assetId || node?.data?.metaonticVideoUrl)));
+  return { total: order.length, readyCount: order.length - missing.length, missing: missing.map(step => step.label) };
 }
 
 /** 节点默认尺寸：新建节点、复制节点与自动排版都用同一份，避免各处写死不一样。 */
@@ -219,6 +229,8 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
 .movc-status { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
 .movc-status[data-error="true"] { color: #c0392b; }
 .movc-plan { font-size: 12px; line-height: 1.7; background: ${TOKENS.controlFill}; border-radius: 8px; padding: 10px 12px; }
+.movc-link { display: inline-flex; align-items: center; box-sizing: border-box; height: 32px; padding: 0 14px; border: 1px solid ${TOKENS.border}; border-radius: 8px; color: ${TOKENS.text}; font-size: 12px; text-decoration: none; white-space: nowrap; transition: border-color .15s, color .15s; }
+.movc-link:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-marquee { position: absolute; border: 1px dashed ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}1f; pointer-events: none; border-radius: 4px; }
 .movc-name { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 160px; min-width: 0; }
 .movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 12px; font-size: 14px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
@@ -268,6 +280,8 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
     const [createDialog, setCreateDialog] = React.useState(null as any);
     const [scriptDialog, setScriptDialog] = React.useState(null as any);
     const [chainDialog, setChainDialog] = React.useState(null as any);
+    const [filmDialog, setFilmDialog] = React.useState(null as any);
+    const [importing, setImporting] = React.useState(false);
     const [confirmDelete, setConfirmDelete] = React.useState(false);
     const [dialog, setDialog] = React.useState(null as any);
     const pan = React.useRef(null as any);
@@ -275,6 +289,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
     const marqueeDone = React.useRef(false);
     const timer = React.useRef(null as any);
     const chainTimer = React.useRef(null as any);
+    const importRef = React.useRef(null as any);
     const alive = React.useRef(true);
     const stageRef = React.useRef(null as any);
     React.useEffect(() => () => { alive.current = false; if (timer.current) clearInterval(timer.current); if (chainTimer.current) clearInterval(chainTimer.current); }, []);
@@ -346,6 +361,48 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       } catch (e: any) { setError(e?.message || '导出画布失败'); }
     }, [canvas])
+
+    /** 导入自己的图片素材：整张写进画布数据目录，再建一个图片节点；
+     *  之后连到视频节点的「首帧」或「参考图」端口就能直接用于制作，不依赖任何外部图床。 */
+    const importImages = React.useCallback(async (files: any) => {
+      const picked = Array.from(files || []) as any[];
+      if (!canvas || !picked.length) return;
+      setError(''); setImporting(true);
+      const made: string[] = [];
+      try {
+        for (const file of picked) {
+          const response = await fetch(`/metaontic-video/canvas-import?projectId=${encodeURIComponent(canvas.projectId)}&name=${encodeURIComponent(String(file?.name || ''))}`,
+            { method: 'POST', headers: { 'content-type': file?.type || 'application/octet-stream' }, body: file });
+          const body = await response.json().catch(() => ({}));
+          if (!response.ok || body?.error) throw new Error(body?.error || '导入图片未完成。');
+          const id = `usr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+          const count = Object.keys(canvas.nodes || {}).length + made.length;
+          await saveNode(id, { type: 'image', x: 60 + (count % 4) * 420, y: 60 + Math.floor(count / 4) * 360,
+            w: NODE_SIZE.image[0], h: NODE_SIZE.image[1],
+            data: { label: body.name || String(file?.name || '导入图片'), assetId: body.assetId, ratio: '1:1', resolution: '720p', prompt: '' } });
+          made.push(id);
+        }
+        if (made.length) {
+          setSelectedIds(made); await refresh();
+          setNotice(`已导入 ${made.length} 张图片素材：连到视频节点的「首帧」或「参考图」端口就能直接用于制作。真人照片会被视频接口拒绝，先把照片连到图片节点生成一张非真人二维动画风格的图，再用那张当首帧。`);
+        }
+      } catch (e: any) { setError(e?.message || '导入图片失败'); }
+      finally { setImporting(false); if (importRef.current) importRef.current.value = ''; }
+    }, [canvas, saveNode, refresh]);
+
+    /** 合成成片：把已生成的每段视频按连线顺序拼成一条，完成后直接预览、下载。
+     *  合成只读取已有成果，不会重新生成任何段落；缺段会明确报出是第几段。 */
+    const mergeFilm = React.useCallback(async () => {
+      if (!canvas) return;
+      setError('');
+      setFilmDialog({ busy: true, film: canvas.film || null, message: '' });
+      try {
+        const data = await canvasNativeRpc({ action: 'mergeFilm', projectId: canvas.projectId }, fetch, 900000);
+        setFilmDialog({ busy: false, film: data?.film || null, message: '' });
+        await refresh();
+        setNotice(`成片已合成：${data?.film?.count || 0} 段${data?.film?.seconds ? ` · 约 ${Math.round(data.film.seconds)} 秒` : ''}，可直接预览或下载。`);
+      } catch (e: any) { setFilmDialog((current: any) => ({ ...(current || {}), busy: false, message: e?.message || '合成成片未完成。' })); }
+    }, [canvas, refresh]);
 
     /** 落库一版按连线排好的坐标：只写 x/y，不动内容与连线。 */
     const applyLayout = React.useCallback(async (doc: any) => {
@@ -568,6 +625,18 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
       await refresh();
     }, [canvas, refresh]);
 
+    /** 切换媒体端口：首帧和参考图共用同一条边，只是 toPort 不同；改端口就重建这条线，
+     *  让「一张自己的图当开头」和「多张参考图」都能在画布里直接连出来。 */
+    const setEdgePort = React.useCallback(async (edge: any, toPort: string) => {
+      if (!canvas || !edge || edge.toPort === toPort) return;
+      try {
+        setError('');
+        await rpc('edgeDelete', { projectId: canvas.projectId, edgeId: edge.id });
+        await rpc('edgeAdd', { projectId: canvas.projectId, fromNode: edge.fromNode, toNode: edge.toNode, fromPort: 'out', toPort });
+        await refresh();
+      } catch (e: any) { setError(e?.message || '切换素材端口未完成。'); }
+    }, [canvas, refresh]);
+
     /** 删除整张画布要二次确认：删掉的是这份文档，成果素材文件仍留在插件数据目录里。 */
     const deleteCanvas = React.useCallback(async () => {
       if (!canvas) return;
@@ -764,6 +833,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
     };
 
     const steps = flowSteps(canvas);
+    const film = canvas ? filmStatus(canvas) : null;
     const nextStep = steps.find(step => !step.done) || null;
     const doneSteps = steps.filter(step => step.done).length;
     const nodes = canvas ? Object.values(canvas.nodes || {}) : [];
@@ -772,10 +842,16 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
     // 头部状态胶囊：显式标了完成，或画布上已经有它的成果节点。插件自己写 status 的节点（如自动投影的
     // 制作节点）按阶段走「待制作/已完成」，不被成果回填覆盖掉未审核的中间状态。
     const achieved = (node: any) => node?.data?.status === 'done' || (node?.data?.status === undefined && producedIds.has(node?.id));
+    // 导入的图片是素材而不是待制作的镜头：状态标签区分开，免得被当成「还没生成」。
+    const materialOf = (node: any) => Boolean(node?.data?.assetId) && !node?.metaonticSourceNode;
     const geometry = (node: any) => ({ ...node, ...sizeOf(node), ...(positions[node.id] || {}) });
     const at = (id: string) => geometry((canvas?.nodes || {})[id]);
     const kindOf = (id: string) => (canvas?.nodes || {})[id]?.type;
     const dialogNode = dialog ? (canvas?.nodes || {})[dialog.nodeId] : null;
+
+    // 视频节点的上游媒体端口：默认按连线落在「参考图」，需要开头画面时在这里切成「首帧」。
+    const mediaInbound = dialog?.type === 'video' && dialog.stage === 'form'
+      ? edges.filter((edge: any) => edge.toNode === dialog.nodeId && ['ref', 'frame'].includes(edge.toPort) && ['image', 'video'].includes(kindOf(edge.fromNode))) : [];
 
     const formFields = dialog && ['form', 'plan', 'edit'].includes(dialog.stage) ? h('div', { key: 'fields' }, [
       dialog.stage === 'edit'
@@ -788,6 +864,15 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
       ]) : null,
       dialog.type === 'video' && dialog.stage !== 'edit' ? h('label', { key: 'audio', className: 'movc-check' }, [h('input', { type: 'checkbox', checked: dialog.form.generateAudio === true, onChange: (e: any) => patchDialog({ form: { ...dialog.form, generateAudio: e.target.checked } }) }), ' 本次生成音频']) : null,
       dialog.stage === 'plan' && dialog.plan?.operation === 'extend' ? h('label', { key: 'transition', className: 'movc-field' }, ['上一段结尾到本段的衔接描述', h('textarea', { value: dialog.form.transitionDescription, onChange: (e: any) => patchDialog({ form: { ...dialog.form, transitionDescription: e.target.value } }) })]) : null,
+      mediaInbound.length ? h('div', { key: 'ports', className: 'movc-plan' }, [
+        h('div', { key: 'hint' }, '上游素材端口：「首帧」用一张图开画，「参考图」按参考素材参与生成；两者不能同时使用。'),
+        ...mediaInbound.map((edge: any) => h('div', { key: edge.id, className: 'movc-row' }, [
+          h('span', { key: 'name' }, labelOf((canvas?.nodes || {})[edge.fromNode])),
+          h('select', { key: 'port', value: edge.toPort, onChange: (e: any) => void setEdgePort(edge, e.target.value) },
+            ['ref', 'frame'].map(port => h('option', { key: port, value: port }, port === 'frame' ? '首帧' : '参考图'))),
+          h('button', { key: 'off', type: 'button', className: 'mov-btn movc-danger', onClick: () => void removeEdge(edge.id) }, '断开'),
+        ])),
+      ]) : null,
     ]) : null;
 
     const planView = dialog?.stage === 'plan' && dialog.plan ? h('div', { key: 'plan', className: 'movc-plan' }, [
@@ -841,6 +926,15 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
           canvas ? h('button', { key: 'video', type: 'button', className: 'mov-btn', onClick: () => void newNode('video') }, '+ 视频') : null,
           canvas ? h('button', { key: 'write-script', type: 'button', className: 'mov-btn movc-run', title: '写下脚本与目标时长，自动铺开剧本、分镜与每段制作节点', onClick: () => void openScript() }, '写脚本…') : null,
           canvas ? h('button', { key: 'chain', type: 'button', className: 'mov-btn', title: '一次确认整条链路的方案与总费用，按顺序逐段生成；每段成果仍需你审核', onClick: () => void openChain() }, '连拍') : null,
+          canvas ? h('button', { key: 'import-image', type: 'button', className: 'mov-btn', disabled: importing,
+            title: '把自己的图片写进画布数据目录，连到视频节点的「首帧」或「参考图」端口使用',
+            onClick: () => importRef.current?.click() }, importing ? '导入中…' : '导入图片') : null,
+          canvas ? h('input', { key: 'import-input', type: 'file', multiple: true, accept: 'image/png,image/jpeg,image/webp', ref: importRef,
+            style: { display: 'none' }, onChange: (e: any) => void importImages(e.target.files) }) : null,
+          canvas ? h('button', { key: 'merge-film', type: 'button', className: 'mov-btn movc-run', disabled: Boolean(filmDialog?.busy) || !film?.total,
+            title: film?.missing?.length ? `还有 ${film.missing.length} 段没有成果：${film.missing.join('、')}`
+              : film?.total ? '把已生成的每段视频按连线顺序拼成一条成片，只需一次确认' : '画布上还没有视频节点',
+            onClick: () => void mergeFilm() }, filmDialog?.busy ? '合成中…' : '合成成片') : null,
           canvas ? h('span', { key: 'sep-flow', className: 'movc-sep' }) : null,
           canvas ? h('button', { key: 'run-next', type: 'button', className: 'mov-btn movc-run', disabled: !nextStep,
             title: nextStep ? `当前读取节点内容并沿上游拼接提示词，生成前仍需确认方案与费用` : '流程里的制作节点都已有成果',
@@ -899,7 +993,8 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
               h('div', { key: 'head', className: 'movc-node-head' }, [
                 h('span', { key: 'label', className: 'movc-node-title' }, labelOf(node)),
                 // 状态标签直接复用宿主的结果胶囊样式（.mov-chip / .mov-chip-ok）。
-                h('span', { key: 'status', className: achieved(node) ? 'mov-chip mov-chip-ok' : 'mov-chip movc-badge' }, achieved(node) ? '已完成' : '待制作'),
+                h('span', { key: 'status', className: achieved(node) ? 'mov-chip mov-chip-ok' : 'mov-chip movc-badge' },
+                  materialOf(node) ? '素材' : achieved(node) ? '已完成' : '待制作'),
                 h('span', { key: 'actions', className: 'movc-actions' }, [
                   h('button', { key: 'edit', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void openDialog(node); } }, media ? '制作' : '编辑'),
                   h('button', { key: 'copy', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void duplicateNode(node); } }, '复制'),
@@ -915,10 +1010,15 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
           left: Math.min(marquee.x1, marquee.x2), top: Math.min(marquee.y1, marquee.y2),
           width: Math.abs(marquee.x2 - marquee.x1), height: Math.abs(marquee.y2 - marquee.y1),
         } }) : null) : null,
+      canvas?.film?.assetId ? h('div', { key: 'film-bar', className: 'movc-bar' }, [
+        h('span', { key: 'label', className: 'movc-flow' }, `成片：${canvas.film.count} 段${canvas.film.seconds ? ` · 约 ${Math.round(canvas.film.seconds)} 秒` : ''} · ${new Date(canvas.film.updatedAt || Date.now()).toLocaleString()} · 已保存到画布数据目录`),
+        h('button', { key: 'play', type: 'button', className: 'mov-btn', onClick: () => setFilmDialog({ busy: false, film: { ...canvas.film, url: mediaUrl(canvas.film.assetId) }, message: '' }) }, '播放成片'),
+        h('a', { key: 'download', className: 'movc-link', href: mediaUrl(canvas.film.assetId), download: `${String(canvas.name || '成片')}.mp4` }, '下载成片'),
+      ]) : null,
       canvas && steps.length ? h('p', { key: 'flow-hint', className: 'movc-hint' }, nextStep
         ? `流程：按连线顺序逐个制作，当前轮到「${nextStep.label}」（画布上虚线框标出）。点上面的「制作」按钮会读取节点内容与上游剧本/分镜拼出提示词，仍然要先核对制作方案、单独确认费用才会调用模型。`
         : `流程：${steps.length} 个制作节点都已有回填成果。要重做某一段，点该节点里的「制作」，重新核对方案并确认费用。`) : null,
-      canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `双击画布名重命名（Enter 保存，Esc 取消）；拖动空白处平移、滚轮缩放；拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）；节点摆乱了点「美化布局」按连线一键重排；想按脚本铺开制作节点就点「写脚本…」，想一次确认整条链路再逐段生成就点「连拍」。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
+      canvas ? h('p', { key: 'hint', className: 'movc-hint' }, `双击画布名重命名（Enter 保存，Esc 取消）；拖动空白处平移、滚轮缩放；拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）；节点摆乱了点「美化布局」按连线一键重排；想按脚本铺开制作节点就点「写脚本…」，想一次确认整条链路再逐段生成就点「连拍」，自己的图片点「导入图片」写进数据目录当首帧或参考图，每段都出成果后点「合成成片」拼成一条可预览、可下载的成片。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
       connectFrom ? h('p', { key: 'connect', className: 'movc-hint' }, '连线模式：点击目标节点完成连接，点空白处取消。') : null,
       confirmDelete ? h('div', { key: 'delete-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget) setConfirmDelete(false); } },
         h('div', { key: 'body', className: 'movc-modal-body', style: { width: 'min(420px, calc(100vw - 32px))' } }, [
@@ -927,6 +1027,24 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
           h('div', { key: 'ops', className: 'movc-bar' }, [
             h('button', { key: 'cancel', type: 'button', className: 'mov-btn', onClick: () => setConfirmDelete(false) }, '取消'),
             h('button', { key: 'ok', type: 'button', className: 'mov-btn', onClick: () => void deleteCanvas() }, '确认删除'),
+          ]),
+        ])) : null,
+      filmDialog ? h('div', { key: 'film-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget && !filmDialog.busy) setFilmDialog(null); } },
+        h('div', { key: 'body', className: 'movc-modal-body' }, [
+          h('h4', { key: 'h' }, '合成成片'),
+          filmDialog.busy ? h('p', { key: 'busy', className: 'movc-status' }, '正在按连线顺序读取每段成果并合并，长视频需要一点时间…') : null,
+          filmDialog.film?.url ? h('video', { key: 'player', src: filmDialog.film.url, controls: true, preload: 'metadata', className: 'movc-media', style: { maxHeight: '46vh' } }) : null,
+          filmDialog.film ? h('p', { key: 'info', className: 'movc-status' },
+            `成片：${filmDialog.film.count} 段${filmDialog.film.seconds ? ` · 约 ${Math.round(filmDialog.film.seconds)} 秒` : ''}；文件已保存到画布数据目录，可直接预览或下载。`) : null,
+          filmDialog.film?.segments?.length ? h('div', { key: 'segs', className: 'movc-plan' },
+            filmDialog.film.segments.map((segment: any) => h('div', { key: `s${segment.index}` },
+              `第${segment.index}段「${segment.label}」${segment.seconds ? `${segment.seconds}秒` : ''}`))) : null,
+          filmDialog.message ? h('p', { key: 'msg', className: 'movc-status', 'data-error': 'true' }, filmDialog.message) : null,
+          h('p', { key: 'note', className: 'movc-status' }, '合成只读取已经生成的成果，不会重新生成任何段落，也不产生新的模型费用。'),
+          h('div', { key: 'ops', className: 'movc-bar' }, [
+            h('button', { key: 'close', type: 'button', className: 'mov-btn', disabled: filmDialog.busy, onClick: () => setFilmDialog(null) }, '关闭'),
+            filmDialog.film?.url ? h('a', { key: 'download', className: 'movc-link', href: filmDialog.film.url, download: `${String(canvas?.name || '成片')}.mp4` }, '下载成片') : null,
+            !filmDialog.busy ? h('button', { key: 'again', type: 'button', className: 'mov-btn mov-btn-primary', onClick: () => void mergeFilm() }, '重新合成') : null,
           ]),
         ])) : null,
       chainDialog ? h('div', { key: 'chain-modal', className: 'movc-modal', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { if (e.target === e.currentTarget && !chainDialog.busy) { stopChainPolling(); setChainDialog(null); } } },

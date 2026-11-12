@@ -17,7 +17,7 @@ var __export = (target, all) => {
 var PLUGIN_VERSION;
 var init_version = __esm({
   "src/core/version.ts"() {
-    PLUGIN_VERSION = true ? "3.21.0".trim().replace(/^v/i, "") : "";
+    PLUGIN_VERSION = true ? "3.22.0".trim().replace(/^v/i, "") : "";
   }
 });
 
@@ -952,7 +952,7 @@ var init_config = __esm({
     init_lib2();
     videoConfigFields = {
       // 默认关闭：画布是可选组件，用户要的时候在设置页打开，不再默认替每个创作项目建图。
-      autoCreateCanvas: Schema.boolean().default(false).description("\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03\u5E76\u540C\u6B65\u811A\u672C\u3001\u5206\u955C\u4E0E\u751F\u6210\u6210\u679C\uFF08\u9ED8\u8BA4\u5173\u95ED\uFF09\uFF1B\u6253\u5F00\u540E\u521B\u4F5C\u81EA\u52A8\u5EFA\u56FE\uFF0C\u5173\u95ED\u65F6\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\uFF0C\u4ECD\u53EF\u624B\u52A8\u4F7F\u7528\u753B\u5E03\u8282\u70B9\u3002").volatile(),
+      autoCreateCanvas: Schema.boolean().default(false).description("\u6D41\u7A0B\u753B\u5E03\uFF08\u9ED8\u8BA4\u5173\u95ED\uFF09\uFF1A\u6253\u5F00\u540E\u5DE6\u4FA7\u680F\u51FA\u73B0\u753B\u5E03\u5165\u53E3\uFF0C\u521B\u4F5C\u4E5F\u81EA\u52A8\u5EFA\u56FE\u5E76\u540C\u6B65\u811A\u672C\u3001\u5206\u955C\u4E0E\u751F\u6210\u6210\u679C\uFF1B\u5173\u95ED\u65F6\u5DE6\u4FA7\u680F\u9690\u85CF\u5165\u53E3\uFF0C\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\u5728\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\u3002").volatile(),
       connectionMode: Schema.union(["metaontic", "volcengine"]).default("metaontic").description("\u63A5\u5165\u65B9\u5F0F\uFF1AMetaOntic AI\uFF08metaontic\uFF09\uFF1B\u706B\u5C71\u5F15\u64CE\u76F4\u8FDE\uFF08volcengine\uFF0C\u5F53\u524D\u8BBE\u7F6E\u9875\u6682\u4E0D\u63D0\u4F9B\u9009\u62E9\uFF09").volatile(),
       metaonticApiKey: Schema.string().default("").description("MetaOntic AI API\u5BC6\u94A5").volatile(),
       volcengineApiKey: Schema.string().default("").description("\u706B\u5C71\u5F15\u64CE\u76F4\u8FDE\u6A21\u5F0F\u7684\u706B\u5C71 API\u5BC6\u94A5").volatile(),
@@ -4767,14 +4767,14 @@ function submissionTool(liveConfig) {
 }
 
 // src/businesses/video/integrations/canvas.ts
-import { createHash as createHash5, randomUUID as randomUUID8 } from "node:crypto";
+import { createHash as createHash6, randomUUID as randomUUID8 } from "node:crypto";
 import { mkdir as mkdir11, readFile as readFile10, writeFile as writeFile8, rename as rename9, copyFile, stat as stat7, open as open4 } from "node:fs/promises";
 import path18 from "node:path";
 
 // src/businesses/video/integrations/canvas-builtin.ts
 import { mkdir as mkdir9, readFile as readFile9, writeFile as writeFile7, rename as rename7, readdir as readdir5, stat as stat6 } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { randomUUID as randomUUID7 } from "node:crypto";
+import { createHash as createHash5, randomUUID as randomUUID7 } from "node:crypto";
 import path16 from "node:path";
 var BUILTIN_BACKEND = "builtin";
 var validId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
@@ -4840,6 +4840,7 @@ function mergeDoc(id, prev, args) {
     name: String(args?.name || prev?.name || id).slice(0, 80),
     ...args?.defaultCanvasName !== void 0 ? { defaultCanvasName: String(args.defaultCanvasName).slice(0, 80) } : prev?.defaultCanvasName !== void 0 ? { defaultCanvasName: prev.defaultCanvasName } : {},
     ...incoming.bible !== void 0 ? { bible: incoming.bible } : prev?.bible !== void 0 ? { bible: prev.bible } : {},
+    ...incoming.film !== void 0 ? { film: incoming.film } : prev?.film !== void 0 ? { film: prev.film } : {},
     nodes,
     edges,
     view: incoming.view || prev?.view || { x: 60, y: 40, scale: 1 },
@@ -4968,6 +4969,39 @@ async function builtinCanvasCreate(name) {
   await writeDoc(id, doc);
   return { canvas: { projectId: id, name: label, updatedAt: doc.updatedAt, view: doc.view, nodes: {}, edges: [], dataRoot: dataRootOf() } };
 }
+var IMAGE_MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp" };
+var IMPORT_LIMIT_BYTES = 32 * 1024 * 1024;
+function imageExtension(mime, bytes) {
+  const normalized = String(mime || "").toLowerCase().split(";")[0].trim();
+  if (normalized === "image/png") return ".png";
+  if (normalized === "image/jpeg" || normalized === "image/jpg") return ".jpg";
+  if (normalized === "image/webp") return ".webp";
+  if (bytes.length > 8 && bytes.toString("hex", 0, 8) === "89504e470d0a1a0a") return ".png";
+  if (bytes.length > 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return ".jpg";
+  if (bytes.length > 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") return ".webp";
+  return "";
+}
+async function builtinCanvasImport(args) {
+  const doc = await requireDoc(args?.projectId);
+  const bytes = Buffer.isBuffer(args?.bytes) ? args.bytes : Buffer.from(args?.bytes || []);
+  if (!bytes.length) throw new Error("\u5BFC\u5165\u7684\u56FE\u7247\u662F\u7A7A\u6587\u4EF6\u3002");
+  if (bytes.length > IMPORT_LIMIT_BYTES) throw new Error("\u5355\u5F20\u56FE\u7247\u4E0D\u80FD\u8D85\u8FC7 32MB\u3002");
+  const extension = imageExtension(args?.mime, bytes);
+  if (!extension) throw new Error("\u53EA\u652F\u6301 PNG\u3001JPEG\u3001WebP \u56FE\u7247\u3002");
+  const id = `mov_img_${createHash5("sha256").update(bytes).digest("hex").slice(0, 24)}`;
+  const label = String(args?.name || "").trim().slice(0, 80) || `\u5BFC\u5165\u56FE\u7247${extension}`;
+  const rel = `projects/${doc.id}/image/${id}${extension}`;
+  const dest = path16.join(dataRootOf(), rel);
+  await mkdir9(path16.dirname(dest), { recursive: true, mode: 448 });
+  if (!(await stat6(dest).catch(() => null))?.isFile()) {
+    const temp = `${dest}.${randomUUID7()}.tmp`;
+    await writeFile7(temp, bytes, { mode: 384, flag: "wx" });
+    await rename7(temp, dest);
+  }
+  const mime = IMAGE_MIME[extension];
+  await builtinRpc().assetCreate({ projectName: doc.name || "", asset: { id, projectId: doc.id, kind: "image", mime, name: label, rel, size: bytes.length, createdAt: Date.now(), stored: "disk", source: "metaontic-video" } });
+  return { ok: true, assetId: id, name: label, rel, size: bytes.length, mime };
+}
 async function builtinCanvasHandle(args) {
   const method = String(args?.method || "");
   const params = args?.args || {};
@@ -4986,6 +5020,7 @@ async function builtinCanvasHandle(args) {
       name: doc.name,
       updatedAt: doc.updatedAt || 0,
       view: doc.view || { x: 60, y: 40, scale: 1 },
+      film: doc.film || null,
       nodes: doc.nodes || {},
       edges: doc.edges || [],
       dataRoot: dataRootOf()
@@ -5102,12 +5137,59 @@ function registerBuiltinCanvas(ctx) {
         const info = await stat6(file);
         if (!info.isFile()) throw new Error("\u7D20\u6750\u4E0D\u5B58\u5728\u3002");
         res.setHeader("content-type", asset.mime || "application/octet-stream");
-        res.setHeader("content-length", String(info.size));
         res.setHeader("cache-control", "private, max-age=300");
-        createReadStream(file).pipe(res);
+        res.setHeader("accept-ranges", "bytes");
+        const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || "").trim());
+        let start = 0, end = info.size - 1, partial = false;
+        if (range) {
+          const hasStart = range[1] !== "", hasEnd = range[2] !== "";
+          if (hasStart) {
+            start = Number(range[1]);
+            end = hasEnd ? Number(range[2]) : info.size - 1;
+          } else if (hasEnd) {
+            start = Math.max(0, info.size - Number(range[2]));
+            end = info.size - 1;
+          }
+          if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start > end || start >= info.size) {
+            res.statusCode = 416;
+            res.setHeader("content-range", `bytes */${info.size}`);
+            res.end();
+            return;
+          }
+          end = Math.min(end, info.size - 1);
+          partial = true;
+        }
+        res.setHeader("content-length", String(end - start + 1));
+        if (partial) {
+          res.statusCode = 206;
+          res.setHeader("content-range", `bytes ${start}-${end}/${info.size}`);
+        }
+        createReadStream(file, { start, end }).pipe(res);
       } catch (e) {
         res.statusCode = 404;
         res.end();
+      }
+    } });
+    const removeImport = scope.webServer.register({ kind: "exact", path: "/metaontic-video/canvas-import", async handler(req, res) {
+      res.setHeader("content-type", "application/json; charset=utf-8");
+      res.setHeader("cache-control", "no-store");
+      try {
+        if (req.method !== "POST") throw new Error("\u4EC5\u63A5\u53D7POST\u3002");
+        if (req.headers["sec-fetch-site"] === "cross-site" || req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) throw new Error("\u8BF7\u6C42\u6765\u6E90\u65E0\u6548\u3002");
+        if (!String(req.headers["content-type"] || "").startsWith("image/")) throw new Error("\u8BF7\u6C42\u7C7B\u578B\u65E0\u6548\uFF0C\u53EA\u63A5\u53D7\u56FE\u7247\u3002");
+        const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+        const chunks = [];
+        let size = 0;
+        for await (const chunk of req) {
+          size += chunk.length;
+          if (size > IMPORT_LIMIT_BYTES) throw new Error("\u5355\u5F20\u56FE\u7247\u4E0D\u80FD\u8D85\u8FC7 32MB\u3002");
+          chunks.push(chunk);
+        }
+        const result = await builtinCanvasImport({ projectId: url.searchParams.get("projectId"), name: url.searchParams.get("name"), mime: req.headers["content-type"], bytes: Buffer.concat(chunks) });
+        res.end(JSON.stringify(result));
+      } catch (e) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: String(e?.message || "\u5BFC\u5165\u56FE\u7247\u672A\u5B8C\u6210\u3002") }));
       }
     } });
     const remove = scope.webServer.register({ kind: "exact", path: "/metaontic-video/canvas", async handler(req, res) {
@@ -5131,6 +5213,7 @@ function registerBuiltinCanvas(ctx) {
     return () => {
       if (typeof remove === "function") remove();
       if (typeof removeMedia === "function") removeMedia();
+      if (typeof removeImport === "function") removeImport();
     };
   });
 }
@@ -5200,7 +5283,7 @@ var canvasLinkSchema = { type: "object", properties: {
   nodeId: { type: "string" },
   fingerprint: { type: "string" }
 }, required: ["projectId", "nodeId", "fingerprint"], description: "video_canvas(action:read)\u8FD4\u56DE\u7684\u6D41\u7A0B\u753B\u5E03\u5B9A\u4F4D\u4E0E\u5185\u5BB9\u6458\u8981\uFF1B\u539F\u6837\u4F20\u5165\uFF0C\u4E0D\u731C\u6D4B\u3002" };
-var digest = (value) => createHash5("sha256").update(JSON.stringify(value)).digest("hex");
+var digest = (value) => createHash6("sha256").update(JSON.stringify(value)).digest("hex");
 var validId2 = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 function location(link) {
   if (!validId2(link?.projectId) || !validId2(link?.nodeId) || link.canvasId && !validId2(link.canvasId)) throw new Error("\u753B\u5E03\u9879\u76EE\u6216\u8282\u70B9\u6807\u8BC6\u65E0\u6548");
@@ -5489,11 +5572,11 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
 }
 
 // src/businesses/video/integrations/canvas-project.ts
-import { createHash as createHash6 } from "node:crypto";
+import { createHash as createHash7 } from "node:crypto";
 import { readFile as readFile11 } from "node:fs/promises";
 import path19 from "node:path";
 init_config();
-var digest2 = (value) => createHash6("sha256").update(JSON.stringify(value)).digest("hex");
+var digest2 = (value) => createHash7("sha256").update(JSON.stringify(value)).digest("hex");
 async function adapterForNewCanvas(binding, load) {
   if (binding?.projectId) return resolveCanvasAdapter(binding.projectId, load);
   if (load !== loadCanvasAdapter) return load();
@@ -5801,9 +5884,9 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
 }
 
 // src/businesses/video/integrations/canvas-native.ts
-import path20 from "node:path";
-import { createHash as createHash8, randomUUID as randomUUID9 } from "node:crypto";
-import { mkdir as mkdir12, readFile as readFile12, writeFile as writeFile9, rename as rename10 } from "node:fs/promises";
+import path21 from "node:path";
+import { createHash as createHash9, randomUUID as randomUUID9 } from "node:crypto";
+import { mkdir as mkdir13, readFile as readFile12, writeFile as writeFile10, rename as rename11, stat as stat9 } from "node:fs/promises";
 init_connection();
 
 // src/businesses/video/providers/seedance.ts
@@ -5874,7 +5957,7 @@ function endWithPunctuation(text) {
 }
 
 // src/businesses/video/workflow/real-person.ts
-import { createHash as createHash7 } from "node:crypto";
+import { createHash as createHash8 } from "node:crypto";
 
 // src/businesses/video/tools/results.ts
 import { resolve as resolve2 } from "node:path";
@@ -6236,7 +6319,7 @@ async function recoverRealPersonImages(config, body, ctx, exec, final, state = {
   try {
     for (const item of images) {
       const source = String(item.image_url.url);
-      const key = createHash7("sha256").update(source).digest("hex");
+      const key = createHash8("sha256").update(source).digest("hex");
       const entry = state.images[key] ||= {};
       if (entry.failed) throw new Error(`\u56FE\u7247\u4EFB\u52A1 ${entry.taskId || ""} \u5DF2\u660E\u786E\u5931\u8D25\uFF1A${entry.failed}\u3002\u4E0D\u81EA\u52A8\u518D\u6B21\u51FA\u56FE\u3002`);
       if (!entry.imageUrl) {
@@ -6556,9 +6639,395 @@ async function writeScript(config, brief2, options = {}) {
   return { script, model: String(body?.model || model), usage: { promptTokens: Number(body?.usage?.prompt_tokens) || 0, completionTokens: Number(body?.usage?.completion_tokens) || 0 } };
 }
 
+// src/businesses/video/media/merge.ts
+init_config();
+init_connection();
+import { rm as rm8, mkdir as mkdir12, writeFile as writeFile9, rename as rename10, stat as stat8, copyFile as copyFile2 } from "node:fs/promises";
+import path20 from "node:path";
+function evenNumber(value, fallback) {
+  const number2 = Number(value);
+  if (!Number.isFinite(number2) || number2 <= 0) return fallback;
+  const rounded = Math.round(number2);
+  const even = rounded % 2 === 0 ? rounded : rounded - 1;
+  return even >= 2 ? even : 2;
+}
+var AUDIO_PADDING_TOLERANCE_FRAMES = 1;
+async function alignSegmentAudio(config, files, probed, outPath, { signal, binary } = {}) {
+  const temps = [];
+  const trimmed = [];
+  const aligned = [];
+  for (const [index, file] of files.entries()) {
+    const media = probed?.[index];
+    const fps = Math.max(1, Math.round(media?.fps || 30));
+    const videoSeconds = Number(media?.videoDurationSeconds) || 0;
+    const audioSeconds = Number(media?.audioDurationSeconds) || 0;
+    const padding = audioSeconds - videoSeconds;
+    const isLast = index === files.length - 1;
+    if (isLast || !media?.hasAudio || videoSeconds <= 0 || padding <= AUDIO_PADDING_TOLERANCE_FRAMES / fps) {
+      aligned.push(file);
+      continue;
+    }
+    const temp = `${outPath}.${uniqueSuffix(`align${index + 1}`)}.mp4`;
+    const { code } = await runProcess(
+      binary || resolveBinary(config, "ffmpegBinary", "ffmpeg"),
+      [
+        "-y",
+        "-i",
+        file,
+        "-map",
+        "0:v",
+        "-map",
+        "0:a",
+        "-c:v",
+        "copy",
+        "-c:a",
+        "aac",
+        "-af",
+        `atrim=0:${videoSeconds.toFixed(3)}`,
+        "-movflags",
+        "+faststart",
+        temp
+      ],
+      { signal }
+    );
+    if (code === 0 && await exists(temp)) {
+      temps.push(temp);
+      trimmed.push({ index: index + 1, paddingSeconds: Number(padding.toFixed(3)) });
+      aligned.push(temp);
+    } else {
+      await rm8(temp, { force: true });
+      aligned.push(file);
+    }
+  }
+  return { files: aligned, temps, trimmed };
+}
+async function cleanupSegmentTemps(temps) {
+  for (const temp of temps || []) await rm8(temp, { force: true });
+}
+async function mergeClips(config, files, outPath, { signal } = {}) {
+  const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
+  await mkdir12(path20.dirname(outPath), { recursive: true });
+  const work = `${outPath}.${uniqueSuffix("work")}.mp4`;
+  let copyError = "";
+  let audioError = "";
+  const probed = [];
+  for (const file of files) probed.push(await probeMedia(file, config, signal));
+  const videos = probed.filter((media) => media && media.width && media.height);
+  const paramsMatch = videos.length !== probed.length || videos.every((media) => media.width === videos[0].width && media.height === videos[0].height);
+  const { files: aligned, temps, trimmed } = await alignSegmentAudio(
+    config,
+    files,
+    probed,
+    work,
+    { signal, binary }
+  );
+  files = aligned;
+  try {
+    const mergeMode = ref(config, "mergeMode", "copy");
+    if (mergeMode !== "reencode" && paramsMatch) {
+      const listPath = `${work}.concat.txt`;
+      const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
+      await writeFile9(listPath, `${lines}
+`, "utf8");
+      try {
+        const { code: code2, stderr: stderr2 } = await runProcess(binary, [
+          "-y",
+          "-f",
+          "concat",
+          "-safe",
+          "0",
+          "-i",
+          listPath,
+          "-c",
+          "copy",
+          "-movflags",
+          "+faststart",
+          work
+        ], { signal });
+        if (code2 === 0 && await exists(work)) {
+          await rename10(work, outPath);
+          return { path: outPath, mode: "copy", trimmed };
+        }
+        copyError = stderr2.trim().slice(-400);
+      } finally {
+        await rm8(listPath, { force: true });
+      }
+    } else if (!paramsMatch) {
+      copyError = "\u5206\u6BB5\u5206\u8FA8\u7387\u4E0D\u4E00\u81F4\uFF0C\u8DF3\u8FC7\u65E0\u635F\u62FC\u63A5\u3002";
+    }
+    const first = probed.find((media) => media && media.width && media.height) || {};
+    const width = evenNumber(first.width, 1280);
+    const height = evenNumber(first.height, 720);
+    const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
+    const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
+    const videoParts = files.map((_, index) => `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${index}]`);
+    const videoInputs = files.map((_, index) => `[v${index}]`).join("");
+    async function encode(filter2, maps, withAudioTrack) {
+      await rm8(work, { force: true });
+      const args = ["-y"];
+      for (const file of files) args.push("-i", file);
+      args.push("-filter_complex", filter2, ...maps, "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p");
+      if (withAudioTrack) args.push("-c:a", "aac", "-b:a", "192k");
+      args.push("-movflags", "+faststart", work);
+      return runProcess(binary, args, { signal });
+    }
+    if (withAudio) {
+      const audioParts = files.map((_, index) => `[${index}:a]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a${index}]`);
+      const pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join("");
+      const filter2 = [
+        ...videoParts,
+        ...audioParts,
+        `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`
+      ].join(";");
+      const { code: code2, stderr: stderr2 } = await encode(filter2, ["-map", "[v]", "-map", "[a]"], true);
+      if (code2 === 0 && await exists(work)) {
+        await rename10(work, outPath);
+        return { path: outPath, mode: "reencode", trimmed };
+      }
+      audioError = stderr2.trim().slice(-400);
+    }
+    const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(";");
+    const { code, stderr } = await encode(filter, ["-map", "[v]"], false);
+    if (code === 0 && await exists(work)) {
+      await rename10(work, outPath);
+      return { path: outPath, mode: withAudio ? "reencode-video-only" : "reencode", trimmed };
+    }
+    const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
+    throw Object.assign(new Error(`ffmpeg \u5408\u5E76\u5931\u8D25\uFF1A${detail || "\u672A\u77E5\u9519\u8BEF"}`), { code: "ffmpeg_failed" });
+  } finally {
+    await cleanupSegmentTemps([...temps, work]);
+  }
+}
+async function prepareSeamTrims(config, files, outPath, { signal } = {}) {
+  const requested = ref(config, "seamTrimSeconds", "");
+  const trims = String(requested || "").trim() ? String(requested).split(",").map((value) => Number(value.trim())) : [];
+  if (trims.some((value) => !Number.isFinite(value) || value < 0 || value > 3)) {
+    throw new Error("seamTrimSeconds \u5FC5\u987B\u4E3A\u9017\u53F7\u5206\u9694\u7684 0\u20133 \u79D2\u6570\u503C\uFF0C\u4F8B\u5982 0.5,0\uFF1B\u5206\u522B\u5BF9\u5E94\u7B2C 2\u30013 \u6BB5\u5F00\u5934\u3002");
+  }
+  const prepared = [...files];
+  const temps = [];
+  const cuts = [];
+  try {
+    for (let index = 0; index < files.length; index++) {
+      const official = !isOmniExtendModel(resolveModel(config)) && files.length > 1 && !trims.length;
+      const secondsRequested = index > 0 ? trims[index - 1] || 0 : 0;
+      if (!official && !secondsRequested) continue;
+      const media = await probeMedia(files[index], config, signal);
+      const duration = Number(media?.videoDurationSeconds || media?.durationSeconds);
+      const fps = Number(media?.fps) || 24;
+      const seconds = official ? index > 0 ? 1 / fps : 0 : secondsRequested;
+      const tailSeconds = official && index < files.length - 1 ? 6 / fps : 0;
+      const keptSeconds = duration - seconds - tailSeconds;
+      if (!(keptSeconds > 0.5)) throw new Error(`\u7B2C ${index + 1} \u6BB5\u88C1\u526A\u540E\u4E0D\u8DB3 0.5 \u79D2\uFF0C\u5DF2\u505C\u6B62\u5408\u5E76\u3002`);
+      const temp = `${outPath}.${uniqueSuffix(`cut${index + 1}`)}.mp4`;
+      temps.push(temp);
+      const result = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
+        "-y",
+        "-i",
+        files[index],
+        "-ss",
+        String(seconds),
+        "-t",
+        String(keptSeconds),
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a:0?",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-movflags",
+        "+faststart",
+        temp
+      ], { signal });
+      if (result.code !== 0) throw new Error(`\u7B2C ${index + 1} \u6BB5\u63A5\u7F1D\u88C1\u526A\u5931\u8D25\uFF1A${tail(result.stderr)}`);
+      prepared[index] = temp;
+      cuts.push({ index: index + 1, seconds, tailSeconds });
+    }
+    return { files: prepared, temps, cuts };
+  } catch (error) {
+    await cleanupSegmentTemps(temps);
+    throw error;
+  }
+}
+var SEGMENT_TASK_CONCURRENCY = 4;
+async function mapLimit(items, limit, worker) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  let failure;
+  const runner = async () => {
+    while (cursor < items.length && !failure) {
+      const index = cursor++;
+      try {
+        results[index] = await worker(items[index], index);
+      } catch (error) {
+        failure ??= error;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, runner));
+  if (failure) throw failure;
+  return results;
+}
+async function downloadSegmentsAndMerge(config, {
+  segments,
+  segmentsDir,
+  outDir,
+  stamp,
+  notes = [],
+  keepSingleFile = false,
+  signal
+}) {
+  const files = [];
+  const deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0);
+  const ffmpegReady = segments.length > 1 ? await hasFfmpeg(config, signal) : true;
+  let probeWarned = false;
+  const destOf = (segment) => path20.join(
+    segmentsDir,
+    `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`
+  );
+  const downloaded = await mapLimit(segments, SEGMENT_TASK_CONCURRENCY, async (segment) => {
+    const dest = destOf(segment);
+    try {
+      if (!await exists(dest)) {
+        await timedStage("segment_download", () => downloadFile(segment.videoUrl, dest, { signal }));
+      }
+      return { dest };
+    } catch (failure) {
+      if (failure?.code === "ABORTED") throw failure;
+      return { failure };
+    }
+  });
+  const failed = downloaded.find((item) => item.failure);
+  if (failed) {
+    for (const [index, item] of downloaded.entries()) {
+      if (!item?.dest) continue;
+      segments[index].localPath = item.dest;
+      files.push(item.dest);
+    }
+    const reason = `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u4E0B\u8F7D\u5931\u8D25\uFF1A${failed.failure?.message || failed.failure}`;
+    notes.push(reason);
+    return { files, segmentsDir, deliveredSeconds, error: reason };
+  }
+  const dests = downloaded.map((item) => item.dest);
+  const probed = await mapLimit(
+    dests,
+    SEGMENT_TASK_CONCURRENCY,
+    (dest) => timedStage("segment_probe", () => probeMedia(dest, config, signal))
+  );
+  for (const [index, segment] of segments.entries()) {
+    const dest = dests[index];
+    segment.localPath = dest;
+    await appendRequestLog({
+      event: "segment_saved",
+      index: segment.index,
+      taskId: segment.taskId,
+      path: dest,
+      bytes: (await stat8(dest)).size
+    });
+    const media = probed[index];
+    if (media?.durationSeconds) {
+      segment.durationSeconds = Number(media.durationSeconds.toFixed(2));
+      const cumulative = segments.slice(0, index + 1).reduce((sum, item) => sum + (item.seconds || 0), 0);
+      const tolerance = Math.max(
+        CUMULATIVE_TOLERANCE_MIN_SECONDS,
+        cumulative * CUMULATIVE_TOLERANCE_RATIO
+      );
+      const looksCumulative = files.length > 0 && Math.abs(media.durationSeconds - cumulative) <= tolerance && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
+      if (looksCumulative) {
+        await appendRequestLog({ event: "cumulative_output_detected", index: segment.index, duration: media.durationSeconds, plannedCumulative: cumulative });
+        files.length = 0;
+        notes.push(
+          `\u7B2C ${segment.index} \u6BB5\u5B9E\u6D4B ${formatSeconds(media.durationSeconds)} \u79D2\uFF0C\u63A5\u8FD1\u7D2F\u8BA1\u65F6\u957F ${cumulative} \u79D2\uFF0C\u6309\u300C\u4E0A\u6E38\u8FD4\u56DE\u7684\u662F\u7D2F\u8BA1\u6210\u7247\u300D\u5904\u7406\u3002`
+        );
+      }
+    } else if (!probeWarned) {
+      probeWarned = true;
+      notes.push("\u6CA1\u6709\u53EF\u7528\u7684 ffprobe\uFF0C\u65E0\u6CD5\u63A2\u6D4B\u5206\u6BB5\u65F6\u957F\uFF0C\u6309\u300C\u6BCF\u6BB5\u90FD\u662F\u589E\u91CF\u7247\u6BB5\u300D\u76F4\u63A5\u62FC\u63A5\u3002");
+    }
+    files.push(dest);
+  }
+  if (!files.length) return { files, segmentsDir, deliveredSeconds };
+  if (!ffmpegReady && files.length > 1) {
+    const guide = ffmpegInstallHint(config);
+    notes.push(`\u5206\u6BB5\u6587\u4EF6\u90FD\u5DF2\u4E0B\u8F7D\u5230 ${segmentsDir}\u3002`);
+    notes.push(guide.hint);
+    return {
+      files,
+      segmentsDir,
+      deliveredSeconds,
+      merged: false,
+      ffmpegMissing: true,
+      installHint: guide.hint
+    };
+  }
+  const finalPath = path20.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
+  try {
+    if (files.length === 1 && keepSingleFile) {
+      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "segment", videoPath: files[0] };
+    }
+    if (files.length === 1) {
+      await mkdir12(path20.dirname(finalPath), { recursive: true });
+      const copy = `${finalPath}.${uniqueSuffix("copy")}.mp4`;
+      try {
+        await copyFile2(files[0], copy);
+        await rename10(copy, finalPath);
+      } finally {
+        await rm8(copy, { force: true }).catch(() => {
+        });
+      }
+      await appendRequestLog({ event: "delivery_copied", sourcePath: files[0], videoPath: finalPath });
+      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "single", videoPath: finalPath };
+    }
+    await appendRequestLog({ event: "merge_started", inputPaths: files, videoPath: finalPath });
+    const prepared = await timedStage("seam_prepare", () => prepareSeamTrims(config, files, finalPath, { signal }));
+    await appendRequestLog({ event: "seam_trims_prepared", cuts: prepared.cuts });
+    let merged;
+    try {
+      merged = await timedStage("video_merge", () => mergeClips(config, prepared.files, finalPath, { signal }));
+    } finally {
+      await cleanupSegmentTemps(prepared.temps);
+    }
+    if (prepared.cuts.length) {
+      notes.push(`\u5DF2\u6309${String(ref(config, "seamTrimSeconds", "")).trim() ? "\u624B\u52A8\u8BBE\u7F6E" : "\u6A21\u578B\u9ED8\u8BA4\u7B56\u7565"}\u88C1\u526A\u63A5\u7F1D\uFF1A${prepared.cuts.map((cut) => `\u7B2C ${cut.index} \u6BB5\uFF1A\u5934\u90E8 ${cut.seconds.toFixed(3)} \u79D2\u3001\u5C3E\u90E8 ${cut.tailSeconds.toFixed(3)} \u79D2`).join("\uFF1B")}\u3002\u539F\u59CB\u5206\u6BB5\u672A\u6539\u52A8\uFF1B\u5B9E\u9645\u6210\u7247\u4F1A\u7F29\u77ED\uFF0C\u4E0D\u8865\u5E27\u51D1\u65F6\u957F\u3002`);
+    }
+    const actual = await probeMedia(finalPath, config, signal);
+    await appendRequestLog({
+      event: "merge_completed",
+      videoPath: finalPath,
+      mode: merged.mode,
+      actualSeconds: actual?.durationSeconds,
+      sourceCount: segments.length
+    });
+    if (merged.trimmed?.length) {
+      notes.push(
+        `\u7B2C ${merged.trimmed.map((item) => item.index).join("\u3001")} \u6BB5\u7684\u97F3\u9891\u6BD4\u89C6\u9891\u957F\uFF08\u6700\u957F ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} \u79D2\uFF09\uFF0C\u5DF2\u88C1\u9F50\u540E\u518D\u62FC\u63A5\uFF0C\u907F\u514D\u63A5\u7F1D\u5904\u7F3A\u4E00\u5C0F\u6BB5\u753B\u9762\u3002`
+      );
+    }
+    return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: merged.mode, videoPath: finalPath, seamCuts: prepared.cuts, actualSeconds: actual?.durationSeconds };
+  } catch (failure) {
+    if (failure?.code === "ABORTED") throw failure;
+    let reason = `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u5408\u5E76\u5931\u8D25\uFF1A${failure?.message || failure}`;
+    let installHint;
+    if (failure?.code === "ffmpeg_missing") {
+      const guide = ffmpegInstallHint(config);
+      installHint = guide.hint;
+      reason = guide.hint;
+    }
+    notes.push(reason);
+    await appendRequestLog({ event: "merge_failed", errorCode: String(failure?.code || "merge_error"), segmentsDir });
+    return { files, segmentsDir, deliveredSeconds, error: reason, ffmpegMissing: Boolean(installHint), installHint };
+  }
+}
+
 // src/businesses/video/integrations/canvas-native.ts
 init_config();
-var hash3 = (value) => createHash8("sha256").update(JSON.stringify(value)).digest("hex");
+var hash3 = (value) => createHash9("sha256").update(JSON.stringify(value)).digest("hex");
 var validToken = (value) => /^[a-f0-9-]{36}$/.test(String(value || ""));
 var terminal = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled"]);
 function splitEvenly(items, count) {
@@ -6578,6 +7047,31 @@ function splitEvenly(items, count) {
   while (index < items.length) groups[count - 1].push(items[index++]);
   return groups;
 }
+function filmSegments(doc) {
+  const nodes = Object.values(doc?.nodes || {});
+  const segments = [], missing = [];
+  for (const [index, node] of pendingVideoOrder(doc).entries()) {
+    const label = String(node?.label || `\u7B2C${index + 1}\u6BB5`);
+    const made = nodes.filter((n) => n?.metaonticSourceNode === node.id && n?.type === "video" && (n?.data?.assetId || n?.data?.metaonticVideoUrl));
+    made.sort((a, b) => Number(a?.metaonticCreatedAt || 0) - Number(b?.metaonticCreatedAt || 0));
+    const latest = made[made.length - 1];
+    if (!latest) {
+      missing.push(label);
+      continue;
+    }
+    segments.push({
+      index,
+      nodeId: node.id,
+      label,
+      resultId: latest.id,
+      assetId: String(latest.data?.assetId || ""),
+      url: String(latest.data?.metaonticVideoUrl || ""),
+      seconds: Number(latest.data?.metaonticSeconds ?? latest.data?.duration ?? 0) || null
+    });
+  }
+  return { segments, missing };
+}
+var mediaUrl = (assetId) => `/metaontic-video/canvas-media?assetId=${encodeURIComponent(String(assetId || ""))}`;
 function shotPrompt(shot) {
   const visual = String(shot?.visual || shot?.title || "").trim();
   const line = visual.split(/\r?\n/).map((part) => part.trim()).find((part) => /^(?:画面|visual)[:：]/.test(part));
@@ -6692,33 +7186,33 @@ function planCanvasNative(input, config, operation = "generate", draft = {}, car
 function createCanvasNativeService(liveConfig, options = {}) {
   const load = options.load || loadCanvasAdapter;
   const adapterFor = (link) => options.resolve ? options.resolve(link) : resolveCanvasAdapter(link?.projectId, load);
-  const directory2 = options.directory || path20.join(dshHome(), "metaontic-video", "canvas-native");
+  const directory2 = options.directory || path21.join(dshHome(), "metaontic-video", "canvas-native");
   const snapshots = /* @__PURE__ */ new Map(), running = /* @__PURE__ */ new Map(), locks2 = /* @__PURE__ */ new Set();
   const proposals = /* @__PURE__ */ new Map();
-  const chainDirectory = options.chainDirectory || path20.join(directory2, "chains");
+  const chainDirectory = options.chainDirectory || path21.join(directory2, "chains");
   let disposed = false;
   const file = (id) => {
     if (!validToken(id)) throw new Error("\u5236\u4F5C\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548\u3002");
-    return path20.join(directory2, `${id}.json`);
+    return path21.join(directory2, `${id}.json`);
   };
-  const pointer = (link) => path20.join(directory2, `node-${hash3([link.projectId, link.canvasId || "", link.nodeId])}.json`);
+  const pointer = (link) => path21.join(directory2, `node-${hash3([link.projectId, link.canvasId || "", link.nodeId])}.json`);
   async function save2(job) {
-    await mkdir12(directory2, { recursive: true, mode: 448 });
+    await mkdir13(directory2, { recursive: true, mode: 448 });
     const dest = file(job.id), temp = `${dest}.${randomUUID9()}.tmp`;
-    await writeFile9(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
-    await rename10(temp, dest);
+    await writeFile10(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
+    await rename11(temp, dest);
   }
   const read = async (id) => JSON.parse(await readFile12(file(id), "utf8"));
   const chainFile = (id) => {
     if (!validToken(id)) throw new Error("\u8FDE\u62CD\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548\u3002");
-    return path20.join(chainDirectory, `${id}.json`);
+    return path21.join(chainDirectory, `${id}.json`);
   };
-  const chainPointer = (link) => path20.join(chainDirectory, `canvas-${hash3([link.projectId, link.canvasId || ""])}.json`);
+  const chainPointer = (link) => path21.join(chainDirectory, `canvas-${hash3([link.projectId, link.canvasId || ""])}.json`);
   async function saveChain(chain) {
-    await mkdir12(chainDirectory, { recursive: true, mode: 448 });
+    await mkdir13(chainDirectory, { recursive: true, mode: 448 });
     const dest = chainFile(chain.id), temp = `${dest}.${randomUUID9()}.tmp`;
-    await writeFile9(temp, JSON.stringify(chain), { mode: 384, flag: "wx" });
-    await rename10(temp, dest);
+    await writeFile10(temp, JSON.stringify(chain), { mode: 384, flag: "wx" });
+    await rename11(temp, dest);
   }
   const readChain = async (id) => JSON.parse(await readFile12(chainFile(id), "utf8"));
   async function previousChain(link) {
@@ -6825,8 +7319,8 @@ function createCanvasNativeService(liveConfig, options = {}) {
       const job = { version: 1, id: randomUUID9(), canvas, plan, identity: chain.identity, createdAt: Date.now(), state: "running", reviewed: false, chain: chain.id };
       await save2(job);
       const temp = `${key}.${randomUUID9()}.tmp`;
-      await writeFile9(temp, JSON.stringify({ id: job.id }), { mode: 384, flag: "wx" });
-      await rename10(temp, key);
+      await writeFile10(temp, JSON.stringify({ id: job.id }), { mode: 384, flag: "wx" });
+      await rename11(temp, key);
       snapshots.set(job.id, config);
       void perform(job, config).catch(() => {
       });
@@ -6937,6 +7431,65 @@ function createCanvasNativeService(liveConfig, options = {}) {
       running.delete(job.id);
     }
   }
+  async function mergeFilm(link, config) {
+    const adapter = await adapterFor(link);
+    const loc = { id: link.projectId, ...link.canvasId ? { canvasId: link.canvasId } : {} };
+    const doc = await adapter.rpc.projectsGet(loc);
+    if (!doc?.nodes) throw new Error("\u753B\u5E03\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");
+    const { segments, missing } = filmSegments(doc);
+    if (!segments.length) throw new Error("\u753B\u5E03\u4E0A\u8FD8\u6CA1\u6709\u53EF\u5408\u6210\u7684\u89C6\u9891\u6210\u679C\uFF1A\u5148\u6309\u6D41\u7A0B\u9010\u6BB5\u751F\u6210\uFF0C\u518D\u5408\u6210\u6210\u7247\u3002");
+    if (missing.length) throw new Error(`\u8FD8\u6709 ${missing.length} \u6BB5\u6CA1\u6709\u6210\u679C\uFF08${missing.join("\u3001")}\uFF09\uFF0C\u5148\u628A\u6BCF\u6BB5\u90FD\u751F\u6210\u5B8C\u518D\u5408\u6210\u6210\u7247\u3002`);
+    const ffmpegReady = await (options.hasFfmpeg || hasFfmpeg)(config);
+    if (!ffmpegReady) throw new Error(`\u672C\u673A\u6CA1\u6709\u627E\u5230\u53EF\u7528\u7684 ffmpeg\uFF0C\u6682\u65F6\u4E0D\u80FD\u5408\u6210\u6210\u7247\u3002${(options.ffmpegInstallHint || ffmpegInstallHint)(config).hint}`);
+    const root = (await adapter.rpc.dataRootGet()).dataRoot;
+    if (!root) throw new Error("\u753B\u5E03\u6570\u636E\u76EE\u5F55\u4E0D\u53EF\u7528\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\u6743\u9650\u3002");
+    const records = (await adapter.rpc.assetsGet({ ids: segments.map((x) => x.assetId).filter(Boolean) })).items || [];
+    const work = path21.join(directory2, "film-work");
+    await mkdir13(work, { recursive: true, mode: 448 });
+    const files = [];
+    for (const segment of segments) {
+      const asset = records.find((a) => a.id === segment.assetId);
+      const local = asset?.rel ? path21.resolve(root, String(asset.rel)) : "";
+      if (local && (await stat9(local).catch(() => null))?.isFile()) {
+        files.push(local);
+        segment.bytes = (await stat9(local)).size;
+        continue;
+      }
+      if (!segment.url) throw new Error(`\u7B2C ${segment.index + 1} \u6BB5\uFF08${segment.label}\uFF09\u7D20\u6750\u4E0D\u5728\u753B\u5E03\u6570\u636E\u76EE\u5F55\uFF0C\u4E5F\u6CA1\u6709\u53EF\u4E0B\u8F7D\u7684\u5730\u5740\u3002`);
+      const dest2 = path21.join(work, `${String(segment.index + 1).padStart(2, "0")}-segment.mp4`);
+      await downloadFile(segment.url, dest2, {});
+      files.push(dest2);
+      segment.bytes = (await stat9(dest2)).size;
+    }
+    const stamp = hash3(segments.map((x) => [x.resultId, x.assetId, x.url, x.bytes]));
+    const id = `mov_film_${stamp.slice(0, 24)}`;
+    const rel = `projects/${link.projectId}/final/${id}.mp4`;
+    const dest = path21.join(root, rel);
+    await mkdir13(path21.dirname(dest), { recursive: true });
+    await (options.mergeClips || mergeClips)(config, files, dest, {});
+    const seconds = segments.reduce((sum, x) => sum + (x.seconds || 0), 0) || null;
+    const film = {
+      assetId: id,
+      count: segments.length,
+      seconds,
+      updatedAt: Date.now(),
+      segments: segments.map((x) => ({ index: x.index + 1, label: x.label, seconds: x.seconds, bytes: x.bytes }))
+    };
+    await adapter.rpc.assetCreate({ projectName: doc.name || "", asset: {
+      id,
+      projectId: link.projectId,
+      kind: "video",
+      mime: "video/mp4",
+      name: "\u6210\u7247",
+      rel,
+      size: (await stat9(dest)).size,
+      createdAt: film.updatedAt,
+      stored: "disk",
+      source: "metaontic-video"
+    } });
+    await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, film, ts: Date.now() } });
+    return { ok: true, film: { ...film, url: mediaUrl(id) } };
+  }
   async function handle(args) {
     if (disposed) throw new Error("\u753B\u5E03\u5236\u4F5C\u670D\u52A1\u6B63\u5728\u5378\u8F7D\uFF0C\u8BF7\u7A0D\u540E\u67E5\u8BE2\u539F\u4EFB\u52A1\u3002");
     if (args.action === "info") {
@@ -6995,10 +7548,10 @@ function createCanvasNativeService(liveConfig, options = {}) {
         segments
       };
       await saveChain(chain);
-      await mkdir12(chainDirectory, { recursive: true, mode: 448 });
+      await mkdir13(chainDirectory, { recursive: true, mode: 448 });
       const temp = `${chainPointer(link)}.${randomUUID9()}.tmp`;
-      await writeFile9(temp, JSON.stringify({ id: chain.id }), { mode: 384, flag: "wx" });
-      await rename10(temp, chainPointer(link));
+      await writeFile10(temp, JSON.stringify({ id: chain.id }), { mode: 384, flag: "wx" });
+      await rename11(temp, chainPointer(link));
       try {
         await runChainSegment(chain, config);
       } catch (error) {
@@ -7060,6 +7613,22 @@ function createCanvasNativeService(liveConfig, options = {}) {
       chain.message = "\u5DF2\u505C\u6B62\u8FDE\u62CD\uFF1B\u5DF2\u63D0\u4EA4\u7684\u90A3\u4E00\u6BB5\u4ECD\u4F1A\u8DD1\u5B8C\u5E76\u56DE\u586B\u3002";
       await saveChain(chain);
       return { chain: chainView(chain, await currentJob(chain)) };
+    }
+    if (args.action === "film") {
+      const adapter = await adapterFor({ projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} });
+      const doc = await adapter.rpc.projectsGet({ id: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} });
+      const film = doc?.film;
+      return { film: film?.assetId ? { ...film, url: mediaUrl(film.assetId) } : null };
+    }
+    if (args.action === "mergeFilm") {
+      const config = snapshotConfig(liveConfig);
+      if (locks2.has(`film:${args.projectId}`)) throw new Error("\u8FD9\u6761\u753B\u5E03\u6B63\u5728\u5408\u6210\u6210\u7247\uFF0C\u8BF7\u7A0D\u7B49\u3002");
+      locks2.add(`film:${args.projectId}`);
+      try {
+        return await mergeFilm({ projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} }, config);
+      } finally {
+        locks2.delete(`film:${args.projectId}`);
+      }
     }
     if (args.action === "write") {
       const config = snapshotConfig(liveConfig);
@@ -7154,8 +7723,8 @@ function createCanvasNativeService(liveConfig, options = {}) {
         const job2 = { version: 1, id: p.id, canvas: p.canvas, plan: p.plan, identity: p.identity, createdAt: Date.now(), state: "running", reviewed: false };
         await save2(job2);
         const temp = `${key}.${randomUUID9()}.tmp`;
-        await writeFile9(temp, JSON.stringify({ id: job2.id }), { mode: 384, flag: "wx" });
-        await rename10(temp, key);
+        await writeFile10(temp, JSON.stringify({ id: job2.id }), { mode: 384, flag: "wx" });
+        await rename11(temp, key);
         proposals.delete(p.id);
         snapshots.set(job2.id, p.config);
         void perform(job2, p.config).catch(() => {
@@ -7262,395 +7831,7 @@ function approvedCharacterReferences(images, state) {
 // src/businesses/video/workflow/segment-run.ts
 init_config();
 import path22 from "node:path";
-import { stat as stat9 } from "node:fs/promises";
-
-// src/businesses/video/media/merge.ts
-init_config();
-init_connection();
-import { rm as rm8, mkdir as mkdir13, writeFile as writeFile10, rename as rename11, stat as stat8, copyFile as copyFile2 } from "node:fs/promises";
-import path21 from "node:path";
-function evenNumber(value, fallback) {
-  const number2 = Number(value);
-  if (!Number.isFinite(number2) || number2 <= 0) return fallback;
-  const rounded = Math.round(number2);
-  const even = rounded % 2 === 0 ? rounded : rounded - 1;
-  return even >= 2 ? even : 2;
-}
-var AUDIO_PADDING_TOLERANCE_FRAMES = 1;
-async function alignSegmentAudio(config, files, probed, outPath, { signal, binary } = {}) {
-  const temps = [];
-  const trimmed = [];
-  const aligned = [];
-  for (const [index, file] of files.entries()) {
-    const media = probed?.[index];
-    const fps = Math.max(1, Math.round(media?.fps || 30));
-    const videoSeconds = Number(media?.videoDurationSeconds) || 0;
-    const audioSeconds = Number(media?.audioDurationSeconds) || 0;
-    const padding = audioSeconds - videoSeconds;
-    const isLast = index === files.length - 1;
-    if (isLast || !media?.hasAudio || videoSeconds <= 0 || padding <= AUDIO_PADDING_TOLERANCE_FRAMES / fps) {
-      aligned.push(file);
-      continue;
-    }
-    const temp = `${outPath}.${uniqueSuffix(`align${index + 1}`)}.mp4`;
-    const { code } = await runProcess(
-      binary || resolveBinary(config, "ffmpegBinary", "ffmpeg"),
-      [
-        "-y",
-        "-i",
-        file,
-        "-map",
-        "0:v",
-        "-map",
-        "0:a",
-        "-c:v",
-        "copy",
-        "-c:a",
-        "aac",
-        "-af",
-        `atrim=0:${videoSeconds.toFixed(3)}`,
-        "-movflags",
-        "+faststart",
-        temp
-      ],
-      { signal }
-    );
-    if (code === 0 && await exists(temp)) {
-      temps.push(temp);
-      trimmed.push({ index: index + 1, paddingSeconds: Number(padding.toFixed(3)) });
-      aligned.push(temp);
-    } else {
-      await rm8(temp, { force: true });
-      aligned.push(file);
-    }
-  }
-  return { files: aligned, temps, trimmed };
-}
-async function cleanupSegmentTemps(temps) {
-  for (const temp of temps || []) await rm8(temp, { force: true });
-}
-async function mergeClips(config, files, outPath, { signal } = {}) {
-  const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  await mkdir13(path21.dirname(outPath), { recursive: true });
-  const work = `${outPath}.${uniqueSuffix("work")}.mp4`;
-  let copyError = "";
-  let audioError = "";
-  const probed = [];
-  for (const file of files) probed.push(await probeMedia(file, config, signal));
-  const videos = probed.filter((media) => media && media.width && media.height);
-  const paramsMatch = videos.length !== probed.length || videos.every((media) => media.width === videos[0].width && media.height === videos[0].height);
-  const { files: aligned, temps, trimmed } = await alignSegmentAudio(
-    config,
-    files,
-    probed,
-    work,
-    { signal, binary }
-  );
-  files = aligned;
-  try {
-    const mergeMode = ref(config, "mergeMode", "copy");
-    if (mergeMode !== "reencode" && paramsMatch) {
-      const listPath = `${work}.concat.txt`;
-      const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
-      await writeFile10(listPath, `${lines}
-`, "utf8");
-      try {
-        const { code: code2, stderr: stderr2 } = await runProcess(binary, [
-          "-y",
-          "-f",
-          "concat",
-          "-safe",
-          "0",
-          "-i",
-          listPath,
-          "-c",
-          "copy",
-          "-movflags",
-          "+faststart",
-          work
-        ], { signal });
-        if (code2 === 0 && await exists(work)) {
-          await rename11(work, outPath);
-          return { path: outPath, mode: "copy", trimmed };
-        }
-        copyError = stderr2.trim().slice(-400);
-      } finally {
-        await rm8(listPath, { force: true });
-      }
-    } else if (!paramsMatch) {
-      copyError = "\u5206\u6BB5\u5206\u8FA8\u7387\u4E0D\u4E00\u81F4\uFF0C\u8DF3\u8FC7\u65E0\u635F\u62FC\u63A5\u3002";
-    }
-    const first = probed.find((media) => media && media.width && media.height) || {};
-    const width = evenNumber(first.width, 1280);
-    const height = evenNumber(first.height, 720);
-    const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
-    const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
-    const videoParts = files.map((_, index) => `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${index}]`);
-    const videoInputs = files.map((_, index) => `[v${index}]`).join("");
-    async function encode(filter2, maps, withAudioTrack) {
-      await rm8(work, { force: true });
-      const args = ["-y"];
-      for (const file of files) args.push("-i", file);
-      args.push("-filter_complex", filter2, ...maps, "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p");
-      if (withAudioTrack) args.push("-c:a", "aac", "-b:a", "192k");
-      args.push("-movflags", "+faststart", work);
-      return runProcess(binary, args, { signal });
-    }
-    if (withAudio) {
-      const audioParts = files.map((_, index) => `[${index}:a]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a${index}]`);
-      const pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join("");
-      const filter2 = [
-        ...videoParts,
-        ...audioParts,
-        `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`
-      ].join(";");
-      const { code: code2, stderr: stderr2 } = await encode(filter2, ["-map", "[v]", "-map", "[a]"], true);
-      if (code2 === 0 && await exists(work)) {
-        await rename11(work, outPath);
-        return { path: outPath, mode: "reencode", trimmed };
-      }
-      audioError = stderr2.trim().slice(-400);
-    }
-    const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(";");
-    const { code, stderr } = await encode(filter, ["-map", "[v]"], false);
-    if (code === 0 && await exists(work)) {
-      await rename11(work, outPath);
-      return { path: outPath, mode: withAudio ? "reencode-video-only" : "reencode", trimmed };
-    }
-    const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
-    throw Object.assign(new Error(`ffmpeg \u5408\u5E76\u5931\u8D25\uFF1A${detail || "\u672A\u77E5\u9519\u8BEF"}`), { code: "ffmpeg_failed" });
-  } finally {
-    await cleanupSegmentTemps([...temps, work]);
-  }
-}
-async function prepareSeamTrims(config, files, outPath, { signal } = {}) {
-  const requested = ref(config, "seamTrimSeconds", "");
-  const trims = String(requested || "").trim() ? String(requested).split(",").map((value) => Number(value.trim())) : [];
-  if (trims.some((value) => !Number.isFinite(value) || value < 0 || value > 3)) {
-    throw new Error("seamTrimSeconds \u5FC5\u987B\u4E3A\u9017\u53F7\u5206\u9694\u7684 0\u20133 \u79D2\u6570\u503C\uFF0C\u4F8B\u5982 0.5,0\uFF1B\u5206\u522B\u5BF9\u5E94\u7B2C 2\u30013 \u6BB5\u5F00\u5934\u3002");
-  }
-  const prepared = [...files];
-  const temps = [];
-  const cuts = [];
-  try {
-    for (let index = 0; index < files.length; index++) {
-      const official = !isOmniExtendModel(resolveModel(config)) && files.length > 1 && !trims.length;
-      const secondsRequested = index > 0 ? trims[index - 1] || 0 : 0;
-      if (!official && !secondsRequested) continue;
-      const media = await probeMedia(files[index], config, signal);
-      const duration = Number(media?.videoDurationSeconds || media?.durationSeconds);
-      const fps = Number(media?.fps) || 24;
-      const seconds = official ? index > 0 ? 1 / fps : 0 : secondsRequested;
-      const tailSeconds = official && index < files.length - 1 ? 6 / fps : 0;
-      const keptSeconds = duration - seconds - tailSeconds;
-      if (!(keptSeconds > 0.5)) throw new Error(`\u7B2C ${index + 1} \u6BB5\u88C1\u526A\u540E\u4E0D\u8DB3 0.5 \u79D2\uFF0C\u5DF2\u505C\u6B62\u5408\u5E76\u3002`);
-      const temp = `${outPath}.${uniqueSuffix(`cut${index + 1}`)}.mp4`;
-      temps.push(temp);
-      const result = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
-        "-y",
-        "-i",
-        files[index],
-        "-ss",
-        String(seconds),
-        "-t",
-        String(keptSeconds),
-        "-map",
-        "0:v:0",
-        "-map",
-        "0:a:0?",
-        "-c:v",
-        "libx264",
-        "-preset",
-        "veryfast",
-        "-pix_fmt",
-        "yuv420p",
-        "-c:a",
-        "aac",
-        "-movflags",
-        "+faststart",
-        temp
-      ], { signal });
-      if (result.code !== 0) throw new Error(`\u7B2C ${index + 1} \u6BB5\u63A5\u7F1D\u88C1\u526A\u5931\u8D25\uFF1A${tail(result.stderr)}`);
-      prepared[index] = temp;
-      cuts.push({ index: index + 1, seconds, tailSeconds });
-    }
-    return { files: prepared, temps, cuts };
-  } catch (error) {
-    await cleanupSegmentTemps(temps);
-    throw error;
-  }
-}
-var SEGMENT_TASK_CONCURRENCY = 4;
-async function mapLimit(items, limit, worker) {
-  const results = new Array(items.length);
-  let cursor = 0;
-  let failure;
-  const runner = async () => {
-    while (cursor < items.length && !failure) {
-      const index = cursor++;
-      try {
-        results[index] = await worker(items[index], index);
-      } catch (error) {
-        failure ??= error;
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, runner));
-  if (failure) throw failure;
-  return results;
-}
-async function downloadSegmentsAndMerge(config, {
-  segments,
-  segmentsDir,
-  outDir,
-  stamp,
-  notes = [],
-  keepSingleFile = false,
-  signal
-}) {
-  const files = [];
-  const deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0);
-  const ffmpegReady = segments.length > 1 ? await hasFfmpeg(config, signal) : true;
-  let probeWarned = false;
-  const destOf = (segment) => path21.join(
-    segmentsDir,
-    `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`
-  );
-  const downloaded = await mapLimit(segments, SEGMENT_TASK_CONCURRENCY, async (segment) => {
-    const dest = destOf(segment);
-    try {
-      if (!await exists(dest)) {
-        await timedStage("segment_download", () => downloadFile(segment.videoUrl, dest, { signal }));
-      }
-      return { dest };
-    } catch (failure) {
-      if (failure?.code === "ABORTED") throw failure;
-      return { failure };
-    }
-  });
-  const failed = downloaded.find((item) => item.failure);
-  if (failed) {
-    for (const [index, item] of downloaded.entries()) {
-      if (!item?.dest) continue;
-      segments[index].localPath = item.dest;
-      files.push(item.dest);
-    }
-    const reason = `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u4E0B\u8F7D\u5931\u8D25\uFF1A${failed.failure?.message || failed.failure}`;
-    notes.push(reason);
-    return { files, segmentsDir, deliveredSeconds, error: reason };
-  }
-  const dests = downloaded.map((item) => item.dest);
-  const probed = await mapLimit(
-    dests,
-    SEGMENT_TASK_CONCURRENCY,
-    (dest) => timedStage("segment_probe", () => probeMedia(dest, config, signal))
-  );
-  for (const [index, segment] of segments.entries()) {
-    const dest = dests[index];
-    segment.localPath = dest;
-    await appendRequestLog({
-      event: "segment_saved",
-      index: segment.index,
-      taskId: segment.taskId,
-      path: dest,
-      bytes: (await stat8(dest)).size
-    });
-    const media = probed[index];
-    if (media?.durationSeconds) {
-      segment.durationSeconds = Number(media.durationSeconds.toFixed(2));
-      const cumulative = segments.slice(0, index + 1).reduce((sum, item) => sum + (item.seconds || 0), 0);
-      const tolerance = Math.max(
-        CUMULATIVE_TOLERANCE_MIN_SECONDS,
-        cumulative * CUMULATIVE_TOLERANCE_RATIO
-      );
-      const looksCumulative = files.length > 0 && Math.abs(media.durationSeconds - cumulative) <= tolerance && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
-      if (looksCumulative) {
-        await appendRequestLog({ event: "cumulative_output_detected", index: segment.index, duration: media.durationSeconds, plannedCumulative: cumulative });
-        files.length = 0;
-        notes.push(
-          `\u7B2C ${segment.index} \u6BB5\u5B9E\u6D4B ${formatSeconds(media.durationSeconds)} \u79D2\uFF0C\u63A5\u8FD1\u7D2F\u8BA1\u65F6\u957F ${cumulative} \u79D2\uFF0C\u6309\u300C\u4E0A\u6E38\u8FD4\u56DE\u7684\u662F\u7D2F\u8BA1\u6210\u7247\u300D\u5904\u7406\u3002`
-        );
-      }
-    } else if (!probeWarned) {
-      probeWarned = true;
-      notes.push("\u6CA1\u6709\u53EF\u7528\u7684 ffprobe\uFF0C\u65E0\u6CD5\u63A2\u6D4B\u5206\u6BB5\u65F6\u957F\uFF0C\u6309\u300C\u6BCF\u6BB5\u90FD\u662F\u589E\u91CF\u7247\u6BB5\u300D\u76F4\u63A5\u62FC\u63A5\u3002");
-    }
-    files.push(dest);
-  }
-  if (!files.length) return { files, segmentsDir, deliveredSeconds };
-  if (!ffmpegReady && files.length > 1) {
-    const guide = ffmpegInstallHint(config);
-    notes.push(`\u5206\u6BB5\u6587\u4EF6\u90FD\u5DF2\u4E0B\u8F7D\u5230 ${segmentsDir}\u3002`);
-    notes.push(guide.hint);
-    return {
-      files,
-      segmentsDir,
-      deliveredSeconds,
-      merged: false,
-      ffmpegMissing: true,
-      installHint: guide.hint
-    };
-  }
-  const finalPath = path21.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
-  try {
-    if (files.length === 1 && keepSingleFile) {
-      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "segment", videoPath: files[0] };
-    }
-    if (files.length === 1) {
-      await mkdir13(path21.dirname(finalPath), { recursive: true });
-      const copy = `${finalPath}.${uniqueSuffix("copy")}.mp4`;
-      try {
-        await copyFile2(files[0], copy);
-        await rename11(copy, finalPath);
-      } finally {
-        await rm8(copy, { force: true }).catch(() => {
-        });
-      }
-      await appendRequestLog({ event: "delivery_copied", sourcePath: files[0], videoPath: finalPath });
-      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "single", videoPath: finalPath };
-    }
-    await appendRequestLog({ event: "merge_started", inputPaths: files, videoPath: finalPath });
-    const prepared = await timedStage("seam_prepare", () => prepareSeamTrims(config, files, finalPath, { signal }));
-    await appendRequestLog({ event: "seam_trims_prepared", cuts: prepared.cuts });
-    let merged;
-    try {
-      merged = await timedStage("video_merge", () => mergeClips(config, prepared.files, finalPath, { signal }));
-    } finally {
-      await cleanupSegmentTemps(prepared.temps);
-    }
-    if (prepared.cuts.length) {
-      notes.push(`\u5DF2\u6309${String(ref(config, "seamTrimSeconds", "")).trim() ? "\u624B\u52A8\u8BBE\u7F6E" : "\u6A21\u578B\u9ED8\u8BA4\u7B56\u7565"}\u88C1\u526A\u63A5\u7F1D\uFF1A${prepared.cuts.map((cut) => `\u7B2C ${cut.index} \u6BB5\uFF1A\u5934\u90E8 ${cut.seconds.toFixed(3)} \u79D2\u3001\u5C3E\u90E8 ${cut.tailSeconds.toFixed(3)} \u79D2`).join("\uFF1B")}\u3002\u539F\u59CB\u5206\u6BB5\u672A\u6539\u52A8\uFF1B\u5B9E\u9645\u6210\u7247\u4F1A\u7F29\u77ED\uFF0C\u4E0D\u8865\u5E27\u51D1\u65F6\u957F\u3002`);
-    }
-    const actual = await probeMedia(finalPath, config, signal);
-    await appendRequestLog({
-      event: "merge_completed",
-      videoPath: finalPath,
-      mode: merged.mode,
-      actualSeconds: actual?.durationSeconds,
-      sourceCount: segments.length
-    });
-    if (merged.trimmed?.length) {
-      notes.push(
-        `\u7B2C ${merged.trimmed.map((item) => item.index).join("\u3001")} \u6BB5\u7684\u97F3\u9891\u6BD4\u89C6\u9891\u957F\uFF08\u6700\u957F ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} \u79D2\uFF09\uFF0C\u5DF2\u88C1\u9F50\u540E\u518D\u62FC\u63A5\uFF0C\u907F\u514D\u63A5\u7F1D\u5904\u7F3A\u4E00\u5C0F\u6BB5\u753B\u9762\u3002`
-      );
-    }
-    return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: merged.mode, videoPath: finalPath, seamCuts: prepared.cuts, actualSeconds: actual?.durationSeconds };
-  } catch (failure) {
-    if (failure?.code === "ABORTED") throw failure;
-    let reason = `\u5206\u6BB5\u5DF2\u751F\u6210\uFF0C\u4F46\u5408\u5E76\u5931\u8D25\uFF1A${failure?.message || failure}`;
-    let installHint;
-    if (failure?.code === "ffmpeg_missing") {
-      const guide = ffmpegInstallHint(config);
-      installHint = guide.hint;
-      reason = guide.hint;
-    }
-    notes.push(reason);
-    await appendRequestLog({ event: "merge_failed", errorCode: String(failure?.code || "merge_error"), segmentsDir });
-    return { files, segmentsDir, deliveredSeconds, error: reason, ffmpegMissing: Boolean(installHint), installHint };
-  }
-}
-
-// src/businesses/video/workflow/segment-run.ts
+import { stat as stat10 } from "node:fs/promises";
 var SEGMENT_PAUSE_NOTE = "\u672C\u6BB5\u5DF2\u5B8C\u6210\uFF1A\u8BF7\u5148\u5C55\u793A\u672C\u6B21\u89C6\u9891\u6210\u679C\uFF0C\u8BA9\u7528\u6237\u9884\u89C8\uFF1B\u6B63\u6587\u5C55\u793A\u540E\u7ACB\u5373\u8C03\u7528video_project(action:review_segment,resume:\u539FresumeDir)\u5F39\u51FA\u5206\u6BB5\u7ED3\u679C\u786E\u8BA4\u7A97\uFF1B\u901A\u8FC7\u540E\u624D\u7528resume\u8FDB\u5165\u4E0B\u4E00\u6BB5\u8D39\u7528\u5BA1\u6279\uFF0C\u4E0D\u4EE5\u6587\u5B57\u95EE\u53E5\u66FF\u4EE3\u5F39\u7A97\u3002";
 function recordSegmentResult({ final, segments, segment, submissionId, convertedReferences }) {
   const detail = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error;
@@ -7728,7 +7909,7 @@ async function runSegmentDelivery({
     for (const segment of completed.slice(0, -1)) {
       const file = path22.join(segmentsDir, `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`);
       try {
-        if ((await stat9(file)).isFile()) segment.localPath = file;
+        if ((await stat10(file)).isFile()) segment.localPath = file;
       } catch {
       }
     }
@@ -8793,7 +8974,7 @@ function setupTool(config) {
 import { spawn as spawn2 } from "node:child_process";
 import path23 from "node:path";
 import { createRequire as createRequire2 } from "node:module";
-import { stat as stat10, mkdir as mkdir14 } from "node:fs/promises";
+import { stat as stat11, mkdir as mkdir14 } from "node:fs/promises";
 function runHyperframes(cli, args, cwd, config, signal) {
   return new Promise((resolve3, reject) => {
     if (signal?.aborted) return reject(new Error("Hyperframes \u5DF2\u53D6\u6D88\u3002"));
@@ -8897,7 +9078,7 @@ function hyperframesTool(config, deps) {
       const project = path23.resolve(cwd, args.projectDir || ".");
       if (action !== "check") {
         if (!args.projectDir) throw new Error("lint/render \u5FC5\u987B\u6307\u5B9A projectDir\u3002");
-        if (!(await stat10(path23.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
+        if (!(await stat11(path23.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
       }
       let videoPath;
       let command = ["doctor", "--json"];
@@ -8911,7 +9092,7 @@ function hyperframesTool(config, deps) {
           throw new Error("\u8F93\u51FA\u5FC5\u987B\u662F\u9879\u76EE\u76EE\u5F55\u5185\u7684 .mp4 \u6587\u4EF6\u3002");
         }
         try {
-          await stat10(videoPath);
+          await stat11(videoPath);
           throw new Error("\u8F93\u51FA\u6587\u4EF6\u5DF2\u5B58\u5728\uFF0C\u8BF7\u6362\u4E00\u4E2A\u6587\u4EF6\u540D\u3002");
         } catch (error) {
           if (error.code !== "ENOENT") throw error;
@@ -8921,7 +9102,7 @@ function hyperframesTool(config, deps) {
       }
       const result = await runHyperframes(cli, command, action === "check" ? cwd : project, config, exec?.signal);
       if (result.code !== 0) return { status: "failed", action, output: result.output, note: "\u68C0\u67E5\u8F93\u51FA\u4E2D\u7684\u73AF\u5883\u6216\u9879\u76EE\u9519\u8BEF\u540E\u91CD\u8BD5\uFF1B\u4E0D\u4F1A\u91CD\u590D\u63D0\u4EA4 Seedance \u4EFB\u52A1\u3002" };
-      if (videoPath && !(await stat10(videoPath)).size) throw new Error("Hyperframes \u672A\u751F\u6210\u6709\u6548\u7684 MP4 \u6587\u4EF6\u3002");
+      if (videoPath && !(await stat11(videoPath)).size) throw new Error("Hyperframes \u672A\u751F\u6210\u6709\u6548\u7684 MP4 \u6587\u4EF6\u3002");
       return { status: action === "render" ? "succeeded" : "checked", action, output: result.output, ...videoPath ? { videoPath } : {} };
     }
   };

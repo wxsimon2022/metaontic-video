@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "3.21.0",
+  "version": "3.22.0",
   "description": "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
@@ -106,13 +106,13 @@
   },
   "dependencies": {},
   "releaseNotes": {
-    "version": "3.21.0",
+    "version": "3.22.0",
     "prerelease": false,
-    "publishedAt": "2026-11-12T13:43:35.142Z",
+    "publishedAt": "2026-11-12T14:09:30.181Z",
     "items": [
-      "新增：内置流程画布：独立页面管理画布与连线，图片视频节点直接制作、续拍。",
-      "新增：画布内写脚本铺开剧本分镜，「连拍」一次确认后逐段生成并逐段审核。",
-      "优化：不再需要第三方画布插件；自动创建画布默认关闭，文本模型可单独配密钥。"
+      "新增：流程画布可直接导入自己的图片作素材，连成首帧或参考图参与制作。",
+      "新增：全部段落出成果后可一键合成成片，在画布内预览或下载。",
+      "优化：流程画布开关关闭后左侧栏不再显示画布入口，已有画布与成果保留。"
     ]
   }
 }

@@ -109,18 +109,42 @@ export function createVideoClient(require) {
             manager: pluginManager,
           }),
         }, VideoPanel)), 'metaontic-video: sidebar panel');
-        ctx.effect(() => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
-          name: 'sidebar.panellist',
-          id: CANVAS_PANEL_ID,
-          order: 31,
-          locale: NS,
-          label: () => t('canvasPanelLabel'),
-        }, PanelIcon)), 'metaontic-video: canvas sidebar entry');
-        ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({
-          name: 'main',
-          key: CANVAS_PANEL_ID,
-          locale: NS,
-        }, FlowCanvasPage)), 'metaontic-video: canvas page');
+        // 流程画布是可开关的组件：设置页「流程画布」开关打开时才注册左侧栏入口与画布页。
+        // 关闭后左侧栏不再出现画布入口，已有画布与成果仍留在插件数据目录；开关改动实时生效，不必重开 Harness。
+        const canvasSwitchOn = () => {
+          try { return form?.getSnapshot?.()?.value?.autoCreateCanvas === true; } catch { return false; }
+        };
+        const canvasSlots = [
+          () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+            name: 'sidebar.panellist',
+            id: CANVAS_PANEL_ID,
+            order: 31,
+            locale: NS,
+            label: () => t('canvasPanelLabel'),
+          }, PanelIcon)),
+          () => ctx.slots.inject('main', () => ctx.slots.register({
+            name: 'main',
+            key: CANVAS_PANEL_ID,
+            locale: NS,
+          }, FlowCanvasPage)),
+        ];
+        ctx.effect(() => {
+          let active = false;
+          let disposers: any[] = [];
+          const close = () => { for (const off of disposers) off(); disposers = []; active = false; };
+          const sync = () => {
+            const wanted = canvasSwitchOn();
+            if (wanted === active) return;
+            if (!wanted) { close(); return; }
+            disposers = canvasSlots.map((register: any) => register()).filter((off: any) => typeof off === 'function');
+            active = true;
+          };
+          sync();
+          // 订阅设置快照：用户在设置页关掉开关，左侧栏入口与画布页立刻消失。
+          let unsubscribe: any;
+          try { unsubscribe = form?.subscribe?.(sync); } catch { unsubscribe = undefined; }
+          return () => { if (typeof unsubscribe === 'function') unsubscribe(); close(); };
+        }, 'metaontic-video: canvas entry follows the canvas switch');
       },
     };
 }

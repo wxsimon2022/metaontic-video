@@ -4,17 +4,47 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createPreviewHost } from '../preview/host.mjs';
 
-test('standalone preview host mounts the real client and registers settings and progress views', () => {
-  // 把 slot 注册项按 名称:key 存下来，便于分别断言设置页、进度视图与左侧栏面板。
+/** 设置快照桩：流程画布入口跟着「流程画布」开关走，关掉要立刻消失。 */
+function switchForm(value = {}) {
+  const listeners = new Set();
+  let current = { ...value };
+  return {
+    getSnapshot: () => ({ status: 'ready', value: { ...current }, writable: true, revision: 1 }),
+    subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+    set(key, next) { current = { ...current, [key]: next }; for (const listener of listeners) listener(); },
+  };
+}
+
+function boot(form) {
   let entry;
   vm.runInNewContext(readFileSync(new URL('../client.js', import.meta.url), 'utf8'), {
     window: { __ModuleLoader__: { load(value) { entry = value; } } },
   });
   const plugin = entry.factory(() => ({ createElement() {} }));
   const components = {}, dictionaries = {};
-  const host = createPreviewHost({ form: {}, components, dictionaries, getLocale: () => 'zh', onUpdate() {} });
+  const host = createPreviewHost({ form, components, dictionaries, getLocale: () => 'zh', onUpdate() {} });
   for (const service of plugin.inject) assert.ok(host[service], service);
   assert.doesNotThrow(() => plugin.apply(host));
+  return { host, components, dictionaries };
+}
+
+test('流程画布开关关掉后左侧栏不再注册画布入口，打开立刻回来', () => {
+  const form = switchForm({ autoCreateCanvas: false });
+  const off = boot(form);
+  assert.equal(off.components['sidebar.panellist:metaontic-video-canvas'], undefined, '关闭时不该有画布图标');
+  assert.equal(off.components['main:metaontic-video-canvas'], undefined, '关闭时不该有画布页');
+  // 视频创作入口不受影响。
+  assert.equal(typeof off.components['sidebar.panellist:metaontic-video'], 'function', '视频创作入口照旧');
+  form.set('autoCreateCanvas', true);
+  assert.equal(typeof off.components['sidebar.panellist:metaontic-video-canvas'], 'function', '打开后画布图标回来');
+  assert.equal(typeof off.components['main:metaontic-video-canvas'], 'function', '打开后画布页回来');
+  form.set('autoCreateCanvas', false);
+  assert.equal(off.components['sidebar.panellist:metaontic-video-canvas'], undefined, '再关掉又消失');
+});
+
+test('standalone preview host mounts the real client and registers settings and progress views', () => {
+  // 把 slot 注册项按 名称:key 存下来，便于分别断言设置页、进度视图与左侧栏面板。
+  const { host, components, dictionaries } = boot(switchForm({ autoCreateCanvas: true }));
   for (const key of ['metaontic-video', 'video_generate', 'video_extend', 'video_status', 'metaontic-video-progress']) {
     assert.equal(typeof components[key], 'function', key);
   }

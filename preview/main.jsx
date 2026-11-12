@@ -10,7 +10,7 @@ const secretFields = ['apiKey', 'metaonticApiKey', 'volcengineApiKey', 'deviceSe
 const emit = () => { revision++; for (const listener of listeners) listener(); };
 function preset(mode) {
   scenario = mode;
-  value = { connectionMode: ['empty', 'error'].includes(mode) ? 'service' : mode, model: 'doubao-seedance-2-0-mini-260615', ratio: '9:16', mode: 'continuous', generateAudio: true, watermark: false, duration: 15 };
+  value = { connectionMode: ['empty', 'error'].includes(mode) ? 'service' : mode, model: 'doubao-seedance-2-0-mini-260615', ratio: '9:16', mode: 'continuous', generateAudio: true, watermark: false, duration: 15, autoCreateCanvas: true };
   if (mode === 'service' || mode === 'error') Object.assign(value, { apiKey: 'preview-service-key', keyOrigin: 'register', registerEmail: 'preview@example.com', deviceId: 'preview-device', deviceSecret: 'preview-device-secret' });
   if (mode === 'metaontic') value.metaonticApiKey = 'preview-metaontic-key';
   // ?noshare：预览「不共用密钥」时的三张模型卡片（视频 / 图片 / 文本各自一把密钥）。

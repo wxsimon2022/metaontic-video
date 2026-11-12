@@ -9,6 +9,8 @@ export function createPreviewHost({ form, components, dictionaries, getLocale, o
   // 左侧栏那一行的显示名由注册项的 label 给（宿主要求传函数），预览按同样方式取。
   const labels = {};
   const uuid = (() => { let n = 0; return () => `reg-${++n}`; })();
+  // inject 期间注册的项都要能注销：真实宿主的 inject 返回的就是「注销这轮注册」的 disposer。
+  let collecting = null;
   return {
     calls,
     labels,
@@ -31,17 +33,22 @@ export function createPreviewHost({ form, components, dictionaries, getLocale, o
         if (spec.inject) components[`${spec.name}:${key}:props`] = spec.inject;
         if (typeof spec.label === 'function') labels[`${spec.name}:${key}`] = spec.label;
         const token = uuid();
-        return () => {
+        const off = () => {
           delete components[`${spec.name}:${key}`];
           if (components[key] === component) delete components[key];
           delete components[`${spec.name}:${key}:props`];
+          delete labels[`${spec.name}:${key}`];
           void token;
         };
+        collecting?.push(off);
+        return off;
       },
       inject(_slot, callback) {
-        const result = callback();
-        if (result?.next) for (const _ of result) {}
-        return () => {};
+        const previous = collecting, offs = [];
+        collecting = offs;
+        try { callback(); } finally { collecting = previous; }
+        // 返回注销函数：宿主关掉入口时调用它，这一轮注册就整批消失。
+        return () => { for (const off of offs) off(); };
       },
     },
     get(name) {

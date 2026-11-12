@@ -1,7 +1,7 @@
 /** 画布内制作入口：独立的方案/费用/结果审核，不创建或伪造助手会话。 */
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, stat } from 'node:fs/promises';
 import { dshHome } from '../../../core/paths.js';
 import { loadCanvasAdapter, readCanvasInput, publishCanvasResult, resolveCanvasAdapter } from './canvas.js';
 import { snapshotConfig, imageConfig, resolveApiKey, resolveTextApiKey, assertConfigured, resolveModel, resolveTextModel, isVolcengine, connectionLabel } from '../providers/connection.js';
@@ -14,6 +14,9 @@ import { IMAGE_MODEL } from '../connection-defaults.js';
 import { modelMaxSeconds, planVideoSegments, resolveSegmentSeconds } from '../workflow/planning.js';
 import { estimateSegmentCosts } from '../tools/video-estimate.js';
 import { writeScript } from '../providers/text.js';
+import { mergeClips } from '../media/merge.js';
+import { hasFfmpeg, ffmpegInstallHint } from '../media/ffmpeg.js';
+import { downloadFile } from '../media/download.js';
 import { canvasScriptPreview, scriptStoryboardShots } from './canvas-project.js';
 import { clampInteger } from '../../../core/utils/validation.js';
 import { MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_TOTAL_SECONDS } from '../config.js';
@@ -38,6 +41,25 @@ function splitEvenly(items: string[], count: number) {
   while (index < items.length) groups[count - 1].push(items[index++]);
   return groups;
 }
+
+/** 成片分段：按连拍同一套顺序，取每个视频制作节点最新的一条成果；缺成果的段落单独列出来。 */
+export function filmSegments(doc: any) {
+  const nodes: any[] = Object.values(doc?.nodes || {});
+  const segments: any[] = [], missing: string[] = [];
+  for (const [index, node] of pendingVideoOrder(doc).entries()) {
+    const label = String(node?.label || `第${index + 1}段`);
+    const made = nodes.filter(n => n?.metaonticSourceNode === node.id && n?.type === 'video' && (n?.data?.assetId || n?.data?.metaonticVideoUrl));
+    made.sort((a, b) => Number(a?.metaonticCreatedAt || 0) - Number(b?.metaonticCreatedAt || 0));
+    const latest = made[made.length - 1];
+    if (!latest) { missing.push(label); continue; }
+    segments.push({ index, nodeId: node.id, label, resultId: latest.id, assetId: String(latest.data?.assetId || ''),
+      url: String(latest.data?.metaonticVideoUrl || ''), seconds: Number(latest.data?.metaonticSeconds ?? latest.data?.duration ?? 0) || null });
+  }
+  return { segments, missing };
+}
+
+/** 成片在画布里的回看地址：与成果素材同一套只读通道，不需要额外接口。 */
+const mediaUrl = assetId => `/metaontic-video/canvas-media?assetId=${encodeURIComponent(String(assetId || ''))}`;
 
 /** 写脚本 → 逐段提示词：有分镜表就按画面列切，否则按句子/段落按字数均分。
  *  只做切分，不编造内容；内容不够拆成这么多段时直接报错，让用户补脚本或缩短时长。 */
@@ -330,6 +352,50 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       await save(job);
     } finally { running.delete(job.id); }
   }
+  /** 成片合并：把画布上已生成的每段视频按顺序拼成一条，落进画布数据目录并登记资产。
+   *  先查缺段与 ffmpeg，再下载/读取分段，最后合并一次；不重建任何已完成的段落。 */
+  async function mergeFilm(link, config) {
+    const adapter = await adapterFor(link);
+    const loc = { id: link.projectId, ...(link.canvasId ? { canvasId: link.canvasId } : {}) };
+    const doc = await adapter.rpc.projectsGet(loc);
+    if (!doc?.nodes) throw new Error('画布不存在或已删除。');
+    const { segments, missing } = filmSegments(doc);
+    if (!segments.length) throw new Error('画布上还没有可合成的视频成果：先按流程逐段生成，再合成成片。');
+    if (missing.length) throw new Error(`还有 ${missing.length} 段没有成果（${missing.join('、')}），先把每段都生成完再合成成片。`);
+    const ffmpegReady = await (options.hasFfmpeg || hasFfmpeg)(config);
+    if (!ffmpegReady) throw new Error(`本机没有找到可用的 ffmpeg，暂时不能合成成片。${(options.ffmpegInstallHint || ffmpegInstallHint)(config).hint}`);
+    const root = (await adapter.rpc.dataRootGet()).dataRoot;
+    if (!root) throw new Error('画布数据目录不可用，请核对插件数据目录权限。');
+    const records = (await adapter.rpc.assetsGet({ ids: segments.map(x => x.assetId).filter(Boolean) })).items || [];
+    const work = path.join(directory, 'film-work');
+    await mkdir(work, { recursive: true, mode: 0o700 });
+    const files: string[] = [];
+    for (const segment of segments) {
+      const asset = records.find((a: any) => a.id === segment.assetId);
+      const local = asset?.rel ? path.resolve(root, String(asset.rel)) : '';
+      if (local && (await stat(local).catch(() => null))?.isFile()) { files.push(local); segment.bytes = (await stat(local)).size; continue; }
+      // 分段素材不在画布数据目录时按原始地址补下载；下载失败就停住，不合成缺段成片。
+      if (!segment.url) throw new Error(`第 ${segment.index + 1} 段（${segment.label}）素材不在画布数据目录，也没有可下载的地址。`);
+      const dest = path.join(work, `${String(segment.index + 1).padStart(2, '0')}-segment.mp4`);
+      await downloadFile(segment.url, dest, {});
+      files.push(dest); segment.bytes = (await stat(dest)).size;
+    }
+    // 成片 id 由分段内容决定：同一批分段重复合并得到同一条，重做某一段则得到新版成片。
+    const stamp = hash(segments.map(x => [x.resultId, x.assetId, x.url, x.bytes]));
+    const id = `mov_film_${stamp.slice(0, 24)}`;
+    const rel = `projects/${link.projectId}/final/${id}.mp4`;
+    const dest = path.join(root, rel);
+    await mkdir(path.dirname(dest), { recursive: true });
+    await (options.mergeClips || mergeClips)(config, files, dest, {});
+    const seconds = segments.reduce((sum, x) => sum + (x.seconds || 0), 0) || null;
+    const film = { assetId: id, count: segments.length, seconds, updatedAt: Date.now(),
+      segments: segments.map(x => ({ index: x.index + 1, label: x.label, seconds: x.seconds, bytes: x.bytes })) };
+    await adapter.rpc.assetCreate({ projectName: doc.name || '', asset: { id, projectId: link.projectId, kind: 'video', mime: 'video/mp4', name: '成片',
+      rel, size: (await stat(dest)).size, createdAt: film.updatedAt, stored: 'disk', source: 'metaontic-video' } });
+    await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, film, ts: Date.now() } });
+    return { ok: true, film: { ...film, url: mediaUrl(id) } };
+  }
+
   async function handle(args) {
     if (disposed) throw new Error('画布制作服务正在卸载，请稍后查询原任务。');
     if (args.action === 'info') {
@@ -405,6 +471,21 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       chain.message = '已停止连拍；已提交的那一段仍会跑完并回填。';
       await saveChain(chain);
       return { chain: chainView(chain, await currentJob(chain)) };
+    }
+    // 成片：读取当前成片记录（回看上个版本的成果），不合并、不收费。
+    if (args.action === 'film') {
+      const adapter = await adapterFor({ projectId: args.projectId, ...(args.canvasId ? { canvasId: args.canvasId } : {}) });
+      const doc = await adapter.rpc.projectsGet({ id: args.projectId, ...(args.canvasId ? { canvasId: args.canvasId } : {}) });
+      const film = doc?.film;
+      return { film: film?.assetId ? { ...film, url: mediaUrl(film.assetId) } : null };
+    }
+    // 合成成片：把已生成的每段视频按连线顺序拼成一条，落进画布数据目录后即可回看与下载。
+    if (args.action === 'mergeFilm') {
+      const config = snapshotConfig(liveConfig);
+      if (locks.has(`film:${args.projectId}`)) throw new Error('这条画布正在合成成片，请稍等。');
+      locks.add(`film:${args.projectId}`);
+      try { return await mergeFilm({ projectId: args.projectId, ...(args.canvasId ? { canvasId: args.canvasId } : {}) }, config); }
+      finally { locks.delete(`film:${args.projectId}`); }
     }
     // 文本模型写脚本：一次调用，返回 Markdown 剧本；不建节点、不碰视频模型。
     if (args.action === 'write') {

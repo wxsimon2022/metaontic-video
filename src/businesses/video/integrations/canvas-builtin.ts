@@ -3,7 +3,7 @@
  *  读写接口与 readCanvasInput / publishCanvasResult / markCanvasChanged 的既有形状一致，直接复用。 */
 import { mkdir, readFile, writeFile, rename, readdir, stat } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { dshHome } from '../../../core/paths.js';
 
@@ -60,6 +60,7 @@ function mergeDoc(id: string, prev: any, args: any) {
     ...(args?.defaultCanvasName !== undefined ? { defaultCanvasName: String(args.defaultCanvasName).slice(0, 80) }
       : prev?.defaultCanvasName !== undefined ? { defaultCanvasName: prev.defaultCanvasName } : {}),
     ...(incoming.bible !== undefined ? { bible: incoming.bible } : prev?.bible !== undefined ? { bible: prev.bible } : {}),
+    ...(incoming.film !== undefined ? { film: incoming.film } : prev?.film !== undefined ? { film: prev.film } : {}),
     nodes, edges, view: incoming.view || prev?.view || { x: 60, y: 40, scale: 1 },
     assets: { ...(prev?.assets || {}), ...(incoming.assets || {}) },
     tombstones, edgeTombstones, rev: (prev?.rev || 0) + 1, ...(incoming.ts ? { ts: incoming.ts } : {}) };
@@ -177,6 +178,46 @@ export async function builtinCanvasCreate(name: any) {
   return { canvas: { projectId: id, name: label, updatedAt: doc.updatedAt, view: doc.view, nodes: {}, edges: [], dataRoot: dataRootOf() } };
 }
 
+const IMAGE_MIME: any = { '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
+const IMPORT_LIMIT_BYTES = 32 * 1024 * 1024;
+
+/** 图片类型只认扩展名与文件头一致的那几种；识别不出来就拒绝，不写成打不开的假素材。 */
+function imageExtension(mime: any, bytes: Buffer) {
+  const normalized = String(mime || '').toLowerCase().split(';')[0].trim();
+  if (normalized === 'image/png') return '.png';
+  if (normalized === 'image/jpeg' || normalized === 'image/jpg') return '.jpg';
+  if (normalized === 'image/webp') return '.webp';
+  if (bytes.length > 8 && bytes.toString('hex', 0, 8) === '89504e470d0a1a0a') return '.png';
+  if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return '.jpg';
+  if (bytes.length > 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') return '.webp';
+  return '';
+}
+
+/** 导入用户自己的图片素材：整张写进内置画布数据根并登记资产，
+ *  之后就能在画布里当参考图或首帧连给视频节点，全程不依赖任何外部图床。 */
+export async function builtinCanvasImport(args: any) {
+  const doc = await requireDoc(args?.projectId);
+  const bytes = Buffer.isBuffer(args?.bytes) ? args.bytes : Buffer.from(args?.bytes || []);
+  if (!bytes.length) throw new Error('导入的图片是空文件。');
+  if (bytes.length > IMPORT_LIMIT_BYTES) throw new Error('单张图片不能超过 32MB。');
+  const extension = imageExtension(args?.mime, bytes);
+  if (!extension) throw new Error('只支持 PNG、JPEG、WebP 图片。');
+  // 同一张图重复导入复用同一个资产：id 由内容决定，重试或再拖一次不会堆出多份。
+  const id = `mov_img_${createHash('sha256').update(bytes).digest('hex').slice(0, 24)}`;
+  const label = String(args?.name || '').trim().slice(0, 80) || `导入图片${extension}`;
+  const rel = `projects/${doc.id}/image/${id}${extension}`;
+  const dest = path.join(dataRootOf(), rel);
+  await mkdir(path.dirname(dest), { recursive: true, mode: 0o700 });
+  if (!(await stat(dest).catch(() => null))?.isFile()) {
+    const temp = `${dest}.${randomUUID()}.tmp`;
+    await writeFile(temp, bytes, { mode: 0o600, flag: 'wx' });
+    await rename(temp, dest);
+  }
+  const mime = IMAGE_MIME[extension];
+  await builtinRpc().assetCreate({ projectName: doc.name || '', asset: { id, projectId: doc.id, kind: 'image', mime, name: label, rel, size: bytes.length, createdAt: Date.now(), stored: 'disk', source: 'metaontic-video' } });
+  return { ok: true, assetId: id, name: label, rel, size: bytes.length, mime };
+}
+
 /** 面板读取/编辑用的接口：只暴露内置画布自己的文档，不碰其他插件的存储与配置。 */
 export async function builtinCanvasHandle(args: any) {
   const method = String(args?.method || '');
@@ -192,7 +233,7 @@ export async function builtinCanvasHandle(args: any) {
     const doc = await readDoc(params.projectId);
     if (!doc || doc.deleted) throw new Error('画布不存在或已删除。');
     return { canvas: { projectId: doc.id, name: doc.name, updatedAt: doc.updatedAt || 0, view: doc.view || { x: 60, y: 40, scale: 1 },
-      nodes: doc.nodes || {}, edges: doc.edges || [], dataRoot: dataRootOf() } };
+      film: doc.film || null, nodes: doc.nodes || {}, edges: doc.edges || [], dataRoot: dataRootOf() } };
   }
   if (method === 'rename') {
     const doc = await requireDoc(params.projectId);
@@ -290,10 +331,39 @@ export function registerBuiltinCanvas(ctx) {
         const info = await stat(file);
         if (!info.isFile()) throw new Error('素材不存在。');
         res.setHeader('content-type', asset.mime || 'application/octet-stream');
-        res.setHeader('content-length', String(info.size));
         res.setHeader('cache-control', 'private, max-age=300');
-        createReadStream(file).pipe(res);
+        res.setHeader('accept-ranges', 'bytes');
+        // 成片要能拖动进度条：支持 Range 才拿得到 206 与分段内容。
+        const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || '').trim());
+        let start = 0, end = info.size - 1, partial = false;
+        if (range) {
+          const hasStart = range[1] !== '', hasEnd = range[2] !== '';
+          if (hasStart) { start = Number(range[1]); end = hasEnd ? Number(range[2]) : info.size - 1; }
+          else if (hasEnd) { start = Math.max(0, info.size - Number(range[2])); end = info.size - 1; }
+          if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start > end || start >= info.size) {
+            res.statusCode = 416; res.setHeader('content-range', `bytes */${info.size}`); res.end(); return;
+          }
+          end = Math.min(end, info.size - 1);
+          partial = true;
+        }
+        res.setHeader('content-length', String(end - start + 1));
+        if (partial) { res.statusCode = 206; res.setHeader('content-range', `bytes ${start}-${end}/${info.size}`); }
+        createReadStream(file, { start, end }).pipe(res);
       } catch (e: any) { res.statusCode = 404; res.end(); }
+    } });
+    // 导入用户自己的参考图：只收图片二进制，写进画布数据根后再由画布端建节点。
+    const removeImport = scope.webServer.register({ kind: 'exact', path: '/metaontic-video/canvas-import', async handler(req, res) {
+      res.setHeader('content-type', 'application/json; charset=utf-8'); res.setHeader('cache-control', 'no-store');
+      try {
+        if (req.method !== 'POST') throw new Error('仅接受POST。');
+        if (req.headers['sec-fetch-site'] === 'cross-site' || (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host)) throw new Error('请求来源无效。');
+        if (!String(req.headers['content-type'] || '').startsWith('image/')) throw new Error('请求类型无效，只接受图片。');
+        const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+        const chunks = []; let size = 0;
+        for await (const chunk of req) { size += chunk.length; if (size > IMPORT_LIMIT_BYTES) throw new Error('单张图片不能超过 32MB。'); chunks.push(chunk); }
+        const result = await builtinCanvasImport({ projectId: url.searchParams.get('projectId'), name: url.searchParams.get('name'), mime: req.headers['content-type'], bytes: Buffer.concat(chunks) });
+        res.end(JSON.stringify(result));
+      } catch (e: any) { res.statusCode = 400; res.end(JSON.stringify({ error: String(e?.message || '导入图片未完成。') })); }
     } });
     const remove = scope.webServer.register({ kind: 'exact', path: '/metaontic-video/canvas', async handler(req, res) {
       res.setHeader('content-type', 'application/json; charset=utf-8'); res.setHeader('cache-control', 'no-store');
@@ -305,6 +375,6 @@ export function registerBuiltinCanvas(ctx) {
         res.end(JSON.stringify(await builtinCanvasHandle(JSON.parse(raw))));
       } catch (e: any) { res.statusCode = 400; res.end(JSON.stringify({ error: String(e?.message || '画布操作未完成。') })); }
     } });
-    return () => { if (typeof remove === 'function') remove(); if (typeof removeMedia === 'function') removeMedia(); };
+    return () => { if (typeof remove === 'function') remove(); if (typeof removeMedia === 'function') removeMedia(); if (typeof removeImport === 'function') removeImport(); };
   });
 }

@@ -840,8 +840,8 @@
       sectionVideo: "\u753B\u9762\u4E0E\u58F0\u97F3",
       sectionCanvas: "\u6D41\u7A0B\u753B\u5E03",
       canvasPanelLabel: "MetaOnticVideo\u6D41\u7A0B\u753B\u5E03",
-      autoCreateCanvas: "\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03",
-      autoCreateCanvasHint: "\u9ED8\u8BA4\u5173\u95ED\uFF1A\u5173\u95ED\u65F6\u6BCF\u6B21\u521B\u4F5C\u4E0D\u4F1A\u81EA\u52A8\u5EFA\u56FE\u6216\u540C\u6B65\uFF0C\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\uFF0C\u624B\u52A8\u8282\u70B9\u5236\u4F5C\u4ECD\u53EF\u7528\u3002\u5F00\u542F\u540E\u968F\u521B\u4F5C\u81EA\u52A8\u5EFA\u56FE\uFF0C\u5BA1\u6838\u524D\u540C\u6B65\u5267\u672C\u3001\u5206\u955C\u548C\u5236\u4F5C\u8BA1\u5212\uFF0C\u751F\u6210\u540E\u56DE\u586B\u6210\u679C\u3002\u6D41\u7A0B\u753B\u5E03\u662F\u672C\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u5176\u4ED6\u753B\u5E03\u63D2\u4EF6\u3002",
+      autoCreateCanvas: "\u6D41\u7A0B\u753B\u5E03",
+      autoCreateCanvasHint: "\u9ED8\u8BA4\u5173\u95ED\uFF1A\u5173\u95ED\u65F6\u5DE6\u4FA7\u680F\u4E0D\u51FA\u73B0\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u5165\u53E3\uFF0C\u521B\u4F5C\u4E5F\u4E0D\u4F1A\u81EA\u52A8\u5EFA\u56FE\u6216\u540C\u6B65\uFF1B\u5DF2\u6709\u753B\u5E03\u4E0E\u6210\u679C\u4ECD\u4FDD\u7559\u5728\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\uFF0C\u91CD\u65B0\u6253\u5F00\u5C31\u80FD\u7EE7\u7EED\u3002\u5F00\u542F\u540E\u5DE6\u4FA7\u680F\u51FA\u73B0\u6D41\u7A0B\u753B\u5E03\u5165\u53E3\uFF0C\u968F\u521B\u4F5C\u81EA\u52A8\u5EFA\u56FE\uFF0C\u5BA1\u6838\u524D\u540C\u6B65\u5267\u672C\u3001\u5206\u955C\u548C\u5236\u4F5C\u8BA1\u5212\uFF0C\u751F\u6210\u540E\u56DE\u586B\u6210\u679C\u3002\u6D41\u7A0B\u753B\u5E03\u662F\u672C\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u5176\u4ED6\u753B\u5E03\u63D2\u4EF6\u3002",
       sectionModels: "\u6A21\u578B\u914D\u7F6E",
       sectionCombined: "\u66F4\u591A\u8BBE\u7F6E",
       advancedPicture: "\u753B\u9762",
@@ -994,8 +994,8 @@
       sectionVideo: "Picture & audio",
       sectionCanvas: "Workflow canvas",
       canvasPanelLabel: "MetaOnticVideo workflow canvas",
-      autoCreateCanvas: "Automatically create a workflow canvas",
-      autoCreateCanvasHint: "Off by default: nothing is created or synced automatically, existing canvases stay, and manual node generation still works. Turn it on to create a canvas with each project, sync scripts and plans before review, and publish results. The workflow canvas is built into this plugin; no other canvas plugin is required.",
+      autoCreateCanvas: "Workflow canvas",
+      autoCreateCanvasHint: "Off by default: the sidebar shows no workflow canvas entry, and nothing is created or synced automatically. Existing canvases and results stay in the plugin data folder. Turn it on to show the entry, create a canvas with each project, sync scripts and plans before review, and publish results. The workflow canvas is built into this plugin; no other canvas plugin is required.",
       sectionModels: "Models",
       sectionCombined: "More settings",
       advancedPicture: "Picture",
@@ -1161,7 +1161,7 @@
     const UPDATE_ATTEMPTS = 3;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check-v3";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "3.21.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.22.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1592,7 +1592,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.21.0",
+    version: "3.22.0",
     description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1698,13 +1698,13 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.21.0",
+      version: "3.22.0",
       prerelease: false,
-      publishedAt: "2026-11-12T13:43:35.142Z",
+      publishedAt: "2026-11-12T14:09:30.181Z",
       items: [
-        "\u65B0\u589E\uFF1A\u5185\u7F6E\u6D41\u7A0B\u753B\u5E03\uFF1A\u72EC\u7ACB\u9875\u9762\u7BA1\u7406\u753B\u5E03\u4E0E\u8FDE\u7EBF\uFF0C\u56FE\u7247\u89C6\u9891\u8282\u70B9\u76F4\u63A5\u5236\u4F5C\u3001\u7EED\u62CD\u3002",
-        "\u65B0\u589E\uFF1A\u753B\u5E03\u5185\u5199\u811A\u672C\u94FA\u5F00\u5267\u672C\u5206\u955C\uFF0C\u300C\u8FDE\u62CD\u300D\u4E00\u6B21\u786E\u8BA4\u540E\u9010\u6BB5\u751F\u6210\u5E76\u9010\u6BB5\u5BA1\u6838\u3002",
-        "\u4F18\u5316\uFF1A\u4E0D\u518D\u9700\u8981\u7B2C\u4E09\u65B9\u753B\u5E03\u63D2\u4EF6\uFF1B\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\u9ED8\u8BA4\u5173\u95ED\uFF0C\u6587\u672C\u6A21\u578B\u53EF\u5355\u72EC\u914D\u5BC6\u94A5\u3002"
+        "\u65B0\u589E\uFF1A\u6D41\u7A0B\u753B\u5E03\u53EF\u76F4\u63A5\u5BFC\u5165\u81EA\u5DF1\u7684\u56FE\u7247\u4F5C\u7D20\u6750\uFF0C\u8FDE\u6210\u9996\u5E27\u6216\u53C2\u8003\u56FE\u53C2\u4E0E\u5236\u4F5C\u3002",
+        "\u65B0\u589E\uFF1A\u5168\u90E8\u6BB5\u843D\u51FA\u6210\u679C\u540E\u53EF\u4E00\u952E\u5408\u6210\u6210\u7247\uFF0C\u5728\u753B\u5E03\u5185\u9884\u89C8\u6216\u4E0B\u8F7D\u3002",
+        "\u4F18\u5316\uFF1A\u6D41\u7A0B\u753B\u5E03\u5F00\u5173\u5173\u95ED\u540E\u5DE6\u4FA7\u680F\u4E0D\u518D\u663E\u793A\u753B\u5E03\u5165\u53E3\uFF0C\u5DF2\u6709\u753B\u5E03\u4E0E\u6210\u679C\u4FDD\u7559\u3002"
       ]
     }
   };
@@ -2401,8 +2401,8 @@
   }
 
   // src/businesses/video/client/canvas-view.ts
-  async function canvasNativeRpc(args, fetcher = fetch) {
-    const response = await fetcher("/metaontic-video/canvas-native", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(args), signal: AbortSignal.timeout(2e4) });
+  async function canvasNativeRpc(args, fetcher = fetch, timeoutMs = 2e4) {
+    const response = await fetcher("/metaontic-video/canvas-native", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(args), signal: AbortSignal.timeout(timeoutMs) });
     let body;
     try {
       body = await response.json();
@@ -2442,6 +2442,12 @@
     };
     for (const node of author) visit(node);
     return ordered.map((node) => ({ id: node.id, type: node.type, label: String(node?.data?.label || (node.type === "image" ? "\u56FE\u7247" : "\u89C6\u9891")), done: produced.has(node.id) }));
+  }
+  function filmStatus(canvas) {
+    const nodes = Object.values(canvas?.nodes || {});
+    const order = flowSteps(canvas).filter((step) => step.type === "video");
+    const missing = order.filter((step) => !nodes.some((node) => node?.metaonticSourceNode === step.id && node?.type === "video" && (node?.data?.assetId || node?.data?.metaonticVideoUrl)));
+    return { total: order.length, readyCount: order.length - missing.length, missing: missing.map((step) => step.label) };
   }
   var NODE_SIZE = { script: [420, 320], storyboard: [460, 340], text: [360, 200], video: [360, 300], image: [360, 300] };
   function nodeSize(node) {
@@ -2622,6 +2628,8 @@
 .movc-status { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
 .movc-status[data-error="true"] { color: #c0392b; }
 .movc-plan { font-size: 12px; line-height: 1.7; background: ${TOKENS.controlFill}; border-radius: 8px; padding: 10px 12px; }
+.movc-link { display: inline-flex; align-items: center; box-sizing: border-box; height: 32px; padding: 0 14px; border: 1px solid ${TOKENS.border}; border-radius: 8px; color: ${TOKENS.text}; font-size: 12px; text-decoration: none; white-space: nowrap; transition: border-color .15s, color .15s; }
+.movc-link:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-marquee { position: absolute; border: 1px dashed ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}1f; pointer-events: none; border-radius: 4px; }
 .movc-name { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 160px; min-width: 0; }
 .movc-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; border-radius: 8px; padding: 5px 12px; font-size: 14px; font-weight: 600; color: ${TOKENS.text}; background: transparent; cursor: text; }
@@ -2667,6 +2675,8 @@
       const [createDialog, setCreateDialog] = React.useState(null);
       const [scriptDialog, setScriptDialog] = React.useState(null);
       const [chainDialog, setChainDialog] = React.useState(null);
+      const [filmDialog, setFilmDialog] = React.useState(null);
+      const [importing, setImporting] = React.useState(false);
       const [confirmDelete, setConfirmDelete] = React.useState(false);
       const [dialog, setDialog] = React.useState(null);
       const pan = React.useRef(null);
@@ -2674,6 +2684,7 @@
       const marqueeDone = React.useRef(false);
       const timer = React.useRef(null);
       const chainTimer = React.useRef(null);
+      const importRef = React.useRef(null);
       const alive = React.useRef(true);
       const stageRef = React.useRef(null);
       React.useEffect(() => () => {
@@ -2761,6 +2772,57 @@
           setError(e?.message || "\u5BFC\u51FA\u753B\u5E03\u5931\u8D25");
         }
       }, [canvas]);
+      const importImages = React.useCallback(async (files) => {
+        const picked = Array.from(files || []);
+        if (!canvas || !picked.length) return;
+        setError("");
+        setImporting(true);
+        const made = [];
+        try {
+          for (const file of picked) {
+            const response = await fetch(
+              `/metaontic-video/canvas-import?projectId=${encodeURIComponent(canvas.projectId)}&name=${encodeURIComponent(String(file?.name || ""))}`,
+              { method: "POST", headers: { "content-type": file?.type || "application/octet-stream" }, body: file }
+            );
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok || body?.error) throw new Error(body?.error || "\u5BFC\u5165\u56FE\u7247\u672A\u5B8C\u6210\u3002");
+            const id = `usr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+            const count = Object.keys(canvas.nodes || {}).length + made.length;
+            await saveNode(id, {
+              type: "image",
+              x: 60 + count % 4 * 420,
+              y: 60 + Math.floor(count / 4) * 360,
+              w: NODE_SIZE.image[0],
+              h: NODE_SIZE.image[1],
+              data: { label: body.name || String(file?.name || "\u5BFC\u5165\u56FE\u7247"), assetId: body.assetId, ratio: "1:1", resolution: "720p", prompt: "" }
+            });
+            made.push(id);
+          }
+          if (made.length) {
+            setSelectedIds(made);
+            await refresh();
+            setNotice(`\u5DF2\u5BFC\u5165 ${made.length} \u5F20\u56FE\u7247\u7D20\u6750\uFF1A\u8FDE\u5230\u89C6\u9891\u8282\u70B9\u7684\u300C\u9996\u5E27\u300D\u6216\u300C\u53C2\u8003\u56FE\u300D\u7AEF\u53E3\u5C31\u80FD\u76F4\u63A5\u7528\u4E8E\u5236\u4F5C\u3002\u771F\u4EBA\u7167\u7247\u4F1A\u88AB\u89C6\u9891\u63A5\u53E3\u62D2\u7EDD\uFF0C\u5148\u628A\u7167\u7247\u8FDE\u5230\u56FE\u7247\u8282\u70B9\u751F\u6210\u4E00\u5F20\u975E\u771F\u4EBA\u4E8C\u7EF4\u52A8\u753B\u98CE\u683C\u7684\u56FE\uFF0C\u518D\u7528\u90A3\u5F20\u5F53\u9996\u5E27\u3002`);
+          }
+        } catch (e) {
+          setError(e?.message || "\u5BFC\u5165\u56FE\u7247\u5931\u8D25");
+        } finally {
+          setImporting(false);
+          if (importRef.current) importRef.current.value = "";
+        }
+      }, [canvas, saveNode, refresh]);
+      const mergeFilm = React.useCallback(async () => {
+        if (!canvas) return;
+        setError("");
+        setFilmDialog({ busy: true, film: canvas.film || null, message: "" });
+        try {
+          const data = await canvasNativeRpc({ action: "mergeFilm", projectId: canvas.projectId }, fetch, 9e5);
+          setFilmDialog({ busy: false, film: data?.film || null, message: "" });
+          await refresh();
+          setNotice(`\u6210\u7247\u5DF2\u5408\u6210\uFF1A${data?.film?.count || 0} \u6BB5${data?.film?.seconds ? ` \xB7 \u7EA6 ${Math.round(data.film.seconds)} \u79D2` : ""}\uFF0C\u53EF\u76F4\u63A5\u9884\u89C8\u6216\u4E0B\u8F7D\u3002`);
+        } catch (e) {
+          setFilmDialog((current) => ({ ...current || {}, busy: false, message: e?.message || "\u5408\u6210\u6210\u7247\u672A\u5B8C\u6210\u3002" }));
+        }
+      }, [canvas, refresh]);
       const applyLayout = React.useCallback(async (doc) => {
         const { positions: spots, moved } = tidyLayout(doc);
         for (const node of Object.values(doc?.nodes || {})) {
@@ -3025,6 +3087,17 @@
         await rpc("edgeDelete", { projectId: canvas.projectId, edgeId: id });
         await refresh();
       }, [canvas, refresh]);
+      const setEdgePort = React.useCallback(async (edge, toPort) => {
+        if (!canvas || !edge || edge.toPort === toPort) return;
+        try {
+          setError("");
+          await rpc("edgeDelete", { projectId: canvas.projectId, edgeId: edge.id });
+          await rpc("edgeAdd", { projectId: canvas.projectId, fromNode: edge.fromNode, toNode: edge.toNode, fromPort: "out", toPort });
+          await refresh();
+        } catch (e) {
+          setError(e?.message || "\u5207\u6362\u7D20\u6750\u7AEF\u53E3\u672A\u5B8C\u6210\u3002");
+        }
+      }, [canvas, refresh]);
       const deleteCanvas = React.useCallback(async () => {
         if (!canvas) return;
         try {
@@ -3273,16 +3346,19 @@
         event.currentTarget.setPointerCapture?.(event.pointerId);
       };
       const steps = flowSteps(canvas);
+      const film = canvas ? filmStatus(canvas) : null;
       const nextStep = steps.find((step) => !step.done) || null;
       const doneSteps = steps.filter((step) => step.done).length;
       const nodes = canvas ? Object.values(canvas.nodes || {}) : [];
       const edges = canvas?.edges || [];
       const producedIds = producedNodeIds(canvas);
       const achieved = (node) => node?.data?.status === "done" || node?.data?.status === void 0 && producedIds.has(node?.id);
+      const materialOf = (node) => Boolean(node?.data?.assetId) && !node?.metaonticSourceNode;
       const geometry = (node) => ({ ...node, ...sizeOf(node), ...positions[node.id] || {} });
       const at = (id) => geometry((canvas?.nodes || {})[id]);
       const kindOf = (id) => (canvas?.nodes || {})[id]?.type;
       const dialogNode = dialog ? (canvas?.nodes || {})[dialog.nodeId] : null;
+      const mediaInbound = dialog?.type === "video" && dialog.stage === "form" ? edges.filter((edge) => edge.toNode === dialog.nodeId && ["ref", "frame"].includes(edge.toPort) && ["image", "video"].includes(kindOf(edge.fromNode))) : [];
       const formFields = dialog && ["form", "plan", "edit"].includes(dialog.stage) ? h("div", { key: "fields" }, [
         dialog.stage === "edit" ? h("label", { key: "text", className: "movc-field" }, ["\u8282\u70B9\u5185\u5BB9", h("textarea", { value: dialog.form.text, onChange: (e) => patchDialog({ form: { ...dialog.form, text: e.target.value } }) })]) : h("label", { key: "prompt", className: "movc-field" }, ["\u672C\u6B21\u8981\u751F\u6210\u7684\u753B\u9762 / \u7EED\u62CD\u5185\u5BB9", h("textarea", { value: dialog.form.prompt, placeholder: "\u5199\u6E05\u4E3B\u4F53\u3001\u52A8\u4F5C\u3001\u955C\u5934\u4E0E\u58F0\u97F3\uFF1B\u7559\u7A7A\u4F1A\u7528\u8282\u70B9\u4E0E\u4E0A\u6E38\u811A\u672C\u6587\u672C\u3002", onChange: (e) => patchDialog({ form: { ...dialog.form, prompt: e.target.value } }) })]),
         dialog.type === "video" && dialog.stage !== "edit" ? h("div", { key: "spec", className: "movc-row" }, [
@@ -3291,7 +3367,19 @@
           h("label", { key: "resolution", className: "movc-field" }, ["\u6E05\u6670\u5EA6", h("select", { value: dialog.form.resolution, onChange: (e) => patchDialog({ form: { ...dialog.form, resolution: e.target.value } }) }, RESOLUTIONS.map((r) => h("option", { key: r, value: r }, r.toUpperCase())))])
         ]) : null,
         dialog.type === "video" && dialog.stage !== "edit" ? h("label", { key: "audio", className: "movc-check" }, [h("input", { type: "checkbox", checked: dialog.form.generateAudio === true, onChange: (e) => patchDialog({ form: { ...dialog.form, generateAudio: e.target.checked } }) }), " \u672C\u6B21\u751F\u6210\u97F3\u9891"]) : null,
-        dialog.stage === "plan" && dialog.plan?.operation === "extend" ? h("label", { key: "transition", className: "movc-field" }, ["\u4E0A\u4E00\u6BB5\u7ED3\u5C3E\u5230\u672C\u6BB5\u7684\u8854\u63A5\u63CF\u8FF0", h("textarea", { value: dialog.form.transitionDescription, onChange: (e) => patchDialog({ form: { ...dialog.form, transitionDescription: e.target.value } }) })]) : null
+        dialog.stage === "plan" && dialog.plan?.operation === "extend" ? h("label", { key: "transition", className: "movc-field" }, ["\u4E0A\u4E00\u6BB5\u7ED3\u5C3E\u5230\u672C\u6BB5\u7684\u8854\u63A5\u63CF\u8FF0", h("textarea", { value: dialog.form.transitionDescription, onChange: (e) => patchDialog({ form: { ...dialog.form, transitionDescription: e.target.value } }) })]) : null,
+        mediaInbound.length ? h("div", { key: "ports", className: "movc-plan" }, [
+          h("div", { key: "hint" }, "\u4E0A\u6E38\u7D20\u6750\u7AEF\u53E3\uFF1A\u300C\u9996\u5E27\u300D\u7528\u4E00\u5F20\u56FE\u5F00\u753B\uFF0C\u300C\u53C2\u8003\u56FE\u300D\u6309\u53C2\u8003\u7D20\u6750\u53C2\u4E0E\u751F\u6210\uFF1B\u4E24\u8005\u4E0D\u80FD\u540C\u65F6\u4F7F\u7528\u3002"),
+          ...mediaInbound.map((edge) => h("div", { key: edge.id, className: "movc-row" }, [
+            h("span", { key: "name" }, labelOf((canvas?.nodes || {})[edge.fromNode])),
+            h(
+              "select",
+              { key: "port", value: edge.toPort, onChange: (e) => void setEdgePort(edge, e.target.value) },
+              ["ref", "frame"].map((port) => h("option", { key: port, value: port }, port === "frame" ? "\u9996\u5E27" : "\u53C2\u8003\u56FE"))
+            ),
+            h("button", { key: "off", type: "button", className: "mov-btn movc-danger", onClick: () => void removeEdge(edge.id) }, "\u65AD\u5F00")
+          ]))
+        ]) : null
       ]) : null;
       const planView = dialog?.stage === "plan" && dialog.plan ? h("div", { key: "plan", className: "movc-plan" }, [
         h("div", { key: "prompt", style: { whiteSpace: "pre-wrap", maxHeight: "26vh", overflow: "auto" } }, dialog.plan.prompt),
@@ -3362,6 +3450,31 @@
             canvas ? h("button", { key: "video", type: "button", className: "mov-btn", onClick: () => void newNode("video") }, "+ \u89C6\u9891") : null,
             canvas ? h("button", { key: "write-script", type: "button", className: "mov-btn movc-run", title: "\u5199\u4E0B\u811A\u672C\u4E0E\u76EE\u6807\u65F6\u957F\uFF0C\u81EA\u52A8\u94FA\u5F00\u5267\u672C\u3001\u5206\u955C\u4E0E\u6BCF\u6BB5\u5236\u4F5C\u8282\u70B9", onClick: () => void openScript() }, "\u5199\u811A\u672C\u2026") : null,
             canvas ? h("button", { key: "chain", type: "button", className: "mov-btn", title: "\u4E00\u6B21\u786E\u8BA4\u6574\u6761\u94FE\u8DEF\u7684\u65B9\u6848\u4E0E\u603B\u8D39\u7528\uFF0C\u6309\u987A\u5E8F\u9010\u6BB5\u751F\u6210\uFF1B\u6BCF\u6BB5\u6210\u679C\u4ECD\u9700\u4F60\u5BA1\u6838", onClick: () => void openChain() }, "\u8FDE\u62CD") : null,
+            canvas ? h("button", {
+              key: "import-image",
+              type: "button",
+              className: "mov-btn",
+              disabled: importing,
+              title: "\u628A\u81EA\u5DF1\u7684\u56FE\u7247\u5199\u8FDB\u753B\u5E03\u6570\u636E\u76EE\u5F55\uFF0C\u8FDE\u5230\u89C6\u9891\u8282\u70B9\u7684\u300C\u9996\u5E27\u300D\u6216\u300C\u53C2\u8003\u56FE\u300D\u7AEF\u53E3\u4F7F\u7528",
+              onClick: () => importRef.current?.click()
+            }, importing ? "\u5BFC\u5165\u4E2D\u2026" : "\u5BFC\u5165\u56FE\u7247") : null,
+            canvas ? h("input", {
+              key: "import-input",
+              type: "file",
+              multiple: true,
+              accept: "image/png,image/jpeg,image/webp",
+              ref: importRef,
+              style: { display: "none" },
+              onChange: (e) => void importImages(e.target.files)
+            }) : null,
+            canvas ? h("button", {
+              key: "merge-film",
+              type: "button",
+              className: "mov-btn movc-run",
+              disabled: Boolean(filmDialog?.busy) || !film?.total,
+              title: film?.missing?.length ? `\u8FD8\u6709 ${film.missing.length} \u6BB5\u6CA1\u6709\u6210\u679C\uFF1A${film.missing.join("\u3001")}` : film?.total ? "\u628A\u5DF2\u751F\u6210\u7684\u6BCF\u6BB5\u89C6\u9891\u6309\u8FDE\u7EBF\u987A\u5E8F\u62FC\u6210\u4E00\u6761\u6210\u7247\uFF0C\u53EA\u9700\u4E00\u6B21\u786E\u8BA4" : "\u753B\u5E03\u4E0A\u8FD8\u6CA1\u6709\u89C6\u9891\u8282\u70B9",
+              onClick: () => void mergeFilm()
+            }, filmDialog?.busy ? "\u5408\u6210\u4E2D\u2026" : "\u5408\u6210\u6210\u7247") : null,
             canvas ? h("span", { key: "sep-flow", className: "movc-sep" }) : null,
             canvas ? h(
               "button",
@@ -3470,7 +3583,11 @@
                 h("div", { key: "head", className: "movc-node-head" }, [
                   h("span", { key: "label", className: "movc-node-title" }, labelOf(node)),
                   // 状态标签直接复用宿主的结果胶囊样式（.mov-chip / .mov-chip-ok）。
-                  h("span", { key: "status", className: achieved(node) ? "mov-chip mov-chip-ok" : "mov-chip movc-badge" }, achieved(node) ? "\u5DF2\u5B8C\u6210" : "\u5F85\u5236\u4F5C"),
+                  h(
+                    "span",
+                    { key: "status", className: achieved(node) ? "mov-chip mov-chip-ok" : "mov-chip movc-badge" },
+                    materialOf(node) ? "\u7D20\u6750" : achieved(node) ? "\u5DF2\u5B8C\u6210" : "\u5F85\u5236\u4F5C"
+                  ),
                   h("span", { key: "actions", className: "movc-actions" }, [
                     h("button", { key: "edit", type: "button", className: "movc-mini", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
                       e.stopPropagation();
@@ -3502,8 +3619,13 @@
             height: Math.abs(marquee.y2 - marquee.y1)
           } }) : null
         ) : null,
+        canvas?.film?.assetId ? h("div", { key: "film-bar", className: "movc-bar" }, [
+          h("span", { key: "label", className: "movc-flow" }, `\u6210\u7247\uFF1A${canvas.film.count} \u6BB5${canvas.film.seconds ? ` \xB7 \u7EA6 ${Math.round(canvas.film.seconds)} \u79D2` : ""} \xB7 ${new Date(canvas.film.updatedAt || Date.now()).toLocaleString()} \xB7 \u5DF2\u4FDD\u5B58\u5230\u753B\u5E03\u6570\u636E\u76EE\u5F55`),
+          h("button", { key: "play", type: "button", className: "mov-btn", onClick: () => setFilmDialog({ busy: false, film: { ...canvas.film, url: mediaUrl(canvas.film.assetId) }, message: "" }) }, "\u64AD\u653E\u6210\u7247"),
+          h("a", { key: "download", className: "movc-link", href: mediaUrl(canvas.film.assetId), download: `${String(canvas.name || "\u6210\u7247")}.mp4` }, "\u4E0B\u8F7D\u6210\u7247")
+        ]) : null,
         canvas && steps.length ? h("p", { key: "flow-hint", className: "movc-hint" }, nextStep ? `\u6D41\u7A0B\uFF1A\u6309\u8FDE\u7EBF\u987A\u5E8F\u9010\u4E2A\u5236\u4F5C\uFF0C\u5F53\u524D\u8F6E\u5230\u300C${nextStep.label}\u300D\uFF08\u753B\u5E03\u4E0A\u865A\u7EBF\u6846\u6807\u51FA\uFF09\u3002\u70B9\u4E0A\u9762\u7684\u300C\u5236\u4F5C\u300D\u6309\u94AE\u4F1A\u8BFB\u53D6\u8282\u70B9\u5185\u5BB9\u4E0E\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u62FC\u51FA\u63D0\u793A\u8BCD\uFF0C\u4ECD\u7136\u8981\u5148\u6838\u5BF9\u5236\u4F5C\u65B9\u6848\u3001\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u624D\u4F1A\u8C03\u7528\u6A21\u578B\u3002` : `\u6D41\u7A0B\uFF1A${steps.length} \u4E2A\u5236\u4F5C\u8282\u70B9\u90FD\u5DF2\u6709\u56DE\u586B\u6210\u679C\u3002\u8981\u91CD\u505A\u67D0\u4E00\u6BB5\uFF0C\u70B9\u8BE5\u8282\u70B9\u91CC\u7684\u300C\u5236\u4F5C\u300D\uFF0C\u91CD\u65B0\u6838\u5BF9\u65B9\u6848\u5E76\u786E\u8BA4\u8D39\u7528\u3002`) : null,
-        canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D\uFF08Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\uFF1B\u8282\u70B9\u6446\u4E71\u4E86\u70B9\u300C\u7F8E\u5316\u5E03\u5C40\u300D\u6309\u8FDE\u7EBF\u4E00\u952E\u91CD\u6392\uFF1B\u60F3\u6309\u811A\u672C\u94FA\u5F00\u5236\u4F5C\u8282\u70B9\u5C31\u70B9\u300C\u5199\u811A\u672C\u2026\u300D\uFF0C\u60F3\u4E00\u6B21\u786E\u8BA4\u6574\u6761\u94FE\u8DEF\u518D\u9010\u6BB5\u751F\u6210\u5C31\u70B9\u300C\u8FDE\u62CD\u300D\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
+        canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D\uFF08Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\uFF1B\u8282\u70B9\u6446\u4E71\u4E86\u70B9\u300C\u7F8E\u5316\u5E03\u5C40\u300D\u6309\u8FDE\u7EBF\u4E00\u952E\u91CD\u6392\uFF1B\u60F3\u6309\u811A\u672C\u94FA\u5F00\u5236\u4F5C\u8282\u70B9\u5C31\u70B9\u300C\u5199\u811A\u672C\u2026\u300D\uFF0C\u60F3\u4E00\u6B21\u786E\u8BA4\u6574\u6761\u94FE\u8DEF\u518D\u9010\u6BB5\u751F\u6210\u5C31\u70B9\u300C\u8FDE\u62CD\u300D\uFF0C\u81EA\u5DF1\u7684\u56FE\u7247\u70B9\u300C\u5BFC\u5165\u56FE\u7247\u300D\u5199\u8FDB\u6570\u636E\u76EE\u5F55\u5F53\u9996\u5E27\u6216\u53C2\u8003\u56FE\uFF0C\u6BCF\u6BB5\u90FD\u51FA\u6210\u679C\u540E\u70B9\u300C\u5408\u6210\u6210\u7247\u300D\u62FC\u6210\u4E00\u6761\u53EF\u9884\u89C8\u3001\u53EF\u4E0B\u8F7D\u7684\u6210\u7247\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
         connectFrom ? h("p", { key: "connect", className: "movc-hint" }, "\u8FDE\u7EBF\u6A21\u5F0F\uFF1A\u70B9\u51FB\u76EE\u6807\u8282\u70B9\u5B8C\u6210\u8FDE\u63A5\uFF0C\u70B9\u7A7A\u767D\u5904\u53D6\u6D88\u3002") : null,
         confirmDelete ? h(
           "div",
@@ -3516,6 +3638,38 @@
             h("div", { key: "ops", className: "movc-bar" }, [
               h("button", { key: "cancel", type: "button", className: "mov-btn", onClick: () => setConfirmDelete(false) }, "\u53D6\u6D88"),
               h("button", { key: "ok", type: "button", className: "mov-btn", onClick: () => void deleteCanvas() }, "\u786E\u8BA4\u5220\u9664")
+            ])
+          ])
+        ) : null,
+        filmDialog ? h(
+          "div",
+          { key: "film-modal", className: "movc-modal", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
+            if (e.target === e.currentTarget && !filmDialog.busy) setFilmDialog(null);
+          } },
+          h("div", { key: "body", className: "movc-modal-body" }, [
+            h("h4", { key: "h" }, "\u5408\u6210\u6210\u7247"),
+            filmDialog.busy ? h("p", { key: "busy", className: "movc-status" }, "\u6B63\u5728\u6309\u8FDE\u7EBF\u987A\u5E8F\u8BFB\u53D6\u6BCF\u6BB5\u6210\u679C\u5E76\u5408\u5E76\uFF0C\u957F\u89C6\u9891\u9700\u8981\u4E00\u70B9\u65F6\u95F4\u2026") : null,
+            filmDialog.film?.url ? h("video", { key: "player", src: filmDialog.film.url, controls: true, preload: "metadata", className: "movc-media", style: { maxHeight: "46vh" } }) : null,
+            filmDialog.film ? h(
+              "p",
+              { key: "info", className: "movc-status" },
+              `\u6210\u7247\uFF1A${filmDialog.film.count} \u6BB5${filmDialog.film.seconds ? ` \xB7 \u7EA6 ${Math.round(filmDialog.film.seconds)} \u79D2` : ""}\uFF1B\u6587\u4EF6\u5DF2\u4FDD\u5B58\u5230\u753B\u5E03\u6570\u636E\u76EE\u5F55\uFF0C\u53EF\u76F4\u63A5\u9884\u89C8\u6216\u4E0B\u8F7D\u3002`
+            ) : null,
+            filmDialog.film?.segments?.length ? h(
+              "div",
+              { key: "segs", className: "movc-plan" },
+              filmDialog.film.segments.map((segment) => h(
+                "div",
+                { key: `s${segment.index}` },
+                `\u7B2C${segment.index}\u6BB5\u300C${segment.label}\u300D${segment.seconds ? `${segment.seconds}\u79D2` : ""}`
+              ))
+            ) : null,
+            filmDialog.message ? h("p", { key: "msg", className: "movc-status", "data-error": "true" }, filmDialog.message) : null,
+            h("p", { key: "note", className: "movc-status" }, "\u5408\u6210\u53EA\u8BFB\u53D6\u5DF2\u7ECF\u751F\u6210\u7684\u6210\u679C\uFF0C\u4E0D\u4F1A\u91CD\u65B0\u751F\u6210\u4EFB\u4F55\u6BB5\u843D\uFF0C\u4E5F\u4E0D\u4EA7\u751F\u65B0\u7684\u6A21\u578B\u8D39\u7528\u3002"),
+            h("div", { key: "ops", className: "movc-bar" }, [
+              h("button", { key: "close", type: "button", className: "mov-btn", disabled: filmDialog.busy, onClick: () => setFilmDialog(null) }, "\u5173\u95ED"),
+              filmDialog.film?.url ? h("a", { key: "download", className: "movc-link", href: filmDialog.film.url, download: `${String(canvas?.name || "\u6210\u7247")}.mp4` }, "\u4E0B\u8F7D\u6210\u7247") : null,
+              !filmDialog.busy ? h("button", { key: "again", type: "button", className: "mov-btn mov-btn-primary", onClick: () => void mergeFilm() }, "\u91CD\u65B0\u5408\u6210") : null
             ])
           ])
         ) : null,
@@ -3781,18 +3935,57 @@
             manager: pluginManager
           })
         }, VideoPanel)), "metaontic-video: sidebar panel");
-        ctx.effect(() => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
-          name: "sidebar.panellist",
-          id: CANVAS_PANEL_ID,
-          order: 31,
-          locale: NS,
-          label: () => t("canvasPanelLabel")
-        }, PanelIcon)), "metaontic-video: canvas sidebar entry");
-        ctx.effect(() => ctx.slots.inject("main", () => ctx.slots.register({
-          name: "main",
-          key: CANVAS_PANEL_ID,
-          locale: NS
-        }, FlowCanvasPage)), "metaontic-video: canvas page");
+        const canvasSwitchOn = () => {
+          try {
+            return form?.getSnapshot?.()?.value?.autoCreateCanvas === true;
+          } catch {
+            return false;
+          }
+        };
+        const canvasSlots = [
+          () => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
+            name: "sidebar.panellist",
+            id: CANVAS_PANEL_ID,
+            order: 31,
+            locale: NS,
+            label: () => t("canvasPanelLabel")
+          }, PanelIcon)),
+          () => ctx.slots.inject("main", () => ctx.slots.register({
+            name: "main",
+            key: CANVAS_PANEL_ID,
+            locale: NS
+          }, FlowCanvasPage))
+        ];
+        ctx.effect(() => {
+          let active = false;
+          let disposers = [];
+          const close = () => {
+            for (const off of disposers) off();
+            disposers = [];
+            active = false;
+          };
+          const sync = () => {
+            const wanted = canvasSwitchOn();
+            if (wanted === active) return;
+            if (!wanted) {
+              close();
+              return;
+            }
+            disposers = canvasSlots.map((register) => register()).filter((off) => typeof off === "function");
+            active = true;
+          };
+          sync();
+          let unsubscribe;
+          try {
+            unsubscribe = form?.subscribe?.(sync);
+          } catch {
+            unsubscribe = void 0;
+          }
+          return () => {
+            if (typeof unsubscribe === "function") unsubscribe();
+            close();
+          };
+        }, "metaontic-video: canvas entry follows the canvas switch");
       }
     };
   }

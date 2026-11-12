@@ -7,7 +7,7 @@ import z from '@deepseek-ai/schemastery';
 
 export const videoConfigFields = {
   // 默认关闭：画布是可选组件，用户要的时候在设置页打开，不再默认替每个创作项目建图。
-  autoCreateCanvas: z.boolean().default(false).description('自动创建流程画布并同步脚本、分镜与生成成果（默认关闭）；打开后创作自动建图，关闭时已有画布保留，仍可手动使用画布节点。').volatile(),
+  autoCreateCanvas: z.boolean().default(false).description('流程画布（默认关闭）：打开后左侧栏出现画布入口，创作也自动建图并同步脚本、分镜与生成成果；关闭时左侧栏隐藏入口，已有画布保留在插件数据目录。').volatile(),
   connectionMode: z.union(['metaontic', 'volcengine']).default('metaontic')
     .description('接入方式：MetaOntic AI（metaontic）；火山引擎直连（volcengine，当前设置页暂不提供选择）').volatile(),
   metaonticApiKey: z.string().default('').description('MetaOntic AI API密钥').volatile(),
