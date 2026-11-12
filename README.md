@@ -33,13 +33,13 @@ DeepSeek Harness 视频创作插件：**新手快速上手，低成本制作长�
 Gitee：
 
 ```text
-https://gitee.com/hackloop/metaontic-video/releases/download/v3.20.2/metaontic-video-3.20.2.tgz
+https://gitee.com/hackloop/metaontic-video/releases/download/v3.21.0/metaontic-video-3.21.0.tgz
 ```
 
 GitHub 同版备用：
 
 ```text
-https://github.com/wxsimon2022/metaontic-video/releases/download/v3.20.2/metaontic-video-3.20.2.tgz
+https://github.com/wxsimon2022/metaontic-video/releases/download/v3.21.0/metaontic-video-3.21.0.tgz
 ```
 
 安装后打开插件设置，选择 **MetaOntic AI**，填写 API密钥并保存；在会话中选择 **视频创作助手** 开始。制作产品、品牌或活动内容时，也可选择 **宣传视频助手**。这两个助手使用相同的制作流程，标准模式保持通用用途。
@@ -70,6 +70,17 @@ flowchart TB
 
 <details>
 <summary>最新更新</summary>
+
+## v3.21.0 更新内容
+
+### 新增
+
+- 内置流程画布：独立页面管理画布与连线，图片视频节点直接制作、续拍。
+- 画布内写脚本铺开剧本分镜，「连拍」一次确认后逐段生成并逐段审核。
+
+### 优化
+
+- 不再需要第三方画布插件；自动创建画布默认关闭，文本模型可单独配密钥。
 
 ## v3.20.2 更新内容
 

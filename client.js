@@ -1161,7 +1161,7 @@
     const UPDATE_ATTEMPTS = 3;
     const UPDATE_CACHE_KEY = "metaontic-video.update-check-v3";
     const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "3.20.2".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.21.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1592,7 +1592,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.20.2",
+    version: "3.21.0",
     description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1698,11 +1698,13 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.20.2",
+      version: "3.21.0",
       prerelease: false,
-      publishedAt: "2026-11-08T03:02:31.736Z",
+      publishedAt: "2026-11-12T13:43:35.142Z",
       items: [
-        "\u4F18\u5316\uFF1A\u5E38\u89C4\u4F53\u9A8C\u4F18\u5316\u3002"
+        "\u65B0\u589E\uFF1A\u5185\u7F6E\u6D41\u7A0B\u753B\u5E03\uFF1A\u72EC\u7ACB\u9875\u9762\u7BA1\u7406\u753B\u5E03\u4E0E\u8FDE\u7EBF\uFF0C\u56FE\u7247\u89C6\u9891\u8282\u70B9\u76F4\u63A5\u5236\u4F5C\u3001\u7EED\u62CD\u3002",
+        "\u65B0\u589E\uFF1A\u753B\u5E03\u5185\u5199\u811A\u672C\u94FA\u5F00\u5267\u672C\u5206\u955C\uFF0C\u300C\u8FDE\u62CD\u300D\u4E00\u6B21\u786E\u8BA4\u540E\u9010\u6BB5\u751F\u6210\u5E76\u9010\u6BB5\u5BA1\u6838\u3002",
+        "\u4F18\u5316\uFF1A\u4E0D\u518D\u9700\u8981\u7B2C\u4E09\u65B9\u753B\u5E03\u63D2\u4EF6\uFF1B\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\u9ED8\u8BA4\u5173\u95ED\uFF0C\u6587\u672C\u6A21\u578B\u53EF\u5355\u72EC\u914D\u5BC6\u94A5\u3002"
       ]
     }
   };
