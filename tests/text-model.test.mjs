@@ -86,3 +86,22 @@ test('设置页文本模型是下拉：候选就是视频/图片模型那种在�
   const withCustom = scope.createSettingsActions(custom).control(field);
   assert.ok([...withCustom.children].map((option) => option.props.value).includes('my-relay-model'), '手填过的其它型号仍在下拉里看得到，不会被静默换掉');
 });
+
+test('关了共用密钥以后文本模型用自己那把 API密钥，没填就停下来提示补填', async () => {
+  const own = { ...config, imageUseVideoKey: false, textApiKey: 'text-key' };
+  assert.equal(api.resolveTextApiKey(config), 'secret-never-persist', '共用时仍用视频模型那把');
+  assert.equal(api.resolveTextApiKey(own), 'text-key');
+  assert.equal(api.resolveApiKey(api.textConfig(own)), 'text-key', '文本调用的连接快照换成文本密钥');
+  assert.equal(api.textConfig(own).metaonticApiKey, 'text-key');
+  assert.equal(api.textConfig(own).baseUrl, 'https://relay.invalid', '地址仍沿用当前 MetaOntic AI 连接');
+  const blank = { ...config, imageUseVideoKey: false, textApiKey: '  ' };
+  assert.equal(api.resolveTextApiKey(blank), '', '没填时不会退回视频密钥');
+  assert.throws(() => api.textConfig(blank), /单独填写文本模型 API密钥/);
+  await assert.rejects(() => api.writeScript(blank, { idea: 'x' }, { fetcher: async () => response({}) }), /文本模型 API密钥/);
+
+  // 真调用时请求头里带的就是文本模型那把密钥。
+  const calls = [];
+  const fetcher = async (url, options) => { calls.push(options.headers.authorization); return response({ choices: [{ message: { content: '# 片名' } }] }); };
+  await api.writeScript(own, { idea: '青旅天台的清晨' }, { fetcher });
+  assert.deepEqual(calls, ['Bearer text-key']);
+});

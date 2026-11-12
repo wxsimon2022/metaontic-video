@@ -1,6 +1,6 @@
 /** providers/text：写脚本用的文本模型。走与视频同一个中转站的 OpenAI 兼容 /v1/chat/completions，
  *  同一把 API密钥；只负责把一段想法写成剧本与分镜表，不参与视频/图片生成，也不代替分镜解析。 */
-import { assertConfigured, resolveApiKey, resolveBaseUrl, resolveTextModel } from './connection.js';
+import { assertConfigured, resolveApiKey, resolveBaseUrl, resolveTextModel, textConfig } from './connection.js';
 import { MAX_TOTAL_SECONDS } from '../config.js';
 
 /** 一次写脚本最多等多久：文本模型比视频快，但中转站慢起来也得兜住。 */
@@ -46,15 +46,17 @@ export function textEndpoint(config: any) {
 
 /** 写脚本：返回 Markdown 剧本正文；失败时抛出可直接展示的原因，不伪造脚本。 */
 export async function writeScript(config: any, brief: any, options: any = {}) {
-  const apiKey = resolveApiKey(config);
-  assertConfigured(config, apiKey);
-  const model = resolveTextModel(config);
+  // 关了共用密钥时文本模型用自己那把：这里就决定密钥与地址，缺密钥直接停下来让用户补。
+  const cfg = options.textConfig ? options.textConfig(config) : textConfig(config);
+  const apiKey = resolveApiKey(cfg);
+  assertConfigured(cfg, apiKey);
+  const model = resolveTextModel(cfg);
   if (!model) throw new Error('请在设置页填写文本模型，再让文本模型写脚本。');
   const fetcher = options.fetcher || fetch;
   const signal = options.signal || AbortSignal.timeout(TEXT_TIMEOUT_MS);
   let response;
   try {
-    response = await fetcher(textEndpoint(config), {
+    response = await fetcher(textEndpoint(cfg), {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ model, temperature: 0.6, messages: [

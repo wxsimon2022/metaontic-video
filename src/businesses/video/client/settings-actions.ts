@@ -114,7 +114,7 @@ export function createSettingsActions(context: any) {
                 ...list.map((option) => h('option', { key: option, value: option }, optionLabel(t, field.key, option))),
             ]);
         }
-        const canReveal = field.key === 'metaonticApiKey' || field.key === 'volcengineApiKey' || field.key === 'imageApiKey';
+        const canReveal = field.key === 'metaonticApiKey' || field.key === 'volcengineApiKey' || field.key === 'imageApiKey' || field.key === 'textApiKey';
         const revealed = canReveal && visibleKey === field.key;
         const input = h('input', {
             // 这个 input 会和右侧眼睛按钮一起放进数组，React 要求数组子节点带 key

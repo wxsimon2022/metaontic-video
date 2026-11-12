@@ -321,3 +321,34 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 未覆盖：真实中转站的文本模型可用性与计费（需要用户自己的 API密钥）；真实 Harness 桌面窗口里的观感（需宿主重载后人工复核）；Windows 未实测。
 
 本地成品：`.local/test/3.20.1-test.28/metaontic-video-3.20.1-test.28.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+
+## 连拍（一次确认整条链路，逐段生成逐段审核）+ 文本模型候选对齐视频/图片 3.20.1-test.29
+
+需求：先「我希望实现整个链路」，接着「文本模型配置 需要参考视频 跟 图片」「模型先用 deepseek v4.1 flash 和 deepseekv4pro」。前者要的是画布上一条脚本铺出来的链路能一次确认、按段推进；后者要的是文本模型的配置方式与视频/图片模型一致（下拉候选，不是自由填写）。
+
+**连拍（服务端 `canvas-native` 新动作，`integrations/canvas-native.ts`）**
+
+- `chainPlan`（免费）：`pendingVideoOrder(doc)` 按连线拓扑顺序取还没有成果的视频节点（有 `assetId` 或 `metaonticSourceNode` 的已做过，不算待做），逐段用既有单段方案逻辑出方案：第 1 段 `generate`，其余 `extend`（`carry` 上一段成果）。返回每段的提示词、秒数、画幅、清晰度、单独估价与整条链路合计（未知价目仍返回 `cny: null`，界面写「按实际调用计费」，不编金额）。只算方案，不提交、不建节点。
+- `chainStart`：必须同时带 `confirmPlan` 与 `confirmCost`（外加 `identity` 校验插件配置没变），把方案整条落盘（`chains/<id>.json` + `chains/canvas-<hash>.json` 指针，同一条画布同时只允许一条在跑的连拍），然后只提交第 1 段。重复点击是幂等的：还在跑或等着审核就返回同一条记录；方案（节点、提示词、参数、上游指纹）与上次完全一致时也返回同一条记录，不会重复提交费用。
+- `chainNext`：`accept: true` 先把当前段标记为已审核，把 `{ videoUrl, seconds }` 作为下一段的 `carry`，再以 `extend` 提交下一段；`accept: false` 表示停止。每段生成完都停在「等你审核」，连拍不会自己跨过没审核的分段。
+- `chainStatus` / `chainStop`：换窗口、刷新后按记录接着显示；`chainStop` 只标记停止，已提交的那一段仍会跑完并回填。
+- 守卫：`assertSegmentMatches` 比对节点当前的提示词/时长/画幅/清晰度与方案快照，改动后继续会提示「第 N 段内容或参数已改动，请重新预览连拍方案再开始」，不提交没核对过的那一版；插件配置（`hash(config)`）变了同样要求重新预览。
+- 状态合成（`chainStateOf`）：`running` / `review` / `done` / `stopped` / `stale`。成果先落盘再回填，回填期间打 `job.syncing`，连拍继续算「生成中」，界面不会在还没回填时就能推进（这也修掉了「点确认并继续下一段偶尔提示还没回填」的竞态）。
+
+**客户端（`client/canvas-view.ts`）**：工具条「连拍」按钮 + 连拍弹窗（方案区、逐段进度、当前段成果播放、两项确认勾选、关闭/停止连拍/补回填画布/确认并继续下一段/确认并开始连拍/重新看方案/完成），弹窗打开时按 3 秒轮询 `chainStatus`，离开时清掉定时器；点「连拍」若有在跑或待审核的链路，直接接着显示它。
+
+**文本模型候选对齐视频/图片（`connection-defaults.ts`、`client/config.ts`、`client/settings-actions.ts`、`providers/connection.ts`）**
+
+- `TEXT_MODELS = ['deepseek v4.1 flash', 'deepseekv4pro']`（取自中转站 `/api/pricing` 的在售型号），`TEXT_MODEL` 为第一项；设置页从自由填写改成 `kind: 'select'`（`SELECTS.textModel`），位置仍在视频模型卡片里（与视频同一把密钥、同一中转站）。
+- `normalizeTextModel`：留空或存着已下线的旧默认值 `doubao-seed-1-6-250615` 都按当前默认项生效；设置页对存量旧型号按默认项显示（`retiredTextModel`），用户不动这项就不写回配置；手填过的其它型号仍会出现在下拉里，不被静默换掉。
+- 提示文案与 `video_config` 只读视图、`CONFIG_FIELDS`、`PLUGIN_OWNED_KEYS`、`snapshotConfig` 同步为候选口径；`README.md` / `README.en.md` / `MetaOnticVideo使用说明书.md` 同步。
+- 关了共用密钥后文本模型也有自己那把（用户追加要求「不共用key的时候 文本也需要配置apiKEY」）：新增 `textApiKey`（schema、客户端字段、`PLUGIN_OWNED_KEYS`、`video_config` 只读项都同步），共用开关改名为「视频 / 图片 / 文本模型共用 API密钥」；关闭时模型区渲染三张卡片——视频 / 图片 / 文本各「模型 + 该模型 API密钥」，共用时保持原来两张（文本模型仍在视频卡片里）。
+- `resolveTextApiKey(config)`：共用时就是视频密钥，关闭时只认 `textApiKey`（没填返回空，不退回视频密钥）；`textConfig(config)` 生成写脚本用的连接快照，关闭且没填就抛「已关闭模型共用 API密钥，请单独填写文本模型 API密钥」。`writeScript` 改走 `textConfig`，`canvas-native` 的 `info.textReady` 也按文本密钥算。
+
+验证：类型检查、构建、478 项自动测试、`git diff --check` 通过。新增/更新测试：`canvas-native` 连拍首段直出与其余续拍、整条链路一次确认、逐段停下等审核、续拍以上一段成果为输入、中途停下不再提交、节点内容改动后拒绝提交、结束后重开按同一条记录且不重复调用；`canvas-view-layout` 连拍按钮开弹窗、方案列出每段与合计、两项确认缺一不可、开跑带上两次确认与方案标识、审核态显示成果与「确认并继续下一段」、停止后不再给继续；`text-model` 候选列表与默认项、旧型号归一、设置页文本模型是下拉且旧型号显示为默认项；设置页截图核对文本模型下拉与视频/图片同栏同形态（`/tmp/settings-textmodel.png`），画布预览截图核对连拍的方案确认与逐段审核两屏（`/tmp/canvas-chain-plan.png`、`/tmp/canvas-chain.png`）。
+
+未覆盖：真实 Harness 桌面窗口里的整条连拍实跑（付费链路需用户在重载后自行确认）；真实中转站的文本模型可用性与计费；Windows 未实测。
+
+随后用户追加「不共用key的时候 文本也需要配置apiKEY」，同一版本内补齐为：文本模型单独一把密钥（`textApiKey`）、关闭共用时三张模型卡片各自「模型 + API密钥」、`writeScript` 与 `info.textReady` 都按文本密钥判断（见上）。设置页三张卡片形态用预览截图核对（`/tmp/settings-noshare.png`）。
+
+本地成品：`.local/test/3.20.1-test.29/metaontic-video-3.20.1-test.29.tgz`（文本独立密钥之前）与 `.local/test/3.20.1-test.30/metaontic-video-3.20.1-test.30.tgz`（含文本独立密钥）。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。

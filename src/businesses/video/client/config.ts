@@ -37,7 +37,7 @@ export function createClientConfig() {
     // 只有「上游对卡满 15 秒的延长段敏感」这种少数情况才需要改成 14。
     const SECTIONS = [
       { key: 'sectionConnection', fields: ['connectionMode'] },
-      { key: 'sectionModels', fields: ['imageUseVideoKey', 'model', 'metaonticApiKey', 'volcengineApiKey', 'imageModel', 'imageApiKey', 'textModel'] },
+      { key: 'sectionModels', fields: ['imageUseVideoKey', 'model', 'metaonticApiKey', 'volcengineApiKey', 'imageModel', 'imageApiKey', 'textModel', 'textApiKey'] },
       { key: 'sectionVideo', fields: ['ratio', 'generateAudio'] },
       { key: 'sectionCanvas', fields: ['autoCreateCanvas'] },
     ];
@@ -52,6 +52,7 @@ export function createClientConfig() {
       { key: 'textModel', kind: 'select', wide: true },
       { key: 'imageUseVideoKey', kind: 'switch', wide: true },
       { key: 'imageApiKey', kind: 'text', secret: true, wide: true },
+      { key: 'textApiKey', kind: 'text', secret: true, wide: true },
       { key: 'ratio', kind: 'select' },
       { key: 'generateAudio', kind: 'switch' },
       { key: 'watermark', kind: 'switch' },
@@ -69,7 +70,7 @@ export function createClientConfig() {
     /** 插件自己会写进配置的项：重置时兜底一起清，免得宿主没把它们列进 user。 */
     const PLUGIN_OWNED_KEYS = [
       'autoCreateCanvas', 'usageStatsEnabled', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'entryId', 'baseUrl',
-      'submitPath', 'queryPath', 'imageUseVideoKey', 'imageApiKey', 'imageModel', 'textModel', 'model',
+      'submitPath', 'queryPath', 'imageUseVideoKey', 'imageApiKey', 'imageModel', 'textModel', 'textApiKey', 'model',
       'estimateGroupRatio', 'duration', 'singleMaxSeconds', 'seamTrimSeconds', 'mergeMode', 'bgmFadeSeconds',
       'outputDir', 'keepSegments', 'resumeLockStaleMinutes', 'ffmpegBinary', 'ffprobeBinary', 'mode',
       'ratio', 'generateAudio', 'watermark', 'extraParams', 'pollIntervalMs', 'maxWaitMs',

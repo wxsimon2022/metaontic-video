@@ -205,6 +205,21 @@ test('画布内 AI 写脚本：走文本模型一次，把段数与画幅带进�
   broken.dispose();
 });
 
+test('关了共用密钥：文本模型算自己的密钥，没填就不算就绪、写脚本直接报错', async () => {
+  const build = (liveConfig, extra = {}) => api.createCanvasNativeService(liveConfig, { directory: path.join(temp, `textkey-${Math.random().toString(16).slice(2)}`), load: async () => fixture().adapter,
+    video: async () => ({ status: 'succeeded', videoUrl: 'https://example.invalid/x.mp4' }), publish: async () => ({ status: 'synced' }), ...extra });
+  const blank = build({ ...config, imageUseVideoKey: false, textApiKey: '' });
+  const info = await blank.handle({ action: 'info' });
+  assert.equal(info.textReady, false, '关了共用又没填文本密钥时不算就绪');
+  assert.equal(info.videoReady, true, '视频密钥仍在，不影响视频生成');
+  await assert.rejects(() => blank.handle({ action: 'write', idea: '青旅天台的清晨' }), /文本模型 API密钥/);
+  blank.dispose();
+  const own = build({ ...config, imageUseVideoKey: false, textApiKey: 'text-key' }, { writeScript: async () => ({ script: '# 片名', model: 'deepseek v4.1 flash', usage: {} }) });
+  assert.equal((await own.handle({ action: 'info' })).textReady, true, '填了文本密钥就算就绪');
+  assert.equal((await own.handle({ action: 'write', idea: 'x' })).script, '# 片名');
+  own.dispose();
+});
+
 test('写脚本计划只算方案：不超过单段上限只建一段，超过按每段时长排续拍段', async () => {
   const s = await service();
   const script = '第一句。第二句。第三句。第四句。';

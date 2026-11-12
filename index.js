@@ -963,6 +963,8 @@ var init_config = __esm({
       queryPath: Schema.string().default("").description("\u67E5\u8BE2\u4EFB\u52A1\u8DEF\u5F84\uFF0C{task_id} \u4F1A\u88AB\u4EFB\u52A1 ID \u66FF\u6362\uFF1B\u7559\u7A7A\u7528\u4E2D\u8F6C\u7AD9\u9ED8\u8BA4\u503C").volatile(),
       imageUseVideoKey: Schema.boolean().default(true).description("\u56FE\u7247\u6A21\u578B\u4E0E\u89C6\u9891\u6A21\u578B\u5171\u7528 API\u5BC6\u94A5").volatile(),
       imageApiKey: Schema.string().default("").description("\u4E0D\u5171\u7528\u65F6\u586B\u5199\u7684\u56FE\u7247\u6A21\u578B API\u5BC6\u94A5").volatile(),
+      // 文本模型（写脚本）：关闭共用密钥后跟图片一样单独配一把，没填只影响写脚本，不会改用别的密钥。
+      textApiKey: Schema.string().default("").description("\u4E0D\u5171\u7528\u65F6\u586B\u5199\u7684\u6587\u672C\u6A21\u578B API\u5BC6\u94A5").volatile(),
       // 图片模型：doubao-seedream-5-0-260128 已下线，默认改用在售的 pro 版；旧型号仍允许写入校验，
       // 读取时由 connection-defaults 的 resolveImageModel 归一到在售型号。
       imageModel: Schema.union(["doubao-seedream-5-0-pro-260628", "doubao-seedream-5-0-260128"]).default("doubao-seedream-5-0-pro-260628").description("A/B \u771F\u4EBA\u53C2\u8003\u56FE\u975E\u771F\u4EBA\u5316\u4F7F\u7528\u7684\u56FE\u7247\u6A21\u578B\uFF08\u65E7\u578B\u53F7\u5DF2\u4E0B\u7EBF\uFF0C\u6309 pro \u7248\u8C03\u7528\uFF09").volatile(),
@@ -1070,8 +1072,10 @@ __export(connection_exports, {
   resolveModel: () => resolveModel,
   resolveQueryPath: () => resolveQueryPath,
   resolveSubmitPath: () => resolveSubmitPath,
+  resolveTextApiKey: () => resolveTextApiKey,
   resolveTextModel: () => resolveTextModel,
-  snapshotConfig: () => snapshotConfig
+  snapshotConfig: () => snapshotConfig,
+  textConfig: () => textConfig
 });
 function relayPreset() {
   return RELAY_PRESET;
@@ -1157,6 +1161,17 @@ function snapshotConfig(config) {
   snapshot2.submitPath = resolveSubmitPath(config);
   snapshot2.queryPath = isVolcengine(config) ? "/api/v3/contents/generations/tasks/{task_id}" : String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
   return Object.freeze(snapshot2);
+}
+function resolveTextApiKey(config) {
+  if (!isMetaontic(config) || ref(config, "imageUseVideoKey", true) !== false) return resolveApiKey(config);
+  return String(ref(config, "textApiKey", "")).trim();
+}
+function textConfig(config) {
+  const snapshot2 = snapshotConfig(config);
+  if (!isMetaontic(snapshot2) || ref(snapshot2, "imageUseVideoKey", true) !== false) return snapshot2;
+  const key = String(ref(snapshot2, "textApiKey", "")).trim();
+  if (!key) throw new Error("\u5DF2\u5173\u95ED\u6A21\u578B\u5171\u7528 API\u5BC6\u94A5\uFF0C\u8BF7\u5355\u72EC\u586B\u5199\u6587\u672C\u6A21\u578B API\u5BC6\u94A5\u3002");
+  return Object.freeze({ ...snapshot2, metaonticApiKey: key });
 }
 function imageConfig(config) {
   const snapshot2 = snapshotConfig(config);
@@ -6510,15 +6525,16 @@ function textEndpoint(config) {
   return /\/v\d+$/.test(base) ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
 }
 async function writeScript(config, brief2, options = {}) {
-  const apiKey = resolveApiKey(config);
-  assertConfigured(config, apiKey);
-  const model = resolveTextModel(config);
+  const cfg = options.textConfig ? options.textConfig(config) : textConfig(config);
+  const apiKey = resolveApiKey(cfg);
+  assertConfigured(cfg, apiKey);
+  const model = resolveTextModel(cfg);
   if (!model) throw new Error("\u8BF7\u5728\u8BBE\u7F6E\u9875\u586B\u5199\u6587\u672C\u6A21\u578B\uFF0C\u518D\u8BA9\u6587\u672C\u6A21\u578B\u5199\u811A\u672C\u3002");
   const fetcher = options.fetcher || fetch;
   const signal = options.signal || AbortSignal.timeout(TEXT_TIMEOUT_MS);
   let response;
   try {
-    response = await fetcher(textEndpoint(config), {
+    response = await fetcher(textEndpoint(cfg), {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ model, temperature: 0.6, messages: [
@@ -6932,7 +6948,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       let textModel = "", textReady = false;
       try {
         textModel = resolveTextModel(config);
-        textReady = Boolean(resolveApiKey(config));
+        textReady = Boolean(resolveTextApiKey(config));
       } catch {
       }
       return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: Boolean(resolveApiKey(config)), imageReady, singleMax: modelMaxSeconds(config), textModel, textReady };
@@ -8926,6 +8942,7 @@ var CONFIG_FIELDS = [
   "textModel",
   "imageUseVideoKey",
   "imageApiKey",
+  "textApiKey",
   "duration",
   "singleMaxSeconds",
   "ratio",
@@ -8948,7 +8965,8 @@ function maskSecrets(view) {
     ...view,
     metaonticApiKey: view.metaonticApiKey ? "\uFF08\u5DF2\u914D\u7F6E\uFF09" : "",
     volcengineApiKey: view.volcengineApiKey ? "\uFF08\u5DF2\u914D\u7F6E\uFF09" : "",
-    imageApiKey: view.imageApiKey ? "\uFF08\u5DF2\u914D\u7F6E\uFF09" : ""
+    imageApiKey: view.imageApiKey ? "\uFF08\u5DF2\u914D\u7F6E\uFF09" : "",
+    textApiKey: view.textApiKey ? "\uFF08\u5DF2\u914D\u7F6E\uFF09" : ""
   };
 }
 function configView(config) {
@@ -8966,6 +8984,7 @@ function configView(config) {
       imageUseVideoKey: !isMetaontic(config) || ref(config, "imageUseVideoKey", true),
       imageModel: resolveImageModel(ref(config, "imageModel", IMAGE_MODEL)),
       textModel: resolveTextModel(config),
+      textApiKeySource: resolveTextApiKey(config) ? ref(config, "imageUseVideoKey", true) !== false ? "shared" : "text" : "missing",
       apiKeySource: resolveApiKey(config) ? isVolcengine(config) ? "volcengine" : "metaontic" : "missing"
     }
   };
@@ -8995,9 +9014,10 @@ function configTool(config, settings) {
         queryPath: { type: "string", description: "\u67E5\u8BE2\u4EFB\u52A1\u8DEF\u5F84\uFF0C{task_id} \u4F1A\u88AB\u66FF\u6362\u3002" },
         imageUseVideoKey: { type: "boolean", description: "\u56FE\u7247\u4E0E\u89C6\u9891\u662F\u5426\u5171\u7528 API\u5BC6\u94A5\uFF0C\u9ED8\u8BA4 true" },
         imageApiKey: { type: "string", description: "\u5173\u95ED\u5171\u7528\u65F6\u5FC5\u987B\u586B\u5199\u7684\u56FE\u7247\u6A21\u578B API\u5BC6\u94A5\uFF0C\u5730\u5740\u4ECD\u6CBF\u7528\u5F53\u524D MetaOntic AI \u8FDE\u63A5" },
+        textApiKey: { type: "string", description: "\u5173\u95ED\u5171\u7528\u65F6\u5FC5\u987B\u586B\u5199\u7684\u6587\u672C\u6A21\u578B\uFF08\u5199\u811A\u672C\uFF09API\u5BC6\u94A5\uFF0C\u5730\u5740\u4ECD\u6CBF\u7528\u5F53\u524D MetaOntic AI \u8FDE\u63A5" },
         imageModel: { type: "string", enum: [IMAGE_MODEL], description: "MetaOntic AI \u771F\u4EBA\u53C2\u8003\u56FE\u975E\u771F\u4EBA\u5316\u6A21\u578B\uFF08\u65E7\u578B\u53F7\u5DF2\u4E0B\u7EBF\uFF0C\u6309 pro \u7248\u8C03\u7528\uFF09" },
         model: { type: "string", description: "\u6A21\u578B ID\uFF0C\u4F8B\u5982 doubao-seedance-2-0-mini-260615\u3002" },
-        textModel: { type: "string", description: "\u5199\u811A\u672C\u7528\u7684\u6587\u672C\u6A21\u578B ID\uFF08\u8D70\u540C\u4E00\u4E2D\u8F6C\u7AD9\u7684 /v1/chat/completions\uFF09\uFF1B\u7559\u7A7A\u7528\u5185\u7F6E\u9ED8\u8BA4\u503C\u3002" },
+        textModel: { type: "string", description: "\u5199\u811A\u672C\u7528\u7684\u6587\u672C\u6A21\u578B ID\uFF08\u8D70\u540C\u4E00\u4E2D\u8F6C\u7AD9\u7684 /v1/chat/completions\uFF09\uFF0C\u5019\u9009\u4E0E\u4E2D\u8F6C\u7AD9\u5728\u552E\u4E00\u81F4\uFF1B\u7559\u7A7A\u7528\u5185\u7F6E\u9ED8\u8BA4\u503C\u3002" },
         duration: { type: "integer", minimum: 4, maximum: modelMaxSeconds(config), description: "\u6BCF\u6BB5\u65B0\u589E\u79D2\u6570\u4E0A\u9650\uFF084 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09 \u7684\u6574\u6570\uFF0C\u9ED8\u8BA4\u6309\u6A21\u578B\u4E0A\u9650\u3001\u6BB5\u6570\u6700\u5C11\uFF09\u3002" },
         ratio: {
           type: "string",

@@ -13,6 +13,8 @@ function preset(mode) {
   value = { connectionMode: ['empty', 'error'].includes(mode) ? 'service' : mode, model: 'doubao-seedance-2-0-mini-260615', ratio: '9:16', mode: 'continuous', generateAudio: true, watermark: false, duration: 15 };
   if (mode === 'service' || mode === 'error') Object.assign(value, { apiKey: 'preview-service-key', keyOrigin: 'register', registerEmail: 'preview@example.com', deviceId: 'preview-device', deviceSecret: 'preview-device-secret' });
   if (mode === 'metaontic') value.metaonticApiKey = 'preview-metaontic-key';
+  // ?noshare：预览「不共用密钥」时的三张模型卡片（视频 / 图片 / 文本各自一把密钥）。
+  if (new URLSearchParams(location.search).has('noshare')) Object.assign(value, { imageUseVideoKey: false, imageApiKey: 'preview-image-key', textApiKey: 'preview-text-key' });
   if (mode === 'volcengine') value.volcengineApiKey = 'preview-volcano-key';
   localStorage.removeItem('metaontic-video.update-check-v2');
   if (mode === 'empty') localStorage.setItem('metaontic-video.logged-out', '1');

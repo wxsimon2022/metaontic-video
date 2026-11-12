@@ -108,6 +108,21 @@ export function snapshotConfig(config) {
   return Object.freeze(snapshot);
 }
 
+/** 文本模型这次调用实际用哪把密钥：共用时就是视频密钥，关了共用就用文本模型自己的那把（没填返回空）。 */
+export function resolveTextApiKey(config) {
+  if (!isMetaontic(config) || ref(config, 'imageUseVideoKey', true) !== false) return resolveApiKey(config);
+  return String(ref(config, 'textApiKey', '')).trim();
+}
+
+/** 文本模型沿用当前地址；关了共用密钥时用文本模型自己的 API密钥，没填就停下来让用户补。 */
+export function textConfig(config) {
+  const snapshot = snapshotConfig(config);
+  if (!isMetaontic(snapshot) || ref(snapshot, 'imageUseVideoKey', true) !== false) return snapshot;
+  const key = String(ref(snapshot, 'textApiKey', '')).trim();
+  if (!key) throw new Error('已关闭模型共用 API密钥，请单独填写文本模型 API密钥。');
+  return Object.freeze({ ...snapshot, metaonticApiKey: key });
+}
+
 /** 图片沿用当前地址，独立 API密钥仅替换本次图片连接快照。 */
 export function imageConfig(config) {
   const snapshot = snapshotConfig(config);

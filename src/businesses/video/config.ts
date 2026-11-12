@@ -32,6 +32,8 @@ export const videoConfigFields = {
     .volatile(),
   imageUseVideoKey: z.boolean().default(true).description('图片模型与视频模型共用 API密钥').volatile(),
   imageApiKey: z.string().default('').description('不共用时填写的图片模型 API密钥').volatile(),
+  // 文本模型（写脚本）：关闭共用密钥后跟图片一样单独配一把，没填只影响写脚本，不会改用别的密钥。
+  textApiKey: z.string().default('').description('不共用时填写的文本模型 API密钥').volatile(),
   // 图片模型：doubao-seedream-5-0-260128 已下线，默认改用在售的 pro 版；旧型号仍允许写入校验，
   // 读取时由 connection-defaults 的 resolveImageModel 归一到在售型号。
   imageModel: z.union(['doubao-seedream-5-0-pro-260628', 'doubao-seedream-5-0-260128']).default('doubao-seedream-5-0-pro-260628').description('A/B 真人参考图非真人化使用的图片模型（旧型号已下线，按 pro 版调用）').volatile(),

@@ -618,7 +618,7 @@
     };
     const SECTIONS = [
       { key: "sectionConnection", fields: ["connectionMode"] },
-      { key: "sectionModels", fields: ["imageUseVideoKey", "model", "metaonticApiKey", "volcengineApiKey", "imageModel", "imageApiKey", "textModel"] },
+      { key: "sectionModels", fields: ["imageUseVideoKey", "model", "metaonticApiKey", "volcengineApiKey", "imageModel", "imageApiKey", "textModel", "textApiKey"] },
       { key: "sectionVideo", fields: ["ratio", "generateAudio"] },
       { key: "sectionCanvas", fields: ["autoCreateCanvas"] }
     ];
@@ -633,6 +633,7 @@
       { key: "textModel", kind: "select", wide: true },
       { key: "imageUseVideoKey", kind: "switch", wide: true },
       { key: "imageApiKey", kind: "text", secret: true, wide: true },
+      { key: "textApiKey", kind: "text", secret: true, wide: true },
       { key: "ratio", kind: "select" },
       { key: "generateAudio", kind: "switch" },
       { key: "watermark", kind: "switch" },
@@ -660,6 +661,7 @@
       "imageApiKey",
       "imageModel",
       "textModel",
+      "textApiKey",
       "model",
       "estimateGroupRatio",
       "duration",
@@ -773,10 +775,11 @@
       model: "\u89C6\u9891\u6A21\u578B",
       imageModel: "\u56FE\u7247\u6A21\u578B",
       textModel: "\u6587\u672C\u6A21\u578B\uFF08\u5199\u811A\u672C\uFF09",
-      imageUseVideoKey: "\u56FE\u7247\u6A21\u578B\u4E0E\u89C6\u9891\u6A21\u578B\u5171\u7528 API\u5BC6\u94A5",
+      imageUseVideoKey: "\u89C6\u9891 / \u56FE\u7247 / \u6587\u672C\u6A21\u578B\u5171\u7528 API\u5BC6\u94A5",
       sharedModelKey: "\u5171\u7528 API\u5BC6\u94A5",
       videoModelKey: "\u89C6\u9891\u6A21\u578B API\u5BC6\u94A5",
       imageApiKey: "\u56FE\u7247\u6A21\u578B API\u5BC6\u94A5",
+      textApiKey: "\u6587\u672C\u6A21\u578B API\u5BC6\u94A5",
       resolution: "\u89C6\u9891\u6E05\u6670\u5EA6",
       imageModelHint: "Seedream\u53EF\u751F\u6210\u89D2\u8272\u56FE\uFF1B\u9047\u771F\u4EBA\u9650\u5236\u65F6\uFF0C\u7ECF\u540C\u610F\u53EF\u8F6C\u6362\u53C2\u8003\u56FE\u3002\u56FE\u7247\u8C03\u7528\u5355\u72EC\u8BA1\u8D39\uFF0C\u7ED3\u679C\u9700\u5BA1\u6838\u3002",
       textModelHint: "\u753B\u5E03\u300C\u5199\u811A\u672C\u2026\u300D\u7528\u8FD9\u4E2A\u578B\u53F7\u628A\u4E00\u6BB5\u60F3\u6CD5\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF1B\u8D70\u540C\u4E00\u4E2D\u8F6C\u7AD9\u7684 /v1/chat/completions\uFF0C\u5355\u72EC\u6309\u6587\u672C\u8BA1\u8D39\u3002\u5019\u9009\u4E0E\u4E2D\u8F6C\u7AD9\u5728\u552E\u7684\u6587\u672C\u6A21\u578B\u4E00\u81F4\uFF0C\u65E7\u7684\u9ED8\u8BA4\u578B\u53F7\u5DF2\u4E0B\u7EBF\uFF0C\u8BFB\u5230\u4F1A\u81EA\u52A8\u6362\u6210\u9ED8\u8BA4\u9879\u3002",
@@ -926,10 +929,11 @@
       model: "Video model",
       imageModel: "Image model",
       textModel: "Text model (scripting)",
-      imageUseVideoKey: "Use video API key for images",
+      imageUseVideoKey: "Share one API key across video / image / text models",
       sharedModelKey: "Shared key",
       videoModelKey: "Video model key",
       imageApiKey: "Image model key",
+      textApiKey: "Text model key",
       resolution: "Video resolution",
       imageModelHint: "Seedream creates character images or, with consent after a real-person restriction, stylizes references. Image calls are billed separately and results require review.",
       textModelHint: 'Used by the canvas "Write script" action to turn a brief into a script and storyboard table through the same relay (/v1/chat/completions); text calls are billed separately. Options match the text models on sale at the relay; the retired default is replaced with the current default.',
@@ -1543,7 +1547,7 @@
           ...list.map((option) => h("option", { key: option, value: option }, optionLabel(t, field.key, option)))
         ]);
       }
-      const canReveal = field.key === "metaonticApiKey" || field.key === "volcengineApiKey" || field.key === "imageApiKey";
+      const canReveal = field.key === "metaonticApiKey" || field.key === "volcengineApiKey" || field.key === "imageApiKey" || field.key === "textApiKey";
       const revealed = canReveal && visibleKey === field.key;
       const input = h("input", {
         // 这个 input 会和右侧眼睛按钮一起放进数组，React 要求数组子节点带 key
@@ -1942,13 +1946,15 @@
           if (section.key === "sectionModels") {
             const shared2 = (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
             const common = !directMode ? [fieldCell(FIELD_BY_KEY.imageUseVideoKey), ...shared2 ? [fieldCell(FIELD_BY_KEY.metaonticApiKey)] : []] : [];
-            const videoFields = ["model", "textModel", ...directMode || !shared2 ? [directMode ? "volcengineApiKey" : "metaonticApiKey"] : []];
+            const videoFields = ["model", ...shared2 ? ["textModel"] : [], ...directMode || !shared2 ? [directMode ? "volcengineApiKey" : "metaonticApiKey"] : []];
             const imageFields = ["imageModel", ...!shared2 ? ["imageApiKey"] : []];
+            const textFields = !directMode && !shared2 ? ["textModel", "textApiKey"] : [];
             return h("div", { key: section.key, className: "mov-model-settings" }, [
               ...common,
               h("div", { key: "models", className: `mov-model-grid${directMode ? " mov-model-grid-single" : ""}` }, [
                 h("div", { key: "video", className: "mov-model-card", "data-group": "video-model" }, videoFields.map((key) => fieldCell(FIELD_BY_KEY[key]))),
-                !directMode ? h("div", { key: "image", className: "mov-model-card", "data-group": "image-model" }, imageFields.map((key) => fieldCell(FIELD_BY_KEY[key]))) : null
+                !directMode ? h("div", { key: "image", className: "mov-model-card", "data-group": "image-model" }, imageFields.map((key) => fieldCell(FIELD_BY_KEY[key]))) : null,
+                textFields.length ? h("div", { key: "text", className: "mov-model-card", "data-group": "text-model" }, textFields.map((key) => fieldCell(FIELD_BY_KEY[key]))) : null
               ])
             ]);
           }

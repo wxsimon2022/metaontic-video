@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { dshHome } from '../../../core/paths.js';
 import { loadCanvasAdapter, readCanvasInput, publishCanvasResult, resolveCanvasAdapter } from './canvas.js';
-import { snapshotConfig, imageConfig, resolveApiKey, assertConfigured, resolveModel, resolveTextModel, isVolcengine, connectionLabel } from '../providers/connection.js';
+import { snapshotConfig, imageConfig, resolveApiKey, resolveTextApiKey, assertConfigured, resolveModel, resolveTextModel, isVolcengine, connectionLabel } from '../providers/connection.js';
 import { buildGenerationBody, buildRequestBody, runTask } from '../providers/seedance.js';
 import { generateSeedreamImage } from '../providers/seedream.js';
 import { waitForCompletion } from '../providers/transport.js';
@@ -337,7 +337,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       let imageReady = false;
       try { const c = imageConfig(config); imageReady = !isVolcengine(c) && Boolean(resolveApiKey(c)); } catch { /* 缺少独立图片密钥 */ }
       let textModel = '', textReady = false;
-      try { textModel = resolveTextModel(config); textReady = Boolean(resolveApiKey(config)); } catch { /* 接入方式未配好 */ }
+      try { textModel = resolveTextModel(config); textReady = Boolean(resolveTextApiKey(config)); } catch { /* 接入方式未配好 */ }
       return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: Boolean(resolveApiKey(config)), imageReady, singleMax: modelMaxSeconds(config), textModel, textReady };
     }
     // 连拍：一次确认整条链路的方案与总费用，之后逐段生成，每段结果仍要人工审核才继续。
