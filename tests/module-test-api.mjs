@@ -25,6 +25,7 @@ export * from './src/businesses/video/client/state.ts';
 export * from './src/client/updates.ts';
 export * from './src/businesses/video/workflow/planning.ts';
 export * from './src/businesses/video/prompts/scope.ts';
+export * from './src/businesses/video/prompts/guidance.ts';
 export {resolveResolution} from './src/businesses/video/config.ts';
 export {isOmniExtendModel,resolveTextModel,resolveTextApiKey,textConfig,resolveApiKey,resolveBaseUrl} from './src/businesses/video/providers/connection.ts';
 export * from './src/businesses/video/workflow/result-state.ts';

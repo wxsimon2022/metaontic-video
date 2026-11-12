@@ -10,10 +10,15 @@ import { MAX_TOTAL_SECONDS, MAX_SEGMENTS, ref } from '../config.js';
 export function buildPromptGuidance(config) {
   const singleMax = resolveSingleMax(config);
   const segmentSeconds = resolveSegmentSeconds(config);
+  const autoCreate = ref(config, 'autoCreateCanvas', false) === true;
   return [
-    `· 当前自动创建流程画布：${ref(config, 'autoCreateCanvas', true) === false ? '关闭；不自动建图或同步，已有画布保留，明确手动选中节点时仍可联动' : '开启'}。该开关只能在插件设置页修改，video_config可只读核对。`,
-    '· 流程画布是插件自带组件（左侧栏「流程画布」那一行打开独立页面，视频创作面板里不再内嵌），不需要安装任何第三方画布插件；按当前开关执行自动投影。普通创作照常调用video_project prepare/review，工具自动建流程画布项目、同步完整脚本与制作段计划并请求打开。不要要求用户另建项目/节点或另问是否同步。生成传projectId，续做传原resume，成果自动回填，不必手工拼自动canvas绑定。canvasProject unavailable/pending如实说明，用video_project status重试同步，不重建创作项目或重生成。仍保留脚本、费用和分段结果审核。',
-    '· 流程画布联动：用户要用MetaOnticVideo制作画布节点时，先video_canvas(action:list/read)读取目标节点、上游剧本/分镜和参考素材。按端口/refOrder保留首帧、尾帧、参考视频角色，明确缺失规格，不猜时长和清晰度。据此完成现有video_project准备、正文展示脚本/内嵌分镜及review；完整specification与随后video_generate/video_extend参数都带read返回的canvas对象。图片走video_prepare_image并带canvas，仍须图片费用审批和结果审核。不复制API密钥。成果自动新增到流程画布，paused仍须先交付并review_segment，回填不代表结果已审核或整片完成。回填pending时用video_canvas(action:sync,token)补传，绝不重新生成。画布按连线顺序执行：顶部有「制作「节点名」」按钮依次驱动下一个未完成节点，未完成节点用虚线框标出，进度显示在工具条上；节点内的「制作」按钮与它都由插件接管方案、费用与结果审核。用户在画布内自行点击生成时同样先确认方案与费用。',
+    `· 当前自动创建流程画布：${autoCreate ? '开启' : '关闭（默认关闭，可在插件设置页打开）' + '；不自动建图或同步，已有画布保留，明确手动选中节点时仍可联动'}。该开关只能在插件设置页修改，video_config可只读核对。`,
+    '· 流程画布是插件自带组件（左侧栏「MetaOnticVideo流程画布」那一行打开独立页面，视频创作面板里不再内嵌），不需要安装任何第三方画布插件；按当前开关决定是否自动投影。'
+      + (autoCreate
+        ? '普通创作照常调用video_project prepare/review，工具会自动建流程画布项目、同步完整脚本与制作段计划，并提示用户到左侧栏「MetaOnticVideo流程画布」查看；不要要求用户另建项目/节点或另问是否同步。'
+        : '当前开关关闭：不要自动建图、不要自动同步，也不要对用户说已经建好或打开了流程画布；用户明确要用画布时再按下面的画布联动规则手动处理。')
+      + '开启后生成传projectId，续做传原resume，成果回到已绑定的画布节点，不必手工拼自动canvas绑定。canvasProject为disabled表示未开启自动投影，unavailable/pending如实说明，用video_project status重试同步，不重建创作项目或重生成；内置画布只能由用户自己从左侧栏打开，工具无法代开，不要声称已打开。仍保留脚本、费用和分段结果审核。',
+    '· 流程画布联动（由用户明确选中画布节点触发，与设置里的自动创建开关无关）：用户要用MetaOnticVideo制作画布节点时，先video_canvas(action:list/read)读取目标节点、上游剧本/分镜和参考素材。按端口/refOrder保留首帧、尾帧、参考视频角色，明确缺失规格，不猜时长和清晰度。据此完成现有video_project准备、正文展示脚本/内嵌分镜及review；完整specification与随后video_generate/video_extend参数都带read返回的canvas对象。图片走video_prepare_image并带canvas，仍须图片费用审批和结果审核。不复制API密钥。成果自动新增到流程画布，paused仍须先交付并review_segment，回填不代表结果已审核或整片完成。回填pending时用video_canvas(action:sync,token)补传，绝不重新生成。画布按连线顺序执行：顶部有「制作「节点名」」按钮依次驱动下一个未完成节点，未完成节点用虚线框标出，进度显示在工具条上；节点内的「制作」按钮与它都由插件接管方案、费用与结果审核。用户在画布内自行点击生成时同样先确认方案与费用。',
 
     '· 状态表述必须与证据一致：查询失败或超时只说状态未确认，不能断言成功、失败或仍在生成；仅在收到成功状态及视频链接后说本段生成成功。本地文件存在后才说下载完成，合并成功后才说完整成片已合并，逐项给出链接后才说已交付。暂停默认交付本段，不宣称正在合并。查询曾报401但后来成功时，正常进度只报告当前已确认结果；不得将401称为密钥抖动或猜测原因。视频进度提示仅用于视频生成或续拍等待，不用于脚本、图片、审核、查询、下载、合并或结果展示。',
     '· 分段结果确认必须弹窗：video_generate/video_extend返回paused=true时先在独立正文给本段可点击视频链接，正文消息同时调用video_stage结束result_present并开始segment_review_wait，随后立即单独调用video_project(action:review_segment,resume:返回的resumeDir)。禁止只问一句效果如何就结束回合；该结果审核不属于重复制作确认，不能被合并或省略。只有返回approved才用原resume继续下一段费用审批。取消、未答、拒绝均停止且保留成果；不自动重做。',

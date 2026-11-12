@@ -66,6 +66,7 @@
   var SUMMARY_TOOLS = { video_project: "\u811A\u672C\u5BA1\u6838", video_estimate: "\u8D39\u7528\u8BD5\u7B97" };
   var ACTION_LABELS = { prepare: "\u51C6\u5907\u9879\u76EE", review: "\u811A\u672C\u5BA1\u6838", review_segment: "\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838", status: "\u8BFB\u53D6\u9879\u76EE\u72B6\u6001" };
   var STATUS_LABELS = { approved: "\u5DF2\u901A\u8FC7", draft: "\u5F85\u4FEE\u6539", pending: "\u5F85\u786E\u8BA4", blocked: "\u672A\u901A\u8FC7\u6821\u9A8C", running: "\u8FDB\u884C\u4E2D" };
+  var CANVAS_SYNC_LABELS = { synced: "\u5DF2\u540C\u6B65", pending: "\u5F85\u8865\u4F20\uFF08\u7528video_canvas\u8865\u4F20\uFF0C\u4E0D\u91CD\u65B0\u751F\u6210\uFF09", unavailable: "\u6682\u4E0D\u53EF\u7528", external: "\u6CBF\u7528\u6240\u9009\u753B\u5E03" };
   var textOf = (block) => (Array.isArray(block?.content) ? block.content : []).filter((part) => part?.type === "text").map((part) => String(part.text || "")).join("\n").trim();
   var money = (value) => Number.isFinite(Number(value)) ? `\xA5${(Math.round(Number(value) * 1e4) / 1e4).toFixed(4)}` : "";
   function parseJson(text) {
@@ -108,7 +109,8 @@
     push("\u9879\u76EE", data.projectId);
     push("\u4E0B\u4E00\u6B65", data.nextAction);
     push("\u8BF4\u660E", data.reason);
-    if (data.canvasProject?.status) push("\u753B\u5E03\u540C\u6B65", data.canvasProject.status === "synced" ? "\u5DF2\u540C\u6B65" : String(data.canvasProject.status));
+    const canvasSync = String(data.canvasProject?.status || "");
+    if (canvasSync && canvasSync !== "disabled") push("\u753B\u5E03\u540C\u6B65", CANVAS_SYNC_LABELS[canvasSync] || canvasSync);
     const state = data.status === "approved" ? "ok" : ["draft", "blocked"].includes(String(data.status)) ? "warn" : "done";
     return { title, state, stateLabel: STATUS_LABELS[String(data.status)] || "\u5DF2\u5B8C\u6210", rows, raw };
   }
@@ -837,9 +839,9 @@
       sectionConnection: "\u63A5\u5165\u4E0E API\u5BC6\u94A5",
       sectionVideo: "\u753B\u9762\u4E0E\u58F0\u97F3",
       sectionCanvas: "\u6D41\u7A0B\u753B\u5E03",
-      canvasPanelLabel: "\u6D41\u7A0B\u753B\u5E03",
+      canvasPanelLabel: "MetaOnticVideo\u6D41\u7A0B\u753B\u5E03",
       autoCreateCanvas: "\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03",
-      autoCreateCanvasHint: "\u5F00\u542F\u540E\u968F\u521B\u4F5C\u81EA\u52A8\u5EFA\u56FE\uFF0C\u5BA1\u6838\u524D\u540C\u6B65\u5267\u672C\u3001\u5206\u955C\u548C\u5236\u4F5C\u8BA1\u5212\uFF0C\u751F\u6210\u540E\u56DE\u586B\u6210\u679C\u3002\u6D41\u7A0B\u753B\u5E03\u662F\u672C\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u5176\u4ED6\u753B\u5E03\u63D2\u4EF6\u3002\u5173\u95ED\u540E\u505C\u6B62\u81EA\u52A8\u5EFA\u56FE\u548C\u540C\u6B65\uFF0C\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\uFF0C\u624B\u52A8\u8282\u70B9\u5236\u4F5C\u4ECD\u53EF\u7528\u3002",
+      autoCreateCanvasHint: "\u9ED8\u8BA4\u5173\u95ED\uFF1A\u5173\u95ED\u65F6\u6BCF\u6B21\u521B\u4F5C\u4E0D\u4F1A\u81EA\u52A8\u5EFA\u56FE\u6216\u540C\u6B65\uFF0C\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\uFF0C\u624B\u52A8\u8282\u70B9\u5236\u4F5C\u4ECD\u53EF\u7528\u3002\u5F00\u542F\u540E\u968F\u521B\u4F5C\u81EA\u52A8\u5EFA\u56FE\uFF0C\u5BA1\u6838\u524D\u540C\u6B65\u5267\u672C\u3001\u5206\u955C\u548C\u5236\u4F5C\u8BA1\u5212\uFF0C\u751F\u6210\u540E\u56DE\u586B\u6210\u679C\u3002\u6D41\u7A0B\u753B\u5E03\u662F\u672C\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u5176\u4ED6\u753B\u5E03\u63D2\u4EF6\u3002",
       sectionModels: "\u6A21\u578B\u914D\u7F6E",
       sectionCombined: "\u66F4\u591A\u8BBE\u7F6E",
       advancedPicture: "\u753B\u9762",
@@ -991,9 +993,9 @@
       sectionConnection: "Connection & credentials",
       sectionVideo: "Picture & audio",
       sectionCanvas: "Workflow canvas",
-      canvasPanelLabel: "Workflow canvas",
+      canvasPanelLabel: "MetaOnticVideo workflow canvas",
       autoCreateCanvas: "Automatically create a workflow canvas",
-      autoCreateCanvasHint: "Create a canvas with each project, sync scripts and plans before review, and publish results. The workflow canvas is built into this plugin; no other canvas plugin is required. Turning off stops automatic creation and sync, preserves existing canvases, and keeps manual node generation available.",
+      autoCreateCanvasHint: "Off by default: nothing is created or synced automatically, existing canvases stay, and manual node generation still works. Turn it on to create a canvas with each project, sync scripts and plans before review, and publish results. The workflow canvas is built into this plugin; no other canvas plugin is required.",
       sectionModels: "Models",
       sectionCombined: "More settings",
       advancedPicture: "Picture",
@@ -1509,7 +1511,7 @@
     function control(field) {
       const { draft, value, h, SELECTS, inputStyle, t, snapshot, visibleKey, setVisibleKey, edit, optionLabel } = context;
       const blankTextModel = field.key === "textModel" && !String(draft[field.key] ?? value[field.key] ?? "").trim();
-      const current = blankTextModel ? (SELECTS.textModel || [])[0] : draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (["imageUseVideoKey", "usageStatsEnabled", "autoCreateCanvas"].includes(field.key) ? true : field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0);
+      const current = blankTextModel ? (SELECTS.textModel || [])[0] : draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (["imageUseVideoKey", "usageStatsEnabled"].includes(field.key) ? true : field.key === "autoCreateCanvas" ? false : field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0);
       const secondsField = field.key === "pollIntervalMs" || field.key === "maxWaitMs";
       const displayed = secondsField && current !== void 0 && current !== "" ? Number(current) / 1e3 : current;
       const id = `metaontic-video-${field.key}`;
@@ -2415,10 +2417,13 @@
     }
     return { type: node?.type || "text", x: Number(spot?.x || 0) + 40, y: Number(spot?.y || 0) + 40, w: spot?.w, h: spot?.h, data };
   }
+  function producedNodeIds(canvas) {
+    return new Set(Object.values(canvas?.nodes || {}).map((node) => node?.metaonticSourceNode).filter(Boolean));
+  }
   function flowSteps(canvas) {
     const nodes = Object.values(canvas?.nodes || {});
     const edges = Array.isArray(canvas?.edges) ? canvas.edges : [];
-    const produced = new Set(nodes.map((node) => node?.metaonticSourceNode).filter(Boolean));
+    const produced = producedNodeIds(canvas);
     const author = nodes.filter((node) => ["image", "video"].includes(node?.type) && !node?.metaonticSourceNode && !node?.data?.assetId);
     const byId = new Map(author.map((node) => [node.id, node]));
     const inbound = new Map(author.map((node) => [node.id, []]));
@@ -2529,7 +2534,7 @@
     });
     return { positions, moved, width, height: draft.height };
   }
-  function createCanvasView({ React, h, TOKENS }) {
+  function createCanvasView({ React, h, TOKENS, PAGE_CSS = "" }) {
     const ROOT_CLASS = "mov-section movc";
     const rpc = async (method, args = {}) => {
       const response = await fetch("/metaontic-video/canvas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ method, args }) });
@@ -2556,14 +2561,20 @@
     const CSS = `
 .movc { display: flex; flex-direction: column; gap: 14px; }
 .movc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.movc-top { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 4px; padding: 12px 14px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; }
+.movc-top { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 4px; padding: 12px 14px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.cardFill}; }
 .movc-list { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
 .movc-pick { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
 .movc-name-empty { font-size: 13px; font-weight: 600; color: ${TOKENS.muted}; }
-/* \u5DE5\u5177\u6761\u6309\u94AE\uFF1A\u6CBF\u7528 .mov-btn \u7684 8px \u5706\u89D2\u3001\u63CF\u8FB9\u4E0E\u4E3B\u8272\uFF0C\u53EA\u628A\u56FA\u5B9A 120px \u5BBD\u6539\u6210\u6309\u5185\u5BB9\u6392\u5E03\u3002 */
+/* \u753B\u5E03\u5185\u6309\u94AE\u7EDF\u4E00\u6210\u4E00\u5957\uFF1A\u63CF\u8FB9 + \u4E3B\u8272\u60AC\u505C\uFF0C\u4E0D\u5403\u5BBF\u4E3B\u9ED8\u8BA4\u7684\u7070\u5E95\uFF1B\u4E3B\u6309\u94AE\u624D\u7528\u5B9E\u5FC3\u4E3B\u8272\u3002 */
+.movc .mov-btn, .movc-modal .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12px; line-height: 1.2; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
+.movc .mov-btn:hover:not(:disabled), .movc-modal .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; background: transparent; color: ${TOKENS.primaryFill}; }
+.movc .mov-btn:disabled, .movc-modal .mov-btn:disabled { opacity: .5; cursor: default; }
+.movc .mov-btn-primary, .movc-modal .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
+.movc .mov-btn-primary:hover:not(:disabled), .movc-modal .mov-btn-primary:hover:not(:disabled) { background: ${TOKENS.primaryFill}; color: #fff; opacity: .88; }
+.movc .movc-danger:hover:not(:disabled), .movc-modal .movc-danger:hover:not(:disabled) { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
+/* \u5DE5\u5177\u6761\u6309\u94AE\uFF1A\u53EA\u628A\u56FA\u5B9A 120px \u5BBD\u6539\u6210\u6309\u5185\u5BB9\u6392\u5E03\uFF0C\u9AD8\u5EA6\u4E0E\u5185\u8DDD\u548C\u9009\u62E9\u753B\u5E03\u80F6\u56CA\u5BF9\u9F50\u3002 */
 .movc-ops { flex: 1 1 auto; min-width: 0; gap: 6px; row-gap: 8px; container-type: inline-size; }
-.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 32px; min-height: 32px; padding: 0 14px; border-radius: 8px; font-size: 12px; white-space: nowrap; overflow-wrap: normal; }
-.movc-ops .movc-danger:hover:not(:disabled) { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
+.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 32px; min-height: 32px; padding: 0 14px; overflow-wrap: normal; }
 .movc-flow { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; white-space: nowrap; }
 /* \u6D41\u7A0B\u4E3B\u884C\u52A8\uFF1A\u7528\u4E3B\u8272\u63CF\u8FB9\u7A81\u51FA\uFF0C\u4F46\u4E0D\u548C\u300C\u65B0\u5EFA\u753B\u5E03\u2026\u300D\u7684\u5B9E\u5FC3\u4E3B\u6309\u94AE\u62A2\u6CE8\u610F\u529B\u3002 */
 .movc-ops .movc-run { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
@@ -2573,8 +2584,8 @@
 @container (max-width: 460px) { .movc-sep { display: none; } }
 .movc-ops .mov-btn:focus-visible, .movc-chip:focus-visible, .movc-mini:focus-visible, .movc-name-text:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
 .movc-ops .mov-btn:active:not(:disabled), .movc-chip:active, .movc-mini:active { opacity: .82; }
-.movc-chip { display: inline-flex; align-items: center; box-sizing: border-box; height: 30px; padding: 0 14px; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
-.movc-chip:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-chip { display: inline-flex; align-items: center; box-sizing: border-box; height: 32px; padding: 0 14px; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.movc-chip:hover { border-color: ${TOKENS.primaryFill}; background: transparent; color: ${TOKENS.primaryFill}; }
 .movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
 .movc-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
 .movc-stage { position: relative; height: clamp(520px, calc(100vh - 320px), 1400px); border: 1px solid ${TOKENS.border}; border-radius: 12px; background-color: ${TOKENS.controlFill}; background-image: radial-gradient(${TOKENS.border} 1px, transparent 1px); background-size: 22px 22px; overflow: hidden; cursor: grab; touch-action: none; }
@@ -3264,6 +3275,8 @@
       const doneSteps = steps.filter((step) => step.done).length;
       const nodes = canvas ? Object.values(canvas.nodes || {}) : [];
       const edges = canvas?.edges || [];
+      const producedIds = producedNodeIds(canvas);
+      const achieved = (node) => node?.data?.status === "done" || node?.data?.status === void 0 && producedIds.has(node?.id);
       const geometry = (node) => ({ ...node, ...sizeOf(node), ...positions[node.id] || {} });
       const at = (id) => geometry((canvas?.nodes || {})[id]);
       const kindOf = (id) => (canvas?.nodes || {})[id]?.type;
@@ -3310,7 +3323,7 @@
         ])
       ]) : null;
       return h("section", { className: ROOT_CLASS }, [
-        h("style", { key: "css" }, CSS),
+        h("style", { key: "css" }, PAGE_CSS + CSS),
         h("div", { key: "title", className: "mov-section-title" }, "\u6D41\u7A0B\u753B\u5E03"),
         // 画布操作全部放最上面：先选画布、再操作当前画布，画布区只负责画本事。
         h("div", { key: "top", className: "movc-top" }, [
@@ -3383,7 +3396,7 @@
           ])
         ]),
         error ? h("p", { key: "error", className: "movc-hint" }, error) : null,
-        !list.length ? h("p", { key: "empty", className: "movc-hint" }, "\u8FD8\u6CA1\u6709\u6D41\u7A0B\u753B\u5E03\uFF1A\u786E\u8BA4\u521B\u4F5C\u9700\u6C42\u540E\u4F1A\u5728\u8FD9\u91CC\u81EA\u52A8\u5EFA\u7ACB\uFF0C\u811A\u672C\u5BA1\u6838\u540E\u540C\u6B65\u5206\u955C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\uFF0C\u751F\u6210\u6210\u679C\u81EA\u52A8\u56DE\u586B\uFF1B\u4E5F\u53EF\u4EE5\u76F4\u63A5\u300C\u65B0\u5EFA\u753B\u5E03\u2026\u300D\u3002") : null,
+        !list.length ? h("p", { key: "empty", className: "movc-hint" }, "\u8FD8\u6CA1\u6709\u6D41\u7A0B\u753B\u5E03\uFF1A\u70B9\u300C\u65B0\u5EFA\u753B\u5E03\u2026\u300D\u53EF\u4EE5\u7ACB\u523B\u521B\u5EFA\u4E00\u4EFD\u7A7A\u767D\u6587\u6863\uFF1B\u5982\u679C\u5728\u8BBE\u7F6E\u9875\u6253\u5F00\u300C\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03\u300D\uFF08\u9ED8\u8BA4\u5173\u95ED\uFF09\uFF0C\u666E\u901A\u521B\u4F5C\u786E\u8BA4\u9700\u6C42\u540E\u4E5F\u4F1A\u5728\u8FD9\u91CC\u81EA\u52A8\u5EFA\u7ACB\uFF0C\u811A\u672C\u5BA1\u6838\u540E\u540C\u6B65\u5206\u955C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\uFF0C\u751F\u6210\u6210\u679C\u81EA\u52A8\u56DE\u586B\u3002") : null,
         canvas ? h(
           "div",
           {
@@ -3455,7 +3468,7 @@
                 h("div", { key: "head", className: "movc-node-head" }, [
                   h("span", { key: "label", className: "movc-node-title" }, labelOf(node)),
                   // 状态标签直接复用宿主的结果胶囊样式（.mov-chip / .mov-chip-ok）。
-                  h("span", { key: "status", className: node.data?.status === "done" ? "mov-chip mov-chip-ok" : "mov-chip movc-badge" }, node.data?.status === "done" ? "\u5DF2\u5B8C\u6210" : "\u5F85\u5236\u4F5C"),
+                  h("span", { key: "status", className: achieved(node) ? "mov-chip mov-chip-ok" : "mov-chip movc-badge" }, achieved(node) ? "\u5DF2\u5B8C\u6210" : "\u5F85\u5236\u4F5C"),
                   h("span", { key: "actions", className: "movc-actions" }, [
                     h("button", { key: "edit", type: "button", className: "movc-mini", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
                       e.stopPropagation();
@@ -3745,7 +3758,7 @@
         };
         const Page = makePage({ form, t, manager: pluginManager });
         settings.register({ id: "video", namespace: NAMESPACE, locale: NS, Page });
-        const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS });
+        const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS, PAGE_CSS });
         const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: icon_default });
         ctx.effect(() => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
           name: "sidebar.panellist",

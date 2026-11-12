@@ -6,6 +6,8 @@
 const SUMMARY_TOOLS: Record<string, string> = { video_project: '脚本审核', video_estimate: '费用试算' };
 const ACTION_LABELS: Record<string, string> = { prepare: '准备项目', review: '脚本审核', review_segment: '分段结果审核', status: '读取项目状态' };
 const STATUS_LABELS: Record<string, string> = { approved: '已通过', draft: '待修改', pending: '待确认', blocked: '未通过校验', running: '进行中' };
+/** 画布同步结果的人话标签；`disabled` 是默认关闭自动投影的常态，不占用卡片一行。 */
+const CANVAS_SYNC_LABELS: Record<string, string> = { synced: '已同步', pending: '待补传（用video_canvas补传，不重新生成）', unavailable: '暂不可用', external: '沿用所选画布' };
 
 const textOf = (block: any) => (Array.isArray(block?.content) ? block.content : [])
   .filter(part => part?.type === 'text').map(part => String(part.text || '')).join('\n').trim();
@@ -45,7 +47,8 @@ export function toolSummary(toolName: string, block: any) {
   push('项目', data.projectId);
   push('下一步', data.nextAction);
   push('说明', data.reason);
-  if (data.canvasProject?.status) push('画布同步', data.canvasProject.status === 'synced' ? '已同步' : String(data.canvasProject.status));
+  const canvasSync = String(data.canvasProject?.status || '');
+  if (canvasSync && canvasSync !== 'disabled') push('画布同步', CANVAS_SYNC_LABELS[canvasSync] || canvasSync);
   const state = data.status === 'approved' ? 'ok' : ['draft', 'blocked'].includes(String(data.status)) ? 'warn' : 'done';
   return { title, state, stateLabel: STATUS_LABELS[String(data.status)] || '已完成', rows, raw };
 }

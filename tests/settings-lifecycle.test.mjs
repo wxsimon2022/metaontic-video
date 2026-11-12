@@ -1,4 +1,5 @@
 import { api } from './module-test-api.mjs';
+import { sourceOf } from './source.mjs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
@@ -162,4 +163,18 @@ test('save retains edits made while the write is in flight', async () => {
   currentDraft = {model:'edited-again',ratio:'16:9'};
   release(true); await saving;
   assert.deepEqual(JSON.parse(JSON.stringify(currentDraft)), {model:'edited-again',ratio:'16:9'});
+});
+
+test('自动创建流程画布开关默认关闭，配过 true 才勾上', () => {
+  const scope = vm.createContext({});
+  vm.runInContext(sourceOf('businesses/video/connection-defaults', 'businesses/video/client/config', 'businesses/video/client/settings-actions')
+    + '\nObject.assign(globalThis, createClientConfig());\nObject.assign(globalThis, { createSettingsActions });', scope);
+  const h = (type, props, children) => ({ type, props: props || {}, children: Array.isArray(children) ? children.filter(Boolean) : children === undefined ? [] : [children] });
+  const build = (value) => scope.createSettingsActions({
+    draft: {}, value, h, SELECTS: scope.SELECTS, inputStyle: {}, t: (key) => key, snapshot: { secrets: {} },
+    visibleKey: '', setVisibleKey: () => {}, edit: () => {}, optionLabel: scope.optionLabel,
+  }).control(scope.FIELD_BY_KEY.autoCreateCanvas).children.find((child) => child.type === 'input');
+  assert.equal(build({}).props.checked, false, '没配过时开关是关的');
+  assert.equal(build({ autoCreateCanvas: false }).props.checked, false);
+  assert.equal(build({ autoCreateCanvas: true }).props.checked, true, '用户打开后才勾上');
 });

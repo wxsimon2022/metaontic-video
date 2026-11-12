@@ -321,12 +321,12 @@ ffmpeg -y -f concat -safe 0 -i clips/concat.txt \
 
 状态文案按工具证据区分：上游生成成功不等于下载、合并或交付完成；查询失败/超时不推断任务终态。暂停先给本段预览并审核，不能说默认正在合并。已有分段不重生成，新增剩余分段仍计费；上游链接有效期由渠道决定，不保证24小时。401称鉴权异常，不称密钥抖动；后来成功查询后进度只报告当前确认结果。视频进度提示只用于生成/续拍等待，其他阶段禁止使用。
 
-## 无限画布联动
+## 流程画布联动
 
-用户要求制作画布节点时，先用video_canvas(action:list/read)定位项目和节点，读取原稿、分镜、连线端口与参考素材；不让用户手工抄写已有文本，不询问API密钥。遵守原有创意完善、缺失规格、角色图选择和脚本审核流程。video_project.review的specification和随后video_generate/video_extend需携带read返回的canvas对象；图片走video_prepare_image并带canvas。生成、续拍及图片费用审批不能省略；暂停仍须展示真实分段后review_segment。
+流程画布是本插件自带的组件，不依赖任何第三方画布插件；左侧栏「MetaOnticVideo流程画布」那一行打开独立页面，视频创作面板里不再内嵌画布。
 
-原版canvas_run_node/canvas_generate_node使用原版配置，不用它们代替MetaOnticVideo生成。成果由桥接自动新增回原画布；canvasSync.pending时用video_canvas(action:sync,token)补传，不重新生成、不重复扣费。源稿修改后重新read和review；不复活已删节点。
+用户要用MetaOnticVideo制作画布节点时，先用video_canvas(action:list/read)定位项目和节点，读取原稿、分镜、连线端口与参考素材；不让用户手工抄写已有文本，不询问API密钥。遵守原有创意完善、缺失规格、角色图选择和脚本审核流程。video_project.review的specification和随后video_generate/video_extend需携带read返回的canvas对象；图片走video_prepare_image并带canvas。生成、续拍及图片费用审批不能省略；暂停仍须展示真实分段后review_segment。这条联动由用户明确选中画布节点触发，与设置里的自动创建开关无关。
 
-用户可在画布中选中一个节点，点击工具栏「用 MetaOnticVideo 生成」自动填入节点定位请求；收到此请求直接用定位信息调用video_canvas read，不重复索取项目名/节点名。填入请求不表示用户已审核制作规格或同意费用，继续走既有审核和确认。
+不要用其它画布插件的生成入口代替MetaOnticVideo生成，也不要把它们的画布当成本插件的流程画布。成果只新增成果节点，不覆盖源稿；canvasSync.pending时用video_canvas(action:sync,token)补传，不重新生成、不重复扣费。源稿修改后重新read和review；不复活已删节点。
 
-创作与无限画布自动融合：普通视频需求仍按现有创作流程调用video_project prepare/review，项目工具自动创建原版画布项目、同步完整剧本和实际制作段计划并请求打开。无需用户另建项目/节点，也不需要另问是否同步画布。生成工具凭projectId（续做凭原resume）自动找到绑定并回填成果，无需助手抄写自动绑定canvas参数；明确从已有节点发起时仍使用read返回的canvas。canvasProject unavailable/pending须如实说明，通过video_project status重试同步，不新建创作项目、不重复付费生成。自动建图不代表脚本、费用或分段成果已审核，原审核全部保留。
+设置页的「自动创建流程画布」默认关闭。只有开启时普通视频需求才在原有创作流程里自动投影：video_project prepare/review后自动创建流程画布项目、同步完整剧本和实际制作段计划，并提示用户到左侧栏打开；内置画布不能由工具代开，不要声称已打开，也不需要另问是否同步画布。关闭时不要自动建图或同步，也不要对用户说已经建好流程画布，用户明确要用画布就按上面手动read节点、带canvas生成。canvasProject为disabled表示未开启自动投影，unavailable/pending须如实说明，通过video_project status重试同步，不新建创作项目、不重复付费生成。自动建图不代表脚本、费用或分段成果已审核，原审核全部保留。

@@ -21,7 +21,7 @@ test('创作项目自动建图、恢复审核材料、自动回填且不改变�
    projectDirGet:async()=>({ok:true,abs:path.join(root,'projects','auto'),dataRoot:root}),
    assetCreate:async()=>({ok:true}),canvasOpen:async()=>({ok:true}),
   }};
-  const sync=api.createCanvasProjectSync(async()=>adapter);
+  const sync=api.createCanvasProjectSync(async()=>adapter,{autoCreateCanvas:true});
   const wrapped=sync.wrapProject({execute:async()=>({projectId:project.id,status:'prepared'})});
   assert.equal((await wrapped.execute({action:'prepare'},exec)).canvasProject.status,'synced');
   const spec={prompt:'日出到黄昏',segmentPrompts:['日出','黄昏'],duration:30,ratio:'9:16',resolution:'720p'};
@@ -41,7 +41,7 @@ test('创作项目自动建图、恢复审核材料、自动回填且不改变�
    assert.equal(edge.fromPort,'out');
   }
   const file=path.join(root,'成片.mp4');await writeFile(file,'mock');
-  let calls=0;const bridge=api.createCanvasBridge(async()=>adapter);
+  let calls=0;const bridge=api.createCanvasBridge(async()=>adapter,{autoCreateCanvas:true});
   const tool=bridge.wrap({name:'video_generate',parameters:{properties:{}},execute:async(args)=>{
    calls++;assert.equal(args.canvas,undefined);return {status:'succeeded',videoPath:file};
   }});
@@ -73,7 +73,7 @@ test('画布项目名跟随会话标题，用户改过的画布名不被覆盖',
    assetCreate:async()=>({ok:true}),canvasOpen:async()=>({ok:true}),
   }};
   let title='民勤蜜瓜独白短视频';
-  const sync=api.createCanvasProjectSync(async()=>adapter,{}, {get:()=>({title})});
+  const sync=api.createCanvasProjectSync(async()=>adapter,{autoCreateCanvas:true}, {get:()=>({title})});
   await sync.sync(project.id,exec);
   // 画布名与会话标题同源，不带创作项目 id；重试仍靠原版同名幂等复用。
   assert.equal(created,title);
@@ -123,7 +123,7 @@ test('首轮还没有会话标题时先建画布，标题落定后补名；非�
    projectDirGet:async()=>({ok:true,abs:path.join(root,'projects','plate'),dataRoot:root}),
    assetCreate:async()=>({ok:true}),canvasOpen:async()=>({ok:true}),
   }};
-  const sync=api.createCanvasProjectSync(async()=>adapter,{}, {get:()=>null});
+  const sync=api.createCanvasProjectSync(async()=>adapter,{autoCreateCanvas:true}, {get:()=>null});
   await sync.sync(project.id,exec);
   assert.equal(doc.name,'MetaOntic 创作画布');
   assert.ok(!doc.name.includes(project.id));
@@ -181,7 +181,7 @@ test('同名画布已被别的创作项目占用时另起带序号的名字，�
    projectDirGet:async()=>({ok:true,abs:path.join(root,'projects','p2'),dataRoot:root}),
    assetCreate:async()=>({ok:true}),canvasOpen:async()=>({ok:true}),
   }};
-  const sync=api.createCanvasProjectSync(async()=>adapter,{}, {get:()=>({title:'民勤蜜瓜独白短视频'})});
+  const sync=api.createCanvasProjectSync(async()=>adapter,{autoCreateCanvas:true}, {get:()=>({title:'民勤蜜瓜独白短视频'})});
   const result=await sync.sync(project.id,exec);
   assert.deepEqual(attempted,['民勤蜜瓜独白短视频','民勤蜜瓜独白短视频 2']);
   assert.equal(result.projectId,'p2');
@@ -209,7 +209,7 @@ test('同名画布已有内容（不是本创作项目的）时也不占用',asy
    projectDirGet:async()=>({ok:true,abs:path.join(root,'projects','pmine'),dataRoot:root}),
    assetCreate:async()=>({ok:true}),canvasOpen:async()=>({ok:true}),
   }};
-  const sync=api.createCanvasProjectSync(async()=>adapter,{}, {get:()=>({title:'民勤蜜瓜独白短视频'})});
+  const sync=api.createCanvasProjectSync(async()=>adapter,{autoCreateCanvas:true}, {get:()=>({title:'民勤蜜瓜独白短视频'})});
   const result=await sync.sync(project.id,exec);
   assert.deepEqual(attempted,['民勤蜜瓜独白短视频','民勤蜜瓜独白短视频 2']);
   assert.equal(result.projectId,'pmine');
@@ -234,7 +234,7 @@ test('旧记录里带创作项目 id 的创建名不再沿用',async()=>{
    projectDirGet:async()=>({ok:true,abs:path.join(root,'projects','pold'),dataRoot:root}),
    assetCreate:async()=>({ok:true}),canvasOpen:async()=>({ok:true}),
   }};
-  const sync=api.createCanvasProjectSync(async()=>adapter,{}, {get:()=>null});
+  const sync=api.createCanvasProjectSync(async()=>adapter,{autoCreateCanvas:true}, {get:()=>null});
   await sync.sync(project.id,exec);
   assert.equal(created,'MetaOntic 创作画布');
   assert.ok(!created.includes(project.id));
@@ -259,7 +259,7 @@ test('老版本只写过标题名的画布补记归属，以后跟着会话改�
    assetCreate:async()=>({ok:true}),canvasOpen:async()=>({ok:true}),
   }};
   let title='沙葱宣传片';
-  const sync=api.createCanvasProjectSync(async()=>adapter,{}, {get:()=>({title})});
+  const sync=api.createCanvasProjectSync(async()=>adapter,{autoCreateCanvas:true}, {get:()=>({title})});
   await sync.sync(project.id,exec);
   assert.equal(doc.name,'沙葱宣传片');
   assert.equal((await api.readProject(project.id,exec)).canvasAuto.appliedName,'沙葱宣传片');
@@ -285,7 +285,7 @@ test('review在用户答复前同步已验证草稿，取消审核保留画布�
   const spec={prompt:'海边',segmentPrompts:['清晨','黄昏'],duration:30,ratio:'9:16',resolution:'720p'};
   let doc={nodes:{},edges:[]},askCalled=false,answer;
   const adapter={connect:async(args)=>{connects.push(args);return {ok:true,already:true};},rpc:{canvasCreateProject:async()=>({ok:true,projectId:'pre'}),projectsGet:async()=>structuredClone(doc),projectsPut:async({doc:next})=>{doc=next;return {ok:true};},dataRootGet:async()=>({dataRoot:root})}};
-  const sync=api.createCanvasProjectSync(async()=>adapter);
+  const sync=api.createCanvasProjectSync(async()=>adapter,{autoCreateCanvas:true});
   const ctx={get:n=>n==='userQuestions'?{ask:async()=>{
    askCalled=true;assert.ok(Object.values(doc.nodes).some(n=>n.type==='storyboard'&&n.data.shots.length===1));
    return new Promise(r=>answer=r);
@@ -327,7 +327,7 @@ test('旧版无效文本连线被清理并记墓碑，画布端能删掉缓存�
    projectDirGet:async()=>({ok:true,abs:path.join(root,'projects','auto'),dataRoot:root}),
    assetCreate:async()=>({ok:true}),canvasOpen:async()=>({ok:true}),
   }};
-  const sync=api.createCanvasProjectSync(async()=>adapter);
+  const sync=api.createCanvasProjectSync(async()=>adapter,{autoCreateCanvas:true});
   const scriptPath=path.join(root,'剧本.md');await writeFile(scriptPath,'# 剧本');
   const spec={prompt:'日出',segmentPrompts:['日出'],duration:30,ratio:'9:16',resolution:'720p'};
   const saved=await api.readProject(project.id,exec);saved.approved={scriptPath,specification:spec};await api.writeProject(saved);
@@ -344,4 +344,38 @@ test('旧版无效文本连线被清理并记墓碑，画布端能删掉缓存�
   assert.ok((doc.edgeTombstones||[]).includes(legacy.id));
   assert.equal(connects.length,2);
  }finally{if(old===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=old;await rm(root,{recursive:true,force:true});}
+});
+
+test('自动创建流程画布默认关闭：没配过时不建图不同步，video_config 也只读成关闭', async () => {
+  const sync = api.createCanvasProjectSync(async () => { throw new Error('默认关闭时不该去碰画布'); }, {});
+  const disabled = await sync.sync('any-project', { agent: { session: { id: 's', header: { cwd: os.tmpdir() } } } });
+  assert.equal(disabled.status, 'disabled');
+  assert.match(disabled.reason, /默认关闭/);
+  const { Config } = await import('../index.js');
+  assert.equal(Config.dict.autoCreateCanvas.meta.default, false, 'schema 默认值就是关闭（设置页没配过时按它走）');
+});
+
+test('默认关闭不谎报：助手口径不承诺自动建图、摘要卡不印 disabled、内置画布不报已打开', async () => {
+  const off = api.buildPromptGuidance({});
+  assert.match(off, /左侧栏「MetaOnticVideo流程画布」/, '提示词按现在的侧边栏名字指路');
+  assert.match(off, /当前开关关闭/);
+  assert.doesNotMatch(off, /工具自动建流程画布项目/, '默认关闭时不能还说工具会自动建图');
+  assert.match(off, /无法代开/, '内置画布开不了要说清楚');
+  const on = api.buildPromptGuidance({ autoCreateCanvas: true });
+  assert.match(on, /工具会自动建流程画布项目/);
+  assert.doesNotMatch(on, /当前开关关闭/);
+
+  // 摘要卡：未开启自动投影是常态，不占一行，也不把内部状态码印给用户。
+  const rows = (canvasStatus) => api.toolSummary('video_project', {
+    kind: 'tool_use',
+    content: [{ type: 'text', text: JSON.stringify({ status: 'approved', projectId: 'p', canvasProject: { status: canvasStatus } }) }],
+  }).rows;
+  assert.ok(!rows('disabled').some(([key]) => key === '画布同步'), '默认关闭不占卡片行');
+  assert.deepEqual(rows('synced').find(([key]) => key === '画布同步'), ['画布同步', '已同步']);
+  assert.deepEqual(rows('pending').find(([key]) => key === '画布同步'), ['画布同步', '待补传（用video_canvas补传，不重新生成）']);
+
+  const { rpc } = api.builtinCanvasAdapter();
+  const opened = await rpc.canvasOpen({ projectId: 'p1' });
+  assert.equal(opened.ok, false);
+  assert.match(opened.reason, /左侧栏/);
 });

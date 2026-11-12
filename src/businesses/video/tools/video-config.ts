@@ -35,7 +35,7 @@ export function configView(config) {
   return {
     stored: maskSecrets(stored),
     effective: {
-      autoCreateCanvas: ref(config, 'autoCreateCanvas', true) !== false,
+      autoCreateCanvas: ref(config, 'autoCreateCanvas', false) === true,
       connectionMode: isVolcengine(config) ? 'volcengine' : 'metaontic',
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),
@@ -138,7 +138,7 @@ export function configTool(config, settings) {
           patchPath: { type: 'string' },
           stored: { type: 'object' },
           effective: {
-      autoCreateCanvas: ref(config, 'autoCreateCanvas', true) !== false, type: 'object' },
+      autoCreateCanvas: ref(config, 'autoCreateCanvas', false) === true, type: 'object' },
           error: { type: 'string' },
         },
       },

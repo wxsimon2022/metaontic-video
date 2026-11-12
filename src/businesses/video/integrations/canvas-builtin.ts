@@ -120,7 +120,8 @@ export function builtinRpc() {
       await writeDoc(doc.id, doc);
       return { ok: true, id: doc.id, name: doc.name };
     },
-    async canvasOpen() { return { ok: true }; },
+    /** 内置画布是插件自己的左侧栏页面，工具没法替用户打开：如实返回未打开，由助手提示用户点入口。 */
+    async canvasOpen() { return { ok: false, reason: '内置流程画布需要用户自己从左侧栏「MetaOnticVideo流程画布」打开，工具无法代开。' }; },
   };
 }
 

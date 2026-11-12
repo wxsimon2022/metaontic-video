@@ -20,12 +20,17 @@ export function duplicateNodePayload(node: any, spot: any) {
   return { type: node?.type || 'text', x: Number(spot?.x || 0) + 40, y: Number(spot?.y || 0) + 40, w: spot?.w, h: spot?.h, data };
 }
 
+/** 画布上已经有成果的源节点：成果节点用 metaonticSourceNode 指回它生成的那个节点。 */
+export function producedNodeIds(canvas: any) {
+  return new Set<unknown>(Object.values(canvas?.nodes || {}).map((node: any) => node?.metaonticSourceNode).filter(Boolean));
+}
+
 /** 流程执行顺序：图片/视频节点按连线从上游排到下游，成果节点不参与排队。
  *  节点「是否已产出」看画布上有没有它生成的成果节点（metaonticSourceNode 指回本节点）。 */
 export function flowSteps(canvas: any) {
   const nodes: any[] = Object.values(canvas?.nodes || {});
   const edges: any[] = Array.isArray(canvas?.edges) ? canvas.edges : [];
-  const produced = new Set(nodes.map(node => node?.metaonticSourceNode).filter(Boolean));
+  const produced = producedNodeIds(canvas);
   const author = nodes.filter(node => ['image', 'video'].includes(node?.type) && !node?.metaonticSourceNode && !node?.data?.assetId);
   const byId = new Map(author.map(node => [node.id, node]));
   const inbound = new Map(author.map(node => [node.id, [] as string[]]));
@@ -130,7 +135,8 @@ export function tidyLayout(canvas: any) {
   return { positions, moved, width, height: draft.height };
 }
 
-export function createCanvasView({ React, h, TOKENS }: any) {
+export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
+  // PAGE_CSS 带上按钮/输入框这套控件外观：画布页可能单独打开，不能指望别的插件页面已经把样式挂上。
   // 流程画布只作为插件自己的独立页面渲染，空间大，工具条与画布区按整页尺寸排布。
   const ROOT_CLASS = 'mov-section movc';
   const rpc = async (method: string, args: any = {}) => {
@@ -154,14 +160,20 @@ export function createCanvasView({ React, h, TOKENS }: any) {
   const CSS = `
 .movc { display: flex; flex-direction: column; gap: 14px; }
 .movc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.movc-top { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 4px; padding: 12px 14px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.controlFill}; }
+.movc-top { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 4px; padding: 12px 14px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.cardFill}; }
 .movc-list { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
 .movc-pick { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
 .movc-name-empty { font-size: 13px; font-weight: 600; color: ${TOKENS.muted}; }
-/* 工具条按钮：沿用 .mov-btn 的 8px 圆角、描边与主色，只把固定 120px 宽改成按内容排布。 */
+/* 画布内按钮统一成一套：描边 + 主色悬停，不吃宿主默认的灰底；主按钮才用实心主色。 */
+.movc .mov-btn, .movc-modal .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12px; line-height: 1.2; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
+.movc .mov-btn:hover:not(:disabled), .movc-modal .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; background: transparent; color: ${TOKENS.primaryFill}; }
+.movc .mov-btn:disabled, .movc-modal .mov-btn:disabled { opacity: .5; cursor: default; }
+.movc .mov-btn-primary, .movc-modal .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
+.movc .mov-btn-primary:hover:not(:disabled), .movc-modal .mov-btn-primary:hover:not(:disabled) { background: ${TOKENS.primaryFill}; color: #fff; opacity: .88; }
+.movc .movc-danger:hover:not(:disabled), .movc-modal .movc-danger:hover:not(:disabled) { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
+/* 工具条按钮：只把固定 120px 宽改成按内容排布，高度与内距和选择画布胶囊对齐。 */
 .movc-ops { flex: 1 1 auto; min-width: 0; gap: 6px; row-gap: 8px; container-type: inline-size; }
-.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 32px; min-height: 32px; padding: 0 14px; border-radius: 8px; font-size: 12px; white-space: nowrap; overflow-wrap: normal; }
-.movc-ops .movc-danger:hover:not(:disabled) { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
+.movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 32px; min-height: 32px; padding: 0 14px; overflow-wrap: normal; }
 .movc-flow { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; white-space: nowrap; }
 /* 流程主行动：用主色描边突出，但不和「新建画布…」的实心主按钮抢注意力。 */
 .movc-ops .movc-run { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
@@ -171,8 +183,8 @@ export function createCanvasView({ React, h, TOKENS }: any) {
 @container (max-width: 460px) { .movc-sep { display: none; } }
 .movc-ops .mov-btn:focus-visible, .movc-chip:focus-visible, .movc-mini:focus-visible, .movc-name-text:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
 .movc-ops .mov-btn:active:not(:disabled), .movc-chip:active, .movc-mini:active { opacity: .82; }
-.movc-chip { display: inline-flex; align-items: center; box-sizing: border-box; height: 30px; padding: 0 14px; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.cardFill}; color: ${TOKENS.text}; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
-.movc-chip:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
+.movc-chip { display: inline-flex; align-items: center; box-sizing: border-box; height: 32px; padding: 0 14px; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.movc-chip:hover { border-color: ${TOKENS.primaryFill}; background: transparent; color: ${TOKENS.primaryFill}; }
 .movc-chip[data-active="true"] { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
 .movc-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.6; }
 .movc-stage { position: relative; height: clamp(520px, calc(100vh - 320px), 1400px); border: 1px solid ${TOKENS.border}; border-radius: 12px; background-color: ${TOKENS.controlFill}; background-image: radial-gradient(${TOKENS.border} 1px, transparent 1px); background-size: 22px 22px; overflow: hidden; cursor: grab; touch-action: none; }
@@ -756,6 +768,10 @@ export function createCanvasView({ React, h, TOKENS }: any) {
     const doneSteps = steps.filter(step => step.done).length;
     const nodes = canvas ? Object.values(canvas.nodes || {}) : [];
     const edges = canvas?.edges || [];
+    const producedIds = producedNodeIds(canvas);
+    // 头部状态胶囊：显式标了完成，或画布上已经有它的成果节点。插件自己写 status 的节点（如自动投影的
+    // 制作节点）按阶段走「待制作/已完成」，不被成果回填覆盖掉未审核的中间状态。
+    const achieved = (node: any) => node?.data?.status === 'done' || (node?.data?.status === undefined && producedIds.has(node?.id));
     const geometry = (node: any) => ({ ...node, ...sizeOf(node), ...(positions[node.id] || {}) });
     const at = (id: string) => geometry((canvas?.nodes || {})[id]);
     const kindOf = (id: string) => (canvas?.nodes || {})[id]?.type;
@@ -802,7 +818,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
     ]) : null;
 
     return h('section', { className: ROOT_CLASS }, [
-      h('style', { key: 'css' }, CSS),
+      h('style', { key: 'css' }, PAGE_CSS + CSS),
       h('div', { key: 'title', className: 'mov-section-title' }, '流程画布'),
       // 画布操作全部放最上面：先选画布、再操作当前画布，画布区只负责画本事。
       h('div', { key: 'top', className: 'movc-top' }, [
@@ -848,7 +864,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
         ]),
       ]),
       error ? h('p', { key: 'error', className: 'movc-hint' }, error) : null,
-      !list.length ? h('p', { key: 'empty', className: 'movc-hint' }, '还没有流程画布：确认创作需求后会在这里自动建立，脚本审核后同步分镜与制作段计划，生成成果自动回填；也可以直接「新建画布…」。') : null,
+      !list.length ? h('p', { key: 'empty', className: 'movc-hint' }, '还没有流程画布：点「新建画布…」可以立刻创建一份空白文档；如果在设置页打开「自动创建流程画布」（默认关闭），普通创作确认需求后也会在这里自动建立，脚本审核后同步分镜与制作段计划，生成成果自动回填。') : null,
       canvas ? h('div', { key: 'stage', ref: stageRef, className: 'movc-stage', 'data-panning': String(panning), 'data-connect': String(Boolean(connectFrom)),
         onClick: (event: any) => {
           if (connectFrom) { setConnectFrom(''); return; }
@@ -883,7 +899,7 @@ export function createCanvasView({ React, h, TOKENS }: any) {
               h('div', { key: 'head', className: 'movc-node-head' }, [
                 h('span', { key: 'label', className: 'movc-node-title' }, labelOf(node)),
                 // 状态标签直接复用宿主的结果胶囊样式（.mov-chip / .mov-chip-ok）。
-                h('span', { key: 'status', className: node.data?.status === 'done' ? 'mov-chip mov-chip-ok' : 'mov-chip movc-badge' }, node.data?.status === 'done' ? '已完成' : '待制作'),
+                h('span', { key: 'status', className: achieved(node) ? 'mov-chip mov-chip-ok' : 'mov-chip movc-badge' }, achieved(node) ? '已完成' : '待制作'),
                 h('span', { key: 'actions', className: 'movc-actions' }, [
                   h('button', { key: 'edit', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void openDialog(node); } }, media ? '制作' : '编辑'),
                   h('button', { key: 'copy', type: 'button', className: 'movc-mini', onPointerDown: (e: any) => e.stopPropagation(), onClick: (e: any) => { e.stopPropagation(); void duplicateNode(node); } }, '复制'),

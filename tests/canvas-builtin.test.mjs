@@ -22,10 +22,12 @@ test('没有原版画布也能建流程画布：创建、命名、连线、读�
   const builtin=await api.loadCanvasAdapter();
   assert.equal(typeof builtin.rpc.projectsList,'function');
   const title='猫和老鼠20秒搞笑动画';
-  const sync=api.createCanvasProjectSync(undefined,{}, {get:()=>({title})});
+  const sync=api.createCanvasProjectSync(undefined,{autoCreateCanvas:true}, {get:()=>({title})});
   const result=await sync.sync(project.id,exec);
   assert.equal(result.status,'synced');
   assert.match(result.projectId,/^[A-Za-z0-9_-]{1,100}$/);
+  // 内置画布是左侧栏页面，工具不能代开：不能回「已打开」骗助手和用户。
+  assert.equal(result.openRequested,false,'内置画布不应谎报已打开');
   const record=await api.readProject(project.id,exec);
   assert.equal(record.canvasAuto.backend,'builtin');
   assert.equal(record.canvasAuto.appliedName,title);

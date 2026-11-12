@@ -349,6 +349,49 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 
 未覆盖：真实 Harness 桌面窗口里的整条连拍实跑（付费链路需用户在重载后自行确认）；真实中转站的文本模型可用性与计费；Windows 未实测。
 
-随后用户追加「不共用key的时候 文本也需要配置apiKEY」，同一版本内补齐为：文本模型单独一把密钥（`textApiKey`）、关闭共用时三张模型卡片各自「模型 + API密钥」、`writeScript` 与 `info.textReady` 都按文本密钥判断（见上）。设置页三张卡片形态用预览截图核对（`/tmp/settings-noshare.png`）。
+随后用户要求左侧栏那一行改为「MetaOnticVideo流程画布」（英文界面 `MetaOnticVideo workflow canvas`）：只改 `canvasPanelLabel` 这一条字典（`client.ts` 的注册不变，仍走 `t('canvasPanelLabel')`），画布页自己的标题字仍写「流程画布」，README 与使用说明书同步改成「在左侧栏点「MetaOnticVideo流程画布」」。
 
-本地成品：`.local/test/3.20.1-test.29/metaontic-video-3.20.1-test.29.tgz`（文本独立密钥之前）与 `.local/test/3.20.1-test.30/metaontic-video-3.20.1-test.30.tgz`（含文本独立密钥）。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+另外用户追加「不共用key的时候 文本也需要配置apiKEY」，同一版本内补齐为：文本模型单独一把密钥（`textApiKey`）、关闭共用时三张模型卡片各自「模型 + API密钥」、`writeScript` 与 `info.textReady` 都按文本密钥判断（见上）。设置页三张卡片形态用预览截图核对（`/tmp/settings-noshare.png`）。
+
+本地成品：`.local/test/3.20.1-test.29/metaontic-video-3.20.1-test.29.tgz`（文本独立密钥之前）、`.local/test/3.20.1-test.30/metaontic-video-3.20.1-test.30.tgz`（含文本独立密钥）与 `.local/test/3.20.1-test.31/metaontic-video-3.20.1-test.31.tgz`（含侧边栏改名）。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+
+## 自动创建流程画布改为默认关闭 + 画布内按钮统一「描边、无灰底」 3.20.1-test.32
+
+用户两点要求：「插件设置里面 流程画布默认关闭」「流程画布里面所有的按钮优化下 按钮不要带灰色背景 优化下样式 保持统一风格」。
+
+**默认关闭**
+
+- `config.ts` 的 `autoCreateCanvas` 默认值 `true → false`；所有读取点跟着改口径：`canvas-project.ts`（`ref(config, 'autoCreateCanvas', false) !== true` 就返回 `status: 'disabled'`，理由写明默认关闭、可在设置页打开）、`canvas.ts`（生成工具只在开关打开时才自动带上创作项目的画布）、`video-config.ts`（只读视图 `effective.autoCreateCanvas` 用 `=== true`）、助手提示词里那一行也按新口径报「开启 / 关闭（默认关闭，可在插件设置页打开）」。
+- 设置页开关同步：`client/settings-actions.ts` 里 `autoCreateCanvas` 不再落在「未配置即真」的分支（单独给 `false`）；中英文提示都改成「默认关闭」开头。
+- 影响面：默认关闭后普通创作不再自动建图/同步，已有画布保留，手动「写脚本…」铺节点与节点内「制作」照旧可用；用户要自动投影就在设置页打开。测试里凡是要跑自动建图/自动回填的用例显式传 `{ autoCreateCanvas: true }`（`createCanvasProjectSync` / `createCanvasBridge`），并新增两条断言：默认关闭时 `sync` 返回 `disabled`、schema 默认值是 `false`；开关控件未配置时不勾选、配过 `true` 才勾选。
+
+**按钮统一风格**
+
+- 根因：画布页只注入自己的 `.movc-*` 样式，`.mov-btn` 那套控件外观原本靠设置页/左侧栏面板挂上 `PAGE_CSS` 才有；画布页单独打开时按钮回落到宿主默认样式（灰底）。现在 `createCanvasView` 接收并注入 `PAGE_CSS`（与面板同做法）。
+- 画布内按钮统一成一套，并写进画布自己的 CSS，不再依赖宿主默认底色：`.movc .mov-btn` / `.movc-modal .mov-btn` = 1px 描边 + 8px 圆角 + `background: transparent`，悬停只换主色描边与文字；`.mov-btn-primary` 才实心主色；危险按钮只是悬停变红。节点小按钮 `.movc-mini` 与「选择画布」胶囊 `.movc-chip` 同属这一套（胶囊改透明底、32px 高与工具条按钮齐平）。
+- 顶部工具条容器由灰底 `controlFill` 改成卡片底 `cardFill`，整页与设置页的白卡片风格一致。
+
+验证：类型检查、构建、482 项自动测试、`git diff --check` 通过；`.local/canvas-qa/style-preview` 重新构建后 Chrome 无头截图核对工具条、节点小按钮与连拍弹窗按钮（`/tmp/canvas-buttons.png`、`/tmp/canvas-buttons2.png`、`/tmp/canvas-buttons-modal.png`）。
+
+未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。
+
+本地成品：`.local/test/3.20.1-test.32/metaontic-video-3.20.1-test.32.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+
+## 流程画布复查：默认关闭后的口径一致性与两处不诚实状态 3.20.1-test.33
+
+用户要求「检查下有没有不合理的地方 尤其流程画布这块」。逐项核对画布相关代码、提示词、技能文档、说明书与工具卡片后，确认的问题与处理：
+
+- **助手口径与「自动创建」开关冲突（主要问题）**：`prompts/guidance.ts` 那一行已经会按开关报「开启 / 关闭」，但同一段接着无条件说「工具自动建流程画布项目、同步完整脚本与制作段计划并请求打开……不要问是否同步」，两份 `skills/*/SKILL.md` 的「无限画布联动」末段也写着「项目工具自动创建原版画布项目……不需要另问是否同步画布」。默认关闭时这些说法会让助手凭空宣布已经建好/打开了流程画布。现在两处都按开关分支：开启才说自动投影与「不必再问是否同步」，关闭明确写「不要自动建图或同步，也不要对用户说已经建好或打开了流程画布」，并补上 `canvasProject: 'disabled'` 的含义（未开启自动投影）。
+- **技能文档仍按已移除的第三方画布写**：两份 SKILL.md 的小节叫「无限画布联动」，正文写着「原版canvas_run_node/canvas_generate_node使用原版配置」「成果自动新增回原画布」「点击工具栏『用 MetaOnticVideo 生成』」，这些都属于 3.20.1-test.18 已移除的第三方画布桥接（内置画布没有这个工具栏按钮）。现改为「流程画布联动」，写明流程画布是本插件自带组件、左侧栏「MetaOnticVideo流程画布」打开独立页面，并保留真正需要的行为约束（不要用别的画布插件的生成入口代替本插件生成、不复活已删节点、pending 只补传不重生成、联动由用户明确选中节点触发、与开关无关）。
+- **节点状态胶囊与流程进度互相矛盾**：回填成果只新增成果节点（`metaonticSourceNode` 指回源节点），从不改源节点的 `data.status`，所以手工建的视频/图片节点出过成果后头部一直显示「待制作」，同时工具条却算它「已有成果」。新增 `producedNodeIds(canvas)`（`flowSteps` 也改用它），胶囊按「显式 `status === 'done'`，或没写 status 但画布上已有它的成果节点」判「已完成」；插件自己写 status 的节点（自动投影的制作节点）仍按阶段走，不被成果回填盖掉。
+- **空状态文案承诺了默认不会发生的事**：`client/canvas-view.ts` 写「确认创作需求后会在这里自动建立」。改为先说「点『新建画布…』可以立刻创建一份空白文档」，再说打开设置页开关后才会自动建立。
+- **工具卡片把内部状态码印给用户**：`canvasProject: 'disabled'` 是默认关闭的常态，摘要卡却会多出一行「画布同步 disabled」。现在 `disabled` 不占行，其余状态给中文标签（已同步 / 待补传（用video_canvas补传，不重新生成）/ 暂不可用 / 沿用所选画布）。
+- **内置画布谎报「已打开」**：`builtinCanvasAdapter` 的 `canvasOpen` 直接返回 `{ ok: true }`，于是每次同步都带 `openRequested: true`，而内置画布根本没有能让工具代开的能力（用户只能点左侧栏入口）。改为返回 `ok: false` 并说明「需要用户自己从左侧栏打开」，助手提示词与技能文档同步写明「内置画布不能由工具代开，不要声称已打开」。
+- **本文档自身的一处过期描述**：3.20.1-test.16 一节写着「新建画布默认写内置，设置项 `canvasBackend: 'original'` 可强制回原版」。`canvasBackend` 在 3.20.1-test.18 移除第三方画布时就已不存在，画布适配器现在只有内置实现（老绑定按项目标识解析，仍在内置存储；只有自动化检查显式注入加载器才走别的实现）。历史小节不改写，以此处为准。
+- **说明书与实现不一致**：说明书「文本模型（写脚本）」一节还写「与视频模型共用同一把 API密钥」，但 3.20.1-test.30 之后关闭共用密钥时文本模型有自己的 `textApiKey`。已改为「共用时用共用那把，关闭共用后用它自己卡片上的文本模型 API密钥」，并把「两个模型仍沿用同一接入地址」更正为「三个模型」。
+
+验证：类型检查、构建、484 项自动测试、`git diff --check` 通过。新增/更新测试：`canvas-project` 新增用例断言默认关闭时提示词不出现「工具自动建流程画布项目」且写明「无法代开」、开启时才出现自动投影说法；摘要卡在 `disabled` 时不出现「画布同步」行、`synced`/`pending` 给中文标签；`builtinCanvasAdapter().rpc.canvasOpen` 返回 `ok: false`；`canvas-builtin` 的真实同步里补断言 `openRequested === false`；`canvas-view-layout` 新增用例：有成果节点的源节点胶囊为「已完成」、无成果的仍「待制作」、流程进度按成果算，空状态文案包含「自动创建流程画布」与「默认关闭」。`.local/canvas-qa/style-preview` 的样例补了一个成果节点，Chrome 无头截图核对节点胶囊与空状态（`/tmp/canvas-badge.png`、`/tmp/canvas-empty2.png`）。
+
+未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。
+
+本地成品：`.local/test/3.20.1-test.33/metaontic-video-3.20.1-test.33.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。

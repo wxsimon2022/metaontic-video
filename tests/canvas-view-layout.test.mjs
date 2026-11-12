@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { sourceOf } from './source.mjs';
 
 const TOKENS = { text: 'text', muted: 'muted', border: 'border', cardFill: 'card', controlFill: 'control', primaryFill: 'primary', error: 'error', success: 'success' };
+const PAGE_CSS_STUB = '/* PAGE_CSS 控件样式 */';
 
 /** 极简 React 桩：保留 hook 槽位、第一轮渲染后跑一次 effect，够画布组件渲染出静态结构。 */
 function makeReact() {
@@ -54,7 +55,8 @@ function harness(documents, native = {}) {
   vm.runInContext(sourceOf('businesses/video/client/canvas-view'), context);
   const h = (type, elementProps, children) => ({ type, props: elementProps || {}, children: Array.isArray(children) ? children : children === undefined ? [] : [children] });
   const mini = makeReact();
-  const { FlowCanvas } = context.createCanvasView({ React: mini.React, h, TOKENS });
+  // 画布页自己带上 PAGE_CSS（按钮/输入框那套控件外观），这里用一小段占位文本验证它确实被注入。
+  const { FlowCanvas } = context.createCanvasView({ React: mini.React, h, TOKENS, PAGE_CSS: PAGE_CSS_STUB });
   return { FlowCanvas, mini };
 }
 
@@ -107,6 +109,7 @@ test('没有任何画布时也能新建：操作行仍给出「新建画布…�
   const ops = find(tree, (node) => node.props.key === 'ops');
   assert.ok(texts(ops).includes('新建画布…'), '没有画布时仍能新建');
   assert.ok(texts(tree).includes('暂无画布，点「新建画布…」创建一份空白文档。'), '空列表在选择画布行给出指引');
+  assert.ok(texts(tree).some((text) => text.includes('还没有流程画布') && text.includes('自动创建流程画布') && text.includes('默认关闭')), '空状态要说清默认关闭、需要到设置页打开');
   assert.equal(find(tree, (node) => node.props.key === 'stage'), null, '没有画布时不渲染画布区');
 });
 
@@ -117,8 +120,19 @@ test('独立页面样式：工具条两行（操作 + 选择画布），画布�
   mini.begin();
   const tree = FlowCanvas();
   const css = find(tree, (node) => node.type === 'style').children.join('');
+  assert.ok(css.startsWith(PAGE_CSS_STUB), '画布页自己注入控件样式，不依赖设置页/面板先挂上');
   assert.match(css, /\.movc-ops \.mov-btn \{[^}]*height: 32px/, '工具条按钮按内容排布');
-  assert.match(css, /\.movc-ops \.mov-btn \{[^}]*border-radius: 8px/, '按钮沿用宿主 8px 圆角，不用胶囊');
+  // 按钮统一一套：8px 圆角 + 1px 描边 + 透明底（不吃宿主默认的灰底），主按钮才实心。
+  const buttons = css.match(/\.movc \.mov-btn, \.movc-modal \.mov-btn \{[^}]*\}/)[0];
+  assert.match(buttons, /border: 1px solid border/, '统一描边');
+  assert.match(buttons, /border-radius: 8px/, '统一 8px 圆角，不用胶囊');
+  assert.match(buttons, /background: transparent/, '普通按钮不带底色');
+  assert.doesNotMatch(buttons, /background: (?!transparent)/, '默认态不能是灰底');
+  assert.match(css, /\.movc \.mov-btn-primary[^{]*\{[^}]*background: primary/, '主按钮仍是实心主色');
+  assert.match(css, /\.movc-chip \{[^}]*background: transparent/, '选择画布胶囊与按钮同一套，不带底色');
+  assert.match(css, /\.movc-chip \{[^}]*height: 32px/, '胶囊与按钮同高');
+  assert.match(css, /\.movc-top \{[^}]*background: card/, '顶部工具条是白卡片，不是灰底');
+  assert.match(css, /\.movc-mini \{[^}]*background: transparent/, '节点小按钮同样不带底色');
   assert.doesNotMatch(css, /border-radius: 999px/, '画布内的控件不用胶囊圆角');
   assert.match(css, /\.movc-stage \{[^}]*height: clamp\(520px, calc\(100vh - 320px\), 1400px\)/, '画布区按视口高度撑开');
   assert.match(css, /\.movc-top \{[^}]*flex-direction: column/, '操作行与选择画布行上下排布');
@@ -403,4 +417,30 @@ test('工具条给出流程主行动与进度，未完成节点标虚线框', as
   const node = find(tree, (n) => n.props['data-current'] === 'true');
   assert.ok(node, '当前待制作节点要有标记');
   assert.ok(texts(tree).some((text) => text.includes('当前轮到「第一段」')), '提示要说明当前轮到哪个节点');
+});
+
+test('节点状态胶囊与流程进度一致：已有成果的节点不能还显示待制作', async () => {
+  const { FlowCanvas, mini } = harness({
+    list: { canvases: [{ projectId: 'p1', name: '青旅宣传片', nodeCount: 3 }] },
+    get: { canvas: { projectId: 'p1', name: '青旅宣传片', dataRoot: '/tmp/canvas', edges: [], nodes: {
+      v1: { id: 'v1', type: 'video', x: 0, y: 0, w: 360, h: 300, data: { label: '第一段', prompt: 'A', ratio: '16:9', duration: 5, resolution: '480p' } },
+      r1: { id: 'r1', type: 'video', x: 520, y: 0, w: 360, h: 280, metaonticSourceNode: 'v1', data: { label: 'MetaOntic · 视频', status: 'done', assetId: 'r1' } },
+      v2: { id: 'v2', type: 'video', x: 0, y: 400, w: 360, h: 300, data: { label: '第二段', prompt: 'B' } },
+    } } },
+  });
+  mini.begin(); FlowCanvas();
+  await mini.flush();
+  mini.begin();
+  const tree = FlowCanvas();
+  const badgeOf = (id) => {
+    const node = find(tree, (n) => n.props?.className === 'movc-node' && n.props?.key === id);
+    assert.ok(node, `画布上应有节点 ${id}`);
+    const head = find(node, (n) => n.props?.key === 'head');
+    return texts(find(head, (n) => n.props?.key === 'status')).join('');
+  };
+  assert.equal(badgeOf('v1'), '已完成', '有成果节点的源节点要标已完成');
+  assert.equal(badgeOf('r1'), '已完成', '成果节点本身也是已完成');
+  assert.equal(badgeOf('v2'), '待制作', '还没成果的节点仍是待制作');
+  const labels = texts(find(tree, (node) => node.props.key === 'ops'));
+  assert.ok(labels.includes('流程进度 1/2'), `流程进度应把有成果的算进去：${labels.join('、')}`);
 });

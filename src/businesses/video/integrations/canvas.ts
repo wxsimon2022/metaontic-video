@@ -186,7 +186,7 @@ export function createCanvasBridge(load = loadCanvasAdapter, config: any = {}) {
       const saved = !canvas && resumeDir ? await readPauseFile(resumeDir) : null;
       const projectId = args.projectId || saved?.options?.projectId;
       canvas ||= saved?.options?.canvas;
-      if (!canvas && projectId && ref(config, 'autoCreateCanvas', true) !== false) {
+      if (!canvas && projectId && ref(config, 'autoCreateCanvas', false) === true) {
         const project = await readProject(projectId, exec);
         canvas = project.canvasAuto?.canvas;
       }

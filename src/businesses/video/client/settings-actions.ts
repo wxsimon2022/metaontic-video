@@ -72,7 +72,7 @@ export function createSettingsActions(context: any) {
         const { draft, value, h, SELECTS, inputStyle, t, snapshot, visibleKey, setVisibleKey, edit, optionLabel } = context;
         // 文本模型留空就是用默认项：下拉里直接落在第一项候选上，不用让用户先自己选一个。
         const blankTextModel = field.key === 'textModel' && !String(draft[field.key] ?? value[field.key] ?? '').trim();
-        const current = blankTextModel ? (SELECTS.textModel || [])[0] : draft[field.key] !== undefined ? draft[field.key] : value[field.key] ?? (['imageUseVideoKey', 'usageStatsEnabled', 'autoCreateCanvas'].includes(field.key) ? true : field.key === 'pollIntervalMs' ? 5000 : field.key === 'maxWaitMs' ? 600000 : undefined);
+        const current = blankTextModel ? (SELECTS.textModel || [])[0] : draft[field.key] !== undefined ? draft[field.key] : value[field.key] ?? (['imageUseVideoKey', 'usageStatsEnabled'].includes(field.key) ? true : field.key === 'autoCreateCanvas' ? false : field.key === 'pollIntervalMs' ? 5000 : field.key === 'maxWaitMs' ? 600000 : undefined);
         const secondsField = field.key === 'pollIntervalMs' || field.key === 'maxWaitMs';
         const displayed = secondsField && current !== undefined && current !== '' ? Number(current) / 1000 : current;
         const id = `metaontic-video-${field.key}`;
