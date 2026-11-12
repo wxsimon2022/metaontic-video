@@ -1,5 +1,5 @@
 /** 浏览器端 config：由入口注入宿主 React 与共享依赖。 */
-import { VOLCENGINE_MODE_AVAILABLE, IMAGE_MODEL } from '../connection-defaults.js';
+import { VOLCENGINE_MODE_AVAILABLE, IMAGE_MODEL, TEXT_MODELS } from '../connection-defaults.js';
 
 export function createClientConfig() {
 /** Host 侧条目的 id，与 cordis.patch.yml 里那条覆盖项一致。 */
@@ -25,6 +25,8 @@ export function createClientConfig() {
       model: MODEL_OPTIONS,
       // 图片模型只提供在售的 pro 版；旧型号已下线，存量配置由 resolveImageModel 归一到这一项。
       imageModel: [IMAGE_MODEL],
+      // 文本模型同样只列中转站当前上架的候选；旧默认值由 normalizeTextModel 归一到第一项。
+      textModel: TEXT_MODELS,
       ratio: ['16:9', '9:16', '4:3', '3:4', '1:1', 'adaptive'],
       mergeMode: ['copy', 'reencode'],
     };
@@ -46,8 +48,8 @@ export function createClientConfig() {
       // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
       { key: 'model', kind: 'select', wide: true },
       { key: 'imageModel', kind: 'select', wide: true },
-      // 文本模型（写脚本）：中转站上架的型号不一，做成自由填写，留空用内置默认值
-      { key: 'textModel', kind: 'text', wide: true },
+      // 文本模型（写脚本）：与视频模型同一把密钥，候选见 SELECTS（TEXT_MODELS）
+      { key: 'textModel', kind: 'select', wide: true },
       { key: 'imageUseVideoKey', kind: 'switch', wide: true },
       { key: 'imageApiKey', kind: 'text', secret: true, wide: true },
       { key: 'ratio', kind: 'select' },

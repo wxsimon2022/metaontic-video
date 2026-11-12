@@ -1,4 +1,4 @@
-import { VOLCENGINE_MODE_AVAILABLE } from '../connection-defaults.js';
+import { RETIRED_TEXT_MODELS, VOLCENGINE_MODE_AVAILABLE } from '../connection-defaults.js';
 // 下架某个接入方式时，把它填进这里：设置页用一个隐藏项显示已有取值，列表里选不到它，
 // 也不会把它显示成别的渠道。在售时为空气（候选见 SELECTS.connectionMode）。
 const HIDDEN_CONNECTION_MODES = [
@@ -70,7 +70,9 @@ export function createSettingsActions(context: any) {
     }
     function control(field) {
         const { draft, value, h, SELECTS, inputStyle, t, snapshot, visibleKey, setVisibleKey, edit, optionLabel } = context;
-        const current = draft[field.key] !== undefined ? draft[field.key] : value[field.key] ?? (['imageUseVideoKey', 'usageStatsEnabled', 'autoCreateCanvas'].includes(field.key) ? true : field.key === 'pollIntervalMs' ? 5000 : field.key === 'maxWaitMs' ? 600000 : undefined);
+        // 文本模型留空就是用默认项：下拉里直接落在第一项候选上，不用让用户先自己选一个。
+        const blankTextModel = field.key === 'textModel' && !String(draft[field.key] ?? value[field.key] ?? '').trim();
+        const current = blankTextModel ? (SELECTS.textModel || [])[0] : draft[field.key] !== undefined ? draft[field.key] : value[field.key] ?? (['imageUseVideoKey', 'usageStatsEnabled', 'autoCreateCanvas'].includes(field.key) ? true : field.key === 'pollIntervalMs' ? 5000 : field.key === 'maxWaitMs' ? 600000 : undefined);
         const secondsField = field.key === 'pollIntervalMs' || field.key === 'maxWaitMs';
         const displayed = secondsField && current !== undefined && current !== '' ? Number(current) / 1000 : current;
         const id = `metaontic-video-${field.key}`;
@@ -92,15 +94,17 @@ export function createSettingsActions(context: any) {
             // 图片模型的旧型号已下线：存量配置按实际生效的在售型号显示，用户不用自己改；
             // 归一只发生在读取时，用户不动这项就不会写回配置。
             const retiredImageModel = field.key === 'imageModel' && !options.includes(String(current || ''));
+            // 文本模型的旧默认值同样已下线：存量配置按实际生效的候选显示，用户不用自己改。
+            const retiredTextModel = field.key === 'textModel' && RETIRED_TEXT_MODELS.includes(String(current || ''));
             const removedMode = field.key === 'connectionMode' && !['metaontic', 'volcengine'].includes(String(current || ''));
-            const list = !removedMode && current && !options.includes(current) && !hiddenModel && !hiddenMode && !legacyMerge && !retiredImageModel ? [...options, current] : options;
+            const list = !removedMode && current && !options.includes(current) && !hiddenModel && !hiddenMode && !legacyMerge && !retiredImageModel && !retiredTextModel ? [...options, current] : options;
             return h('select', {
                 key: 'control',
                 id,
                 'data-field': field.key,
                 className: `mov-input${field.mono ? ' mov-mono' : ''}`,
                 style: inputStyle,
-                value: removedMode ? '' : legacyMerge ? 'copy' : retiredImageModel ? options[0] ?? '' : current ?? '',
+                value: removedMode ? '' : legacyMerge ? 'copy' : (retiredImageModel || retiredTextModel) ? options[0] ?? '' : current ?? '',
                 onChange: (event) => edit(field.key, event.target.value),
             }, [
                 removedMode ? h('option', { key: 'select-connection', value: '', disabled: true }, t('unknownConnection')) : null,

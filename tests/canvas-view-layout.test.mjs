@@ -233,8 +233,8 @@ test('画布内写脚本：按脚本铺开剧本/分镜/分段视频节点并自
     nodeSave: (args) => { const node = { ...(doc.nodes[args.node.id] || {}), ...args.node }; doc.nodes[args.node.id] = node; calls.nodes.push(args.node); return { canvas: { projectId: 'p1', node } }; },
     edgeAdd: (args) => { const edge = { id: `e${calls.edges.length + 1}`, ...args }; doc.edges.push(edge); calls.edges.push(edge); return { canvas: { projectId: 'p1', edge } }; },
   }, {
-    info: { singleMax: 15, videoReady: true, textModel: 'doubao-seed-1-6-250615', textReady: true },
-    write: (body) => ({ script: `# 青旅的清晨\n\n${body.idea}`, model: 'doubao-seed-1-6-250615', usage: { promptTokens: 1, completionTokens: 2 } }),
+    info: { singleMax: 15, videoReady: true, textModel: 'deepseek v4.1 flash', textReady: true },
+    write: (body) => ({ script: `# 青旅的清晨\n\n${body.idea}`, model: 'deepseek v4.1 flash', usage: { promptTokens: 1, completionTokens: 2 } }),
     plan: (body) => {
       calls.plans.push(body);
       const shots = body.script.includes('|') ? [{ index: 1, visual: '镜头：1\n画面：清晨天台' }, { index: 2, visual: '镜头：2\n画面：前台接待' }] : [];
@@ -308,6 +308,84 @@ test('画布内写脚本：按脚本铺开剧本/分镜/分段视频节点并自
   assert.deepEqual(calls.edges.slice(before.edges).map((edge) => [edge.fromNode, edge.toNode]), [[created[0].id, created[1].id], [created[0].id, created[2].id]], '剧本直接连到每段视频节点');
 });
 
+test('连拍：一次确认整条链路，逐段停下等审核，确认后才继续下一段', async () => {
+  const calls = [];
+  const chain = (state, over = {}) => ({ id: 'c1', projectId: 'p1', state, index: 0, total: 2, done: 0, message: '',
+    cny: 1.2, priceDate: '2026-01-01',
+    segments: [
+      { index: 0, label: '第1段', nodeId: 'v1', operation: 'generate', seconds: 15, ratio: '16:9', resolution: '720p', prompt: '第一句。', cny: 0.6 },
+      { index: 1, label: '第2段', nodeId: 'v2', operation: 'extend', seconds: 15, ratio: '16:9', resolution: '720p', prompt: '第二句。', cny: 0.6 },
+    ], job: null, ...over });
+  const media = [{ kind: 'video', url: 'https://example.invalid/seg1.mp4' }];
+  const { FlowCanvas, mini } = harness({
+    list: { canvases: [{ projectId: 'p1', name: '青旅宣传片', nodeCount: 2 }] },
+    get: { canvas: { projectId: 'p1', name: '青旅宣传片', dataRoot: '/tmp/canvas', nodes: {}, edges: [] } },
+  }, {
+    info: { singleMax: 15, videoReady: true, textModel: 'deepseek v4.1 flash', textReady: true },
+    chainPlan: { segments: [{ index: 0, label: '第1段', operation: 'generate', seconds: 15, ratio: '16:9', resolution: '720p', prompt: '第一句。', cny: 0.6 },
+      { index: 1, label: '第2段', operation: 'extend', seconds: 15, ratio: '16:9', resolution: '720p', prompt: '第二句。', cny: 0.6 }],
+      cny: 1.2, priceDate: '2026-01-01', identity: 'id-1', active: null },
+    chainStart: (body) => { calls.push(['start', body]); return { chain: chain('review', { job: { id: 'j1', state: 'succeeded', reviewed: false, sync: { status: 'synced' }, media } }) }; },
+    chainNext: (body) => { calls.push(['next', body]); return { chain: chain('running', { index: 1, done: 1 }) }; },
+    chainStop: () => { calls.push(['stop']); return { chain: chain('stopped', { done: 1 }) }; },
+    chainStatus: { chain: null },
+  });
+  const flush = async (rounds = 40) => { for (let i = 0; i < rounds; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
+  const slot = (tree, key) => find(tree, (node) => node.props && node.props.key === key);
+  mini.begin(); FlowCanvas();
+  await mini.flush();
+  mini.begin();
+  let tree = FlowCanvas();
+  const ops = slot(tree, 'ops');
+  assert.ok(texts(ops).includes('连拍'), `操作行要有连拍入口：${texts(ops).join('、')}`);
+  slot(ops, 'chain').props.onClick();
+  await flush();
+  mini.begin(); tree = FlowCanvas();
+  const modal = slot(tree, 'chain-modal');
+  assert.ok(modal, '点「连拍」应打开弹窗');
+  const plan = slot(modal, 'plan');
+  assert.ok(plan, '先给出整条链路的方案');
+  const planText = texts(plan).join(' ');
+  assert.ok(planText.includes('2 段'), `方案要写清段数：${planText}`);
+  assert.ok(planText.includes('第一句。') && planText.includes('第二句。'), '每段提示词都要列出来');
+  assert.ok(planText.includes('¥1.2') || planText.includes('1.2'), `给出整条链路的预估合计：${planText}`);
+  assert.equal(calls.length, 0, '只看方案不提交任何生成');
+
+  // 两项确认都勾上之前不能开跑。
+  const render = () => { mini.begin(); return FlowCanvas(); };
+  const checks = (tree) => { const out = []; walk(slot(tree, 'chain-modal'), (node) => { if (node.type === 'input' && node.props.type === 'checkbox') out.push(node); }); return out; };
+  const startButton = () => slot(slot(render(), 'chain-modal'), 'start');
+  assert.equal(startButton().props.disabled, true, '默认不能直接开跑');
+  assert.equal(checks(render()).length, 2, '方案与费用要分别确认');
+  checks(render())[0].props.onChange({ target: { checked: true } });
+  assert.equal(startButton().props.disabled, true, '只确认方案不能开跑');
+  checks(render())[1].props.onChange({ target: { checked: true } });
+  startButton().props.onClick();
+  await flush();
+  assert.equal(calls.length, 1, '只有点开跑才提交一次');
+  assert.deepEqual(calls[0], ['start', { action: 'chainStart', projectId: 'p1', confirmPlan: true, confirmCost: true, identity: 'id-1' }], '开跑带上两次确认与方案标识');
+
+  // 第一段出成果后停下来等审核：能看到成果，也能继续或停止。
+  mini.begin(); tree = FlowCanvas();
+  const reviewModal = slot(tree, 'chain-modal');
+  assert.ok(texts(slot(reviewModal, 'chain')).join(' ').includes('等你审核'), '第一段出成果后停下等审核');
+  assert.ok(slot(reviewModal, 'media'), '审核时能看这一段成果');
+  assert.ok(texts(tree).some((line) => line.includes('连拍已开始')), '给出连拍已开始的提示');
+  const nextButton = slot(reviewModal, 'next');
+  assert.ok(nextButton, '审核通过才能继续下一段');
+  assert.ok(slot(reviewModal, 'stop2'), '审核时也能停止连拍');
+  nextButton.props.onClick();
+  await flush();
+  assert.deepEqual(calls[1], ['next', { action: 'chainNext', id: 'c1', accept: true }], '第二段要显式确认才推进');
+  // 收尾：停下连拍，避免留下轮询定时器。
+  mini.begin(); tree = FlowCanvas();
+  const runningModal = slot(tree, 'chain-modal');
+  slot(runningModal, 'stop').props.onClick();
+  await flush();
+  assert.deepEqual(calls[2], ['stop'], '停下连拍');
+  mini.begin(); tree = FlowCanvas();
+  assert.equal(slot(slot(tree, 'chain-modal'), 'next'), null, '停下后不再给出继续下一段');
+});
 test('工具条给出流程主行动与进度，未完成节点标虚线框', async () => {
   const { FlowCanvas, mini } = harness({
     list: { canvases: [{ projectId: 'p1', name: '青旅宣传片', nodeCount: 2 }] },

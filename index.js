@@ -38,13 +38,20 @@ function resolveImageModel(value) {
   if (!model || RETIRED_IMAGE_MODELS.includes(model)) return IMAGE_MODEL;
   return model;
 }
-var METAONTIC_BASE_URL, IMAGE_MODEL, TEXT_MODEL, RETIRED_IMAGE_MODELS;
+function normalizeTextModel(value) {
+  const model = String(value ?? "").trim();
+  if (!model || RETIRED_TEXT_MODELS.includes(model)) return TEXT_MODEL;
+  return model;
+}
+var METAONTIC_BASE_URL, IMAGE_MODEL, TEXT_MODELS, TEXT_MODEL, RETIRED_IMAGE_MODELS, RETIRED_TEXT_MODELS;
 var init_connection_defaults = __esm({
   "src/businesses/video/connection-defaults.ts"() {
     METAONTIC_BASE_URL = "https://ai.bileego.com";
     IMAGE_MODEL = "doubao-seedream-5-0-pro-260628";
-    TEXT_MODEL = "doubao-seed-1-6-250615";
+    TEXT_MODELS = ["deepseek v4.1 flash", "deepseekv4pro"];
+    TEXT_MODEL = TEXT_MODELS[0];
     RETIRED_IMAGE_MODELS = ["doubao-seedream-5-0-260128"];
+    RETIRED_TEXT_MODELS = ["doubao-seed-1-6-250615"];
   }
 });
 
@@ -959,7 +966,9 @@ var init_config = __esm({
       // 图片模型：doubao-seedream-5-0-260128 已下线，默认改用在售的 pro 版；旧型号仍允许写入校验，
       // 读取时由 connection-defaults 的 resolveImageModel 归一到在售型号。
       imageModel: Schema.union(["doubao-seedream-5-0-pro-260628", "doubao-seedream-5-0-260128"]).default("doubao-seedream-5-0-pro-260628").description("A/B \u771F\u4EBA\u53C2\u8003\u56FE\u975E\u771F\u4EBA\u5316\u4F7F\u7528\u7684\u56FE\u7247\u6A21\u578B\uFF08\u65E7\u578B\u53F7\u5DF2\u4E0B\u7EBF\uFF0C\u6309 pro \u7248\u8C03\u7528\uFF09").volatile(),
-      textModel: Schema.string().default("").description("\u5199\u811A\u672C\u7528\u7684\u6587\u672C\u6A21\u578B\uFF08OpenAI \u517C\u5BB9 /v1/chat/completions\uFF09\uFF1B\u7559\u7A7A\u8BFB NEWAPI_TEXT_MODEL \u6216\u5185\u7F6E\u9ED8\u8BA4\u503C").volatile(),
+      // 文本模型：候选与中转站在售一致（deepseek v4.1 flash / deepseekv4pro），旧默认值已下线，
+      // 读取时由 connection-defaults 的 normalizeTextModel 归一到当前默认。
+      textModel: Schema.string().default("").description("\u5199\u811A\u672C\u7528\u7684\u6587\u672C\u6A21\u578B\uFF08OpenAI \u517C\u5BB9 /v1/chat/completions\uFF09\uFF1B\u5019\u9009\u4E0E\u4E2D\u8F6C\u7AD9\u5728\u552E\u6587\u672C\u6A21\u578B\u4E00\u81F4\uFF0C\u7559\u7A7A\u8BFB NEWAPI_TEXT_MODEL \u6216\u5185\u7F6E\u9ED8\u8BA4\u503C").volatile(),
       model: Schema.string().default("").description("\u89C6\u9891\u751F\u6210\u7528\u7684\u6A21\u578B ID\uFF08seedance 2.0 / 2.5 \u7CFB\u5217\uFF09\uFF1B\u7559\u7A7A\u8BFB NEWAPI_VIDEO_MODEL \u6216\u5185\u7F6E\u9ED8\u8BA4\u503C").volatile(),
       estimateGroupRatio: Schema.number().min(0).max(10).default(0.8).description("\u9884\u4F30\u8D39\u7528\u7528\u7684\u5206\u7EC4\u6298\u6263\uFF08\u4E2D\u8F6C\u7AD9 group_ratio\uFF1Avideosvip=0.8\u3001default=1\uFF09").volatile(),
       duration: Schema.number().step(1).min(4).max(30).default(15).description("\u517C\u5BB9\u65E7\u914D\u7F6E\uFF1B\u5206\u6BB5\u9ED8\u8BA4\u6309\u6A21\u578B\u4E0A\u9650\u6620\u5C04\uFF1A2.0 \u4E3A 15 \u79D2\u30012.5 \u4E3A 30 \u79D2\u3002\u9700\u7F29\u77ED\u5206\u6BB5\u65F6\u5728\u5DE5\u5177\u8C03\u7528\u4E2D\u6307\u5B9A\u3002").volatile(),
@@ -1105,7 +1114,7 @@ function resolveModel(config) {
 function resolveTextModel(config) {
   const preset = relayPreset();
   const model = String(ref(config, "textModel", "")).trim() || envValue(preset.textModelEnv) || TEXT_MODEL;
-  return String(model).trim();
+  return normalizeTextModel(model);
 }
 function isOmniExtendModel(model) {
   const lowered = String(model).toLowerCase();
@@ -6569,7 +6578,35 @@ function splitScriptPrompts(script, count, shots = []) {
   if (sentences.length < count) throw new Error(`\u811A\u672C\u6B63\u6587\u53EA\u591F\u62C6\u6210 ${sentences.length} \u6BB5\uFF0C\u8BF7\u8865\u5145\u811A\u672C\u6216\u7F29\u77ED\u76EE\u6807\u65F6\u957F\u3002`);
   return splitEvenly(sentences, count).map((group) => group.join(""));
 }
-function planCanvasNative(input, config, operation = "generate", draft = {}) {
+function pendingVideoOrder(doc) {
+  const nodes = Object.values(doc?.nodes || {});
+  const author = nodes.filter((n) => n?.type === "video" && !n?.metaonticSourceNode && !n?.data?.assetId);
+  const byId = new Map(author.map((n) => [n.id, n]));
+  const inbound = new Map(author.map((n) => [n.id, []]));
+  for (const edge of doc?.edges || []) {
+    if (edge?.metaonticResult) continue;
+    if (byId.has(edge?.toNode) && byId.has(edge?.fromNode)) inbound.get(edge.toNode).push(edge.fromNode);
+  }
+  const ordered = [], seen = /* @__PURE__ */ new Set();
+  const visit = (node) => {
+    if (!node || seen.has(node.id)) return;
+    seen.add(node.id);
+    for (const up of inbound.get(node.id) || []) visit(byId.get(up));
+    ordered.push(node);
+  };
+  for (const node of author) visit(node);
+  return ordered.map((node) => ({
+    id: node.id,
+    label: String(node?.data?.label || "\u89C6\u9891\u8282\u70B9"),
+    prompt: String(node?.data?.prompt || ""),
+    transition: String(node?.data?.transition || "").trim(),
+    duration: node?.data?.duration ?? null,
+    ratio: String(node?.data?.ratio || ""),
+    resolution: String(node?.data?.resolution || "").toLowerCase(),
+    generateAudio: node?.data?.generateAudio === true
+  }));
+}
+function planCanvasNative(input, config, operation = "generate", draft = {}, carry = null) {
   if (!["generate", "extend"].includes(operation)) throw new Error("\u4E0D\u652F\u6301\u7684\u753B\u5E03\u5236\u4F5C\u64CD\u4F5C\u3002");
   const node = input.nodes.find((n) => n.id === input.canvas.nodeId);
   if (!node || !["image", "video"].includes(node.type)) throw new Error("\u76F4\u63A5\u5236\u4F5C\u76EE\u524D\u652F\u6301\u56FE\u7247\u548C\u89C6\u9891\u8282\u70B9\u3002");
@@ -6616,9 +6653,10 @@ function planCanvasNative(input, config, operation = "generate", draft = {}) {
   args.resolution = String(draft.resolution ?? node.resolution).toLowerCase();
   if (!["480p", "720p"].includes(args.resolution)) throw new Error("\u8BF7\u5728\u8282\u70B9\u660E\u786E\u9009\u62E9480P\u6216720P\u3002");
   if (operation === "extend") {
-    if (!node.metaonticTaskId || !node.metaonticVideoUrl || !Number.isFinite(node.metaonticSeconds) || node.metaonticSeconds <= 0) throw new Error("\u7EED\u62CD\u9700\u9009\u4E2D\u672C\u63D2\u4EF6\u76F4\u63A5\u5236\u4F5C\u5E76\u5DF2\u5BA1\u6838\u7684\u89C6\u9891\u6210\u679C\u8282\u70B9\u3002");
-    args.videoUrl = node.metaonticVideoUrl;
-    args.inputVideoSeconds = node.metaonticSeconds;
+    const from2 = carry?.videoUrl ? { videoUrl: String(carry.videoUrl), seconds: Number(carry.seconds) } : null;
+    if (from2 ? !from2.videoUrl || !Number.isFinite(from2.seconds) || from2.seconds <= 0 : !node.metaonticTaskId || !node.metaonticVideoUrl || !Number.isFinite(node.metaonticSeconds) || node.metaonticSeconds <= 0) throw new Error("\u7EED\u62CD\u9700\u9009\u4E2D\u672C\u63D2\u4EF6\u76F4\u63A5\u5236\u4F5C\u5E76\u5DF2\u5BA1\u6838\u7684\u89C6\u9891\u6210\u679C\u8282\u70B9\u3002");
+    args.videoUrl = from2 ? from2.videoUrl : node.metaonticVideoUrl;
+    args.inputVideoSeconds = from2 ? from2.seconds : node.metaonticSeconds;
     args.transitionDescription = String(draft.transitionDescription || "").trim();
     if (!args.transitionDescription) throw new Error("\u8BF7\u586B\u5199\u4E0A\u4E00\u6BB5\u7ED3\u5C3E\u5230\u672C\u6BB5\u52A8\u4F5C\u3001\u955C\u5934\u4E0E\u58F0\u97F3\u7684\u8854\u63A5\u63CF\u8FF0\u3002");
     if (images.some((x) => x.port === "frame")) throw new Error("\u7EED\u62CD\u4EE5\u89C6\u9891\u4E3A\u8F93\u5165\uFF0C\u8BF7\u79FB\u9664\u9996\u5E27\u8FDE\u63A5\u3002");
@@ -6639,6 +6677,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
   const directory2 = options.directory || path20.join(dshHome(), "metaontic-video", "canvas-native");
   const snapshots = /* @__PURE__ */ new Map(), running = /* @__PURE__ */ new Map(), locks2 = /* @__PURE__ */ new Set();
   const proposals = /* @__PURE__ */ new Map();
+  const chainDirectory = options.chainDirectory || path20.join(directory2, "chains");
   let disposed = false;
   const file = (id) => {
     if (!validToken(id)) throw new Error("\u5236\u4F5C\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548\u3002");
@@ -6652,6 +6691,28 @@ function createCanvasNativeService(liveConfig, options = {}) {
     await rename10(temp, dest);
   }
   const read = async (id) => JSON.parse(await readFile12(file(id), "utf8"));
+  const chainFile = (id) => {
+    if (!validToken(id)) throw new Error("\u8FDE\u62CD\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548\u3002");
+    return path20.join(chainDirectory, `${id}.json`);
+  };
+  const chainPointer = (link) => path20.join(chainDirectory, `canvas-${hash3([link.projectId, link.canvasId || ""])}.json`);
+  async function saveChain(chain) {
+    await mkdir12(chainDirectory, { recursive: true, mode: 448 });
+    const dest = chainFile(chain.id), temp = `${dest}.${randomUUID9()}.tmp`;
+    await writeFile9(temp, JSON.stringify(chain), { mode: 384, flag: "wx" });
+    await rename10(temp, dest);
+  }
+  const readChain = async (id) => JSON.parse(await readFile12(chainFile(id), "utf8"));
+  async function previousChain(link) {
+    let id;
+    try {
+      id = JSON.parse(await readFile12(chainPointer(link), "utf8")).id;
+    } catch (e) {
+      if (e.code === "ENOENT") return null;
+      throw e;
+    }
+    return readChain(id);
+  }
   async function previous(link) {
     let id;
     try {
@@ -6689,6 +6750,130 @@ function createCanvasNativeService(liveConfig, options = {}) {
     }
     await save2(job);
   }
+  async function chainPlan(adapter, projectId, config) {
+    const doc = await adapter.rpc.projectsGet({ id: projectId });
+    if (!doc?.nodes) throw new Error("\u753B\u5E03\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");
+    const order = pendingVideoOrder(doc);
+    if (!order.length) throw new Error("\u753B\u5E03\u4E0A\u6CA1\u6709\u5F85\u5236\u4F5C\u7684\u89C6\u9891\u8282\u70B9\uFF1A\u5148\u70B9\u300C\u5199\u811A\u672C\u2026\u300D\u94FA\u5F00\uFF0C\u6216\u65B0\u5EFA\u4E00\u4E2A\u89C6\u9891\u8282\u70B9\u3002");
+    const segments = [];
+    let carry = null;
+    for (const [index, node] of order.entries()) {
+      const link = { projectId, nodeId: node.id };
+      const input = await readCanvasInput(adapter, link);
+      const operation = index === 0 ? "generate" : "extend";
+      const draft = { prompt: node.prompt, duration: node.duration, resolution: node.resolution, ratio: node.ratio, generateAudio: node.generateAudio };
+      if (operation === "extend") draft.transitionDescription = node.transition || node.prompt;
+      const plan = planCanvasNative(input, config, operation, draft, carry);
+      const segment = {
+        index,
+        nodeId: node.id,
+        label: node.label,
+        operation,
+        prompt: String(plan.args.prompt),
+        transition: String(plan.args.transitionDescription || ""),
+        seconds: plan.args.duration,
+        ratio: plan.args.ratio,
+        resolution: plan.args.resolution,
+        cny: plan.estimate?.cny ?? null,
+        priceDate: plan.estimate?.priceDate ?? null,
+        fingerprint: input.canvas.fingerprint,
+        snapshot: { prompt: node.prompt, duration: node.duration, ratio: node.ratio, resolution: node.resolution }
+      };
+      segments.push(segment);
+      carry = { videoUrl: "pending-previous-segment", seconds: plan.args.duration };
+    }
+    return segments;
+  }
+  function assertSegmentMatches(node, segment) {
+    const same = node && node.prompt === segment.snapshot.prompt && (node.duration ?? null) === segment.snapshot.duration && node.ratio === segment.snapshot.ratio && String(node.resolution).toLowerCase() === segment.snapshot.resolution;
+    if (!same) throw new Error(`\u7B2C ${segment.index + 1} \u6BB5\u5185\u5BB9\u6216\u53C2\u6570\u5DF2\u6539\u52A8\uFF0C\u8BF7\u91CD\u65B0\u9884\u89C8\u8FDE\u62CD\u65B9\u6848\u518D\u5F00\u59CB\u3002`);
+  }
+  async function planChainSegment(adapter, projectId, segment, carry, config) {
+    const input = await readCanvasInput(adapter, { projectId, nodeId: segment.nodeId });
+    const node = input.nodes.find((n) => n.id === segment.nodeId);
+    assertSegmentMatches(node, segment);
+    const draft = { prompt: segment.prompt, duration: segment.seconds, resolution: segment.resolution, ratio: segment.ratio };
+    if (segment.operation === "extend") draft.transitionDescription = segment.transition || segment.prompt;
+    return { canvas: input.canvas, plan: planCanvasNative(input, config, segment.operation, draft, carry) };
+  }
+  async function launchSegment(chain, segment, planned, config) {
+    const { canvas, plan } = planned;
+    const key = pointer(canvas);
+    if (locks2.has(key)) throw new Error("\u6B64\u8282\u70B9\u6B63\u5728\u786E\u8BA4\u5236\u4F5C\u3002");
+    locks2.add(key);
+    try {
+      const old = await previous(canvas);
+      if (old && (!terminal.has(old.state) || old.media?.length && !old.reviewed || old.sync?.status === "pending")) return old;
+      const job = { version: 1, id: randomUUID9(), canvas, plan, identity: chain.identity, createdAt: Date.now(), state: "running", reviewed: false, chain: chain.id };
+      await save2(job);
+      const temp = `${key}.${randomUUID9()}.tmp`;
+      await writeFile9(temp, JSON.stringify({ id: job.id }), { mode: 384, flag: "wx" });
+      await rename10(temp, key);
+      snapshots.set(job.id, config);
+      void perform(job, config).catch(() => {
+      });
+      return job;
+    } finally {
+      locks2.delete(key);
+    }
+  }
+  async function runChainSegment(chain, config) {
+    const segment = chain.segments[chain.index];
+    if (!segment) throw new Error("\u8FDE\u62CD\u6BB5\u4F4D\u8D8A\u754C\uFF0C\u8BF7\u91CD\u65B0\u9884\u89C8\u65B9\u6848\u3002");
+    const adapter = await adapterFor({ projectId: chain.projectId, ...chain.canvasId ? { canvasId: chain.canvasId } : {} });
+    const carry = chain.index > 0 ? chain.carry : null;
+    const planned = await planChainSegment(adapter, chain.projectId, segment, carry, config);
+    const job = await launchSegment(chain, segment, planned, config);
+    chain.jobs[chain.index] = job.id;
+    chain.state = "running";
+    chain.message = "";
+    await saveChain(chain);
+    return job;
+  }
+  async function currentJob(chain) {
+    const id = chain?.jobs?.[chain.index];
+    if (!id) return null;
+    return read(id).catch(() => null);
+  }
+  function chainStateOf(chain, job) {
+    if (!chain) return "none";
+    if (chain.state === "done" || chain.state === "stopped" || chain.state === "stale") return chain.state;
+    if (!job) return "running";
+    if (job.state === "running" || job.syncing) return "running";
+    if (job.state === "succeeded" && job.media?.length) return "review";
+    return "stopped";
+  }
+  function chainView(chain, job) {
+    if (!chain) return null;
+    const state = chainStateOf(chain, job);
+    const done = chain.segments.slice(0, chain.index).length;
+    return {
+      id: chain.id,
+      projectId: chain.projectId,
+      state,
+      message: chain.message || "",
+      index: chain.index,
+      total: chain.segments.length,
+      done,
+      segments: chain.segments.map((segment) => ({
+        index: segment.index,
+        label: segment.label,
+        nodeId: segment.nodeId,
+        operation: segment.operation,
+        seconds: segment.seconds,
+        ratio: segment.ratio,
+        resolution: segment.resolution,
+        prompt: segment.prompt,
+        cny: segment.cny
+      })),
+      cny: chain.segments.every((x) => x.cny !== null) ? chain.segments.reduce((sum, x) => sum + x.cny, 0) : null,
+      priceDate: chain.segments[0]?.priceDate || null,
+      job: job ? view(job) : null
+    };
+  }
+  function chainSignature(segments) {
+    return JSON.stringify((segments || []).map((x) => [x.nodeId, x.operation, x.prompt, x.transition || "", x.seconds, x.ratio, x.resolution, x.fingerprint || ""]));
+  }
   async function perform(job, config, query = false) {
     const ctl = new AbortController();
     running.set(job.id, ctl);
@@ -6719,8 +6904,11 @@ function createCanvasNativeService(liveConfig, options = {}) {
         if (!job.media?.length) job.message = terminal.has(result.status) ? "\u4EFB\u52A1\u672A\u6210\u529F\uFF0C\u672A\u81EA\u52A8\u91CD\u8BD5\u3002" : "\u72B6\u6001\u5C1A\u672A\u786E\u8BA4\uFF1B\u53EA\u67E5\u8BE2\u539F\u4EFB\u52A1\uFF0C\u4E0D\u91CD\u590D\u63D0\u4EA4\u3002";
       }
       if (job.media?.length) {
+        job.syncing = true;
         await save2(job);
         await sync(job);
+        job.syncing = false;
+        await save2(job);
       } else await save2(job);
     } catch (e) {
       if (e?.taskId) job.taskId = e.taskId;
@@ -6748,6 +6936,112 @@ function createCanvasNativeService(liveConfig, options = {}) {
       } catch {
       }
       return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: Boolean(resolveApiKey(config)), imageReady, singleMax: modelMaxSeconds(config), textModel, textReady };
+    }
+    if (args.action === "chainPlan") {
+      const config = snapshotConfig(liveConfig);
+      assertConfigured(config, resolveApiKey(config));
+      const adapter = await adapterFor({ projectId: args.projectId });
+      const segments = await chainPlan(adapter, args.projectId, config);
+      const active2 = await previousChain({ projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} }).catch(() => null);
+      const alive = active2 && ["running", "review"].includes(chainStateOf(active2, await currentJob(active2))) ? chainView(active2, await currentJob(active2)) : null;
+      return {
+        segments,
+        cny: segments.every((x) => x.cny !== null) ? segments.reduce((sum, x) => sum + x.cny, 0) : null,
+        priceDate: segments[0]?.priceDate || null,
+        identity: hash3(config),
+        active: alive
+      };
+    }
+    if (args.action === "chainStart") {
+      const config = snapshotConfig(liveConfig);
+      if (args.confirmPlan !== true || args.confirmCost !== true) throw new Error("\u8BF7\u5148\u5206\u522B\u786E\u8BA4\u6574\u6761\u8FDE\u62CD\u7684\u5236\u4F5C\u65B9\u6848\u4E0E\u8D39\u7528\u3002");
+      if (args.identity && args.identity !== hash3(config)) throw new Error("\u63D2\u4EF6\u914D\u7F6E\u5DF2\u53D8\uFF0C\u8BF7\u91CD\u65B0\u9884\u89C8\u8FDE\u62CD\u65B9\u6848\u3002");
+      const link = { projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} };
+      const adapter = await adapterFor(link);
+      const existing = await previousChain(link);
+      if (existing && ["running", "review"].includes(chainStateOf(existing, await currentJob(existing)))) return { chain: chainView(existing, await currentJob(existing)) };
+      const segments = await chainPlan(adapter, args.projectId, config);
+      if (existing && chainSignature(existing.segments) === chainSignature(segments)) return { chain: chainView(existing, await currentJob(existing)) };
+      const chain = {
+        version: 1,
+        id: randomUUID9(),
+        projectId: args.projectId,
+        ...args.canvasId ? { canvasId: args.canvasId } : {},
+        identity: hash3(config),
+        createdAt: Date.now(),
+        index: 0,
+        jobs: [],
+        carry: null,
+        state: "running",
+        message: "",
+        segments
+      };
+      await saveChain(chain);
+      await mkdir12(chainDirectory, { recursive: true, mode: 448 });
+      const temp = `${chainPointer(link)}.${randomUUID9()}.tmp`;
+      await writeFile9(temp, JSON.stringify({ id: chain.id }), { mode: 384, flag: "wx" });
+      await rename10(temp, chainPointer(link));
+      try {
+        await runChainSegment(chain, config);
+      } catch (error) {
+        chain.state = "stale";
+        chain.message = String(error?.message || "\u8FDE\u62CD\u672A\u5F00\u59CB\u3002");
+        await saveChain(chain);
+        throw error;
+      }
+      return { chain: chainView(chain, await currentJob(chain)) };
+    }
+    if (args.action === "chainStatus") {
+      const chain = args.id ? await readChain(args.id) : await previousChain({ projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} });
+      if (!chain) return { chain: null };
+      const job2 = await currentJob(chain);
+      return { chain: chainView(chain, job2), job: job2 ? view(job2) : null };
+    }
+    if (args.action === "chainNext") {
+      const chain = await readChain(args.id);
+      const job2 = await currentJob(chain);
+      if (chain.state !== "running" && chain.state !== "review") throw new Error("\u8FD9\u6761\u8FDE\u62CD\u5DF2\u7ECF\u7ED3\u675F\uFF0C\u8BF7\u91CD\u65B0\u9884\u89C8\u65B9\u6848\u3002");
+      if (args.accept !== true) {
+        chain.state = "stopped";
+        chain.message = "\u5DF2\u505C\u6B62\u8FDE\u62CD\uFF1B\u5DF2\u751F\u6210\u7684\u5206\u6BB5\u6210\u679C\u4FDD\u7559\u3002";
+        await saveChain(chain);
+        return { chain: chainView(chain, job2) };
+      }
+      if (!job2) throw new Error("\u6CA1\u6709\u6B63\u5728\u63A8\u8FDB\u7684\u8FDE\u62CD\u5206\u6BB5\u3002");
+      if (job2.syncing) throw new Error("\u8FD9\u4E00\u6BB5\u8FD8\u5728\u56DE\u586B\u753B\u5E03\uFF0C\u7A0D\u7B49\u7247\u523B\u518D\u7EE7\u7EED\u4E0B\u4E00\u6BB5\u3002");
+      if (job2.state !== "succeeded" || !job2.media?.length) throw new Error("\u8FD9\u4E00\u6BB5\u8FD8\u6CA1\u6709\u53EF\u5BA1\u6838\u7684\u6210\u679C\uFF0C\u5148\u67E5\u8BE2\u539F\u4EFB\u52A1\u6216\u91CD\u65B0\u751F\u6210\u3002");
+      if (job2.sync?.status === "pending" || !job2.sync) throw new Error("\u8FD9\u4E00\u6BB5\u6210\u679C\u8FD8\u6CA1\u56DE\u586B\u5230\u753B\u5E03\uFF0C\u5148\u70B9\u300C\u8865\u56DE\u586B\u753B\u5E03\u300D\u3002");
+      const accepted2 = await read(job2.id).catch(() => null);
+      if (accepted2 && accepted2.reviewed !== true) {
+        accepted2.reviewed = true;
+        await save2(accepted2);
+      }
+      const config = snapshotConfig(liveConfig);
+      if (hash3(config) !== chain.identity) throw new Error("\u63D2\u4EF6\u914D\u7F6E\u5DF2\u53D8\uFF0C\u8BF7\u91CD\u65B0\u9884\u89C8\u8FDE\u62CD\u65B9\u6848\u3002");
+      chain.carry = { videoUrl: job2.media[0].url, seconds: job2.plan.args.duration };
+      chain.index += 1;
+      if (chain.index >= chain.segments.length) {
+        chain.state = "done";
+        chain.message = "\u5168\u90E8\u6BB5\u843D\u90FD\u5DF2\u6709\u6210\u679C\u3002";
+        await saveChain(chain);
+        return { chain: chainView(chain, null), job: null };
+      }
+      try {
+        await runChainSegment(chain, config);
+      } catch (error) {
+        chain.state = "stale";
+        chain.message = String(error?.message || "\u4E0B\u4E00\u6BB5\u672A\u80FD\u5F00\u59CB\u3002");
+        await saveChain(chain);
+        throw error;
+      }
+      return { chain: chainView(chain, await currentJob(chain)) };
+    }
+    if (args.action === "chainStop") {
+      const chain = await readChain(args.id);
+      chain.state = "stopped";
+      chain.message = "\u5DF2\u505C\u6B62\u8FDE\u62CD\uFF1B\u5DF2\u63D0\u4EA4\u7684\u90A3\u4E00\u6BB5\u4ECD\u4F1A\u8DD1\u5B8C\u5E76\u56DE\u586B\u3002";
+      await saveChain(chain);
+      return { chain: chainView(chain, await currentJob(chain)) };
     }
     if (args.action === "write") {
       const config = snapshotConfig(liveConfig);

@@ -188,16 +188,16 @@ test('连拍：可以中途停下，节点内容改动后不提交没核对过�
 
 test('画布内 AI 写脚本：走文本模型一次，把段数与画幅带进提示词，失败原样报错', async () => {
   const briefs = [];
-  const s = await service({ writeScript: async (_config, brief) => { briefs.push(brief); return { script: '# 片名\n\n| 镜头 | 画面 | 时长 | 台词 |\n| --- | --- | --- | --- |', model: 'doubao-seed-1-6-250615', usage: { promptTokens: 1, completionTokens: 2 } }; } });
+  const s = await service({ writeScript: async (_config, brief) => { briefs.push(brief); return { script: '# 片名\n\n| 镜头 | 画面 | 时长 | 台词 |\n| --- | --- | --- | --- |', model: 'deepseek v4.1 flash', usage: { promptTokens: 1, completionTokens: 2 } }; } });
   const made = await s.handle({ action: 'write', idea: '青旅天台的清晨', totalSeconds: 30, segmentSeconds: 15, ratio: '9:16' });
   assert.equal(briefs.length, 1);
   assert.deepEqual(briefs[0], { idea: '青旅天台的清晨', totalSeconds: 30, segmentSeconds: 15, segments: 2, ratio: '9:16' });
   assert.equal(made.script.startsWith('# 片名'), true);
-  assert.equal(made.model, 'doubao-seed-1-6-250615');
+  assert.equal(made.model, 'deepseek v4.1 flash');
   assert.equal(made.segments, 2);
   assert.equal(s.calls(), 0, '写脚本不触发视频生成');
   const info = await s.handle({ action: 'info' });
-  assert.equal(info.textModel.startsWith('doubao-'), true);
+  assert.equal(info.textModel, 'deepseek v4.1 flash');
   assert.equal(info.textReady, true);
   s.dispose();
   const broken = await service({ writeScript: async () => { throw new Error('文本模型调用失败：model not found'); } });

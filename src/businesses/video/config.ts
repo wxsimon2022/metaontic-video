@@ -35,9 +35,11 @@ export const videoConfigFields = {
   // 图片模型：doubao-seedream-5-0-260128 已下线，默认改用在售的 pro 版；旧型号仍允许写入校验，
   // 读取时由 connection-defaults 的 resolveImageModel 归一到在售型号。
   imageModel: z.union(['doubao-seedream-5-0-pro-260628', 'doubao-seedream-5-0-260128']).default('doubao-seedream-5-0-pro-260628').description('A/B 真人参考图非真人化使用的图片模型（旧型号已下线，按 pro 版调用）').volatile(),
+  // 文本模型：候选与中转站在售一致（deepseek v4.1 flash / deepseekv4pro），旧默认值已下线，
+  // 读取时由 connection-defaults 的 normalizeTextModel 归一到当前默认。
   textModel: z.string()
     .default('')
-    .description('写脚本用的文本模型（OpenAI 兼容 /v1/chat/completions）；留空读 NEWAPI_TEXT_MODEL 或内置默认值')
+    .description('写脚本用的文本模型（OpenAI 兼容 /v1/chat/completions）；候选与中转站在售文本模型一致，留空读 NEWAPI_TEXT_MODEL 或内置默认值')
     .volatile(),
   model: z.string()
     .default('')

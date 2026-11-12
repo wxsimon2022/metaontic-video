@@ -274,7 +274,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
     if (!chain) return 'none';
     if (chain.state === 'done' || chain.state === 'stopped' || chain.state === 'stale') return chain.state;
     if (!job) return 'running';
-    if (job.state === 'running') return 'running';
+    if (job.state === 'running' || job.syncing) return 'running';
     // 只有拿到成果的分段才谈得上审核；失败、待确认、中断都停下来让用户处理当前段。
     if (job.state === 'succeeded' && job.media?.length) return 'review';
     return 'stopped';
@@ -320,7 +320,8 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
         if (result.status === 'succeeded' && result.videoUrl) job.media = [{ kind: 'video', label: job.plan.operation === 'extend' ? '续拍视频' : '视频', url: result.videoUrl }];
         if (!job.media?.length) job.message = terminal.has(result.status) ? '任务未成功，未自动重试。' : '状态尚未确认；只查询原任务，不重复提交。';
       }
-      if (job.media?.length) { await save(job); await sync(job); }
+      // 成果先落盘再回填：回填期间标记 syncing，连拍会继续等，不会让界面在没回填时就能推进。
+      if (job.media?.length) { job.syncing = true; await save(job); await sync(job); job.syncing = false; await save(job); }
       else await save(job);
     } catch (e) {
       if (e?.taskId) job.taskId = e.taskId;
@@ -384,6 +385,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       if (chain.state !== 'running' && chain.state !== 'review') throw new Error('这条连拍已经结束，请重新预览方案。');
       if (args.accept !== true) { chain.state = 'stopped'; chain.message = '已停止连拍；已生成的分段成果保留。'; await saveChain(chain); return { chain: chainView(chain, job) }; }
       if (!job) throw new Error('没有正在推进的连拍分段。');
+      if (job.syncing) throw new Error('这一段还在回填画布，稍等片刻再继续下一段。');
       if (job.state !== 'succeeded' || !job.media?.length) throw new Error('这一段还没有可审核的成果，先查询原任务或重新生成。');
       if (job.sync?.status === 'pending' || !job.sync) throw new Error('这一段成果还没回填到画布，先点「补回填画布」。');
       const accepted = await read(job.id).catch(() => null);

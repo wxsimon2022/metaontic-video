@@ -569,11 +569,18 @@
   var METAONTIC_BASE_URL = "https://ai.bileego.com";
   var VOLCENGINE_MODE_AVAILABLE = false;
   var IMAGE_MODEL = "doubao-seedream-5-0-pro-260628";
-  var TEXT_MODEL = "doubao-seed-1-6-250615";
+  var TEXT_MODELS = ["deepseek v4.1 flash", "deepseekv4pro"];
+  var TEXT_MODEL = TEXT_MODELS[0];
   var RETIRED_IMAGE_MODELS = ["doubao-seedream-5-0-260128"];
   function resolveImageModel(value) {
     const model = String(value ?? "").trim();
     if (!model || RETIRED_IMAGE_MODELS.includes(model)) return IMAGE_MODEL;
+    return model;
+  }
+  var RETIRED_TEXT_MODELS = ["doubao-seed-1-6-250615"];
+  function normalizeTextModel(value) {
+    const model = String(value ?? "").trim();
+    if (!model || RETIRED_TEXT_MODELS.includes(model)) return TEXT_MODEL;
     return model;
   }
   function connectionDefaults(values) {
@@ -585,7 +592,7 @@
       queryPath: volc ? "/api/v3/contents/generations/tasks/{task_id}" : text("queryPath", "/doubao/api/v3/contents/generations/tasks/{task_id}"),
       model: text("model", "doubao-seedance-2-0-mini-260615"),
       imageModel: resolveImageModel(text("imageModel", IMAGE_MODEL)),
-      textModel: text("textModel", TEXT_MODEL),
+      textModel: normalizeTextModel(text("textModel", TEXT_MODEL)),
       imageUseVideoKey: values.imageUseVideoKey !== false
     };
   }
@@ -604,6 +611,8 @@
       model: MODEL_OPTIONS,
       // 图片模型只提供在售的 pro 版；旧型号已下线，存量配置由 resolveImageModel 归一到这一项。
       imageModel: [IMAGE_MODEL],
+      // 文本模型同样只列中转站当前上架的候选；旧默认值由 normalizeTextModel 归一到第一项。
+      textModel: TEXT_MODELS,
       ratio: ["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"],
       mergeMode: ["copy", "reencode"]
     };
@@ -620,8 +629,8 @@
       // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
       { key: "model", kind: "select", wide: true },
       { key: "imageModel", kind: "select", wide: true },
-      // 文本模型（写脚本）：中转站上架的型号不一，做成自由填写，留空用内置默认值
-      { key: "textModel", kind: "text", wide: true },
+      // 文本模型（写脚本）：与视频模型同一把密钥，候选见 SELECTS（TEXT_MODELS）
+      { key: "textModel", kind: "select", wide: true },
       { key: "imageUseVideoKey", kind: "switch", wide: true },
       { key: "imageApiKey", kind: "text", secret: true, wide: true },
       { key: "ratio", kind: "select" },
@@ -770,7 +779,7 @@
       imageApiKey: "\u56FE\u7247\u6A21\u578B API\u5BC6\u94A5",
       resolution: "\u89C6\u9891\u6E05\u6670\u5EA6",
       imageModelHint: "Seedream\u53EF\u751F\u6210\u89D2\u8272\u56FE\uFF1B\u9047\u771F\u4EBA\u9650\u5236\u65F6\uFF0C\u7ECF\u540C\u610F\u53EF\u8F6C\u6362\u53C2\u8003\u56FE\u3002\u56FE\u7247\u8C03\u7528\u5355\u72EC\u8BA1\u8D39\uFF0C\u7ED3\u679C\u9700\u5BA1\u6838\u3002",
-      textModelHint: "\u753B\u5E03\u300C\u5199\u811A\u672C\u2026\u300D\u7528\u8FD9\u4E2A\u578B\u53F7\u628A\u4E00\u6BB5\u60F3\u6CD5\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF1B\u8D70\u540C\u4E00\u4E2D\u8F6C\u7AD9\u7684 /v1/chat/completions\uFF0C\u5355\u72EC\u6309\u6587\u672C\u8BA1\u8D39\u3002\u7559\u7A7A\u7528\u5185\u7F6E\u9ED8\u8BA4\u578B\u53F7\u3002",
+      textModelHint: "\u753B\u5E03\u300C\u5199\u811A\u672C\u2026\u300D\u7528\u8FD9\u4E2A\u578B\u53F7\u628A\u4E00\u6BB5\u60F3\u6CD5\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF1B\u8D70\u540C\u4E00\u4E2D\u8F6C\u7AD9\u7684 /v1/chat/completions\uFF0C\u5355\u72EC\u6309\u6587\u672C\u8BA1\u8D39\u3002\u5019\u9009\u4E0E\u4E2D\u8F6C\u7AD9\u5728\u552E\u7684\u6587\u672C\u6A21\u578B\u4E00\u81F4\uFF0C\u65E7\u7684\u9ED8\u8BA4\u578B\u53F7\u5DF2\u4E0B\u7EBF\uFF0C\u8BFB\u5230\u4F1A\u81EA\u52A8\u6362\u6210\u9ED8\u8BA4\u9879\u3002",
       modelHint: "mini \u4FA7\u91CD\u6210\u672C\uFF0Cfast \u4FA7\u91CD\u751F\u6210\u901F\u5EA6\u3002\u5B9E\u9645\u4EF7\u683C\u4EE5\u6240\u9009\u6E20\u9053\u4E3A\u51C6\u3002",
       mergeMode: "\u5408\u5E76\u65B9\u5F0F",
       mergeModeSeamless: "\u76F4\u63A5\u62FC\u63A5\uFF08\u65E7\u914D\u7F6E\u517C\u5BB9\uFF09",
@@ -923,7 +932,7 @@
       imageApiKey: "Image model key",
       resolution: "Video resolution",
       imageModelHint: "Seedream creates character images or, with consent after a real-person restriction, stylizes references. Image calls are billed separately and results require review.",
-      textModelHint: 'Used by the canvas "Write script" action to turn a brief into a script and storyboard table through the same relay (/v1/chat/completions); text calls are billed separately. Leave empty for the built-in default.',
+      textModelHint: 'Used by the canvas "Write script" action to turn a brief into a script and storyboard table through the same relay (/v1/chat/completions); text calls are billed separately. Options match the text models on sale at the relay; the retired default is replaced with the current default.',
       modelHint: "mini focuses on cost; fast focuses on generation speed. Actual prices depend on your provider.",
       mergeMode: "Merge mode",
       mergeModeSeamless: "Direct concat (legacy setting)",
@@ -1495,7 +1504,8 @@
     }
     function control(field) {
       const { draft, value, h, SELECTS, inputStyle, t, snapshot, visibleKey, setVisibleKey, edit, optionLabel } = context;
-      const current = draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (["imageUseVideoKey", "usageStatsEnabled", "autoCreateCanvas"].includes(field.key) ? true : field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0);
+      const blankTextModel = field.key === "textModel" && !String(draft[field.key] ?? value[field.key] ?? "").trim();
+      const current = blankTextModel ? (SELECTS.textModel || [])[0] : draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (["imageUseVideoKey", "usageStatsEnabled", "autoCreateCanvas"].includes(field.key) ? true : field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0);
       const secondsField = field.key === "pollIntervalMs" || field.key === "maxWaitMs";
       const displayed = secondsField && current !== void 0 && current !== "" ? Number(current) / 1e3 : current;
       const id = `metaontic-video-${field.key}`;
@@ -1514,15 +1524,16 @@
         const hiddenMode = field.key === "connectionMode" && HIDDEN_CONNECTION_MODES.includes(String(current || ""));
         const legacyMerge = field.key === "mergeMode" && current === "seamless";
         const retiredImageModel = field.key === "imageModel" && !options.includes(String(current || ""));
+        const retiredTextModel = field.key === "textModel" && RETIRED_TEXT_MODELS.includes(String(current || ""));
         const removedMode = field.key === "connectionMode" && !["metaontic", "volcengine"].includes(String(current || ""));
-        const list = !removedMode && current && !options.includes(current) && !hiddenModel && !hiddenMode && !legacyMerge && !retiredImageModel ? [...options, current] : options;
+        const list = !removedMode && current && !options.includes(current) && !hiddenModel && !hiddenMode && !legacyMerge && !retiredImageModel && !retiredTextModel ? [...options, current] : options;
         return h("select", {
           key: "control",
           id,
           "data-field": field.key,
           className: `mov-input${field.mono ? " mov-mono" : ""}`,
           style: inputStyle,
-          value: removedMode ? "" : legacyMerge ? "copy" : retiredImageModel ? options[0] ?? "" : current ?? "",
+          value: removedMode ? "" : legacyMerge ? "copy" : retiredImageModel || retiredTextModel ? options[0] ?? "" : current ?? "",
           onChange: (event) => edit(field.key, event.target.value)
         }, [
           removedMode ? h("option", { key: "select-connection", value: "", disabled: true }, t("unknownConnection")) : null,
@@ -2615,6 +2626,13 @@
       const text = textOf2(node);
       return h("div", { key: "text", className: "movc-body" }, text ? text.slice(0, 600) : "\uFF08\u6682\u65E0\u5185\u5BB9\uFF0C\u53EF\u5148\u7F16\u8F91\uFF09");
     }
+    const chainStatusText = (chain) => ({
+      running: `\u8FDE\u62CD\u8FDB\u884C\u4E2D\uFF1A\u7B2C ${chain.index + 1}/${chain.total} \u6BB5\u751F\u6210\u4E2D\u2026`,
+      review: `\u7B2C ${chain.index + 1}/${chain.total} \u6BB5\u5DF2\u6709\u6210\u679C\uFF0C\u7B49\u4F60\u5BA1\u6838`,
+      done: `\u8FDE\u62CD\u5B8C\u6210\uFF1A${chain.total} \u6BB5\u90FD\u5DF2\u6709\u6210\u679C`,
+      stopped: `\u8FDE\u62CD\u5DF2\u505C\u6B62\uFF1A\u5DF2\u5B8C\u6210 ${chain.done}/${chain.total} \u6BB5`,
+      stale: `\u8FDE\u62CD\u9700\u8981\u91CD\u6392\uFF1A\u5DF2\u5B8C\u6210 ${chain.done}/${chain.total} \u6BB5`
+    })[chain.state] || `\u8FDE\u62CD\u72B6\u6001\uFF1A${chain.state}`;
     function FlowCanvas() {
       const [list, setList] = React.useState([]);
       const [canvas, setCanvas] = React.useState(null);
@@ -2629,17 +2647,20 @@
       const [inline, setInline] = React.useState(null);
       const [createDialog, setCreateDialog] = React.useState(null);
       const [scriptDialog, setScriptDialog] = React.useState(null);
+      const [chainDialog, setChainDialog] = React.useState(null);
       const [confirmDelete, setConfirmDelete] = React.useState(false);
       const [dialog, setDialog] = React.useState(null);
       const pan = React.useRef(null);
       const moving = React.useRef(null);
       const marqueeDone = React.useRef(false);
       const timer = React.useRef(null);
+      const chainTimer = React.useRef(null);
       const alive = React.useRef(true);
       const stageRef = React.useRef(null);
       React.useEffect(() => () => {
         alive.current = false;
         if (timer.current) clearInterval(timer.current);
+        if (chainTimer.current) clearInterval(chainTimer.current);
       }, []);
       const load = React.useCallback(async (projectId) => {
         try {
@@ -2741,6 +2762,99 @@
         const scale = Math.min(1, Math.max(0.3, Math.min((rect.width - 80) / spanX, (rect.height - 80) / spanY)));
         setView({ scale, x: 40 - left * scale + Math.max(0, (rect.width - 80 - spanX * scale) / 2), y: 30 - top * scale + Math.max(0, (rect.height - 80 - spanY * scale) / 2) });
       }, []);
+      const patchChainDialog = React.useCallback((patch) => setChainDialog((current) => current ? { ...current, ...patch } : current), []);
+      const stopChainPolling = React.useCallback(() => {
+        if (chainTimer.current) {
+          clearInterval(chainTimer.current);
+          chainTimer.current = void 0;
+        }
+      }, []);
+      const pullChain = React.useCallback(async (id) => {
+        try {
+          const data = await canvasNativeRpc({ action: "chainStatus", ...id ? { id } : { projectId: canvas?.projectId } });
+          if (!alive.current) return null;
+          patchChainDialog({ chain: data?.chain || null, busy: false });
+          if (!data?.chain || !["running"].includes(data.chain.state)) stopChainPolling();
+          if (data?.chain && !["running", "review"].includes(data.chain.state)) await refresh();
+          return data?.chain || null;
+        } catch (e) {
+          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "\u8FDE\u62CD\u72B6\u6001\u6CA1\u8BFB\u5230\u3002" });
+          return null;
+        }
+      }, [canvas, patchChainDialog, refresh, stopChainPolling]);
+      const watchChain = React.useCallback((id) => {
+        stopChainPolling();
+        chainTimer.current = setInterval(() => {
+          void pullChain(id);
+        }, 3e3);
+      }, [pullChain, stopChainPolling]);
+      const openChain = React.useCallback(async () => {
+        if (!canvas) return;
+        setError("");
+        setChainDialog({ loading: true, busy: false, error: "", chain: null, plan: null, confirm: { plan: false, cost: false } });
+        try {
+          const data = await canvasNativeRpc({ action: "chainPlan", projectId: canvas.projectId });
+          if (!alive.current) return;
+          patchChainDialog({ loading: false, plan: data, chain: data?.active || null });
+          if (data?.active && data.active.state === "running") watchChain(data.active.id);
+          else if (data?.active && ["done", "stopped", "stale"].includes(data.active.state)) {
+            await pullChain(data.active.id);
+          }
+        } catch (e) {
+          if (alive.current) patchChainDialog({ loading: false, error: e?.message || "\u8FDE\u62CD\u65B9\u6848\u6CA1\u7B97\u51FA\u6765\u3002" });
+        }
+      }, [canvas, patchChainDialog, pullChain, watchChain]);
+      const startChain = React.useCallback(async () => {
+        if (!canvas || !chainDialog?.plan) return;
+        patchChainDialog({ busy: true, error: "" });
+        try {
+          const { chain } = await canvasNativeRpc({ action: "chainStart", projectId: canvas.projectId, confirmPlan: true, confirmCost: true, identity: chainDialog.plan.identity });
+          if (!alive.current) return;
+          patchChainDialog({ chain, busy: false });
+          watchChain(chain?.id);
+          setNotice("\u8FDE\u62CD\u5DF2\u5F00\u59CB\uFF1A\u4F1A\u6309\u987A\u5E8F\u9010\u6BB5\u751F\u6210\uFF0C\u6BCF\u6BB5\u51FA\u6210\u679C\u540E\u505C\u4E0B\u6765\u7B49\u4F60\u5BA1\u6838\uFF0C\u786E\u8BA4\u65E0\u8BEF\u518D\u7EE7\u7EED\u4E0B\u4E00\u6BB5\u3002");
+        } catch (e) {
+          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "\u8FDE\u62CD\u6CA1\u5F00\u59CB\u3002" });
+        }
+      }, [canvas, chainDialog, patchChainDialog, watchChain]);
+      const advanceChain = React.useCallback(async (accept) => {
+        if (!chainDialog?.chain) return;
+        patchChainDialog({ busy: true, error: "" });
+        try {
+          const { chain } = await canvasNativeRpc({ action: "chainNext", id: chainDialog.chain.id, accept });
+          if (!alive.current) return;
+          patchChainDialog({ chain, busy: false });
+          await refresh();
+          if (chain?.state === "running") watchChain(chain.id);
+          else stopChainPolling();
+        } catch (e) {
+          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "\u8FD9\u4E00\u6BB5\u6CA1\u80FD\u7EE7\u7EED\u3002" });
+        }
+      }, [chainDialog, patchChainDialog, refresh, stopChainPolling, watchChain]);
+      const stopChain = React.useCallback(async () => {
+        if (!chainDialog?.chain) return;
+        patchChainDialog({ busy: true, error: "" });
+        try {
+          const { chain } = await canvasNativeRpc({ action: "chainStop", id: chainDialog.chain.id });
+          if (!alive.current) return;
+          stopChainPolling();
+          patchChainDialog({ chain, busy: false });
+        } catch (e) {
+          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "\u8FDE\u62CD\u6CA1\u80FD\u505C\u4E0B\u3002" });
+        }
+      }, [chainDialog, patchChainDialog, stopChainPolling]);
+      const syncChainSegment = React.useCallback(async () => {
+        const job = chainDialog?.chain?.job;
+        if (!job) return;
+        patchChainDialog({ busy: true, error: "" });
+        try {
+          await canvasNativeRpc({ action: "sync", id: job.id });
+          await refresh();
+          await pullChain(chainDialog.chain.id);
+        } catch (e) {
+          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "\u8865\u56DE\u586B\u6CA1\u5B8C\u6210\u3002" });
+        }
+      }, [chainDialog, patchChainDialog, pullChain, refresh]);
       const tidy = React.useCallback(async () => {
         if (!canvas) return;
         try {
@@ -3226,6 +3340,7 @@
             canvas ? h("button", { key: "image", type: "button", className: "mov-btn", onClick: () => void newNode("image") }, "+ \u56FE\u7247") : null,
             canvas ? h("button", { key: "video", type: "button", className: "mov-btn", onClick: () => void newNode("video") }, "+ \u89C6\u9891") : null,
             canvas ? h("button", { key: "write-script", type: "button", className: "mov-btn movc-run", title: "\u5199\u4E0B\u811A\u672C\u4E0E\u76EE\u6807\u65F6\u957F\uFF0C\u81EA\u52A8\u94FA\u5F00\u5267\u672C\u3001\u5206\u955C\u4E0E\u6BCF\u6BB5\u5236\u4F5C\u8282\u70B9", onClick: () => void openScript() }, "\u5199\u811A\u672C\u2026") : null,
+            canvas ? h("button", { key: "chain", type: "button", className: "mov-btn", title: "\u4E00\u6B21\u786E\u8BA4\u6574\u6761\u94FE\u8DEF\u7684\u65B9\u6848\u4E0E\u603B\u8D39\u7528\uFF0C\u6309\u987A\u5E8F\u9010\u6BB5\u751F\u6210\uFF1B\u6BCF\u6BB5\u6210\u679C\u4ECD\u9700\u4F60\u5BA1\u6838", onClick: () => void openChain() }, "\u8FDE\u62CD") : null,
             canvas ? h("span", { key: "sep-flow", className: "movc-sep" }) : null,
             canvas ? h(
               "button",
@@ -3367,7 +3482,7 @@
           } }) : null
         ) : null,
         canvas && steps.length ? h("p", { key: "flow-hint", className: "movc-hint" }, nextStep ? `\u6D41\u7A0B\uFF1A\u6309\u8FDE\u7EBF\u987A\u5E8F\u9010\u4E2A\u5236\u4F5C\uFF0C\u5F53\u524D\u8F6E\u5230\u300C${nextStep.label}\u300D\uFF08\u753B\u5E03\u4E0A\u865A\u7EBF\u6846\u6807\u51FA\uFF09\u3002\u70B9\u4E0A\u9762\u7684\u300C\u5236\u4F5C\u300D\u6309\u94AE\u4F1A\u8BFB\u53D6\u8282\u70B9\u5185\u5BB9\u4E0E\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u62FC\u51FA\u63D0\u793A\u8BCD\uFF0C\u4ECD\u7136\u8981\u5148\u6838\u5BF9\u5236\u4F5C\u65B9\u6848\u3001\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u624D\u4F1A\u8C03\u7528\u6A21\u578B\u3002` : `\u6D41\u7A0B\uFF1A${steps.length} \u4E2A\u5236\u4F5C\u8282\u70B9\u90FD\u5DF2\u6709\u56DE\u586B\u6210\u679C\u3002\u8981\u91CD\u505A\u67D0\u4E00\u6BB5\uFF0C\u70B9\u8BE5\u8282\u70B9\u91CC\u7684\u300C\u5236\u4F5C\u300D\uFF0C\u91CD\u65B0\u6838\u5BF9\u65B9\u6848\u5E76\u786E\u8BA4\u8D39\u7528\u3002`) : null,
-        canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D\uFF08Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\uFF1B\u8282\u70B9\u6446\u4E71\u4E86\u70B9\u300C\u7F8E\u5316\u5E03\u5C40\u300D\u6309\u8FDE\u7EBF\u4E00\u952E\u91CD\u6392\uFF1B\u60F3\u6309\u811A\u672C\u94FA\u5F00\u5236\u4F5C\u8282\u70B9\u5C31\u70B9\u300C\u5199\u811A\u672C\u2026\u300D\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
+        canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D\uFF08Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF1B\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\uFF1B\u8282\u70B9\u6446\u4E71\u4E86\u70B9\u300C\u7F8E\u5316\u5E03\u5C40\u300D\u6309\u8FDE\u7EBF\u4E00\u952E\u91CD\u6392\uFF1B\u60F3\u6309\u811A\u672C\u94FA\u5F00\u5236\u4F5C\u8282\u70B9\u5C31\u70B9\u300C\u5199\u811A\u672C\u2026\u300D\uFF0C\u60F3\u4E00\u6B21\u786E\u8BA4\u6574\u6761\u94FE\u8DEF\u518D\u9010\u6BB5\u751F\u6210\u5C31\u70B9\u300C\u8FDE\u62CD\u300D\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
         connectFrom ? h("p", { key: "connect", className: "movc-hint" }, "\u8FDE\u7EBF\u6A21\u5F0F\uFF1A\u70B9\u51FB\u76EE\u6807\u8282\u70B9\u5B8C\u6210\u8FDE\u63A5\uFF0C\u70B9\u7A7A\u767D\u5904\u53D6\u6D88\u3002") : null,
         confirmDelete ? h(
           "div",
@@ -3380,6 +3495,72 @@
             h("div", { key: "ops", className: "movc-bar" }, [
               h("button", { key: "cancel", type: "button", className: "mov-btn", onClick: () => setConfirmDelete(false) }, "\u53D6\u6D88"),
               h("button", { key: "ok", type: "button", className: "mov-btn", onClick: () => void deleteCanvas() }, "\u786E\u8BA4\u5220\u9664")
+            ])
+          ])
+        ) : null,
+        chainDialog ? h(
+          "div",
+          { key: "chain-modal", className: "movc-modal", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
+            if (e.target === e.currentTarget && !chainDialog.busy) {
+              stopChainPolling();
+              setChainDialog(null);
+            }
+          } },
+          h("div", { key: "body", className: "movc-modal-body" }, [
+            h("h4", { key: "h" }, "\u8FDE\u62CD\uFF1A\u4E00\u6B21\u786E\u8BA4\uFF0C\u9010\u6BB5\u751F\u6210"),
+            chainDialog.loading ? h("p", { key: "loading", className: "movc-status" }, "\u6B63\u5728\u6309\u753B\u5E03\u4E0A\u7684\u89C6\u9891\u8282\u70B9\u6392\u8FDE\u62CD\u65B9\u6848\u2026") : null,
+            chainDialog.plan ? h("div", { key: "plan", className: "movc-plan" }, [
+              h("div", { key: "head" }, `\u8FDE\u62CD\u65B9\u6848\uFF1A${chainDialog.plan.segments.length} \u6BB5${chainDialog.plan.cny !== null ? ` \xB7 \u9884\u4F30 \xA5${(Math.round(chainDialog.plan.cny * 1e4) / 1e4).toFixed(4)}\uFF08\u57FA\u7840\u516C\u5F0F\uFF0C\u6309\u6E20\u9053\u8D26\u5355\u7ED3\u7B97\uFF09` : " \xB7 \u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39"}${chainDialog.plan.priceDate ? ` \xB7 \u4EF7\u76EE ${chainDialog.plan.priceDate}` : ""}`),
+              ...chainDialog.plan.segments.map((segment) => h(
+                "div",
+                { key: `s${segment.index}` },
+                `\u7B2C${segment.index + 1}\u6BB5\u300C${segment.label}\u300D${segment.seconds}\u79D2 \xB7 ${segment.operation === "extend" ? "\u7EED\u62CD\u4E0A\u4E00\u6BB5" : "\u9996\u6BB5\u76F4\u51FA"} \xB7 ${segment.ratio} ${String(segment.resolution).toUpperCase()}\uFF1A${String(segment.prompt).slice(0, 70)}${String(segment.prompt).length > 70 ? "\u2026" : ""}`
+              )),
+              h("div", { key: "note" }, "\u7B2C 1 \u6BB5\u76F4\u51FA\uFF0C\u5176\u4F59\u6BB5\u4EE5\u4E0A\u4E00\u6BB5\u6210\u679C\u7EED\u62CD\uFF1B\u6BCF\u6BB5\u51FA\u6210\u679C\u540E\u90FD\u4F1A\u505C\u4E0B\u6765\u7B49\u4F60\u5BA1\u6838\uFF0C\u5BA1\u6838\u901A\u8FC7\u624D\u7EE7\u7EED\u4E0B\u4E00\u6BB5\u3002")
+            ]) : null,
+            chainDialog.chain ? h("div", { key: "chain", className: "movc-plan" }, [
+              h("div", { key: "head" }, `${chainStatusText(chainDialog.chain)}`),
+              chainDialog.chain.segments.map((segment) => h(
+                "div",
+                { key: `c${segment.index}` },
+                `${segment.index < chainDialog.chain.done ? "\u2713 " : segment.index === chainDialog.chain.index ? "\u25B6 " : "\xB7 "}\u7B2C${segment.index + 1}\u6BB5\u300C${segment.label}\u300D${segment.seconds}\u79D2${segment.index < chainDialog.chain.done ? "\uFF1A\u5DF2\u6709\u6210\u679C" : ""}`
+              )),
+              chainDialog.chain.message ? h("div", { key: "msg" }, chainDialog.chain.message) : null
+            ]) : null,
+            chainDialog.chain?.job?.media?.length && chainDialog.chain.state === "review" ? h(
+              "div",
+              { key: "media" },
+              chainDialog.chain.job.media.map((media, index) => h(media.kind === "image" ? "img" : "video", {
+                key: `m${index}`,
+                src: media.url,
+                alt: media.label || "",
+                controls: media.kind === "video",
+                preload: "metadata",
+                className: "movc-media",
+                style: { maxHeight: "38vh" }
+              }))
+            ) : null,
+            chainDialog.chain && chainDialog.chain.state === "review" ? h("p", { key: "review-note", className: "movc-status" }, "\u5148\u770B\u8FD9\u4E00\u6BB5\uFF1A\u6EE1\u610F\u5C31\u300C\u786E\u8BA4\u5E76\u7EE7\u7EED\u4E0B\u4E00\u6BB5\u300D\uFF0C\u4E0D\u6EE1\u610F\u53EF\u4EE5\u505C\u6B62\u8FDE\u62CD\uFF0C\u5DF2\u751F\u6210\u7684\u6210\u679C\u90FD\u4FDD\u7559\u5728\u753B\u5E03\u4E0A\u3002") : null,
+            chainDialog.error ? h("p", { key: "err", className: "movc-status", "data-error": "true" }, chainDialog.error) : null,
+            chainDialog.plan && !chainDialog.chain ? h("div", { key: "confirms" }, [
+              h("label", { key: "p", className: "movc-check" }, [h("input", { type: "checkbox", checked: chainDialog.confirm.plan === true, onChange: (e) => patchChainDialog({ confirm: { ...chainDialog.confirm, plan: e.target.checked } }) }), " \u6211\u5DF2\u6838\u5BF9\u6574\u6761\u94FE\u8DEF\u7684\u65B9\u6848\uFF08\u6BCF\u6BB5\u63D0\u793A\u8BCD\u3001\u65F6\u957F\u3001\u753B\u5E45\u4E0E\u6E05\u6670\u5EA6\uFF09"]),
+              h("label", { key: "c", className: "movc-check" }, [h("input", { type: "checkbox", checked: chainDialog.confirm.cost === true, onChange: (e) => patchChainDialog({ confirm: { ...chainDialog.confirm, cost: e.target.checked } }) }), " \u6211\u5DF2\u786E\u8BA4\u6574\u6761\u94FE\u8DEF\u7684\u9884\u4F30\u8D39\u7528\uFF0C\u6309\u6E20\u9053\u8D26\u5355\u7ED3\u7B97"])
+            ]) : null,
+            h("div", { key: "ops", className: "movc-bar" }, [
+              h("button", { key: "close", type: "button", className: "mov-btn", disabled: chainDialog.busy, onClick: () => {
+                stopChainPolling();
+                setChainDialog(null);
+              } }, "\u5173\u95ED"),
+              chainDialog.chain?.state === "running" ? h("button", { key: "stop", type: "button", className: "mov-btn movc-danger", disabled: chainDialog.busy, onClick: () => void stopChain() }, "\u505C\u6B62\u8FDE\u62CD") : null,
+              chainDialog.chain?.state === "review" && chainDialog.chain.job?.sync?.status !== "synced" ? h("button", { key: "sync", type: "button", className: "mov-btn", disabled: chainDialog.busy, onClick: () => void syncChainSegment() }, "\u8865\u56DE\u586B\u753B\u5E03") : null,
+              chainDialog.chain?.state === "review" ? h("button", { key: "stop2", type: "button", className: "mov-btn movc-danger", disabled: chainDialog.busy, onClick: () => void stopChain() }, "\u505C\u6B62\u8FDE\u62CD") : null,
+              chainDialog.chain?.state === "review" ? h("button", { key: "next", type: "button", className: "mov-btn mov-btn-primary", disabled: chainDialog.busy, onClick: () => void advanceChain(true) }, "\u786E\u8BA4\u5E76\u7EE7\u7EED\u4E0B\u4E00\u6BB5") : null,
+              chainDialog.plan && !chainDialog.chain ? h("button", { key: "start", type: "button", className: "mov-btn mov-btn-primary", disabled: chainDialog.busy || !(chainDialog.confirm.plan && chainDialog.confirm.cost), onClick: () => void startChain() }, "\u786E\u8BA4\u5E76\u5F00\u59CB\u8FDE\u62CD") : null,
+              chainDialog.chain && ["done", "stopped", "stale"].includes(chainDialog.chain.state) && chainDialog.plan ? h("button", { key: "again", type: "button", className: "mov-btn", disabled: chainDialog.busy, onClick: () => void openChain() }, "\u91CD\u65B0\u770B\u65B9\u6848") : null,
+              chainDialog.chain && chainDialog.chain.state === "done" ? h("button", { key: "close2", type: "button", className: "mov-btn", disabled: chainDialog.busy, onClick: () => {
+                stopChainPolling();
+                setChainDialog(null);
+              } }, "\u5B8C\u6210") : null
             ])
           ])
         ) : null,

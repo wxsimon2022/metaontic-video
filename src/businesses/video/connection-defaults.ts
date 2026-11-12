@@ -18,13 +18,26 @@ export const VOLCENGINE_MODE_AVAILABLE = false;
  */
 export const IMAGE_MODEL = 'doubao-seedream-5-0-pro-260628';
 
-/** 文本模型（写脚本、分镜与逐段提示词）：与视频模型同一中转站、同一个 API密钥，按 /v1/chat/completions 调用。
- *  中转站上架的型号各不相同，留空就用这里的默认值；填了别的型号就按填的调。 */
-export const TEXT_MODEL = 'doubao-seed-1-6-250615';
+/**
+ * 文本模型（写脚本、分镜与逐段提示词）：与视频模型同一中转站、同一个 API密钥，按 /v1/chat/completions 调用。
+ *
+ * 和中转站在售候选保持一致：设置页只提供这几支（见 client/config.ts 的 SELECTS），
+ * 这里同时给出默认值与归一：留空、或存着已下线型号时按默认值生效，避免把下线的型号提交上去。
+ */
+export const TEXT_MODELS = ['deepseek v4.1 flash', 'deepseekv4pro'];
+export const TEXT_MODEL = TEXT_MODELS[0];
 const RETIRED_IMAGE_MODELS = ['doubao-seedream-5-0-260128'];
 export function resolveImageModel(value) {
   const model = String(value ?? '').trim();
   if (!model || RETIRED_IMAGE_MODELS.includes(model)) return IMAGE_MODEL;
+  return model;
+}
+/** 已下线的文本模型：旧的写脚本默认值，上游不再上架，读到就按当前默认值调用。
+ *  设置页也用它判断「存量配置里的旧型号」该显示成哪一项。 */
+export const RETIRED_TEXT_MODELS = ['doubao-seed-1-6-250615'];
+export function normalizeTextModel(value) {
+  const model = String(value ?? '').trim();
+  if (!model || RETIRED_TEXT_MODELS.includes(model)) return TEXT_MODEL;
   return model;
 }
 
@@ -38,7 +51,7 @@ export function connectionDefaults(values) {
     queryPath: volc ? '/api/v3/contents/generations/tasks/{task_id}' : text('queryPath', '/doubao/api/v3/contents/generations/tasks/{task_id}'),
     model: text('model', 'doubao-seedance-2-0-mini-260615'),
     imageModel: resolveImageModel(text('imageModel', IMAGE_MODEL)),
-    textModel: text('textModel', TEXT_MODEL),
+    textModel: normalizeTextModel(text('textModel', TEXT_MODEL)),
     imageUseVideoKey: values.imageUseVideoKey !== false,
   };
 }
