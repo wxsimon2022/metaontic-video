@@ -1194,7 +1194,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "3.23.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.24.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1625,7 +1625,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.23.0",
+    version: "3.24.0",
     description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1731,12 +1731,12 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.23.0",
+      version: "3.24.0",
       prerelease: false,
-      publishedAt: "2026-11-13T01:24:19.936Z",
+      publishedAt: "2026-11-13T04:49:29.996Z",
       items: [
-        "\u65B0\u589E\uFF1A\u8BBE\u7F6E\u9875\u65B0\u589E\u300C\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\u300D\u5F00\u5173\uFF08\u9ED8\u8BA4\u5F00\u542F\uFF09\uFF0C\u53EF\u5173\u6389\u81EA\u52A8\u5EFA\u56FE\uFF0C\u53EA\u5728\u753B\u5E03\u5185\u9009\u4E2D\u7684\u8282\u70B9\u4E0A\u8054\u52A8\u3002",
-        "\u4F18\u5316\uFF1A\u6D41\u7A0B\u753B\u5E03\u62C6\u6210\u300C\u6D41\u7A0B\u753B\u5E03\u300D\u4E0E\u300C\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\u300D\u4E24\u4E2A\u5F00\u5173\uFF0C\u5148\u6253\u5F00\u6D41\u7A0B\u753B\u5E03\u624D\u4F1A\u51FA\u73B0\u81EA\u52A8\u521B\u5EFA\u3002"
+        "\u65B0\u589E\uFF1AAI \u5199\u811A\u672C\u7684\u5206\u955C\u8868\u589E\u52A0\u955C\u53F7\u3001\u955C\u522B\u3001\u8FD0\u955C\u4E09\u5217\uFF0C\u753B\u9762\u5217\u8981\u6C42\u5199\u5168\u4E3B\u4F53\u3001\u52A8\u4F5C\u3001\u73AF\u5883\u3001\u5149\u7EBF\u4E0E\u6C1B\u56F4\u3002",
+        "\u4F18\u5316\uFF1A\u5206\u955C\u8868\u91CC\u7684\u955C\u522B\u4E0E\u8FD0\u955C\u4F1A\u5E26\u8FDB\u6BCF\u6BB5\u63D0\u793A\u8BCD\uFF0C\u753B\u5E03\u5206\u955C\u8282\u70B9\u6309\u955C\u522B\xB7\u8FD0\u955C\u52A0\u753B\u9762\u8BE6\u60C5\u663E\u793A\u3002"
       ]
     }
   };
@@ -2673,6 +2673,11 @@
 /* \u5F39\u7A97\u91CC\u7684\u6309\u94AE\u6309\u5185\u5BB9\u81EA\u9002\u5E94\uFF0C\u4E0D\u6491\u6210\u8BBE\u7F6E\u9875\u90A3\u79CD 120px \u65B9\u5757\u3002 */
 .movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; border-radius: 8px; white-space: nowrap; overflow-wrap: normal; }
 `;
+    function shotVisual(shot) {
+      const visual = String(shot?.visual || shot?.text || shot?.scene || "").trim();
+      const line = visual.split(/\r?\n/).map((part) => part.trim()).find((part) => /^(?:画面|visual)[:：]/.test(part));
+      return (line ? line.replace(/^(?:画面|visual)[:：]\s*/, "") : visual).trim();
+    }
     function nodeBody(node) {
       const data = node?.data || {};
       if (data.assetId) return h(node.type === "image" ? "img" : "video", {
@@ -2681,7 +2686,7 @@
         ...node.type === "image" ? { src: mediaUrl(data.assetId), alt: data.label || "" } : { src: mediaUrl(data.assetId), controls: true, preload: "metadata" }
       });
       if (node.type === "storyboard" && Array.isArray(data.shots) && data.shots.length) return h("div", { key: "shots", className: "movc-body" }, [
-        h("ul", { key: "list", className: "movc-shots" }, data.shots.slice(0, 12).map((shot, index) => h("li", { key: index }, `${shot?.index || index + 1}. ${String(shot?.visual || shot?.text || shot?.scene || "").slice(0, 60)}`))),
+        h("ul", { key: "list", className: "movc-shots" }, data.shots.slice(0, 12).map((shot, index) => h("li", { key: index }, `${shot?.index || index + 1}. ${[shot?.camera, shotVisual(shot).slice(0, 60)].filter(Boolean).join(" \xB7 ")}`))),
         data.shots.length > 12 ? h("div", { key: "more" }, `\u2026\u5171 ${data.shots.length} \u4E2A\u955C\u5934`) : null
       ]);
       const text = textOf2(node);
@@ -3787,7 +3792,7 @@
             })]),
             h("label", { key: "text", className: "movc-field" }, ["\u811A\u672C\u5185\u5BB9\uFF08\u53EF\u4EE5\u76F4\u63A5\u5199\uFF0C\u4E5F\u53EF\u4EE5\u8BA9\u6587\u672C\u6A21\u578B\u5199\uFF09", h("textarea", {
               value: scriptDialog.text,
-              placeholder: "\u5199\u4E0B\u8981\u62CD\u7684\u5185\u5BB9\u3002\u5199\u6210 Markdown \u5206\u955C\u8868\uFF08\u8868\u5934\u542B\u300C\u955C\u5934\u300D\u300C\u753B\u9762\u300D\u4E24\u5217\uFF09\u65F6\u4F1A\u6309\u5206\u955C\u5207\u6BB5\uFF1B\u5426\u5219\u6309\u53E5\u5B50\u3001\u6BB5\u843D\u6309\u5B57\u6570\u5747\u5206\u3002\u5199\u591A\u5C11\u62C6\u591A\u5C11\uFF0C\u4E0D\u81EA\u52A8\u7F16\u5185\u5BB9\u3002",
+              placeholder: "\u5199\u4E0B\u8981\u62CD\u7684\u5185\u5BB9\u3002\u5199\u6210 Markdown \u5206\u955C\u8868\uFF08\u8868\u5934\u542B\u300C\u955C\u53F7\u300D\u300C\u955C\u522B\u300D\u300C\u8FD0\u955C\u300D\u300C\u753B\u9762\u300D\u5217\uFF09\u65F6\u4F1A\u6309\u5206\u955C\u5207\u6BB5\uFF1B\u5426\u5219\u6309\u53E5\u5B50\u3001\u6BB5\u843D\u6309\u5B57\u6570\u5747\u5206\u3002\u5199\u591A\u5C11\u62C6\u591A\u5C11\uFF0C\u4E0D\u81EA\u52A8\u7F16\u5185\u5BB9\u3002",
               onChange: (e) => patchScriptDialog({ text: e.target.value, error: "" })
             })]),
             h("div", { key: "spec", className: "movc-row" }, [

@@ -14,7 +14,7 @@ test('文本模型写脚本：请求走同一中转站的 chat 接口，提示�
   const calls = [];
   const fetcher = async (url, options) => {
     calls.push({ url, options, body: JSON.parse(options.body) });
-    return response({ model: 'deepseek v4.1 flash', choices: [{ message: { content: '```markdown\n# 青旅的清晨\n\n| 镜头 | 画面 | 时长 | 台词 |\n| --- | --- | --- | --- |\n| 1 | 天台晨光 | 15秒 | — |\n| 2 | 前台接待 | 15秒 | — |\n```' } }], usage: { prompt_tokens: 120, completion_tokens: 300 } });
+    return response({ model: 'deepseek v4.1 flash', choices: [{ message: { content: '```markdown\n# 青旅的清晨\n\n| 镜号 | 镜别 | 运镜 | 画面 | 时长 | 台词 |\n| --- | --- | --- | --- | --- | --- |\n| 1 | 远景 | 固定镜头 | 天台晨光 | 15秒 | — |\n| 2 | 中景 | 缓慢推近 | 前台接待 | 15秒 | — |\n```' } }], usage: { prompt_tokens: 120, completion_tokens: 300 } });
   };
   const result = await api.writeScript(config, { idea: '青旅天台的清晨', totalSeconds: 30, segmentSeconds: 15, segments: 2, ratio: '9:16' }, { fetcher });
   assert.equal(calls.length, 1);
@@ -23,7 +23,10 @@ test('文本模型写脚本：请求走同一中转站的 chat 接口，提示�
   assert.equal(calls[0].body.model, api.resolveTextModel(config));
   const prompt = calls[0].body.messages[1].content;
   assert.ok(prompt.includes('青旅天台的清晨') && prompt.includes('9:16'), prompt.slice(0, 80));
-  assert.ok(prompt.includes('| 镜头 | 画面 | 时长 | 台词 |'), '把分镜表表头写死，分段解析才有依据');
+  assert.ok(prompt.includes('| 镜号 | 镜别 | 运镜 | 画面 | 时长 | 台词 |'), '把分镜表表头写死，分段解析才有依据');
+  assert.ok(prompt.includes('镜别列只填一个标准景别词'), '镜别单独成列，不能用运镜代替');
+  assert.ok(prompt.includes('运镜列写清这一段镜头怎么动'), '运镜写清方式、方向与速度');
+  assert.ok(prompt.includes('画面列是这一段要拍的详情'), '画面列要求写全主体、动作、环境、光线与氛围');
   assert.ok(prompt.includes('正好 2 行'), '段数写死');
   assert.equal(result.script.startsWith('# 青旅的清晨'), true, '去掉代码块围栏');
   assert.equal(result.script.includes('```'), false);

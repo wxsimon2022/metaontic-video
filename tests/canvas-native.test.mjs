@@ -107,6 +107,15 @@ test('写脚本分段：按分镜表或句子切分，内容不足直接报错�
   const split = api.splitScriptPrompts(storyboard, 2, shots);
   assert.ok(split[0].includes('清晨天台') && !split[0].includes('前台接待'));
   assert.ok(split[1].includes('前台接待'));
+  // 带镜别、运镜列的分镜表：逐段提示词里保留镜别与运镜，画面详情照样带上。
+  const richShots = api.scriptStoryboardShots(['| 镜号 | 镜别 | 运镜 | 画面 | 时长 |', '| --- | --- | --- | --- | --- |',
+    '| 1 | 近景 | 平稳右摇 | 老人把玉米放进竹筐，暖色斜阳从左侧照入 | 5秒 |',
+    '| 2 | 特写 | 缓慢推近 | 手背青筋与玉米须，背景虚化的院墙 | 5秒 |'].join('\n'));
+  assert.equal(richShots.length, 2);
+  assert.equal(api.shotPrompt(richShots[0]), '镜别：近景\n运镜：平稳右摇\n画面：老人把玉米放进竹筐，暖色斜阳从左侧照入');
+  const richSplit = api.splitScriptPrompts(storyboard, 2, richShots);
+  assert.ok(richSplit[0].includes('镜别：近景') && richSplit[0].includes('运镜：平稳右摇') && richSplit[0].includes('老人把玉米'));
+  assert.ok(richSplit[1].includes('镜别：特写') && !richSplit[1].includes('老人把玉米'));
   assert.throws(() => api.splitScriptPrompts('只有一句话。', 2), /只够拆成 1 段/);
   assert.throws(() => api.splitScriptPrompts('   ', 1), /先写下脚本内容/);
 });

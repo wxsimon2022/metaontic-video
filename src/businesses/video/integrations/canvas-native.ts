@@ -64,9 +64,19 @@ const mediaUrl = assetId => `/metaontic-video/canvas-media?assetId=${encodeURICo
 
 /** 写脚本 → 逐段提示词：有分镜表就按画面列切，否则按句子/段落按字数均分。
  *  只做切分，不编造内容；内容不够拆成这么多段时直接报错，让用户补脚本或缩短时长。 */
-/** 分镜行的「画面」列就是要拍的镜头；没有画面列时才退回整行文本。 */
+/** 分镜行的「画面」列就是要拍的镜头；镜别与运镜另起一行交给模型，没有画面列时才退回整行文本。 */
 export function shotPrompt(shot: any) {
   const visual = String(shot?.visual || shot?.title || '').trim();
+  const field = (labels: RegExp) => {
+    for (const part of visual.split(/\r?\n/).map(x => x.trim())) {
+      const matched = part.match(/^([^：:]+?)[：:]\s*([\s\S]*)$/);
+      if (matched && labels.test(matched[1].trim())) return matched[2].trim();
+    }
+    return '';
+  };
+  const framing = field(/景别|镜别|shot\s*size/i), camera = field(/运镜|camera|movement|视角/i), scene = field(/画面|visual|详情|描述/i);
+  // 有镜别或运镜才带上标签；只有画面列时保持原来的纯文本，避免给模型加无意义的字段名。
+  if (framing || camera) return [framing && `镜别：${framing}`, camera && `运镜：${camera}`, scene && `画面：${scene}`].filter(Boolean).join('\n');
   const line = visual.split(/\r?\n/).map(part => part.trim()).find(part => /^(?:画面|visual)[:：]/.test(part));
   return (line ? line.replace(/^(?:画面|visual)[:：]\s*/, '') : visual).trim();
 }

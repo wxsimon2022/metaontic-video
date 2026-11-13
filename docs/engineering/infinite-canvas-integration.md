@@ -312,7 +312,7 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 需求：「插件加上文本模型」——画布里的「写脚本…」不该只让人手写，也要能像对话里那样由模型把想法写成剧本与分镜表。
 
 - 配置：新增 `textModel`（`connection-defaults.TEXT_MODEL = 'doubao-seed-1-6-250615'` 为内置默认值，环境变量 `NEWAPI_TEXT_MODEL` 次之，设置页填写的型号优先）。设置页把它放在视频模型卡片里（与视频同一把 API密钥、同一中转站），文案为「文本模型（写脚本）」；`video_config` 只读视图、`CONFIG_FIELDS`、`PLUGIN_OWNED_KEYS`、`snapshotConfig` 同步带上该字段。留空即用默认值，填别的型号就按填的调。
-- 新模块 `providers/text.ts`：`writeScript(config, brief)` 调同一中转站的 OpenAI 兼容 `/v1/chat/completions`（baseUrl 已带 `/v1` 就不重复拼），120 秒超时，`stripFence` 去掉整段代码块围栏，返回 `{ script, model, usage }`；空想法、缺密钥、上游报错、空正文都直接抛错，不伪造脚本。`scriptPrompt(brief)` 把表头 `| 镜头 | 画面 | 时长 | 台词 |`、段数与每段秒数写死，并要求「正好 N 行、画面列自包含、不写指代」，因为分段解析（`scriptStoryboardShots` → `splitScriptPrompts`）只认这张表。
+- 新模块 `providers/text.ts`：`writeScript(config, brief)` 调同一中转站的 OpenAI 兼容 `/v1/chat/completions`（baseUrl 已带 `/v1` 就不重复拼），120 秒超时，`stripFence` 去掉整段代码块围栏，返回 `{ script, model, usage }`；空想法、缺密钥、上游报错、空正文都直接抛错，不伪造脚本。`scriptPrompt(brief)` 把表头 `| 镜号 | 镜别 | 运镜 | 画面 | 时长 | 台词 |`、段数与每段秒数写死，要求「镜号顺写、镜别用标准景别词、运镜写方式与方向速度、画面列自包含详情、不写指代、正好 N 行」，因为分段解析（`scriptStoryboardShots` → `splitScriptPrompts`）只认这张表；`shotPrompt` 把镜别与运镜带进逐段提示词。
 - 画布动作 `canvas-native { action: 'write' }`：只调用一次文本模型，返回 Markdown 剧本；不建节点、不碰视频模型。`createCanvasNativeService` 新增 `options.writeScript` 注入点；`action: 'info'` 额外返回 `textModel` / `textReady`。
 - 画布弹窗：新增「想拍什么（交给文本模型写成脚本）」输入与「AI 写脚本」按钮，按钮把返回正文填回脚本文本区（可直接改），提示里写明会用哪个文本模型、单独按文本计费；`splitScriptPrompts` 改为优先取分镜行的「画面」列，避免把「镜头：1／时长：5秒」一起当提示词。
 

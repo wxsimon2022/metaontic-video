@@ -17,7 +17,7 @@ var __export = (target, all) => {
 var PLUGIN_VERSION;
 var init_version = __esm({
   "src/core/version.ts"() {
-    PLUGIN_VERSION = true ? "3.23.0".trim().replace(/^v/i, "") : "";
+    PLUGIN_VERSION = true ? "3.24.0".trim().replace(/^v/i, "") : "";
   }
 });
 
@@ -5669,11 +5669,11 @@ function scriptStoryboardShots(script) {
     if (fenced || !lines[i].includes("|")) continue;
     const header = cells(lines[i]), separator = cells(lines[i + 1]);
     if (separator.length !== header.length || !separator.every((x) => /^:?-{3,}:?$/.test(x))) continue;
-    const titleAt = header.findIndex((x) => /镜头|shot/i.test(x));
-    const visualAt = header.findIndex((x) => /画面|visual/i.test(x));
+    const titleAt = header.findIndex((x) => /镜号|镜头|shot/i.test(x));
+    const visualAt = header.findIndex((x) => /画面|visual|详情|描述/i.test(x));
     if (titleAt < 0 || visualAt < 0 || titleAt === visualAt) continue;
     const timeAt = header.findIndex((x) => /时间|时长|time|duration/i.test(x));
-    const cameraAt = header.findIndex((x) => /景别|运镜|camera/i.test(x));
+    const cameraAt = header.map((x, j) => /景别|镜别|运镜|视角|camera|movement/i.test(x) ? j : -1).filter((j) => j >= 0);
     const soundAt = header.findIndex((x) => /声音|音效|sound|sfx/i.test(x));
     const dialogueAt = header.findIndex((x) => /台词|对白|dialogue/i.test(x));
     for (i += 2; i < lines.length && lines[i].includes("|") && lines[i].trim(); i++) {
@@ -5685,7 +5685,7 @@ function scriptStoryboardShots(script) {
       shots.push({
         title: row[titleAt],
         visual: header.map((h, j) => `${h}\uFF1A${row[j]}`).join("\n"),
-        camera: row[cameraAt] || "",
+        camera: cameraAt.map((j) => row[j]).filter(Boolean).join(" \xB7 "),
         sfx: row[soundAt] || "",
         dialogue: row[dialogueAt] ? [{ role: "\u5267\u672C\u5BF9\u767D", line: row[dialogueAt] }] : [],
         ...duration > 0 ? { duration } : {},
@@ -6674,11 +6674,14 @@ function scriptPrompt(brief2) {
     "",
     "\u8981\u6C42\uFF1A",
     `1. \u7B2C\u4E00\u884C\u662F\u300C# \u300D\u5F00\u5934\u7684\u7247\u540D\uFF0C\u7B2C\u4E8C\u6BB5\u7528\u4E00\u53E5\u8BDD\u5199\u6E05\u4E3B\u9898\u4E0E\u6574\u4F53\u57FA\u8C03\u3002`,
-    `2. \u5FC5\u987B\u8F93\u51FA\u4E00\u4E2A Markdown \u5206\u955C\u8868\uFF0C\u8868\u5934\u56FA\u5B9A\u4E3A | \u955C\u5934 | \u753B\u9762 | \u65F6\u957F | \u53F0\u8BCD |\uFF0C\u5206\u5272\u884C\u662F | --- | --- | --- | --- |\u3002`,
-    `3. \u5206\u955C\u8868\u5FC5\u987B\u6B63\u597D ${segments} \u884C\uFF0C\u6BCF\u884C\u5BF9\u5E94\u4E00\u6BB5\uFF1A\u955C\u5934\u5217\u5199\u5E8F\u53F7\uFF0C\u65F6\u957F\u5217\u5199\u8BE5\u6BB5\u79D2\u6570\uFF08\u5408\u8BA1 ${Math.min(total, MAX_TOTAL_SECONDS)} \u79D2\uFF09\u3002`,
-    "4. \u753B\u9762\u5217\u5199\u8FD9\u4E00\u6BB5\u8981\u62CD\u7684\u753B\u9762\uFF1A\u4E3B\u4F53\u3001\u52A8\u4F5C\u3001\u955C\u5934\u8FD0\u52A8\u3001\u5149\u7EBF\u4E0E\u6C1B\u56F4\uFF0C\u4E00\u53E5\u8BDD\u8BB2\u5B8C\uFF0C\u4E0D\u8981\u51FA\u73B0\u300C\u540C\u4E0A\u300D\u300C\u627F\u63A5\u4E0A\u6BB5\u300D\u8FD9\u7C7B\u6307\u4EE3\u3002",
-    "5. \u53F0\u8BCD\u5217\u6CA1\u6709\u5BF9\u767D\u5C31\u5199\u300C\u2014\u300D\u3002",
-    "6. \u8868\u540E\u53E6\u8D77\u4E00\u8282\u300C## \u5236\u4F5C\u8BF4\u660E\u300D\uFF0C\u7528 2\u20134 \u6761\u77ED\u53E5\u5199\u6E05\u695A\u8854\u63A5\u3001\u97F3\u4E50\u4E0E\u9700\u8981\u6CE8\u610F\u7684\u7EC6\u8282\u3002",
+    `2. \u5FC5\u987B\u8F93\u51FA\u4E00\u4E2A Markdown \u5206\u955C\u8868\uFF0C\u8868\u5934\u56FA\u5B9A\u4E3A | \u955C\u53F7 | \u955C\u522B | \u8FD0\u955C | \u753B\u9762 | \u65F6\u957F | \u53F0\u8BCD |\uFF0C\u5206\u5272\u884C\u662F | --- | --- | --- | --- | --- | --- |\u3002`,
+    `3. \u5206\u955C\u8868\u5FC5\u987B\u6B63\u597D ${segments} \u884C\uFF0C\u6BCF\u884C\u5BF9\u5E94\u4E00\u6BB5\uFF1A\u955C\u53F7\u5217\u4ECE 1 \u987A\u5199\uFF0C\u65F6\u957F\u5217\u5199\u8BE5\u6BB5\u79D2\u6570\uFF08\u5408\u8BA1 ${Math.min(total, MAX_TOTAL_SECONDS)} \u79D2\uFF09\u3002`,
+    "4. \u955C\u522B\u5217\u53EA\u586B\u4E00\u4E2A\u6807\u51C6\u666F\u522B\u8BCD\uFF1A\u8FDC\u666F\u3001\u5168\u666F\u3001\u4E2D\u666F\u3001\u8FD1\u666F\u3001\u7279\u5199\u6216\u5927\u7279\u5199\u3002",
+    "5. \u8FD0\u955C\u5217\u5199\u6E05\u8FD9\u4E00\u6BB5\u955C\u5934\u600E\u4E48\u52A8\uFF1A\u56FA\u5B9A\u955C\u5934\uFF0C\u6216\u63A8\u3001\u62C9\u3001\u6447\u3001\u79FB\u3001\u8DDF\u3001\u5347\u964D\u3001\u73AF\u7ED5\u4E2D\u7684\u4E00\u79CD\uFF0C\u5E76\u6CE8\u660E\u65B9\u5411\u4E0E\u901F\u5EA6\uFF0C\u4F8B\u5982\u300C\u7F13\u6162\u63A8\u8FD1\u300D\u300C\u5E73\u7A33\u53F3\u6447\u300D\u3002",
+    "6. \u753B\u9762\u5217\u662F\u8FD9\u4E00\u6BB5\u8981\u62CD\u7684\u8BE6\u60C5\uFF0C\u5199\u5168\uFF1A\u4E3B\u4F53\u4E0E 2\u20133 \u4E2A\u7A33\u5B9A\u7279\u5F81\u3001\u6B63\u5728\u505A\u7684\u52A8\u4F5C\u53CA\u8D77\u6B62\u72B6\u6001\u3001\u6240\u5904\u73AF\u5883\u4E0E\u80CC\u666F\u9053\u5177\u3001\u5149\u7EBF\u65B9\u5411\u4E0E\u8272\u8C03\u3001\u6574\u4F53\u6C1B\u56F4\uFF1B\u4E00\u53E5\u8BDD\u5199\u5B8C\u6574\uFF0C\u4E0D\u7528\u300C\u540C\u4E0A\u300D\u300C\u627F\u63A5\u4E0A\u6BB5\u300D\u8FD9\u7C7B\u6307\u4EE3\u3002",
+    "7. \u53F0\u8BCD\u5217\u5199\u8FD9\u4E00\u6BB5\u5B9E\u9645\u8BF4\u51FA\u7684\u539F\u8BDD\u5E76\u6807\u660E\u8BF4\u8BDD\u4EBA\uFF1B\u6CA1\u6709\u5BF9\u767D\u5C31\u5199\u300C\u2014\u300D\u3002",
+    "8. \u6BCF\u4E2A\u5355\u5143\u683C\u53EA\u5360\u4E00\u884C\uFF0C\u4E0D\u8981\u6362\u884C\uFF0C\u5217\u4E4B\u95F4\u7528\u534A\u89D2\u7AD6\u7EBF\u5206\u9694\u3002",
+    "9. \u8868\u540E\u53E6\u8D77\u4E00\u8282\u300C## \u5236\u4F5C\u8BF4\u660E\u300D\uFF0C\u7528 2\u20134 \u6761\u77ED\u53E5\u5199\u6E05\u695A\u8854\u63A5\u3001\u97F3\u4E50\u4E0E\u9700\u8981\u6CE8\u610F\u7684\u7EC6\u8282\u3002",
     "\u53EA\u8F93\u51FA\u8FD9\u4EFD Markdown\uFF0C\u4E0D\u8981\u89E3\u91CA\u3001\u4E0D\u8981\u989D\u5916\u5BD2\u6684\u3001\u4E0D\u8981\u7528\u4EE3\u7801\u5757\u5305\u8D77\u6765\u3002"
   ].join("\n");
 }
@@ -7151,6 +7154,15 @@ function filmSegments(doc) {
 var mediaUrl = (assetId) => `/metaontic-video/canvas-media?assetId=${encodeURIComponent(String(assetId || ""))}`;
 function shotPrompt(shot) {
   const visual = String(shot?.visual || shot?.title || "").trim();
+  const field = (labels) => {
+    for (const part of visual.split(/\r?\n/).map((x) => x.trim())) {
+      const matched = part.match(/^([^：:]+?)[：:]\s*([\s\S]*)$/);
+      if (matched && labels.test(matched[1].trim())) return matched[2].trim();
+    }
+    return "";
+  };
+  const framing = field(/景别|镜别|shot\s*size/i), camera = field(/运镜|camera|movement|视角/i), scene = field(/画面|visual|详情|描述/i);
+  if (framing || camera) return [framing && `\u955C\u522B\uFF1A${framing}`, camera && `\u8FD0\u955C\uFF1A${camera}`, scene && `\u753B\u9762\uFF1A${scene}`].filter(Boolean).join("\n");
   const line = visual.split(/\r?\n/).map((part) => part.trim()).find((part) => /^(?:画面|visual)[:：]/.test(part));
   return (line ? line.replace(/^(?:画面|visual)[:：]\s*/, "") : visual).trim();
 }

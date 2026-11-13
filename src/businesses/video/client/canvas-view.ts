@@ -241,6 +241,13 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
 .movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; border-radius: 8px; white-space: nowrap; overflow-wrap: normal; }
 `;
 
+  /** 分镜节点里的预览：有「画面」列就只显示详情，镜别与运镜另接在前面。 */
+  function shotVisual(shot: any) {
+    const visual = String(shot?.visual || shot?.text || shot?.scene || '').trim();
+    const line = visual.split(/\r?\n/).map(part => part.trim()).find(part => /^(?:画面|visual)[:：]/.test(part));
+    return (line ? line.replace(/^(?:画面|visual)[:：]\s*/, '') : visual).trim();
+  }
+
   function nodeBody(node: any) {
     const data = node?.data || {};
     if (data.assetId) return h(node.type === 'image' ? 'img' : 'video', {
@@ -249,7 +256,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
     });
     if (node.type === 'storyboard' && Array.isArray(data.shots) && data.shots.length) return h('div', { key: 'shots', className: 'movc-body' }, [
       h('ul', { key: 'list', className: 'movc-shots' }, data.shots.slice(0, 12).map((shot: any, index: number) =>
-        h('li', { key: index }, `${shot?.index || index + 1}. ${String(shot?.visual || shot?.text || shot?.scene || '').slice(0, 60)}`))),
+        h('li', { key: index }, `${shot?.index || index + 1}. ${[shot?.camera, shotVisual(shot).slice(0, 60)].filter(Boolean).join(' · ')}`))),
       data.shots.length > 12 ? h('div', { key: 'more' }, `…共 ${data.shots.length} 个镜头`) : null,
     ]);
     const text = textOf(node);
@@ -1091,7 +1098,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
             placeholder: '一句话就够，例如：青旅天台的清晨，一个人拖着行李住进城市。',
             onChange: (e: any) => patchScriptDialog({ idea: e.target.value, error: '' }) })]),
           h('label', { key: 'text', className: 'movc-field' }, ['脚本内容（可以直接写，也可以让文本模型写）', h('textarea', { value: scriptDialog.text,
-            placeholder: '写下要拍的内容。写成 Markdown 分镜表（表头含「镜头」「画面」两列）时会按分镜切段；否则按句子、段落按字数均分。写多少拆多少，不自动编内容。',
+            placeholder: '写下要拍的内容。写成 Markdown 分镜表（表头含「镜号」「镜别」「运镜」「画面」列）时会按分镜切段；否则按句子、段落按字数均分。写多少拆多少，不自动编内容。',
             onChange: (e: any) => patchScriptDialog({ text: e.target.value, error: '' }) })]),
           h('div', { key: 'spec', className: 'movc-row' }, [
             h('label', { key: 'total', className: 'movc-field' }, ['目标总时长（秒）', h('input', { type: 'number', min: 4, max: 120, value: scriptDialog.totalSeconds, onChange: (e: any) => patchScriptDialog({ totalSeconds: e.target.value }) })]),
