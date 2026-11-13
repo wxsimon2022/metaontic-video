@@ -17,7 +17,7 @@ var __export = (target, all) => {
 var PLUGIN_VERSION;
 var init_version = __esm({
   "src/core/version.ts"() {
-    PLUGIN_VERSION = true ? "3.24.0".trim().replace(/^v/i, "") : "";
+    PLUGIN_VERSION = true ? "3.24.1".trim().replace(/^v/i, "") : "";
   }
 });
 
@@ -1319,7 +1319,7 @@ init_hardcoded_config();
 init_hardcoded_config();
 var STATE = /* @__PURE__ */ Symbol.for(`${PLUGIN_ID}.analytics.process`);
 var EVENTS = /* @__PURE__ */ new Set(["plugin_started", "tool_started", "tool_finished", "video_task_created", "video_task_finished"]);
-var TOOLS = /* @__PURE__ */ new Set(["video_generate", "video_extend", "video_status", "video_project", "video_prepare_image", "video_estimate", "video_config", "video_setup", "video_stage", "media_submission"]);
+var TOOLS = /* @__PURE__ */ new Set(["video_generate", "video_extend", "video_status", "video_project", "video_prepare_image", "video_estimate", "video_config", "video_setup", "video_stage", "media_submission", "video_canvas", "video_hyperframes"]);
 var STATUSES = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled", "unknown", "timeout", "approved", "pending", "paused", "prepared", "draft", "blocked", "review_required", "submission_unknown", "ok"]);
 var ERRORS = /* @__PURE__ */ new Set(["provider_auth", "provider_failed", "provider_network_error", "provider_rate_limited", "provider_quota_exceeded", "provider_price_config_error", "provider_bad_response", "content_rejected", "real_person_rejected", "submission_unknown", "waiting_stopped", "ABORTED"]);
 function processState() {
@@ -1366,15 +1366,27 @@ function analyticsFields(input = {}) {
   if (typeof input.errorCode === "string") value.errorCode = ERRORS.has(input.errorCode) ? input.errorCode : "other";
   return value;
 }
+function deviceText(value, allowSpace) {
+  return String(value ?? "").replace(allowSpace ? /[^a-zA-Z0-9.+_ -]/g : /[^a-zA-Z0-9.+_-]/g, "").slice(0, 64) || "unknown";
+}
+function isReleaseVersion(version) {
+  return /^\d+\.\d+\.\d+$/.test(String(version ?? "").trim().replace(/^v/i, ""));
+}
 function createAnalyticsReporter(config, options = {}) {
+  const releaseBuild = options.releaseBuild || (() => isReleaseVersion(PLUGIN_VERSION));
+  if (!releaseBuild()) return { record() {
+  }, start() {
+  }, dispose() {
+  }, flush: async () => {
+  }, pending: () => 0 };
   const enabled = options.enabled || (() => process.env.METAONTIC_VIDEO_ANALYTICS_DISABLED !== "1" && ref(config, "usageStatsEnabled", true) !== false);
   const request = options.request || ((...args) => globalThis.fetch(...args));
   const identity = options.identity || analyticsIdentity;
   const device = options.device || (() => ({
     arch: ["arm64", "x64", "ia32", "arm"].includes(os2.arch()) ? os2.arch() : "other",
-    osRelease: os2.release().slice(0, 64),
+    osRelease: deviceText(os2.release(), true),
     memoryGb: Math.max(1, Math.min(4096, Math.round(os2.totalmem() / 1024 ** 3))),
-    harnessVersion: String(process.env.DSH_CLIENT_VERSION || process.env.DSH_APP_VERSION || "unknown").replace(/[^a-zA-Z0-9.+_-]/g, "").slice(0, 64)
+    harnessVersion: deviceText(process.env.DSH_CLIENT_VERSION || process.env.DSH_APP_VERSION, false)
   }));
   const delay = options.delayMs ?? 1e3;
   const timeout = options.timeoutMs ?? 1500;

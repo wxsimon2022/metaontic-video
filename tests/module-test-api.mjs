@@ -33,6 +33,6 @@ export * from './src/businesses/video/workflow/duration-choice.ts';
 export {segmentContinueLine} from './src/businesses/video/workflow/approval.ts';
 export {validateImageRoles} from './src/businesses/video/media/references.ts';
 export {withVideoExecution,withGenerationProgress} from './src/businesses/video/workflow/execution.ts';
-`, resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', outfile: path.join(dir, 'api.mjs') });
+`, resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', define: { __PLUGIN_VERSION__: JSON.stringify('3.24.1') }, outfile: path.join(dir, 'api.mjs') });
 export const api = await import(pathToFileURL(path.join(dir, 'api.mjs')).href);
 after(() => rm(dir, { recursive: true, force: true }));

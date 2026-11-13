@@ -51,3 +51,21 @@ test('unsupported business tools cannot poison an otherwise valid analytics batc
  let body;const r=fixture(async(_u,o)=>{body=JSON.parse(o.body);return{ok:true};});
  try{r.record('tool_started',{tool:'writing_outline',mode:'writer'});r.record('tool_started',{tool:'video_generate',mode:'video-director'});await r.flush();assert.equal(body.events.length,1);assert.equal(body.events[0].tool,'video_generate');}finally{r.dispose();}
 });
+test('every registered business tool reports, including the canvas and hyperframes tools',async()=>{
+ let body;const r=fixture(async(_u,o)=>{body=JSON.parse(o.body);return{ok:true};});
+ try{for(const tool of ['video_canvas','video_hyperframes'])r.record('tool_finished',{tool,status:'succeeded',durationMs:30});
+ await r.flush();assert.deepEqual(body.events.map(x=>x.tool),['video_canvas','video_hyperframes']);}finally{r.dispose();}
+});
+test('device fields never carry characters the ingest whitelist rejects',async()=>{
+ let body;const r=fixture(async(_u,o)=>{body=JSON.parse(o.body);return{ok:true};},{device:undefined});
+ try{r.record('tool_started',{tool:'video_generate'});await r.flush();
+ assert.match(body.device.osRelease,/^[a-zA-Z0-9.+_ -]{1,64}$/);assert.match(body.device.harnessVersion,/^[a-zA-Z0-9.+_-]{1,64}$/);
+ }finally{r.dispose();}
+});
+test('test builds and unversioned dev builds never report anything',async()=>{
+ for(const version of ['3.24.1','v3.24.1'])assert.equal(api.isReleaseVersion(version),true);
+ for(const version of ['3.22.9-test.2','3.24.1-rc.1','3.24.1+build.5','','dev','3.24'])assert.equal(api.isReleaseVersion(version),false);
+ let calls=0;const r=fixture(async()=>{calls++;return{ok:true};},{releaseBuild:()=>false});
+ try{r.start();r.record('plugin_started');r.record('tool_finished',{tool:'video_generate',status:'succeeded'});await r.flush();
+ assert.equal(calls,0);assert.equal(r.pending(),0);}finally{r.dispose();}
+});

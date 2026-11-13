@@ -11,7 +11,7 @@ import { ANALYTICS_URL, DATA_DIR, PLUGIN_ID } from '../hardcoded-config.js';
 export { ANALYTICS_URL } from '../hardcoded-config.js';
 const STATE = Symbol.for(`${PLUGIN_ID}.analytics.process`);
 const EVENTS = new Set(['plugin_started', 'tool_started', 'tool_finished', 'video_task_created', 'video_task_finished']);
-const TOOLS = new Set(['video_generate', 'video_extend', 'video_status', 'video_project', 'video_prepare_image', 'video_estimate', 'video_config', 'video_setup', 'video_stage', 'media_submission']);
+const TOOLS = new Set(['video_generate', 'video_extend', 'video_status', 'video_project', 'video_prepare_image', 'video_estimate', 'video_config', 'video_setup', 'video_stage', 'media_submission', 'video_canvas', 'video_hyperframes']);
 const STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'unknown', 'timeout', 'approved', 'pending', 'paused', 'prepared', 'draft', 'blocked', 'review_required', 'submission_unknown', 'ok']);
 const ERRORS = new Set(['provider_auth', 'provider_failed', 'provider_network_error', 'provider_rate_limited', 'provider_quota_exceeded', 'provider_price_config_error', 'provider_bad_response', 'content_rejected', 'real_person_rejected', 'submission_unknown', 'waiting_stopped', 'ABORTED']);
 function processState() {
@@ -47,15 +47,26 @@ export function analyticsFields(input: any = {}) {
   if (typeof input.errorCode === 'string') value.errorCode = ERRORS.has(input.errorCode) ? input.errorCode : 'other';
   return value;
 }
+/** 设备字段只保留服务端白名单允许的字符；清空后回退 unknown，避免一条越界字段让整批 422 被拒。 */
+function deviceText(value: unknown, allowSpace: boolean) {
+  return String(value ?? '').replace(allowSpace ? /[^a-zA-Z0-9.+_ -]/g : /[^a-zA-Z0-9.+_-]/g, '').slice(0, 64) || 'unknown';
+}
+/** 只有正式版 X.Y.Z 计入统计：测试版（如 3.22.9-test.2）与未注入版本号的开发构建一律不上报。 */
+export function isReleaseVersion(version: unknown) {
+  return /^\d+\.\d+\.\d+$/.test(String(version ?? '').trim().replace(/^v/i, ''));
+}
 export function createAnalyticsReporter(config, options: any = {}) {
+  const releaseBuild = options.releaseBuild || (() => isReleaseVersion(PLUGIN_VERSION));
+  // 测试版连匿名身份文件都不写、定时器也不起，统计流量完全为零。
+  if (!releaseBuild()) return { record() {}, start() {}, dispose() {}, flush: async () => {}, pending: () => 0 };
   const enabled = options.enabled || (() => process.env.METAONTIC_VIDEO_ANALYTICS_DISABLED !== '1' && ref(config, 'usageStatsEnabled', true) !== false);
   const request = options.request || ((...args) => (globalThis.fetch as any)(...args));
   const identity = options.identity || analyticsIdentity;
   const device = options.device || (() => ({
     arch: ['arm64', 'x64', 'ia32', 'arm'].includes(os.arch()) ? os.arch() : 'other',
-    osRelease: os.release().slice(0, 64),
+    osRelease: deviceText(os.release(), true),
     memoryGb: Math.max(1, Math.min(4096, Math.round(os.totalmem() / 1024 ** 3))),
-    harnessVersion: String(process.env.DSH_CLIENT_VERSION || process.env.DSH_APP_VERSION || 'unknown').replace(/[^a-zA-Z0-9.+_-]/g, '').slice(0, 64),
+    harnessVersion: deviceText(process.env.DSH_CLIENT_VERSION || process.env.DSH_APP_VERSION, false),
   }));
   const delay = options.delayMs ?? 1000;
   const timeout = options.timeoutMs ?? 1500;
