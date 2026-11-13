@@ -3,10 +3,11 @@ import { VOLCENGINE_MODE_AVAILABLE, IMAGE_MODEL, resolveImageModel } from '../co
 import { ref } from '../config.js';
 import { isMetaontic, isVolcengine, resolveBaseUrl, resolveSubmitPath, relayPreset, resolveModel, resolveApiKey, resolveTextApiKey, resolveTextModel } from '../providers/connection.js';
 import { modelMaxSeconds } from '../workflow/planning.js';
+import { RELAY } from '../../../core/hardcoded-config.js';
 
 /** 用户可在插件内改的配置字段。 */
 export const CONFIG_FIELDS = [
-  'autoCreateCanvas', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel', 'textModel', 'imageUseVideoKey', 'imageApiKey', 'textApiKey',
+  'canvasEnabled', 'autoCreateCanvas', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel', 'textModel', 'imageUseVideoKey', 'imageApiKey', 'textApiKey',
   'duration', 'singleMaxSeconds', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'pollErrorRetries',
@@ -35,7 +36,8 @@ export function configView(config) {
   return {
     stored: maskSecrets(stored),
     effective: {
-      autoCreateCanvas: ref(config, 'autoCreateCanvas', false) === true,
+      canvasEnabled: ref(config, 'canvasEnabled', false) === true,
+      autoCreateCanvas: ref(config, 'canvasEnabled', false) === true && ref(config, 'autoCreateCanvas', true) === true,
       connectionMode: isVolcengine(config) ? 'volcengine' : 'metaontic',
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),
@@ -79,7 +81,7 @@ export function configTool(config, settings) {
         },
         metaonticApiKey: { type: 'string', description: 'MetaOntic AI 手动 API密钥，无需登录' },
         volcengineApiKey: { type: 'string', description: '火山引擎直连模式的火山 API密钥' },
-        baseUrl: { type: 'string', description: '基础地址，即中转站站址，例如 https://ai.bileego.com。' },
+        baseUrl: { type: 'string', description: `基础地址，即中转站站址，例如 ${RELAY.baseUrl}。` },
         estimateGroupRatio: { type: 'number', description: '预估费用用的分组折扣（中转站 group_ratio：默认 0.8）。' },
         submitPath: { type: 'string', description: '创建任务路径，例如 /doubao/api/v3/contents/generations/tasks。' },
         queryPath: { type: 'string', description: '查询任务路径，{task_id} 会被替换。' },
@@ -137,8 +139,7 @@ export function configTool(config, settings) {
           action: { type: 'string' },
           patchPath: { type: 'string' },
           stored: { type: 'object' },
-          effective: {
-      autoCreateCanvas: ref(config, 'autoCreateCanvas', false) === true, type: 'object' },
+          effective: { type: 'object' },
           error: { type: 'string' },
         },
       },

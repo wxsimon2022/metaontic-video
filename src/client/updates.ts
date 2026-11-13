@@ -1,13 +1,16 @@
 /** 浏览器端 updates：由入口注入宿主 React 与共享依赖。 */
+import {
+  GITEE,
+  GITHUB,
+  PLUGIN_PACKAGE,
+  UPDATE_ATTEMPTS,
+  UPDATE_CACHE_KEY,
+  UPDATE_MAX_AGE_MS,
+  UPDATE_SPEC,
+  releaseDownloadUrl,
+} from '../core/hardcoded-config.js';
 export function createUpdates({ h, fetchSource }: any) {
-/** 「检查更新」的数据源：Gitee 镜像仓库（Gitee 的 API 带 CORS 头，浏览器半侧能直接读）。 */
-    const PLUGIN_PACKAGE = 'metaontic-video';
-    const UPDATE_SPEC = 'git+https://gitee.com/hackloop/metaontic-video.git';
-    /** 在线更新最多试几次：Gitee 的匿名 HTTPS 克隆会排队，429 一般过一会儿就好。 */
-    const UPDATE_ATTEMPTS = 3;
-    /** 版本检查结果的本地缓存：打开设置页先显示，再后台刷新。 */
-    const UPDATE_CACHE_KEY = 'metaontic-video.update-check-v3';
-    const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+    // 仓库地址、缓存键与重试次数统一写在 src/core/hardcoded-config.ts。
     /** 构建时由 esbuild --define 注入的版本号；从源码直接跑（没注入）时为空串。 */
     const PLUGIN_VERSION = typeof __PLUGIN_VERSION__ === 'string'
       ? __PLUGIN_VERSION__.trim().replace(/^v/i, '')
@@ -65,8 +68,8 @@ export function createUpdates({ h, fetchSource }: any) {
     /** 两仓合并去重，仅保留最近三个已发布正式版本。 */
     async function fetchRecentVersions() {
       const urls = [
-        'https://gitee.com/api/v5/repos/hackloop/metaontic-video/releases?per_page=100',
-        'https://api.github.com/repos/wxsimon2022/metaontic-video/releases?per_page=100',
+        `${GITEE.api}/releases?per_page=100`,
+        `${GITHUB.api}/releases?per_page=100`,
       ];
       const results = await Promise.allSettled(urls.map(async url => {
         const body = await (await (fetchSource || fetchUpdateSource)(url, 6000)).json();
@@ -234,8 +237,8 @@ async function runOnlineUpdate() {
         return;
     }
     const candidates = [
-      `https://gitee.com/hackloop/metaontic-video/releases/download/v${context.updateLatest}/metaontic-video-${context.updateLatest}.tgz`,
-      `https://github.com/wxsimon2022/metaontic-video/releases/download/v${context.updateLatest}/metaontic-video-${context.updateLatest}.tgz`,
+      releaseDownloadUrl(context.updateLatest, 'gitee'),
+      releaseDownloadUrl(context.updateLatest, 'github'),
     ];
     /** 这条 spec 装不上时值不值得换下一条：只有「这个 committish 解析不出来」才换。 */
     const specUnresolvable = (text) => /Could not resolve|No matching version|ERR_PNPM_NO_MATCHING_VERSION|ERR_PNPM_FETCH_40[34]|HTTP[ :]+40[34]|404 Not Found|403 Forbidden/i.test(text);

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, rm, open, readdir } from 'node:fs/promises';
 import { dshHome } from '../media/references.js';
+import { DATA_DIR } from '../../../core/hardcoded-config.js';
 import { imageConfig, resolveApiKey, resolveBaseUrl, isVolcengine, isMetaontic } from './connection.js';
 import { relayRequest } from './transport.js';
 import { extractTaskId } from './response.js';
@@ -12,7 +13,7 @@ const hash = (value) => createHash('sha256').update(value).digest('hex');
 export function submissionIdentity(config) {
   return hash(JSON.stringify([isVolcengine(config) ? 'volcengine' : 'metaontic', resolveBaseUrl(config), hash(resolveApiKey(config))]));
 }
-function directory() { return path.join(dshHome(), 'state', 'metaontic-video', 'submissions'); }
+function directory() { return path.join(dshHome(), 'state', DATA_DIR, 'submissions'); }
 async function save(file, record) {
   const temporary = `${file}.${randomUUID()}.tmp`;
   try { await writeFile(temporary, JSON.stringify(record), { mode: 0o600 }); await rename(temporary, file); }

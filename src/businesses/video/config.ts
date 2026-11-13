@@ -2,25 +2,29 @@ import { ref } from '../../core/settings/value.js';
 export { ref } from '../../core/settings/value.js';
 export { PLUGIN_VERSION } from '../../core/version.js';
 import { METAONTIC_BASE_URL } from './connection-defaults.js';
+import { PLUGIN_ID, RELAY, VIDEO_MODEL } from '../../core/hardcoded-config.js';
+export { DATA_DIR, DEFAULT_OUTPUT_DIR } from '../../core/hardcoded-config.js';
 /** config：从宿主入口拆出的独立职责模块。 */
 import z from '@deepseek-ai/schemastery';
 
 export const videoConfigFields = {
-  // 默认关闭：画布是可选组件，用户要的时候在设置页打开，不再默认替每个创作项目建图。
-  autoCreateCanvas: z.boolean().default(false).description('流程画布（默认关闭）：打开后左侧栏出现画布入口，创作也自动建图并同步脚本、分镜与生成成果；关闭时左侧栏隐藏入口，已有画布保留在插件数据目录。').volatile(),
+  // 画布总开关：默认关闭，打开后左侧栏才出现画布入口，画布组件才可用。
+  canvasEnabled: z.boolean().default(false).description('流程画布（默认关闭）：打开后左侧栏出现「MetaOnticVideo流程画布」入口，可用独立画布页创作；关闭时左侧栏隐藏入口，已有画布与成果保留在插件数据目录。').volatile(),
+  // 自动建图：只在流程画布打开后生效，默认开启，跟着创作自动建图并回填成果。
+  autoCreateCanvas: z.boolean().default(true).description('自动创建画布（流程画布打开后有效，默认开启）：创作时自动建图，审核前同步剧本、分镜与制作计划，生成后回填成果；关闭后不自动建图，仅在用户明确选中画布节点时联动。').volatile(),
   connectionMode: z.union(['metaontic', 'volcengine']).default('metaontic')
     .description('接入方式：MetaOntic AI（metaontic）；火山引擎直连（volcengine，当前设置页暂不提供选择）').volatile(),
   metaonticApiKey: z.string().default('').description('MetaOntic AI API密钥').volatile(),
   volcengineApiKey: z.string().default('').description('火山引擎直连模式的火山 API密钥').volatile(),
   entryId: z.string()
-    .default('metaontic-video')
+    .default(PLUGIN_ID)
     .description('本插件在 profile patch 里的条目 id；配置工具用它把改动写回')
     .volatile(),
   baseUrl: z.string()
     .default('')
     .description(
-      '基础地址（中转站站址）；留空时读环境变量 NEWAPI_VIDEO_BASE_URL / NEWAPI_BASE_URL，再使用 https://ai.bileego.com。'
-      + '示例 https://ai.bileego.com（不要带 /v1，也不要重复 /api/v3）',
+      `基础地址（中转站站址）；留空时读环境变量 NEWAPI_VIDEO_BASE_URL / NEWAPI_BASE_URL，再使用 ${RELAY.baseUrl}。`
+      + `示例 ${RELAY.baseUrl}（不要带 /v1，也不要重复 /api/v3）`,
     )
     .volatile(),
   submitPath: z.string()
@@ -132,7 +136,7 @@ export const videoConfigFields = {
     .volatile(),
 };
 
-const DEFAULT_MODEL = 'doubao-seedance-2-0-mini-260615';
+const DEFAULT_MODEL = VIDEO_MODEL;
 
 export const MAX_SEGMENTS = 10;
 
@@ -158,7 +162,7 @@ export function resolveResolution(config, args: any = {}) {
 }
 
 /** 输出目录的默认子目录名。 */
-export const DEFAULT_OUTPUT_DIR = 'metaontic-video';
+
 
 /** 判断「上游返回的是累计成片」的容差：累计时长的 25%，且至少 1.5 秒。 */
 export const CUMULATIVE_TOLERANCE_RATIO = 0.25;
@@ -197,12 +201,12 @@ export const ESTIMATE_RATES: Array<[string, { none: number; video: number }]> = 
 /** provider 预设：字段留空时按这里的顺序回退到环境变量，再回退到预设默认值。 */
 export const RELAY_PRESET = {
     baseUrl: METAONTIC_BASE_URL,
-    submitPath: '/doubao/api/v3/contents/generations/tasks',
-    queryPath: '/doubao/api/v3/contents/generations/tasks/{task_id}',
+    submitPath: RELAY.submitPath,
+    queryPath: RELAY.queryPath,
     model: DEFAULT_MODEL,
-    baseEnv: ['NEWAPI_VIDEO_BASE_URL', 'NEWAPI_BASE_URL'],
-  modelEnv: ['NEWAPI_VIDEO_MODEL'],
-  textModelEnv: ['NEWAPI_TEXT_MODEL'],
+    baseEnv: RELAY.baseEnv,
+    modelEnv: RELAY.modelEnv,
+    textModelEnv: RELAY.textModelEnv,
 };
 
 export const SUCCESS_STATES = new Set(['succeeded', 'success', 'completed', 'complete', 'done', 'finished']);

@@ -174,7 +174,11 @@ test('面板文案不再出现裸露的 Key 字样，样式随组件注入', () 
 
 test('入口用同一个 id 注册左侧栏图标与 main 面板', () => {
   const source = readFileSync(new URL('../src/businesses/video/client.ts', import.meta.url), 'utf8');
-  assert.match(source, /const PANEL_ID = 'metaontic-video';/);
+  // id 与会话/配置命名空间同源，统一写在 src/core/hardcoded-config.ts。
+  assert.match(source, /import \{ CANVAS_PANEL_ID, GUIDE_URL, PANEL_ID \} from '\.\.\/\.\.\/core\/hardcoded-config\.js';/);
+  const shared = readFileSync(new URL('../src/core/hardcoded-config.ts', import.meta.url), 'utf8');
+  assert.match(shared, /export const PLUGIN_ID = 'metaontic-video';/);
+  assert.match(shared, /export const PANEL_ID = PLUGIN_ID;/);
   assert.match(source, /name: 'sidebar\.panellist',\s*id: PANEL_ID/);
   assert.match(source, /label: \(\) => t\('panelSidebarLabel'\)/);
   assert.match(source, /name: 'main',\s*key: PANEL_ID/);

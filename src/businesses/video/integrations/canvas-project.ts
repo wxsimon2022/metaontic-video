@@ -79,7 +79,8 @@ export function pluginNamedCanvasName(binding: any, current: any, title: any = '
 
 export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = {}, sessionTitle: any = null) {
   async function sync(projectId, exec, draft: any = {}) {
-    if (ref(config, 'autoCreateCanvas', false) !== true) return { status: 'disabled', reason: '未开启自动创建流程画布（默认关闭，可在插件设置页打开）；已有画布保留。' };
+    if (ref(config, 'canvasEnabled', false) !== true) return { status: 'disabled', reason: '未打开流程画布（默认关闭，可在插件设置页打开）；已有画布保留。' };
+    if (ref(config, 'autoCreateCanvas', true) !== true) return { status: 'disabled', reason: '已关闭自动创建画布；改为在画布内明确选中节点时联动，已有画布保留。' };
     return lockProject(`canvas:${projectId}`, async () => {
       const project = await readProject(projectId, exec);
       // status重试也恢复已审核材料，不能用空草稿覆盖制作计划。

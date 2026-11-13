@@ -361,9 +361,9 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 
 **默认关闭**
 
-- `config.ts` 的 `autoCreateCanvas` 默认值 `true → false`；所有读取点跟着改口径：`canvas-project.ts`（`ref(config, 'autoCreateCanvas', false) !== true` 就返回 `status: 'disabled'`，理由写明默认关闭、可在设置页打开）、`canvas.ts`（生成工具只在开关打开时才自动带上创作项目的画布）、`video-config.ts`（只读视图 `effective.autoCreateCanvas` 用 `=== true`）、助手提示词里那一行也按新口径报「开启 / 关闭（默认关闭，可在插件设置页打开）」。
-- 设置页开关同步：`client/settings-actions.ts` 里 `autoCreateCanvas` 不再落在「未配置即真」的分支（单独给 `false`）；中英文提示都改成「默认关闭」开头。
-- 影响面：默认关闭后普通创作不再自动建图/同步，已有画布保留，手动「写脚本…」铺节点与节点内「制作」照旧可用；用户要自动投影就在设置页打开。测试里凡是要跑自动建图/自动回填的用例显式传 `{ autoCreateCanvas: true }`（`createCanvasProjectSync` / `createCanvasBridge`），并新增两条断言：默认关闭时 `sync` 返回 `disabled`、schema 默认值是 `false`；开关控件未配置时不勾选、配过 `true` 才勾选。
+- 画布开关后来拆成两个（v3.23.0）：`canvasEnabled`（设置页「流程画布」，默认 `false`）是总开关，只有它打开时才注册左侧栏入口与画布页、才允许自动建图；`autoCreateCanvas`（设置页「自动创建画布」，默认 `true`）只在总开关打开后显示与生效，控制普通创作是否自动建图并同步。读取点：`client.ts` 的槽位注册看 `canvasEnabled`，`canvas-project.ts` 先判 `canvasEnabled`（未打开就返回 `status: 'disabled'`）再判 `autoCreateCanvas`（关掉自动创建时也返回 `disabled`，理由区分两者），`canvas.ts` 自动绑定要求两个都为真，`video-config.ts` 只读视图同时给 `canvasEnabled` 与 effective 的 `autoCreateCanvas`，助手提示词报「当前流程画布：开启/关闭；自动创建画布：开启/关闭」。
+- 设置页同步：`client/settings-actions.ts` 的默认值里 `canvasEnabled` 单独给 `false`、`autoCreateCanvas` 落在「未配置即真」；`client/settings.ts` 在总开关关闭时整项隐藏「自动创建画布」；中英文提示分别说明两个开关。
+- 影响面：总开关关闭时左侧栏无画布入口、画布不可用，已有画布与成果保留，重新打开即可继续；总开关打开但关掉自动创建时不自动建图/同步，用户明确选中画布节点仍可联动，画布内「写脚本…」「制作」「连拍」照旧可用。测试里凡是要跑自动建图/自动回填的用例显式传 `{ canvasEnabled: true, autoCreateCanvas: true }`；另断言总开关默认 `false`、自动创建默认 `true`、只开自动创建时左侧栏仍无入口。
 
 **按钮统一风格**
 

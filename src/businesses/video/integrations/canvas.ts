@@ -20,6 +20,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, copyFile, stat, open } from 'node:fs/promises';
 import path from 'node:path';
 import { dshHome } from '../../../core/paths.js';
+import { DATA_DIR, PLUGIN_ID } from '../../../core/hardcoded-config.js';
 import { builtinCanvasAdapter, builtinCanvasExists, builtinCanvasList } from './canvas-builtin.js';
 import { readProject, sessionOwner } from '../workflow/project.js';
 import { mediaPreviewMeta } from '../workflow/media-preview.js';
@@ -83,7 +84,7 @@ export async function readCanvasInput(adapter, link) {
 
 function resultFile(token) {
   if (!/^[a-f0-9-]{36}$/.test(String(token || ''))) throw new Error('回填记录标识无效');
-  return path.join(dshHome(), 'metaontic-video', 'canvas-results', `${token}.json`);
+  return path.join(dshHome(), DATA_DIR, 'canvas-results', `${token}.json`);
 }
 async function saveRecord(record) {
   const file = resultFile(record.id); await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
@@ -135,7 +136,7 @@ export async function publishCanvasResult(adapter, record) {
       const corrected = dest.replace(/\.png$/, suffix); await rename(dest, corrected); dest = corrected;
       rel = rel.replace(/\.png$/, suffix);
     }
-    const created = await adapter.rpc.assetCreate({ projectName: doc.name || '', asset: { id, projectId: record.canvas.projectId, kind: media.kind, mime, name: media.label, rel, size: (await stat(dest)).size, createdAt: record.createdAt, stored: 'disk', source: 'metaontic-video' } });
+    const created = await adapter.rpc.assetCreate({ projectName: doc.name || '', asset: { id, projectId: record.canvas.projectId, kind: media.kind, mime, name: media.label, rel, size: (await stat(dest)).size, createdAt: record.createdAt, stored: 'disk', source: PLUGIN_ID } });
     if (created?.ok === false) throw new Error('画布资产登记失败');
     publications.push({ id, media, index });
   }
@@ -186,7 +187,7 @@ export function createCanvasBridge(load = loadCanvasAdapter, config: any = {}) {
       const saved = !canvas && resumeDir ? await readPauseFile(resumeDir) : null;
       const projectId = args.projectId || saved?.options?.projectId;
       canvas ||= saved?.options?.canvas;
-      if (!canvas && projectId && ref(config, 'autoCreateCanvas', false) === true) {
+      if (!canvas && projectId && ref(config, 'canvasEnabled', false) === true && ref(config, 'autoCreateCanvas', true) === true) {
         const project = await readProject(projectId, exec);
         canvas = project.canvasAuto?.canvas;
       }

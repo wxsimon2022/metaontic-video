@@ -1,9 +1,10 @@
 /** 浏览器端 config：由入口注入宿主 React 与共享依赖。 */
 import { VOLCENGINE_MODE_AVAILABLE, IMAGE_MODEL, TEXT_MODELS } from '../connection-defaults.js';
+import { PLUGIN_NAMESPACE, VIDEO_MODEL_OPTIONS } from '../../../core/hardcoded-config.js';
 
 export function createClientConfig() {
 /** Host 侧条目的 id，与 cordis.patch.yml 里那条覆盖项一致。 */
-    const NAMESPACE = 'metaontic-video';
+    const NAMESPACE = PLUGIN_NAMESPACE;
     /** 本模块自己的界面字典命名空间。 */
     const NS = 'settings.metaonticVideo';
 
@@ -12,10 +13,7 @@ export function createClientConfig() {
      * 两个都在插件的预估价目表里，所以换着选也不会把「预估费用」算歪；
      * 服务端下发的型号如果比这张表新，会照原样补进下拉，不会被静默换掉。
      */
-    const MODEL_OPTIONS = [
-      'doubao-seedance-2-0-mini-260615',
-      'doubao-seedance-2-0-fast-260128',
-    ];
+    const MODEL_OPTIONS = VIDEO_MODEL_OPTIONS;
     /** 可编辑字段；kind 决定控件，标注 secret 的字段宿主只会告知是否已配置。 */
     const SELECTS = {
       // MetaOntic AI；火山直连按开关提供。
@@ -39,7 +37,7 @@ export function createClientConfig() {
       { key: 'sectionConnection', fields: ['connectionMode'] },
       { key: 'sectionModels', fields: ['imageUseVideoKey', 'model', 'metaonticApiKey', 'volcengineApiKey', 'imageModel', 'imageApiKey', 'textModel', 'textApiKey'] },
       { key: 'sectionVideo', fields: ['ratio', 'generateAudio'] },
-      { key: 'sectionCanvas', fields: ['autoCreateCanvas'] },
+      { key: 'sectionCanvas', fields: ['canvasEnabled', 'autoCreateCanvas'] },
     ];
     const FIELDS = [
       { key: 'connectionMode', kind: 'select', wide: true },
@@ -57,6 +55,8 @@ export function createClientConfig() {
       { key: 'generateAudio', kind: 'switch' },
       { key: 'watermark', kind: 'switch' },
       { key: 'usageStatsEnabled', kind: 'switch' },
+      // 流程画布总开关；打开后设置页才显示「自动创建画布」这一项。
+      { key: 'canvasEnabled', kind: 'switch', wide: true },
       { key: 'autoCreateCanvas', kind: 'switch', wide: true },
       { key: 'seamTrimSeconds', kind: 'text' },
       { key: 'mergeMode', kind: 'select', wide: true },
@@ -69,7 +69,7 @@ export function createClientConfig() {
 
     /** 插件自己会写进配置的项：重置时兜底一起清，免得宿主没把它们列进 user。 */
     const PLUGIN_OWNED_KEYS = [
-      'autoCreateCanvas', 'usageStatsEnabled', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'entryId', 'baseUrl',
+      'canvasEnabled', 'autoCreateCanvas', 'usageStatsEnabled', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'entryId', 'baseUrl',
       'submitPath', 'queryPath', 'imageUseVideoKey', 'imageApiKey', 'imageModel', 'textModel', 'textApiKey', 'model',
       'estimateGroupRatio', 'duration', 'singleMaxSeconds', 'seamTrimSeconds', 'mergeMode', 'bgmFadeSeconds',
       'outputDir', 'keepSegments', 'resumeLockStaleMinutes', 'ffmpegBinary', 'ffprobeBinary', 'mode',
@@ -87,25 +87,6 @@ export function createClientConfig() {
       if (/win/.test(raw)) return 'windows';
       return 'linux';
     }
-
-    /** 各系统的 ffmpeg 安装命令：主推一条，其余的折叠在「其他系统」里。 */
-    const FFMPEG_INSTALLS = {
-      macos: { label: 'macOS（Homebrew）', command: 'brew install ffmpeg' },
-      windows: { label: 'Windows（winget）', command: 'winget install --id Gyan.FFmpeg -e' },
-      linux: { label: 'Linux（Debian / Ubuntu）', command: 'sudo apt update && sudo apt install -y ffmpeg' },
-    };
-    const FFMPEG_ALL = [
-      { os: 'macos', label: 'macOS（Homebrew）', command: 'brew install ffmpeg' },
-      {
-        os: 'macos',
-        label: 'macOS（还没装 Homebrew）',
-        command: '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
-      },
-      { os: 'windows', label: 'Windows（winget）', command: 'winget install --id Gyan.FFmpeg -e' },
-      { os: 'windows', label: 'Windows（Chocolatey）', command: 'choco install ffmpeg' },
-      { os: 'linux', label: 'Linux（Debian / Ubuntu）', command: 'sudo apt update && sudo apt install -y ffmpeg' },
-      { os: 'linux', label: 'Linux（Fedora / RHEL / CentOS）', command: 'sudo dnf install -y ffmpeg' },
-    ];
 
     /** 金额显示与中转站一致：|x| ≥ 1 保留 2 位小数，否则保留 4 位，末尾多余的 0 去掉。 */
     function formatMoney(value) {

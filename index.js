@@ -17,7 +17,7 @@ var __export = (target, all) => {
 var PLUGIN_VERSION;
 var init_version = __esm({
   "src/core/version.ts"() {
-    PLUGIN_VERSION = true ? "3.22.0".trim().replace(/^v/i, "") : "";
+    PLUGIN_VERSION = true ? "3.23.0".trim().replace(/^v/i, "") : "";
   }
 });
 
@@ -32,6 +32,70 @@ var init_value = __esm({
   }
 });
 
+// src/core/hardcoded-config.ts
+var PLUGIN_ID, PLUGIN_PACKAGE, CANVAS_PANEL_ID, ANALYTICS_URL, GITEE, GITHUB, CHANGELOG_URL, UPDATE_SPEC, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, RELAY, VOLCENGINE, VIDEO_MODEL, IMAGE_MODEL, RETIRED_IMAGE_MODELS, TEXT_MODELS, TEXT_MODEL, RETIRED_TEXT_MODELS, DATA_DIR, DEFAULT_OUTPUT_DIR, REFERENCE_TMP_DIR, FFMPEG_INSTALLS;
+var init_hardcoded_config = __esm({
+  "src/core/hardcoded-config.ts"() {
+    PLUGIN_ID = "metaontic-video";
+    PLUGIN_PACKAGE = PLUGIN_ID;
+    CANVAS_PANEL_ID = `${PLUGIN_ID}-canvas`;
+    ANALYTICS_URL = "https://video.mybfs.cn/api/v1/analytics/events";
+    GITEE = {
+      slug: "hackloop/metaontic-video",
+      web: "https://gitee.com/hackloop/metaontic-video",
+      api: "https://gitee.com/api/v5/repos/hackloop/metaontic-video",
+      transport: "git@gitee.com:hackloop/metaontic-video.git"
+    };
+    GITHUB = {
+      slug: "wxsimon2022/metaontic-video",
+      web: "https://github.com/wxsimon2022/metaontic-video",
+      api: "https://api.github.com/repos/wxsimon2022/metaontic-video",
+      transport: "git@ssh.github.com:wxsimon2022/metaontic-video.git"
+    };
+    CHANGELOG_URL = `${GITHUB.web}/blob/master/CHANGELOG.md`;
+    UPDATE_SPEC = `git+${GITEE.web}.git`;
+    UPDATE_CACHE_KEY = `${PLUGIN_ID}.update-check-v3`;
+    UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
+    RELAY = {
+      baseUrl: "https://ai.bileego.com",
+      signupUrl: "https://ai.bileego.com/sign-up?aff=VzYr",
+      pricingUrl: "https://ai.bileego.com/pricing",
+      submitPath: "/doubao/api/v3/contents/generations/tasks",
+      queryPath: "/doubao/api/v3/contents/generations/tasks/{task_id}",
+      baseEnv: ["NEWAPI_VIDEO_BASE_URL", "NEWAPI_BASE_URL"],
+      modelEnv: ["NEWAPI_VIDEO_MODEL"],
+      textModelEnv: ["NEWAPI_TEXT_MODEL"]
+    };
+    VOLCENGINE = {
+      modeAvailable: false,
+      baseUrl: "https://ark.cn-beijing.volces.com",
+      submitPath: "/api/v3/contents/generations/tasks",
+      queryPath: "/api/v3/contents/generations/tasks/{task_id}",
+      pricingUrl: "https://docs.volcengine.com/docs/ark/model-pricing"
+    };
+    VIDEO_MODEL = "doubao-seedance-2-0-mini-260615";
+    IMAGE_MODEL = "doubao-seedream-5-0-pro-260628";
+    RETIRED_IMAGE_MODELS = ["doubao-seedream-5-0-260128"];
+    TEXT_MODELS = ["deepseek v4.1 flash", "deepseekv4pro"];
+    TEXT_MODEL = TEXT_MODELS[0];
+    RETIRED_TEXT_MODELS = ["doubao-seed-1-6-250615"];
+    DATA_DIR = PLUGIN_ID;
+    DEFAULT_OUTPUT_DIR = PLUGIN_ID;
+    REFERENCE_TMP_DIR = `${PLUGIN_ID}-reference`;
+    FFMPEG_INSTALLS = {
+      macos: { label: "macOS\uFF08Homebrew\uFF09", command: "brew install ffmpeg" },
+      macosBootstrap: {
+        label: "macOS\uFF08\u8FD8\u6CA1\u88C5 Homebrew\uFF09",
+        command: '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+      },
+      windows: { label: "Windows\uFF08winget\uFF09", command: "winget install --id Gyan.FFmpeg -e" },
+      windowsChoco: { label: "Windows\uFF08Chocolatey\uFF09", command: "choco install ffmpeg" },
+      linux: { label: "Linux\uFF08Debian / Ubuntu\uFF09", command: "sudo apt update && sudo apt install -y ffmpeg" },
+      linuxDnf: { label: "Linux\uFF08Fedora / RHEL / CentOS\uFF09", command: "sudo dnf install -y ffmpeg" }
+    };
+  }
+});
+
 // src/businesses/video/connection-defaults.ts
 function resolveImageModel(value) {
   const model = String(value ?? "").trim();
@@ -43,15 +107,12 @@ function normalizeTextModel(value) {
   if (!model || RETIRED_TEXT_MODELS.includes(model)) return TEXT_MODEL;
   return model;
 }
-var METAONTIC_BASE_URL, IMAGE_MODEL, TEXT_MODELS, TEXT_MODEL, RETIRED_IMAGE_MODELS, RETIRED_TEXT_MODELS;
+var METAONTIC_BASE_URL, VOLCENGINE_MODE_AVAILABLE;
 var init_connection_defaults = __esm({
   "src/businesses/video/connection-defaults.ts"() {
-    METAONTIC_BASE_URL = "https://ai.bileego.com";
-    IMAGE_MODEL = "doubao-seedream-5-0-pro-260628";
-    TEXT_MODELS = ["deepseek v4.1 flash", "deepseekv4pro"];
-    TEXT_MODEL = TEXT_MODELS[0];
-    RETIRED_IMAGE_MODELS = ["doubao-seedream-5-0-260128"];
-    RETIRED_TEXT_MODELS = ["doubao-seed-1-6-250615"];
+    init_hardcoded_config();
+    METAONTIC_BASE_URL = RELAY.baseUrl;
+    VOLCENGINE_MODE_AVAILABLE = VOLCENGINE.modeAvailable;
   }
 });
 
@@ -943,22 +1004,26 @@ function envValue(names) {
   }
   return "";
 }
-var videoConfigFields, DEFAULT_MODEL, MAX_SEGMENTS, MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_SEGMENT_SECONDS, MAX_TOTAL_SECONDS, FIXED_RESOLUTION, DEFAULT_OUTPUT_DIR, CUMULATIVE_TOLERANCE_RATIO, CUMULATIVE_TOLERANCE_MIN_SECONDS, GATED_TOOLS, RELAY_PRESET, SUCCESS_STATES, FAILED_STATES, CANCEL_STATES, QUOTA_HINTS, PRICE_HINTS, CONTENT_HINTS, VIDEO_URL_KEYS, GENERIC_URL_KEYS, IMAGE_KEY_TOKENS, IMAGE_EXTENSIONS, CONTINUOUS_TRANSITION, FORWARD_TRANSITION, CLOSEUP_TRANSITION, CONTENT_REJECTION_HINT;
+var videoConfigFields, DEFAULT_MODEL, MAX_SEGMENTS, MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_SEGMENT_SECONDS, MAX_TOTAL_SECONDS, FIXED_RESOLUTION, CUMULATIVE_TOLERANCE_RATIO, CUMULATIVE_TOLERANCE_MIN_SECONDS, GATED_TOOLS, RELAY_PRESET, SUCCESS_STATES, FAILED_STATES, CANCEL_STATES, QUOTA_HINTS, PRICE_HINTS, CONTENT_HINTS, VIDEO_URL_KEYS, GENERIC_URL_KEYS, IMAGE_KEY_TOKENS, IMAGE_EXTENSIONS, CONTINUOUS_TRANSITION, FORWARD_TRANSITION, CLOSEUP_TRANSITION, CONTENT_REJECTION_HINT;
 var init_config = __esm({
   "src/businesses/video/config.ts"() {
     init_value();
     init_version();
     init_connection_defaults();
+    init_hardcoded_config();
+    init_hardcoded_config();
     init_lib2();
     videoConfigFields = {
-      // 默认关闭：画布是可选组件，用户要的时候在设置页打开，不再默认替每个创作项目建图。
-      autoCreateCanvas: Schema.boolean().default(false).description("\u6D41\u7A0B\u753B\u5E03\uFF08\u9ED8\u8BA4\u5173\u95ED\uFF09\uFF1A\u6253\u5F00\u540E\u5DE6\u4FA7\u680F\u51FA\u73B0\u753B\u5E03\u5165\u53E3\uFF0C\u521B\u4F5C\u4E5F\u81EA\u52A8\u5EFA\u56FE\u5E76\u540C\u6B65\u811A\u672C\u3001\u5206\u955C\u4E0E\u751F\u6210\u6210\u679C\uFF1B\u5173\u95ED\u65F6\u5DE6\u4FA7\u680F\u9690\u85CF\u5165\u53E3\uFF0C\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\u5728\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\u3002").volatile(),
+      // 画布总开关：默认关闭，打开后左侧栏才出现画布入口，画布组件才可用。
+      canvasEnabled: Schema.boolean().default(false).description("\u6D41\u7A0B\u753B\u5E03\uFF08\u9ED8\u8BA4\u5173\u95ED\uFF09\uFF1A\u6253\u5F00\u540E\u5DE6\u4FA7\u680F\u51FA\u73B0\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u5165\u53E3\uFF0C\u53EF\u7528\u72EC\u7ACB\u753B\u5E03\u9875\u521B\u4F5C\uFF1B\u5173\u95ED\u65F6\u5DE6\u4FA7\u680F\u9690\u85CF\u5165\u53E3\uFF0C\u5DF2\u6709\u753B\u5E03\u4E0E\u6210\u679C\u4FDD\u7559\u5728\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\u3002").volatile(),
+      // 自动建图：只在流程画布打开后生效，默认开启，跟着创作自动建图并回填成果。
+      autoCreateCanvas: Schema.boolean().default(true).description("\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\uFF08\u6D41\u7A0B\u753B\u5E03\u6253\u5F00\u540E\u6709\u6548\uFF0C\u9ED8\u8BA4\u5F00\u542F\uFF09\uFF1A\u521B\u4F5C\u65F6\u81EA\u52A8\u5EFA\u56FE\uFF0C\u5BA1\u6838\u524D\u540C\u6B65\u5267\u672C\u3001\u5206\u955C\u4E0E\u5236\u4F5C\u8BA1\u5212\uFF0C\u751F\u6210\u540E\u56DE\u586B\u6210\u679C\uFF1B\u5173\u95ED\u540E\u4E0D\u81EA\u52A8\u5EFA\u56FE\uFF0C\u4EC5\u5728\u7528\u6237\u660E\u786E\u9009\u4E2D\u753B\u5E03\u8282\u70B9\u65F6\u8054\u52A8\u3002").volatile(),
       connectionMode: Schema.union(["metaontic", "volcengine"]).default("metaontic").description("\u63A5\u5165\u65B9\u5F0F\uFF1AMetaOntic AI\uFF08metaontic\uFF09\uFF1B\u706B\u5C71\u5F15\u64CE\u76F4\u8FDE\uFF08volcengine\uFF0C\u5F53\u524D\u8BBE\u7F6E\u9875\u6682\u4E0D\u63D0\u4F9B\u9009\u62E9\uFF09").volatile(),
       metaonticApiKey: Schema.string().default("").description("MetaOntic AI API\u5BC6\u94A5").volatile(),
       volcengineApiKey: Schema.string().default("").description("\u706B\u5C71\u5F15\u64CE\u76F4\u8FDE\u6A21\u5F0F\u7684\u706B\u5C71 API\u5BC6\u94A5").volatile(),
-      entryId: Schema.string().default("metaontic-video").description("\u672C\u63D2\u4EF6\u5728 profile patch \u91CC\u7684\u6761\u76EE id\uFF1B\u914D\u7F6E\u5DE5\u5177\u7528\u5B83\u628A\u6539\u52A8\u5199\u56DE").volatile(),
+      entryId: Schema.string().default(PLUGIN_ID).description("\u672C\u63D2\u4EF6\u5728 profile patch \u91CC\u7684\u6761\u76EE id\uFF1B\u914D\u7F6E\u5DE5\u5177\u7528\u5B83\u628A\u6539\u52A8\u5199\u56DE").volatile(),
       baseUrl: Schema.string().default("").description(
-        "\u57FA\u7840\u5730\u5740\uFF08\u4E2D\u8F6C\u7AD9\u7AD9\u5740\uFF09\uFF1B\u7559\u7A7A\u65F6\u8BFB\u73AF\u5883\u53D8\u91CF NEWAPI_VIDEO_BASE_URL / NEWAPI_BASE_URL\uFF0C\u518D\u4F7F\u7528 https://ai.bileego.com\u3002\u793A\u4F8B https://ai.bileego.com\uFF08\u4E0D\u8981\u5E26 /v1\uFF0C\u4E5F\u4E0D\u8981\u91CD\u590D /api/v3\uFF09"
+        `\u57FA\u7840\u5730\u5740\uFF08\u4E2D\u8F6C\u7AD9\u7AD9\u5740\uFF09\uFF1B\u7559\u7A7A\u65F6\u8BFB\u73AF\u5883\u53D8\u91CF NEWAPI_VIDEO_BASE_URL / NEWAPI_BASE_URL\uFF0C\u518D\u4F7F\u7528 ${RELAY.baseUrl}\u3002\u793A\u4F8B ${RELAY.baseUrl}\uFF08\u4E0D\u8981\u5E26 /v1\uFF0C\u4E5F\u4E0D\u8981\u91CD\u590D /api/v3\uFF09`
       ).volatile(),
       submitPath: Schema.string().default("").description("\u521B\u5EFA\u4EFB\u52A1\u8DEF\u5F84\uFF1B\u7559\u7A7A\u7528\u4E2D\u8F6C\u7AD9\u9ED8\u8BA4\u503C /doubao/api/v3/contents/generations/tasks").volatile(),
       queryPath: Schema.string().default("").description("\u67E5\u8BE2\u4EFB\u52A1\u8DEF\u5F84\uFF0C{task_id} \u4F1A\u88AB\u4EFB\u52A1 ID \u66FF\u6362\uFF1B\u7559\u7A7A\u7528\u4E2D\u8F6C\u7AD9\u9ED8\u8BA4\u503C").volatile(),
@@ -999,25 +1064,24 @@ var init_config = __esm({
         "\u8F6E\u8BE2\u671F\u95F4\u300C\u67E5\u8BE2\u5931\u8D25\u300D\u7684\u5BB9\u5FCD\u6B21\u6570\uFF1A\u7F51\u7EDC\u6296\u52A8\u3001\u4E2D\u8F6C\u7AD9\u9650\u6D41\u3001API\u5BC6\u94A5\u4E2D\u9014\u88AB\u5224\u65E0\u6548\u90FD\u4F1A\u8BA9\u67E5\u8BE2\u62A5\u9519\uFF0C\u8FD9\u4E9B\u9519\u8BEF\u4E0D\u8868\u660E\u4EFB\u52A1\u7EC8\u6001\uFF1B\u8FDE\u7EED\u67E5\u8BE2\u5931\u8D25\u5230\u8FD9\u4E2A\u6B21\u6570\u624D\u505C\u6B62\u672C\u6B21\u7B49\u5F85\u3002\u653E\u5F03\u65F6\u4EFB\u52A1 ID \u4ECD\u4FDD\u7559\uFF0C\u53EF\u7528 video_status \u4E8B\u540E\u8865\u67E5\uFF0C\u4E0D\u4F1A\u628A\u300C\u67E5\u4E0D\u5230\u300D\u5F53\u6210\u300C\u6CA1\u751F\u6210\u300D\u3002\u8BBE\u7F6E\u9875\u4E0D\u663E\u793A\u8FD9\u4E00\u9879\uFF1A\u9ED8\u8BA4\u503C 5 \u591F\u7528\u3002"
       ).volatile()
     };
-    DEFAULT_MODEL = "doubao-seedance-2-0-mini-260615";
+    DEFAULT_MODEL = VIDEO_MODEL;
     MAX_SEGMENTS = 10;
     MIN_SECONDS = 4;
     MIN_SEGMENT_SECONDS = 4;
     MAX_SEGMENT_SECONDS = 15;
     MAX_TOTAL_SECONDS = 120;
     FIXED_RESOLUTION = "720p";
-    DEFAULT_OUTPUT_DIR = "metaontic-video";
     CUMULATIVE_TOLERANCE_RATIO = 0.25;
     CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5;
     GATED_TOOLS = ["video_generate", "video_extend", "video_setup", "video_prepare_image", "media_submission"];
     RELAY_PRESET = {
       baseUrl: METAONTIC_BASE_URL,
-      submitPath: "/doubao/api/v3/contents/generations/tasks",
-      queryPath: "/doubao/api/v3/contents/generations/tasks/{task_id}",
+      submitPath: RELAY.submitPath,
+      queryPath: RELAY.queryPath,
       model: DEFAULT_MODEL,
-      baseEnv: ["NEWAPI_VIDEO_BASE_URL", "NEWAPI_BASE_URL"],
-      modelEnv: ["NEWAPI_VIDEO_MODEL"],
-      textModelEnv: ["NEWAPI_TEXT_MODEL"]
+      baseEnv: RELAY.baseEnv,
+      modelEnv: RELAY.modelEnv,
+      textModelEnv: RELAY.textModelEnv
     };
     SUCCESS_STATES = /* @__PURE__ */ new Set(["succeeded", "success", "completed", "complete", "done", "finished"]);
     FAILED_STATES = /* @__PURE__ */ new Set(["failed", "failure", "error", "cancelled", "canceled", "expired"]);
@@ -1099,16 +1163,16 @@ function resolveApiKey(config) {
   throw new Error("\u8BF7\u5728\u8BBE\u7F6E\u9875\u9009\u62E9 MetaOntic AI \u6216\u706B\u5C71\u5F15\u64CE\u76F4\u8FDE\u5E76\u4FDD\u5B58\u914D\u7F6E\u3002");
 }
 function resolveBaseUrl(config) {
-  if (isVolcengine(config)) return "https://ark.cn-beijing.volces.com";
+  if (isVolcengine(config)) return VOLCENGINE.baseUrl;
   const preset = relayPreset();
   return (String(ref(config, "baseUrl", "")).trim() || envValue(preset.baseEnv) || preset.baseUrl).replace(/\/+$/, "");
 }
 function resolveSubmitPath(config) {
-  if (isVolcengine(config)) return "/api/v3/contents/generations/tasks";
+  if (isVolcengine(config)) return VOLCENGINE.submitPath;
   return String(ref(config, "submitPath", "")).trim() || relayPreset().submitPath;
 }
 function resolveQueryPath(config, taskId) {
-  if (isVolcengine(config)) return `/api/v3/contents/generations/tasks/${encodeURIComponent(taskId)}`;
+  if (isVolcengine(config)) return VOLCENGINE.queryPath.replace("{task_id}", encodeURIComponent(taskId));
   const path24 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
   return path24.replace("{task_id}", encodeURIComponent(taskId));
 }
@@ -1185,6 +1249,7 @@ var init_connection = __esm({
   "src/businesses/video/providers/connection.ts"() {
     init_config();
     init_connection_defaults();
+    init_hardcoded_config();
   }
 });
 
@@ -1250,8 +1315,9 @@ function dshHome() {
 // src/core/telemetry/reporter.ts
 init_version();
 init_value();
-var ANALYTICS_URL = "https://video.mybfs.cn/api/v1/analytics/events";
-var STATE = /* @__PURE__ */ Symbol.for("metaontic-video.analytics.process");
+init_hardcoded_config();
+init_hardcoded_config();
+var STATE = /* @__PURE__ */ Symbol.for(`${PLUGIN_ID}.analytics.process`);
 var EVENTS = /* @__PURE__ */ new Set(["plugin_started", "tool_started", "tool_finished", "video_task_created", "video_task_finished"]);
 var TOOLS = /* @__PURE__ */ new Set(["video_generate", "video_extend", "video_status", "video_project", "video_prepare_image", "video_estimate", "video_config", "video_setup", "video_stage", "media_submission"]);
 var STATUSES = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled", "unknown", "timeout", "approved", "pending", "paused", "prepared", "draft", "blocked", "review_required", "submission_unknown", "ok"]);
@@ -1261,7 +1327,7 @@ function processState() {
   return owner[STATE] ||= { identities: /* @__PURE__ */ new Map(), started: /* @__PURE__ */ new Set() };
 }
 async function analyticsIdentity() {
-  const file = path2.join(dshHome(), "state", "metaontic-video", "analytics-id.json");
+  const file = path2.join(dshHome(), "state", DATA_DIR, "analytics-id.json");
   const state = processState();
   if (!state.identities.has(file)) state.identities.set(file, (async () => {
     const parse = (raw) => {
@@ -1473,12 +1539,13 @@ import { performance } from "node:perf_hooks";
 import { AsyncLocalStorage } from "node:async_hooks";
 import path3 from "node:path";
 init_version();
+init_hardcoded_config();
 import { mkdir as mkdir2, appendFile } from "node:fs/promises";
 var requestLogContext = new AsyncLocalStorage();
 function requestLogPath() {
   const now = /* @__PURE__ */ new Date();
   const date2 = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-  return path3.join(dshHome(), "logs", "metaontic-video", date2, "requests.jsonl");
+  return path3.join(dshHome(), "logs", DATA_DIR, date2, "requests.jsonl");
 }
 var preparedDirs = /* @__PURE__ */ new Set();
 async function ensureLogDir(dir) {
@@ -1568,13 +1635,18 @@ function createToolRegistry(ctx, agents2, analytics, defer = () => {
   return { register, allowed, owner: (name) => owners.get(name) };
 }
 
+// src/core/runtime.ts
+init_hardcoded_config();
+
 // src/core/installation/update-lockfile.ts
+init_hardcoded_config();
 import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path4 from "node:path";
 import { fileURLToPath } from "node:url";
-var PACKAGE_NAME = "metaontic-video";
+var PACKAGE_NAME = PLUGIN_PACKAGE;
 var LOCKFILE = "pnpm-lock.yaml";
-var RELEASE_URL = /^https?:\/\/(?:gitee\.com\/hackloop|github\.com\/wxsimon2022)\/metaontic-video\/releases\/download\//i;
+var RELEASE_HOSTS = [GITEE, GITHUB].map(({ web }) => web.replace(/^https?:\/\//, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+var RELEASE_URL = new RegExp(`^https?://(?:${RELEASE_HOSTS.join("|")})/releases/download/`, "i");
 var SHA = /^sha\d+-[A-Za-z0-9+/=]+$/;
 var indentOf = (line) => line.length - line.trimStart().length;
 function integrityOf(block) {
@@ -1777,7 +1849,7 @@ function createPluginRuntime(definitions) {
     try {
       for (const business of businesses.values()) defer(business.apply(runtime));
       defer(ctx.inject(["systemPrompt"], (promptCtx) => promptCtx.systemPrompt.section({
-        name: "plugin:metaontic-video",
+        name: `plugin:${PLUGIN_ID}`,
         order: 5200,
         text: (context) => {
           const agent = agents2.resolve(context, ctx);
@@ -2398,6 +2470,7 @@ import { mkdir as mkdir6, readdir as readdir2, readFile as readFile4, writeFile 
 import path8 from "node:path";
 
 // src/businesses/video/media/references.ts
+init_hardcoded_config();
 import path7 from "node:path";
 import os4 from "node:os";
 import { stat as stat2, mkdir as mkdir5, rename as rename2, rm as rm2, open as open2, readdir, readFile as readFile3 } from "node:fs/promises";
@@ -2483,6 +2556,7 @@ function isRetryablePollError(failure) {
 }
 
 // src/businesses/video/media/ffmpeg.ts
+init_hardcoded_config();
 function resolveBinary(config, key, fallback) {
   return String(ref(config, key, "")).trim() || fallback;
 }
@@ -2553,13 +2627,13 @@ function currentPlatform() {
     return "linux";
   }
 }
-var HOMEBREW_BOOTSTRAP = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"';
+var HOMEBREW_BOOTSTRAP = FFMPEG_INSTALLS.macosBootstrap.command;
 function ffmpegInstallOptions(platform = currentPlatform()) {
   if (platform === "darwin") {
     return {
       os: "macOS",
       installs: [
-        { label: "macOS\uFF08Homebrew\uFF09", command: "brew install ffmpeg" },
+        FFMPEG_INSTALLS.macos,
         {
           label: "macOS\uFF08\u8FD8\u6CA1\u88C5 Homebrew \u5C31\u5148\u88C5\u5B83\uFF09",
           command: HOMEBREW_BOOTSTRAP
@@ -2573,8 +2647,8 @@ function ffmpegInstallOptions(platform = currentPlatform()) {
     return {
       os: "Windows",
       installs: [
-        { label: "Windows\uFF08winget\uFF09", command: "winget install --id Gyan.FFmpeg -e" },
-        { label: "Windows\uFF08Chocolatey\uFF09", command: "choco install ffmpeg" }
+        FFMPEG_INSTALLS.windows,
+        FFMPEG_INSTALLS.windowsChoco
       ],
       bootstrap: null
     };
@@ -2582,11 +2656,8 @@ function ffmpegInstallOptions(platform = currentPlatform()) {
   return {
     os: "Linux",
     installs: [
-      {
-        label: "Linux\uFF08Debian / Ubuntu\uFF09",
-        command: "sudo apt update && sudo apt install -y ffmpeg"
-      },
-      { label: "Linux\uFF08Fedora / RHEL / CentOS\uFF09", command: "sudo dnf install -y ffmpeg" }
+      FFMPEG_INSTALLS.linux,
+      FFMPEG_INSTALLS.linuxDnf
     ],
     bootstrap: null
   };
@@ -2692,7 +2763,7 @@ function canvasSize(ratio) {
   return CANVAS_SIZES[String(ratio ?? "").trim()] || null;
 }
 function referenceCacheDir() {
-  return path7.join(os4.tmpdir(), "metaontic-video-reference");
+  return path7.join(os4.tmpdir(), REFERENCE_TMP_DIR);
 }
 async function isUsableFit(dest, width, height, config, signal) {
   const info = await stat2(dest).catch(() => null);
@@ -2927,6 +2998,7 @@ function validateImageRoles(args, model) {
 }
 
 // src/businesses/video/workflow/project.ts
+init_hardcoded_config();
 init_config();
 init_connection();
 var locks = /* @__PURE__ */ new Set();
@@ -2943,7 +3015,7 @@ function sessionOwner(exec) {
   return hash(id);
 }
 async function allProjects() {
-  const dir = path8.join(dshHome(), "metaontic-video", "projects");
+  const dir = path8.join(dshHome(), DATA_DIR, "projects");
   const names = await readdir2(dir).catch(() => []);
   const found = [];
   for (const name of names) {
@@ -2966,7 +3038,7 @@ async function projectsOfSession(session) {
 }
 function projectFile(id) {
   if (!/^[a-f0-9-]{36}$/.test(String(id || ""))) throw new Error("\u7F3A\u5C11\u6709\u6548 projectId\uFF0C\u8BF7\u5148\u8C03\u7528 video_project(action:prepare)\u3002");
-  return path8.join(dshHome(), "metaontic-video", "projects", `${id}.json`);
+  return path8.join(dshHome(), DATA_DIR, "projects", `${id}.json`);
 }
 async function readProject(id, exec) {
   const data = JSON.parse(await readFile4(projectFile(id), "utf8"));
@@ -4365,6 +4437,7 @@ function jsonSafeTool(tool) {
 import path15 from "node:path";
 import { createHash as createHash4, randomUUID as randomUUID6 } from "node:crypto";
 import { mkdir as mkdir8, readFile as readFile8, writeFile as writeFile6, rename as rename6, rm as rm6, open as open3, readdir as readdir4 } from "node:fs/promises";
+init_hardcoded_config();
 init_connection();
 
 // src/businesses/video/providers/transport.ts
@@ -4627,7 +4700,7 @@ function submissionIdentity(config) {
   return hash2(JSON.stringify([isVolcengine(config) ? "volcengine" : "metaontic", resolveBaseUrl(config), hash2(resolveApiKey(config))]));
 }
 function directory() {
-  return path15.join(dshHome(), "state", "metaontic-video", "submissions");
+  return path15.join(dshHome(), "state", DATA_DIR, "submissions");
 }
 async function save(file, record) {
   const temporary = `${file}.${randomUUID6()}.tmp`;
@@ -4770,15 +4843,17 @@ function submissionTool(liveConfig) {
 import { createHash as createHash6, randomUUID as randomUUID8 } from "node:crypto";
 import { mkdir as mkdir11, readFile as readFile10, writeFile as writeFile8, rename as rename9, copyFile, stat as stat7, open as open4 } from "node:fs/promises";
 import path18 from "node:path";
+init_hardcoded_config();
 
 // src/businesses/video/integrations/canvas-builtin.ts
 import { mkdir as mkdir9, readFile as readFile9, writeFile as writeFile7, rename as rename7, readdir as readdir5, stat as stat6 } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { createHash as createHash5, randomUUID as randomUUID7 } from "node:crypto";
 import path16 from "node:path";
+init_hardcoded_config();
 var BUILTIN_BACKEND = "builtin";
 var validId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
-var storeDir = () => path16.join(dshHome(), "metaontic-video", "canvas");
+var storeDir = () => path16.join(dshHome(), DATA_DIR, "canvas");
 var docsDir = () => path16.join(storeDir(), "projects");
 var dataRootOf = () => path16.join(storeDir(), "data");
 var assetsFile = () => path16.join(storeDir(), "assets.json");
@@ -5363,7 +5438,7 @@ async function readCanvasInput(adapter, link) {
 }
 function resultFile(token) {
   if (!/^[a-f0-9-]{36}$/.test(String(token || ""))) throw new Error("\u56DE\u586B\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548");
-  return path18.join(dshHome(), "metaontic-video", "canvas-results", `${token}.json`);
+  return path18.join(dshHome(), DATA_DIR, "canvas-results", `${token}.json`);
 }
 async function saveRecord(record) {
   const file = resultFile(record.id);
@@ -5427,7 +5502,7 @@ async function publishCanvasResult(adapter, record) {
       dest = corrected;
       rel = rel.replace(/\.png$/, suffix);
     }
-    const created = await adapter.rpc.assetCreate({ projectName: doc.name || "", asset: { id, projectId: record.canvas.projectId, kind: media.kind, mime, name: media.label, rel, size: (await stat7(dest)).size, createdAt: record.createdAt, stored: "disk", source: "metaontic-video" } });
+    const created = await adapter.rpc.assetCreate({ projectName: doc.name || "", asset: { id, projectId: record.canvas.projectId, kind: media.kind, mime, name: media.label, rel, size: (await stat7(dest)).size, createdAt: record.createdAt, stored: "disk", source: PLUGIN_ID } });
     if (created?.ok === false) throw new Error("\u753B\u5E03\u8D44\u4EA7\u767B\u8BB0\u5931\u8D25");
     publications.push({ id, media, index });
   }
@@ -5501,7 +5576,7 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
       const saved = !canvas && resumeDir ? await readPauseFile(resumeDir) : null;
       const projectId = args.projectId || saved?.options?.projectId;
       canvas ||= saved?.options?.canvas;
-      if (!canvas && projectId && ref(config, "autoCreateCanvas", false) === true) {
+      if (!canvas && projectId && ref(config, "canvasEnabled", false) === true && ref(config, "autoCreateCanvas", true) === true) {
         const project = await readProject(projectId, exec);
         canvas = project.canvasAuto?.canvas;
       }
@@ -5636,7 +5711,8 @@ function pluginNamedCanvasName(binding, current, title = "") {
 }
 function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionTitle = null) {
   async function sync(projectId, exec, draft = {}) {
-    if (ref(config, "autoCreateCanvas", false) !== true) return { status: "disabled", reason: "\u672A\u5F00\u542F\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03\uFF08\u9ED8\u8BA4\u5173\u95ED\uFF0C\u53EF\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u6253\u5F00\uFF09\uFF1B\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\u3002" };
+    if (ref(config, "canvasEnabled", false) !== true) return { status: "disabled", reason: "\u672A\u6253\u5F00\u6D41\u7A0B\u753B\u5E03\uFF08\u9ED8\u8BA4\u5173\u95ED\uFF0C\u53EF\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u6253\u5F00\uFF09\uFF1B\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\u3002" };
+    if (ref(config, "autoCreateCanvas", true) !== true) return { status: "disabled", reason: "\u5DF2\u5173\u95ED\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\uFF1B\u6539\u4E3A\u5728\u753B\u5E03\u5185\u660E\u786E\u9009\u4E2D\u8282\u70B9\u65F6\u8054\u52A8\uFF0C\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\u3002" };
     return lockProject(`canvas:${projectId}`, async () => {
       const project = await readProject(projectId, exec);
       draft = { ...project.canvasDraft || { scriptPath: project.approved?.scriptPath, specification: project.approved?.specification }, ...draft };
@@ -5887,6 +5963,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
 import path21 from "node:path";
 import { createHash as createHash9, randomUUID as randomUUID9 } from "node:crypto";
 import { mkdir as mkdir13, readFile as readFile12, writeFile as writeFile10, rename as rename11, stat as stat9 } from "node:fs/promises";
+init_hardcoded_config();
 init_connection();
 
 // src/businesses/video/providers/seedance.ts
@@ -7186,7 +7263,7 @@ function planCanvasNative(input, config, operation = "generate", draft = {}, car
 function createCanvasNativeService(liveConfig, options = {}) {
   const load = options.load || loadCanvasAdapter;
   const adapterFor = (link) => options.resolve ? options.resolve(link) : resolveCanvasAdapter(link?.projectId, load);
-  const directory2 = options.directory || path21.join(dshHome(), "metaontic-video", "canvas-native");
+  const directory2 = options.directory || path21.join(dshHome(), DATA_DIR, "canvas-native");
   const snapshots = /* @__PURE__ */ new Map(), running = /* @__PURE__ */ new Map(), locks2 = /* @__PURE__ */ new Set();
   const proposals = /* @__PURE__ */ new Map();
   const chainDirectory = options.chainDirectory || path21.join(directory2, "chains");
@@ -9112,7 +9189,9 @@ function hyperframesTool(config, deps) {
 init_connection_defaults();
 init_config();
 init_connection();
+init_hardcoded_config();
 var CONFIG_FIELDS = [
+  "canvasEnabled",
   "autoCreateCanvas",
   "connectionMode",
   "metaonticApiKey",
@@ -9158,7 +9237,8 @@ function configView(config) {
   return {
     stored: maskSecrets(stored),
     effective: {
-      autoCreateCanvas: ref(config, "autoCreateCanvas", false) === true,
+      canvasEnabled: ref(config, "canvasEnabled", false) === true,
+      autoCreateCanvas: ref(config, "canvasEnabled", false) === true && ref(config, "autoCreateCanvas", true) === true,
       connectionMode: isVolcengine(config) ? "volcengine" : "metaontic",
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),
@@ -9191,7 +9271,7 @@ function configTool(config, settings) {
         },
         metaonticApiKey: { type: "string", description: "MetaOntic AI \u624B\u52A8 API\u5BC6\u94A5\uFF0C\u65E0\u9700\u767B\u5F55" },
         volcengineApiKey: { type: "string", description: "\u706B\u5C71\u5F15\u64CE\u76F4\u8FDE\u6A21\u5F0F\u7684\u706B\u5C71 API\u5BC6\u94A5" },
-        baseUrl: { type: "string", description: "\u57FA\u7840\u5730\u5740\uFF0C\u5373\u4E2D\u8F6C\u7AD9\u7AD9\u5740\uFF0C\u4F8B\u5982 https://ai.bileego.com\u3002" },
+        baseUrl: { type: "string", description: `\u57FA\u7840\u5730\u5740\uFF0C\u5373\u4E2D\u8F6C\u7AD9\u7AD9\u5740\uFF0C\u4F8B\u5982 ${RELAY.baseUrl}\u3002` },
         estimateGroupRatio: { type: "number", description: "\u9884\u4F30\u8D39\u7528\u7528\u7684\u5206\u7EC4\u6298\u6263\uFF08\u4E2D\u8F6C\u7AD9 group_ratio\uFF1A\u9ED8\u8BA4 0.8\uFF09\u3002" },
         submitPath: { type: "string", description: "\u521B\u5EFA\u4EFB\u52A1\u8DEF\u5F84\uFF0C\u4F8B\u5982 /doubao/api/v3/contents/generations/tasks\u3002" },
         queryPath: { type: "string", description: "\u67E5\u8BE2\u4EFB\u52A1\u8DEF\u5F84\uFF0C{task_id} \u4F1A\u88AB\u66FF\u6362\u3002" },
@@ -9248,10 +9328,7 @@ function configTool(config, settings) {
           action: { type: "string" },
           patchPath: { type: "string" },
           stored: { type: "object" },
-          effective: {
-            autoCreateCanvas: ref(config, "autoCreateCanvas", false) === true,
-            type: "object"
-          },
+          effective: { type: "object" },
           error: { type: "string" }
         }
       },
@@ -9298,11 +9375,12 @@ init_config();
 function buildPromptGuidance(config) {
   const singleMax = resolveSingleMax(config);
   const segmentSeconds = resolveSegmentSeconds(config);
-  const autoCreate = ref(config, "autoCreateCanvas", false) === true;
+  const canvasOn = ref(config, "canvasEnabled", false) === true;
+  const autoCreate = canvasOn && ref(config, "autoCreateCanvas", true) === true;
   return [
-    `\xB7 \u5F53\u524D\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03\uFF1A${autoCreate ? "\u5F00\u542F" : "\u5173\u95ED\uFF08\u9ED8\u8BA4\u5173\u95ED\uFF0C\u53EF\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u6253\u5F00\uFF09\uFF1B\u4E0D\u81EA\u52A8\u5EFA\u56FE\u6216\u540C\u6B65\uFF0C\u5DF2\u6709\u753B\u5E03\u4FDD\u7559\uFF0C\u660E\u786E\u624B\u52A8\u9009\u4E2D\u8282\u70B9\u65F6\u4ECD\u53EF\u8054\u52A8"}\u3002\u8BE5\u5F00\u5173\u53EA\u80FD\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u4FEE\u6539\uFF0Cvideo_config\u53EF\u53EA\u8BFB\u6838\u5BF9\u3002`,
-    "\xB7 \u6D41\u7A0B\u753B\u5E03\u662F\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF08\u5DE6\u4FA7\u680F\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u90A3\u4E00\u884C\u6253\u5F00\u72EC\u7ACB\u9875\u9762\uFF0C\u89C6\u9891\u521B\u4F5C\u9762\u677F\u91CC\u4E0D\u518D\u5185\u5D4C\uFF09\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u4EFB\u4F55\u7B2C\u4E09\u65B9\u753B\u5E03\u63D2\u4EF6\uFF1B\u6309\u5F53\u524D\u5F00\u5173\u51B3\u5B9A\u662F\u5426\u81EA\u52A8\u6295\u5F71\u3002" + (autoCreate ? "\u666E\u901A\u521B\u4F5C\u7167\u5E38\u8C03\u7528video_project prepare/review\uFF0C\u5DE5\u5177\u4F1A\u81EA\u52A8\u5EFA\u6D41\u7A0B\u753B\u5E03\u9879\u76EE\u3001\u540C\u6B65\u5B8C\u6574\u811A\u672C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\uFF0C\u5E76\u63D0\u793A\u7528\u6237\u5230\u5DE6\u4FA7\u680F\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u67E5\u770B\uFF1B\u4E0D\u8981\u8981\u6C42\u7528\u6237\u53E6\u5EFA\u9879\u76EE/\u8282\u70B9\u6216\u53E6\u95EE\u662F\u5426\u540C\u6B65\u3002" : "\u5F53\u524D\u5F00\u5173\u5173\u95ED\uFF1A\u4E0D\u8981\u81EA\u52A8\u5EFA\u56FE\u3001\u4E0D\u8981\u81EA\u52A8\u540C\u6B65\uFF0C\u4E5F\u4E0D\u8981\u5BF9\u7528\u6237\u8BF4\u5DF2\u7ECF\u5EFA\u597D\u6216\u6253\u5F00\u4E86\u6D41\u7A0B\u753B\u5E03\uFF1B\u7528\u6237\u660E\u786E\u8981\u7528\u753B\u5E03\u65F6\u518D\u6309\u4E0B\u9762\u7684\u753B\u5E03\u8054\u52A8\u89C4\u5219\u624B\u52A8\u5904\u7406\u3002") + "\u5F00\u542F\u540E\u751F\u6210\u4F20projectId\uFF0C\u7EED\u505A\u4F20\u539Fresume\uFF0C\u6210\u679C\u56DE\u5230\u5DF2\u7ED1\u5B9A\u7684\u753B\u5E03\u8282\u70B9\uFF0C\u4E0D\u5FC5\u624B\u5DE5\u62FC\u81EA\u52A8canvas\u7ED1\u5B9A\u3002canvasProject\u4E3Adisabled\u8868\u793A\u672A\u5F00\u542F\u81EA\u52A8\u6295\u5F71\uFF0Cunavailable/pending\u5982\u5B9E\u8BF4\u660E\uFF0C\u7528video_project status\u91CD\u8BD5\u540C\u6B65\uFF0C\u4E0D\u91CD\u5EFA\u521B\u4F5C\u9879\u76EE\u6216\u91CD\u751F\u6210\uFF1B\u5185\u7F6E\u753B\u5E03\u53EA\u80FD\u7531\u7528\u6237\u81EA\u5DF1\u4ECE\u5DE6\u4FA7\u680F\u6253\u5F00\uFF0C\u5DE5\u5177\u65E0\u6CD5\u4EE3\u5F00\uFF0C\u4E0D\u8981\u58F0\u79F0\u5DF2\u6253\u5F00\u3002\u4ECD\u4FDD\u7559\u811A\u672C\u3001\u8D39\u7528\u548C\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838\u3002",
-    "\xB7 \u6D41\u7A0B\u753B\u5E03\u8054\u52A8\uFF08\u7531\u7528\u6237\u660E\u786E\u9009\u4E2D\u753B\u5E03\u8282\u70B9\u89E6\u53D1\uFF0C\u4E0E\u8BBE\u7F6E\u91CC\u7684\u81EA\u52A8\u521B\u5EFA\u5F00\u5173\u65E0\u5173\uFF09\uFF1A\u7528\u6237\u8981\u7528MetaOnticVideo\u5236\u4F5C\u753B\u5E03\u8282\u70B9\u65F6\uFF0C\u5148video_canvas(action:list/read)\u8BFB\u53D6\u76EE\u6807\u8282\u70B9\u3001\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u548C\u53C2\u8003\u7D20\u6750\u3002\u6309\u7AEF\u53E3/refOrder\u4FDD\u7559\u9996\u5E27\u3001\u5C3E\u5E27\u3001\u53C2\u8003\u89C6\u9891\u89D2\u8272\uFF0C\u660E\u786E\u7F3A\u5931\u89C4\u683C\uFF0C\u4E0D\u731C\u65F6\u957F\u548C\u6E05\u6670\u5EA6\u3002\u636E\u6B64\u5B8C\u6210\u73B0\u6709video_project\u51C6\u5907\u3001\u6B63\u6587\u5C55\u793A\u811A\u672C/\u5185\u5D4C\u5206\u955C\u53CAreview\uFF1B\u5B8C\u6574specification\u4E0E\u968F\u540Evideo_generate/video_extend\u53C2\u6570\u90FD\u5E26read\u8FD4\u56DE\u7684canvas\u5BF9\u8C61\u3002\u56FE\u7247\u8D70video_prepare_image\u5E76\u5E26canvas\uFF0C\u4ECD\u987B\u56FE\u7247\u8D39\u7528\u5BA1\u6279\u548C\u7ED3\u679C\u5BA1\u6838\u3002\u4E0D\u590D\u5236API\u5BC6\u94A5\u3002\u6210\u679C\u81EA\u52A8\u65B0\u589E\u5230\u6D41\u7A0B\u753B\u5E03\uFF0Cpaused\u4ECD\u987B\u5148\u4EA4\u4ED8\u5E76review_segment\uFF0C\u56DE\u586B\u4E0D\u4EE3\u8868\u7ED3\u679C\u5DF2\u5BA1\u6838\u6216\u6574\u7247\u5B8C\u6210\u3002\u56DE\u586Bpending\u65F6\u7528video_canvas(action:sync,token)\u8865\u4F20\uFF0C\u7EDD\u4E0D\u91CD\u65B0\u751F\u6210\u3002\u753B\u5E03\u6309\u8FDE\u7EBF\u987A\u5E8F\u6267\u884C\uFF1A\u9876\u90E8\u6709\u300C\u5236\u4F5C\u300C\u8282\u70B9\u540D\u300D\u300D\u6309\u94AE\u4F9D\u6B21\u9A71\u52A8\u4E0B\u4E00\u4E2A\u672A\u5B8C\u6210\u8282\u70B9\uFF0C\u672A\u5B8C\u6210\u8282\u70B9\u7528\u865A\u7EBF\u6846\u6807\u51FA\uFF0C\u8FDB\u5EA6\u663E\u793A\u5728\u5DE5\u5177\u6761\u4E0A\uFF1B\u8282\u70B9\u5185\u7684\u300C\u5236\u4F5C\u300D\u6309\u94AE\u4E0E\u5B83\u90FD\u7531\u63D2\u4EF6\u63A5\u7BA1\u65B9\u6848\u3001\u8D39\u7528\u4E0E\u7ED3\u679C\u5BA1\u6838\u3002\u7528\u6237\u5728\u753B\u5E03\u5185\u81EA\u884C\u70B9\u51FB\u751F\u6210\u65F6\u540C\u6837\u5148\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002",
+    `\xB7 \u5F53\u524D\u6D41\u7A0B\u753B\u5E03\uFF1A${canvasOn ? `\u5F00\u542F\uFF1B\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\uFF1A${autoCreate ? "\u5F00\u542F" : "\u5173\u95ED"}` : "\u5173\u95ED\uFF08\u9ED8\u8BA4\u5173\u95ED\uFF0C\u53EF\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u6253\u5F00\uFF09"}\u3002\u8FD9\u4E24\u4E2A\u5F00\u5173\u53EA\u80FD\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u4FEE\u6539\uFF0Cvideo_config\u53EF\u53EA\u8BFB\u6838\u5BF9\u3002`,
+    "\xB7 \u6D41\u7A0B\u753B\u5E03\u662F\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF08\u5DE6\u4FA7\u680F\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u90A3\u4E00\u884C\u6253\u5F00\u72EC\u7ACB\u9875\u9762\uFF0C\u89C6\u9891\u521B\u4F5C\u9762\u677F\u91CC\u4E0D\u518D\u5185\u5D4C\uFF09\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u4EFB\u4F55\u7B2C\u4E09\u65B9\u753B\u5E03\u63D2\u4EF6\uFF1B\u6309\u5F53\u524D\u5F00\u5173\u51B3\u5B9A\u662F\u5426\u81EA\u52A8\u6295\u5F71\u3002" + (!canvasOn ? "\u5F53\u524D\u6D41\u7A0B\u753B\u5E03\u5173\u95ED\uFF1A\u5DE6\u4FA7\u680F\u6CA1\u6709\u753B\u5E03\u5165\u53E3\uFF0C\u4E0D\u8981\u81EA\u52A8\u5EFA\u56FE\u3001\u4E0D\u8981\u81EA\u52A8\u540C\u6B65\uFF0C\u4E5F\u4E0D\u8981\u5BF9\u7528\u6237\u8BF4\u5DF2\u7ECF\u5EFA\u597D\u6216\u6253\u5F00\u4E86\u6D41\u7A0B\u753B\u5E03\uFF1B\u7528\u6237\u8981\u7528\u753B\u5E03\u65F6\u5148\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u6253\u5F00\u300C\u6D41\u7A0B\u753B\u5E03\u300D\uFF0C\u518D\u6309\u4E0B\u9762\u7684\u753B\u5E03\u8054\u52A8\u89C4\u5219\u624B\u52A8\u5904\u7406\u3002" : autoCreate ? "\u666E\u901A\u521B\u4F5C\u7167\u5E38\u8C03\u7528video_project prepare/review\uFF0C\u5DE5\u5177\u4F1A\u81EA\u52A8\u5EFA\u6D41\u7A0B\u753B\u5E03\u9879\u76EE\u3001\u540C\u6B65\u5B8C\u6574\u811A\u672C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\uFF0C\u5E76\u63D0\u793A\u7528\u6237\u5230\u5DE6\u4FA7\u680F\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u67E5\u770B\uFF1B\u4E0D\u8981\u8981\u6C42\u7528\u6237\u53E6\u5EFA\u9879\u76EE/\u8282\u70B9\u6216\u53E6\u95EE\u662F\u5426\u540C\u6B65\u3002" : "\u5F53\u524D\u6D41\u7A0B\u753B\u5E03\u5DF2\u6253\u5F00\u4F46\u5173\u95ED\u4E86\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\uFF1A\u4E0D\u8981\u81EA\u52A8\u5EFA\u56FE\u3001\u4E0D\u8981\u81EA\u52A8\u540C\u6B65\uFF0C\u4E5F\u4E0D\u8981\u5BF9\u7528\u6237\u8BF4\u5DF2\u7ECF\u81EA\u52A8\u5EFA\u597D\uFF1B\u7528\u6237\u660E\u786E\u9009\u4E2D\u753B\u5E03\u8282\u70B9\u65F6\u518D\u6309\u4E0B\u9762\u7684\u753B\u5E03\u8054\u52A8\u89C4\u5219\u624B\u52A8\u5904\u7406\u3002") + "\u5F00\u542F\u540E\u751F\u6210\u4F20projectId\uFF0C\u7EED\u505A\u4F20\u539Fresume\uFF0C\u6210\u679C\u56DE\u5230\u5DF2\u7ED1\u5B9A\u7684\u753B\u5E03\u8282\u70B9\uFF0C\u4E0D\u5FC5\u624B\u5DE5\u62FC\u81EA\u52A8canvas\u7ED1\u5B9A\u3002canvasProject\u4E3Adisabled\u8868\u793A\u672A\u5F00\u542F\u81EA\u52A8\u6295\u5F71\uFF0Cunavailable/pending\u5982\u5B9E\u8BF4\u660E\uFF0C\u7528video_project status\u91CD\u8BD5\u540C\u6B65\uFF0C\u4E0D\u91CD\u5EFA\u521B\u4F5C\u9879\u76EE\u6216\u91CD\u751F\u6210\uFF1B\u5185\u7F6E\u753B\u5E03\u53EA\u80FD\u7531\u7528\u6237\u81EA\u5DF1\u4ECE\u5DE6\u4FA7\u680F\u6253\u5F00\uFF0C\u5DE5\u5177\u65E0\u6CD5\u4EE3\u5F00\uFF0C\u4E0D\u8981\u58F0\u79F0\u5DF2\u6253\u5F00\u3002\u4ECD\u4FDD\u7559\u811A\u672C\u3001\u8D39\u7528\u548C\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838\u3002",
+    "\xB7 \u6D41\u7A0B\u753B\u5E03\u8054\u52A8\uFF08\u7531\u7528\u6237\u660E\u786E\u9009\u4E2D\u753B\u5E03\u8282\u70B9\u89E6\u53D1\uFF0C\u4E0E\u8BBE\u7F6E\u91CC\u7684\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\u5F00\u5173\u65E0\u5173\uFF09\uFF1A\u7528\u6237\u8981\u7528MetaOnticVideo\u5236\u4F5C\u753B\u5E03\u8282\u70B9\u65F6\uFF0C\u5148video_canvas(action:list/read)\u8BFB\u53D6\u76EE\u6807\u8282\u70B9\u3001\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u548C\u53C2\u8003\u7D20\u6750\u3002\u6309\u7AEF\u53E3/refOrder\u4FDD\u7559\u9996\u5E27\u3001\u5C3E\u5E27\u3001\u53C2\u8003\u89C6\u9891\u89D2\u8272\uFF0C\u660E\u786E\u7F3A\u5931\u89C4\u683C\uFF0C\u4E0D\u731C\u65F6\u957F\u548C\u6E05\u6670\u5EA6\u3002\u636E\u6B64\u5B8C\u6210\u73B0\u6709video_project\u51C6\u5907\u3001\u6B63\u6587\u5C55\u793A\u811A\u672C/\u5185\u5D4C\u5206\u955C\u53CAreview\uFF1B\u5B8C\u6574specification\u4E0E\u968F\u540Evideo_generate/video_extend\u53C2\u6570\u90FD\u5E26read\u8FD4\u56DE\u7684canvas\u5BF9\u8C61\u3002\u56FE\u7247\u8D70video_prepare_image\u5E76\u5E26canvas\uFF0C\u4ECD\u987B\u56FE\u7247\u8D39\u7528\u5BA1\u6279\u548C\u7ED3\u679C\u5BA1\u6838\u3002\u4E0D\u590D\u5236API\u5BC6\u94A5\u3002\u6210\u679C\u81EA\u52A8\u65B0\u589E\u5230\u6D41\u7A0B\u753B\u5E03\uFF0Cpaused\u4ECD\u987B\u5148\u4EA4\u4ED8\u5E76review_segment\uFF0C\u56DE\u586B\u4E0D\u4EE3\u8868\u7ED3\u679C\u5DF2\u5BA1\u6838\u6216\u6574\u7247\u5B8C\u6210\u3002\u56DE\u586Bpending\u65F6\u7528video_canvas(action:sync,token)\u8865\u4F20\uFF0C\u7EDD\u4E0D\u91CD\u65B0\u751F\u6210\u3002\u753B\u5E03\u6309\u8FDE\u7EBF\u987A\u5E8F\u6267\u884C\uFF1A\u9876\u90E8\u6709\u300C\u5236\u4F5C\u300C\u8282\u70B9\u540D\u300D\u300D\u6309\u94AE\u4F9D\u6B21\u9A71\u52A8\u4E0B\u4E00\u4E2A\u672A\u5B8C\u6210\u8282\u70B9\uFF0C\u672A\u5B8C\u6210\u8282\u70B9\u7528\u865A\u7EBF\u6846\u6807\u51FA\uFF0C\u8FDB\u5EA6\u663E\u793A\u5728\u5DE5\u5177\u6761\u4E0A\uFF1B\u8282\u70B9\u5185\u7684\u300C\u5236\u4F5C\u300D\u6309\u94AE\u4E0E\u5B83\u90FD\u7531\u63D2\u4EF6\u63A5\u7BA1\u65B9\u6848\u3001\u8D39\u7528\u4E0E\u7ED3\u679C\u5BA1\u6838\u3002\u7528\u6237\u5728\u753B\u5E03\u5185\u81EA\u884C\u70B9\u51FB\u751F\u6210\u65F6\u540C\u6837\u5148\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002",
     "\xB7 \u72B6\u6001\u8868\u8FF0\u5FC5\u987B\u4E0E\u8BC1\u636E\u4E00\u81F4\uFF1A\u67E5\u8BE2\u5931\u8D25\u6216\u8D85\u65F6\u53EA\u8BF4\u72B6\u6001\u672A\u786E\u8BA4\uFF0C\u4E0D\u80FD\u65AD\u8A00\u6210\u529F\u3001\u5931\u8D25\u6216\u4ECD\u5728\u751F\u6210\uFF1B\u4EC5\u5728\u6536\u5230\u6210\u529F\u72B6\u6001\u53CA\u89C6\u9891\u94FE\u63A5\u540E\u8BF4\u672C\u6BB5\u751F\u6210\u6210\u529F\u3002\u672C\u5730\u6587\u4EF6\u5B58\u5728\u540E\u624D\u8BF4\u4E0B\u8F7D\u5B8C\u6210\uFF0C\u5408\u5E76\u6210\u529F\u540E\u624D\u8BF4\u5B8C\u6574\u6210\u7247\u5DF2\u5408\u5E76\uFF0C\u9010\u9879\u7ED9\u51FA\u94FE\u63A5\u540E\u624D\u8BF4\u5DF2\u4EA4\u4ED8\u3002\u6682\u505C\u9ED8\u8BA4\u4EA4\u4ED8\u672C\u6BB5\uFF0C\u4E0D\u5BA3\u79F0\u6B63\u5728\u5408\u5E76\u3002\u67E5\u8BE2\u66FE\u62A5401\u4F46\u540E\u6765\u6210\u529F\u65F6\uFF0C\u6B63\u5E38\u8FDB\u5EA6\u53EA\u62A5\u544A\u5F53\u524D\u5DF2\u786E\u8BA4\u7ED3\u679C\uFF1B\u4E0D\u5F97\u5C06401\u79F0\u4E3A\u5BC6\u94A5\u6296\u52A8\u6216\u731C\u6D4B\u539F\u56E0\u3002\u89C6\u9891\u8FDB\u5EA6\u63D0\u793A\u4EC5\u7528\u4E8E\u89C6\u9891\u751F\u6210\u6216\u7EED\u62CD\u7B49\u5F85\uFF0C\u4E0D\u7528\u4E8E\u811A\u672C\u3001\u56FE\u7247\u3001\u5BA1\u6838\u3001\u67E5\u8BE2\u3001\u4E0B\u8F7D\u3001\u5408\u5E76\u6216\u7ED3\u679C\u5C55\u793A\u3002",
     "\xB7 \u5206\u6BB5\u7ED3\u679C\u786E\u8BA4\u5FC5\u987B\u5F39\u7A97\uFF1Avideo_generate/video_extend\u8FD4\u56DEpaused=true\u65F6\u5148\u5728\u72EC\u7ACB\u6B63\u6587\u7ED9\u672C\u6BB5\u53EF\u70B9\u51FB\u89C6\u9891\u94FE\u63A5\uFF0C\u6B63\u6587\u6D88\u606F\u540C\u65F6\u8C03\u7528video_stage\u7ED3\u675Fresult_present\u5E76\u5F00\u59CBsegment_review_wait\uFF0C\u968F\u540E\u7ACB\u5373\u5355\u72EC\u8C03\u7528video_project(action:review_segment,resume:\u8FD4\u56DE\u7684resumeDir)\u3002\u7981\u6B62\u53EA\u95EE\u4E00\u53E5\u6548\u679C\u5982\u4F55\u5C31\u7ED3\u675F\u56DE\u5408\uFF1B\u8BE5\u7ED3\u679C\u5BA1\u6838\u4E0D\u5C5E\u4E8E\u91CD\u590D\u5236\u4F5C\u786E\u8BA4\uFF0C\u4E0D\u80FD\u88AB\u5408\u5E76\u6216\u7701\u7565\u3002\u53EA\u6709\u8FD4\u56DEapproved\u624D\u7528\u539Fresume\u7EE7\u7EED\u4E0B\u4E00\u6BB5\u8D39\u7528\u5BA1\u6279\u3002\u53D6\u6D88\u3001\u672A\u7B54\u3001\u62D2\u7EDD\u5747\u505C\u6B62\u4E14\u4FDD\u7559\u6210\u679C\uFF1B\u4E0D\u81EA\u52A8\u91CD\u505A\u3002",
     "\xB7 \u9002\u7528\u8303\u56F4\uFF1A\u672C\u5BF9\u8BDD\u53EA\u505A\u89C6\u9891\u521B\u4F5C\u2014\u2014\u811A\u672C\u3001\u5206\u955C\u3001\u751F\u6210\u3001\u63A5\u957F\u3001\u5408\u5E76\u3001\u4EA4\u4ED8\uFF0C\u4EE5\u53CA\u5B8C\u6210\u8FD9\u4E9B\u5FC5\u9700\u7684\u914D\u7F6E\u6307\u5F15\u4E0E\u73AF\u5883\u6392\u67E5\u3002\u4E0E\u89C6\u9891\u521B\u4F5C\u65E0\u5173\u7684\u8BDD\u9898\uFF08\u5176\u4ED6\u8F6F\u4EF6\u7684\u5B89\u88C5\u4E0E\u6392\u969C\u3001\u5199\u4EE3\u7801\u3001\u901A\u7528\u95EE\u7B54\u3001\u95F2\u804A\u7B49\uFF09\u4E0D\u627F\u63A5\uFF1A\u4E00\u53E5\u8BDD\u8BF4\u660E\u672C\u63D2\u4EF6\u53EA\u7528\u4E8E\u89C6\u9891\u521B\u4F5C\uFF0C\u8BF7\u7528\u6237\u56DE\u5230\u89C6\u9891\u9700\u6C42\uFF0C\u4E0D\u5C55\u5F00\u3001\u4E0D\u4EE3\u529E\uFF0C\u4E5F\u4E0D\u8981\u4E3A\u6B64\u8C03\u7528\u5176\u4ED6\u5DE5\u5177\u3002",

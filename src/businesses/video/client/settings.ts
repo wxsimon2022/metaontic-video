@@ -3,6 +3,7 @@ import { VOLCENGINE_MODE_AVAILABLE } from '../connection-defaults.js';
 import { createUpdateActions, renderUpdateNotice, formatReleaseTime } from '../../../client/updates.js';
 /** 浏览器端 settings：由入口注入宿主 React 与共享依赖。 */
 import packageInfo from '../../../../package.json';
+import { CHANGELOG_URL, RELAY, SUPPORT_URL } from '../../../core/hardcoded-config.js';
 /** 设置页工厂：入口注入宿主 React、配置表单及更新服务。 */
 export function createSettingsPage(deps: any) {
   const {
@@ -144,7 +145,7 @@ function makePage({ form, t, manager }) {
         // 少数需要解释的字段：模型选哪个（mini 便宜 / fast 贵一些）
         const hints = {
           connectionMode: selectedMode === 'metaontic'
-            ? [t('connectionMetaonticHint'), ' ', h('a', { key: 'metaontic-register', href: 'https://ai.bileego.com/sign-up?aff=VzYr', target: '_blank', rel: 'noopener noreferrer', style: { textDecoration: 'underline' } }, t('connectionMetaonticRegister'))]
+            ? [t('connectionMetaonticHint'), ' ', h('a', { key: 'metaontic-register', href: RELAY.signupUrl, target: '_blank', rel: 'noopener noreferrer', style: { textDecoration: 'underline' } }, t('connectionMetaonticRegister'))]
               : directMode && !VOLCENGINE_MODE_AVAILABLE ? t('connectionVolcengineUnavailable') : t('connectionModeHint'),
           metaonticApiKey: t('metaonticKeyHint'),
           volcengineApiKey: t('volcengineKeyHint'),
@@ -152,6 +153,7 @@ function makePage({ form, t, manager }) {
           imageModel: t('imageModelHint'),
           textModel: t('textModelHint'),
           seamTrimSeconds: t('seamTrimSecondsHint'),
+          canvasEnabled: t('canvasEnabledHint'),
           autoCreateCanvas: t('autoCreateCanvasHint'),
           maxWaitMs: t('waitSecondsHint'),
         };
@@ -205,6 +207,8 @@ function makePage({ form, t, manager }) {
           }
           const shared = (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
           const videoKey = directMode ? 'volcengineApiKey' : 'metaonticApiKey';
+          // 「自动创建画布」只在「流程画布」打开后才有意义，关闭时整项不显示，避免误解成两件事。
+          const canvasOn = (draft.canvasEnabled ?? value.canvasEnabled ?? false) === true;
           const fields = section.key === 'sectionModels'
             ? directMode ? ['model', videoKey]
               : shared ? ['imageUseVideoKey', videoKey, 'model', 'imageModel']
@@ -214,7 +218,8 @@ function makePage({ form, t, manager }) {
           fields.filter((key) => (key !== 'volcengineApiKey' || directMode)
             && (!['imageModel', 'imageUseVideoKey', 'imageApiKey'].includes(key) || !directMode)
             && (key !== 'imageApiKey' || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) === false)
-            && (key !== 'metaonticApiKey' || selectedMode === 'metaontic'))
+            && (key !== 'metaonticApiKey' || selectedMode === 'metaontic')
+            && (key !== 'autoCreateCanvas' || canvasOn))
             .map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean));
         };
         const settingsRows = () => [
@@ -328,7 +333,7 @@ function makePage({ form, t, manager }) {
               h('span', { key: 'label' }, PLUGIN_VERSION ? t('versionCurrent', { version: PLUGIN_VERSION }) : ''),
               updateBell(t, updateLatest, PLUGIN_VERSION),
             ]),
-            h('a', { key: 'history', className: 'mov-hint', href: 'https://github.com/wxsimon2022/metaontic-video/blob/master/CHANGELOG.md', target: '_blank', rel: 'noopener noreferrer' }, t('versionHistory')),
+            h('a', { key: 'history', className: 'mov-hint', href: '${CHANGELOG_URL}', target: '_blank', rel: 'noopener noreferrer' }, t('versionHistory')),
             h('button', {
               key: 'check',
               'data-action': 'update-check',
@@ -425,8 +430,8 @@ function makePage({ form, t, manager }) {
               h('button', { key: 'close', type: 'button', className: 'mov-btn mov-btn-sm mov-trailing', 'aria-label': t('supportClose'), onClick: () => setSupportOpen(false) }, t('supportClose')),
             ]),
             h('p', { key: 'hint', className: 'mov-hint' }, t('supportScan')),
-            h('iframe', { key: 'qr', className: 'mov-support-frame', title: t('supportContact'), src: 'https://work.weixin.qq.com/kfid/kfcd6fc4ca793eeac18', referrerPolicy: 'no-referrer' }),
-            h('a', { key: 'fallback', href: 'https://work.weixin.qq.com/kfid/kfcd6fc4ca793eeac18', target: '_blank', rel: 'noopener noreferrer' }, t('supportOpenPage')),
+            h('iframe', { key: 'qr', className: 'mov-support-frame', title: t('supportContact'), src: SUPPORT_URL, referrerPolicy: 'no-referrer' }),
+            h('a', { key: 'fallback', href: SUPPORT_URL, target: '_blank', rel: 'noopener noreferrer' }, t('supportOpenPage')),
           ])) : null,
         ]);
       };

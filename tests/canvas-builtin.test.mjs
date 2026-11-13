@@ -22,7 +22,7 @@ test('没有原版画布也能建流程画布：创建、命名、连线、读�
   const builtin=await api.loadCanvasAdapter();
   assert.equal(typeof builtin.rpc.projectsList,'function');
   const title='猫和老鼠20秒搞笑动画';
-  const sync=api.createCanvasProjectSync(undefined,{autoCreateCanvas:true}, {get:()=>({title})});
+  const sync=api.createCanvasProjectSync(undefined,{canvasEnabled:true, autoCreateCanvas:true}, {get:()=>({title})});
   const result=await sync.sync(project.id,exec);
   assert.equal(result.status,'synced');
   assert.match(result.projectId,/^[A-Za-z0-9_-]{1,100}$/);

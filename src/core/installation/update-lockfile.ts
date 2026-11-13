@@ -13,11 +13,13 @@
 import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GITEE, GITHUB, PLUGIN_PACKAGE } from '../hardcoded-config.js';
 
-const PACKAGE_NAME = 'metaontic-video';
+const PACKAGE_NAME = PLUGIN_PACKAGE;
 const LOCKFILE = 'pnpm-lock.yaml';
 /** 本插件成品包的发布地址；这类记录必须能验签，否则 pnpm 会拒绝整次安装。 */
-const RELEASE_URL = /^https?:\/\/(?:gitee\.com\/hackloop|github\.com\/wxsimon2022)\/metaontic-video\/releases\/download\//i;
+const RELEASE_HOSTS = [GITEE, GITHUB].map(({ web }) => web.replace(/^https?:\/\//, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+const RELEASE_URL = new RegExp(`^https?://(?:${RELEASE_HOSTS.join('|')})/releases/download/`, 'i');
 /** 真正的校验值形如 sha512-xxxx；null、空值和缺字段都算不可校验。 */
 const SHA = /^sha\d+-[A-Za-z0-9+/=]+$/;
 const indentOf = (line) => line.length - line.trimStart().length;

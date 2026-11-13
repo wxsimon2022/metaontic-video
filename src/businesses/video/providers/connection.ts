@@ -1,6 +1,7 @@
 /** providers/connection：从宿主入口拆出的独立职责模块。 */
 import { RELAY_PRESET, ref, envValue } from '../config.js';
 import { IMAGE_MODEL, TEXT_MODEL, normalizeTextModel, resolveImageModel } from '../connection-defaults.js';
+import { VOLCENGINE } from '../../../core/hardcoded-config.js';
 
 export function relayPreset() {
   // 只走 New API 中转站，路径/模型都取这一份预设。
@@ -30,19 +31,19 @@ export function resolveApiKey(config) {
 }
 
 export function resolveBaseUrl(config) {
-  if (isVolcengine(config)) return 'https://ark.cn-beijing.volces.com';
+  if (isVolcengine(config)) return VOLCENGINE.baseUrl;
   const preset = relayPreset();
   return (String(ref(config, 'baseUrl', '')).trim() || envValue(preset.baseEnv) || preset.baseUrl)
     .replace(/\/+$/, '');
 }
 
 export function resolveSubmitPath(config) {
-  if (isVolcengine(config)) return '/api/v3/contents/generations/tasks';
+  if (isVolcengine(config)) return VOLCENGINE.submitPath;
   return String(ref(config, 'submitPath', '')).trim() || relayPreset().submitPath;
 }
 
 export function resolveQueryPath(config, taskId) {
-  if (isVolcengine(config)) return `/api/v3/contents/generations/tasks/${encodeURIComponent(taskId)}`;
+  if (isVolcengine(config)) return VOLCENGINE.queryPath.replace('{task_id}', encodeURIComponent(taskId));
   const path = String(ref(config, 'queryPath', '')).trim() || relayPreset().queryPath;
   return path.replace('{task_id}', encodeURIComponent(taskId));
 }

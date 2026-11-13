@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { dshHome } from '../media/references.js';
+import { DATA_DIR } from '../../../core/hardcoded-config.js';
 import { ref, resolveResolution } from '../config.js';
 import { resolveBaseUrl, resolveModel, resolveSubmitPath } from '../providers/connection.js';
 import { resumeDirOf, readPauseFile } from './resume.js';
@@ -23,7 +24,7 @@ export function sessionOwner(exec) {
 }
 /** 本机全部创作项目；读不动的单个文件跳过，不影响其余项目。 */
 export async function allProjects() {
-  const dir = path.join(dshHome(), 'metaontic-video', 'projects');
+  const dir = path.join(dshHome(), DATA_DIR, 'projects');
   const names = await readdir(dir).catch(() => []);
   const found = [];
   for (const name of names) {
@@ -40,7 +41,7 @@ export async function projectsOfSession(session) {
 }
 function projectFile(id) {
   if (!/^[a-f0-9-]{36}$/.test(String(id || ''))) throw new Error('缺少有效 projectId，请先调用 video_project(action:prepare)。');
-  return path.join(dshHome(), 'metaontic-video', 'projects', `${id}.json`);
+  return path.join(dshHome(), DATA_DIR, 'projects', `${id}.json`);
 }
 export async function readProject(id, exec) {
   const data = JSON.parse(await readFile(projectFile(id), 'utf8'));

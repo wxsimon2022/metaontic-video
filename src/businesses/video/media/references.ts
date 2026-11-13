@@ -1,4 +1,5 @@
 import { dshHome } from '../../../core/paths.js';
+import { REFERENCE_TMP_DIR } from '../../../core/hardcoded-config.js';
 export { dshHome } from '../../../core/paths.js';
 /** media/references：从宿主入口拆出的独立职责模块。 */
 import path from 'node:path';
@@ -52,7 +53,7 @@ export function canvasSize(ratio) {
 
 /** 适配后的参考图放这里：同一张图反复提交时不必每次重跑 ffmpeg。 */
 function referenceCacheDir() {
-  return path.join(os.tmpdir(), 'metaontic-video-reference');
+  return path.join(os.tmpdir(), REFERENCE_TMP_DIR);
 }
 
 /**

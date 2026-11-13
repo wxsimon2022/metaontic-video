@@ -4,6 +4,7 @@ import path from 'node:path';
 import { dshHome } from '../paths.js';
 import { mkdir, appendFile } from 'node:fs/promises';
 import { PLUGIN_VERSION } from '../version.js';
+import { DATA_DIR } from '../hardcoded-config.js';
 
 /** 日志仅包含白名单字段；每日一个JSONL文件，不写请求体、鉴权头或输出URL。 */
 export const requestLogContext = new AsyncLocalStorage<Record<string, unknown>>();
@@ -11,7 +12,7 @@ export const requestLogContext = new AsyncLocalStorage<Record<string, unknown>>(
 function requestLogPath() {
   const now = new Date();
   const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-  return path.join(dshHome(), 'logs', 'metaontic-video', date, 'requests.jsonl');
+  return path.join(dshHome(), 'logs', DATA_DIR, date, 'requests.jsonl');
 }
 
 /**

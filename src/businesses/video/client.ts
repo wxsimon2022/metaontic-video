@@ -13,12 +13,7 @@ import { createSidebarPanel } from './client/panel.js';
 import { createCanvasView } from './client/canvas-view.js';
 import iconMark from '../../../icon.svg';
 
-/** 左侧栏入参与面板本体共用的面板 id；也是 `main` 键位槽的 key。 */
-const PANEL_ID = 'metaontic-video';
-/** 流程画布是插件自己的独立页面：单独的左侧栏入口与 `main` 键位槽，不与创作面板挤在一起。 */
-const CANVAS_PANEL_ID = 'metaontic-video-canvas';
-/** 面板里的「使用说明」链接。 */
-const GUIDE_URL = 'https://ai.mybfs.cn';
+import { CANVAS_PANEL_ID, GUIDE_URL, PANEL_ID } from '../../core/hardcoded-config.js';
 
 export function createVideoClient(require) {
     const React = require('react');
@@ -109,10 +104,10 @@ export function createVideoClient(require) {
             manager: pluginManager,
           }),
         }, VideoPanel)), 'metaontic-video: sidebar panel');
-        // 流程画布是可开关的组件：设置页「流程画布」开关打开时才注册左侧栏入口与画布页。
+        // 流程画布是可开关的组件：设置页「流程画布」总开关打开时才注册左侧栏入口与画布页。
         // 关闭后左侧栏不再出现画布入口，已有画布与成果仍留在插件数据目录；开关改动实时生效，不必重开 Harness。
         const canvasSwitchOn = () => {
-          try { return form?.getSnapshot?.()?.value?.autoCreateCanvas === true; } catch { return false; }
+          try { return form?.getSnapshot?.()?.value?.canvasEnabled === true; } catch { return false; }
         };
         const canvasSlots = [
           () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({

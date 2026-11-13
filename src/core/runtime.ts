@@ -1,5 +1,6 @@
 import { bindAgentRegistry, createAgentRegistry, type AgentDefinition } from './agent-registry.js';
 import { createToolRegistry } from './tool-registry.js';
+import { PLUGIN_ID } from './hardcoded-config.js';
 import { createAnalyticsReporter } from './telemetry/reporter.js';
 import { startUpdateLockfileRepair } from './installation/update-lockfile.js';
 export interface BusinessModule {
@@ -47,7 +48,7 @@ export function createPluginRuntime(definitions: { agents: readonly AgentDefinit
     try {
       for (const business of businesses.values()) defer(business.apply(runtime));
       defer(ctx.inject(['systemPrompt'], promptCtx => promptCtx.systemPrompt.section({
-        name: 'plugin:metaontic-video', order: 5200,
+        name: `plugin:${PLUGIN_ID}`, order: 5200,
         text: context => {
           const agent = agents.resolve(context, ctx);
           if (!agent) return '';

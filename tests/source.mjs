@@ -1,9 +1,14 @@
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 
+/** 写死的固定配置（src/core/hardcoded-config.ts）是所有模块的共享基础，sourceOf 默认带上它，
+ *  这样测试只需要列自己要塞依赖的业务模块。 */
+const SHARED = 'core/hardcoded-config';
+
 /** Compile modules for isolated dependency mocks without relying on bundle order or renamed imports. */
 export function sourceOf(...modules) {
-  return modules.map(name => ts.transpileModule(
+  const list = modules.includes(SHARED) ? modules : [SHARED, ...modules];
+  return list.map(name => ts.transpileModule(
     readFileSync(new URL(`../src/${name}.ts`, import.meta.url), 'utf8'),
     {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },

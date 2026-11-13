@@ -567,19 +567,70 @@
     return { videoExecutionSource, VideoTaskProgress, VideoProgressDock };
   }
 
-  // src/businesses/video/connection-defaults.ts
-  var METAONTIC_BASE_URL = "https://ai.bileego.com";
-  var VOLCENGINE_MODE_AVAILABLE = false;
+  // src/core/hardcoded-config.ts
+  var PLUGIN_ID = "metaontic-video";
+  var PLUGIN_PACKAGE = PLUGIN_ID;
+  var PLUGIN_NAMESPACE = PLUGIN_ID;
+  var PANEL_ID = PLUGIN_ID;
+  var CANVAS_PANEL_ID = `${PLUGIN_ID}-canvas`;
+  var GUIDE_URL = "https://ai.mybfs.cn";
+  var SUPPORT_URL = "https://work.weixin.qq.com/kfid/kfcd6fc4ca793eeac18";
+  var GITEE = {
+    slug: "hackloop/metaontic-video",
+    web: "https://gitee.com/hackloop/metaontic-video",
+    api: "https://gitee.com/api/v5/repos/hackloop/metaontic-video",
+    transport: "git@gitee.com:hackloop/metaontic-video.git"
+  };
+  var GITHUB = {
+    slug: "wxsimon2022/metaontic-video",
+    web: "https://github.com/wxsimon2022/metaontic-video",
+    api: "https://api.github.com/repos/wxsimon2022/metaontic-video",
+    transport: "git@ssh.github.com:wxsimon2022/metaontic-video.git"
+  };
+  var CHANGELOG_URL = `${GITHUB.web}/blob/master/CHANGELOG.md`;
+  var UPDATE_SPEC = `git+${GITEE.web}.git`;
+  var UPDATE_CACHE_KEY = `${PLUGIN_ID}.update-check-v3`;
+  var UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
+  var UPDATE_ATTEMPTS = 3;
+  var releaseArchiveName = (version) => `${PLUGIN_ID}-${version}.tgz`;
+  var releaseDownloadUrl = (version, channel = "gitee") => `${(channel === "github" ? GITHUB : GITEE).web}/releases/download/v${version}/${releaseArchiveName(version)}`;
+  var RELAY = {
+    baseUrl: "https://ai.bileego.com",
+    signupUrl: "https://ai.bileego.com/sign-up?aff=VzYr",
+    pricingUrl: "https://ai.bileego.com/pricing",
+    submitPath: "/doubao/api/v3/contents/generations/tasks",
+    queryPath: "/doubao/api/v3/contents/generations/tasks/{task_id}",
+    baseEnv: ["NEWAPI_VIDEO_BASE_URL", "NEWAPI_BASE_URL"],
+    modelEnv: ["NEWAPI_VIDEO_MODEL"],
+    textModelEnv: ["NEWAPI_TEXT_MODEL"]
+  };
+  var VOLCENGINE = {
+    modeAvailable: false,
+    baseUrl: "https://ark.cn-beijing.volces.com",
+    submitPath: "/api/v3/contents/generations/tasks",
+    queryPath: "/api/v3/contents/generations/tasks/{task_id}",
+    pricingUrl: "https://docs.volcengine.com/docs/ark/model-pricing"
+  };
+  var VIDEO_MODEL = "doubao-seedance-2-0-mini-260615";
+  var VIDEO_MODEL_OPTIONS = [
+    "doubao-seedance-2-0-mini-260615",
+    "doubao-seedance-2-0-fast-260128"
+  ];
   var IMAGE_MODEL = "doubao-seedream-5-0-pro-260628";
+  var RETIRED_IMAGE_MODELS = ["doubao-seedream-5-0-260128"];
   var TEXT_MODELS = ["deepseek v4.1 flash", "deepseekv4pro"];
   var TEXT_MODEL = TEXT_MODELS[0];
-  var RETIRED_IMAGE_MODELS = ["doubao-seedream-5-0-260128"];
+  var RETIRED_TEXT_MODELS = ["doubao-seed-1-6-250615"];
+  var REFERENCE_TMP_DIR = `${PLUGIN_ID}-reference`;
+
+  // src/businesses/video/connection-defaults.ts
+  var METAONTIC_BASE_URL = RELAY.baseUrl;
+  var VOLCENGINE_MODE_AVAILABLE = VOLCENGINE.modeAvailable;
   function resolveImageModel(value) {
     const model = String(value ?? "").trim();
     if (!model || RETIRED_IMAGE_MODELS.includes(model)) return IMAGE_MODEL;
     return model;
   }
-  var RETIRED_TEXT_MODELS = ["doubao-seed-1-6-250615"];
   function normalizeTextModel(value) {
     const model = String(value ?? "").trim();
     if (!model || RETIRED_TEXT_MODELS.includes(model)) return TEXT_MODEL;
@@ -589,10 +640,10 @@
     const text = (key, fallback) => String(values[key] ?? "").trim() || fallback;
     const volc = values.connectionMode === "volcengine";
     return {
-      ...volc ? { baseUrl: "https://ark.cn-beijing.volces.com" } : { baseUrl: text("baseUrl", METAONTIC_BASE_URL).replace(/\/+$/, "") },
-      submitPath: volc ? "/api/v3/contents/generations/tasks" : text("submitPath", "/doubao/api/v3/contents/generations/tasks"),
-      queryPath: volc ? "/api/v3/contents/generations/tasks/{task_id}" : text("queryPath", "/doubao/api/v3/contents/generations/tasks/{task_id}"),
-      model: text("model", "doubao-seedance-2-0-mini-260615"),
+      ...volc ? { baseUrl: VOLCENGINE.baseUrl } : { baseUrl: text("baseUrl", METAONTIC_BASE_URL).replace(/\/+$/, "") },
+      submitPath: volc ? VOLCENGINE.submitPath : text("submitPath", RELAY.submitPath),
+      queryPath: volc ? VOLCENGINE.queryPath : text("queryPath", RELAY.queryPath),
+      model: text("model", VIDEO_MODEL),
       imageModel: resolveImageModel(text("imageModel", IMAGE_MODEL)),
       textModel: normalizeTextModel(text("textModel", TEXT_MODEL)),
       imageUseVideoKey: values.imageUseVideoKey !== false
@@ -601,12 +652,9 @@
 
   // src/businesses/video/client/config.ts
   function createClientConfig() {
-    const NAMESPACE = "metaontic-video";
+    const NAMESPACE = PLUGIN_NAMESPACE;
     const NS = "settings.metaonticVideo";
-    const MODEL_OPTIONS = [
-      "doubao-seedance-2-0-mini-260615",
-      "doubao-seedance-2-0-fast-260128"
-    ];
+    const MODEL_OPTIONS = VIDEO_MODEL_OPTIONS;
     const SELECTS = {
       // MetaOntic AI；火山直连按开关提供。
       connectionMode: VOLCENGINE_MODE_AVAILABLE ? ["metaontic", "volcengine"] : ["metaontic"],
@@ -622,7 +670,7 @@
       { key: "sectionConnection", fields: ["connectionMode"] },
       { key: "sectionModels", fields: ["imageUseVideoKey", "model", "metaonticApiKey", "volcengineApiKey", "imageModel", "imageApiKey", "textModel", "textApiKey"] },
       { key: "sectionVideo", fields: ["ratio", "generateAudio"] },
-      { key: "sectionCanvas", fields: ["autoCreateCanvas"] }
+      { key: "sectionCanvas", fields: ["canvasEnabled", "autoCreateCanvas"] }
     ];
     const FIELDS = [
       { key: "connectionMode", kind: "select", wide: true },
@@ -640,6 +688,8 @@
       { key: "generateAudio", kind: "switch" },
       { key: "watermark", kind: "switch" },
       { key: "usageStatsEnabled", kind: "switch" },
+      // 流程画布总开关；打开后设置页才显示「自动创建画布」这一项。
+      { key: "canvasEnabled", kind: "switch", wide: true },
       { key: "autoCreateCanvas", kind: "switch", wide: true },
       { key: "seamTrimSeconds", kind: "text" },
       { key: "mergeMode", kind: "select", wide: true },
@@ -650,6 +700,7 @@
     ];
     const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((field) => [field.key, field]));
     const PLUGIN_OWNED_KEYS = [
+      "canvasEnabled",
       "autoCreateCanvas",
       "usageStatsEnabled",
       "connectionMode",
@@ -694,23 +745,6 @@
       if (/win/.test(raw)) return "windows";
       return "linux";
     }
-    const FFMPEG_INSTALLS = {
-      macos: { label: "macOS\uFF08Homebrew\uFF09", command: "brew install ffmpeg" },
-      windows: { label: "Windows\uFF08winget\uFF09", command: "winget install --id Gyan.FFmpeg -e" },
-      linux: { label: "Linux\uFF08Debian / Ubuntu\uFF09", command: "sudo apt update && sudo apt install -y ffmpeg" }
-    };
-    const FFMPEG_ALL = [
-      { os: "macos", label: "macOS\uFF08Homebrew\uFF09", command: "brew install ffmpeg" },
-      {
-        os: "macos",
-        label: "macOS\uFF08\u8FD8\u6CA1\u88C5 Homebrew\uFF09",
-        command: '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-      },
-      { os: "windows", label: "Windows\uFF08winget\uFF09", command: "winget install --id Gyan.FFmpeg -e" },
-      { os: "windows", label: "Windows\uFF08Chocolatey\uFF09", command: "choco install ffmpeg" },
-      { os: "linux", label: "Linux\uFF08Debian / Ubuntu\uFF09", command: "sudo apt update && sudo apt install -y ffmpeg" },
-      { os: "linux", label: "Linux\uFF08Fedora / RHEL / CentOS\uFF09", command: "sudo dnf install -y ffmpeg" }
-    ];
     function formatMoney(value) {
       const number = Number(value);
       if (!Number.isFinite(number)) return "0";
@@ -840,8 +874,10 @@
       sectionVideo: "\u753B\u9762\u4E0E\u58F0\u97F3",
       sectionCanvas: "\u6D41\u7A0B\u753B\u5E03",
       canvasPanelLabel: "MetaOnticVideo\u6D41\u7A0B\u753B\u5E03",
-      autoCreateCanvas: "\u6D41\u7A0B\u753B\u5E03",
-      autoCreateCanvasHint: "\u9ED8\u8BA4\u5173\u95ED\uFF1A\u5173\u95ED\u65F6\u5DE6\u4FA7\u680F\u4E0D\u51FA\u73B0\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u5165\u53E3\uFF0C\u521B\u4F5C\u4E5F\u4E0D\u4F1A\u81EA\u52A8\u5EFA\u56FE\u6216\u540C\u6B65\uFF1B\u5DF2\u6709\u753B\u5E03\u4E0E\u6210\u679C\u4ECD\u4FDD\u7559\u5728\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\uFF0C\u91CD\u65B0\u6253\u5F00\u5C31\u80FD\u7EE7\u7EED\u3002\u5F00\u542F\u540E\u5DE6\u4FA7\u680F\u51FA\u73B0\u6D41\u7A0B\u753B\u5E03\u5165\u53E3\uFF0C\u968F\u521B\u4F5C\u81EA\u52A8\u5EFA\u56FE\uFF0C\u5BA1\u6838\u524D\u540C\u6B65\u5267\u672C\u3001\u5206\u955C\u548C\u5236\u4F5C\u8BA1\u5212\uFF0C\u751F\u6210\u540E\u56DE\u586B\u6210\u679C\u3002\u6D41\u7A0B\u753B\u5E03\u662F\u672C\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u5176\u4ED6\u753B\u5E03\u63D2\u4EF6\u3002",
+      canvasEnabled: "\u6D41\u7A0B\u753B\u5E03",
+      canvasEnabledHint: "\u9ED8\u8BA4\u5173\u95ED\uFF1A\u5173\u95ED\u65F6\u5DE6\u4FA7\u680F\u4E0D\u51FA\u73B0\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u5165\u53E3\uFF0C\u753B\u5E03\u4E0D\u53EF\u7528\uFF1B\u5DF2\u6709\u753B\u5E03\u4E0E\u6210\u679C\u4ECD\u4FDD\u7559\u5728\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\uFF0C\u91CD\u65B0\u6253\u5F00\u5C31\u80FD\u7EE7\u7EED\u3002\u5F00\u542F\u540E\u5DE6\u4FA7\u680F\u51FA\u73B0\u6D41\u7A0B\u753B\u5E03\u5165\u53E3\uFF0C\u53EF\u7528\u72EC\u7ACB\u753B\u5E03\u9875\u521B\u4F5C\u3002\u6D41\u7A0B\u753B\u5E03\u662F\u672C\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u5176\u4ED6\u753B\u5E03\u63D2\u4EF6\u3002",
+      autoCreateCanvas: "\u81EA\u52A8\u521B\u5EFA\u753B\u5E03",
+      autoCreateCanvasHint: "\u6D41\u7A0B\u753B\u5E03\u6253\u5F00\u540E\u6709\u6548\uFF0C\u9ED8\u8BA4\u5F00\u542F\uFF1A\u521B\u4F5C\u65F6\u81EA\u52A8\u5EFA\u56FE\uFF0C\u5BA1\u6838\u524D\u540C\u6B65\u5267\u672C\u3001\u5206\u955C\u548C\u5236\u4F5C\u8BA1\u5212\uFF0C\u751F\u6210\u540E\u56DE\u586B\u6210\u679C\uFF1B\u5173\u95ED\u540E\u4E0D\u81EA\u52A8\u5EFA\u56FE\uFF0C\u4EC5\u5728\u753B\u5E03\u5185\u660E\u786E\u9009\u4E2D\u8282\u70B9\u65F6\u8054\u52A8\u3002",
       sectionModels: "\u6A21\u578B\u914D\u7F6E",
       sectionCombined: "\u66F4\u591A\u8BBE\u7F6E",
       advancedPicture: "\u753B\u9762",
@@ -994,8 +1030,10 @@
       sectionVideo: "Picture & audio",
       sectionCanvas: "Workflow canvas",
       canvasPanelLabel: "MetaOnticVideo workflow canvas",
-      autoCreateCanvas: "Workflow canvas",
-      autoCreateCanvasHint: "Off by default: the sidebar shows no workflow canvas entry, and nothing is created or synced automatically. Existing canvases and results stay in the plugin data folder. Turn it on to show the entry, create a canvas with each project, sync scripts and plans before review, and publish results. The workflow canvas is built into this plugin; no other canvas plugin is required.",
+      canvasEnabled: "Workflow canvas",
+      canvasEnabledHint: "Off by default: the sidebar shows no workflow canvas entry and the canvas is unavailable. Existing canvases and results stay in the plugin data folder and reopen where they left off. Turn it on to show the entry and use the standalone canvas page. The workflow canvas is built into this plugin; no other canvas plugin is required.",
+      autoCreateCanvas: "Create canvas automatically",
+      autoCreateCanvasHint: "Effective once the workflow canvas is on, on by default: each project creates a canvas automatically, syncs script, storyboard and plan before review, and publishes results after generation. Turn it off to stop automatic creation and only act on nodes you select.",
       sectionModels: "Models",
       sectionCombined: "More settings",
       advancedPicture: "Picture",
@@ -1156,12 +1194,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_PACKAGE = "metaontic-video";
-    const UPDATE_SPEC = "git+https://gitee.com/hackloop/metaontic-video.git";
-    const UPDATE_ATTEMPTS = 3;
-    const UPDATE_CACHE_KEY = "metaontic-video.update-check-v3";
-    const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    const PLUGIN_VERSION = true ? "3.22.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.23.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1211,8 +1244,8 @@
     }
     async function fetchRecentVersions() {
       const urls = [
-        "https://gitee.com/api/v5/repos/hackloop/metaontic-video/releases?per_page=100",
-        "https://api.github.com/repos/wxsimon2022/metaontic-video/releases?per_page=100"
+        `${GITEE.api}/releases?per_page=100`,
+        `${GITHUB.api}/releases?per_page=100`
       ];
       const results = await Promise.allSettled(urls.map(async (url) => {
         const body = await (await (fetchSource || fetchUpdateSource)(url, 6e3)).json();
@@ -1344,8 +1377,8 @@
         return;
       }
       const candidates = [
-        `https://gitee.com/hackloop/metaontic-video/releases/download/v${context.updateLatest}/metaontic-video-${context.updateLatest}.tgz`,
-        `https://github.com/wxsimon2022/metaontic-video/releases/download/v${context.updateLatest}/metaontic-video-${context.updateLatest}.tgz`
+        releaseDownloadUrl(context.updateLatest, "gitee"),
+        releaseDownloadUrl(context.updateLatest, "github")
       ];
       const specUnresolvable = (text) => /Could not resolve|No matching version|ERR_PNPM_NO_MATCHING_VERSION|ERR_PNPM_FETCH_40[34]|HTTP[ :]+40[34]|404 Not Found|403 Forbidden/i.test(text);
       const trySpec = async (spec) => {
@@ -1511,7 +1544,7 @@
     function control(field) {
       const { draft, value, h, SELECTS, inputStyle, t, snapshot, visibleKey, setVisibleKey, edit, optionLabel } = context;
       const blankTextModel = field.key === "textModel" && !String(draft[field.key] ?? value[field.key] ?? "").trim();
-      const current = blankTextModel ? (SELECTS.textModel || [])[0] : draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (["imageUseVideoKey", "usageStatsEnabled"].includes(field.key) ? true : field.key === "autoCreateCanvas" ? false : field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0);
+      const current = blankTextModel ? (SELECTS.textModel || [])[0] : draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (["imageUseVideoKey", "usageStatsEnabled", "autoCreateCanvas"].includes(field.key) ? true : field.key === "canvasEnabled" ? false : field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0);
       const secondsField = field.key === "pollIntervalMs" || field.key === "maxWaitMs";
       const displayed = secondsField && current !== void 0 && current !== "" ? Number(current) / 1e3 : current;
       const id = `metaontic-video-${field.key}`;
@@ -1592,7 +1625,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.22.0",
+    version: "3.23.0",
     description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1698,13 +1731,12 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.22.0",
+      version: "3.23.0",
       prerelease: false,
-      publishedAt: "2026-11-12T14:09:30.181Z",
+      publishedAt: "2026-11-13T01:24:19.936Z",
       items: [
-        "\u65B0\u589E\uFF1A\u6D41\u7A0B\u753B\u5E03\u53EF\u76F4\u63A5\u5BFC\u5165\u81EA\u5DF1\u7684\u56FE\u7247\u4F5C\u7D20\u6750\uFF0C\u8FDE\u6210\u9996\u5E27\u6216\u53C2\u8003\u56FE\u53C2\u4E0E\u5236\u4F5C\u3002",
-        "\u65B0\u589E\uFF1A\u5168\u90E8\u6BB5\u843D\u51FA\u6210\u679C\u540E\u53EF\u4E00\u952E\u5408\u6210\u6210\u7247\uFF0C\u5728\u753B\u5E03\u5185\u9884\u89C8\u6216\u4E0B\u8F7D\u3002",
-        "\u4F18\u5316\uFF1A\u6D41\u7A0B\u753B\u5E03\u5F00\u5173\u5173\u95ED\u540E\u5DE6\u4FA7\u680F\u4E0D\u518D\u663E\u793A\u753B\u5E03\u5165\u53E3\uFF0C\u5DF2\u6709\u753B\u5E03\u4E0E\u6210\u679C\u4FDD\u7559\u3002"
+        "\u65B0\u589E\uFF1A\u8BBE\u7F6E\u9875\u65B0\u589E\u300C\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\u300D\u5F00\u5173\uFF08\u9ED8\u8BA4\u5F00\u542F\uFF09\uFF0C\u53EF\u5173\u6389\u81EA\u52A8\u5EFA\u56FE\uFF0C\u53EA\u5728\u753B\u5E03\u5185\u9009\u4E2D\u7684\u8282\u70B9\u4E0A\u8054\u52A8\u3002",
+        "\u4F18\u5316\uFF1A\u6D41\u7A0B\u753B\u5E03\u62C6\u6210\u300C\u6D41\u7A0B\u753B\u5E03\u300D\u4E0E\u300C\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\u300D\u4E24\u4E2A\u5F00\u5173\uFF0C\u5148\u6253\u5F00\u6D41\u7A0B\u753B\u5E03\u624D\u4F1A\u51FA\u73B0\u81EA\u52A8\u521B\u5EFA\u3002"
       ]
     }
   };
@@ -1722,8 +1754,8 @@
       PLUGIN_OWNED_KEYS,
       persistBatch,
       PLUGIN_VERSION,
-      UPDATE_CACHE_KEY,
-      UPDATE_MAX_AGE_MS,
+      UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2,
+      UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2,
       fetchLatestVersion,
       SELECTS,
       inputStyle,
@@ -1731,9 +1763,9 @@
       FIELD_BY_KEY,
       SECTIONS,
       formatMoney,
-      PLUGIN_PACKAGE,
-      UPDATE_SPEC,
-      UPDATE_ATTEMPTS,
+      PLUGIN_PACKAGE: PLUGIN_PACKAGE2,
+      UPDATE_SPEC: UPDATE_SPEC2,
+      UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2,
       isNewerVersion,
       updateBell,
       PAGE_CSS
@@ -1773,14 +1805,14 @@
         const [updateConfirm, setUpdateConfirm] = React.useState(false);
         const [updateDeferred, setUpdateDeferred] = React.useState(() => {
           try {
-            return window.localStorage.getItem(`${UPDATE_CACHE_KEY}.deferred`) || "";
+            return window.localStorage.getItem(`${UPDATE_CACHE_KEY2}.deferred`) || "";
           } catch {
             return "";
           }
         });
         const { readUpdateCache, rememberUpdateCheck, forgetUpdateCheck, checkForUpdate, runOnlineUpdate, deferUpdate } = createUpdateActions({
           get UPDATE_CACHE_KEY() {
-            return UPDATE_CACHE_KEY;
+            return UPDATE_CACHE_KEY2;
           },
           get PLUGIN_VERSION() {
             return PLUGIN_VERSION;
@@ -1792,7 +1824,7 @@
             return updateRequest;
           },
           get UPDATE_MAX_AGE_MS() {
-            return UPDATE_MAX_AGE_MS;
+            return UPDATE_MAX_AGE_MS2;
           },
           get setUpdateStatus() {
             return setUpdateStatus;
@@ -1819,7 +1851,7 @@
             return manager;
           },
           get PLUGIN_PACKAGE() {
-            return PLUGIN_PACKAGE;
+            return PLUGIN_PACKAGE2;
           },
           get updateLatest() {
             return updateLatest;
@@ -1831,10 +1863,10 @@
             return setUpdateDeferred;
           },
           get UPDATE_SPEC() {
-            return UPDATE_SPEC;
+            return UPDATE_SPEC2;
           },
           get UPDATE_ATTEMPTS() {
-            return UPDATE_ATTEMPTS;
+            return UPDATE_ATTEMPTS2;
           }
         });
         const updateTried = React.useRef(false);
@@ -1851,7 +1883,7 @@
           setUpdateStatus("idle");
           setUpdateMessage("");
           try {
-            setUpdateDeferred(window.localStorage.getItem(`${UPDATE_CACHE_KEY}.deferred`) || "");
+            setUpdateDeferred(window.localStorage.getItem(`${UPDATE_CACHE_KEY2}.deferred`) || "");
           } catch {
             setUpdateDeferred("");
           }
@@ -1926,13 +1958,14 @@
           confirm: (message) => window.confirm(message)
         });
         const hints = {
-          connectionMode: selectedMode === "metaontic" ? [t("connectionMetaonticHint"), " ", h("a", { key: "metaontic-register", href: "https://ai.bileego.com/sign-up?aff=VzYr", target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "underline" } }, t("connectionMetaonticRegister"))] : directMode && !VOLCENGINE_MODE_AVAILABLE ? t("connectionVolcengineUnavailable") : t("connectionModeHint"),
+          connectionMode: selectedMode === "metaontic" ? [t("connectionMetaonticHint"), " ", h("a", { key: "metaontic-register", href: RELAY.signupUrl, target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "underline" } }, t("connectionMetaonticRegister"))] : directMode && !VOLCENGINE_MODE_AVAILABLE ? t("connectionVolcengineUnavailable") : t("connectionModeHint"),
           metaonticApiKey: t("metaonticKeyHint"),
           volcengineApiKey: t("volcengineKeyHint"),
           model: t("modelHint"),
           imageModel: t("imageModelHint"),
           textModel: t("textModelHint"),
           seamTrimSeconds: t("seamTrimSecondsHint"),
+          canvasEnabled: t("canvasEnabledHint"),
           autoCreateCanvas: t("autoCreateCanvasHint"),
           maxWaitMs: t("waitSecondsHint")
         };
@@ -1977,11 +2010,12 @@
           }
           const shared = (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
           const videoKey = directMode ? "volcengineApiKey" : "metaonticApiKey";
+          const canvasOn = (draft.canvasEnabled ?? value.canvasEnabled ?? false) === true;
           const fields = section.key === "sectionModels" ? directMode ? ["model", videoKey] : shared ? ["imageUseVideoKey", videoKey, "model", "imageModel"] : ["imageUseVideoKey", "model", videoKey, "imageModel", "imageApiKey"] : section.fields;
           return h(
             "div",
             { key: section.key, className: "mov-grid" },
-            fields.filter((key) => (key !== "volcengineApiKey" || directMode) && (!["imageModel", "imageUseVideoKey", "imageApiKey"].includes(key) || !directMode) && (key !== "imageApiKey" || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) === false) && (key !== "metaonticApiKey" || selectedMode === "metaontic")).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
+            fields.filter((key) => (key !== "volcengineApiKey" || directMode) && (!["imageModel", "imageUseVideoKey", "imageApiKey"].includes(key) || !directMode) && (key !== "imageApiKey" || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) === false) && (key !== "metaonticApiKey" || selectedMode === "metaontic") && (key !== "autoCreateCanvas" || canvasOn)).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
           );
         };
         const settingsRows = () => [
@@ -2060,7 +2094,7 @@
               h("span", { key: "label" }, PLUGIN_VERSION ? t("versionCurrent", { version: PLUGIN_VERSION }) : ""),
               updateBell(t, updateLatest, PLUGIN_VERSION)
             ]),
-            h("a", { key: "history", className: "mov-hint", href: "https://github.com/wxsimon2022/metaontic-video/blob/master/CHANGELOG.md", target: "_blank", rel: "noopener noreferrer" }, t("versionHistory")),
+            h("a", { key: "history", className: "mov-hint", href: "${CHANGELOG_URL}", target: "_blank", rel: "noopener noreferrer" }, t("versionHistory")),
             h("button", {
               key: "check",
               "data-action": "update-check",
@@ -2171,8 +2205,8 @@
               h("button", { key: "close", type: "button", className: "mov-btn mov-btn-sm mov-trailing", "aria-label": t("supportClose"), onClick: () => setSupportOpen(false) }, t("supportClose"))
             ]),
             h("p", { key: "hint", className: "mov-hint" }, t("supportScan")),
-            h("iframe", { key: "qr", className: "mov-support-frame", title: t("supportContact"), src: "https://work.weixin.qq.com/kfid/kfcd6fc4ca793eeac18", referrerPolicy: "no-referrer" }),
-            h("a", { key: "fallback", href: "https://work.weixin.qq.com/kfid/kfcd6fc4ca793eeac18", target: "_blank", rel: "noopener noreferrer" }, t("supportOpenPage"))
+            h("iframe", { key: "qr", className: "mov-support-frame", title: t("supportContact"), src: SUPPORT_URL, referrerPolicy: "no-referrer" }),
+            h("a", { key: "fallback", href: SUPPORT_URL, target: "_blank", rel: "noopener noreferrer" }, t("supportOpenPage"))
           ])) : null
         ]);
       };
@@ -3856,9 +3890,6 @@
   var icon_default = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="MetaOnticVideo"><defs>\n<linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#36e8ee"/><stop offset=".5" stop-color="#1688ff"/><stop offset="1" stop-color="#1742e8"/></linearGradient>\n<linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#341ad5"/><stop offset=".5" stop-color="#7635ff"/><stop offset="1" stop-color="#176bff"/></linearGradient>\n<linearGradient id="c" x1="1" y1="0" x2="0" y2="1"><stop stop-color="#2ce7ef"/><stop offset=".5" stop-color="#087bff"/><stop offset="1" stop-color="#2026ba"/></linearGradient>\n<linearGradient id="d" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#24e5ec"/><stop offset=".45" stop-color="#1168ff"/><stop offset="1" stop-color="#2539d7"/></linearGradient>\n</defs>\n<path d="M9 25Q9 11 21 13L43 29 32 43 20 33V79Q20 85 14 85Q9 85 9 79Z" fill="url(#b)"/>\n<path d="M91 25Q91 11 79 13L43 39 57 53 80 35V78Q80 85 86 85Q91 85 91 79Z" fill="url(#c)"/>\n<path d="M10 23Q14 9 27 17L75 49Q79 52 75 56L43 77Q37 81 33 74L19 39Q15 27 10 23ZM40 40Q38 39 38 42V65Q38 68 41 66L59 54Q62 52 59 50Z" fill="url(#a)" fill-rule="evenodd"/>\n<path d="M75 49Q80 52 81 64L91 80Q89 88 82 84L62 70 43 77Q38 80 34 75Z" fill="url(#d)"/>\n<path d="M40 40Q38 39 38 42V65Q38 68 41 66L59 54Q62 52 59 50Z" fill="none"/>\n</svg>\n';
 
   // src/businesses/video/client.ts
-  var PANEL_ID = "metaontic-video";
-  var CANVAS_PANEL_ID = "metaontic-video-canvas";
-  var GUIDE_URL = "https://ai.mybfs.cn";
   function createVideoClient(require2) {
     const React = require2("react");
     const h = React.createElement;
@@ -3869,8 +3900,8 @@
     const { PLUGIN_OWNED_KEYS, SELECTS, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, NS, NAMESPACE } = createClientConfig();
     const { zh, en } = createDictionaries();
     const { useSnapshot, same, validateSettings, persistConnection, persistBatch } = createSettingsState({ React });
-    const { PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell } = createUpdates({ h });
-    const { makePage } = createSettingsPage({ useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS, persistBatch, PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, SELECTS, inputStyle, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell, PAGE_CSS });
+    const { PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, PLUGIN_PACKAGE: PLUGIN_PACKAGE2, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell } = createUpdates({ h });
+    const { makePage } = createSettingsPage({ useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS, persistBatch, PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, SELECTS, inputStyle, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE: PLUGIN_PACKAGE2, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell, PAGE_CSS });
     return {
       inject: ["slots", "locale", "configForms", "uiSession"],
       apply(ctx, { settings }) {
@@ -3937,7 +3968,7 @@
         }, VideoPanel)), "metaontic-video: sidebar panel");
         const canvasSwitchOn = () => {
           try {
-            return form?.getSnapshot?.()?.value?.autoCreateCanvas === true;
+            return form?.getSnapshot?.()?.value?.canvasEnabled === true;
           } catch {
             return false;
           }
@@ -3992,7 +4023,7 @@
 
   // src/client.ts
   window.__ModuleLoader__.load({
-    id: "metaontic-video",
+    id: PLUGIN_ID,
     factory: (require2) => createClientRuntime(require2, [{ id: "video", create: createVideoClient }])
   });
 })();

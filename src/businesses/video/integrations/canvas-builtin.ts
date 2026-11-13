@@ -6,10 +6,11 @@ import { createReadStream } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { dshHome } from '../../../core/paths.js';
+import { DATA_DIR } from '../../../core/hardcoded-config.js';
 
 export const BUILTIN_BACKEND = 'builtin';
 const validId = (value: any) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
-const storeDir = () => path.join(dshHome(), 'metaontic-video', 'canvas');
+const storeDir = () => path.join(dshHome(), DATA_DIR, 'canvas');
 const docsDir = () => path.join(storeDir(), 'projects');
 const dataRootOf = () => path.join(storeDir(), 'data');
 const assetsFile = () => path.join(storeDir(), 'assets.json');

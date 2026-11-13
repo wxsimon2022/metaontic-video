@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, stat } from 'node:fs/promises';
 import { dshHome } from '../../../core/paths.js';
+import { DATA_DIR } from '../../../core/hardcoded-config.js';
 import { loadCanvasAdapter, readCanvasInput, publishCanvasResult, resolveCanvasAdapter } from './canvas.js';
 import { snapshotConfig, imageConfig, resolveApiKey, resolveTextApiKey, assertConfigured, resolveModel, resolveTextModel, isVolcengine, connectionLabel } from '../providers/connection.js';
 import { buildGenerationBody, buildRequestBody, runTask } from '../providers/seedance.js';
@@ -169,7 +170,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
   const load = options.load || loadCanvasAdapter;
   // 画布适配器按项目标识解析：内置画布文档走插件自己的存储，注入的加载器优先（自动化检查）。
   const adapterFor = link => options.resolve ? options.resolve(link) : resolveCanvasAdapter(link?.projectId, load);
-  const directory = options.directory || path.join(dshHome(), 'metaontic-video', 'canvas-native');
+  const directory = options.directory || path.join(dshHome(), DATA_DIR, 'canvas-native');
   const snapshots = new Map<string, any>(), running = new Map<string, AbortController>(), locks = new Set<string>();
   const proposals = new Map<string, any>();
   // 连拍记录与待确认方案分开存：一条画布同时只允许一条在跑的连拍。

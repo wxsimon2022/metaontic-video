@@ -6,9 +6,10 @@ import os from 'node:os';
 import { dshHome } from '../paths.js';
 import { PLUGIN_VERSION } from '../version.js';
 import { ref } from '../settings/value.js';
+import { ANALYTICS_URL, DATA_DIR, PLUGIN_ID } from '../hardcoded-config.js';
 
-export const ANALYTICS_URL = 'https://video.mybfs.cn/api/v1/analytics/events';
-const STATE = Symbol.for('metaontic-video.analytics.process');
+export { ANALYTICS_URL } from '../hardcoded-config.js';
+const STATE = Symbol.for(`${PLUGIN_ID}.analytics.process`);
 const EVENTS = new Set(['plugin_started', 'tool_started', 'tool_finished', 'video_task_created', 'video_task_finished']);
 const TOOLS = new Set(['video_generate', 'video_extend', 'video_status', 'video_project', 'video_prepare_image', 'video_estimate', 'video_config', 'video_setup', 'video_stage', 'media_submission']);
 const STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'unknown', 'timeout', 'approved', 'pending', 'paused', 'prepared', 'draft', 'blocked', 'review_required', 'submission_unknown', 'ok']);
@@ -18,7 +19,7 @@ function processState() {
   return owner[STATE] ||= { identities: new Map(), started: new Set() };
 }
 export async function analyticsIdentity() {
-  const file = path.join(dshHome(), 'state', 'metaontic-video', 'analytics-id.json');
+  const file = path.join(dshHome(), 'state', DATA_DIR, 'analytics-id.json');
   const state = processState();
   if (!state.identities.has(file)) state.identities.set(file, (async () => {
     const parse = raw => { try { const id = JSON.parse(raw).installationId; return /^[a-f0-9-]{36}$/i.test(id) ? id : null; } catch { return null; } };

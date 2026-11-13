@@ -3,6 +3,7 @@ import { ref } from '../config.js';
 import { type RunOptions } from '../providers/types.js';
 import { spawn } from 'node:child_process';
 import { abortError } from '../utils/errors.js';
+import { FFMPEG_INSTALLS } from '../../../core/hardcoded-config.js';
 
 /* ---------------- 分段下载与 ffmpeg 合并 ---------------- */
 
@@ -91,8 +92,7 @@ function currentPlatform(): string {
 }
 
 /** macOS 上连 Homebrew 都没有时的第一步。 */
-const HOMEBREW_BOOTSTRAP = '/bin/bash -c "$(curl -fsSL '
-  + 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"';
+const HOMEBREW_BOOTSTRAP = FFMPEG_INSTALLS.macosBootstrap.command;
 
 /**
  * 按操作系统给出 ffmpeg 的安装方式。
@@ -104,7 +104,7 @@ export function ffmpegInstallOptions(platform = currentPlatform()) {
     return {
       os: 'macOS',
       installs: [
-        { label: 'macOS（Homebrew）', command: 'brew install ffmpeg' },
+        FFMPEG_INSTALLS.macos,
         {
           label: 'macOS（还没装 Homebrew 就先装它）',
           command: HOMEBREW_BOOTSTRAP,
@@ -118,8 +118,8 @@ export function ffmpegInstallOptions(platform = currentPlatform()) {
     return {
       os: 'Windows',
       installs: [
-        { label: 'Windows（winget）', command: 'winget install --id Gyan.FFmpeg -e' },
-        { label: 'Windows（Chocolatey）', command: 'choco install ffmpeg' },
+        FFMPEG_INSTALLS.windows,
+        FFMPEG_INSTALLS.windowsChoco,
       ],
       bootstrap: null,
     };
@@ -127,11 +127,8 @@ export function ffmpegInstallOptions(platform = currentPlatform()) {
   return {
     os: 'Linux',
     installs: [
-      {
-        label: 'Linux（Debian / Ubuntu）',
-        command: 'sudo apt update && sudo apt install -y ffmpeg',
-      },
-      { label: 'Linux（Fedora / RHEL / CentOS）', command: 'sudo dnf install -y ffmpeg' },
+      FFMPEG_INSTALLS.linux,
+      FFMPEG_INSTALLS.linuxDnf,
     ],
     bootstrap: null,
   };
