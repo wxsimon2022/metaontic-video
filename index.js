@@ -1326,10 +1326,14 @@ function processState() {
   const owner = globalThis;
   return owner[STATE] ||= { identities: /* @__PURE__ */ new Map(), started: /* @__PURE__ */ new Set() };
 }
+function identityFiles() {
+  const dir = path2.join(dshHome(), "state", DATA_DIR);
+  return { dir, files: [path2.join(dir, "analytics-id.json"), path2.join(dir, "analytics-anchor.json")] };
+}
 async function analyticsIdentity() {
-  const file = path2.join(dshHome(), "state", DATA_DIR, "analytics-id.json");
+  const { dir, files } = identityFiles();
   const state = processState();
-  if (!state.identities.has(file)) state.identities.set(file, (async () => {
+  if (!state.identities.has(dir)) state.identities.set(dir, (async () => {
     const parse = (raw) => {
       try {
         const id2 = JSON.parse(raw).installationId;
@@ -1338,24 +1342,40 @@ async function analyticsIdentity() {
         return null;
       }
     };
-    try {
-      const id2 = parse(await readFile(file, "utf8"));
-      if (id2) return id2;
-    } catch {
+    const present = [];
+    for (const file of files) {
+      try {
+        present.push(parse(await readFile(file, "utf8")));
+      } catch {
+        present.push(null);
+      }
     }
-    const id = randomUUID();
-    await mkdir(path2.dirname(file), { recursive: true, mode: 448 });
-    try {
-      await writeFile(file, JSON.stringify({ installationId: id }), { mode: 384, flag: "wx" });
-    } catch (error) {
-      if (error.code !== "EEXIST") throw error;
-      const existing = parse(await readFile(file, "utf8"));
-      if (!existing) throw new Error("anonymous identity unavailable");
-      return existing;
+    let id = present[0] || present[1];
+    await mkdir(dir, { recursive: true, mode: 448 });
+    if (!id) {
+      const created = randomUUID();
+      try {
+        await writeFile(files[0], JSON.stringify({ installationId: created }), { mode: 384, flag: "wx" });
+        id = created;
+      } catch (error) {
+        if (error.code !== "EEXIST") throw error;
+        id = parse(await readFile(files[0], "utf8").catch(() => ""));
+        if (!id) {
+          id = created;
+          await writeFile(files[0], JSON.stringify({ installationId: id }), { mode: 384 });
+        }
+      }
+    }
+    for (const [index, file] of files.entries()) {
+      if (present[index] === id) continue;
+      try {
+        await writeFile(file, JSON.stringify({ installationId: id }), { mode: 384 });
+      } catch {
+      }
     }
     return id;
   })().catch(() => null));
-  return state.identities.get(file);
+  return state.identities.get(dir);
 }
 function analyticsFields(input = {}) {
   const value = {};
@@ -3846,6 +3866,24 @@ import path12 from "node:path";
 import { stat as stat4, readdir as readdir3 } from "node:fs/promises";
 var STORYBOARD_FILE = /storyboard|分镜|示意/i;
 var IMAGE_FILE = /\.(png|jpe?g|webp|svg)$/i;
+function readableText(value) {
+  return String(value || "").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[#*`>|~_\-\s]/g, "");
+}
+function characterPairs(text) {
+  const pairs = /* @__PURE__ */ new Set();
+  for (let index = 0; index + 2 <= text.length; index += 1) pairs.add(text.slice(index, index + 2));
+  return pairs;
+}
+var SCRIPT_COVERAGE_MIN = 0.7;
+function scriptCoverage(script, visible) {
+  const target = readableText(script);
+  if (!target) return 1;
+  if (target.length < 2) return readableText(visible).includes(target) ? 1 : 0;
+  const shown = characterPairs(readableText(visible));
+  let hit = 0;
+  for (const pair of characterPairs(target)) if (shown.has(pair)) hit += 1;
+  return hit / characterPairs(target).size;
+}
 function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
   const sessions = /* @__PURE__ */ new WeakMap();
   async function reportMissing(state) {
@@ -3945,8 +3983,14 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     const state = sessions.get(exec.agent.session);
     if (review && state) state.awaitingReview = false;
     if (!review || !args.requireStoryboard && !state?.active) return null;
-    const normalized = (value) => String(value || "").replace(/\s+/g, "");
-    if (args.requiredScriptText && !normalized(state?.text).includes(normalized(args.requiredScriptText))) return { kind: "deny", reason: "\u8BF7\u5148\u5728\u672C\u8F6E\u7528\u6237\u53EF\u89C1\u6B63\u6587\u5B8C\u6574\u5C55\u793Ascript.md\u6B63\u6587\uFF0C\u518D\u8C03\u7528review\uFF1B\u6587\u4EF6\u94FE\u63A5\u6216\u6458\u8981\u4E0D\u80FD\u4EE3\u66FF\u5B8C\u6574\u811A\u672C\u3002" };
+    if (args.requiredScriptText) {
+      const coverage = scriptCoverage(args.requiredScriptText, state?.text);
+      if (coverage < SCRIPT_COVERAGE_MIN) {
+        const percent2 = Math.round(coverage * 100);
+        await appendRequestLog({ event: "storyboard_review_blocked", reason: "script_text_mismatch", coverage: Math.round(coverage * 1e3) / 1e3 });
+        return { kind: "deny", reason: `\u811A\u672C\u5BA1\u6838\u6682\u672A\u6253\u5F00\uFF1A\u672C\u7248script.md\u6B63\u6587\u53EA\u5728\u672C\u8F6E\u7528\u6237\u53EF\u89C1\u6B63\u6587\u91CC\u51FA\u73B0 ${percent2}%\u3002\u8BF7\u628Ascript.md\u6B63\u6587\u539F\u6837\u8D34\u8FDB\u672C\u8F6E\u6B63\u6587\u518D\u5355\u72EC\u8C03\u7528review\uFF1B\u6807\u9898\u3001\u52A0\u7C97\u3001\u8868\u683C\u8FD9\u7C7B\u6392\u7248\u5DEE\u5F02\u4E0D\u7B97\u95EE\u9898\uFF0C\u4F46\u4E0D\u8981\u6539\u5199\u63AA\u8F9E\u3001\u5220\u6BB5\uFF0C\u4E5F\u4E0D\u8981\u53EA\u7ED9\u6587\u4EF6\u94FE\u63A5\u6216\u6458\u8981\u3002` };
+      }
+    }
     const embedded = [...state?.shown || []].filter((target2) => STORYBOARD_FILE.test(path12.basename(target2)));
     let ready = embedded.length > 0;
     if (ready) {

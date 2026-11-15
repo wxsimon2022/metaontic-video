@@ -18,24 +18,44 @@ function processState() {
   const owner = globalThis as any;
   return owner[STATE] ||= { identities: new Map(), started: new Set() };
 }
+/** 匿名安装标识的两个落盘位置：主文件与冗余锚点，同一目录、同一身份。
+ *  只丢一个文件不算新设备：删掉主文件就用锚点把身份补回来，主文件还在就顺手把锚点补齐。
+ *  做不到的边界见 docs/engineering/analytics.md（整个状态目录被清掉、或整份宿主数据目录被复制到另一台机器）。 */
+function identityFiles() {
+  const dir = path.join(dshHome(), 'state', DATA_DIR);
+  return { dir, files: [path.join(dir, 'analytics-id.json'), path.join(dir, 'analytics-anchor.json')] };
+}
 export async function analyticsIdentity() {
-  const file = path.join(dshHome(), 'state', DATA_DIR, 'analytics-id.json');
+  const { dir, files } = identityFiles();
   const state = processState();
-  if (!state.identities.has(file)) state.identities.set(file, (async () => {
+  // 一个进程只解析一次；键用目录而不是单个文件，因为身份现在有两个落盘位置。
+  if (!state.identities.has(dir)) state.identities.set(dir, (async () => {
     const parse = raw => { try { const id = JSON.parse(raw).installationId; return /^[a-f0-9-]{36}$/i.test(id) ? id : null; } catch { return null; } };
-    try { const id = parse(await readFile(file, 'utf8')); if (id) return id; } catch { /* first activation */ }
-    const id = randomUUID();
-    await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
-    try { await writeFile(file, JSON.stringify({ installationId: id }), { mode: 0o600, flag: 'wx' }); }
-    catch (error) {
-      if (error.code !== 'EEXIST') throw error;
-      const existing = parse(await readFile(file, 'utf8'));
-      if (!existing) throw new Error('anonymous identity unavailable');
-      return existing;
+    const present = [];
+    for (const file of files) {
+      try { present.push(parse(await readFile(file, 'utf8'))); } catch { present.push(null); }
+    }
+    // 主文件优先；它不在了才回落到锚点。两条都读不出来才是首次启用。
+    let id = present[0] || present[1];
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    if (!id) {
+      const created = randomUUID();
+      try { await writeFile(files[0], JSON.stringify({ installationId: created }), { mode: 0o600, flag: 'wx' }); id = created; }
+      catch (error) {
+        if (error.code !== 'EEXIST') throw error;
+        // 并发启动：抢输的那个直接采用磁盘上的身份，不再自己发一份；只有文件坏掉才覆盖重写。
+        id = parse(await readFile(files[0], 'utf8').catch(() => ''));
+        if (!id) { id = created; await writeFile(files[0], JSON.stringify({ installationId: id }), { mode: 0o600 }); }
+      }
+    }
+    // 把两个文件对齐成同一个身份（缺失、被删或损坏的那个补齐）；补写失败不影响本次上报，下次再补。
+    for (const [index, file] of files.entries()) {
+      if (present[index] === id) continue;
+      try { await writeFile(file, JSON.stringify({ installationId: id }), { mode: 0o600 }); } catch { /* 下次再补 */ }
     }
     return id;
   })().catch(() => null));
-  return state.identities.get(file);
+  return state.identities.get(dir);
 }
 /** 上报数据只允许固定枚举和有界数值，禁止透传执行参数/异常/提示词。 */
 export function analyticsFields(input: any = {}) {

@@ -561,3 +561,33 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 - 合理的修法是保留「全部视频段」的枚举，在 `chainPlan` 里跳过已有成果的段，并把这些段的既有成果当作下一段的续拍输入（`carry`）；方案预览要标出哪几段是「已有成果、本次跳过」，费用估算也只算本次要生成的部分。这会改动 `chain` 记录里段序的含义与连拍弹窗的编号，属于付费转换口径的变化，按约定先与用户确认再做。
 
 临时探针与结论都留在本机 `/tmp/probe-chain.mjs`，不入库。
+
+## 按 LibTV 口径补「画面」节点：剧本 → 分镜 → 每段画面 → 视频 3.24.0-canvas.10
+
+上一轮对齐了「参考实现、不照搬」的定位，也确认过 LibTV 画布本身几乎是空的，只能取它的创作顺序。用户对照参考画布后指出还差最关键的一环：**每个镜头（每段）应该有自己的画面节点**——我们原来是「剧本 → 分镜 → 每段视频节点」，缺了「画面」这一跳。本轮把这一跳补上，仍只取顺序与心智，不引它的画布编辑器交互。
+
+- **每段一个「画面」节点（画布内铺开时）**：`createFromScript` 现在每段先建一个 `image` 节点（`data.label = 第N段 · 画面`，带该段提示词、画幅、清晰度与 `imageCount: 1`），再建该段视频节点；连线为 `上游 → 画面（prompt）`、`画面 → 视频（frame）`。也就是 剧本 → 分镜 → 每段画面 → 每段视频 → 合成，画面出图后自动作为这一段的首帧。两条提示词/费用链路不变：画面单独一次图片确认（图片按用量单独计费并要审核），视频仍按段单独确认。
+- **画面节点走流程但不占制作段**：新增 `FRAME_MARK = 'metaonticFrameOf'`（值指向它服务的视频节点）与 `flowAuthors(doc)`；`canvasSegments(doc)` = `flowAuthors(doc)` 去掉画面节点。所以画面节点会进入「制作「…」」的推进顺序（第一段先出画面、再做视频），但「逐段制作」的段数、成片段数、`canvasSegmentStats.total/produced` 都还是只数要交付的视频段，读数与上一版一致。
+- **画面出图后能被下游当首帧读到**：`readCanvasInput` 为「节点自己没有 `assetId`」的上游节点回溯它的最新成果（`metaonticSourceNode` 指回的独立成果节点，按 `metaonticCreatedAt` 取最新）。画布内的成果本来就是独立节点，不做这一步，接在视频前面的画面节点在制作时会找不到素材。
+- **体检提醒先出画面**：`canvasReadiness` 新增 `FRAME_MISSING_IMAGE`（warning）——画面节点还没出图时，提前说明「先点这个画面节点的『制作』出一张图，它才会作为这一段的首帧接给视频节点」。虽然视频侧也有「参考端口连的上游节点还没有生成好的图片」的报错，但那条只在点开制作后才看到，体检把它提前到画布上；连拍弹窗里的体检清单也自动带上这条。
+
+### 本轮修掉的一个真 bug：节点自己的成果回流成它自己的输入
+
+上一轮（canvas.7）加成果回溯时写的是「节点没有 `assetId` 就用它的最新成果」，没有区分「上游节点」和「目标节点本身」。后果是：某段生成出成果后，这个成果节点（`metaonticSourceNode` 指回源节点）又会在下次读取时被当成源节点自己的输入素材，于是
+
+- 审核指纹被自己刚做出来的成果改掉 → 用同一份 `canvas` 对象再执行生成时，报「画布内容或参考素材已修改，请重新读取并审核」，把一次正常重试误判成画布被改；
+- 该成果还会被当成参考素材塞进 `references`（源节点是视频节点时尤其离谱，等于拿自己的产出当自己的输入）。
+
+这个回归是被 `tests/canvas-project.test.mjs` 第一条用例抓到的（助手侧同步后再次 `video_generate`，本该报「重新读取并审核」，却先报「上游媒体资产未落盘」）。修法是 `readCanvasInput` 只对**上游节点**回溯最新成果，目标节点自己的成果不参与：`const upstreamResult = id === link.nodeId ? '' : latest.get(id)?.assetId || ''`。新增回归断言：目标节点出成果前后指纹必须一致，且画面节点出图后仍能当首帧读到。
+
+验证：类型检查、构建、**522 项自动测试**、`git diff --check` 通过；`node scripts/check-active-video.mjs` 无未闭合执行记录。新增断言：`tests/canvas-view-layout.test.mjs` 每段铺出画面节点（标签/提示词/画幅/`FRAME_MARK` 指向本段）、连线是「剧本 → 分镜 → 每段画面 → 视频」、画面跟着流程排队但 `canvasSegments` 不算它；`tests/canvas-bridge.test.mjs` 画面出图回溯给下游当首帧、目标节点自己的成果不回算且指纹稳定；`tests/canvas-stages.test.mjs` 画面节点走流程不算制作段、出图前体检提醒先出图、出图后成果反绑到它服务的段。
+
+人工看图：`.local/canvas-qa/style-preview/`（本地 QA 脚手架，已把 `n5` 改成「第1段 · 画面」并加 `n5 → n4` 的 `frame` 连线）→ `node .local/canvas-qa/style-preview/build.mjs` → 截图 `/tmp/stage-chain.png`、`/tmp/stage-batch-checklist.png`。工具条主行动正确落到「制作「第1段 · 画面」」（流程进度 1/2），虚线框标出未完成，体检行与连拍弹窗里的体检清单都给出「画面「第1段 · 画面」还没有出图」。
+
+本地成品：`.local/test/3.24.0-canvas.10/metaontic-video-3.24.0-canvas.10.tgz`，1,307,645 字节，SHA-256 `4fca4790abfa086d69f71ac47d8a55699feeaddbdfe2ed3cc13cda510773c960`。先打过 `3.24.0-canvas.9`，但那次打包在重排说明书 PDF **之前**，包里的 PDF 还是旧版；同名版本重装被 pnpm 判成「Already up to date」直接跳过，所以改用 `canvas.10` 重打并安装，包内 PDF SHA-256 为 `7eb154368ea2647432e61e26c8d82ce10534268eb3f222670a40b17c17a6ca3f`（与工作区一致）。desktop profile 已从 3.24.0-canvas.8 升到 3.24.0-canvas.10（中间短暂装过 canvas.9）；按转义还原后确认包内 `client.js` 含 `metaonticFrameOf` / `FRAME_MISSING_IMAGE` / 每段画面节点与连线代码，`MetaOnticVideo使用说明书.md` 含新增的画面节点说明与 FAQ。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 仍保持 3.24.1。CLI 未返回 applied/restart-required，不能据此断言运行窗口已热加载，未要求重启。
+
+未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。
+
+**已确认的范围缺口（未做）**：助手侧投影（`canvas-project.ts`）没有跟着铺画面节点。那里一张 `video` 制作节点累积**整条片子**的多段成果（外加每段一个只读文本说明节点），「每段一个画面」在那种结构里没有对应位置，硬加会变成「一个视频节点对应多张画面」的错配；要一起改，得先决定助手侧是否也改成「一段一个视频节点 + 一个画面节点」，那是投影结构的调整，涉及既有 `managed` 差异保护与旧画布迁移，先不动，等用户确认。
+
+另：`pendingVideoOrder` 会把已有成果的段重新排进连拍方案（既有问题，未改，见上一条待确认记录），本轮未触碰。

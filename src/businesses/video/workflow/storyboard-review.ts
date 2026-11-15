@@ -7,6 +7,31 @@ import { appendRequestLog } from '../../../core/utils/logging.js';
 const STORYBOARD_FILE = /storyboard|分镜|示意/i;
 const IMAGE_FILE = /\.(png|jpe?g|webp|svg)$/i;
 
+/** 只比用户真正读到的字：Markdown 标记与空白不算差异，图片/链接语法留文字。 */
+function readableText(value) {
+  return String(value || '')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[#*`>|~_\-\s]/g, '');
+}
+/** 相邻两字集合：顺序与排版变化都不影响，只看这些字有没有出现在用户可见正文里。 */
+function characterPairs(text) {
+  const pairs = new Set();
+  for (let index = 0; index + 2 <= text.length; index += 1) pairs.add(text.slice(index, index + 2));
+  return pairs;
+}
+/** 本版脚本被本轮用户可见正文覆盖了多少：整理排版、补几句解说都不算差异；
+ *  改写措辞、删段、只给摘要或文件链接会明显掉下来。 */
+export const SCRIPT_COVERAGE_MIN = 0.7;
+export function scriptCoverage(script, visible) {
+  const target = readableText(script);
+  if (!target) return 1;
+  if (target.length < 2) return readableText(visible).includes(target) ? 1 : 0;
+  const shown = characterPairs(readableText(visible));
+  let hit = 0;
+  for (const pair of characterPairs(target)) if (shown.has(pair)) hit += 1;
+  return hit / characterPairs(target).size;
+}
+
 export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
   const sessions = new WeakMap<object, { turn: number; active: boolean; files: string[]; shown: Set<string>; awaitingReview: boolean; text: string }>();
   /** 上一轮展示过本版脚本却没弹审核窗时留痕：正文单独成一条消息时助手常直接结束回合。 */
@@ -102,8 +127,17 @@ export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     // 只要真的发起了审核提问就不再算漏问；放行与否仍由下面的展示检查决定。
     if (review && state) state.awaitingReview = false;
     if (!review || (!args.requireStoryboard && !state?.active)) return null;
-    const normalized = value => String(value || '').replace(/\s+/g, '');
-    if (args.requiredScriptText && !normalized(state?.text).includes(normalized(args.requiredScriptText))) return { kind: 'deny', reason: '请先在本轮用户可见正文完整展示script.md正文，再调用review；文件链接或摘要不能代替完整脚本。' };
+    if (args.requiredScriptText) {
+      // 以前要求正文逐字包含 script.md：助手把脚本整理成带标题、加「· 第 1 版」的展示版就会被误拦，
+      // 审核窗一直开不出来。改成按覆盖率判断，仍能挡下摘要、删段与只给链接。
+      const coverage = scriptCoverage(args.requiredScriptText, state?.text);
+      if (coverage < SCRIPT_COVERAGE_MIN) {
+        const percent = Math.round(coverage * 100);
+        await appendRequestLog({ event: 'storyboard_review_blocked', reason: 'script_text_mismatch', coverage: Math.round(coverage * 1000) / 1000 });
+        return { kind: 'deny', reason: `脚本审核暂未打开：本版script.md正文只在本轮用户可见正文里出现 ${percent}%。`
+          + '请把script.md正文原样贴进本轮正文再单独调用review；标题、加粗、表格这类排版差异不算问题，但不要改写措辞、删段，也不要只给文件链接或摘要。' };
+      }
+    }
     const embedded = [...(state?.shown || [])].filter(target => STORYBOARD_FILE.test(path.basename(target)));
     let ready = embedded.length > 0;
     if (ready) {

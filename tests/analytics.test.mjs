@@ -1,11 +1,85 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {setImmediate as tick} from 'node:timers/promises';
+import {mkdtemp,mkdir,writeFile,readFile,copyFile,rm} from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import {api} from './module-test-api.mjs';
 const id='42acda42-69d1-49d9-b60a-955ba8da12b4';
 function fixture(request=async()=>({ok:true}),extra={}){
  return api.createAnalyticsReporter({}, {enabled:()=>true,identity:async()=>id,delayMs:100000,timeoutMs:15,request,started:new Set(),device:()=>({arch:'arm64',osRelease:'25.1.0',memoryGb:16,harnessVersion:'0.2.0'}),...extra});
 }
+const UUID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+/** 匿名身份的两个落盘位置：主文件 + 冗余锚点。测试全部走真实实现，不注入 identity。 */
+const identityDir = (home) => path.join(home, 'state', 'metaontic-video');
+const identityPath = (home, name = 'analytics-id.json') => path.join(identityDir(home), name);
+const readIdentityFile = async (file) => JSON.parse(await readFile(file, 'utf8'));
+async function withHome(fn) {
+ const root = await mkdtemp(path.join(os.tmpdir(), '统计 身份 ')), old = process.env.DSH_HOME;
+ process.env.DSH_HOME = root;
+ try { return await fn(root); }
+ finally { if (old === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = old; await rm(root, { recursive: true, force: true }); }
+}
+test('匿名安装标识同机只发一份：重复与并发调用都是同一个 ID，两个落盘文件内容一致', async () => {
+ await withHome(async (root) => {
+  const first = await api.analyticsIdentity();
+  assert.match(first, UUID_RE);
+  assert.equal(await api.analyticsIdentity(), first, '同一进程重复调用不换身份');
+  const concurrent = await Promise.all([api.analyticsIdentity(), api.analyticsIdentity(), api.analyticsIdentity()]);
+  assert.deepEqual(concurrent, [first, first, first], '并发调用也只有一个身份');
+  assert.equal((await readIdentityFile(identityPath(root))).installationId, first);
+  assert.equal((await readIdentityFile(identityPath(root, 'analytics-anchor.json'))).installationId, first, '锚点与主文件同源');
+ });
+});
+test('只有一个文件留下时仍用同一个身份：主文件丢了用锚点补回来，锚点丢了用主文件补回来', async () => {
+ await withHome(async (root) => {
+  const id = await api.analyticsIdentity();
+  // 主文件被删（手删或清状态），锚点还在：换一个宿主目录模拟「同一个锚点、没有主文件」。
+  const mirrorOnly = path.join(root, '镜像 宿主');
+  await mkdir(identityDir(mirrorOnly), { recursive: true });
+  await copyFile(identityPath(root, 'analytics-anchor.json'), identityPath(mirrorOnly, 'analytics-anchor.json'));
+  process.env.DSH_HOME = mirrorOnly;
+  assert.equal(await api.analyticsIdentity(), id, '主文件没了也不是新设备');
+  assert.equal((await readIdentityFile(identityPath(mirrorOnly))).installationId, id, '主文件被补回来');
+  // 反过来：锚点被删，主文件还在。
+  const primaryOnly = path.join(root, '另一 宿主');
+  await mkdir(identityDir(primaryOnly), { recursive: true });
+  await copyFile(identityPath(root), identityPath(primaryOnly));
+  process.env.DSH_HOME = primaryOnly;
+  assert.equal(await api.analyticsIdentity(), id);
+  assert.equal((await readIdentityFile(identityPath(primaryOnly, 'analytics-anchor.json'))).installationId, id, '锚点被补回来');
+ });
+});
+test('身份文件坏掉或对不上时按主文件为准并自愈，两边都读不出才重新分配', async () => {
+ await withHome(async (root) => {
+  const dir = identityDir(root);
+  await mkdir(dir, { recursive: true });
+  const good = '42acda42-69d1-49d9-b60a-955ba8da12b4', other = '11111111-2222-3333-4444-555555555555';
+  // 锚点有效、主文件是垃圾：回落到锚点，并把主文件改写成有效值。
+  await writeFile(identityPath(root, 'analytics-anchor.json'), JSON.stringify({ installationId: good }));
+  await writeFile(identityPath(root), 'not json at all');
+  assert.equal(await api.analyticsIdentity(), good);
+  assert.equal((await readIdentityFile(identityPath(root))).installationId, good);
+  // 两个文件对不上（备份还原 / 手改）：主文件为准，锚点被对齐。
+  const clash = path.join(root, '冲突 宿主');
+  await mkdir(identityDir(clash), { recursive: true });
+  await writeFile(identityPath(clash), JSON.stringify({ installationId: good }));
+  await writeFile(identityPath(clash, 'analytics-anchor.json'), JSON.stringify({ installationId: other }));
+  process.env.DSH_HOME = clash;
+  assert.equal(await api.analyticsIdentity(), good, '主文件优先，身份不被锚点带走');
+  assert.equal((await readIdentityFile(identityPath(clash, 'analytics-anchor.json'))).installationId, good);
+  // 两边都不是合法 UUID：当作首次启用，重新分配并覆盖。
+  const broken = path.join(root, '损坏 宿主');
+  await mkdir(identityDir(broken), { recursive: true });
+  await writeFile(identityPath(broken), JSON.stringify({ installationId: 'nope' }));
+  await writeFile(identityPath(broken, 'analytics-anchor.json'), JSON.stringify({ installationId: '' }));
+  process.env.DSH_HOME = broken;
+  const fresh = await api.analyticsIdentity();
+  assert.match(fresh, UUID_RE);
+  assert.equal((await readIdentityFile(identityPath(broken))).installationId, fresh);
+  assert.equal((await readIdentityFile(identityPath(broken, 'analytics-anchor.json'))).installationId, fresh);
+ });
+});
 test('analytics payload contains only allowlisted metadata and approved basic device fields',async()=>{
  let body;const r=fixture(async(_url,options)=>{assert.equal(options.redirect,'error');assert.equal(options.credentials,'omit');assert.deepEqual(Object.keys(options.headers),['Content-Type']);body=JSON.parse(options.body);return{ok:true};});
  try{r.record('tool_finished',{tool:'video_generate',mode:'promo-video',status:'succeeded',durationMs:12,prompt:'private story',apiKey:'secret',videoUrl:'private-url',hostname:'private-host',errorCode:'unknown private details'});await r.flush();
