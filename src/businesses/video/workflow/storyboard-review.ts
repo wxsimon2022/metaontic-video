@@ -156,5 +156,9 @@ export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
       + 'present 与模型看图都不等于用户看到图，只有正文里真实渲染的图片才算；'
       + '正文发送完成后再单独调用 ask_user_question，不能与展示并行；不要重画或调用付费生成。' };
   }
-  return { observe, gate };
+  /** 本轮用户可见正文（只含 text 块）：脚本落盘的唯一来源，与放行判断用的是同一份累计文本。 */
+  function visibleText(session) {
+    return sessions.get(session)?.text || '';
+  }
+  return { observe, gate, visibleText };
 }

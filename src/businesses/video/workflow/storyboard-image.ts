@@ -56,13 +56,23 @@ function visualOf(shot: any) {
   return body || String(shot?.visual || '').replace(/^[^：:]*[：:]\s*/, '').trim();
 }
 
+/** 片名取脚本第一行「# 」标题；取不到才退回默认名。 */
+function titleOf(script: any) {
+  for (const line of String(script ?? '').split(/\r?\n/)) {
+    const matched = /^#\s+(\S.*)$/.exec(line.trim());
+    if (matched) return matched[1].trim();
+    if (line.trim()) break;
+  }
+  return '';
+}
+
 const dialogueOf = (shot: any) => (Array.isArray(shot?.dialogue) ? shot.dialogue : [])
   .map((line: any) => String(line?.line || line?.text || '').trim()).filter(Boolean).join(' / ');
 
 /** 分镜示意图：片名 + 规格 + 每镜头一张卡（镜号、景别运镜、画面、时长、台词）。只画解析到的镜头。 */
 export function renderStoryboardSvg(script: any, options: any = {}) {
   const shots = Array.isArray(options.shots) ? options.shots : scriptStoryboardShots(String(script ?? ''));
-  const title = String(options.title || '').trim() || '分镜示意图';
+  const title = String(options.title || '').trim() || titleOf(script) || '分镜示意图';
   const version = Number(options.version) || 1;
   const ratio = String(options.ratio || '').trim();
   const total = Number(options.seconds) || shots.reduce((sum: number, shot: any) => sum + (Number(shot?.duration) || 0), 0);

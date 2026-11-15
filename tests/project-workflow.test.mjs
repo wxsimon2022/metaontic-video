@@ -39,10 +39,11 @@ async function fixture(run) {
     const text=(body?await readFile(script,'utf8'):'摘要')+`\n![分镜](<${image}>)`;
     for(const observer of observers)await observer(exec.agent.session,{type:'assistant/message',data:{turn:1,message:{content:[{type:'text',text}]}}});
   }
+  const say=async text=>{for(const observer of observers)await observer(exec.agent.session,{type:'assistant/message',data:{turn:1,message:{content:[{type:'text',text}]}}});};
   const project=tools.get('video_project');
   async function prepare(subjectType='scenery'){return project.execute({action:'prepare',subjectType,duration:spec.duration},exec);}
   async function review(id,extra={}){await show();return project.execute({action:'review',projectId:id,scriptPath:script,toolName:'video_generate',specification:spec,...extra},exec);}
-  try {await run({dir,config,tools,exec,answers,spec,script,image,project,prepare,review,show,gate:x=>gate(x,()=>null),get asks(){return asks;},get posts(){return posts;}});}
+  try {await run({dir,config,tools,exec,answers,spec,script,image,project,prepare,review,show,say,gate:x=>gate(x,()=>null),get asks(){return asks;},get posts(){return posts;}});}
   finally{dispose();globalThis.fetch=oldFetch;if(oldHome===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=oldHome;await rm(dir,{recursive:true,force:true});}
 }
 
@@ -79,6 +80,35 @@ test('review requires full script and inline storyboard, not a summary or file p
   const p=await h.prepare();await h.show(false);
   const result=await h.project.execute({action:'review',projectId:p.projectId,scriptPath:h.script,specification:h.spec},h.exec);
   assert.equal(result.status,'blocked');assert.equal(h.asks,0);assert.match(result.reason,/只在本轮用户可见正文里出现 \d+%/);
+}));
+
+test('脚本只在正文生成一次：storyboard 落盘并渲染示意图，review 直接放行',()=>fixture(async h=>{
+  const p=await h.prepare();
+  // 这一版脚本只出现在用户可见正文里，没有用写文件工具写 script.md。
+  const body=['# 青旅晨光','','清晨的天台，镜头缓慢推近。','','## 分镜表','',
+    '| 镜号 | 镜别 | 运镜 | 画面 | 时长 | 台词 |','| --- | --- | --- | --- | --- | --- |',
+    '| 1 | 远景 | 缓慢推近 | 清晨天台的城市天际线，薄雾里亮起第一盏灯 | 5秒 | — |',
+    '| 2 | 近景 | 固定 | 前台接待与行李特写 | 5秒 | 欢迎回来 |','','## 费用预估','按渠道账单结算。'].join('\n');
+  await h.say(body);
+  const board=await h.project.execute({action:'storyboard',projectId:p.projectId,scriptPath:h.script,captureScript:true},h.exec);
+  assert.match(board.path,/storyboard-v1\.svg$/,'示意图按版本命名，审核守卫按文件名找得到');
+  assert.equal(board.shots,2);
+  assert.match(board.markdown,/^!\[分镜示意图\]\(<.*storyboard-v1\.svg>\)$/);
+  const svg=await readFile(board.path,'utf8');
+  assert.ok(svg.includes('镜头 2')&&svg.includes('欢迎回来')&&svg.includes('前台接待与行李特写'),'按分镜表渲染每一个镜头');
+  assert.equal((await readFile(h.script,'utf8')).trim(),body,'插件把正文里的脚本落成 script.md');
+  await h.say(`示意图已出，下面是本版脚本的交付：\n${board.markdown}\n${board.link}`);
+  const result=await h.project.execute({action:'review',projectId:p.projectId,scriptPath:h.script,specification:h.spec,captureScript:true},h.exec);
+  assert.equal(result.status,'approved','正文里贴出脚本并内嵌本版示意图后直接通过审核');
+  assert.equal(h.asks,1,'只弹一次脚本审核');
+}));
+
+test('正文里没有完整脚本时，storyboard 与 review 都不伪造脚本',()=>fixture(async h=>{
+  const p=await h.prepare();
+  await h.say('本版要点：湖面、晨雾，详情见 script.md。');
+  await assert.rejects(()=>h.project.execute({action:'storyboard',projectId:p.projectId,scriptPath:h.script,captureScript:true},h.exec),/正文里没有找到完整脚本/);
+  await assert.rejects(()=>h.project.execute({action:'review',projectId:p.projectId,scriptPath:h.script,specification:h.spec,captureScript:true},h.exec),/正文里没有找到完整脚本/);
+  assert.equal(h.asks,0,'没通过审核前置就不弹窗');
 }));
 
 test('changes while waiting for review cannot approve a different script',()=>fixture(async h=>{

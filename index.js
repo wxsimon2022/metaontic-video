@@ -3326,7 +3326,7 @@ async function ensureProjectDuration(ctx, exec, project, requested, save2) {
 }
 
 // src/businesses/video/tools/video-project.ts
-import { readFile as readFile7 } from "node:fs/promises";
+import { mkdir as mkdir8, readFile as readFile7, readdir as readdir3, writeFile as writeFile6 } from "node:fs/promises";
 
 // src/businesses/video/workflow/costs.ts
 init_config();
@@ -3753,15 +3753,337 @@ async function preflightGate(ctx, config, exec) {
   throw new Error("\u8BF7\u5728\u8BBE\u7F6E\u9875\u9009\u62E9\u6709\u6548\u63A5\u5165\u65B9\u5F0F\u5E76\u4FDD\u5B58\u3002");
 }
 
+// src/businesses/video/workflow/script-capture.ts
+var IMAGE_OR_LINK = /^!?\[[^\]]*\]\([^)]*\)$/;
+var ONLY_TARGET = /^<[^>]+>$/;
+var RULE = /^([-*_]\s*){3,}$/;
+function captureScriptBody(text) {
+  const lines = String(text ?? "").replace(/\r\n?/g, "\n").split("\n");
+  const start = lines.findIndex((line) => /^#\s+\S/.test(line));
+  if (start < 0) return "";
+  const kept = lines.slice(start);
+  while (kept.length) {
+    const line = kept[kept.length - 1].trim();
+    if (!line || RULE.test(line) || IMAGE_OR_LINK.test(line) || ONLY_TARGET.test(line)) {
+      kept.pop();
+      continue;
+    }
+    break;
+  }
+  const body = kept.join("\n").trim();
+  return body.length >= 200 ? body : "";
+}
+
+// src/businesses/video/tools/video-stage.ts
+import { randomUUID as randomUUID5 } from "node:crypto";
+import { performance as performance2 } from "node:perf_hooks";
+var STAGES = ["script_design", "storyboard_design", "script_present", "script_review_wait", "production_confirm_wait", "reference_review_wait", "segment_review_wait", "result_present"];
+var pendingStages = /* @__PURE__ */ new Map();
+async function closePendingStage(stage, source) {
+  let target;
+  for (const [spanId, entry2] of pendingStages) if (entry2.stage === stage) target = spanId;
+  if (!target) return null;
+  const entry = pendingStages.get(target);
+  pendingStages.delete(target);
+  const elapsedMs = Math.round((performance2.now() - entry.start) * 1e3) / 1e3;
+  await appendRequestLog({
+    event: "stage_finished",
+    stage: entry.stage,
+    spanId: target,
+    startedAt: entry.startedAt,
+    finishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    elapsedMs,
+    outcome: "success",
+    source
+  });
+  return { spanId: target, elapsedMs };
+}
+function stageTool() {
+  return {
+    name: "video_stage",
+    description: "\u4EC5\u8BB0\u5F55\u9636\u6BB5\u8BA1\u65F6\uFF0C\u4E0D\u8C03\u7528\u751F\u6210\u63A5\u53E3\u3001\u4E0D\u4EA7\u751F\u6A21\u578B\u8D39\u7528\u3001\u4E0D\u6539\u914D\u7F6E\u3002\u811A\u672C\u8BBE\u8BA1/\u793A\u610F\u56FE/\u5C55\u793A/\u7B49\u5F85\u5BA1\u6838\u7B49\u9636\u6BB5\u5F00\u59CB\u65F6action=start\uFF0C\u7ED3\u675F\u65F6action=finish\u5E76\u4F20\u539FspanId\u3002\u811A\u672C\u8BBE\u8BA1\u4E00\u6BB5\u5728\u811A\u672C\u4FDD\u5B58\u5230script.md\u540E\u7531\u63D2\u4EF6\u81EA\u52A8\u7ED3\u675F\uFF0C\u6B64\u65F6\u4E0D\u5FC5\u518D\u8C03finish\uFF1B\u811A\u672C\u4E0D\u662F\u7528\u5199\u6587\u4EF6\u5DE5\u5177\u4FDD\u5B58\u65F6\u518D\u8865finish\u3002\u8017\u65F6\u662F\u6807\u8BB0\u8FB9\u754C\u95F4\u5899\u949F\u65F6\u95F4\uFF08\u5305\u542B\u5DE5\u5177\u8C03\u5EA6\uFF09\uFF0C\u4E0D\u662F\u6A21\u578B\u7EAF\u63A8\u7406\u8017\u65F6\uFF1B\u7B49\u5F85\u7528\u6237\u5355\u72EC\u8BB0\u9636\u6BB5\u3002\u7F3A\u5931\u5F00\u59CB\u6216\u70ED\u91CD\u8F7D\u4E22\u5931\u6807\u8BB0\u65F6\u8FD4\u56DEunavailable\uFF0C\u4E0D\u731C\u8017\u65F6\u3002",
+    parameters: { type: "object", properties: { action: { type: "string", enum: ["start", "finish"] }, stage: { type: "string", enum: STAGES }, spanId: { type: "string" }, outcome: { type: "string", enum: ["success", "cancelled", "error"] } }, required: ["action", "stage"] },
+    output: { schema: { type: "object", properties: { status: { type: "string" }, spanId: { type: "string" }, elapsedMs: { type: "number" } } }, render(_args, value) {
+      return [{ type: "text", text: JSON.stringify(value) }];
+    } },
+    timeoutMs: 1e4,
+    isConcurrencySafe() {
+      return true;
+    },
+    async execute(args) {
+      if (!STAGES.includes(args?.stage)) throw new Error("\u672A\u77E5\u8BA1\u65F6\u9636\u6BB5");
+      if (args.action === "start") {
+        if (pendingStages.size >= 512) return { status: "unavailable" };
+        const spanId = randomUUID5(), startedAt = (/* @__PURE__ */ new Date()).toISOString();
+        pendingStages.set(spanId, { stage: args.stage, startedAt, start: performance2.now() });
+        await appendRequestLog({ event: "stage_started", stage: args.stage, spanId, startedAt, source: "assistant_marker" });
+        return { status: "started", spanId };
+      }
+      if (args.action !== "finish") throw new Error("\u672A\u77E5\u8BA1\u65F6\u52A8\u4F5C");
+      const entry = pendingStages.get(args.spanId);
+      if (!entry || entry.stage !== args.stage) return { status: "unavailable" };
+      pendingStages.delete(args.spanId);
+      const elapsedMs = Math.round((performance2.now() - entry.start) * 1e3) / 1e3;
+      const outcome = ["success", "cancelled", "error"].includes(args.outcome) ? args.outcome : "success";
+      await appendRequestLog({ event: "stage_finished", stage: entry.stage, spanId: args.spanId, startedAt: entry.startedAt, finishedAt: (/* @__PURE__ */ new Date()).toISOString(), elapsedMs, outcome, source: "assistant_marker" });
+      return { status: "finished", spanId: args.spanId, elapsedMs };
+    }
+  };
+}
+
+// src/businesses/video/workflow/script-tracking.ts
+var SCRIPT_FILE = /^script(?:[-_]?v?\d+)?\.md$/i;
+var WRITE_TOOLS = /* @__PURE__ */ new Set(["write", "edit", "multi_edit", "multiedit", "apply_patch"]);
+var PATCH_FILE_LINE = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gim;
+function fileBaseName(target) {
+  return String(target ?? "").split(/[\\/]/).pop() || "";
+}
+function isScriptPath(target) {
+  return SCRIPT_FILE.test(fileBaseName(target));
+}
+function toolArguments(value) {
+  if (value && typeof value === "object") return value;
+  if (typeof value !== "string") return {};
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+function scriptSaveOf(event) {
+  if (event?.type !== "tool/call") return null;
+  const data = event.data || {};
+  const name = String(data.name || "");
+  if (!WRITE_TOOLS.has(name)) return null;
+  const args = toolArguments(data.arguments);
+  const direct = args.file_path || args.path || args.filePath;
+  if (isScriptPath(direct)) return { path: String(direct), tool: name, mode: name === "write" ? "create" : "update" };
+  if (name !== "apply_patch") return null;
+  const text = String(args.patch ?? args.input ?? "");
+  for (const match of text.matchAll(PATCH_FILE_LINE)) {
+    if (isScriptPath(match[1])) return { path: match[1].trim(), tool: name, mode: "update" };
+  }
+  return null;
+}
+function scriptVersion(content) {
+  const match = /版本[:：]\s*(第?\s*\d+\s*版)/.exec(String(content ?? ""));
+  return match ? match[1].replace(/\s+/g, "") : void 0;
+}
+function createScriptTracker({ closeStage = closePendingStage, log = appendRequestLog } = {}) {
+  async function observe(session, event) {
+    if (!session || typeof session !== "object") return;
+    const save2 = scriptSaveOf(event);
+    if (!save2) return;
+    try {
+      const content = toolArguments((event.data || {}).arguments).content;
+      const text = typeof content === "string" ? content : "";
+      const closed = await closeStage("script_design", "script_saved");
+      await log({
+        event: "script_saved",
+        path: save2.path,
+        tool: save2.tool,
+        mode: save2.mode,
+        bytes: text ? Buffer.byteLength(text, "utf8") : void 0,
+        characters: text ? text.length : void 0,
+        version: scriptVersion(text),
+        turn: (event.data || {}).turn,
+        closedSpanId: closed?.spanId,
+        closedElapsedMs: closed?.elapsedMs
+      });
+    } catch {
+    }
+  }
+  return { observe };
+}
+
+// src/businesses/video/workflow/storyboard-shots.ts
+function scriptStoryboardShots(script) {
+  const lines = script.split(/\r?\n/), shots = [];
+  const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split(/(?<!\\)\|/).map((s) => s.trim().replace(/\\\|/g, "|"));
+  let fenced = false;
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (/^\s*(```|~~~)/.test(lines[i])) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced || !lines[i].includes("|")) continue;
+    const header = cells(lines[i]), separator = cells(lines[i + 1]);
+    if (separator.length !== header.length || !separator.every((x) => /^:?-{3,}:?$/.test(x))) continue;
+    const titleAt = header.findIndex((x) => /镜号|镜头|shot/i.test(x));
+    const visualAt = header.findIndex((x) => /画面|visual|详情|描述/i.test(x));
+    if (titleAt < 0 || visualAt < 0 || titleAt === visualAt) continue;
+    const timeAt = header.findIndex((x) => /时间|时长|time|duration/i.test(x));
+    const cameraAt = header.map((x, j) => /景别|镜别|运镜|视角|camera|movement/i.test(x) ? j : -1).filter((j) => j >= 0);
+    const soundAt = header.findIndex((x) => /声音|音效|sound|sfx/i.test(x));
+    const dialogueAt = header.findIndex((x) => /台词|对白|dialogue/i.test(x));
+    for (i += 2; i < lines.length && lines[i].includes("|") && lines[i].trim(); i++) {
+      const row = cells(lines[i]);
+      if (row.length !== header.length || !row[visualAt]) continue;
+      const time = row[timeAt] || "", range = time.match(/(\d+(?:\.\d+)?)\s*(?:秒|s)?\s*[–—~～至-]\s*(\d+(?:\.\d+)?)/i);
+      const explicit = time.match(/^(\d+(?:\.\d+)?)\s*(?:秒|s)$/i);
+      const duration = range ? Number(range[2]) - Number(range[1]) : explicit ? Number(explicit[1]) : null;
+      shots.push({
+        title: row[titleAt],
+        visual: header.map((h, j) => `${h}\uFF1A${row[j]}`).join("\n"),
+        camera: cameraAt.map((j) => row[j]).filter(Boolean).join(" \xB7 "),
+        sfx: row[soundAt] || "",
+        dialogue: row[dialogueAt] ? [{ role: "\u5267\u672C\u5BF9\u767D", line: row[dialogueAt] }] : [],
+        ...duration > 0 ? { duration } : {},
+        metaonticTime: time
+      });
+    }
+    i--;
+  }
+  return shots;
+}
+
+// src/businesses/video/workflow/storyboard-image.ts
+var FONT = "-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
+var ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" };
+var escapeXml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ESCAPES[char]);
+var STORYBOARD_PREFIX = "storyboard-v";
+var storyboardFileName = (version) => `${STORYBOARD_PREFIX}${version}.svg`;
+function nextStoryboardVersion(entries = []) {
+  let max = 0;
+  for (const entry of entries || []) {
+    const matched = /^storyboard[-_]?v?(\d+)\.[a-z0-9]+$/i.exec(String(entry || ""));
+    if (matched) max = Math.max(max, Number(matched[1]));
+  }
+  return max + 1;
+}
+function displayWidth(value) {
+  let width = 0;
+  for (const char of String(value ?? "")) width += /[\u2e80-\uffff]/.test(char) ? 1 : 0.55;
+  return width;
+}
+function wrapText(value, maxUnits, maxLines = 4) {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return [];
+  const lines = [];
+  let current = "";
+  for (const char of text) {
+    if (current && displayWidth(current + char) > maxUnits) {
+      lines.push(current);
+      current = char;
+      if (lines.length >= maxLines) break;
+      continue;
+    }
+    current += char;
+  }
+  if (lines.length < maxLines && current) lines.push(current);
+  if (lines.join("").length < text.length && lines.length) lines[lines.length - 1] = `${lines[lines.length - 1].slice(0, -1)}\u2026`;
+  return lines;
+}
+function visualOf(shot) {
+  const fields = String(shot?.visual || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const wanted = /^(?:画面|视觉|visual|详情|描述)\s*[:：]/i;
+  const hit = fields.find((line) => wanted.test(line));
+  const body = (hit ? hit.replace(wanted, "") : fields.join(" ")).trim();
+  return body || String(shot?.visual || "").replace(/^[^：:]*[：:]\s*/, "").trim();
+}
+function titleOf(script) {
+  for (const line of String(script ?? "").split(/\r?\n/)) {
+    const matched = /^#\s+(\S.*)$/.exec(line.trim());
+    if (matched) return matched[1].trim();
+    if (line.trim()) break;
+  }
+  return "";
+}
+var dialogueOf = (shot) => (Array.isArray(shot?.dialogue) ? shot.dialogue : []).map((line) => String(line?.line || line?.text || "").trim()).filter(Boolean).join(" / ");
+function renderStoryboardSvg(script, options = {}) {
+  const shots = Array.isArray(options.shots) ? options.shots : scriptStoryboardShots(String(script ?? ""));
+  const title = String(options.title || "").trim() || titleOf(script) || "\u5206\u955C\u793A\u610F\u56FE";
+  const version = Number(options.version) || 1;
+  const ratio = String(options.ratio || "").trim();
+  const total = Number(options.seconds) || shots.reduce((sum, shot) => sum + (Number(shot?.duration) || 0), 0);
+  const width = 1560, pad = 44, cardWidth = width - pad * 2, inner = 34;
+  const meta = [ratio, total ? `\u5168\u7247\u7EA6 ${total} \u79D2` : "", `${shots.length} \u4E2A\u955C\u5934`, `\u7B2C ${version} \u7248`].filter(Boolean).join(" \xB7 ");
+  const headHeight = 132;
+  const cards = shots.map((shot, index) => {
+    const visual = wrapText(visualOf(shot), 74, 4);
+    const dialogue = wrapText(dialogueOf(shot), 74, 1);
+    const sound = wrapText(String(shot?.sfx || "").trim(), 74, 1);
+    const seconds = Number(shot?.duration) > 0 ? `${Number(shot.duration)} \u79D2` : String(shot?.metaonticTime || "").trim();
+    return {
+      index,
+      shot,
+      visual,
+      dialogue,
+      sound,
+      seconds,
+      height: 44 + visual.length * 30 + (dialogue.length + sound.length) * 26 + 22
+    };
+  });
+  const bodyHeight = cards.reduce((sum, card) => sum + card.height + 18, 0);
+  const height = headHeight + bodyHeight + 78;
+  const out = [];
+  out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="${FONT}">`);
+  out.push(`<rect width="${width}" height="${height}" fill="#f7f5f0"/>`);
+  out.push(`<text x="${pad}" y="58" font-size="34" font-weight="600" fill="#2b2b2b">${escapeXml(title)}</text>`);
+  out.push(`<text x="${pad}" y="94" font-size="20" fill="#6e6c68">${escapeXml(meta)}</text>`);
+  out.push(`<text x="${pad}" y="122" font-size="17" fill="#8a8880">\u5206\u955C\u793A\u610F\uFF0C\u975E\u5B9E\u9645\u751F\u6210\u753B\u9762\uFF1B\u6309\u811A\u672C\u5206\u955C\u8868\u9010\u955C\u5934\u5BF9\u5E94\u3002</text>`);
+  if (!cards.length) {
+    out.push(`<text x="${pad}" y="${headHeight + 40}" font-size="22" fill="#8a8880">\u811A\u672C\u91CC\u8FD8\u6CA1\u6709\u53EF\u5206\u955C\u7684\u8868\u683C\uFF1A\u5148\u8865\u4E00\u4E2A\u5E26\u300C\u955C\u53F7 / \u955C\u522B / \u8FD0\u955C / \u753B\u9762 / \u65F6\u957F\u300D\u7684\u5206\u955C\u8868\u3002</text>`);
+  }
+  let y = headHeight;
+  for (const card of cards) {
+    out.push(`<g><rect x="${pad}" y="${y}" width="${cardWidth}" height="${card.height}" rx="14" fill="#ffffff" stroke="#e2ded6"/>`);
+    out.push(`<rect x="${pad}" y="${y}" width="6" height="${card.height}" rx="3" fill="#c9a26a"/>`);
+    const line = [
+      String(card.shot?.title || card.index + 1).trim() ? `\u955C\u5934 ${String(card.shot?.title || card.index + 1).trim()}` : `\u955C\u5934 ${card.index + 1}`,
+      String(card.shot?.camera || "").trim(),
+      card.seconds
+    ].filter(Boolean).join("\u3000\xB7\u3000");
+    out.push(`<text x="${pad + inner}" y="${y + 34}" font-size="21" font-weight="600" fill="#3a3a38">${escapeXml(line)}</text>`);
+    let cursor = y + 62;
+    for (const text of card.visual) {
+      out.push(`<text x="${pad + inner}" y="${cursor}" font-size="20" fill="#2b2b2b">${escapeXml(text)}</text>`);
+      cursor += 30;
+    }
+    cursor += 4;
+    for (const [label, lines] of [["\u53F0\u8BCD", card.dialogue], ["\u58F0\u97F3", card.sound]]) {
+      if (!lines.length) continue;
+      out.push(`<text x="${pad + inner}" y="${cursor}" font-size="18" fill="#7d7a72">${escapeXml(`${label}\uFF1A${lines[0]}`)}</text>`);
+      cursor += 26;
+    }
+    out.push("</g>");
+    y += card.height + 18;
+  }
+  out.push(`<text x="${pad}" y="${height - 32}" font-size="17" fill="#8a8880">\u7531 MetaOnticVideo \u672C\u5730\u6E32\u67D3\uFF0C\u4E0D\u8C03\u7528\u4ED8\u8D39\u51FA\u56FE\u6A21\u578B\uFF1B\u5B9E\u9645\u753B\u9762\u4EE5\u9010\u6BB5\u751F\u6210\u7ED3\u679C\u4E3A\u51C6\u3002</text>`);
+  out.push("</svg>");
+  return out.join("\n");
+}
+
 // src/businesses/video/tools/video-project.ts
+async function captureScriptFile(scriptPath, text) {
+  const body = captureScriptBody(text);
+  if (!body) return null;
+  await mkdir8(path11.dirname(scriptPath), { recursive: true, mode: 448 });
+  await writeFile6(scriptPath, `${body}
+`, { mode: 384 });
+  const closed = await closePendingStage("script_design", "script_saved");
+  await appendRequestLog({
+    event: "script_saved",
+    path: scriptPath,
+    tool: "capture",
+    mode: "create",
+    bytes: Buffer.byteLength(body, "utf8"),
+    characters: body.length,
+    version: scriptVersion(body),
+    closedSpanId: closed?.spanId,
+    closedElapsedMs: closed?.elapsedMs
+  });
+  return { body, closed };
+}
 function projectTool(config, ctx, reviewGuard, generationProperties, extensionProperties, segmentReview = null, onReviewReady = null) {
   return {
     name: "video_project",
-    description: "\u5148\u5728\u5B8C\u5584\u521B\u610F\u7684\u540C\u4E00\u8F6E\u5408\u5E76\u8BE2\u95EE\u65F6\u957F\u3001\u753B\u5E45\u548C\u6E05\u6670\u5EA6\uFF0C\u7528\u6237\u56DE\u7B54\u540Eprepare\u521B\u5EFA\u72EC\u7ACBprojectId\u5E76\u4F20\u5DF2\u786E\u8BA4duration\uFF0C\u51B3\u5B9A\u89D2\u8272\u56FE\u8DEF\u7EBF\u3002\u539F\u59CB\u9700\u6C42\u672A\u5199\u65F6\u957F\u4F46\u5DF2\u5728\u5B8C\u5584\u521B\u610F\u4E2D\u56DE\u7B54\uFF0C\u4E5F\u5FC5\u987B\u4F20\u786E\u8BA4\u7684duration\uFF0C\u7981\u6B62\u7701\u7565\u9020\u6210\u91CD\u590D\u8BE2\u95EE\uFF1B\u53EA\u6709\u4ECE\u672A\u786E\u8BA4\u65F6\u957F\u624D\u7531\u5DE5\u5177\u515C\u5E95\u8BE2\u95EE\uFF0C\u672A\u7B54\u4E0D\u7EE7\u7EED\uFF0C\u7981\u6B62\u81EA\u884C\u9ED8\u8BA415\u79D2\u3002scenery\u4EC5\u7528\u4E8E\u65E0\u56FA\u5B9A\u4E3B\u4F53\u7A7A\u955C\uFF0Cfixed_subject\u7528\u4E8E\u9700\u8981\u56FA\u5B9A\u5916\u5F62\u7684\u4EBA\u7269/\u4E3B\u4F53\u3002\u89D2\u8272\u56FE\u9009\u62E9\u7ED1\u5B9A\u9879\u76EE\u4E0D\u968F\u63D0\u793A\u8BCD\u6539\u53D8\u3002\u811A\u672C\u3001\u5206\u955C\u3001\u9010\u6BB5\u751F\u6210\u63D0\u793A\u8BCD\u53CA\u5B8C\u6574\u5236\u4F5C\u53C2\u6570\u51C6\u5907\u540E\uFF0C\u6B63\u6587\u5B8C\u6574\u5C55\u793A\uFF0C\u518Dreview\u5F39\u672C\u7248\u811A\u672C\u5BA1\u6838\uFF08\u540C\u7248\u5DF2\u901A\u8FC7\u4E0D\u91CD\u590D\uFF0C\u6539\u7A3F\u9700\u91CD\u5BA1\uFF09\uFF1B\u901A\u8FC7\u540E\u76F4\u63A5\u8C03\u7528\u5BF9\u5E94\u751F\u6210\u5DE5\u5177\uFF0C\u5DE5\u5177\u4ED8\u8D39\u5BA1\u6279\u5373\u5F00\u59CB\u5236\u4F5C\u786E\u8BA4\uFF0C\u4E0D\u53E6\u5F39\u5F00\u59CB\u5236\u4F5C\u95EE\u9898\u3002\u6539\u7A3F\u6216\u53C2\u6570\u6539\u53D8\u987Breview\uFF0Cstatus\u53EA\u8BFB\u53D6\u771F\u5B9E\u72B6\u6001\u3002\u6BCF\u6BB5\u5B8C\u6210\u540E\u5148\u5C55\u793A\u89C6\u9891\uFF0C\u518D\u8C03\u7528review_segment\u5E76\u4F20resume\u5F39\u7ED3\u679C\u786E\u8BA4\u7A97\uFF1B\u8FD9\u4E0D\u5C5E\u4E8E\u91CD\u590D\u5236\u4F5C\u786E\u8BA4\uFF0C\u7981\u6B62\u8DF3\u8FC7\u3002\u4E0D\u4F1A\u751F\u6210\u6216\u6263\u8D39\u3002",
+    description: "\u5148\u5728\u5B8C\u5584\u521B\u610F\u7684\u540C\u4E00\u8F6E\u5408\u5E76\u8BE2\u95EE\u65F6\u957F\u3001\u753B\u5E45\u548C\u6E05\u6670\u5EA6\uFF0C\u7528\u6237\u56DE\u7B54\u540Eprepare\u521B\u5EFA\u72EC\u7ACBprojectId\u5E76\u4F20\u5DF2\u786E\u8BA4duration\uFF0C\u51B3\u5B9A\u89D2\u8272\u56FE\u8DEF\u7EBF\u3002\u811A\u672C\u53EA\u5728\u6B63\u6587\u751F\u6210\u4E00\u6B21\uFF1A\u8D34\u51FA\u5B8C\u6574\u811A\u672C\u540E\u8C03storyboard\uFF08\u4F20captureScript\u4E0EscriptPath\uFF0C\u63D2\u4EF6\u636E\u6B64\u843Dscript.md\u5E76\u5C31\u5730\u6E32\u67D3\u672C\u7248\u5206\u955C\u793A\u610F\u56FE\uFF0C\u8FD4\u56DEmarkdown\u4E0E\u94FE\u63A5\uFF09\uFF0C\u628A\u793A\u610F\u56FE\u6B63\u6587\u53D1\u51FA\uFF0C\u518D\u8C03review\uFF08\u540C\u6837\u4F20captureScript\uFF09\u5F39\u5BA1\u6838\uFF1B\u4E0D\u8981\u81EA\u5DF1\u5199\u7ED8\u56FE\u4EE3\u7801/SVG\uFF0C\u4E5F\u4E0D\u8981\u7528\u5199\u6587\u4EF6\u5DE5\u5177\u518D\u628A\u811A\u672C\u5199\u4E00\u904D\u3002\u539F\u59CB\u9700\u6C42\u672A\u5199\u65F6\u957F\u4F46\u5DF2\u5728\u5B8C\u5584\u521B\u610F\u4E2D\u56DE\u7B54\uFF0C\u4E5F\u5FC5\u987B\u4F20\u786E\u8BA4\u7684duration\uFF0C\u7981\u6B62\u7701\u7565\u9020\u6210\u91CD\u590D\u8BE2\u95EE\uFF1B\u53EA\u6709\u4ECE\u672A\u786E\u8BA4\u65F6\u957F\u624D\u7531\u5DE5\u5177\u515C\u5E95\u8BE2\u95EE\uFF0C\u672A\u7B54\u4E0D\u7EE7\u7EED\uFF0C\u7981\u6B62\u81EA\u884C\u9ED8\u8BA415\u79D2\u3002scenery\u4EC5\u7528\u4E8E\u65E0\u56FA\u5B9A\u4E3B\u4F53\u7A7A\u955C\uFF0Cfixed_subject\u7528\u4E8E\u9700\u8981\u56FA\u5B9A\u5916\u5F62\u7684\u4EBA\u7269/\u4E3B\u4F53\u3002\u89D2\u8272\u56FE\u9009\u62E9\u7ED1\u5B9A\u9879\u76EE\u4E0D\u968F\u63D0\u793A\u8BCD\u6539\u53D8\u3002\u811A\u672C\u3001\u5206\u955C\u3001\u9010\u6BB5\u751F\u6210\u63D0\u793A\u8BCD\u53CA\u5B8C\u6574\u5236\u4F5C\u53C2\u6570\u51C6\u5907\u540E\uFF0C\u6B63\u6587\u5B8C\u6574\u5C55\u793A\uFF0C\u518Dreview\u5F39\u672C\u7248\u811A\u672C\u5BA1\u6838\uFF08\u540C\u7248\u5DF2\u901A\u8FC7\u4E0D\u91CD\u590D\uFF0C\u6539\u7A3F\u9700\u91CD\u5BA1\uFF09\uFF1B\u901A\u8FC7\u540E\u76F4\u63A5\u8C03\u7528\u5BF9\u5E94\u751F\u6210\u5DE5\u5177\uFF0C\u5DE5\u5177\u4ED8\u8D39\u5BA1\u6279\u5373\u5F00\u59CB\u5236\u4F5C\u786E\u8BA4\uFF0C\u4E0D\u53E6\u5F39\u5F00\u59CB\u5236\u4F5C\u95EE\u9898\u3002\u6539\u7A3F\u6216\u53C2\u6570\u6539\u53D8\u987Breview\uFF0Cstatus\u53EA\u8BFB\u53D6\u771F\u5B9E\u72B6\u6001\u3002\u6BCF\u6BB5\u5B8C\u6210\u540E\u5148\u5C55\u793A\u89C6\u9891\uFF0C\u518D\u8C03\u7528review_segment\u5E76\u4F20resume\u5F39\u7ED3\u679C\u786E\u8BA4\u7A97\uFF1B\u8FD9\u4E0D\u5C5E\u4E8E\u91CD\u590D\u5236\u4F5C\u786E\u8BA4\uFF0C\u7981\u6B62\u8DF3\u8FC7\u3002\u4E0D\u4F1A\u751F\u6210\u6216\u6263\u8D39\u3002",
     parameters: { type: "object", properties: {
       resume: { type: "string", description: "review_segment\u5BA1\u6838\u5DF2\u5B8C\u6210\u5206\u6BB5\uFF0C\u4F20\u539FresumeDir\uFF1B\u5148\u6B63\u6587\u5C55\u793A\u89C6\u9891\uFF0C\u518D\u8C03\u7528\u672C\u52A8\u4F5C\u5F39\u7ED3\u679C\u786E\u8BA4\u7A97\u3002" },
-      action: { type: "string", enum: ["prepare", "review", "status", "review_segment"] },
+      action: { type: "string", enum: ["prepare", "review", "storyboard", "status", "review_segment"] },
       projectId: { type: "string" },
+      captureScript: { type: "boolean", description: "\u4F20true\u65F6\u63D2\u4EF6\u628A\u672C\u8F6E\u7528\u6237\u53EF\u89C1\u6B63\u6587\u91CC\u7684\u5B8C\u6574\u811A\u672C\u843D\u6210script.md\uFF1A\u811A\u672C\u53EA\u9700\u5728\u6B63\u6587\u751F\u6210\u4E00\u6B21\uFF0C\u4E0D\u8981\u518D\u7528\u5199\u6587\u4EF6\u5DE5\u5177\u5199\u4E00\u904D\u3002storyboard\u4E0Ereview\u90FD\u652F\u6301\uFF1B\u6B63\u6587\u91CC\u6CA1\u6709\u5B8C\u6574\u811A\u672C\u4F1A\u62A5\u9519\u3002" },
       duration: { type: "integer", description: "prepare\u65F6\u4EC5\u4F20\u7528\u6237\u5DF2\u660E\u786E\u6307\u5B9A\u6216\u56DE\u7B54\u786E\u8BA4\u7684\u76EE\u6807\u603B\u79D2\u6570\uFF084\u2013120\uFF09\uFF1B\u539F\u59CB\u9700\u6C42\u672A\u5199\u4F46\u5DF2\u5728\u5B8C\u5584\u521B\u610F\u4E2D\u56DE\u7B54\u4E5F\u5FC5\u987B\u4F20\u503C\uFF1B\u540C\u9879\u76EE\u6CBF\u7528\u5DF2\u4FDD\u5B58\u503C\uFF0C\u53EA\u6709\u4ECE\u672A\u786E\u8BA4\u624D\u7701\u7565\u3002\u7EED\u62CD\u6307\u672C\u6B21\u65B0\u589E\u7684\u603B\u79D2\u6570\uFF0C\u4E0D\u662F\u6BCF\u6BB5\u65F6\u957F\u3002" },
       subjectType: { type: "string", enum: ["fixed_subject", "scenery", "provided_images"] },
       resetCharacterChoice: { type: "boolean", description: "\u4EC5\u7528\u6237\u660E\u786E\u6539\u53D8\u89D2\u8272\u56FE\u8DEF\u7EBF\u65F6\u4F20true" },
@@ -3785,6 +4107,29 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         const data2 = await readProject(args.projectId, exec);
         const current = data2.approved && await scriptDigest(data2.approved.scriptPath).catch(() => "") === data2.approved.scriptHash && productionFingerprint(config, data2.approved.name, data2.approved.specification) === data2.approved.fingerprint;
         return { projectId: data2.id, subjectType: data2.subjectType, choice: data2.choice, duration: data2.duration, status: current ? "approved" : "draft" };
+      }
+      if (args.action === "storyboard") {
+        const session = exec.agent?.session;
+        const scriptPath = path11.resolve(session?.header?.cwd || process.cwd(), String(args.scriptPath || ""));
+        if (!/\.md$/i.test(scriptPath)) throw new Error("storyboard\u9700\u4F20\u811A\u672C\u6587\u4EF6\u8DEF\u5F84scriptPath\uFF08.md\uFF09\u3002");
+        if (args.captureScript === true && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(session) || "")) {
+          throw new Error("\u6B63\u6587\u91CC\u6CA1\u6709\u627E\u5230\u5B8C\u6574\u811A\u672C\uFF1A\u5148\u628A\u672C\u7248\u811A\u672C\u6B63\u6587\u5B8C\u6574\u8D34\u8FDB\u7528\u6237\u53EF\u89C1\u6B63\u6587\uFF08\u6458\u8981\u3001\u94FE\u63A5\u3001\u793A\u610F\u56FE\u90FD\u4E0D\u7B97\uFF09\uFF0C\u518D\u8BA9\u63D2\u4EF6\u51FA\u5206\u955C\u793A\u610F\u56FE\u3002");
+        }
+        const script = await readFile7(scriptPath, "utf8").catch(() => "");
+        if (!String(script).trim()) throw new Error("\u8FD8\u6CA1\u8BFB\u5230\u811A\u672C\u6587\u4EF6\uFF1A\u5148\u5728\u6B63\u6587\u8D34\u51FA\u5B8C\u6574\u811A\u672C\u5E76\u4F20captureScript\uFF0C\u6216\u5148\u628A\u811A\u672C\u5199\u5230scriptPath\u3002");
+        const version = nextStoryboardVersion(await readdir3(path11.dirname(scriptPath)).catch(() => []));
+        const svg = renderStoryboardSvg(script, { version });
+        const target = path11.join(path11.dirname(scriptPath), storyboardFileName(version));
+        await writeFile6(target, svg, { mode: 384 });
+        return {
+          path: target,
+          version,
+          shots: scriptStoryboardShots(script).length,
+          bytes: Buffer.byteLength(svg, "utf8"),
+          markdown: `![\u5206\u955C\u793A\u610F\u56FE](<${target}>)`,
+          link: `[\u6253\u5F00\u539F\u56FE](<${target}>)`,
+          hint: "\u628A markdown \u5185\u5D4C\u8FDB\u672C\u8F6E\u6B63\u6587\u3001link \u4E00\u5E76\u7ED9\u51FA\uFF0C\u518D\u8C03\u7528review\uFF1B\u793A\u610F\u56FE\u7531\u63D2\u4EF6\u672C\u5730\u6E32\u67D3\uFF0C\u4E0D\u8981\u81EA\u5DF1\u5199\u7ED8\u56FE\u4EE3\u7801\u6216 SVG\uFF0C\u4E5F\u4E0D\u8981\u8C03\u7528\u4ED8\u8D39\u51FA\u56FE\u6A21\u578B\u3002"
+        };
       }
       if (!["prepare", "review"].includes(args.action)) throw new Error("\u672A\u77E5\u9879\u76EE\u64CD\u4F5C");
       let data = args.projectId ? await readProject(args.projectId, exec) : null;
@@ -3826,6 +4171,9 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         if (requestedTotal !== data.duration && !spec.resume) throw new Error("\u811A\u672C\u65F6\u957F\u4E0E\u7528\u6237\u786E\u8BA4\u7684\u603B\u65F6\u957F\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u5148\u7528prepare\u786E\u8BA4\u53D8\u66F4\uFF0C\u518D\u91CD\u65B0\u5BA1\u6838\u3002");
         const scriptPath = path11.resolve(exec.agent.session.header?.cwd || process.cwd(), String(args.scriptPath || ""));
         if (!/\.md$/i.test(scriptPath)) throw new Error("scriptPath\u9700\u4E3AMarkdown\u811A\u672C\u6587\u4EF6\u3002");
+        if (args.captureScript === true && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(exec.agent.session) || "")) {
+          throw new Error("\u6B63\u6587\u91CC\u6CA1\u6709\u627E\u5230\u5B8C\u6574\u811A\u672C\uFF1A\u8BF7\u5148\u628A\u672C\u7248\u811A\u672C\u6B63\u6587\u5B8C\u6574\u8D34\u8FDB\u7528\u6237\u53EF\u89C1\u6B63\u6587\uFF08\u6458\u8981\u3001\u94FE\u63A5\u3001\u793A\u610F\u56FE\u90FD\u4E0D\u7B97\uFF09\uFF0C\u518D\u8C03\u7528review\uFF1B\u811A\u672C\u53EA\u9700\u5728\u6B63\u6587\u5199\u8FD9\u4E00\u6B21\uFF0C\u63D2\u4EF6\u4F1A\u636E\u6B64\u843D\u6210script.md\u3002");
+        }
         const scriptHash = await scriptDigest(scriptPath);
         const scriptBody = (await readFile7(scriptPath, "utf8")).replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
         if (!scriptBody) throw new Error("\u811A\u672C\u6B63\u6587\u4E0D\u80FD\u4E3A\u7A7A\u3002");
@@ -3863,7 +4211,7 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
 
 // src/businesses/video/workflow/storyboard-review.ts
 import path12 from "node:path";
-import { stat as stat4, readdir as readdir3 } from "node:fs/promises";
+import { stat as stat4, readdir as readdir4 } from "node:fs/promises";
 var STORYBOARD_FILE = /storyboard|分镜|示意/i;
 var IMAGE_FILE = /\.(png|jpe?g|webp|svg)$/i;
 function readableText(value) {
@@ -3947,7 +4295,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     for (const [dir, time] of byDir) {
       let entries;
       try {
-        entries = await readdir3(dir);
+        entries = await readdir4(dir);
       } catch {
         continue;
       }
@@ -4008,7 +4356,10 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     await appendRequestLog({ event: "storyboard_review_blocked", reason: !ready ? "missing_inline_storyboard" : "stale_storyboard_version" });
     return { kind: "deny", reason: (!ready ? "\u811A\u672C\u5BA1\u6838\u6682\u672A\u6253\u5F00\uFF1A\u672C\u7248\u5206\u955C\u56FE\u8FD8\u6CA1\u6709\u5728\u7528\u6237\u53EF\u89C1\u6B63\u6587\u91CC\u5185\u5D4C\u5C55\u793A\u3002\u4EA4\u4ED8\u5361\u7247\u53EA\u767B\u8BB0\u6700\u7EC8\u6210\u7247\uFF0C\u5206\u955C\u56FE\u4E0D\u8D70\u5361\u7247\uFF0C" : `\u811A\u672C\u5BA1\u6838\u6682\u672A\u6253\u5F00\uFF1A\u6539\u7A3F\u540E\u7684\u65B0\u7248\u5206\u955C\u56FE\u8FD8\u6CA1\u5C55\u793A\uFF08${stale}\uFF09\u3002`) + linkHint(target) + "present \u4E0E\u6A21\u578B\u770B\u56FE\u90FD\u4E0D\u7B49\u4E8E\u7528\u6237\u770B\u5230\u56FE\uFF0C\u53EA\u6709\u6B63\u6587\u91CC\u771F\u5B9E\u6E32\u67D3\u7684\u56FE\u7247\u624D\u7B97\uFF1B\u6B63\u6587\u53D1\u9001\u5B8C\u6210\u540E\u518D\u5355\u72EC\u8C03\u7528 ask_user_question\uFF0C\u4E0D\u80FD\u4E0E\u5C55\u793A\u5E76\u884C\uFF1B\u4E0D\u8981\u91CD\u753B\u6216\u8C03\u7528\u4ED8\u8D39\u751F\u6210\u3002" };
   }
-  return { observe, gate };
+  function visibleText(session) {
+    return sessions.get(session)?.text || "";
+  }
+  return { observe, gate, visibleText };
 }
 
 // src/businesses/video/workflow/delivery-order.ts
@@ -4148,128 +4499,6 @@ ${order()}` };
     return null;
   }
   return { remember, observe, gate };
-}
-
-// src/businesses/video/tools/video-stage.ts
-import { randomUUID as randomUUID5 } from "node:crypto";
-import { performance as performance2 } from "node:perf_hooks";
-var STAGES = ["script_design", "storyboard_design", "script_present", "script_review_wait", "production_confirm_wait", "reference_review_wait", "segment_review_wait", "result_present"];
-var pendingStages = /* @__PURE__ */ new Map();
-async function closePendingStage(stage, source) {
-  let target;
-  for (const [spanId, entry2] of pendingStages) if (entry2.stage === stage) target = spanId;
-  if (!target) return null;
-  const entry = pendingStages.get(target);
-  pendingStages.delete(target);
-  const elapsedMs = Math.round((performance2.now() - entry.start) * 1e3) / 1e3;
-  await appendRequestLog({
-    event: "stage_finished",
-    stage: entry.stage,
-    spanId: target,
-    startedAt: entry.startedAt,
-    finishedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    elapsedMs,
-    outcome: "success",
-    source
-  });
-  return { spanId: target, elapsedMs };
-}
-function stageTool() {
-  return {
-    name: "video_stage",
-    description: "\u4EC5\u8BB0\u5F55\u9636\u6BB5\u8BA1\u65F6\uFF0C\u4E0D\u8C03\u7528\u751F\u6210\u63A5\u53E3\u3001\u4E0D\u4EA7\u751F\u6A21\u578B\u8D39\u7528\u3001\u4E0D\u6539\u914D\u7F6E\u3002\u811A\u672C\u8BBE\u8BA1/\u793A\u610F\u56FE/\u5C55\u793A/\u7B49\u5F85\u5BA1\u6838\u7B49\u9636\u6BB5\u5F00\u59CB\u65F6action=start\uFF0C\u7ED3\u675F\u65F6action=finish\u5E76\u4F20\u539FspanId\u3002\u811A\u672C\u8BBE\u8BA1\u4E00\u6BB5\u5728\u811A\u672C\u4FDD\u5B58\u5230script.md\u540E\u7531\u63D2\u4EF6\u81EA\u52A8\u7ED3\u675F\uFF0C\u6B64\u65F6\u4E0D\u5FC5\u518D\u8C03finish\uFF1B\u811A\u672C\u4E0D\u662F\u7528\u5199\u6587\u4EF6\u5DE5\u5177\u4FDD\u5B58\u65F6\u518D\u8865finish\u3002\u8017\u65F6\u662F\u6807\u8BB0\u8FB9\u754C\u95F4\u5899\u949F\u65F6\u95F4\uFF08\u5305\u542B\u5DE5\u5177\u8C03\u5EA6\uFF09\uFF0C\u4E0D\u662F\u6A21\u578B\u7EAF\u63A8\u7406\u8017\u65F6\uFF1B\u7B49\u5F85\u7528\u6237\u5355\u72EC\u8BB0\u9636\u6BB5\u3002\u7F3A\u5931\u5F00\u59CB\u6216\u70ED\u91CD\u8F7D\u4E22\u5931\u6807\u8BB0\u65F6\u8FD4\u56DEunavailable\uFF0C\u4E0D\u731C\u8017\u65F6\u3002",
-    parameters: { type: "object", properties: { action: { type: "string", enum: ["start", "finish"] }, stage: { type: "string", enum: STAGES }, spanId: { type: "string" }, outcome: { type: "string", enum: ["success", "cancelled", "error"] } }, required: ["action", "stage"] },
-    output: { schema: { type: "object", properties: { status: { type: "string" }, spanId: { type: "string" }, elapsedMs: { type: "number" } } }, render(_args, value) {
-      return [{ type: "text", text: JSON.stringify(value) }];
-    } },
-    timeoutMs: 1e4,
-    isConcurrencySafe() {
-      return true;
-    },
-    async execute(args) {
-      if (!STAGES.includes(args?.stage)) throw new Error("\u672A\u77E5\u8BA1\u65F6\u9636\u6BB5");
-      if (args.action === "start") {
-        if (pendingStages.size >= 512) return { status: "unavailable" };
-        const spanId = randomUUID5(), startedAt = (/* @__PURE__ */ new Date()).toISOString();
-        pendingStages.set(spanId, { stage: args.stage, startedAt, start: performance2.now() });
-        await appendRequestLog({ event: "stage_started", stage: args.stage, spanId, startedAt, source: "assistant_marker" });
-        return { status: "started", spanId };
-      }
-      if (args.action !== "finish") throw new Error("\u672A\u77E5\u8BA1\u65F6\u52A8\u4F5C");
-      const entry = pendingStages.get(args.spanId);
-      if (!entry || entry.stage !== args.stage) return { status: "unavailable" };
-      pendingStages.delete(args.spanId);
-      const elapsedMs = Math.round((performance2.now() - entry.start) * 1e3) / 1e3;
-      const outcome = ["success", "cancelled", "error"].includes(args.outcome) ? args.outcome : "success";
-      await appendRequestLog({ event: "stage_finished", stage: entry.stage, spanId: args.spanId, startedAt: entry.startedAt, finishedAt: (/* @__PURE__ */ new Date()).toISOString(), elapsedMs, outcome, source: "assistant_marker" });
-      return { status: "finished", spanId: args.spanId, elapsedMs };
-    }
-  };
-}
-
-// src/businesses/video/workflow/script-tracking.ts
-var SCRIPT_FILE = /^script(?:[-_]?v?\d+)?\.md$/i;
-var WRITE_TOOLS = /* @__PURE__ */ new Set(["write", "edit", "multi_edit", "multiedit", "apply_patch"]);
-var PATCH_FILE_LINE = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gim;
-function fileBaseName(target) {
-  return String(target ?? "").split(/[\\/]/).pop() || "";
-}
-function isScriptPath(target) {
-  return SCRIPT_FILE.test(fileBaseName(target));
-}
-function toolArguments(value) {
-  if (value && typeof value === "object") return value;
-  if (typeof value !== "string") return {};
-  try {
-    return JSON.parse(value);
-  } catch {
-    return {};
-  }
-}
-function scriptSaveOf(event) {
-  if (event?.type !== "tool/call") return null;
-  const data = event.data || {};
-  const name = String(data.name || "");
-  if (!WRITE_TOOLS.has(name)) return null;
-  const args = toolArguments(data.arguments);
-  const direct = args.file_path || args.path || args.filePath;
-  if (isScriptPath(direct)) return { path: String(direct), tool: name, mode: name === "write" ? "create" : "update" };
-  if (name !== "apply_patch") return null;
-  const text = String(args.patch ?? args.input ?? "");
-  for (const match of text.matchAll(PATCH_FILE_LINE)) {
-    if (isScriptPath(match[1])) return { path: match[1].trim(), tool: name, mode: "update" };
-  }
-  return null;
-}
-function scriptVersion(content) {
-  const match = /版本[:：]\s*(第?\s*\d+\s*版)/.exec(String(content ?? ""));
-  return match ? match[1].replace(/\s+/g, "") : void 0;
-}
-function createScriptTracker({ closeStage = closePendingStage, log = appendRequestLog } = {}) {
-  async function observe(session, event) {
-    if (!session || typeof session !== "object") return;
-    const save2 = scriptSaveOf(event);
-    if (!save2) return;
-    try {
-      const content = toolArguments((event.data || {}).arguments).content;
-      const text = typeof content === "string" ? content : "";
-      const closed = await closeStage("script_design", "script_saved");
-      await log({
-        event: "script_saved",
-        path: save2.path,
-        tool: save2.tool,
-        mode: save2.mode,
-        bytes: text ? Buffer.byteLength(text, "utf8") : void 0,
-        characters: text ? text.length : void 0,
-        version: scriptVersion(text),
-        turn: (event.data || {}).turn,
-        closedSpanId: closed?.spanId,
-        closedElapsedMs: closed?.elapsedMs
-      });
-    } catch {
-    }
-  }
-  return { observe };
 }
 
 // src/businesses/video/workflow/actual-cost.ts
@@ -4492,7 +4721,7 @@ function jsonSafeTool(tool) {
 // src/businesses/video/providers/submissions.ts
 import path15 from "node:path";
 import { createHash as createHash4, randomUUID as randomUUID6 } from "node:crypto";
-import { mkdir as mkdir8, readFile as readFile8, writeFile as writeFile6, rename as rename6, rm as rm6, open as open3, readdir as readdir4 } from "node:fs/promises";
+import { mkdir as mkdir9, readFile as readFile8, writeFile as writeFile7, rename as rename6, rm as rm6, open as open3, readdir as readdir5 } from "node:fs/promises";
 init_hardcoded_config();
 init_connection();
 
@@ -4761,7 +4990,7 @@ function directory() {
 async function save(file, record) {
   const temporary = `${file}.${randomUUID6()}.tmp`;
   try {
-    await writeFile6(temporary, JSON.stringify(record), { mode: 384 });
+    await writeFile7(temporary, JSON.stringify(record), { mode: 384 });
     await rename6(temporary, file);
   } finally {
     await rm6(temporary, { force: true }).catch(() => {
@@ -4775,7 +5004,7 @@ async function guardedSubmit(config, requestPath, body, signal, scope = "") {
   if (signal?.aborted) throw abortError();
   const identity = submissionIdentity(config);
   const id = hash2(JSON.stringify([identity, requestPath, body]));
-  await mkdir8(directory(), { recursive: true, mode: 448 });
+  await mkdir9(directory(), { recursive: true, mode: 448 });
   const file = path15.join(directory(), `${id}.json`);
   let handle;
   try {
@@ -4821,7 +5050,7 @@ async function finishSubmission(config, requestPath, body) {
 }
 async function finishKnownTask(config, taskId) {
   const identity = submissionIdentity(config);
-  for (const name of await readdir4(directory()).catch((error) => {
+  for (const name of await readdir5(directory()).catch((error) => {
     if (error.code === "ENOENT") return [];
     throw error;
   })) {
@@ -4897,12 +5126,12 @@ function submissionTool(liveConfig) {
 
 // src/businesses/video/integrations/canvas.ts
 import { createHash as createHash6, randomUUID as randomUUID8 } from "node:crypto";
-import { mkdir as mkdir11, readFile as readFile10, writeFile as writeFile8, rename as rename9, copyFile, stat as stat7, open as open4 } from "node:fs/promises";
+import { mkdir as mkdir12, readFile as readFile10, writeFile as writeFile9, rename as rename9, copyFile, stat as stat7, open as open4 } from "node:fs/promises";
 import path18 from "node:path";
 init_hardcoded_config();
 
 // src/businesses/video/integrations/canvas-builtin.ts
-import { mkdir as mkdir9, readFile as readFile9, writeFile as writeFile7, rename as rename7, readdir as readdir5, stat as stat6 } from "node:fs/promises";
+import { mkdir as mkdir10, readFile as readFile9, writeFile as writeFile8, rename as rename7, readdir as readdir6, stat as stat6 } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { createHash as createHash5, randomUUID as randomUUID7 } from "node:crypto";
 import path16 from "node:path";
@@ -4925,9 +5154,9 @@ async function readJson(file, fallback = null) {
   }
 }
 async function writeJson(file, value) {
-  await mkdir9(path16.dirname(file), { recursive: true, mode: 448 });
+  await mkdir10(path16.dirname(file), { recursive: true, mode: 448 });
   const temp = `${file}.${randomUUID7()}.tmp`;
-  await writeFile7(temp, JSON.stringify(value), { mode: 384, flag: "wx" });
+  await writeFile8(temp, JSON.stringify(value), { mode: 384, flag: "wx" });
   await rename7(temp, file);
 }
 async function builtinCanvasExists(projectId) {
@@ -4941,7 +5170,7 @@ async function writeDoc(id, doc) {
   await writeJson(docFile(id), doc);
 }
 async function allDocs() {
-  const names = await readdir5(docsDir()).catch(() => []);
+  const names = await readdir6(docsDir()).catch(() => []);
   const docs = [];
   for (const name of names) if (name.endsWith(".json")) {
     const doc = await readJson(path16.join(docsDir(), name));
@@ -5123,10 +5352,10 @@ async function builtinCanvasImport(args) {
   const label = String(args?.name || "").trim().slice(0, 80) || `\u5BFC\u5165\u56FE\u7247${extension}`;
   const rel = `projects/${doc.id}/image/${id}${extension}`;
   const dest = path16.join(dataRootOf(), rel);
-  await mkdir9(path16.dirname(dest), { recursive: true, mode: 448 });
+  await mkdir10(path16.dirname(dest), { recursive: true, mode: 448 });
   if (!(await stat6(dest).catch(() => null))?.isFile()) {
     const temp = `${dest}.${randomUUID7()}.tmp`;
-    await writeFile7(temp, bytes, { mode: 384, flag: "wx" });
+    await writeFile8(temp, bytes, { mode: 384, flag: "wx" });
     await rename7(temp, dest);
   }
   const mime = IMAGE_MIME[extension];
@@ -5523,14 +5752,14 @@ function preserveCanvasConfirmations(prev, next) {
 }
 
 // src/businesses/video/media/download.ts
-import { mkdir as mkdir10, rename as rename8, rm as rm7 } from "node:fs/promises";
+import { mkdir as mkdir11, rename as rename8, rm as rm7 } from "node:fs/promises";
 import path17 from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { createWriteStream } from "node:fs";
 var DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1e3;
 async function downloadFile(url, destPath, { signal } = {}) {
-  await mkdir10(path17.dirname(destPath), { recursive: true });
+  await mkdir11(path17.dirname(destPath), { recursive: true });
   const partial = `${destPath}.${uniqueSuffix("part")}`;
   const timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -5679,9 +5908,9 @@ function resultFile(token) {
 }
 async function saveRecord(record) {
   const file = resultFile(record.id);
-  await mkdir11(path18.dirname(file), { recursive: true, mode: 448 });
+  await mkdir12(path18.dirname(file), { recursive: true, mode: 448 });
   const temp = `${file}.${randomUUID8()}.tmp`;
-  await writeFile8(temp, JSON.stringify(record), { mode: 384, flag: "wx" });
+  await writeFile9(temp, JSON.stringify(record), { mode: 384, flag: "wx" });
   await rename9(temp, file);
 }
 async function publishCanvasResult(adapter, record) {
@@ -5708,7 +5937,7 @@ async function publishCanvasResult(adapter, record) {
       }
     }
     if (!(await stat7(dest).catch(() => null))?.isFile()) {
-      await mkdir11(path18.dirname(dest), { recursive: true });
+      await mkdir12(path18.dirname(dest), { recursive: true });
       if (media.localPath) {
         const tmp = `${dest}.${randomUUID8()}.tmp`;
         await copyFile(media.localPath, tmp);
@@ -5894,45 +6123,6 @@ async function adapterForNewCanvas(binding, load) {
   if (binding?.projectId) return resolveCanvasAdapter(binding.projectId, load);
   if (load !== loadCanvasAdapter) return load();
   return builtinCanvasAdapter();
-}
-function scriptStoryboardShots(script) {
-  const lines = script.split(/\r?\n/), shots = [];
-  const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split(/(?<!\\)\|/).map((s) => s.trim().replace(/\\\|/g, "|"));
-  let fenced = false;
-  for (let i = 0; i < lines.length - 1; i++) {
-    if (/^\s*(```|~~~)/.test(lines[i])) {
-      fenced = !fenced;
-      continue;
-    }
-    if (fenced || !lines[i].includes("|")) continue;
-    const header = cells(lines[i]), separator = cells(lines[i + 1]);
-    if (separator.length !== header.length || !separator.every((x) => /^:?-{3,}:?$/.test(x))) continue;
-    const titleAt = header.findIndex((x) => /镜号|镜头|shot/i.test(x));
-    const visualAt = header.findIndex((x) => /画面|visual|详情|描述/i.test(x));
-    if (titleAt < 0 || visualAt < 0 || titleAt === visualAt) continue;
-    const timeAt = header.findIndex((x) => /时间|时长|time|duration/i.test(x));
-    const cameraAt = header.map((x, j) => /景别|镜别|运镜|视角|camera|movement/i.test(x) ? j : -1).filter((j) => j >= 0);
-    const soundAt = header.findIndex((x) => /声音|音效|sound|sfx/i.test(x));
-    const dialogueAt = header.findIndex((x) => /台词|对白|dialogue/i.test(x));
-    for (i += 2; i < lines.length && lines[i].includes("|") && lines[i].trim(); i++) {
-      const row = cells(lines[i]);
-      if (row.length !== header.length || !row[visualAt]) continue;
-      const time = row[timeAt] || "", range = time.match(/(\d+(?:\.\d+)?)\s*(?:秒|s)?\s*[–—~～至-]\s*(\d+(?:\.\d+)?)/i);
-      const explicit = time.match(/^(\d+(?:\.\d+)?)\s*(?:秒|s)$/i);
-      const duration = range ? Number(range[2]) - Number(range[1]) : explicit ? Number(explicit[1]) : null;
-      shots.push({
-        title: row[titleAt],
-        visual: header.map((h, j) => `${h}\uFF1A${row[j]}`).join("\n"),
-        camera: cameraAt.map((j) => row[j]).filter(Boolean).join(" \xB7 "),
-        sfx: row[soundAt] || "",
-        dialogue: row[dialogueAt] ? [{ role: "\u5267\u672C\u5BF9\u767D", line: row[dialogueAt] }] : [],
-        ...duration > 0 ? { duration } : {},
-        metaonticTime: time
-      });
-    }
-    i--;
-  }
-  return shots;
 }
 function canvasScriptPreview(script) {
   return script.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").split(/\r?\n/).filter((line) => !/^\s*(```|~~~)/.test(line) && !/^\s*\|?\s*:?-{3,}:?\s*\|/.test(line)).map((line) => line.replace(/^#{1,6}\s+/, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "\u56FE\u7247\uFF1A$1\uFF08$2\uFF09").replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1\uFF08$2\uFF09").replace(/`([^`]+)`/g, "$1").replace(/^\s*\|(.+)\|\s*$/, (_, row) => row.split(/(?<!\\)\|/).map((x) => x.trim()).join(" \xB7 "))).join("\n").trim();
@@ -6221,7 +6411,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
 // src/businesses/video/integrations/canvas-native.ts
 import path21 from "node:path";
 import { createHash as createHash9, randomUUID as randomUUID9 } from "node:crypto";
-import { mkdir as mkdir13, readFile as readFile12, writeFile as writeFile10, rename as rename11, stat as stat9 } from "node:fs/promises";
+import { mkdir as mkdir14, readFile as readFile12, writeFile as writeFile11, rename as rename11, stat as stat9 } from "node:fs/promises";
 init_hardcoded_config();
 init_connection();
 
@@ -6981,7 +7171,7 @@ async function writeScript(config, brief2, options = {}) {
 // src/businesses/video/media/merge.ts
 init_config();
 init_connection();
-import { rm as rm8, mkdir as mkdir12, writeFile as writeFile9, rename as rename10, stat as stat8, copyFile as copyFile2 } from "node:fs/promises";
+import { rm as rm8, mkdir as mkdir13, writeFile as writeFile10, rename as rename10, stat as stat8, copyFile as copyFile2 } from "node:fs/promises";
 import path20 from "node:path";
 function evenNumber(value, fallback) {
   const number2 = Number(value);
@@ -7045,7 +7235,7 @@ async function cleanupSegmentTemps(temps) {
 }
 async function mergeClips(config, files, outPath, { signal } = {}) {
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  await mkdir12(path20.dirname(outPath), { recursive: true });
+  await mkdir13(path20.dirname(outPath), { recursive: true });
   const work = `${outPath}.${uniqueSuffix("work")}.mp4`;
   let copyError = "";
   let audioError = "";
@@ -7066,7 +7256,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
     if (mergeMode !== "reencode" && paramsMatch) {
       const listPath = `${work}.concat.txt`;
       const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
-      await writeFile9(listPath, `${lines}
+      await writeFile10(listPath, `${lines}
 `, "utf8");
       try {
         const { code: code2, stderr: stderr2 } = await runProcess(binary, [
@@ -7311,7 +7501,7 @@ async function downloadSegmentsAndMerge(config, {
       return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "segment", videoPath: files[0] };
     }
     if (files.length === 1) {
-      await mkdir12(path20.dirname(finalPath), { recursive: true });
+      await mkdir13(path20.dirname(finalPath), { recursive: true });
       const copy = `${finalPath}.${uniqueSuffix("copy")}.mp4`;
       try {
         await copyFile2(files[0], copy);
@@ -7550,9 +7740,9 @@ function createCanvasNativeService(liveConfig, options = {}) {
   };
   const pointer = (link) => path21.join(directory2, `node-${hash3([link.projectId, link.canvasId || "", link.nodeId])}.json`);
   async function save2(job) {
-    await mkdir13(directory2, { recursive: true, mode: 448 });
+    await mkdir14(directory2, { recursive: true, mode: 448 });
     const dest = file(job.id), temp = `${dest}.${randomUUID9()}.tmp`;
-    await writeFile10(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
+    await writeFile11(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
     await rename11(temp, dest);
   }
   const read = async (id) => JSON.parse(await readFile12(file(id), "utf8"));
@@ -7562,9 +7752,9 @@ function createCanvasNativeService(liveConfig, options = {}) {
   };
   const chainPointer = (link) => path21.join(chainDirectory, `canvas-${hash3([link.projectId, link.canvasId || ""])}.json`);
   async function saveChain(chain) {
-    await mkdir13(chainDirectory, { recursive: true, mode: 448 });
+    await mkdir14(chainDirectory, { recursive: true, mode: 448 });
     const dest = chainFile(chain.id), temp = `${dest}.${randomUUID9()}.tmp`;
-    await writeFile10(temp, JSON.stringify(chain), { mode: 384, flag: "wx" });
+    await writeFile11(temp, JSON.stringify(chain), { mode: 384, flag: "wx" });
     await rename11(temp, dest);
   }
   const readChain = async (id) => JSON.parse(await readFile12(chainFile(id), "utf8"));
@@ -7697,7 +7887,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       const job = { version: 1, id: randomUUID9(), canvas, plan, identity: chain.identity, createdAt: Date.now(), state: "running", reviewed: false, chain: chain.id };
       await save2(job);
       const temp = `${key}.${randomUUID9()}.tmp`;
-      await writeFile10(temp, JSON.stringify({ id: job.id }), { mode: 384, flag: "wx" });
+      await writeFile11(temp, JSON.stringify({ id: job.id }), { mode: 384, flag: "wx" });
       await rename11(temp, key);
       snapshots.set(job.id, config);
       void perform(job, config).catch(() => {
@@ -7841,7 +8031,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
     if (!root) throw new Error("\u753B\u5E03\u6570\u636E\u76EE\u5F55\u4E0D\u53EF\u7528\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\u6743\u9650\u3002");
     const records = (await adapter.rpc.assetsGet({ ids: segments.map((x) => x.assetId).filter(Boolean) })).items || [];
     const work = path21.join(directory2, "film-work");
-    await mkdir13(work, { recursive: true, mode: 448 });
+    await mkdir14(work, { recursive: true, mode: 448 });
     const files = [];
     for (const segment of segments) {
       const asset = records.find((a) => a.id === segment.assetId);
@@ -7861,7 +8051,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
     const id = `mov_film_${stamp.slice(0, 24)}`;
     const rel = `projects/${link.projectId}/final/${id}.mp4`;
     const dest = path21.join(root, rel);
-    await mkdir13(path21.dirname(dest), { recursive: true });
+    await mkdir14(path21.dirname(dest), { recursive: true });
     await (options.mergeClips || mergeClips)(config, files, dest, {});
     const seconds = segments.reduce((sum, x) => sum + (x.seconds || 0), 0) || null;
     const film = {
@@ -7948,9 +8138,9 @@ function createCanvasNativeService(liveConfig, options = {}) {
         segments
       };
       await saveChain(chain);
-      await mkdir13(chainDirectory, { recursive: true, mode: 448 });
+      await mkdir14(chainDirectory, { recursive: true, mode: 448 });
       const temp = `${chainPointer(link)}.${randomUUID9()}.tmp`;
-      await writeFile10(temp, JSON.stringify({ id: chain.id }), { mode: 384, flag: "wx" });
+      await writeFile11(temp, JSON.stringify({ id: chain.id }), { mode: 384, flag: "wx" });
       await rename11(temp, chainPointer(link));
       try {
         await runChainSegment(chain, config);
@@ -8117,7 +8307,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
         const job2 = { version: 1, id: p.id, canvas: p.canvas, plan: p.plan, identity: p.identity, createdAt: Date.now(), state: "running", reviewed: false };
         await save2(job2);
         const temp = `${key}.${randomUUID9()}.tmp`;
-        await writeFile10(temp, JSON.stringify({ id: job2.id }), { mode: 384, flag: "wx" });
+        await writeFile11(temp, JSON.stringify({ id: job2.id }), { mode: 384, flag: "wx" });
         await rename11(temp, key);
         proposals.delete(p.id);
         snapshots.set(job2.id, p.config);
@@ -9368,7 +9558,7 @@ function setupTool(config) {
 import { spawn as spawn2 } from "node:child_process";
 import path23 from "node:path";
 import { createRequire as createRequire2 } from "node:module";
-import { stat as stat11, mkdir as mkdir14 } from "node:fs/promises";
+import { stat as stat11, mkdir as mkdir15 } from "node:fs/promises";
 function runHyperframes(cli, args, cwd, config, signal) {
   return new Promise((resolve3, reject) => {
     if (signal?.aborted) return reject(new Error("Hyperframes \u5DF2\u53D6\u6D88\u3002"));
@@ -9491,7 +9681,7 @@ function hyperframesTool(config, deps) {
         } catch (error) {
           if (error.code !== "ENOENT") throw error;
         }
-        await mkdir14(path23.dirname(videoPath), { recursive: true });
+        await mkdir15(path23.dirname(videoPath), { recursive: true });
         command = ["render", project, "--output", videoPath, "--fps", String(args.fps || 30), "--workers", "1", "--strict"];
       }
       const result = await runHyperframes(cli, command, action === "check" ? cwd : project, config, exec?.signal);
