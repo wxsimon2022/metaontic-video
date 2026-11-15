@@ -97,11 +97,11 @@ git show --no-patch "v<版本>"
 
 版本包在 [GitHub Releases](https://github.com/wxsimon2022/metaontic-video/releases) 或 [Gitee Releases](https://gitee.com/hackloop/metaontic-video/releases) 下载，通用插件包为 `metaontic-video-<版本>.tgz`。Windows与Mac使用同一个 `.tgz`，不再发布ZIP；指南和PDF已包含在通用包中。不再向 npm 注册表发布，无需配置 `NPM_TOKEN` 或 Trusted Publishing。
 
-`v*` 标签触发完整构建与测试，通过双平台安装检查后，使用 GitHub 自动令牌上传通用tgz。`--both`发布脚本再下载这个同一成品，用本地 `GITEE_TOKEN` 发布Gitee；CI未通过时不上传Gitee，不将单仓成功报告为双仓成功。手动运行工作流时须选择与包版本匹配的标签。
+`v*` 标签触发完整构建与测试，通过双平台安装检查后，使用 GitHub 自动令牌上传通用tgz。`--both`发布脚本再下载这个同一成品，用本地 `GITEE_TOKEN` 发布Gitee；CI未通过时不上传Gitee，不将单仓成功报告为双仓成功。手动运行工作流时须选择与包版本匹配的标签。只让流水线发 Gitee 时，本地用 `node scripts/release.mjs X.Y.Z --notes release-plan.json --ci`：本机仍做构建与测试、版本与更新内容、README/CHANGELOG、指南地址与宣传页同步，然后提交、打标签并推送，打包与 Gitee Release 交给流水线，本地不需要 `GITEE_TOKEN`；这条路不要再并跑 `--both`，否则 GitHub 那份成品会再打一次，与流水线成品大小不同而被拒绝。
 
 某次发布只补齐镜像时，手动运行 `sync-gitee` 工作流并填写对应标签；它从 GitHub Release 取回该版本的 通用 `.tgz`，逐个补传到 Gitee 发布页并核对大小，不会覆盖或改动已有附件。
 
-Gitee 侧另有一条 Gitee Go 流水线（`.workflow/MetaOnticVideo.yml`）：向 `master` 推送、发起面向 `master` 的 PR 或推送 `v*` 标签时，在 Gitee 构建机上安装依赖、构建并运行单元测试，再校验版本元数据；每次运行都会打出成品并作为该次流水线的制品留存，可在 Gitee 的流水线运行结果页直接下载：`metaontic-video-<版本>.tgz` 总会生成，两平台使用同一个tgz，不再生成Windows ZIP。标签触发时还会核对 `v<版本>` 标签与 `package.json` 里的版本是否一致，不一致直接失败，保证成品按标签出。想在发版前演练一次按标签的流程，可以打以 `ci-` 开头的演练标签（如 `ci-test`）：它同样触发构建与打包，但跳过标签与版本的强校验，制品只作演练用。这条流水线只生成成品，不发布版本：GitHub 与 Gitee 的 Release 成品始终由 `publish` 工作流按 `v*` 标签产出，避免两处各打一份包导致成品不一致。流水线不依赖 Gitee 下拉里提供的版本：构建机上没有可用 Node 时，它会自己从 npmmirror 下载 Node 20（按 glibc 自动选择官方构建或 glibc 2.17 兼容版），并缓存到 `~/.local/node`；因此免费构建机即使镜像较旧也能跑通。
+Gitee 侧另有一条 Gitee Go 流水线（`.workflow/MetaOnticVideo.yml`）：向 `master` 推送、发起面向 `master` 的 PR 或推送 `v*` 标签时，在 Gitee 构建机上安装依赖、构建并运行单元测试，再校验版本元数据；每次运行都会打出成品并作为该次流水线的制品留存，可在 Gitee 的流水线运行结果页直接下载：`metaontic-video-<版本>.tgz` 总会生成，两平台使用同一个tgz，不再生成Windows ZIP。标签触发时还会核对 `v<版本>` 标签与 `package.json` 里的版本是否一致，不一致直接失败，保证成品按标签出。想在发版前演练一次按标签的流程，可以打以 `ci-` 开头的演练标签（如 `ci-test`）：它同样触发构建与打包，但跳过标签与版本的强校验，制品只作演练用。这条流水线同时承担 Gitee 侧的打包与发版：`v*` 标签触发时，打包步骤跑完紧接执行 `node scripts/ci-release.mjs --dist dist --tag "$TAG"`，把本次成品发布成 Gitee Release，发行说明直接从 `package.json` 的 `releaseNotes` 生成（只发正式版；`ci-` 演练标签与分支、PR 运行只出制品、不发布）。发版令牌来自流水线变量 `GITEE_TOKEN`（也认 `GITEE_ACCESS_TOKEN`、`TOKEN_GITEE`、`GITEE_API_TOKEN` 这几个别名）：在 Gitee 流水线设置里添加并勾选私密，仓库和流水线 YAML 里都不写令牌。发布是幂等的：同版本已经有同大小附件时只核对、不重建、不覆盖，所以本地发版与流水线发版可以并存；万一两边各打了一份包，后到的一方会因为附件大小不同被拒绝并给出提示，不会出现两份成品混用。流水线不依赖 Gitee 下拉里提供的版本：构建机上没有可用 Node 时，它会自己从 npmmirror 下载 Node 20（按 glibc 自动选择官方构建或 glibc 2.17 兼容版），并缓存到 `~/.local/node`；因此免费构建机即使镜像较旧也能跑通。
 
 本机打包可执行 `npm pack --pack-destination /tmp`。需要目录安装时，将 `.tgz` 解压后使用其中的 `package` 目录：
 

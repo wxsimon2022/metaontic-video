@@ -174,6 +174,8 @@ Windows解压目录安装在更新时出现空目录/locale缺失：先核对成
 
 用户原创意中的时长/横竖屏/分辨率直接作为确认值，仅询问缺失项；完善创意不清空规格。“30秒竖屏720P”不得再问这三项，不支持的参数单独说明并询问可执行替代，不静默改值。
 
+流水线发版（2026-11-15）：Gitee 侧的打包 + 发版都放在 Gitee Go 流水线 `.workflow/MetaOnticVideo.yml`——`v*` 标签触发时，打包步骤末尾执行 `node scripts/ci-release.mjs --dist dist --tag "$TAG"`，发行说明从 package.json 的 releaseNotes 生成并发布 Gitee Release（只发正式版；ci- 演练标签、分支与 PR 只出制品）。令牌配在流水线变量里（GITEE_TOKEN，别名 TOKEN_GITEE 等），绝不写进仓库或流水线 YAML——`.workflow/流水线-202611031408.yml` 这类自动生成文件里出现过明文 TOKEN_GITEE，属于要清理的泄露面。本地只做准备时用 `node scripts/release.mjs X.Y.Z --notes release-plan.json --ci`（不本地打包、不需要 GITEE_TOKEN），别再并跑 `--both`。幂等靠 publish-gitee 的「同大小附件只核对不覆盖」，两边都打过包时第二处会因大小不同被拒。流水线发版失败先看 ci-release.mjs 日志里的标签与包版本、成品路径、令牌来源与 sha256，不要重打版本。
+
 宣传预设promo-video与video-director复用YAML插件列表锚点和公共工具/审批，仅宣传模式注入promo专题。作用域判断以当前预设registry为准，标准/未知预设不得注入。预设新增后核对宿主YAML解析、技能入包和动态模式切换；旧会话固定身份不追溯修改。
 
 组件中文名称：宿主包含组件列表按row.moduleName读取<完整模块名>/locale/en.json及同目录语言文件，不读预设config.name。两个预设用metaontic-video/presets/<id>独立入口转导出宿主dsh-agent-preset，并导出对应locale；不修改宿主文件，不改预设id。打包核对wrapper与locale均纳入，宿主解析名称而非仅模式列表名称。
