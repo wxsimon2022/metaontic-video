@@ -84,6 +84,8 @@ stages:
           # 正式版标签触发时，流水线自己把这次成品发布成 Gitee Release（幂等：已存在同大小附件只核对不覆盖）；
           # ci- 演练标签与分支运行只出制品，不发布。令牌来自流水线变量 GITEE_TOKEN（或 TOKEN_GITEE 等别名），不写在这一文件里。
           - 'echo "发布检查：TAG=${TAG:-无}"'
+          - 'if [ -n "$RELEASE_TAG" ]; then echo "手动填写的标签：$RELEASE_TAG"; TAG="$RELEASE_TAG"; fi'
+          - 'if [ -n "$RELEASE_NOTES" ]; then echo "本次发版描述用手动填写的内容（$(printf %s "$RELEASE_NOTES" | wc -c) 字节）"; fi'
           - 'if [ -n "$TAG" ] && [ "${TAG#v}" != "$TAG" ]; then node scripts/ci-release.mjs --dist dist --tag "$TAG"; else echo "本次不是正式版标签，只出制品、不发布 Release"; fi'
         artifacts:
           - name: PLUGIN_PACKAGE
@@ -95,3 +97,13 @@ stages:
         notify: []
         strategy:
           retry: '0'
+# 手动运行这条流水线时可以填这两个变量：RELEASE_TAG（要发布的标签，不填就用 git 上的标签）
+# 与 RELEASE_NOTES（这一版的发版描述，按「新增：…」「优化：…」逐行写，合计不超过 100 字；不填就用 package.json 的 releaseNotes）。
+# 令牌用流水线变量 GITEE_TOKEN（别名 GITEE_ACCESS_TOKEN / TOKEN_GITEE / GITEE_API_TOKEN），勾选私密，不写在这个文件里。
+variables:
+  RELEASE_TAG:
+    type: TEXT
+    default: ''
+  RELEASE_NOTES:
+    type: TEXT
+    default: ''

@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { TOKEN_NAMES, resolveToken, versionOfTag, releaseNotesOf, runCiRelease } from '../scripts/ci-release.mjs';
+import { TOKEN_NAMES, resolveToken, versionOfTag, releaseNotesOf, parseReleaseNotes, notesFromInput, runCiRelease } from '../scripts/ci-release.mjs';
 import { releaseVerification } from '../scripts/release.mjs';
 
 /** 拼一个最小仓库：package.json 与 dist 里的成品。 */
@@ -91,11 +91,49 @@ test('流水线发版：没有标签信息时按跳过处理，返回 0', async 
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test('发版描述：逐行「新增／优化」或整段正文都能解析，条目照旧只收这两类', () => {
+  assert.deepEqual(parseReleaseNotes('新增：流程画布可视化创作。\n优化：写脚本更快；连拍不重复计费。'),
+    ['新增：流程画布可视化创作。', '优化：写脚本更快；连拍不重复计费。']);
+  assert.deepEqual(parseReleaseNotes('MetaOnticVideo v1.0.0\n\n新增\n- 流程画布可视化创作。\n\n优化\n- 写脚本更快。'),
+    ['新增：流程画布可视化创作。', '优化：写脚本更快。']);
+  assert.deepEqual(parseReleaseNotes('随便写点什么'), [], '解析不出条目就交给调用方报错，不猜');
+  assert.deepEqual(parseReleaseNotes('修复：悄悄修好了。'), []);
+  const items = ['新增：流程画布可视化创作。', '优化：写脚本更快。'];
+  assert.deepEqual(notesFromInput('新增：流程画布可视化创作。\n优化：写脚本更快。', '1.0.0', items), { notes: '', changed: false }, '与 package.json 一致时不重复生成');
+  const changed = notesFromInput('优化：写脚本更快。', '1.0.0', items);
+  assert.equal(changed.changed, true);
+  assert.equal(changed.notes, 'MetaOnticVideo v1.0.0\n\n优化\n- 写脚本更快。\n');
+  // 发版描述仍走同一套校验：超 100 字、或写了修复分类都会被拦下。
+  assert.throws(() => notesFromInput('优化：' + '字'.repeat(101), '1.0.0', items), /100 字上限/);
+  assert.deepEqual(notesFromInput('修复：悄悄修好了。', '1.0.0', []), { notes: '', changed: false }, '解析不出条目时不生成正文，交给 runCiRelease 明确报错');
+});
+
+test('手动运行流水线：RELEASE_TAG 指标签、RELEASE_NOTES 指发版描述，成品与包版本仍必须一致', async () => {
+  const dir = await fixture();
+  try {
+    const calls = [];
+    const publish = async args => { calls.push(args); return 'https://gitee.com/hackloop/metaontic-video/releases/tag/v1.0.0'; };
+    await runCiRelease({ cwd: dir, dist: 'dist', tag: '', env: { RELEASE_TAG: 'v1.0.0', RELEASE_NOTES: '优化：连拍跳过已有成果的段。', GITEE_TOKEN: 't' }, publish, log: () => {} });
+    assert.equal(calls[0].tag, 'v1.0.0');
+    assert.equal(calls[0].notes, 'MetaOnticVideo v1.0.0\n\n优化\n- 连拍跳过已有成果的段。\n', '发行版正文用手动填写的描述');
+    assert.equal(await readFile(path.join(dir, 'dist', 'release-notes.txt'), 'utf8'), calls[0].notes);
+    // 描述写错格式要直接报错，不能悄悄退回 package.json 的说明。
+    await assert.rejects(runCiRelease({ cwd: dir, dist: 'dist', tag: '', env: { RELEASE_TAG: 'v1.0.0', RELEASE_NOTES: '这次改了不少东西', GITEE_TOKEN: 't' }, publish, log: () => {} }), /没有可用的更新条目/);
+    // 手动填的标签同样要跟包内版本对得上。
+    await assert.rejects(runCiRelease({ cwd: dir, dist: 'dist', tag: '', env: { RELEASE_TAG: 'v9.9.9', GITEE_TOKEN: 't' }, publish, log: () => {} }), /与包内版本 v1\.0\.0 不一致/);
+    assert.equal(calls.length, 1, '报错的两次都没有发布');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 test('流水线发版接在 Gitee Go 流水线的打包步骤后面，只对 v 标签发布', async () => {
   const workflow = await readFile(new URL('../.workflow/MetaOnticVideo.yml', import.meta.url), 'utf8');
   assert.match(workflow, /node scripts\/ci-release\.mjs --dist dist --tag "\$TAG"/);
   assert.match(workflow, /if \[ -n "\$TAG" \] && \[ "\$\{TAG#v\}" != "\$TAG" \]/);
   assert.doesNotMatch(workflow, /GITEE_TOKEN:\s*\S+/, '令牌不写进流水线文件，只在流水线变量里配置');
+  // 手动运行时可以填标签与发版描述：变量在流水线里可填，步骤里按填写的值发布。
+  assert.match(workflow, /RELEASE_TAG:\n\s+type: TEXT/);
+  assert.match(workflow, /RELEASE_NOTES:\n\s+type: TEXT/);
+  assert.match(workflow, /if \[ -n "\$RELEASE_TAG" \]; then echo "手动填写的标签：\$RELEASE_TAG"; TAG="\$RELEASE_TAG"; fi/);
 });
 
 test('流水线发版的发布核对写真话：成品来自流水线、本机未打包未上传', () => {

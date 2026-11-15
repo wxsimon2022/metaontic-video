@@ -2,7 +2,9 @@
  *  与本地发版共用 scripts/publish-gitee.mjs，靠「同版本已有的同大小附件只核对、不重建、不覆盖」保证幂等，
  *  所以先由本地脚本发布还是先由流水线发布都不会出现两份成品。
  *  只处理 vX.Y.Z 正式标签：ci- 演练标签、分支运行、PR 运行一律跳过，跳过不算失败。
- *  发版令牌只从流水线变量/环境读（GITEE_TOKEN 或别名），不写进仓库与流水线 YAML。 */
+ *  发版令牌只从流水线变量/环境读（GITEE_TOKEN 或别名），不写进仓库与流水线 YAML。
+ *  手动运行流水线时可以填两个变量：RELEASE_TAG 指定要发布的标签（不填就用 git 上的标签），
+ *  RELEASE_NOTES 指定这一版的发版描述（不填就用 package.json 里的 releaseNotes）；两者都走同一套校验。 */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -35,9 +37,35 @@ export function releaseNotesOf(pkg, version) {
   return { notes: publicReleaseNotes(version, notes.items), items: notes.items };
 }
 
+/** 发版描述解析：接受「新增：…」「优化：…」逐行写法，也接受 publicReleaseNotes 生成的整段正文
+ *  （「新增」小节下的 `- …` 逐条）。修复并入优化；解析不出的行不当条目，由后面的格式校验报错。 */
+export function parseReleaseNotes(text) {
+  const items = [];
+  let category = '';
+  for (const raw of String(text || '').replace(/\r/g, '').split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^(新增|优化)$/.test(line)) { category = line; continue; }
+    const inline = /^(新增|优化)[:：]\s*(\S.*)$/.exec(line);
+    if (inline) { category = inline[1]; items.push(`${inline[1]}：${inline[2].trim()}`); continue; }
+    const bullet = /^[-*]\s*(\S.*)$/.exec(line);
+    if (bullet && category) items.push(`${category}：${bullet[1].trim()}`);
+  }
+  return items;
+}
+
+/** 手动运行流水线时的发版描述：与 package.json 的 releaseNotes 走同一套校验（只新增/优化、合计≤100字）。 */
+export function notesFromInput(text, version, items) {
+  const written = parseReleaseNotes(text);
+  if (written.length && JSON.stringify(written) !== JSON.stringify(items)) {
+    return { notes: publicReleaseNotes(version, written), changed: true };
+  }
+  return { notes: '', changed: false };
+}
+
 /** 流水线发版主流程：标签与包版本一致 → 找到成品 → 核对更新内容 → 校验令牌 → 发布并核对附件。 */
 export async function runCiRelease({ cwd = process.cwd(), dist = 'dist', tag = '', env = process.env, publish = publishGitee, log = console.log } = {}) {
-  const name = String(tag || env?.GITEE_TAG || env?.GITEE_REF_NAME || env?.CI_COMMIT_TAG || '').trim();
+  const name = String(tag || env?.RELEASE_TAG || env?.GITEE_TAG || env?.GITEE_REF_NAME || env?.CI_COMMIT_TAG || '').trim();
   const version = versionOfTag(name);
   if (!version) {
     log(`流水线发版：本次不是正式版标签（${name || '无标签'}），只留制品、不发布 Release。`);
@@ -46,7 +74,13 @@ export async function runCiRelease({ cwd = process.cwd(), dist = 'dist', tag = '
   const pkgPath = path.join(cwd, 'package.json');
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
   if (String(pkg.version) !== version) throw new Error(`标签 ${name} 与包内版本 v${pkg.version} 不一致：先按标签更新版本号与 releaseNotes，再重新打标签。`);
-  const { notes } = releaseNotesOf(pkg, version);
+  const { notes: defaultNotes, items } = releaseNotesOf(pkg, version);
+  // 手动运行时可以用 RELEASE_NOTES 指定这一版的发版描述；不填就用 package.json 里的 releaseNotes。
+  const input = String(env?.RELEASE_NOTES ?? '').trim();
+  if (input && !parseReleaseNotes(input).length) throw new Error('流水线变量 RELEASE_NOTES 里没有可用的更新条目：按「新增：…」「优化：…」逐行填写（修复并入优化），整篇不超过 100 字。');
+  const written = notesFromInput(input, version, items);
+  const notes = written.notes || defaultNotes;
+  if (written.changed) log('本次发版描述来自流水线变量 RELEASE_NOTES：请把同一份描述同步回 package.json 的 releaseNotes 与 CHANGELOG。');
   const archive = path.join(cwd, dist, `metaontic-video-${version}.tgz`);
   if (!existsSync(archive)) throw new Error(`没有找到本次成品 ${path.relative(cwd, archive)}：请确认打包步骤已经跑过，且流水线制品目录与 --dist 一致。`);
   const { name: tokenName, token } = resolveToken(env);
@@ -65,7 +99,8 @@ const usage = `流水线发版：把 dist 里本次标签的成品发布成 Gite
   node scripts/ci-release.mjs --dist dist --tag v3.24.2
 只处理 vX.Y.Z 正式标签；ci- 演练标签与分支运行会跳过并返回 0。
 令牌从环境变量读取，优先 GITEE_TOKEN，其次 GITEE_ACCESS_TOKEN / TOKEN_GITEE / GITEE_API_TOKEN。
---dist <目录> 成品目录（默认 dist）；--tag <标签> 本次标签（默认读 GITEE_TAG / GITEE_REF_NAME / CI_COMMIT_TAG）。
+手动运行流水线时填两个变量：RELEASE_TAG 指定标签，RELEASE_NOTES 指定发版描述（按「新增：…」「优化：…」逐行写，合计不超过 100 字）。
+--dist <目录> 成品目录（默认 dist）；--tag <标签> 本次标签（默认读 RELEASE_TAG / GITEE_TAG / GITEE_REF_NAME / CI_COMMIT_TAG）。
 --help 显示本说明。`;
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
