@@ -78,7 +78,7 @@ for(const response of [null,'需要修改'])test(`review ${response} never grant
 test('review requires full script and inline storyboard, not a summary or file path',()=>fixture(async h=>{
   const p=await h.prepare();await h.show(false);
   const result=await h.project.execute({action:'review',projectId:p.projectId,scriptPath:h.script,specification:h.spec},h.exec);
-  assert.equal(result.status,'blocked');assert.equal(h.asks,0);assert.match(result.reason,/完整展示/);
+  assert.equal(result.status,'blocked');assert.equal(h.asks,0);assert.match(result.reason,/只在本轮用户可见正文里出现 \d+%/);
 }));
 
 test('changes while waiting for review cannot approve a different script',()=>fixture(async h=>{
