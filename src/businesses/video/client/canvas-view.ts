@@ -1063,6 +1063,9 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
       { key: 'cost', ok: true, label: '「确认费用」', hint: '每段生成前仍要单独确认方案与费用' },
     ];
 
+    // 连拍方案里真正要生成的是「还没有成果」的段：已有成果的段跳过，不提交也不重复计费。
+    const chainPlanPending = chainDialog?.plan ? chainDialog.plan.segments.filter((segment: any) => !segment.skip).length : 0;
+
     /** 画布上确认脚本审核：把「已通过」写进阶段卡事实并重算五张卡，之后不再回退。
      *  这一步只记「用户核对过剧本与每段提示词」，不代替每段的方案与费用确认。 */
     const confirmScript = React.useCallback(async () => {
@@ -1356,15 +1359,19 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
           h('h4', { key: 'h' }, '连拍：一次确认，逐段生成'),
           chainDialog.loading ? h('p', { key: 'loading', className: 'movc-status' }, '正在按画布上的视频节点排连拍方案…') : null,
           chainDialog.plan ? h('div', { key: 'plan', className: 'movc-plan' }, [
-            h('div', { key: 'head' }, `连拍方案：${chainDialog.plan.segments.length} 段${chainDialog.plan.cny !== null ? ` · 预估 ¥${(Math.round(chainDialog.plan.cny * 10000) / 10000).toFixed(4)}（基础公式，按渠道账单结算）` : ' · 按实际调用计费'}${chainDialog.plan.priceDate ? ` · 价目 ${chainDialog.plan.priceDate}` : ''}`),
-            ...chainDialog.plan.segments.map((segment: any) => h('div', { key: `s${segment.index}` },
-              `第${segment.index + 1}段「${segment.label}」${segment.seconds}秒 · ${segment.operation === 'extend' ? '续拍上一段' : '首段直出'} · ${segment.ratio} ${String(segment.resolution).toUpperCase()}：${String(segment.prompt).slice(0, 70)}${String(segment.prompt).length > 70 ? '…' : ''}`)),
-            h('div', { key: 'note' }, '第 1 段直出，其余段以上一段成果续拍；每段出成果后都会停下来等你审核，审核通过才继续下一段。'),
+            h('div', { key: 'head' }, chainPlanPending
+              ? `连拍方案：本次生成 ${chainPlanPending} 段${chainDialog.plan.segments.length > chainPlanPending ? `（另有 ${chainDialog.plan.segments.length - chainPlanPending} 段已有成果，跳过不重复生成）` : ''}${chainDialog.plan.cny !== null ? ` · 预估 ¥${(Math.round(chainDialog.plan.cny * 10000) / 10000).toFixed(4)}（基础公式，按渠道账单结算）` : ' · 按实际调用计费'}${chainDialog.plan.priceDate ? ` · 价目 ${chainDialog.plan.priceDate}` : ''}`
+              : `连拍方案：整条链路 ${chainDialog.plan.segments.length} 段都已有成果，没有要生成的了`),
+            ...chainDialog.plan.segments.map((segment: any) => h('div', { key: `s${segment.index}`, ...(segment.skip ? { 'data-skip': 'true' } : {}) },
+              segment.skip
+                ? `✓ 第${segment.index + 1}段「${segment.label}」${segment.seconds}秒：已有成果，本次跳过（不重复生成、不重复计费）`
+                : `第${segment.index + 1}段「${segment.label}」${segment.seconds}秒 · ${segment.operation === 'extend' ? '续拍上一段' : '首段直出'} · ${segment.ratio} ${String(segment.resolution).toUpperCase()}：${String(segment.prompt).slice(0, 70)}${String(segment.prompt).length > 70 ? '…' : ''}`)),
+            h('div', { key: 'note' }, '没有成果的段才会生成：接着已有成果的段落续拍，整条链路一段成果都没有时第 1 段直出；每段出成果后都会停下来等你审核，审核通过才继续下一段。已有成果的段不重复生成，也不重复计费。'),
           ]) : null,
           chainDialog.chain ? h('div', { key: 'chain', className: 'movc-plan' }, [
             h('div', { key: 'head' }, `${chainStatusText(chainDialog.chain)}`),
             chainDialog.chain.segments.map((segment: any) => h('div', { key: `c${segment.index}` },
-              `${segment.index < chainDialog.chain.done ? '✓ ' : segment.index === chainDialog.chain.index ? '▶ ' : '· '}第${segment.index + 1}段「${segment.label}」${segment.seconds}秒${segment.index < chainDialog.chain.done ? '：已有成果' : ''}`)),
+              `${segment.index < chainDialog.chain.done ? '✓ ' : segment.index === chainDialog.chain.index ? '▶ ' : '· '}第${segment.index + 1}段「${segment.label}」${segment.seconds}秒${segment.skip ? '：已有成果，本次跳过' : segment.index < chainDialog.chain.done ? '：已有成果' : ''}`)),
             chainDialog.chain.message ? h('div', { key: 'msg' }, chainDialog.chain.message) : null,
           ]) : null,
           chainDialog.chain?.job?.media?.length && chainDialog.chain.state === 'review' ? h('div', { key: 'media' },
@@ -1373,13 +1380,13 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
             }))) : null,
           chainDialog.chain && chainDialog.chain.state === 'review' ? h('p', { key: 'review-note', className: 'movc-status' }, '先看这一段：满意就「确认并继续下一段」，不满意可以停止连拍，已生成的成果都保留在画布上。') : null,
           chainDialog.error ? h('p', { key: 'err', className: 'movc-status', 'data-error': 'true' }, chainDialog.error) : null,
-          chainDialog.plan && !chainDialog.chain ? h('div', { key: 'batch-checks', className: 'movc-plan' }, [
+          chainDialog.plan && !chainDialog.chain && chainPlanPending ? h('div', { key: 'batch-checks', className: 'movc-plan' }, [
             h('div', { key: 'head' }, '开始批量生成前，请先完成：'),
             ...batchChecks.map((item: any) => h('div', { key: item.key, 'data-batch-check': item.key, 'data-ok': String(item.ok) },
               `${item.ok ? '✓ ' : '· '}${item.label}— ${item.hint}`)),
             h('div', { key: 'tail' }, '这几项都就绪后再开始连拍；每段出成果仍会停下来等你审核。'),
           ]) : null,
-          chainDialog.plan && !chainDialog.chain ? h('div', { key: 'readiness', className: 'movc-plan' }, [
+          chainDialog.plan && !chainDialog.chain && chainPlanPending ? h('div', { key: 'readiness', className: 'movc-plan' }, [
             h('div', { key: 'head' }, readiness.length ? `画布体检：还有 ${readiness.length} 处没准备齐` : '画布体检：没有发现问题'),
             ...readiness.slice(0, 6).map((item: any) => h('div', { key: `${item.code}-${item.nodeId}`,
               'data-readiness': item.code, 'data-severity': item.severity },
@@ -1387,7 +1394,8 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
             readiness.length > 6 ? h('div', { key: 'more' }, `还有 ${readiness.length - 6} 处，先处理上面这些。`) : null,
             h('div', { key: 'tail' }, '体检只看画布内容：缺成果的段、没接到制作段的素材、断掉的连线，以及成片段数和现在的视频成果对不上。费用与审核仍按每段自己确认。'),
           ]) : null,
-          chainDialog.plan && !chainDialog.chain ? h('div', { key: 'confirms' }, [
+          chainDialog.plan && !chainDialog.chain && !chainPlanPending ? h('p', { key: 'nothing', className: 'movc-status' }, '整条链路的视频段都已有成果，不需要再连拍；要重做哪一段，就点那个节点自己的「制作」。') : null,
+          chainDialog.plan && !chainDialog.chain && chainPlanPending ? h('div', { key: 'confirms' }, [
             h('label', { key: 'p', className: 'movc-check' }, [h('input', { type: 'checkbox', checked: chainDialog.confirm.plan === true, onChange: (e: any) => patchChainDialog({ confirm: { ...chainDialog.confirm, plan: e.target.checked } }) }), ' 我已核对整条链路的方案（每段提示词、时长、画幅与清晰度）']),
             h('label', { key: 'c', className: 'movc-check' }, [h('input', { type: 'checkbox', checked: chainDialog.confirm.cost === true, onChange: (e: any) => patchChainDialog({ confirm: { ...chainDialog.confirm, cost: e.target.checked } }) }), ' 我已确认整条链路的预估费用，按渠道账单结算']),
           ]) : null,
@@ -1397,7 +1405,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
             chainDialog.chain?.state === 'review' && chainDialog.chain.job?.sync?.status !== 'synced' ? h('button', { key: 'sync', type: 'button', className: 'mov-btn', disabled: chainDialog.busy, onClick: () => void syncChainSegment() }, '补回填画布') : null,
             chainDialog.chain?.state === 'review' ? h('button', { key: 'stop2', type: 'button', className: 'mov-btn movc-danger', disabled: chainDialog.busy, onClick: () => void stopChain() }, '停止连拍') : null,
             chainDialog.chain?.state === 'review' ? h('button', { key: 'next', type: 'button', className: 'mov-btn mov-btn-primary', disabled: chainDialog.busy, onClick: () => void advanceChain(true) }, '确认并继续下一段') : null,
-            chainDialog.plan && !chainDialog.chain ? h('button', { key: 'start', type: 'button', className: 'mov-btn mov-btn-primary', disabled: chainDialog.busy || !(chainDialog.confirm.plan && chainDialog.confirm.cost), onClick: () => void startChain() }, '确认并开始连拍') : null,
+            chainDialog.plan && !chainDialog.chain && chainPlanPending ? h('button', { key: 'start', type: 'button', className: 'mov-btn mov-btn-primary', disabled: chainDialog.busy || !(chainDialog.confirm.plan && chainDialog.confirm.cost), onClick: () => void startChain() }, '确认并开始连拍') : null,
             chainDialog.chain && ['done', 'stopped', 'stale'].includes(chainDialog.chain.state) && chainDialog.plan ? h('button', { key: 'again', type: 'button', className: 'mov-btn', disabled: chainDialog.busy, onClick: () => void openChain() }, '重新看方案') : null,
             chainDialog.chain && chainDialog.chain.state === 'done' ? h('button', { key: 'close2', type: 'button', className: 'mov-btn', disabled: chainDialog.busy, onClick: () => { stopChainPolling(); setChainDialog(null); } }, '完成') : null,
           ]),

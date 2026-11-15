@@ -44,18 +44,32 @@ function splitEvenly(items: string[], count: number) {
   return groups;
 }
 
+/** 某个视频制作段的最新一条成果：画布内做出来的成果是独立节点，用 metaonticSourceNode 指回它生成的那一段。
+ *  成片取段与连拍判断「这一段是不是已经有成果」都用这一套口径。 */
+export function latestVideoResult(doc: any, nodeId: string) {
+  const made: any[] = Object.values(doc?.nodes || {}).filter((node: any) => node?.type === 'video'
+    && String(node?.metaonticSourceNode || '') === String(nodeId) && (node?.data?.assetId || node?.data?.metaonticVideoUrl));
+  made.sort((a, b) => Number(a?.metaonticCreatedAt || 0) - Number(b?.metaonticCreatedAt || 0));
+  const latest = made[made.length - 1];
+  if (!latest) return null;
+  return { id: latest.id, assetId: String(latest.data?.assetId || ''), url: String(latest.data?.metaonticVideoUrl || ''),
+    seconds: Number(latest.data?.metaonticSeconds ?? latest.data?.duration ?? 0) || null };
+}
+
+/** 连拍预估：只算本次真的要生成的段；已有成果、被跳过的段不计入费用。 */
+function chainCost(segments: any[]) {
+  const billed = (segments || []).filter((segment: any) => !segment?.skip);
+  return billed.every((segment: any) => segment.cny !== null) ? billed.reduce((sum: number, segment: any) => sum + segment.cny, 0) : null;
+}
+
 /** 成片分段：按连拍同一套顺序，取每个视频制作节点最新的一条成果；缺成果的段落单独列出来。 */
 export function filmSegments(doc: any) {
-  const nodes: any[] = Object.values(doc?.nodes || {});
   const segments: any[] = [], missing: string[] = [];
   for (const [index, node] of pendingVideoOrder(doc).entries()) {
     const label = String(node?.label || `第${index + 1}段`);
-    const made = nodes.filter(n => n?.metaonticSourceNode === node.id && n?.type === 'video' && (n?.data?.assetId || n?.data?.metaonticVideoUrl));
-    made.sort((a, b) => Number(a?.metaonticCreatedAt || 0) - Number(b?.metaonticCreatedAt || 0));
-    const latest = made[made.length - 1];
+    const latest = latestVideoResult(doc, node.id);
     if (!latest) { missing.push(label); continue; }
-    segments.push({ index, nodeId: node.id, label, resultId: latest.id, assetId: String(latest.data?.assetId || ''),
-      url: String(latest.data?.metaonticVideoUrl || ''), seconds: Number(latest.data?.metaonticSeconds ?? latest.data?.duration ?? 0) || null });
+    segments.push({ index, nodeId: node.id, label, resultId: latest.id, assetId: latest.assetId, url: latest.url, seconds: latest.seconds });
   }
   return { segments, missing };
 }
@@ -96,8 +110,8 @@ export function splitScriptPrompts(script: any, count: any, shots: any[] = []) {
   return splitEvenly(sentences, count).map(group => group.join(''));
 }
 
-/** 连拍顺序：待制作的视频节点按连线从上游排到下游；成果节点与已产出节点不参与。
- *  与画布界面 flowSteps 同一套规则，保证「制作「…」」的顺序和连拍一致。 */
+/** 连拍顺序：全部视频制作节点按连线从上游排到下游，不管它有没有成果；成果节点（metaonticSourceNode 指回制作段的那些）不参与排队。
+ *  与画布界面 flowSteps 同一套规则，保证「制作「…」」的顺序和连拍一致；「已经有成果的段跳不跳过」由连拍方案自己判断，成片也按这个顺序取段。 */
 export function pendingVideoOrder(doc: any) {
   const nodes: any[] = Object.values(doc?.nodes || {});
   const author = nodes.filter(n => n?.type === 'video' && !n?.metaonticSourceNode && !n?.data?.assetId);
@@ -223,7 +237,8 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
     } catch { job.sync = { status: 'pending' }; }
     await save(job);
   }
-  /** 连拍计划：逐段排方案。第 1 段直出，其余以上一段成果续拍；只算方案与估价，不提交。
+  /** 连拍计划：逐段排方案。已经有成果的段直接跳过——它的成果当作下一段的续拍输入，不重复提交、不重复计费；
+   *  剩下要生成的段里，接着成果的那一段续拍，整条链路一段成果都没有时才直出。只算方案与估价，不提交。
    *  续拍的输入视频在真正开跑时才有，所以计划阶段用占位地址，方案里的时长/画幅/提示词是最终值。 */
   async function chainPlan(adapter, projectId, config) {
     const doc = await adapter.rpc.projectsGet({ id: projectId });
@@ -231,19 +246,31 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
     const order = pendingVideoOrder(doc);
     if (!order.length) throw new Error('画布上没有待制作的视频节点：点画布空白处打开「创作流程」铺开整条流程，或新建一个视频节点。');
     const segments: any[] = [];
-    let carry = null;
+    let carry: any = null, carryLabel = '';
     for (const [index, node] of order.entries()) {
+      const operation = carry ? 'extend' : 'generate';
+      const made = latestVideoResult(doc, node.id);
+      if (made) {
+        // 这一段已经有成果：不再生成、不估价，把它的成果留给下一段当续拍输入。
+        segments.push({ index, nodeId: node.id, label: node.label, operation, skip: true, prompt: node.prompt, transition: node.transition,
+          seconds: made.seconds ?? node.duration, ratio: node.ratio, resolution: node.resolution, cny: null, priceDate: null, fingerprint: '',
+          snapshot: { prompt: node.prompt, duration: node.duration, ratio: node.ratio, resolution: node.resolution } });
+        carry = { videoUrl: made.url, seconds: made.seconds };
+        carryLabel = node.label;
+        continue;
+      }
+      if (carry && !carry.videoUrl) throw new Error(`上一段「${carryLabel}」的成果没有可用的视频地址，没法作为本段的续拍输入：请在画布上核对这条成果，或删掉它再重新预览连拍方案。`);
       const link = { projectId, nodeId: node.id };
       const input = await readCanvasInput(adapter, link);
-      const operation = index === 0 ? 'generate' : 'extend';
       const draft: any = { prompt: node.prompt, duration: node.duration, resolution: node.resolution, ratio: node.ratio, generateAudio: node.generateAudio };
       if (operation === 'extend') draft.transitionDescription = node.transition || node.prompt;
       const plan = planCanvasNative(input, config, operation, draft, carry);
-      const segment = { index, nodeId: node.id, label: node.label, operation, prompt: String(plan.args.prompt), transition: String(plan.args.transitionDescription || ''),
+      const segment = { index, nodeId: node.id, label: node.label, operation, skip: false, prompt: String(plan.args.prompt), transition: String(plan.args.transitionDescription || ''),
         seconds: plan.args.duration, ratio: plan.args.ratio, resolution: plan.args.resolution, cny: plan.estimate?.cny ?? null, priceDate: plan.estimate?.priceDate ?? null,
         fingerprint: input.canvas.fingerprint, snapshot: { prompt: node.prompt, duration: node.duration, ratio: node.ratio, resolution: node.resolution } };
       segments.push(segment);
       carry = { videoUrl: 'pending-previous-segment', seconds: plan.args.duration };
+      carryLabel = node.label;
     }
     return segments;
   }
@@ -282,18 +309,36 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
     } finally { locks.delete(key); }
   }
 
+  /** 推进到下一个真的要生成的段：已有成果的段按顺序跳过（不提交、不计费），把它的成果接给下一段续拍；
+   *  整条链路没有待生成的段了就收尾成完成。 */
   async function runChainSegment(chain, config) {
-    const segment = chain.segments[chain.index];
-    if (!segment) throw new Error('连拍段位越界，请重新预览方案。');
     const adapter = await adapterFor({ projectId: chain.projectId, ...(chain.canvasId ? { canvasId: chain.canvasId } : {}) });
-    const carry = chain.index > 0 ? chain.carry : null;
-    const planned = await planChainSegment(adapter, chain.projectId, segment, carry, config);
-    const job = await launchSegment(chain, segment, planned, config);
-    chain.jobs[chain.index] = job.id;
-    chain.state = 'running';
-    chain.message = '';
+    let doc: any = null;
+    while (chain.index < chain.segments.length) {
+      const segment = chain.segments[chain.index];
+      if (segment.skip) {
+        doc = doc || await adapter.rpc.projectsGet({ id: chain.projectId });
+        const made = latestVideoResult(doc, segment.nodeId);
+        if (!made?.url) throw new Error(`第 ${chain.index + 1} 段「${segment.label}」已有成果，但这条成果没有可用的视频地址，不能作为下一段的续拍输入。`);
+        chain.carry = { videoUrl: made.url, seconds: made.seconds };
+        chain.jobs[chain.index] = null;
+        chain.index += 1;
+        await saveChain(chain);
+        continue;
+      }
+      const carry = chain.index > 0 ? chain.carry : null;
+      const planned = await planChainSegment(adapter, chain.projectId, segment, carry, config);
+      const job = await launchSegment(chain, segment, planned, config);
+      chain.jobs[chain.index] = job.id;
+      chain.state = 'running';
+      chain.message = '';
+      await saveChain(chain);
+      return job;
+    }
+    chain.state = 'done';
+    chain.message = '全部段落都已有成果。';
     await saveChain(chain);
-    return job;
+    return null;
   }
 
   /** 连拍当前段的制作记录：刚开跑时可能还没落盘，读不到就是 null。 */
@@ -319,15 +364,16 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
     const state = chainStateOf(chain, job);
     const done = chain.segments.slice(0, chain.index).length;
     return { id: chain.id, projectId: chain.projectId, state, message: chain.message || '', index: chain.index, total: chain.segments.length, done,
-      segments: chain.segments.map(segment => ({ index: segment.index, label: segment.label, nodeId: segment.nodeId, operation: segment.operation, seconds: segment.seconds,
-        ratio: segment.ratio, resolution: segment.resolution, prompt: segment.prompt, cny: segment.cny })),
-      cny: chain.segments.every((x: any) => x.cny !== null) ? chain.segments.reduce((sum: number, x: any) => sum + x.cny, 0) : null,
-      priceDate: chain.segments[0]?.priceDate || null, job: job ? view(job) : null };
+      pending: chain.segments.filter((x: any) => !x.skip).length,
+      segments: chain.segments.map(segment => ({ index: segment.index, label: segment.label, nodeId: segment.nodeId, operation: segment.operation, skip: segment.skip === true,
+        seconds: segment.seconds, ratio: segment.ratio, resolution: segment.resolution, prompt: segment.prompt, cny: segment.cny })),
+      cny: chainCost(chain.segments),
+      priceDate: (chain.segments.find((x: any) => !x.skip) || chain.segments[0])?.priceDate || null, job: job ? view(job) : null };
   }
 
-  /** 判断两次连拍方案是不是同一版：节点、参数、提示词和对齐的指纹都一致才算没变。 */
+  /** 判断两次连拍方案是不是同一版：节点、顺序、参数、提示词、跳过与否和对齐的指纹都一致才算没变。 */
   function chainSignature(segments) {
-    return JSON.stringify((segments || []).map(x => [x.nodeId, x.operation, x.prompt, x.transition || '', x.seconds, x.ratio, x.resolution, x.fingerprint || '']));
+    return JSON.stringify((segments || []).map(x => [x.nodeId, x.operation, x.skip === true, x.prompt, x.transition || '', x.seconds, x.ratio, x.resolution, x.fingerprint || '']));
   }
 
   async function perform(job, config, query = false) {
@@ -428,8 +474,9 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       const segments = await chainPlan(adapter, args.projectId, config);
       const active = await previousChain({ projectId: args.projectId, ...(args.canvasId ? { canvasId: args.canvasId } : {}) }).catch(() => null);
       const alive = active && ['running', 'review'].includes(chainStateOf(active, await currentJob(active))) ? chainView(active, await currentJob(active)) : null;
-      return { segments, cny: segments.every(x => x.cny !== null) ? segments.reduce((sum, x) => sum + x.cny, 0) : null,
-        priceDate: segments[0]?.priceDate || null, identity: hash(config), active: alive };
+      const pending = segments.filter((x: any) => !x.skip);
+      return { segments, pending: pending.length, cny: chainCost(segments),
+        priceDate: (pending[0] || segments[0])?.priceDate || null, identity: hash(config), active: alive };
     }
     // 开始连拍：确认一次方案与费用，之后按段推进；每段生成完停下来等用户审核。
     if (args.action === 'chainStart') {
@@ -441,6 +488,8 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       const existing = await previousChain(link);
       if (existing && ['running', 'review'].includes(chainStateOf(existing, await currentJob(existing)))) return { chain: chainView(existing, await currentJob(existing)) };
       const segments = await chainPlan(adapter, args.projectId, config);
+      // 已有成果的段不重复生成：整条链路一段要生成的都没有时直接说清，不新建记录、不提交。
+      if (!segments.some((segment: any) => !segment.skip)) throw new Error('画布上的视频段都已有成果，不需要再连拍；要重做某一段，点那个节点自己的「制作」。');
       // 内容与参数和上次完全一致时按同一条记录说话：已经生成过的段落不再重复提交费用。
       if (existing && chainSignature(existing.segments) === chainSignature(segments)) return { chain: chainView(existing, await currentJob(existing)) };
       const chain: any = { version: 1, id: randomUUID(), projectId: args.projectId, ...(args.canvasId ? { canvasId: args.canvasId } : {}),
@@ -474,7 +523,6 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       if (hash(config) !== chain.identity) throw new Error('插件配置已变，请重新预览连拍方案。');
       chain.carry = { videoUrl: job.media[0].url, seconds: job.plan.args.duration };
       chain.index += 1;
-      if (chain.index >= chain.segments.length) { chain.state = 'done'; chain.message = '全部段落都已有成果。'; await saveChain(chain); return { chain: chainView(chain, null), job: null }; }
       try { await runChainSegment(chain, config); }
       catch (error: any) { chain.state = 'stale'; chain.message = String(error?.message || '下一段未能开始。'); await saveChain(chain); throw error; }
       return { chain: chainView(chain, await currentJob(chain)) };

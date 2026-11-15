@@ -6,6 +6,7 @@ import { readProject, writeProject, lockProject, projectsOfSession, allProjects 
 import { ref } from '../config.js';
 import { loadCanvasAdapter, readCanvasInput, markCanvasChanged, resolveCanvasAdapter } from './canvas.js';
 import { builtinCanvasAdapter, BUILTIN_BACKEND } from './canvas-builtin.js';
+import { scriptStoryboardShots } from '../workflow/storyboard-shots.js';
 import { STAGE_LABELS, canvasSegmentStats, preserveCanvasConfirmations, sealedStageData, stageFacts, stageNodeId, stageNodeOwned, stageNodeRewriteable, stageSpot, stageSummary } from './canvas-stages.js';
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
@@ -17,39 +18,8 @@ async function adapterForNewCanvas(binding: any, load: any) {
   return builtinCanvasAdapter();
 }
 
-/** 提取真实剧本分镜表；没有明确的镜头/画面列时不编造镜头或秒数。 */
-export function scriptStoryboardShots(script: string) {
-  const lines = script.split(/\r?\n/), shots = [];
-  const cells = line => line.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/).map(s => s.trim().replace(/\\\|/g, '|'));
-  let fenced = false;
-  for (let i = 0; i < lines.length - 1; i++) {
-    if (/^\s*(```|~~~)/.test(lines[i])) { fenced = !fenced; continue; }
-    if (fenced || !lines[i].includes('|')) continue;
-    const header = cells(lines[i]), separator = cells(lines[i + 1]);
-    if (separator.length !== header.length || !separator.every(x => /^:?-{3,}:?$/.test(x))) continue;
-    const titleAt = header.findIndex(x => /镜号|镜头|shot/i.test(x));
-    const visualAt = header.findIndex(x => /画面|visual|详情|描述/i.test(x));
-    if (titleAt < 0 || visualAt < 0 || titleAt === visualAt) continue;
-    const timeAt = header.findIndex(x => /时间|时长|time|duration/i.test(x));
-    // 镜别与运镜分成两列时都要保留，按表头顺序拼成一段运镜说明。
-    const cameraAt = header.map((x, j) => (/景别|镜别|运镜|视角|camera|movement/i.test(x) ? j : -1)).filter(j => j >= 0);
-    const soundAt = header.findIndex(x => /声音|音效|sound|sfx/i.test(x));
-    const dialogueAt = header.findIndex(x => /台词|对白|dialogue/i.test(x));
-    for (i += 2; i < lines.length && lines[i].includes('|') && lines[i].trim(); i++) {
-      const row = cells(lines[i]);
-      if (row.length !== header.length || !row[visualAt]) continue;
-      const time = row[timeAt] || '', range = time.match(/(\d+(?:\.\d+)?)\s*(?:秒|s)?\s*[–—~～至-]\s*(\d+(?:\.\d+)?)/i);
-      const explicit = time.match(/^(\d+(?:\.\d+)?)\s*(?:秒|s)$/i);
-      const duration = range ? Number(range[2]) - Number(range[1]) : explicit ? Number(explicit[1]) : null;
-      shots.push({ title: row[titleAt], visual: header.map((h, j) => `${h}：${row[j]}`).join('\n'),
-        camera: cameraAt.map(j => row[j]).filter(Boolean).join(' · '), sfx: row[soundAt] || '',
-        dialogue: row[dialogueAt] ? [{ role: '剧本对白', line: row[dialogueAt] }] : [],
-        ...(duration > 0 ? { duration } : {}), metaonticTime: time });
-    }
-    i--;
-  }
-  return shots;
-}
+/** 分镜表解析搬去 workflow/storyboard-shots；这里转出，保持原有引用方与测试口径不变。 */
+export { scriptStoryboardShots };
 
 /** 剧本节点是纯文本预览；转换展示副本，原始脚本仍用于审核与分镜解析。 */
 export function canvasScriptPreview(script: string) {

@@ -195,6 +195,74 @@ test('连拍：可以中途停下，节点内容改动后不提交没核对过�
   s.dispose();
 });
 
+/** 画布上已有成果的段：连拍要跳过它，不重复生成也不重复计费。 */
+const made = (id, owner, at, url) => ({ id, type: 'video', metaonticSourceNode: owner, metaonticCreatedAt: at,
+  data: { assetId: `asset-${id}`, metaonticVideoUrl: url, metaonticSeconds: 15 } });
+
+test('连拍：已有成果的段跳过，只有没成果的段才提交并续拍上一段成果', async () => {
+  const { s, bodies, doc } = await chainService();
+  // 第 1 段已经在画布上单独「制作」过：连拍只补第 2 段，并以第 1 段的既有成果续拍。
+  doc.nodes.r1 = made('r1', 'a', 1, 'https://example.invalid/made1.mp4');
+  const plan = await s.handle({ action: 'chainPlan', projectId: 'p' });
+  assert.deepEqual(plan.segments.map(x => [x.index, x.skip === true, x.operation]), [[0, true, 'generate'], [1, false, 'extend']], '已有成果的段标成跳过，后面的段续拍');
+  assert.equal(plan.pending, 1, '方案只算本次要生成的段');
+  assert.equal(plan.segments[0].cny, null, '跳过的段不估价');
+  assert.equal(typeof plan.cny, 'number', '估价只算要生成的段');
+  const { chain } = await s.handle({ action: 'chainStart', projectId: 'p', confirmPlan: true, confirmCost: true });
+  assert.equal(chain.total, 2, '整条链路还是 2 段');
+  assert.equal(chain.pending, 1, '本次只生成 1 段');
+  assert.equal(chain.segments[0].skip, true);
+  const review = await waitChain(s, chain.id, 'review');
+  assert.equal(review.index, 1, '跳过段直接推进到第 2 段');
+  assert.equal(review.done, 1, '跳过的段算已完成');
+  assert.equal(bodies.length, 1, '跳过的段没有提交');
+  assert.ok(JSON.stringify(bodies[0]).includes('made1.mp4'), '续拍用既有成果当输入');
+  const done = await s.handle({ action: 'chainNext', id: chain.id, accept: true });
+  assert.equal(done.chain.state, 'done');
+  assert.equal(done.chain.done, 2);
+  assert.equal(bodies.length, 1, '没有重复调用模型');
+  s.dispose();
+});
+
+test('连拍：跑完再加一段，重排方案只生成新增的那一段', async () => {
+  const { s, bodies, doc } = await chainService();
+  // 前两段都已有成果，之后又在末尾加了一段：只有新增段要生成，既有段不重复计费。
+  doc.nodes.r1 = made('r1', 'a', 1, 'https://example.invalid/made1.mp4');
+  doc.nodes.r2 = made('r2', 'b', 2, 'https://example.invalid/made2.mp4');
+  doc.nodes.c = { id: 'c', type: 'video', x: 600, y: 680, w: 360, h: 300, data: { label: '第3段', prompt: '收在青土湖', ratio: '16:9', resolution: '720p', duration: 15 } };
+  doc.edges.push({ id: 'e3', fromNode: 's', toNode: 'c', fromPort: 'out', toPort: 'prompt' });
+  const plan = await s.handle({ action: 'chainPlan', projectId: 'p' });
+  assert.deepEqual(plan.segments.map(x => [x.index, x.skip === true]), [[0, true], [1, true], [2, false]], '只把新加的段排进本次生成');
+  assert.equal(plan.pending, 1);
+  const { chain } = await s.handle({ action: 'chainStart', projectId: 'p', confirmPlan: true, confirmCost: true });
+  await waitChain(s, chain.id, 'review');
+  assert.equal(bodies.length, 1, '只提交了新增的那一段');
+  assert.ok(JSON.stringify(bodies[0]).includes('made2.mp4'), '以第 2 段的既有成果续拍');
+  assert.ok(JSON.stringify(bodies[0]).includes('收在青土湖'), '提交的是新增段的内容');
+  s.dispose();
+});
+
+test('连拍：整条链路都已有成果时不启动，也不重复提交', async () => {
+  const { s, bodies, doc } = await chainService();
+  doc.nodes.r1 = made('r1', 'a', 1, 'https://example.invalid/made1.mp4');
+  doc.nodes.r2 = made('r2', 'b', 2, 'https://example.invalid/made2.mp4');
+  const plan = await s.handle({ action: 'chainPlan', projectId: 'p' });
+  assert.equal(plan.pending, 0);
+  assert.ok(plan.segments.every(x => x.skip === true));
+  await assert.rejects(() => s.handle({ action: 'chainStart', projectId: 'p', confirmPlan: true, confirmCost: true }), /不需要再连拍/);
+  assert.equal(bodies.length, 0, '没有提交任何生成');
+  s.dispose();
+});
+
+test('连拍：已有成果缺视频地址时停下说清，不静默重跑也不换直出', async () => {
+  const { s, bodies, doc } = await chainService();
+  doc.nodes.r1 = { id: 'r1', type: 'video', metaonticSourceNode: 'a', metaonticCreatedAt: 1, data: { assetId: 'asset-r1', metaonticSeconds: 15 } };
+  await assert.rejects(() => s.handle({ action: 'chainPlan', projectId: 'p' }), /没有可用的视频地址/);
+  await assert.rejects(() => s.handle({ action: 'chainStart', projectId: 'p', confirmPlan: true, confirmCost: true }), /没有可用的视频地址/);
+  assert.equal(bodies.length, 0);
+  s.dispose();
+});
+
 test('画布内 AI 写脚本：走文本模型一次，把段数与画幅带进提示词，失败原样报错', async () => {
   const briefs = [];
   const s = await service({ writeScript: async (_config, brief) => { briefs.push(brief); return { script: '# 片名\n\n| 镜头 | 画面 | 时长 | 台词 |\n| --- | --- | --- | --- |', model: 'deepseek v4.1 flash', usage: { promptTokens: 1, completionTokens: 2 } }; } });

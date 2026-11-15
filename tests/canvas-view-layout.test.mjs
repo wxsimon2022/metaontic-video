@@ -477,6 +477,40 @@ test('连拍：一次确认整条链路，逐段停下等审核，确认后才�
   mini.begin(); tree = FlowCanvas();
   assert.equal(slot(slot(tree, 'chain-modal'), 'next'), null, '停下后不再给出继续下一段');
 });
+test('连拍方案标出已有成果的段：只对要生成的段确认，全都有成果时说清不再启动', async () => {
+  const seg = (index, label, skip, operation) => ({ index, label, nodeId: `v${index + 1}`, skip, operation, seconds: 15, ratio: '16:9', resolution: '720p', prompt: `${label}的提示词`, cny: skip ? null : 0.6 });
+  const openChain = async plan => {
+    const { FlowCanvas, mini } = harness({
+      list: { canvases: [{ projectId: 'p1', name: '青旅宣传片', nodeCount: 2 }] },
+      get: { canvas: { projectId: 'p1', name: '青旅宣传片', dataRoot: '/tmp/canvas', nodes: {}, edges: [] } },
+    }, { info: { singleMax: 15, videoReady: true, textModel: 'x', textReady: true }, chainPlan: plan, chainStatus: { chain: null } });
+    mini.begin(); FlowCanvas();
+    await mini.flush();
+    mini.begin();
+    const ops = find(FlowCanvas(), (node) => node.props && node.props.key === 'ops');
+    find(ops, (node) => node.props && node.props.key === 'chain').props.onClick();
+    for (let i = 0; i < 40; i += 1) await new Promise((resolve) => setImmediate(resolve));
+    mini.begin();
+    return find(FlowCanvas(), (node) => node.props && node.props.key === 'chain-modal');
+  };
+  // 第 1 段已有成果：方案只对剩下的段确认，并在标题与那一行里写清跳过。
+  const modal = await openChain({ segments: [seg(0, '第1段', true, 'generate'), seg(1, '第2段', false, 'extend')], pending: 1, cny: 0.6, priceDate: '2026-01-01', identity: 'id-1', active: null });
+  const planText = texts(find(modal, (node) => node.props && node.props.key === 'plan')).join(' ');
+  assert.ok(planText.includes('本次生成 1 段'), `标题要写清本次只生成几段：${planText}`);
+  assert.ok(planText.includes('另有 1 段已有成果，跳过不重复生成'), `标题要点明跳过的段：${planText}`);
+  assert.ok(planText.includes('已有成果，本次跳过'), `跳过的段要单独标出来：${planText}`);
+  assert.ok(planText.includes('不重复生成、不重复计费') && planText.includes('已有成果的段不重复生成，也不重复计费'), '方案里要说明不重复计费');
+  const skipped = find(modal, (node) => node.props?.['data-skip']);
+  assert.ok(skipped, '跳过的段带上 data-skip，界面端可核对');
+  assert.ok(find(modal, (node) => node.props && node.props.key === 'start'), '还有要生成的段时仍给「确认并开始连拍」');
+  // 整条链路都已有成果：不给确认框与开跑按钮，改成一句说明。
+  const all = await openChain({ segments: [seg(0, '第1段', true, 'generate'), seg(1, '第2段', true, 'extend')], pending: 0, cny: 0, priceDate: null, identity: 'id-1', active: null });
+  const allText = texts(find(all, (node) => node.props && node.props.key === 'plan')).join(' ');
+  assert.ok(allText.includes('都已有成果，没有要生成的了'), `都要写清没有要生成的段：${allText}`);
+  assert.equal(find(all, (node) => node.props && node.props.key === 'start'), null, '没有要生成的段就不给开跑按钮');
+  assert.equal(find(all, (node) => node.props && node.props.key === 'confirms'), null, '没有要生成的段就不给费用确认框');
+  assert.ok(texts(all).some((line) => line.includes('不需要再连拍')), '要说明去哪重做单段');
+});
 test('工具条给出流程主行动与进度，未完成节点标虚线框', async () => {
   const { FlowCanvas, mini } = harness({
     list: { canvases: [{ projectId: 'p1', name: '青旅宣传片', nodeCount: 2 }] },
