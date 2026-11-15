@@ -81,6 +81,10 @@ stages:
           - 'if [ -z "$PY" ]; then echo "构建机没有可用的 Python3，尝试安装"; export DEBIAN_FRONTEND=noninteractive; if command -v yum >/dev/null 2>&1; then yum install -y -q python3 || true; elif command -v dnf >/dev/null 2>&1; then dnf install -y -q python3 || true; elif command -v apt-get >/dev/null 2>&1; then apt-get update -qq || true; apt-get install -y -qq python3 || true; fi; PY=$(command -v python3 2>/dev/null); fi'
           - '[ -n "$PY" ] || { echo "需要 Python3 裁剪成品介绍文档"; exit 1; }; "$PY" scripts/strip-package-readme.py "$TGZ"'
           - 'ls -l dist'
+          # 正式版标签触发时，流水线自己把这次成品发布成 Gitee Release（幂等：已存在同大小附件只核对不覆盖）；
+          # ci- 演练标签与分支运行只出制品，不发布。令牌来自流水线变量 GITEE_TOKEN（或 TOKEN_GITEE 等别名），不写在这一文件里。
+          - 'echo "发布检查：TAG=${TAG:-无}"'
+          - 'if [ -n "$TAG" ] && [ "${TAG#v}" != "$TAG" ]; then node scripts/ci-release.mjs --dist dist --tag "$TAG"; else echo "本次不是正式版标签，只出制品、不发布 Release"; fi'
         artifacts:
           - name: PLUGIN_PACKAGE
             path:
