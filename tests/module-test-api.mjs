@@ -14,6 +14,7 @@ export * from './src/businesses/video/integrations/canvas-native.ts';
 export * from './src/businesses/video/integrations/canvas.ts';
 export * from './src/businesses/video/integrations/canvas-project.ts';
 export * from './src/businesses/video/integrations/canvas-builtin.ts';
+export * from './src/businesses/video/integrations/canvas-stages.ts';
 export * from './src/businesses/video/providers/text.ts';
 export {projectTool} from './src/businesses/video/tools/video-project.ts';
 export {createProject,writeProject,readProject} from './src/businesses/video/workflow/project.ts';

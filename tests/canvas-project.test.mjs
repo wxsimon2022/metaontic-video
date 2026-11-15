@@ -24,12 +24,30 @@ test('创作项目自动建图、恢复审核材料、自动回填且不改变�
   const sync=api.createCanvasProjectSync(async()=>adapter,{canvasEnabled:true, autoCreateCanvas:true});
   const wrapped=sync.wrapProject({execute:async()=>({projectId:project.id,status:'prepared'})});
   assert.equal((await wrapped.execute({action:'prepare'},exec)).canvasProject.status,'synced');
+  // 需求确认后立刻铺出整条流程阶段卡：需求已完成，脚本还没同步。
+  const stageOf=key=>Object.values(doc.nodes).find(n=>n?.data?.metaonticStage===key);
+  assert.deepEqual(api.STAGE_KEYS.map(key=>Boolean(stageOf(key))),api.STAGE_KEYS.map(()=>true),'七个阶段卡都要铺出来');
+  assert.equal(stageOf('requirement').data.metaonticStageState,'done');
+  assert.match(stageOf('requirement').data.text,/目标时长：30 秒/);
+  assert.equal(stageOf('script').data.metaonticStageState,'pending');
+  // 用户先在画布上确认了脚本审核，这时助手侧的创作项目还没审核：同步不得把这份审核回退。
+  const cardFacts={...stageOf('script').data.metaonticStageFacts,scriptApproved:true};
+  Object.assign(doc.nodes[stageOf('script').id].data,api.sealedStageData('script','done','剧本：已同步\n审核：已通过',cardFacts));
+  await sync.sync(project.id,exec);
+  assert.equal(stageOf('script').data.metaonticStageState,'done','画布上的脚本审核不被助手侧同步回退');
+  assert.match(stageOf('script').data.text,/审核：已通过/);
   const spec={prompt:'日出到黄昏',segmentPrompts:['日出','黄昏'],duration:30,ratio:'9:16',resolution:'720p'};
   const scriptPath=path.join(root,'剧本.md');await writeFile(scriptPath,'# 完整剧本\n| 镜头 | 时间 | 画面 | 声音 |\n| --- | --- | --- | --- |\n| 镜头1 | 0–7秒 | 日出 | 海浪 |\n| 镜头2 | 7–15秒 | 船 | 风声 |\n| 镜头3 | 15–22秒 | 沙滩 | 脚步 |\n| 镜头4 | 22–30秒 | 黄昏 | 海浪 |');
   const saved=await api.readProject(project.id,exec);saved.approved={scriptPath,specification:spec};await api.writeProject(saved);
   await sync.sync(project.id,exec);
   assert.equal(creates,1);assert.equal(Object.values(doc.nodes).filter(n=>n.type==='storyboard').length,1);
   assert.equal(Object.values(doc.nodes).find(n=>n.type==='storyboard').data.shots.length,4);
+  // 脚本审核通过后：脚本已完成、费用进行中、逐段制作按分镜表铺出的两段待生成。
+  assert.equal(stageOf('script').data.metaonticStageState,'done');
+  assert.equal(stageOf('cost').data.metaonticStageState,'active');
+  assert.equal(stageOf('segments').data.metaonticStageState,'active');
+  assert.equal(stageOf('segments').data.text,'制作段：2 段\n已完成：0 段');
+  assert.equal(stageOf('film').data.metaonticStageState,'pending');
   await sync.sync(project.id,exec);assert.equal(creates,1);
   assert.equal(doc.edges.length,2);
   // 宿主 projectsPut 不产生「文档已变更」信号（画布端只补节点、不补连线）→ 保存后必须补一次幂等连线确认。

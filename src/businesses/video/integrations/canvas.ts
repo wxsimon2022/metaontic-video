@@ -22,6 +22,7 @@ import path from 'node:path';
 import { dshHome } from '../../../core/paths.js';
 import { DATA_DIR, PLUGIN_ID } from '../../../core/hardcoded-config.js';
 import { builtinCanvasAdapter, builtinCanvasExists, builtinCanvasList } from './canvas-builtin.js';
+import { refreshStageNodes } from './canvas-stages.js';
 import { readProject, sessionOwner } from '../workflow/project.js';
 import { mediaPreviewMeta } from '../workflow/media-preview.js';
 import { videoResultState } from '../workflow/result-state.js';
@@ -55,9 +56,21 @@ export async function readCanvasInput(adapter, link) {
     for (const e of doc.edges || []) if (e.toNode === id && doc.nodes[e.fromNode]) visit(e.fromNode);
   };
   visit(link.nodeId);
+  // 节点自己没有 assetId 时用它的最新成果：画布内的成果是独立节点（来源节点只靠 metaonticSourceNode 指回），
+  // 不解析的话，接在上游的「画面」/「参考图」节点在制作时会找不到素材而报错。
+  const latest = new Map<string, { assetId: string; createdAt: number }>();
+  for (const item of Object.values(doc.nodes || {}) as any[]) {
+    const owner = String(item?.metaonticSourceNode || ''), assetId = String(item?.data?.assetId || '');
+    if (!owner || !assetId) continue;
+    const createdAt = Number(item?.metaonticCreatedAt || 0);
+    if (!latest.has(owner) || createdAt >= latest.get(owner)!.createdAt) latest.set(owner, { assetId, createdAt });
+  }
   const nodes = [...ids].map(id => {
     const n = doc.nodes[id], d = n.data || {};
-    return { id, type: n.type, label: d.label || '', text: d.text || '', prompt: d.prompt || '', idea: d.idea || '', output: d.output || '', script: d.script || '', requirement: d.requirement || '', shots: d.shots || [], assetId: d.assetId || '', ratio: d.ratio || '', duration: d.duration ?? null, resolution: d.resolution || '', refOrder: d.refOrder || [],
+    // 目标节点自己的成果不能回算成它的输入：成果是它生成出来的东西，拿回来当参考只会让自己认得自己，
+    // 还会在成果回填后把审核指纹改掉。上游节点才回溯最新成果（画面/参考图出图后接给下游当首帧）。
+    const upstreamResult = id === link.nodeId ? '' : latest.get(id)?.assetId || '';
+    return { id, type: n.type, label: d.label || '', text: d.text || '', prompt: d.prompt || '', idea: d.idea || '', output: d.output || '', script: d.script || '', requirement: d.requirement || '', shots: d.shots || [], assetId: String(d.assetId || upstreamResult || ''), ratio: d.ratio || '', duration: d.duration ?? null, resolution: d.resolution || '', refOrder: d.refOrder || [],
       imageCount: d.imageCount ?? 1, imgExtra: d.imgExtra || '', vidExtra: d.vidExtra || '', frameMode: d.frameMode || 'auto', segShotFrom: d.segShotFrom ?? null, segShotTo: d.segShotTo ?? null,
       metaonticTaskId: d.metaonticTaskId || '', metaonticVideoUrl: d.metaonticVideoUrl || '', metaonticSeconds: d.metaonticSeconds ?? null };
   });
@@ -158,7 +171,9 @@ export async function publishCanvasResult(adapter, record) {
   // 媒体之间没有兼容的提示词端口，清理旧版本创建的成果关系线；同时记墓碑，让画布端删掉缓存里的旧线。
   const removedEdges: string[] = [];
   for (let i = edges.length - 1; i >= 0; i--) if (edges[i].fromNode === source.id && edges[i].id.startsWith('mov_edge_') && ['image', 'video'].includes(source.type)) { removedEdges.push(edges[i].id); edges.splice(i, 1); }
-  const saved = await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes, edges, ts: Date.now(),
+  // 成果回来后按画布内容刷新流程阶段条：只改插件自己写的阶段节点，用户改过的保留。
+  const staged = refreshStageNodes({ ...doc, nodes });
+  const saved = await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes: staged.nodes, edges, ts: Date.now(),
     ...(removedEdges.length ? { edgeTombstones: [...new Set([...(doc.edgeTombstones || []), ...removedEdges])] } : {}) } });
   if (saved?.ok === false || saved?.deleted) throw new Error('画布已删除或回填失败');
   await markCanvasChanged(adapter, loc.id, [...edges.filter((e: any) => e.id.startsWith('mov_edge_')), ...edges]);

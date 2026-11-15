@@ -5305,6 +5305,179 @@ function registerBuiltinCanvas(ctx) {
   });
 }
 
+// src/businesses/video/integrations/canvas-stages.ts
+var STAGE_REV = 2;
+var STAGE_KEYS = ["requirement", "script", "storyboard", "assets", "cost", "segments", "film"];
+var STAGE_LABELS = {
+  requirement: "\u2460 \u9700\u6C42\u786E\u8BA4",
+  script: "\u2461 \u811A\u672C\u5BA1\u6838",
+  storyboard: "\u2462 \u5206\u955C\u786E\u8BA4",
+  assets: "\u2463 \u7D20\u6750\u51C6\u5907",
+  cost: "\u2464 \u8D39\u7528\u786E\u8BA4",
+  segments: "\u2465 \u9010\u6BB5\u5236\u4F5C",
+  film: "\u2466 \u5408\u6210\u6210\u7247"
+};
+function stageNodeId(prefix, key) {
+  return `${prefix}_stage_${key}`;
+}
+function stageSpot(index) {
+  return { x: 40 + index * 400, y: -340, w: 340, h: 180 };
+}
+function stageSeal(label, text, state, facts) {
+  const source = JSON.stringify([label, text, state, facts]);
+  let hash4 = 2166136261;
+  for (let i = 0; i < source.length; i++) {
+    hash4 ^= source.charCodeAt(i);
+    hash4 = Math.imul(hash4, 16777619) >>> 0;
+  }
+  return hash4.toString(16).padStart(8, "0");
+}
+function sealedStageData(key, state, text, facts) {
+  const label = STAGE_LABELS[key] || key;
+  return {
+    label,
+    text,
+    status: state === "done" ? "done" : "idle",
+    metaonticStage: key,
+    metaonticStageState: state,
+    metaonticStageRev: STAGE_REV,
+    metaonticStageFacts: facts || {},
+    metaonticStageSeal: stageSeal(label, text, state, facts || {})
+  };
+}
+function stageNodeOwned(node) {
+  const data = node?.data;
+  return Boolean(data?.metaonticStage) && Number(data.metaonticStageRev) === STAGE_REV && data.metaonticStageSeal === stageSeal(data.label, data.text, data.metaonticStageState, data.metaonticStageFacts || {});
+}
+function stageNodeRewriteable(node) {
+  if (!node?.data?.metaonticStage) return false;
+  return stageNodeOwned(node) || Number(node.data.metaonticStageRev) !== STAGE_REV;
+}
+var MATERIAL_MARK = "metaonticMaterial";
+var FRAME_MARK = "metaonticFrameOf";
+function flowAuthors(doc) {
+  return Object.values(doc?.nodes || {}).filter((node) => ["image", "video"].includes(node?.type) && !node?.metaonticSourceNode && !node?.data?.assetId && !node?.data?.[MATERIAL_MARK]);
+}
+function canvasSegments(doc) {
+  return flowAuthors(doc).filter((node) => !node?.data?.[FRAME_MARK]);
+}
+function canvasAssets(doc) {
+  return Object.values(doc?.nodes || {}).filter((node) => node?.type === "image" && Boolean(node?.data?.assetId || node?.metaonticSourceNode));
+}
+function canvasAssetLinks(doc) {
+  const edges = Array.isArray(doc?.edges) ? doc.edges : [];
+  const segments = new Set(canvasSegments(doc).map((node) => String(node.id)));
+  const feeds = (id) => [...new Set(edges.filter((edge) => String(edge?.fromNode || "") === id && segments.has(String(edge?.toNode || ""))).map((edge) => String(edge.toNode)))];
+  return canvasAssets(doc).map((node) => {
+    const explicit = String(node?.data?.metaonticSegmentOf || "");
+    const owner = String(node?.metaonticSourceNode || "");
+    const serving = segments.has(explicit) ? [explicit] : feeds(owner || String(node.id));
+    return { nodeId: String(node.id), label: String(node?.data?.label || "\u7D20\u6750\u56FE"), segments: serving };
+  });
+}
+function canvasSegmentStats(doc) {
+  const nodes = Object.values(doc?.nodes || {});
+  const authors = new Set(canvasSegments(doc).map((node) => node.id));
+  const produced = nodes.filter((node) => authors.has(node?.metaonticSourceNode) && (node?.data?.assetId || node?.data?.metaonticVideoUrl)).length;
+  const shots = nodes.filter((node) => node?.type === "storyboard").reduce((sum, node) => sum + (Array.isArray(node?.data?.shots) ? node.data.shots.length : 0), 0);
+  const links = canvasAssetLinks(doc);
+  return {
+    total: authors.size,
+    produced,
+    shots,
+    assets: links.length,
+    assetsBound: links.filter((link) => link.segments.length).length,
+    assetsOrphan: links.filter((link) => !link.segments.length).length,
+    filmReady: Boolean(doc?.film?.assetId),
+    filmCount: Number(doc?.film?.count || 0)
+  };
+}
+var CHOICE_TEXT = {
+  not_needed: "\u4E0D\u9700\u8981\u89D2\u8272\u56FE",
+  provided_images: "\u4F7F\u7528\u5DF2\u6709\u89D2\u8272\u56FE",
+  generate_first: "\u5148\u751F\u6210\u89D2\u8272\u56FE\u518D\u5236\u4F5C",
+  text_only: "\u7EAF\u6587\u672C\u751F\u6210"
+};
+function stageSummary(facts = {}, stats = {}) {
+  const duration = Number.isFinite(Number(facts.duration)) && facts.duration !== null && facts.duration !== void 0 ? Number(facts.duration) : null;
+  const produced = Number(stats.produced || 0), total = Math.max(Number(facts.segmentTotal || 0), Number(stats.total || 0));
+  const shots = Number(stats.shots || 0), assets = Number(stats.assets || 0);
+  const choice = CHOICE_TEXT[facts.choice] || facts.choice || "\u5F85\u786E\u8BA4";
+  const requirementText = [
+    `\u76EE\u6807\u65F6\u957F\uFF1A${duration === null ? "\u5F85\u786E\u8BA4" : `${duration} \u79D2`}`,
+    `\u753B\u5E45\uFF1A${facts.ratio || "\u5F85\u786E\u8BA4"}`,
+    `\u6E05\u6670\u5EA6\uFF1A${String(facts.resolution || "\u5F85\u786E\u8BA4").toUpperCase()}`,
+    `\u89D2\u8272\u56FE\u8DEF\u7EBF\uFF1A${choice}`
+  ].join("\n");
+  const scriptText = [
+    `\u5267\u672C\uFF1A${facts.scriptDrafted || facts.scriptApproved ? "\u5DF2\u540C\u6B65" : "\u672A\u5F00\u59CB"}`,
+    `\u5BA1\u6838\uFF1A${facts.scriptApproved ? "\u5DF2\u901A\u8FC7" : facts.scriptDrafted ? "\u7B49\u5F85\u7528\u6237\u5BA1\u6838" : "\u672A\u5F00\u59CB"}`
+  ].join("\n");
+  const storyboardText = shots > 0 ? [`\u5206\u955C\uFF1A${shots} \u4E2A\u955C\u5934`, `\u6BCF\u6BB5\u63D0\u793A\u8BCD\u89C1\u5236\u4F5C\u8282\u70B9`].join("\n") : total > 0 ? [`\u5206\u955C\uFF1A\u6309\u573A\u666F\u4E0E\u53E5\u5B50\u5207\u6BB5\uFF0C\u5171 ${total} \u6BB5`, `\u6BCF\u6BB5\u63D0\u793A\u8BCD\u89C1\u5236\u4F5C\u8282\u70B9`].join("\n") : "\u8FD8\u6CA1\u6709\u5206\u955C\uFF1A\u5148\u5199\u811A\u672C\u5E76\u786E\u8BA4\u5BA1\u6838\uFF0C\u518D\u6309\u5206\u955C\u8868\u6216\u53E5\u5B50\u5207\u6BB5\u3002";
+  const bound = Number.isFinite(Number(stats.assetsBound)) ? Number(stats.assetsBound) : assets;
+  const assetsText = [
+    `\u89D2\u8272\u56FE\u8DEF\u7EBF\uFF1A${choice}`,
+    `\u7D20\u6750\u56FE\uFF1A${assets} \u5F20\uFF08\u89D2\u8272\u56FE / \u9996\u5E27 / \u53C2\u8003\u56FE\uFF09${assets > bound ? `\uFF0C\u5176\u4E2D ${assets - bound} \u5F20\u8FD8\u6CA1\u63A5\u5230\u5236\u4F5C\u6BB5` : ""}`
+  ].join("\n");
+  const costText = [
+    `\u5236\u4F5C\u65B9\u6848\uFF1A${facts.specApproved ? "\u5DF2\u5BA1\u6838" : "\u672A\u4EA7\u51FA"}`,
+    `\u8D39\u7528\uFF1A${produced > 0 ? "\u5DF2\u786E\u8BA4\uFF08\u5DF2\u6709\u751F\u6210\u8BB0\u5F55\uFF09" : "\u751F\u6210\u524D\u4ECD\u8981\u5355\u72EC\u786E\u8BA4"}`
+  ].join("\n");
+  const segmentsText = total > 0 ? [`\u5236\u4F5C\u6BB5\uFF1A${total} \u6BB5`, `\u5DF2\u5B8C\u6210\uFF1A${Math.min(produced, total)} \u6BB5`].join("\n") : "\u6682\u65E0\u5236\u4F5C\u6BB5\uFF1A\u5148\u5728\u753B\u5E03\u4E0A\u5199\u811A\u672C\u3001\u786E\u8BA4\u811A\u672C\u5BA1\u6838\u4E0E\u5236\u4F5C\u65B9\u6848\u3002";
+  const filmText = stats.filmReady ? `\u5DF2\u5408\u6210\u6210\u7247\uFF08${Number(stats.filmCount || 0)} \u6BB5\uFF09` : total > 0 && produced >= total ? "\u6BCF\u6BB5\u90FD\u6709\u6210\u679C\uFF0C\u53EF\u4EE5\u70B9\u300C\u5408\u6210\u6210\u7247\u300D" : "\u7B49\u5F85\u6BCF\u6BB5\u90FD\u4EA7\u51FA\u6210\u679C";
+  const needsAssets = !["not_needed", "text_only"].includes(String(facts.choice || ""));
+  const state = {
+    requirement: { state: facts.requirementSettled ? "done" : "active", text: requirementText },
+    script: { state: facts.scriptApproved ? "done" : facts.scriptDrafted ? "review" : "pending", text: scriptText },
+    storyboard: { state: shots > 0 || total > 0 ? "done" : facts.scriptApproved ? "active" : "pending", text: storyboardText },
+    assets: { state: !needsAssets || assets > 0 ? "done" : facts.requirementSettled ? "active" : "pending", text: assetsText },
+    cost: { state: produced > 0 ? "done" : facts.specApproved ? "active" : "pending", text: costText },
+    segments: { state: total > 0 && produced >= total ? "done" : produced > 0 || total > 0 ? "active" : "pending", text: segmentsText },
+    film: { state: stats.filmReady ? "done" : total > 0 && produced >= total ? "ready" : "pending", text: filmText }
+  };
+  return STAGE_KEYS.map((key) => ({ key, ...state[key] }));
+}
+function stageFacts(project, specification, drafted, segmentTotal) {
+  const duration = Number(project?.duration);
+  return {
+    requirementSettled: Boolean(project?.subjectType) && Number.isFinite(duration),
+    duration: Number.isFinite(duration) ? duration : null,
+    choice: project?.choice || "",
+    ratio: specification?.ratio || "",
+    resolution: specification?.resolution || "",
+    scriptDrafted: Boolean(drafted),
+    scriptApproved: Boolean(project?.approved),
+    specApproved: Boolean(specification),
+    segmentTotal: Number(segmentTotal || 0)
+  };
+}
+function rewriteStageNodes(doc, patch = {}) {
+  const nodes = { ...doc?.nodes || {} };
+  const ids = Object.keys(nodes).filter((id) => nodes[id]?.data?.metaonticStage);
+  if (!ids.length) return { nodes, changed: [] };
+  const stats = canvasSegmentStats({ ...doc, nodes });
+  const changed = [];
+  for (const id of ids) {
+    const node = nodes[id];
+    if (!stageNodeRewriteable(node) || !node.data.metaonticStageFacts) continue;
+    const facts = { ...node.data.metaonticStageFacts || {}, ...patch };
+    const key = String(node.data.metaonticStage);
+    const found = stageSummary(facts, stats).find((stage) => stage.key === key);
+    if (!found) continue;
+    const data = sealedStageData(key, found.state, found.text, facts);
+    if (JSON.stringify(data) === JSON.stringify(node.data)) continue;
+    nodes[id] = { ...node, data };
+    changed.push(id);
+  }
+  return { nodes, changed };
+}
+function refreshStageNodes(doc) {
+  return rewriteStageNodes(doc, {});
+}
+function preserveCanvasConfirmations(prev, next) {
+  return prev?.scriptApproved === true && next?.scriptApproved !== true ? { ...next, scriptApproved: true } : next;
+}
+
 // src/businesses/video/media/download.ts
 import { mkdir as mkdir10, rename as rename8, rm as rm7 } from "node:fs/promises";
 import path17 from "node:path";
@@ -5393,8 +5566,16 @@ async function readCanvasInput(adapter, link) {
     for (const e of doc.edges || []) if (e.toNode === id && doc.nodes[e.fromNode]) visit(e.fromNode);
   };
   visit(link.nodeId);
+  const latest = /* @__PURE__ */ new Map();
+  for (const item of Object.values(doc.nodes || {})) {
+    const owner = String(item?.metaonticSourceNode || ""), assetId = String(item?.data?.assetId || "");
+    if (!owner || !assetId) continue;
+    const createdAt = Number(item?.metaonticCreatedAt || 0);
+    if (!latest.has(owner) || createdAt >= latest.get(owner).createdAt) latest.set(owner, { assetId, createdAt });
+  }
   const nodes = [...ids].map((id) => {
     const n = doc.nodes[id], d = n.data || {};
+    const upstreamResult = id === link.nodeId ? "" : latest.get(id)?.assetId || "";
     return {
       id,
       type: n.type,
@@ -5406,7 +5587,7 @@ async function readCanvasInput(adapter, link) {
       script: d.script || "",
       requirement: d.requirement || "",
       shots: d.shots || [],
-      assetId: d.assetId || "",
+      assetId: String(d.assetId || upstreamResult || ""),
       ratio: d.ratio || "",
       duration: d.duration ?? null,
       resolution: d.resolution || "",
@@ -5554,9 +5735,10 @@ async function publishCanvasResult(adapter, record) {
     removedEdges.push(edges[i].id);
     edges.splice(i, 1);
   }
+  const staged = refreshStageNodes({ ...doc, nodes });
   const saved = await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: {
     ...doc,
-    nodes,
+    nodes: staged.nodes,
     edges,
     ts: Date.now(),
     ...removedEdges.length ? { edgeTombstones: [.../* @__PURE__ */ new Set([...doc.edgeTombstones || [], ...removedEdges])] } : {}
@@ -5772,7 +5954,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
       const ensuredEdges = [], removedEdges = [];
       const managed = { ...binding.nodes }, managedEdges = { ...binding.links || {} };
       const deleted = new Set(doc.tombstones || []), edgeDeleted = new Set(doc.edgeTombstones || []);
-      const add = (key, type, label, x, y, data) => {
+      const add = (key, type, label, x, y, data, size = null) => {
         const id = `${prefix}_${key}`;
         if (deleted.has(id)) throw new Error("\u81EA\u52A8\u8282\u70B9\u5DF2\u88AB\u5220\u9664\uFF0C\u4E0D\u4F1A\u81EA\u52A8\u590D\u6D3B\uFF1B\u8BF7\u5728\u9879\u76EE\u4E2D\u660E\u786E\u9009\u62E9\u65B0\u7684\u753B\u5E03\u7ED1\u5B9A\u3002");
         const previous = nodes[id];
@@ -5780,8 +5962,9 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
           const initial = { label: "\u5B8C\u6574\u5267\u672C", idea: "\u7531MetaOnticVideo\u521B\u4F5C\u9879\u76EE\u540C\u6B65", output: "", status: "idle", metaonticProjectId: project.id };
           if (JSON.stringify(previous.data) === JSON.stringify(initial)) managed[id] = digest2({ type: previous.type, data: previous.data });
         }
-        if (previous && (!managed[id] || digest2({ type: previous.type, data: previous.data }) !== managed[id])) throw new Error("\u81EA\u52A8\u8282\u70B9\u5DF2\u5728\u753B\u5E03\u4E2D\u4FEE\u6539\uFF0C\u4FDD\u7559\u4F60\u7684\u7F16\u8F91\uFF1B\u8BF7\u5148\u5904\u7406\u5DEE\u5F02\u518D\u540C\u6B65\u3002");
-        const next = { ...previous || { id, x, y, w: type === "script" ? 420 : 360, h: 280 }, type, data };
+        const pluginOwnedStage = Boolean(previous?.data?.metaonticStage) && stageNodeOwned(previous);
+        if (previous && !pluginOwnedStage && (!managed[id] || digest2({ type: previous.type, data: previous.data }) !== managed[id])) throw new Error("\u81EA\u52A8\u8282\u70B9\u5DF2\u5728\u753B\u5E03\u4E2D\u4FEE\u6539\uFF0C\u4FDD\u7559\u4F60\u7684\u7F16\u8F91\uFF1B\u8BF7\u5148\u5904\u7406\u5DEE\u5F02\u518D\u540C\u6B65\u3002");
+        const next = { ...previous || { id, x, y, w: size?.w ?? (type === "script" ? 420 : 360), h: size?.h ?? 280 }, type, data };
         const oldX = key === "production" ? 1550 : key.startsWith("segment_") ? 1050 : null;
         const oldY = key === "production" ? 60 : key.startsWith("segment_") ? 60 + (Number(key.slice(8)) - 1) * 320 : null;
         if (previous && previous.x === oldX && previous.y === oldY && previous.w === 360 && previous.h === 280) {
@@ -5851,6 +6034,26 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
         connect(board, production);
       } else if (!nodes[nodeId]) {
         nodeId = source;
+      }
+      const facts = preserveCanvasConfirmations(
+        nodes[stageNodeId(prefix, "script")]?.data?.metaonticStageFacts,
+        stageFacts(project, specification, Boolean(draft.scriptPath || script), specification ? Math.max(1, specification.segmentPrompts?.length || 0) : 0)
+      );
+      const stats = canvasSegmentStats({ ...doc, nodes });
+      for (const [index, stage] of stageSummary(facts, stats).entries()) {
+        const id = stageNodeId(prefix, stage.key);
+        if (nodes[id] && !stageNodeRewriteable(nodes[id])) continue;
+        if (deleted.has(id)) continue;
+        const spot = stageSpot(index);
+        add(
+          `stage_${stage.key}`,
+          "text",
+          STAGE_LABELS[stage.key],
+          spot.x,
+          spot.y,
+          { ...sealedStageData(stage.key, stage.state, stage.text, facts), metaonticProjectId: project.id },
+          spot
+        );
       }
       const currentName = String(doc.name || "").trim();
       const canvasName = conversationName && pluginNamedCanvas(binding, currentName, conversationName) ? conversationName : currentName;
@@ -7248,7 +7451,7 @@ function planCanvasNative(input, config, operation = "generate", draft = {}, car
   const images = refs.map((e) => {
     if (!["ref", "frame"].includes(e.toPort) || e.fromPort !== "out") throw new Error("\u5F53\u524D\u4EC5\u652F\u6301\u56FE\u7247out\u8FDE\u63A5ref/\u9996\u5E27\u53E3\uFF1B\u5C3E\u5E27\u9009\u53D6\u7B49\u8FDE\u63A5\u8BF7\u5148\u5BFC\u51FA\u4E3A\u56FE\u7247\u8282\u70B9\u3002");
     const media = input.references.find((r) => r.nodeId === e.fromNode);
-    if (!media || media.kind !== "image") throw new Error("\u53C2\u8003\u7AEF\u53E3\u9700\u8981\u5DF2\u4FDD\u5B58\u7684\u56FE\u7247\u7D20\u6750\u3002");
+    if (!media || media.kind !== "image") throw new Error("\u53C2\u8003\u7AEF\u53E3\u8FDE\u7684\u4E0A\u6E38\u8282\u70B9\u8FD8\u6CA1\u6709\u751F\u6210\u597D\u7684\u56FE\u7247\uFF1A\u5148\u5728\u5B83\u81EA\u5DF1\u7684\u300C\u5236\u4F5C\u300D\u91CC\u51FA\u4E00\u5F20\u56FE\uFF0C\u518D\u56DE\u6765\u505A\u8FD9\u4E00\u6B65\u3002");
     return { port: e.toPort, path: media.path, nodeId: e.fromNode };
   });
   if (node.frameMode === "off" && images.some((x) => x.port === "frame")) throw new Error("\u9996\u5E27\u7AEF\u53E3\u5DF2\u8FDE\u63A5\u4F46\u8282\u70B9\u5173\u95ED\u4E86\u9996\u5E27\uFF0C\u8BF7\u5148\u7EDF\u4E00\u8BBE\u7F6E\u3002");
@@ -7367,7 +7570,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
     const doc = await adapter.rpc.projectsGet({ id: projectId });
     if (!doc?.nodes) throw new Error("\u753B\u5E03\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");
     const order = pendingVideoOrder(doc);
-    if (!order.length) throw new Error("\u753B\u5E03\u4E0A\u6CA1\u6709\u5F85\u5236\u4F5C\u7684\u89C6\u9891\u8282\u70B9\uFF1A\u5148\u70B9\u300C\u5199\u811A\u672C\u2026\u300D\u94FA\u5F00\uFF0C\u6216\u65B0\u5EFA\u4E00\u4E2A\u89C6\u9891\u8282\u70B9\u3002");
+    if (!order.length) throw new Error("\u753B\u5E03\u4E0A\u6CA1\u6709\u5F85\u5236\u4F5C\u7684\u89C6\u9891\u8282\u70B9\uFF1A\u70B9\u753B\u5E03\u7A7A\u767D\u5904\u6253\u5F00\u300C\u521B\u4F5C\u6D41\u7A0B\u300D\u94FA\u5F00\u6574\u6761\u6D41\u7A0B\uFF0C\u6216\u65B0\u5EFA\u4E00\u4E2A\u89C6\u9891\u8282\u70B9\u3002");
     const segments = [];
     let carry = null;
     for (const [index, node] of order.entries()) {
@@ -7588,7 +7791,8 @@ function createCanvasNativeService(liveConfig, options = {}) {
       stored: "disk",
       source: "metaontic-video"
     } });
-    await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, film, ts: Date.now() } });
+    const staged = refreshStageNodes({ ...doc, film });
+    await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, film, nodes: staged.nodes, ts: Date.now() } });
     return { ok: true, film: { ...film, url: mediaUrl(id) } };
   }
   async function handle(args) {
@@ -9404,7 +9608,7 @@ function buildPromptGuidance(config) {
   return [
     `\xB7 \u5F53\u524D\u6D41\u7A0B\u753B\u5E03\uFF1A${canvasOn ? `\u5F00\u542F\uFF1B\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\uFF1A${autoCreate ? "\u5F00\u542F" : "\u5173\u95ED"}` : "\u5173\u95ED\uFF08\u9ED8\u8BA4\u5173\u95ED\uFF0C\u53EF\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u6253\u5F00\uFF09"}\u3002\u8FD9\u4E24\u4E2A\u5F00\u5173\u53EA\u80FD\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u4FEE\u6539\uFF0Cvideo_config\u53EF\u53EA\u8BFB\u6838\u5BF9\u3002`,
     "\xB7 \u6D41\u7A0B\u753B\u5E03\u662F\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF08\u5DE6\u4FA7\u680F\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u90A3\u4E00\u884C\u6253\u5F00\u72EC\u7ACB\u9875\u9762\uFF0C\u89C6\u9891\u521B\u4F5C\u9762\u677F\u91CC\u4E0D\u518D\u5185\u5D4C\uFF09\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u4EFB\u4F55\u7B2C\u4E09\u65B9\u753B\u5E03\u63D2\u4EF6\uFF1B\u6309\u5F53\u524D\u5F00\u5173\u51B3\u5B9A\u662F\u5426\u81EA\u52A8\u6295\u5F71\u3002" + (!canvasOn ? "\u5F53\u524D\u6D41\u7A0B\u753B\u5E03\u5173\u95ED\uFF1A\u5DE6\u4FA7\u680F\u6CA1\u6709\u753B\u5E03\u5165\u53E3\uFF0C\u4E0D\u8981\u81EA\u52A8\u5EFA\u56FE\u3001\u4E0D\u8981\u81EA\u52A8\u540C\u6B65\uFF0C\u4E5F\u4E0D\u8981\u5BF9\u7528\u6237\u8BF4\u5DF2\u7ECF\u5EFA\u597D\u6216\u6253\u5F00\u4E86\u6D41\u7A0B\u753B\u5E03\uFF1B\u7528\u6237\u8981\u7528\u753B\u5E03\u65F6\u5148\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u6253\u5F00\u300C\u6D41\u7A0B\u753B\u5E03\u300D\uFF0C\u518D\u6309\u4E0B\u9762\u7684\u753B\u5E03\u8054\u52A8\u89C4\u5219\u624B\u52A8\u5904\u7406\u3002" : autoCreate ? "\u666E\u901A\u521B\u4F5C\u7167\u5E38\u8C03\u7528video_project prepare/review\uFF0C\u5DE5\u5177\u4F1A\u81EA\u52A8\u5EFA\u6D41\u7A0B\u753B\u5E03\u9879\u76EE\u3001\u540C\u6B65\u5B8C\u6574\u811A\u672C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\uFF0C\u5E76\u63D0\u793A\u7528\u6237\u5230\u5DE6\u4FA7\u680F\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u67E5\u770B\uFF1B\u4E0D\u8981\u8981\u6C42\u7528\u6237\u53E6\u5EFA\u9879\u76EE/\u8282\u70B9\u6216\u53E6\u95EE\u662F\u5426\u540C\u6B65\u3002" : "\u5F53\u524D\u6D41\u7A0B\u753B\u5E03\u5DF2\u6253\u5F00\u4F46\u5173\u95ED\u4E86\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\uFF1A\u4E0D\u8981\u81EA\u52A8\u5EFA\u56FE\u3001\u4E0D\u8981\u81EA\u52A8\u540C\u6B65\uFF0C\u4E5F\u4E0D\u8981\u5BF9\u7528\u6237\u8BF4\u5DF2\u7ECF\u81EA\u52A8\u5EFA\u597D\uFF1B\u7528\u6237\u660E\u786E\u9009\u4E2D\u753B\u5E03\u8282\u70B9\u65F6\u518D\u6309\u4E0B\u9762\u7684\u753B\u5E03\u8054\u52A8\u89C4\u5219\u624B\u52A8\u5904\u7406\u3002") + "\u5F00\u542F\u540E\u751F\u6210\u4F20projectId\uFF0C\u7EED\u505A\u4F20\u539Fresume\uFF0C\u6210\u679C\u56DE\u5230\u5DF2\u7ED1\u5B9A\u7684\u753B\u5E03\u8282\u70B9\uFF0C\u4E0D\u5FC5\u624B\u5DE5\u62FC\u81EA\u52A8canvas\u7ED1\u5B9A\u3002canvasProject\u4E3Adisabled\u8868\u793A\u672A\u5F00\u542F\u81EA\u52A8\u6295\u5F71\uFF0Cunavailable/pending\u5982\u5B9E\u8BF4\u660E\uFF0C\u7528video_project status\u91CD\u8BD5\u540C\u6B65\uFF0C\u4E0D\u91CD\u5EFA\u521B\u4F5C\u9879\u76EE\u6216\u91CD\u751F\u6210\uFF1B\u5185\u7F6E\u753B\u5E03\u53EA\u80FD\u7531\u7528\u6237\u81EA\u5DF1\u4ECE\u5DE6\u4FA7\u680F\u6253\u5F00\uFF0C\u5DE5\u5177\u65E0\u6CD5\u4EE3\u5F00\uFF0C\u4E0D\u8981\u58F0\u79F0\u5DF2\u6253\u5F00\u3002\u4ECD\u4FDD\u7559\u811A\u672C\u3001\u8D39\u7528\u548C\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838\u3002",
-    "\xB7 \u6D41\u7A0B\u753B\u5E03\u8054\u52A8\uFF08\u7531\u7528\u6237\u660E\u786E\u9009\u4E2D\u753B\u5E03\u8282\u70B9\u89E6\u53D1\uFF0C\u4E0E\u8BBE\u7F6E\u91CC\u7684\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\u5F00\u5173\u65E0\u5173\uFF09\uFF1A\u7528\u6237\u8981\u7528MetaOnticVideo\u5236\u4F5C\u753B\u5E03\u8282\u70B9\u65F6\uFF0C\u5148video_canvas(action:list/read)\u8BFB\u53D6\u76EE\u6807\u8282\u70B9\u3001\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u548C\u53C2\u8003\u7D20\u6750\u3002\u6309\u7AEF\u53E3/refOrder\u4FDD\u7559\u9996\u5E27\u3001\u5C3E\u5E27\u3001\u53C2\u8003\u89C6\u9891\u89D2\u8272\uFF0C\u660E\u786E\u7F3A\u5931\u89C4\u683C\uFF0C\u4E0D\u731C\u65F6\u957F\u548C\u6E05\u6670\u5EA6\u3002\u636E\u6B64\u5B8C\u6210\u73B0\u6709video_project\u51C6\u5907\u3001\u6B63\u6587\u5C55\u793A\u811A\u672C/\u5185\u5D4C\u5206\u955C\u53CAreview\uFF1B\u5B8C\u6574specification\u4E0E\u968F\u540Evideo_generate/video_extend\u53C2\u6570\u90FD\u5E26read\u8FD4\u56DE\u7684canvas\u5BF9\u8C61\u3002\u56FE\u7247\u8D70video_prepare_image\u5E76\u5E26canvas\uFF0C\u4ECD\u987B\u56FE\u7247\u8D39\u7528\u5BA1\u6279\u548C\u7ED3\u679C\u5BA1\u6838\u3002\u4E0D\u590D\u5236API\u5BC6\u94A5\u3002\u6210\u679C\u81EA\u52A8\u65B0\u589E\u5230\u6D41\u7A0B\u753B\u5E03\uFF0Cpaused\u4ECD\u987B\u5148\u4EA4\u4ED8\u5E76review_segment\uFF0C\u56DE\u586B\u4E0D\u4EE3\u8868\u7ED3\u679C\u5DF2\u5BA1\u6838\u6216\u6574\u7247\u5B8C\u6210\u3002\u56DE\u586Bpending\u65F6\u7528video_canvas(action:sync,token)\u8865\u4F20\uFF0C\u7EDD\u4E0D\u91CD\u65B0\u751F\u6210\u3002\u753B\u5E03\u6309\u8FDE\u7EBF\u987A\u5E8F\u6267\u884C\uFF1A\u9876\u90E8\u6709\u300C\u5236\u4F5C\u300C\u8282\u70B9\u540D\u300D\u300D\u6309\u94AE\u4F9D\u6B21\u9A71\u52A8\u4E0B\u4E00\u4E2A\u672A\u5B8C\u6210\u8282\u70B9\uFF0C\u672A\u5B8C\u6210\u8282\u70B9\u7528\u865A\u7EBF\u6846\u6807\u51FA\uFF0C\u8FDB\u5EA6\u663E\u793A\u5728\u5DE5\u5177\u6761\u4E0A\uFF1B\u8282\u70B9\u5185\u7684\u300C\u5236\u4F5C\u300D\u6309\u94AE\u4E0E\u5B83\u90FD\u7531\u63D2\u4EF6\u63A5\u7BA1\u65B9\u6848\u3001\u8D39\u7528\u4E0E\u7ED3\u679C\u5BA1\u6838\u3002\u7528\u6237\u5728\u753B\u5E03\u5185\u81EA\u884C\u70B9\u51FB\u751F\u6210\u65F6\u540C\u6837\u5148\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002",
+    "\xB7 \u6D41\u7A0B\u753B\u5E03\u8054\u52A8\uFF08\u7531\u7528\u6237\u660E\u786E\u9009\u4E2D\u753B\u5E03\u8282\u70B9\u89E6\u53D1\uFF0C\u4E0E\u8BBE\u7F6E\u91CC\u7684\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\u5F00\u5173\u65E0\u5173\uFF09\uFF1A\u7528\u6237\u8981\u7528MetaOnticVideo\u5236\u4F5C\u753B\u5E03\u8282\u70B9\u65F6\uFF0C\u5148video_canvas(action:list/read)\u8BFB\u53D6\u76EE\u6807\u8282\u70B9\u3001\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u548C\u53C2\u8003\u7D20\u6750\u3002\u6309\u7AEF\u53E3/refOrder\u4FDD\u7559\u9996\u5E27\u3001\u5C3E\u5E27\u3001\u53C2\u8003\u89C6\u9891\u89D2\u8272\uFF0C\u660E\u786E\u7F3A\u5931\u89C4\u683C\uFF0C\u4E0D\u731C\u65F6\u957F\u548C\u6E05\u6670\u5EA6\u3002\u636E\u6B64\u5B8C\u6210\u73B0\u6709video_project\u51C6\u5907\u3001\u6B63\u6587\u5C55\u793A\u811A\u672C/\u5185\u5D4C\u5206\u955C\u53CAreview\uFF1B\u5B8C\u6574specification\u4E0E\u968F\u540Evideo_generate/video_extend\u53C2\u6570\u90FD\u5E26read\u8FD4\u56DE\u7684canvas\u5BF9\u8C61\u3002\u56FE\u7247\u8D70video_prepare_image\u5E76\u5E26canvas\uFF0C\u4ECD\u987B\u56FE\u7247\u8D39\u7528\u5BA1\u6279\u548C\u7ED3\u679C\u5BA1\u6838\u3002\u4E0D\u590D\u5236API\u5BC6\u94A5\u3002\u6210\u679C\u81EA\u52A8\u65B0\u589E\u5230\u6D41\u7A0B\u753B\u5E03\uFF0Cpaused\u4ECD\u987B\u5148\u4EA4\u4ED8\u5E76review_segment\uFF0C\u56DE\u586B\u4E0D\u4EE3\u8868\u7ED3\u679C\u5DF2\u5BA1\u6838\u6216\u6574\u7247\u5B8C\u6210\u3002\u56DE\u586Bpending\u65F6\u7528video_canvas(action:sync,token)\u8865\u4F20\uFF0C\u7EDD\u4E0D\u91CD\u65B0\u751F\u6210\u3002\u753B\u5E03\u6309\u8FDE\u7EBF\u987A\u5E8F\u6267\u884C\uFF1A\u5DE5\u5177\u6761\u6709\u300C\u5236\u4F5C\u300C\u8282\u70B9\u540D\u300D\u300D\u6309\u94AE\u4F9D\u6B21\u9A71\u52A8\u4E0B\u4E00\u4E2A\u672A\u5B8C\u6210\u8282\u70B9\uFF0C\u672A\u5B8C\u6210\u8282\u70B9\u7528\u865A\u7EBF\u6846\u6807\u51FA\uFF0C\u8FDB\u5EA6\u663E\u793A\u5728\u5DE5\u5177\u6761\u4E0A\uFF1B\u8282\u70B9\u5185\u7684\u300C\u5236\u4F5C\u300D\u6309\u94AE\u4E0E\u5B83\u90FD\u7531\u63D2\u4EF6\u63A5\u7BA1\u65B9\u6848\u3001\u8D39\u7528\u4E0E\u7ED3\u679C\u5BA1\u6838\u3002\u7528\u6237\u5728\u753B\u5E03\u5185\u81EA\u884C\u70B9\u51FB\u751F\u6210\u65F6\u540C\u6837\u5148\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002\u753B\u5E03\u672C\u8EAB\u5C31\u662F\u751F\u6210\u89C6\u9891\u7684\u6D41\u7A0B\uFF1A\u70B9\u753B\u5E03\u7A7A\u767D\u5904\uFF08\u6216\u5DE6\u4E0A\u89D2\u300C\uFF0B \u521B\u4F5C\u6D41\u7A0B\u300D\uFF09\u6253\u5F00\u300C\u521B\u4F5C\u6D41\u7A0B\u300D\u9762\u677F\uFF0C\u5199\u811A\u672C\u3001\u94FA\u5F00\u5236\u4F5C\u8282\u70B9\u4E0E\u5BFC\u5165\u53C2\u8003\u7D20\u6750\u90FD\u5728\u8FD9\u4E2A\u9762\u677F\u6216\u8282\u70B9\u7684\u5236\u4F5C\u7A97\u53E3\u91CC\uFF1B\u5DE5\u5177\u6761\u4E0A\u5DF2\u7ECF\u6CA1\u6709\u5EFA\u8282\u70B9\u6309\u94AE\uFF0C\u4E0D\u8981\u6307\u5F15\u7528\u6237\u53BB\u70B9\u4E0D\u5B58\u5728\u7684\u6309\u94AE\u3002\u753B\u5E03\u4E0A\u53E6\u6709\u4E03\u5F20\u53EF\u70B9\u7684\u6D41\u7A0B\u9636\u6BB5\u5361\uFF08\u9700\u6C42\u786E\u8BA4\uFF0F\u811A\u672C\u5BA1\u6838\uFF0F\u5206\u955C\u786E\u8BA4\uFF0F\u7D20\u6750\u51C6\u5907\uFF0F\u8D39\u7528\u786E\u8BA4\uFF0F\u9010\u6BB5\u5236\u4F5C\uFF0F\u5408\u6210\u6210\u7247\uFF09\uFF0C\u5361\u95F4\u7528\u865A\u7EBF\u7BAD\u5934\u8868\u793A\u5148\u540E\uFF1B\u70B9\u5361\u53EA\u662F\u8FDB\u5BF9\u5E94\u786E\u8BA4\u5165\u53E3\uFF0C\u4E0D\u4EE3\u66FF\u65B9\u6848\u4E0E\u8D39\u7528\u786E\u8BA4\u3002\u811A\u672C\u672A\u5BA1\u6838\u65F6\u9636\u6BB5\u5361\u2461\u4E0E\u5267\u672C\u8282\u70B9\u90FD\u5E26\u300C\u786E\u8BA4\u811A\u672C\u300D\uFF0C\u7528\u6237\u5728\u753B\u5E03\u5185\u70B9\u8FC7\u5C31\u7B97\u8FD9\u6761\u753B\u5E03\u6D41\u7A0B\u7684\u811A\u672C\u5BA1\u6838\u901A\u8FC7\uFF08\u753B\u5E03\u5185\u5236\u4F5C\u4E0D\u7ECF\u8FC7 video_project(action:review)\uFF09\uFF0C\u2461 \u6807\u4E3A\u5DF2\u5B8C\u6210\u3001\u4E0D\u4F1A\u88AB\u52A9\u624B\u4FA7\u65E7\u72B6\u6001\u56DE\u9000\uFF1B\u4F46\u7528\u6237\u8981\u4F60\u5728\u4F1A\u8BDD\u91CC\u9A71\u52A8\u751F\u6210\u65F6\uFF0C\u4ECD\u6309\u73B0\u6709 video_project(action:review) \u5B8C\u6210\u811A\u672C\u5BA1\u6838\uFF0C\u4E0D\u5F97\u7528\u753B\u5E03\u72B6\u6001\u66FF\u4EE3\u3002\u753B\u5E03\u91CC\u7684\u521B\u4F5C\u6D41\u7A0B\u8DDF\u5BF9\u8BDD\u987A\u5E8F\u4E00\u81F4\u5206\u4E24\u6B65\uFF1A\u5148\u300C\u521B\u5EFA\u9700\u6C42\u300D\uFF08\u53EA\u5EFA\u9700\u6C42\u8282\u70B9\u4E0E\u9636\u6BB5\u5361\uFF0C\u4E0D\u8C03\u7528\u6A21\u578B\u3001\u4E0D\u4EA7\u751F\u89C6\u9891\u8D39\u7528\uFF09\uFF0C\u518D\u70B9\u4E00\u6B21\u300C\u5199\u811A\u672C\u300D\u6309\u9700\u6C42\u5199\u5267\u672C\u4E0E\u5206\u955C\u3001\u5148\u300C\u9884\u89C8\u5206\u6BB5\u300D\u518D\u300C\u751F\u6210\u5236\u4F5C\u8282\u70B9\u300D\u2014\u2014\u4E00\u6B21\u94FA\u597D\u5267\u672C\u3001\u5206\u955C\u3001\u6BCF\u6BB5\u4E00\u4E2A\u300C\u753B\u9762\u300D\u8282\u70B9\u4E0E\u6BCF\u6BB5\u4E00\u4E2A\u89C6\u9891\u8282\u70B9\uFF0C\u753B\u9762\u51FA\u56FE\u540E\u4F5C\u4E3A\u8FD9\u4E00\u6BB5\u9996\u5E27\u63A5\u8FDB\u89C6\u9891\u8282\u70B9\uFF08\u6BCF\u6BB5\u5148\u51FA\u753B\u9762\u3001\u518D\u505A\u89C6\u9891\uFF09\uFF1B\u522B\u8BA9\u7528\u6237\u4EE5\u4E3A\u753B\u5E03\u4E0A\u4E00\u6B65\u5C31\u80FD\u4ECE\u60F3\u6CD5\u76F4\u63A5\u51FA\u89C6\u9891\uFF0C\u4E5F\u522B\u6307\u5F15\u7528\u6237\u53BB\u70B9\u5DF2\u7ECF\u4E0D\u5B58\u5728\u7684\u6309\u94AE\u3002\u753B\u5E03\u4E0A\u7684\u6D41\u7A0B\u6B65\u9AA4\u4E0E\u4E13\u4E1A\u753B\u5E03\u4E00\u81F4\uFF1A\u9700\u6C42 \u2192 \u811A\u672C \u2192 \u5206\u955C \u2192 \u753B\u9762\uFF08\u6BCF\u6BB5\u4E00\u5F20\u56FE\uFF0C\u51FA\u56FE\u540E\u5F53\u9996\u5E27\uFF09\u2192 \u7D20\u6750\uFF08\u89D2\u8272\u56FE/\u9996\u5E27/\u53C2\u8003\u56FE\uFF09\u2192 \u8D39\u7528 \u2192 \u9010\u6BB5\u5236\u4F5C \u2192 \u5408\u6210\uFF0C\u9636\u6BB5\u5361\u4F1A\u6309\u8FDB\u5EA6\u628A\u6309\u94AE\u6362\u6210\u300C\u6539\u9700\u6C42 / \u5199\u811A\u672C / \u786E\u8BA4\u811A\u672C / \u770B\u5267\u672C / \u751F\u6210\u5206\u955C / \u770B\u5206\u955C / \u51C6\u5907\u7D20\u6750 / \u770B\u4F30\u4EF7 / \u505A\u8FD9\u4E00\u6BB5 / \u5408\u6210\u6210\u7247\u300D\uFF1B\u8FDE\u62CD\uFF08\u6279\u91CF\u751F\u6210\uFF09\u524D\u4F1A\u5148\u5217\u300C\u786E\u8BA4\u955C\u5934 / \u51C6\u5907\u7D20\u6750 / \u786E\u8BA4\u8D39\u7528\u300D\uFF0C\u7528\u6237\u8981\u4F60\u5728\u4F1A\u8BDD\u91CC\u6279\u91CF\u63A8\u8FDB\u65F6\u4E5F\u6309\u8FD9\u4E2A\u987A\u5E8F\u5148\u786E\u8BA4\u8FD9\u4E09\u9879\uFF0C\u4E0D\u5F97\u8DF3\u8FC7\u811A\u672C\u5BA1\u6838\u4E0E\u9010\u6BB5\u8D39\u7528\u786E\u8BA4\u3002\u753B\u5E03\u8FD8\u4F1A\u505A\u300C\u753B\u5E03\u4F53\u68C0\u300D\uFF1A\u7F3A\u6210\u679C\u7684\u5236\u4F5C\u6BB5\u3001\u8FD8\u6CA1\u51FA\u56FE\u7684\u753B\u9762\u8282\u70B9\u3001\u8FD8\u6CA1\u63A5\u5230\u4EFB\u4F55\u5236\u4F5C\u6BB5\u7684\u7D20\u6750\u56FE\u3001\u6307\u5230\u5DF2\u5220\u9664\u8282\u70B9\u7684\u65AD\u94FE\u3001\u6210\u7247\u6BB5\u6570\u4E0E\u73B0\u6709\u89C6\u9891\u6210\u679C\u5BF9\u4E0D\u4E0A\uFF0C\u90FD\u4F1A\u5728\u753B\u5E03\u63D0\u793A\u533A\u7ED9\u4E00\u884C\u6458\u8981\uFF0C\u70B9\u300C\u8FDE\u62CD\u300D\u770B\u5B8C\u6574\u6E05\u5355\u4E0E\u5904\u7406\u5EFA\u8BAE\uFF1B\u4F53\u68C0\u53EA\u8BFB\u753B\u5E03\u5185\u5BB9\uFF0C\u4E0D\u6D89\u53CA\u8D39\u7528\u4E0E\u5BA1\u6838\uFF0C\u4E5F\u4E0D\u4F1A\u81EA\u52A8\u6539\u52A8\u753B\u5E03\u3002\u7D20\u6750\uFF08\u53C2\u8003\u56FE\u8282\u70B9\u4E0E\u5BFC\u5165\u7684\u56FE\u7247\uFF09\u7B97\u8D44\u4EA7\u4E0D\u7B97\u5236\u4F5C\u6BB5\uFF0C\u6309\u811A\u672C\u81EA\u52A8\u94FA\u51FA\u7684\u300C\u753B\u9762\u300D\u8282\u70B9\u8DDF\u7740\u6D41\u7A0B\u6392\u961F\u4F46\u4E5F\u4E0D\u7B97\u5236\u4F5C\u6BB5\uFF0C\u90FD\u4E0D\u5360\u7528\u300C\u5236\u4F5C\u300C\u2026\u300D\u300D\u7684\u63A8\u8FDB\u987A\u5E8F\uFF1B\u753B\u9762\u6CA1\u51FA\u56FE\u65F6\u89C6\u9891\u5236\u4F5C\u4F1A\u62A5\u7F3A\u5C11\u9996\u5E27\uFF0C\u8981\u6307\u5F15\u7528\u6237\u5148\u5728\u753B\u9762\u8282\u70B9\u51FA\u56FE\uFF1B\u7528\u6237\u5728\u753B\u5E03\u4E0A\u8865\u7D20\u6750\u65F6\uFF0C\u7D20\u6750\u4F1A\u53CD\u7ED1\u5230\u5B83\u670D\u52A1\u7684\u5236\u4F5C\u6BB5\uFF0C\u2463 \u7D20\u6750\u51C6\u5907\u5361\u7684\u6587\u6848\u4F1A\u5199\u660E\u6709\u51E0\u5F20\u8FD8\u6CA1\u63A5\u4E0A\uFF0C\u52A9\u624B\u4FA7\u4E0D\u8981\u628A\u5B83\u7B97\u6210\u65B0\u7684\u5236\u4F5C\u6BB5\u6216\u8981\u6C42\u7528\u6237\u91CD\u65B0\u8FDE\u7EBF\u3002",
     "\xB7 \u72B6\u6001\u8868\u8FF0\u5FC5\u987B\u4E0E\u8BC1\u636E\u4E00\u81F4\uFF1A\u67E5\u8BE2\u5931\u8D25\u6216\u8D85\u65F6\u53EA\u8BF4\u72B6\u6001\u672A\u786E\u8BA4\uFF0C\u4E0D\u80FD\u65AD\u8A00\u6210\u529F\u3001\u5931\u8D25\u6216\u4ECD\u5728\u751F\u6210\uFF1B\u4EC5\u5728\u6536\u5230\u6210\u529F\u72B6\u6001\u53CA\u89C6\u9891\u94FE\u63A5\u540E\u8BF4\u672C\u6BB5\u751F\u6210\u6210\u529F\u3002\u672C\u5730\u6587\u4EF6\u5B58\u5728\u540E\u624D\u8BF4\u4E0B\u8F7D\u5B8C\u6210\uFF0C\u5408\u5E76\u6210\u529F\u540E\u624D\u8BF4\u5B8C\u6574\u6210\u7247\u5DF2\u5408\u5E76\uFF0C\u9010\u9879\u7ED9\u51FA\u94FE\u63A5\u540E\u624D\u8BF4\u5DF2\u4EA4\u4ED8\u3002\u6682\u505C\u9ED8\u8BA4\u4EA4\u4ED8\u672C\u6BB5\uFF0C\u4E0D\u5BA3\u79F0\u6B63\u5728\u5408\u5E76\u3002\u67E5\u8BE2\u66FE\u62A5401\u4F46\u540E\u6765\u6210\u529F\u65F6\uFF0C\u6B63\u5E38\u8FDB\u5EA6\u53EA\u62A5\u544A\u5F53\u524D\u5DF2\u786E\u8BA4\u7ED3\u679C\uFF1B\u4E0D\u5F97\u5C06401\u79F0\u4E3A\u5BC6\u94A5\u6296\u52A8\u6216\u731C\u6D4B\u539F\u56E0\u3002\u89C6\u9891\u8FDB\u5EA6\u63D0\u793A\u4EC5\u7528\u4E8E\u89C6\u9891\u751F\u6210\u6216\u7EED\u62CD\u7B49\u5F85\uFF0C\u4E0D\u7528\u4E8E\u811A\u672C\u3001\u56FE\u7247\u3001\u5BA1\u6838\u3001\u67E5\u8BE2\u3001\u4E0B\u8F7D\u3001\u5408\u5E76\u6216\u7ED3\u679C\u5C55\u793A\u3002",
     "\xB7 \u5206\u6BB5\u7ED3\u679C\u786E\u8BA4\u5FC5\u987B\u5F39\u7A97\uFF1Avideo_generate/video_extend\u8FD4\u56DEpaused=true\u65F6\u5148\u5728\u72EC\u7ACB\u6B63\u6587\u7ED9\u672C\u6BB5\u53EF\u70B9\u51FB\u89C6\u9891\u94FE\u63A5\uFF0C\u6B63\u6587\u6D88\u606F\u540C\u65F6\u8C03\u7528video_stage\u7ED3\u675Fresult_present\u5E76\u5F00\u59CBsegment_review_wait\uFF0C\u968F\u540E\u7ACB\u5373\u5355\u72EC\u8C03\u7528video_project(action:review_segment,resume:\u8FD4\u56DE\u7684resumeDir)\u3002\u7981\u6B62\u53EA\u95EE\u4E00\u53E5\u6548\u679C\u5982\u4F55\u5C31\u7ED3\u675F\u56DE\u5408\uFF1B\u8BE5\u7ED3\u679C\u5BA1\u6838\u4E0D\u5C5E\u4E8E\u91CD\u590D\u5236\u4F5C\u786E\u8BA4\uFF0C\u4E0D\u80FD\u88AB\u5408\u5E76\u6216\u7701\u7565\u3002\u53EA\u6709\u8FD4\u56DEapproved\u624D\u7528\u539Fresume\u7EE7\u7EED\u4E0B\u4E00\u6BB5\u8D39\u7528\u5BA1\u6279\u3002\u53D6\u6D88\u3001\u672A\u7B54\u3001\u62D2\u7EDD\u5747\u505C\u6B62\u4E14\u4FDD\u7559\u6210\u679C\uFF1B\u4E0D\u81EA\u52A8\u91CD\u505A\u3002",
     "\xB7 \u9002\u7528\u8303\u56F4\uFF1A\u672C\u5BF9\u8BDD\u53EA\u505A\u89C6\u9891\u521B\u4F5C\u2014\u2014\u811A\u672C\u3001\u5206\u955C\u3001\u751F\u6210\u3001\u63A5\u957F\u3001\u5408\u5E76\u3001\u4EA4\u4ED8\uFF0C\u4EE5\u53CA\u5B8C\u6210\u8FD9\u4E9B\u5FC5\u9700\u7684\u914D\u7F6E\u6307\u5F15\u4E0E\u73AF\u5883\u6392\u67E5\u3002\u4E0E\u89C6\u9891\u521B\u4F5C\u65E0\u5173\u7684\u8BDD\u9898\uFF08\u5176\u4ED6\u8F6F\u4EF6\u7684\u5B89\u88C5\u4E0E\u6392\u969C\u3001\u5199\u4EE3\u7801\u3001\u901A\u7528\u95EE\u7B54\u3001\u95F2\u804A\u7B49\uFF09\u4E0D\u627F\u63A5\uFF1A\u4E00\u53E5\u8BDD\u8BF4\u660E\u672C\u63D2\u4EF6\u53EA\u7528\u4E8E\u89C6\u9891\u521B\u4F5C\uFF0C\u8BF7\u7528\u6237\u56DE\u5230\u89C6\u9891\u9700\u6C42\uFF0C\u4E0D\u5C55\u5F00\u3001\u4E0D\u4EE3\u529E\uFF0C\u4E5F\u4E0D\u8981\u4E3A\u6B64\u8C03\u7528\u5176\u4ED6\u5DE5\u5177\u3002",

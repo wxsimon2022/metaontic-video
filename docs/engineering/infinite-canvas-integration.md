@@ -395,3 +395,169 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。
 
 本地成品：`.local/test/3.20.1-test.33/metaontic-video-3.20.1-test.33.tgz`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.20.2。
+
+## 流程阶段条：把助手侧流程画成画布阶段卡 3.24.0-canvas.1
+
+需求：按用户确认的方向「先按照1 出一版」——流程画布要把助手侧的创作流程节点图形化，带实时状态与当前阶段高亮，且不改动费用与结果审核口径。
+
+- 新增 `integrations/canvas-stages.ts`：五个阶段（需求确认 → 脚本审核 → 费用确认 → 逐段制作 → 合成成片）的状态与文案由 `stageSummary(facts, stats)` 统一算出；`facts` 来自创作项目（时长、角色图路线、脚本是否审核、制作方案与段数），`stats` 来自画布内容（制作节点、成果节点数与成片记录）。
+- 创作项目同步时在主链路上方铺一排阶段卡（`canvas-project.ts`）：阶段卡只作展示，不连连线、不参与生成；用户改过内容（`metaonticStageSeal` 对不上）不覆盖，删掉的不复活、也不因此挡住整次同步。
+- 成果回填（`canvas.ts`）与合成成片（`canvas-native.ts`）之后按画布内容重算阶段卡，回填失败补传、查询原任务的既有口径不变。
+- 客户端：阶段卡胶囊显示阶段状态（已完成／进行中／待审核／待合成／未开始），当前阶段用主色描边加虚线框；首次打开带阶段卡的画布按整图适配一次视图，`重置视图` 在带阶段卡时同样按整图适配，同一张画布只自动适配一次，之后刷新与手动缩放平移不被打断。
+- 未做：新建画布的「按当前流程铺开」。画布页是宿主 root 级面板，拿不到当前会话；服务端画布接口也没有会话上下文，直接做会跨会话读取／改写别的会话的创作项目记录，与现有「此项目不属于当前会话」的隔离口径冲突。待用户选择：A）画布页加「关联创作项目」选择器（由用户手点指定项目）；B）维持现状，只在助手建图／同步时铺开。
+
+验证：类型检查、构建、503 项自动测试、`git diff --check` 通过；`node scripts/check-active-video.mjs` 无未闭合执行记录。新增 `tests/canvas-stages.test.mjs`（阶段状态、画布内容侧统计、回填与合成后的重算、用户编辑保护、seal 校验），`tests/canvas-project.test.mjs` 补阶段卡断言；README 中英与本地使用说明书同步说明。
+
+未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。
+
+本地成品：`.local/test/3.24.0-canvas.1/metaontic-video-3.24.0-canvas.1.tgz`，1,272,791 字节，SHA-256 `1205ce2fc4ed347ad006b3717ff8786bbbb5d70263285ce38a9336b20b90b477`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.24.1。经用户要求，desktop profile 已从 3.24.1 安装为 3.24.0-canvas.1，并核对包内构建产物含本次改动（`metaonticStage*` 字段、内嵌测试版版本号与 `refreshStageNodes`）；CLI 未返回 applied/restart-required，不能据此断言运行窗口已热加载，未要求重启。
+
+## 画布本身就是生成流程：撤掉建节点按钮、点画布打开「创作流程」 3.24.0-canvas.3
+
+用户补充口径：「其实我想的是生成视频的流程 在流程画布可视化操作 其实上面哪些新增图片 之类的按钮应该是不需要的 在画布上点击的时候出现流程」。即画布就是这条生成流程，工具条不再摆一排建节点按钮，入口放回画布本身。
+
+- 工具条撤掉「+ 剧本」「+ 文本」「+ 图片」「+ 视频」「写脚本…」「导入图片」（连隐藏的文件输入一起删）。第一行只留画布名、新建画布、按连线驱动的「制作「节点名」」、「连拍」、「合成成片」、刷新、美化布局、重置视图、导出 JSON、删除选中/删除画布；第二行仍是「选择画布」。节点的编辑/制作/复制/连线/删除仍在节点自己身上，没有丢能力。
+- 入口回到画布上：空白画布中央是「点击画布开始创作」引导块，画布上有节点时左上角是「＋ 创作流程」，两者都打开同一个「创作流程」面板（原「写脚本…」弹窗，标题与说明改为创作流程：需求确认 → 剧本 → 分镜 → 每段制作 → 合成成片）。空白单击即打开面板：`openFlow()` 在没有选中节点时开面板，有选中节点时这一下只取消选择（避免想取消选择却被打断）。空白拖拽仍然是平移、Shift+拖仍然是框选，都不会误触发。
+- 参考素材改在制作窗口里补：视频节点制作弹窗新增「导入图片素材」（写进画布数据目录并自动 `edgeAdd` 到该节点 `ref` 端口）与「新建参考图节点」（建一个连好的图片节点），导入成功的提示也改成对应说法；原来靠工具条「导入图片」再手动连线的路径随之取消。
+- 从面板铺开流程时同一套阶段卡一起写：`createFromScript` 除剧本/分镜/分段视频节点外，还按 `stageNodeId/stageSpot/sealedStageData` 写五张阶段卡，事实（时长、画幅、清晰度、脚本已写未审、制作方案已确认、段数）与助手建图保持同一份口径，之后由回填与合成成片重算。
+
+验证：类型检查、构建、504 项自动测试、`git diff --check` 通过；`node scripts/check-active-video.mjs` 无未闭合执行记录。新增 `tests/canvas-view-layout.test.mjs` 的「点画布空白处就打开创作流程」用例（空白单击开面板、有选中节点时先取消选择、角落入口与引导块互斥），并补断言：铺开流程会写出五张阶段卡、阶段卡排在主链路上方、画布渲染 `data-stage-state`。README 中英、本地使用说明书与说明书 PDF 同步；提示词与设置页文本里指向已撤按钮的说法（`guidance.ts`、`locale.ts` 的 textModelHint、`canvas-native.ts` 的连拍空画布报错）一并改成「点画布空白处打开创作流程」。
+
+未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。上一节的待选项（新建画布「关联创作项目」选择器 vs 维持现状）仍未决，本次未改。
+
+本地成品：`.local/test/3.24.0-canvas.3/metaontic-video-3.24.0-canvas.3.tgz`，1,276,663 字节，SHA-256 `24279ca214d666d0de568b20c1ffe90d5d04b18dbc75061989f6a3601eeb7b57`。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.24.1。经用户要求，desktop profile 已从 3.24.0-canvas.1 依次装到 3.24.0-canvas.3，并核对包内构建产物含本次改动（`＋ 创作流程` 入口、旧的 `+ 剧本` 等按钮已消失）与最新说明书 PDF（包内与本地 sha256 一致）；CLI 未返回 applied/restart-required，不能据此断言运行窗口已热加载，未要求重启。
+
+## 阶段卡从「展示」变成「可操作的流程链」 3.24.0-canvas.4
+
+用户反馈「还是不够完整」。逐项核对后确认缺口：上一版只把五张阶段卡投影到画布上，卡是只读文字、卡与卡之间没有关系，画布上仍然找不到「需求确认」「费用确认」这些流程环节的入口——用户要的是在画布上就能一步步操作这条生成流程。
+
+- `canvas-stages.ts` 新增 `STAGE_ACTIONS` 与 `stageAction(key)`：五张卡各自的按钮文案与说明（填需求／看剧本／看估价／做这一段／合成成片），说明里交代每一步的费用口径（写脚本按文本用量单独计费、铺节点不产生视频费用、看剧本只改内容不计费、合成只读成果不额外计费）。未定义的阶段返回 null，不凭空造按钮。
+- 画布渲染（`canvas-view.ts`）：
+  - 卡间画虚线箭头（`.movc-stage-edge` + `movc-stage-arrow` marker），只画在 SVG 层，不落进画布连线——阶段卡仍然不参与生成、不进 `flowSteps`。
+  - 每张卡底部是这一步的主行动按钮（`[data-stage-action]`）：填需求→「创作流程」面板；看剧本→打开剧本节点（没有剧本节点时退回「创作流程」）；看估价→连拍方案（列出每段提示词与整条链路预估）；做这一段→打开当前还没成果的制作节点；合成成片→合成。这些都只是入口，方案与费用确认口径不变。
+  - 阶段卡不再挂节点的「复制／连线／删除」（连到阶段卡的线会被当成提示词素材，是隐患）；要删就选中卡片再用工具条的「删除选中」。
+  - 卡片尺寸由 380×210 收到 340×180：卡间留 60px 让箭头看得清，高度贴住内容。
+- 视觉核对：`.local/canvas-qa/style-preview` 造一份带五张阶段卡的示例（同时把预览里已经失效的两个 QA 入口「写脚本…」「导入图片」换成画布上的入口），Chrome 无头截图 `/tmp/stage-chain.png`（整页）与 `/tmp/stage-zoom.png`（放大到阶段卡一行）确认箭头、状态胶囊、按钮与当前阶段虚线框都对。
+
+验证：类型检查、构建、506 项自动测试（连续 3 次全绿）、`git diff --check` 通过；`node scripts/check-active-video.mjs` 无未闭合执行记录。新增 `tests/canvas-view-layout.test.mjs`「阶段卡就是流程」用例（4 段箭头、五个 `[data-stage-action]` 按钮及文案、卡上没有节点操作、点五个按钮分别进创作流程/剧本节点/连拍方案/当前待制作节点/合成），`tests/canvas-stages.test.mjs` 补 `STAGE_ACTIONS` 断言。README 中英、本地使用说明书与说明书 PDF、助手提示词（`guidance.ts`）同步。
+
+已知偶发（非本次引入）：`tests/canvas-native.test.mjs` 的「failed publication can only republish existing media」在整套并行跑时偶发 `sync.status` 断言失败（pending≠synced）；用 `git archive HEAD` 导出干净树同样 12 次里复现 1 次，确认与本次改动无关，本次未修。
+
+未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。
+
+本地成品：`.local/test/3.24.0-canvas.4/metaontic-video-3.24.0-canvas.4.tgz`，1,282,702 字节，SHA-256 `bd4ebfd7bb8a2a6b2635e304f45bb5a206a7cd19346e0826bbbb6b1f68751ced`（测试包每次打包 gzip 时间戳不同，校验以装完后的包内文件为准）。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.24.1。desktop profile 已从 3.24.0-canvas.3 升到 3.24.0-canvas.4，并逐字节核对包内 `client.js`、`index.js`、说明书 PDF 与成品包一致；CLI 未返回 applied/restart-required，不能据此断言运行窗口已热加载，未要求重启。
+
+## 脚本审核也能在画布上完成：把创作流程闭合在画布内 3.24.0-canvas.5
+
+用户确认上一轮给的方向 A：「把需求→脚本→分镜→每段提示词都改成在画布里填写确认（含每段费用确认），不再依赖助手对话」。本轮补上最后一段缺口：脚本审核原本只能在会话里由助手弹窗完成，画布上的阶段卡②与剧本节点只能跳去助手，画布内的流程到这里就断了。
+
+- `canvas-stages.ts`：新增 `STAGE_REVIEW_ACTION` 与 `pendingStageAction(key, facts)`——阶段②在 `scriptApproved !== true` 时按钮换成「确认脚本」，说明写明通过后标为已完成、费用仍逐段单独确认；新增 `rewriteStageNodes(doc, patch)`（把确认事实合并进插件自己写过的阶段卡再重算，跳过用户改过的卡），`refreshStageNodes` 改为调用它；新增 `preserveCanvasConfirmations(prev, next)`（画布上确认过的脚本审核不被助手侧「还没审核」的事实回退）；需求卡的角色图路线走 `CHOICE_TEXT` 写成人话，费用文案改成「生成前仍要单独确认」，空制作段的文案改成「先在画布上写脚本、确认脚本审核与制作方案」。
+- `canvas-view.ts`：`confirmScript()` 把 `scriptApproved: true` 写进阶段卡事实并重算五张卡，只保存插件自己写过的那几张；阶段卡的 `runStageAction('script')` 与剧本节点新增的「确认脚本／已审核」小按钮都走它——未审核时是主色「确认脚本」，通过后变「已审核」并打开剧本节点；铺开脚本后的提示语改成「点剧本节点或阶段卡②的『确认脚本』」；页面内的流程说明补「脚本还没审核时是『确认脚本』，审核通过就在画布上完成」。
+- `canvas-project.ts`：助手侧同步阶段条时用 `preserveCanvasConfirmations` 合并既有事实，画布上的确认不被回退；`add()` 对插件自己的阶段卡放宽改写守卫，避免画布内确认触发「自动节点已在画布中修改」而整次同步失败。
+- 边界（保留原口径，未改）：画布内确认只记在这条画布的阶段事实上，不写创作项目的 `approved`，也不代替助手侧 `video_project(action:review)`；从会话里驱动生成时仍按原有的脚本审核与逐段费用确认走，`guidance.ts` 已写明「不得用画布状态替代」。原因是创作项目按会话归属（`sessionOwner`）隔离，画布页是宿主 root 级面板、拿不到会话，直接写项目会跨会话串数据，与现有隔离口径冲突。
+
+验证：类型检查、构建、508 项自动测试、`git diff --check` 通过；`node scripts/check-active-video.mjs` 无未闭合执行记录。新增 `tests/canvas-stages.test.mjs`「画布上确认脚本：只重写插件自己的阶段卡，用户改过的不动，确认不被助手侧回退」、`tests/canvas-view-layout.test.mjs`「脚本审核在画布上完成：点『确认脚本』写回阶段卡事实，② 变已完成且不再回退」；`tests/canvas-project.test.mjs` 首用例补阶段条断言（需求后立刻铺五张卡、画布上的脚本审核不被助手侧同步回退）。视觉核对：`.local/canvas-qa/style-preview` 的阶段卡带上 `metaonticStageFacts`、② 显示「确认脚本」，Chrome 无头截图 `/tmp/stage-chain.png`、`/tmp/stage-zoom.png` 确认卡间箭头、② 的按钮与剧本节点上的「确认脚本」小按钮。README 中英、本地使用说明书与说明书 PDF、助手提示词同步。
+
+已知偶发（非本次引入）：`tests/canvas-native.test.mjs` 的「failed publication can only republish existing media」在整套并行跑时偶发 `sync.status` 断言失败（pending≠synced）；用 `git archive HEAD` 导出干净树同样能复现，确认与本次改动无关，本次未修。
+
+未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。
+
+本地成品：`.local/test/3.24.0-canvas.5/metaontic-video-3.24.0-canvas.5.tgz`，1,285,242 字节，SHA-256 `1c044757b13b7dc503f9efcde324252a3cc9d4de14776eddfa367a4eaa915f9a`（测试包每次打包 gzip 时间戳不同，校验以装完后的包内文件为准）。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.24.1。desktop profile 已从 3.24.0-canvas.4 升到 3.24.0-canvas.5，并核对包内 `client.js`、`index.js` 与工作区产物只在版本号一行不同、说明书 PDF 与本地 sha256 一致；CLI 未返回 applied/restart-required，不能据此断言运行窗口已热加载，未要求重启。
+
+## 按 LibTV 画布口径补齐流程：两步创作 + 七张阶段卡 + 批量生成前置清单 3.24.0-canvas.6
+
+用户指定参考 <https://www.liblib.tv/canvas>（页面标题 LibTV 专业视频创作工具）实现流程画布。该页是前端应用，服务端渲染只有壳，但内联的文案资源能挖到完整口径：
+
+- 工作流步骤：**剧本 → 分镜 → 画面 → 视频合成**；画布节点类型有剧本节点、分镜生成器、图片节点、视频节点、音频节点、剪辑节点；工具条含添加节点 / 上传 / 优化工作流布局。
+- 批量生成前置清单（原文）：「开始批量生成前，请先完成：」「确认镜头」— 至少 1 条镜头有画面内容、「准备资产」— 为角色 / 场景 / 道具准备形象图、「合成提示词」— 每镜生成分镜与视频运动提示词，另有一条「切换到支持「首帧生视频」的视频模型」。
+- 其他可借鉴项：提示词「智能合成（AI，消耗积分）/ 自动拼接（本地，不消耗积分）」、资产「批量生成资产图」、分镜组与「删除组内子节点但保留脚本对应关系」。
+
+本轮按这些口径改造我们的画布（只取与本插件管线相容的部分）：
+
+- 创作流程分两步，顺序与对话和专业画布一致：第一步「创建需求」只建需求节点与阶段卡，不写脚本、不调用模型；第二步「写脚本」按需求写剧本与分镜、预览分段后再生成制作节点。入口 `openFlow()` 按进度路由：没需求 → 需求步骤；脚本没审核通过 → 脚本步骤；通过后 → 打开剧本节点。
+- 阶段链由 5 张扩到 7 张，插入 LibTV 的中间两步：`requirement → script → storyboard（分镜确认）→ assets（素材准备）→ cost → segments → film`。③分镜卡在还没有镜头时给「生成分镜」（回到写脚本那一步预演分段），切出镜头后回到「看分镜」；④素材卡对应「准备资产」，需要角色图而画布上还没有素材图时直接建一个参考图节点并连到当前这段，已有素材则打开这段的制作窗口（导入图片素材 / 新建参考图节点都在里面）。`canvasSegmentStats` 增加 `shots`（分镜节点镜头数）与 `assets`（图片类素材数），分镜与素材两卡的状态全部由画布内容算出，没有分镜表时按句子切段也算分镜就绪。
+- 连拍（批量生成）弹窗加上 LibTV 的「开始批量生成前，请先完成」清单：`[data-batch-check]` 三项——确认镜头 / 准备素材 / 确认费用（费用每段仍单独确认，只作说明），并注明「这几项都就绪后再开始连拍」。文案与提示词（`guidance.ts`）同步说明七步与这份清单，助手在会话里批量推进时也要先过这三项。
+- 明确没取的部分（保留本插件的费用与审核口径）：不做 LibTV 的「一键生成微电影 / 短剧」端到端免确认流程；不做音频节点与剪辑节点（本插件只有视频生成与成片合成）；「智能合成提示词」暂未实现，当前每段提示词仍是本地拼接，后续如需可按 LibTV 的「智能合成 / 自动拼接」二选一实现。
+
+验证：类型检查、构建、511 项自动测试、`git diff --check` 通过；`node scripts/check-active-video.mjs` 无未闭合执行记录。新增/更新断言：`tests/canvas-stages.test.mjs` 分镜与素材两卡状态跟画布内容走、主行动清单含生成分镜与准备素材；`tests/canvas-view-layout.test.mjs` 七张卡与六段箭头、各卡按钮（改需求/看剧本/看分镜/准备素材/看估价/做这一段/合成成片）、点④素材打开当前这段的制作窗口、连拍弹窗三项 `data-batch-check`；`tests/canvas-project.test.mjs` 阶段卡按 `STAGE_KEYS` 全量铺开。视觉核对：`.local/canvas-qa/style-preview` 造七张阶段卡，Chrome 无头截图 `/tmp/stage-chain.png`、`/tmp/stage-batch-checklist.png`（连拍弹窗里的前置清单）确认卡间箭头、按钮文案与清单。README 中英、本地使用说明书与说明书 PDF、助手提示词同步。
+
+已知偶发（非本次引入）：`tests/canvas-native.test.mjs` 的「failed publication can only republish existing media」在整套并行跑时偶发 `sync.status` 断言失败（pending≠synced）；干净树同样能复现，与本次改动无关，本次未修。
+
+未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。LibTV 页面只做了文案级提取（无法在沙箱里跑其前端交互），未逐屏比对交互细节。
+
+本地成品：`.local/test/3.24.0-canvas.6/metaontic-video-3.24.0-canvas.6.tgz`，1,297,808 字节，SHA-256 `c42d9fa1eb152bb967bd576827f30f7f67e190cb7dfb69c8798ff5e04a931de4`（测试包每次打包 gzip 时间戳不同，校验以装完后的包内文件为准）。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.24.1。desktop profile 已从 3.24.0-canvas.5 升到 3.24.0-canvas.6，并核对包内 `client.js`、`index.js` 与工作区产物只在版本号一行不同、说明书 PDF 与本地 sha256 一致；CLI 未返回 applied/restart-required，不能据此断言运行窗口已热加载，未要求重启。
+
+## 参考来源：LibTV 插件本地安装记录（只作参考口径，不照搬其实现）
+
+为继续参照 LibTV 的画布口径，按官方说明在本机装了 LibTV 插件。这只影响本机环境，与本插件源码无关，不改动本仓库任何构建或发布产物。
+
+- 执行 `codex plugin marketplace add https://github.com/liblib-ai/marketplace.git --ref main`，再执行 `codex plugin add libtv@libtv`。`~/.codex/config.toml` 记录 `[marketplaces.libtv]`（`source_type = "git"`、`ref = "main"`）与 `[plugins."libtv@libtv"] enabled = true`；插件缓存落在 `~/.codex/plugins/cache/libtv/libtv/1.0.0`，含三个 skill：`libtv-to-treatment`、`libtv-blender-live-action`、`music-driven-product-ad`。
+- 插件自带 MCP 服务器 `libtv`（`https://mcp.liblib.tv/mcp`，`tool_timeout_sec = 1200`）；`codex mcp list` 显示 `enabled`、授权状态 `Not logged in`。
+- 官方说明第 3 步的账号授权需要本人登录 LibTV，由用户完成：`codex mcp list` 的 `Auth` 从 `Not logged in` 变为 `OAuth` 即为已授权。授权后已用 `codex exec` 独立会话实测：`libtv/list_projects` 正常返回真实项目，MCP 共暴露 70+ 个工具（`read_project`/`read_node`/`read_script_v2`/`read_timeline`/`manage_group`/`get_project_snapshot` 等），可用于只读摸清 LibTV 真实画布结构。
+- 装插件时 GitHub 直连不稳定：`marketplace add <github url>` 先失败两次（HTTP2 framing layer / 443 超时），改用本地克隆目录注册才通过；随后重试直连成功并已切回官方 `git` 源，本地副本不再使用。
+
+**定位：参考实现口径，不照搬。** 取的是它已验证的创作顺序与用户心智（剧本 → 分镜 → 画面 → 视频合成、批量生成前的前置检查），不是它的产品形态。以下差异是刻意的，后续不要再按 LibTV 原样对齐：LibTV 是一体化创作工具，我们是挂在对话里的插件，节点画布只是对话的可视化投影，所以不引入它的画布编辑器交互（拖拽连线、分组、多画布工程管理）；不引入它的计费与积分模型，费用仍按本插件每段单独确认；不引入音频节点与剪辑节点，本插件只做视频生成与成片合成；不做端到端免确认的一键出片，需求与脚本两步、逐段确认、成片确认三道审核保留。LibTV 里确属通用做法的部分（先需求后脚本的顺序、分镜与素材的准备前置、批量前的清单提示）才吸收进来。
+
+### LibTV 真实画布数据模型（只读探针）
+
+用 `codex exec` 以只读方式探了用户给的画布 `1d623006c92a48c9a03ee462f48442cd`（spaceId `15841170`，名称「画布 1」）。原始返回留在 `/private/tmp/libtv-probe/`（本机临时目录，不入库）。**关键结论：该画布本身基本是空的**——只有 2 个节点（`image` 与 `text`）和 1 条边，`groups/scripts/assets/scenes/shots/timelines` 全为 0。所以它能提供的价值是数据结构与契约，不是可照搬的成品流程；这反过来印证「参考实现、不照搬」的定位。
+
+摸到的模型要点（供后续参考，均未在本插件落地）：
+
+- **图元三层**：`node{id, type, data{type,name,action,generatorType,params}, position{x,y}, measured{width,height}, sourcePosition, targetPosition}`，即图元 + 布局 + 生成参数分离。`action`/`generatorType` 由 nodeType 派生（image→`image_generate`、text→`text_generate`），调用方不手填。
+- **边**：`{id, source, target, sourceHandle:"source", targetHandle:"target", type:"default", deletable, selectable}`。
+- **引用双写**：除了画布 edge，生成参数里还有 `imageList/textList/videoList/audioList[{nodeId,url,label}]` 加 `order` 数组直接点名上游 nodeId。边和参数数组是同一件事的两种表达。
+- **媒体归因反向绑定**：`media{mediaId, nodeId, identity{state,resourceIds}, type, urls[], task{}, shotIds[], timelineNodeIds[]}`，用 `shotIds`/`timelineNodeIds` 把素材反查回分镜与时间线；`issues` 做健康校验（`ORPHAN_MEDIA` 未绑镜头/时间线、`MEDIA_OUTPUT_MISSING` 无输出 URL）。
+- **读取投影≠已持久化**：`mediaPersistence` 逐节点给 `bindingStatus/persistedUrlCount/readUrlCount`，明确「读到 URL 不代表已落库或可播放」。快照另有 `snapshotId/schemaVersion/capturedAt` 与 `revision{token,fingerprint}` 做并发保护。
+- **剧本两层**：Web screenplay（章节目录 + 草稿 VFS 文件，`write_screenplay` 带 ETag）与 Script V2 分镜表（shot 行，字段含时长、情节、台词、景别、情绪、光影、角色/场景/道具资产 id，行序即镜号）。时间线挂在 `video-clip` 节点上，按节点读取。
+- **未覆盖**：该画布没有 script、video、audio、video-clip 节点，这几类的真实结构只能依据工具契约描述，未做实测。
+
+## 按 LibTV 数据模型打磨：素材反绑制作段 + 画布体检 3.24.0-canvas.7
+
+装好 LibTV 插件并用 `codex exec` 只读探过它的真实画布后（见上一节），挑了两个确实可迁移、且与本插件管线相容的点落地。仍然只取做法不取形态：LibTV 是画布工具，我们是挂在对话里的插件。
+
+- **素材反绑制作段**（对齐 LibTV 的 `media.shotIds`）：素材图用 `metaonticSegmentOf` 记下它服务的制作段。新建参考图节点、从制作窗口导入图片时自动写入；没写过的老素材按连线推（素材图接到哪一段就服务哪一段，素材节点产出的图顺着它的来源节点找下游的段）。新增 `canvasAssets` / `canvasAssetLinks` / `canvasSegments`，`canvasSegmentStats` 相应多出 `assetsBound` 与 `assetsOrphan`；阶段卡④的文案从「素材图：N 张」变成带上「其中 M 张还没接到制作段」。
+- **素材不算制作段**：参考图节点与导入的图片是资产不是镜头内容，新增 `MATERIAL_MARK` 打标，`canvasSegments` 与画布侧 `flowSteps` 都按同一口径排除。以前补一张参考图会让「制作段」多一段、把「制作「…」」的推进顺序和 ⑦ 合成的就绪判断一起带偏，现在不会了。
+- **画布体检**（对齐 LibTV 的 `issues`）：新增只读的 `canvasReadiness(doc)`，按 LibTV 那套 `{code, severity, scope, nodeId, message, suggestedAction}` 出项——`DANGLING_EDGE`（连线指向已删节点，error）、`SEGMENT_MISSING_OUTPUT`（制作段还没成果，warning）、`ORPHAN_ASSET`（素材图没接到任何制作段，info）、`FILM_STALE`（成片段数与现有视频成果段数对不上，warning）。画布提示区给一行摘要，连拍弹窗在「开始批量生成前」清单下面列完整清单（`[data-readiness]`）。体检只读画布内容，不判断费用与审核，也不自动改动画布。
+- **顺带修掉一个真 bug**：`geometry()` 直接取 `node.id`，画布上只要有一条指向已删节点的断链，整个画布渲染就抛 `Cannot read properties of undefined (reading 'id')`，什么节点都看不到。现在缺节点直接返回空、连线跳过不画，断链交给体检提示——这正是 LibTV 拿 issues 兜的那类引用不一致。测试里造断链画布先是复现了这个崩溃，修完才通过。
+- **没取的**：LibTV 用 `revision.token` 做写并发保护、把「读取投影」与「已持久化」分开的表达，本插件是单进程内置存储、写路径简单，暂不引入；Script V2 的镜头行字段（景别/情绪/光影/角色资产 id）我们已有自己的分镜表口径，也不照搬。
+
+验证：类型检查、构建、516 项自动测试、`git diff --check` 通过。新增断言：`tests/canvas-stages.test.mjs` 素材反绑（`canvasSegments` 排除素材节点、按 `metaonticSegmentOf` 与连线两种方式反绑、孤立素材单独计数、没有 `assetsBound` 时退回旧文案）、就绪度体检（四类问题与严重级、成片对得上时不提示）、体检与反绑不碰费用口径；`tests/canvas-view-layout.test.mjs` 断链画布能照常渲染且体检报错、连拍弹窗三项 `data-readiness`、点④建参考图节点带上素材标记与反绑、素材不占用「制作「…」」进度。文档同步：README 中英、本地使用说明书与说明书 PDF、助手提示词 `guidance.ts`（并把其中残留的「五张阶段卡」旧口径改成七张）。
+
+视觉核对：`.local/canvas-qa/style-preview` 重新打包后用 Chrome 无头截图 `/tmp/stage-chain.png`（七张卡、六段箭头、工具条下方一行体检摘要，只报非零档位）、`/tmp/stage-batch-checklist.png`（连拍弹窗里「开始批量生成前，请先完成」清单下方的画布体检块）确认渲染与文案。
+
+本地成品：`.local/test/3.24.0-canvas.7/metaontic-video-3.24.0-canvas.7.tgz`，1,304,363 字节，SHA-256 `2d82ca5c94d3169a3970e49aefcaa937a2ca401c8e98d0a458b039a4fdd1466d`（测试包每次打包 gzip 时间戳不同，校验以装完后的包内文件为准）。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.24.1。desktop profile 已从 3.24.0-canvas.6 升到 3.24.0-canvas.7，并核对包内 `client.js`、`index.js` 与工作区产物只在版本号几行不同、说明书 PDF 与本地 sha256 一致（`74b324b8…`）；CLI 未返回 applied/restart-required，不能据此断言运行窗口已热加载，未要求重启。
+
+未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。LibTV 侧仍未实测 script / video / audio / video-clip 节点结构（其参考画布为空）。
+
+## 自查上一版改动并修复 3.24.0-canvas.8
+
+对本轮（canvas.7）的改动做了一轮边界自查，用临时脚本把边界用例直接喂进阶段模块（`/tmp/probe-*.mjs`，不入库），查出并修掉四处真问题：
+
+- **素材节点被复制后换了身份**：`duplicateNodePayload` 只带 label/prompt/文本这类可编辑内容，复制一张参考图会得到一个没有素材标记、也没有 `metaonticSegmentOf` 的新节点，于是它变成「制作段」，把制作段计数与「合成成片」的就绪判断一起带偏。现在复制素材节点会保留素材身份与它服务的段（阶段投影自己的字段仍不复制）。
+- **体检漏报**：制作段被整段删掉后留下的视频成果，既不算进制作段，也进不了成片（`filmSegments` 按制作段枚举），但当时一条提示都没有，用户会以为它还在流程里。新增 `ORPHAN_RESULT`（info）点名这种成果；图片成果仍由 `ORPHAN_ASSET` 覆盖，不重复报。
+- **成片提示的建议自相矛盾**：`FILM_STALE` 原来按「有没有成果视频段」判据，却按「还有没有制作段」写建议——画布上一段都不剩时会劝用户「每段都出成果后重新合成」，而那时合并没有任何输入、只会直接报错。改成按画布上还有没有视频制作段分岔；另外老文档里成片记录没有 `count` 时不再硬报「已合成的成片是 0 段」。
+- **体检摘要把人指到打不开的地方**：摘要写「点「连拍」可以看到完整清单」，但连拍要按视频制作节点排方案，画布上一个视频节点都没有时 `chainPlan` 会直接报错。现在只在画布上确实有视频制作段时才提「连拍」。
+
+自查方式：把 null/数组形态的 nodes、缺字段的连线、没有 `count` 的成片记录、字符串 `count`、来源标识为空、素材反绑指向已删段等边界一次性喂给 `canvasReadiness` / `canvasAssetLinks` / `canvasSegmentStats` 看是否抛错或给出错误结论；再补两个回归断言——走完整条流程的画布（素材接到段、每段有成果、成片段数对得上）体检必须为空（防误报），删掉一段成果后只报缺成果与成片对不上两条。
+
+另有一条**没修**的既有问题，见下一节：连拍会把已有成果的段重新排进方案。
+
+验证：类型检查、构建、520 项自动测试、`git diff --check` 通过；`node scripts/check-active-video.mjs` 无未闭合执行记录。新增断言：`tests/canvas-stages.test.mjs` 来源节点已删的视频成果要点名、图片成果不重复报、成片建议按有无制作段分岔、走完整条流程不误报；`tests/canvas-builtin.test.mjs` 复制素材节点保留素材身份；`tests/canvas-view-layout.test.mjs` 没有视频制作节点时摘要不提「连拍」。
+
+本地成品：`.local/test/3.24.0-canvas.8/metaontic-video-3.24.0-canvas.8.tgz`，1,304,896 字节，SHA-256 `8106a35eaa6d8f52f3d94e197eec04e6bbf3dafecdb69ceba8e364f03ffcd235`（测试包每次打包 gzip 时间戳不同，校验以装完后的包内文件为准）。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 保持 3.24.1。desktop profile 已从 3.24.0-canvas.7 升到 3.24.0-canvas.8，包内 `client.js`、`index.js` 与工作区产物只在版本号几行不同，说明书 PDF sha256 仍为 `74b324b8…`；按转义还原后逐项确认包内含有本节的四处修复（`画布体检`、`chainable`、`ORPHAN_RESULT`、`已经没有视频制作段`）。CLI 未返回 applied/restart-required，不能据此断言运行窗口已热加载，未要求重启。
+
+> 注：核对包内容时别直接 grep 中文——esbuild 会把模板字符串里的非 ASCII 转成 `\uXXXX`（大写十六进制），按二进制直接搜中文会漏判。
+
+未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。
+
+## 待确认：连拍会把已有成果的段重新排进方案（既有问题，未改）
+
+自查时发现的一处既有问题，**不在本次改动范围内，故意没有动**，因为它落在付费路径上：
+
+- `pendingVideoOrder` 的函数注释写「成果节点与已产出节点不参与」，但过滤条件只有 `type === 'video' && !metaonticSourceNode && !data.assetId`，画布内制作出来的成果是**独立节点**（`publishCanvasResult` 另建一个带 `metaonticSourceNode` 的节点），来源节点自己的 `data.assetId` 始终为空 —— 所以「已产出」这个条件实际上没有生效。
+- 结果：`chainPlan` 会把已经有成果的视频节点也排进连拍方案并估算费用。实测（临时代码探针）：v1 已有成果、v2/v3 没有时，连拍顺序是 `["v1","v2","v3"]`。用户先单独「制作」了第 1 段、再点「连拍」，第 1 段会被重新生成一次；更常见的是**跑完连拍后再加一段、重新点连拍**——`chainStart` 只用「整条方案签名」跟**上一次的连拍记录**比对，新增一段会改掉签名，于是前面已经出成的几段会被重新提交计费。
+- 不能简单地在 `pendingVideoOrder` 里加过滤：`filmSegments` 也用它来枚举**全部**视频段并列出缺成果的段，过滤掉已产出的会让成片少拼几段还一声不响。
+- 合理的修法是保留「全部视频段」的枚举，在 `chainPlan` 里跳过已有成果的段，并把这些段的既有成果当作下一段的续拍输入（`carry`）；方案预览要标出哪几段是「已有成果、本次跳过」，费用估算也只算本次要生成的部分。这会改动 `chain` 记录里段序的含义与连拍弹窗的编号，属于付费转换口径的变化，按约定先与用户确认再做。
+
+临时探针与结论都留在本机 `/tmp/probe-chain.mjs`，不入库。

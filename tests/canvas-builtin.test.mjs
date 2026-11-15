@@ -214,3 +214,15 @@ test('复制节点payload不带成果素材、任务标识与来源关系',()=>{
  assert.equal(payload.data.metaonticNativeJob,undefined);assert.equal(payload.data.metaonticVideoUrl,undefined);
  assert.equal(JSON.stringify(payload).includes('https://example.invalid'),false);
 });
+
+/** 复制素材节点还应该是素材：否则「复制一张参考图」会变成新的制作段，把制作段计数与合成就绪判断带偏。 */
+test('复制素材节点保留素材身份与它服务的段',()=>{
+ const node={id:'ref',type:'image',data:{label:'参考图',prompt:'',ratio:'1:1',resolution:'720p',
+  metaonticMaterial:true,metaonticSegmentOf:'v1',metaonticStage:'assets',metaonticStageFacts:{scriptApproved:true}}};
+ const payload=api.duplicateNodePayload(node,{x:0,y:0,w:360,h:300});
+ assert.equal(payload.data.metaonticMaterial,true);
+ assert.equal(payload.data.metaonticSegmentOf,'v1');
+ // 阶段投影自己的字段不跟着复制。
+ assert.equal(payload.data.metaonticStage,undefined);
+ assert.equal(payload.data.metaonticStageFacts,undefined);
+});

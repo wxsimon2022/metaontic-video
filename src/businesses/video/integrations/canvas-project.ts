@@ -6,6 +6,7 @@ import { readProject, writeProject, lockProject, projectsOfSession, allProjects 
 import { ref } from '../config.js';
 import { loadCanvasAdapter, readCanvasInput, markCanvasChanged, resolveCanvasAdapter } from './canvas.js';
 import { builtinCanvasAdapter, BUILTIN_BACKEND } from './canvas-builtin.js';
+import { STAGE_LABELS, canvasSegmentStats, preserveCanvasConfirmations, sealedStageData, stageFacts, stageNodeId, stageNodeOwned, stageNodeRewriteable, stageSpot, stageSummary } from './canvas-stages.js';
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 /** 流程画布一律写内置存储：老绑定按项目标识解析，新建直接建内置画布。
@@ -129,7 +130,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       const ensuredEdges: any[] = [], removedEdges: string[] = [];
       const managed = { ...binding.nodes }, managedEdges = { ...(binding.links || {}) };
       const deleted = new Set(doc.tombstones || []), edgeDeleted = new Set(doc.edgeTombstones || []);
-      const add = (key, type, label, x, y, data) => {
+      const add = (key, type, label, x, y, data, size: any = null) => {
         const id = `${prefix}_${key}`;
         if (deleted.has(id)) throw new Error('自动节点已被删除，不会自动复活；请在项目中明确选择新的画布绑定。');
         const previous = nodes[id];
@@ -138,8 +139,11 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
           const initial = { label: '完整剧本', idea: '由MetaOnticVideo创作项目同步', output: '', status: 'idle', metaonticProjectId: project.id };
           if (JSON.stringify(previous.data) === JSON.stringify(initial)) managed[id] = digest({ type: previous.type, data: previous.data });
         }
-        if (previous && (!managed[id] || digest({ type: previous.type, data: previous.data }) !== managed[id])) throw new Error('自动节点已在画布中修改，保留你的编辑；请先处理差异再同步。');
-        const next = { ...(previous || { id, x, y, w: type === 'script' ? 420 : 360, h: 280 }), type, data };
+        // 阶段卡由插件自己盖 seal 维护：卡上完成的确认（如脚本审核）会让摘要对不上，
+        // 但只要 seal 还完整就是插件写的卡，同步可以重写；seal 对不上才是用户改过，仍然保护。
+        const pluginOwnedStage = Boolean(previous?.data?.metaonticStage) && stageNodeOwned(previous);
+        if (previous && !pluginOwnedStage && (!managed[id] || digest({ type: previous.type, data: previous.data }) !== managed[id])) throw new Error('自动节点已在画布中修改，保留你的编辑；请先处理差异再同步。');
+        const next = { ...(previous || { id, x, y, w: size?.w ?? (type === 'script' ? 420 : 360), h: size?.h ?? 280 }), type, data };
         // 只迁移旧自动布局；用户移动或缩放过的节点保留原位。
         const oldX = key === 'production' ? 1550 : key.startsWith('segment_') ? 1050 : null;
         const oldY = key === 'production' ? 60 : key.startsWith('segment_') ? 60 + (Number(key.slice(8)) - 1) * 320 : null;
@@ -197,6 +201,20 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
         nodeId = production; connect(board, production);
       } else if (!nodes[nodeId]) {
         nodeId = source;
+      }
+      // 流程阶段条：把助手侧的五个阶段画在主链路之上，状态跟着创作项目与画布成果走。
+      // 阶段节点不连连线、不参与生成；卡上的按钮只是入口，用户改过内容就保留，不用插件状态覆盖。
+      // 用户在画布上确认过脚本审核的，不让助手侧「还没审核」的事实把它回退。
+      const facts = preserveCanvasConfirmations(nodes[stageNodeId(prefix, 'script')]?.data?.metaonticStageFacts,
+        stageFacts(project, specification, Boolean(draft.scriptPath || script), specification ? Math.max(1, specification.segmentPrompts?.length || 0) : 0));
+      const stats = canvasSegmentStats({ ...doc, nodes });
+      for (const [index, stage] of stageSummary(facts, stats).entries()) {
+        const id = stageNodeId(prefix, stage.key);
+        if (nodes[id] && !stageNodeRewriteable(nodes[id])) continue;
+        if (deleted.has(id)) continue; // 用户删掉的阶段卡不复活，也不因此挡住整次同步。
+        const spot = stageSpot(index);
+        add(`stage_${stage.key}`, 'text', STAGE_LABELS[stage.key], spot.x, spot.y,
+          { ...sealedStageData(stage.key, stage.state, stage.text, facts), metaonticProjectId: project.id }, spot);
       }
       // 画布名跟着会话标题走；会话标题通常首轮之后才生成，那就等 session/title 事件补名。
       const currentName = String(doc.name || '').trim();

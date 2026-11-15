@@ -45,6 +45,28 @@ test('读取素材保留连线端口和顺序，素材缺失停止',async()=>{
  assert.equal(read.references[0].path,image);assert.equal(read.edges[0].toPort,'frame');
  f.assets.clear();await assert.rejects(api.readCanvasInput(f.adapter,{projectId:'p',nodeId:'v'}),/未落盘/);
 });
+test('画面节点出图后回溯给下游当首帧；目标节点自己的成果不回算成输入',async()=>{
+ const f=fixture();
+ const frame=path.join(temp,'画面.png');await writeFile(frame,'png');
+ const film=path.join(temp,'成片.mp4');await writeFile(film,'mp4');
+ f.assets.set('af',{id:'af',kind:'image',rel:'image/af.png',path:frame});
+ f.assets.set('av',{id:'av',kind:'video',rel:'video/av.mp4',path:film});
+ f.change(d=>{
+  d.nodes.f={id:'f',type:'image',x:0,y:400,w:360,h:300,data:{label:'第1段 · 画面',prompt:'海边日出',ratio:'9:16',metaonticFrameOf:'v'}};
+  d.edges.unshift({id:'ef',fromNode:'f',fromPort:'out',toNode:'v',toPort:'frame'});
+  // 画面节点的成果是独立节点，只靠 metaonticSourceNode 指回它。
+  d.nodes.rf={id:'rf',type:'image',metaonticSourceNode:'f',metaonticCreatedAt:1,x:400,y:400,w:360,h:280,data:{assetId:'af',label:'MetaOntic · 第1段画面'}};
+ });
+ const before=await api.readCanvasInput(f.adapter,{projectId:'p',nodeId:'v'});
+ assert.deepEqual(before.references.map(r=>r.assetId),['af'],'画面节点出图后接给下游当首帧');
+ assert.equal(before.nodes.find(n=>n.id==='v').assetId,'','目标节点自己的成果不算它自己的输入');
+ // 目标节点生成出成果后结论与指纹不变：刚做出来的成果不该被当成「画布被改过」而让审核失效。
+ f.change(d=>{d.nodes.rv={id:'rv',type:'video',metaonticSourceNode:'v',metaonticCreatedAt:2,x:800,y:0,w:360,h:280,data:{assetId:'av',label:'MetaOntic · 第1段'}};});
+ const after=await api.readCanvasInput(f.adapter,{projectId:'p',nodeId:'v'});
+ assert.equal(after.canvas.fingerprint,before.canvas.fingerprint,'自己的成果不回流成输入，审核指纹保持稳定');
+ assert.deepEqual(after.references.map(r=>r.assetId),['af']);
+});
+
 test('回填新增实际视频节点，重复补传不重复节点，不覆盖源稿',async()=>{
  const f=fixture(),file=path.join(temp,'第一段.mp4');await writeFile(file,'mock-mp4');
  const record={id:'test-result',canvas:{projectId:'p',nodeId:'v'},createdAt:1,phase:'segment_review',ratio:'9:16',media:[{kind:'video',label:'第1段',localPath:file}]};

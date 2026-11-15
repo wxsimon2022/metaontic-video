@@ -19,6 +19,7 @@ import { mergeClips } from '../media/merge.js';
 import { hasFfmpeg, ffmpegInstallHint } from '../media/ffmpeg.js';
 import { downloadFile } from '../media/download.js';
 import { canvasScriptPreview, scriptStoryboardShots } from './canvas-project.js';
+import { refreshStageNodes } from './canvas-stages.js';
 import { clampInteger } from '../../../core/utils/validation.js';
 import { MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_TOTAL_SECONDS } from '../config.js';
 
@@ -141,7 +142,7 @@ export function planCanvasNative(input, config, operation = 'generate', draft: a
   const images = refs.map(e => {
     if (!['ref', 'frame'].includes(e.toPort) || e.fromPort !== 'out') throw new Error('当前仅支持图片out连接ref/首帧口；尾帧选取等连接请先导出为图片节点。');
     const media = input.references.find(r => r.nodeId === e.fromNode);
-    if (!media || media.kind !== 'image') throw new Error('参考端口需要已保存的图片素材。');
+    if (!media || media.kind !== 'image') throw new Error('参考端口连的上游节点还没有生成好的图片：先在它自己的「制作」里出一张图，再回来做这一步。');
     return { port: e.toPort, path: media.path, nodeId: e.fromNode };
   });
   if (node.frameMode === 'off' && images.some(x => x.port === 'frame')) throw new Error('首帧端口已连接但节点关闭了首帧，请先统一设置。');
@@ -228,7 +229,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
     const doc = await adapter.rpc.projectsGet({ id: projectId });
     if (!doc?.nodes) throw new Error('画布不存在或已删除。');
     const order = pendingVideoOrder(doc);
-    if (!order.length) throw new Error('画布上没有待制作的视频节点：先点「写脚本…」铺开，或新建一个视频节点。');
+    if (!order.length) throw new Error('画布上没有待制作的视频节点：点画布空白处打开「创作流程」铺开整条流程，或新建一个视频节点。');
     const segments: any[] = [];
     let carry = null;
     for (const [index, node] of order.entries()) {
@@ -403,7 +404,9 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       segments: segments.map(x => ({ index: x.index + 1, label: x.label, seconds: x.seconds, bytes: x.bytes })) };
     await adapter.rpc.assetCreate({ projectName: doc.name || '', asset: { id, projectId: link.projectId, kind: 'video', mime: 'video/mp4', name: '成片',
       rel, size: (await stat(dest)).size, createdAt: film.updatedAt, stored: 'disk', source: 'metaontic-video' } });
-    await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, film, ts: Date.now() } });
+    // 成片落盘后刷新流程阶段条：只改插件自己写的阶段节点，用户改过的保留。
+    const staged = refreshStageNodes({ ...doc, film });
+    await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, film, nodes: staged.nodes, ts: Date.now() } });
     return { ok: true, film: { ...film, url: mediaUrl(id) } };
   }
 
