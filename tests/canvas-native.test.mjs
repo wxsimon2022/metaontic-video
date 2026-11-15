@@ -272,6 +272,7 @@ test('画布内 AI 写脚本：走文本模型一次，把段数与画幅带进�
   assert.equal(made.script.startsWith('# 片名'), true);
   assert.equal(made.model, 'deepseek v4.1 flash');
   assert.equal(made.segments, 2);
+  assert.equal(made.truncated, false, '没被截断时不打扰用户');
   assert.equal(s.calls(), 0, '写脚本不触发视频生成');
   const info = await s.handle({ action: 'info' });
   assert.equal(info.textModel, 'deepseek v4.1 flash');
@@ -280,6 +281,10 @@ test('画布内 AI 写脚本：走文本模型一次，把段数与画幅带进�
   const broken = await service({ writeScript: async () => { throw new Error('文本模型调用失败：model not found'); } });
   await assert.rejects(() => broken.handle({ action: 'write', idea: 'x' }), /model not found/);
   broken.dispose();
+  // 写到输出上限要透传给画布：用户看到的是「脚本可能不完整」，而不是把截断的脚本当成品。
+  const cut = await service({ writeScript: async () => ({ script: '# 片名', model: 'm', usage: {}, truncated: true }) });
+  assert.equal((await cut.handle({ action: 'write', idea: 'x' })).truncated, true);
+  cut.dispose();
 });
 
 test('关了共用密钥：文本模型算自己的密钥，没填就不算就绪、写脚本直接报错', async () => {

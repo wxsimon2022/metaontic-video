@@ -42,6 +42,62 @@ test('文本模型写脚本：空想法、缺密钥、上游报错与空正文�
   await assert.rejects(() => api.writeScript(config, { idea: 'x' }, { fetcher: async () => { throw new Error('socket hang up'); } }), /socket hang up/);
 });
 
+function sseResponse(chunks, { status = 200, headers = { 'content-type': 'text/event-stream' } } = {}) {
+  const payload = chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n';
+  return new Response(payload, { status, headers });
+}
+
+test('文本模型写脚本：默认流式增量收正文，按段数给输出上限，被截断时回报 truncated', async () => {
+  const calls = [];
+  const fetcher = async (url, options) => {
+    calls.push(JSON.parse(options.body));
+    return sseResponse([
+      { model: 'deepseek v4.1 flash', choices: [{ delta: { content: '# 青旅的清晨\n\n' } }] },
+      { choices: [{ delta: { content: '| 镜号 | 镜别 | 运镜 | 画面 | 时长 | 台词 |\n' } }] },
+      { choices: [{ delta: { content: '| 1 | 远景 | 固定镜头 | 天台晨光 | 15秒 | — |' } }], usage: { prompt_tokens: 12, completion_tokens: 34 } },
+      { choices: [{ delta: {}, finish_reason: 'length' }] },
+    ]);
+  };
+  const seen = [];
+  const result = await api.writeScript(config, { idea: '青旅天台的清晨', totalSeconds: 30, segments: 2, ratio: '9:16' },
+    { fetcher, onProgress: (progress) => seen.push(progress.characters) });
+  assert.equal(calls[0].stream, true, '默认流式：能报进度，也能尽早发现连接假死');
+  assert.deepEqual(calls[0].stream_options, { include_usage: true }, '流式里也要 usage，费用与用量才可核对');
+  assert.equal(calls[0].max_tokens, api.textMaxTokens(2), '按段数给输出上限，既够长又有封顶');
+  assert.ok(calls[0].max_tokens >= 3000, `上限要装得下带分镜表的整份脚本：${calls[0].max_tokens}`);
+  assert.equal(result.script, '# 青旅的清晨\n\n| 镜号 | 镜别 | 运镜 | 画面 | 时长 | 台词 |\n| 1 | 远景 | 固定镜头 | 天台晨光 | 15秒 | — |', '把增量按顺序拼回正文');
+  assert.equal(result.model, 'deepseek v4.1 flash');
+  assert.deepEqual(result.usage, { promptTokens: 12, completionTokens: 34 });
+  assert.equal(result.truncated, true, '写到输出上限要回报，客户端据此提醒用户补写而不是当完整脚本用');
+  assert.ok(seen.length >= 1 && seen.every((count) => count > 0), `读到增量就要报进度：${seen.join(',')}`);
+  assert.ok(seen.every((count, index) => index === 0 || count > seen[index - 1]), `进度只增不减：${seen.join(',')}`);
+  assert.ok(seen[seen.length - 1] >= result.script.length, '最后一次进度就是正文长度');
+  assert.equal(result.characters, result.script.length);
+});
+
+test('文本模型写脚本：流式里上游报错、空正文、写不满一半就断都要报错，不伪造脚本', async () => {
+  const failing = async () => sseResponse([{ error: { message: 'rate limit exceeded' } }]);
+  await assert.rejects(() => api.writeScript(config, { idea: 'x' }, { fetcher: failing }), /rate limit exceeded/);
+  await assert.rejects(() => api.writeScript(config, { idea: 'x' }, { fetcher: async () => sseResponse([{ choices: [{ delta: { content: '   ' } }] }]) }), /空脚本/);
+  await assert.rejects(() => api.writeScript(config, { idea: 'x' }, { fetcher: async () => sseResponse([{ choices: [{ delta: {} }] }]) }), /空脚本/);
+  const bad = async () => sseResponse([], { status: 502 });
+  await assert.rejects(() => api.writeScript(config, { idea: 'x' }, { fetcher: bad }), /文本模型调用失败：502/);
+});
+
+test('文本模型写脚本：连接假死按增量上限提前报错，不必等满总超时', async () => {
+  assert.ok(api.TEXT_IDLE_TIMEOUT_MS < api.TEXT_TIMEOUT_MS, '增量上限要严于总上限，否则等于没兜住');
+  // 真实 fetch 在 signal 中止时会打断 body；桩里照做，否则挂住的流永远读不完。
+  const stalled = async (url, options) => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('data: '));
+      options.signal.addEventListener('abort', () => controller.error(new Error('文本模型连接被中止')), { once: true });
+    },
+  }), { headers: { 'content-type': 'text/event-stream' } });
+  const started = Date.now();
+  await assert.rejects(() => api.writeScript(config, { idea: 'x' }, { fetcher: stalled, idleTimeoutMs: 80 }), /没有输出/);
+  assert.ok(Date.now() - started < 5000, '卡住时按增量上限立刻报错');
+});
+
 test('文本模型默认值：设置页选的型号优先，其次环境变量，最后内置默认值', () => {
   assert.equal(api.resolveTextModel({ ...config, textModel: 'my-relay-model' }), 'my-relay-model');
   assert.equal(api.resolveTextModel(config), 'deepseek v4.1 flash');

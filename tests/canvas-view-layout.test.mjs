@@ -853,3 +853,35 @@ test('画布体检摘要不把用户指到打不开的地方：没有视频制�
   assert.ok(!line.includes('连拍'), `没有视频节点时不该提「连拍」：${line}`);
   assert.ok(line.includes('不涉及费用与审核'), '体检口径照旧要说清楚');
 });
+
+test('画布内写脚本：等文本模型不算 20 秒就掐掉，被输出上限截断时提醒用户', async () => {
+  assert.ok(api.TEXT_WRITE_TIMEOUT_MS > 20000 && api.TEXT_WRITE_TIMEOUT_MS >= 120000,
+    `写脚本要等几十秒，RPC 超时按分钟计：${api.TEXT_WRITE_TIMEOUT_MS}`);
+  const doc = { projectId: 'p1', name: '青旅宣传片', dataRoot: '/tmp/canvas', edges: [], nodes: {
+    req: { id: 'req', type: 'text', x: 60, y: 60, w: 320, h: 200, data: {
+      ...api.requirementNodeData('青旅天台的清晨', 30, 15, '16:9', '720p'),
+      metaonticStage: 'requirement', metaonticStageState: 'done', metaonticStageFacts: { requirementSettled: true, duration: 30 } } },
+  } };
+  const { FlowCanvas, mini } = harness({
+    list: { canvases: [{ projectId: 'p1', name: '青旅宣传片', nodeCount: 1 }] },
+    get: { canvas: { ...doc, nodes: { ...doc.nodes } } },
+  }, { info: { singleMax: 15, videoReady: true, textModel: 'deepseek v4.1 flash', textReady: true },
+    write: { script: '# 片名\n\n正文', model: 'deepseek v4.1 flash', usage: {}, truncated: true } });
+  const flush = async (rounds = 40) => { for (let i = 0; i < rounds; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
+  mini.begin(); FlowCanvas();
+  await mini.flush();
+  mini.begin();
+  clickFlowEntry(FlowCanvas());
+  await mini.flush();
+  mini.begin();
+  const tree = FlowCanvas();
+  const modal = find(tree, (node) => node.props.key === 'script-modal');
+  assert.ok(texts(modal).includes('写脚本'), '需求已确认，入口直接进第二步');
+  find(modal, (node) => node.props.key === 'write').props.onClick();
+  await flush();
+  mini.begin();
+  const after = find(FlowCanvas(), (node) => node.props.key === 'script-modal');
+  const line = texts(after).join('');
+  assert.ok(line.includes('输出上限'), `截断要提醒用户，不能当成完整脚本：${line}`);
+  assert.ok(find(after, (node) => node.type === 'textarea').props.value.includes('正文'), '正文照旧填回面板，用户自己决定要不要补');
+});

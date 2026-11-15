@@ -20,6 +20,7 @@ import { hasFfmpeg, ffmpegInstallHint } from '../media/ffmpeg.js';
 import { downloadFile } from '../media/download.js';
 import { canvasScriptPreview, scriptStoryboardShots } from './canvas-project.js';
 import { refreshStageNodes } from './canvas-stages.js';
+import { appendRequestLog } from '../../../core/utils/logging.js';
 import { clampInteger } from '../../../core/utils/validation.js';
 import { MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_TOTAL_SECONDS } from '../config.js';
 
@@ -558,8 +559,27 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       const count = planVideoSegments(totalSeconds, singleMax, segmentSeconds).length;
       assertConfigured(config, resolveApiKey(config));
       const writer = options.writeScript || writeScript;
-      const result = await writer(config, { idea: args.idea, totalSeconds, segmentSeconds, segments: count, ratio: args.ratio || '16:9' }, {});
-      return { script: result.script, model: result.model, usage: result.usage, totalSeconds, segmentSeconds, segments: count };
+      // 写脚本是画布上最慢的一次等待（实测 40–70 秒）：按 10 秒节奏记一条增量日志，
+      // 用户报「写脚本很慢」时能在 requests.jsonl 里看到是模型慢还是上游卡住。
+      const startedAt = Date.now(); let last = 0;
+      let result;
+      try {
+        result = await writer(config, { idea: args.idea, totalSeconds, segmentSeconds, segments: count, ratio: args.ratio || '16:9' },
+          { onProgress: (progress: any) => {
+            const at = Date.now();
+            if (at - last < 10000) return;
+            last = at;
+            void appendRequestLog({ event: 'text_model_progress', action: 'write', model: resolveTextModel(config),
+              characters: Number(progress?.characters) || 0, chunks: Number(progress?.chunks) || 0, elapsedMs: at - startedAt }).catch(() => {});
+          } });
+      } catch (error) {
+        await appendRequestLog({ event: 'text_model_failed', action: 'write', model: resolveTextModel(config), elapsedMs: Date.now() - startedAt,
+          reason: String(error?.message || '写脚本失败').slice(0, 200) }).catch(() => {});
+        throw error;
+      }
+      await appendRequestLog({ event: 'text_model_done', action: 'write', model: result.model, elapsedMs: Date.now() - startedAt,
+        characters: result.characters, truncated: result.truncated === true }).catch(() => {});
+      return { script: result.script, model: result.model, usage: result.usage, totalSeconds, segmentSeconds, segments: count, truncated: result.truncated === true };
     }
     // 写脚本 → 分段计划：只算方案，不建节点、不接触模型费用。
     if (args.action === 'plan') {

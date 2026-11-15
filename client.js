@@ -1194,7 +1194,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "3.24.1".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.24.2".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1625,7 +1625,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.24.1",
+    version: "3.24.2",
     description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1731,11 +1731,12 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.24.1",
+      version: "3.24.2",
       prerelease: false,
-      publishedAt: "2026-11-13T06:37:11.658Z",
+      publishedAt: "2026-11-15T14:39:59.746Z",
       items: [
-        "\u4F18\u5316\uFF1A\u533F\u540D\u4F7F\u7528\u7EDF\u8BA1\u53E3\u5F84\u66F4\u51C6\u786E\uFF0C\u753B\u5E03\u7B49\u5DE5\u5177\u7684\u8C03\u7528\u4F1A\u88AB\u8BA1\u5165\uFF0C\u6D4B\u8BD5\u7248\u4E0D\u518D\u8BA1\u5165\u7EDF\u8BA1\u3002"
+        "\u65B0\u589E\uFF1A\u6D41\u7A0B\u753B\u5E03\u53EF\u89C6\u5316\u521B\u4F5C\uFF1A\u4E03\u5F20\u9636\u6BB5\u5361\u4E32\u8D77\u9700\u6C42\u5230\u6210\u7247\uFF0C\u4E24\u6B65\u521B\u4F5C\u94FA\u51FA\u5267\u672C\u3001\u5206\u955C\u3001\u753B\u9762\u4E0E\u89C6\u9891\u8282\u70B9\uFF0C\u811A\u672C\u5BA1\u6838\u5728\u753B\u5E03\u5B8C\u6210\u3002",
+        "\u4F18\u5316\uFF1A\u5199\u811A\u672C\u66F4\u5FEB\uFF1A\u5206\u955C\u793A\u610F\u56FE\u672C\u5730\u6E32\u67D3\u3001\u811A\u672C\u53EA\u5199\u4E00\u6B21\uFF1B\u8FDE\u62CD\u8DF3\u8FC7\u5DF2\u6709\u6210\u679C\u7684\u6BB5\uFF0C\u4E0D\u91CD\u590D\u751F\u6210\u4E0E\u8BA1\u8D39\u3002"
       ]
     }
   };
@@ -2726,6 +2727,7 @@
   }
 
   // src/businesses/video/client/canvas-view.ts
+  var TEXT_WRITE_TIMEOUT_MS = 18e4;
   async function canvasNativeRpc(args, fetcher = fetch, timeoutMs = 2e4) {
     const response = await fetcher("/metaontic-video/canvas-native", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(args), signal: AbortSignal.timeout(timeoutMs) });
     let body;
@@ -3025,6 +3027,7 @@
       const [inline, setInline] = React.useState(null);
       const [createDialog, setCreateDialog] = React.useState(null);
       const [scriptDialog, setScriptDialog] = React.useState(null);
+      const [clock, setClock] = React.useState(0);
       const [chainDialog, setChainDialog] = React.useState(null);
       const [filmDialog, setFilmDialog] = React.useState(null);
       const [importing, setImporting] = React.useState(false);
@@ -3043,6 +3046,11 @@
         if (timer.current) clearInterval(timer.current);
         if (chainTimer.current) clearInterval(chainTimer.current);
       }, []);
+      React.useEffect(() => {
+        if (!scriptDialog?.writing) return void 0;
+        const ticker = setInterval(() => setClock(Date.now()), 1e3);
+        return () => clearInterval(ticker);
+      }, [scriptDialog?.writing]);
       const load = React.useCallback(async (projectId) => {
         try {
           setError("");
@@ -3382,7 +3390,7 @@
           patchScriptDialog({ error: "\u5148\u5199\u4E00\u53E5\u60F3\u62CD\u4EC0\u4E48\uFF0C\u6587\u672C\u6A21\u578B\u624D\u6709\u5F97\u5199\u3002" });
           return;
         }
-        patchScriptDialog({ busy: true, error: "", plan: null });
+        patchScriptDialog({ busy: true, writing: true, writingSince: Date.now(), error: "", plan: null });
         try {
           const result = await canvasNativeRpc({
             action: "write",
@@ -3391,12 +3399,18 @@
             totalSeconds: scriptDialog.totalSeconds,
             segmentSeconds: scriptDialog.segmentSeconds,
             ratio: scriptDialog.ratio
-          });
+          }, fetch, TEXT_WRITE_TIMEOUT_MS);
           if (!alive.current) return;
-          patchScriptDialog({ busy: false, text: result.script, error: "" });
+          patchScriptDialog({
+            busy: false,
+            writing: false,
+            writingSince: 0,
+            text: result.script,
+            error: result.truncated === true ? "\u6587\u672C\u6A21\u578B\u5199\u5230\u4E86\u8F93\u51FA\u4E0A\u9650\uFF0C\u811A\u672C\u53EF\u80FD\u4E0D\u5B8C\u6574\uFF1A\u628A\u76EE\u6807\u65F6\u957F\u8C03\u77ED\u4E00\u4E9B\uFF0C\u6216\u5206\u4E24\u6B21\u5199\uFF0C\u518D\u6838\u5BF9\u5206\u955C\u8868\u3002" : ""
+          });
           setNotice(`\u6587\u672C\u6A21\u578B\uFF08${result.model}\uFF09\u5DF2\u5199\u51FA\u5267\u672C\uFF1A\u6838\u5BF9\u5206\u955C\u8868\u540E\u70B9\u300C\u9884\u89C8\u5206\u6BB5\u300D\uFF0C\u518D\u751F\u6210\u5236\u4F5C\u8282\u70B9\u3002`);
         } catch (e) {
-          if (alive.current) patchScriptDialog({ busy: false, error: e?.message || "\u6587\u672C\u6A21\u578B\u6CA1\u6709\u5199\u51FA\u811A\u672C\u3002" });
+          if (alive.current) patchScriptDialog({ busy: false, writing: false, writingSince: 0, error: e?.message || "\u6587\u672C\u6A21\u578B\u6CA1\u6709\u5199\u51FA\u811A\u672C\u3002" });
         }
       }, [canvas, scriptDialog, patchScriptDialog]);
       const previewScript = React.useCallback(async () => {
@@ -4562,7 +4576,7 @@
               placeholder: "\u5199\u4E0B\u8981\u62CD\u7684\u5185\u5BB9\u3002\u5199\u6210 Markdown \u5206\u955C\u8868\uFF08\u8868\u5934\u542B\u300C\u955C\u53F7\u300D\u300C\u955C\u522B\u300D\u300C\u8FD0\u955C\u300D\u300C\u753B\u9762\u300D\u5217\uFF09\u65F6\u4F1A\u6309\u5206\u955C\u5207\u6BB5\uFF1B\u5426\u5219\u6309\u53E5\u5B50\u3001\u6BB5\u843D\u6309\u5B57\u6570\u5747\u5206\u3002\u5199\u591A\u5C11\u62C6\u591A\u5C11\uFF0C\u4E0D\u81EA\u52A8\u7F16\u5185\u5BB9\u3002",
               onChange: (e) => patchScriptDialog({ text: e.target.value, error: "" })
             })]),
-            h("p", { key: "note", className: "movc-status" }, `\u300CAI \u5199\u811A\u672C\u300D\u4F1A\u6309\u8BBE\u7F6E\u9875\u7684\u6587\u672C\u6A21\u578B\uFF08${scriptDialog.textModel || "\u6587\u672C\u6A21\u578B"}\uFF09\u628A\u9700\u6C42\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF0C\u5355\u72EC\u6309\u6587\u672C\u8BA1\u8D39\uFF1B\u8981\u6539\u65F6\u957F\u3001\u753B\u5E45\u6216\u6E05\u6670\u5EA6\uFF0C\u5148\u56DE\u4E0A\u4E00\u6B65\u300C\u6539\u9700\u6C42\u300D\u3002`),
+            h("p", { key: "note", className: "movc-status" }, `\u300CAI \u5199\u811A\u672C\u300D\u4F1A\u6309\u8BBE\u7F6E\u9875\u7684\u6587\u672C\u6A21\u578B\uFF08${scriptDialog.textModel || "\u6587\u672C\u6A21\u578B"}\uFF09\u628A\u9700\u6C42\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF0C\u5355\u72EC\u6309\u6587\u672C\u8BA1\u8D39\uFF1B\u8981\u6539\u65F6\u957F\u3001\u753B\u5E45\u6216\u6E05\u6670\u5EA6\uFF0C\u5148\u56DE\u4E0A\u4E00\u6B65\u300C\u6539\u9700\u6C42\u300D\u3002${scriptDialog.writing ? ` \u6587\u672C\u6A21\u578B\u6B63\u5728\u5199\uFF1A\u5DF2\u7B49\u5F85 ${Math.max(0, Math.round((clock - (scriptDialog.writingSince || clock)) / 1e3))} \u79D2\uFF08\u4E00\u6B21\u901A\u5E38 30\u201390 \u79D2\uFF0C\u53EF\u4EE5\u5148\u53BB\u522B\u7684\u5730\u65B9\u770B\u770B\uFF09\u3002` : ""}`),
             scriptDialog.plan ? h("div", { key: "plan", className: "movc-plan" }, [
               h("div", { key: "head" }, `\u5206\u6BB5\u8BA1\u5212\uFF1A${scriptDialog.plan.segments.length} \u6BB5 \xB7 \u5171 ${scriptDialog.plan.totalSeconds} \u79D2${scriptDialog.plan.shots?.length ? ` \xB7 \u8BC6\u522B\u5230 ${scriptDialog.plan.shots.length} \u4E2A\u5206\u955C` : ""}`),
               ...scriptDialog.plan.segments.map((segment, index) => h("div", { key: `s${index}` }, `\u7B2C${index + 1}\u6BB5 ${segment.seconds} \u79D2\uFF08${segment.kind === "extend" ? "\u7EED\u62CD" : "\u9996\u6BB5"}\uFF09\uFF1A${String(segment.prompt).slice(0, 90)}${String(segment.prompt).length > 90 ? "\u2026" : ""}`))
@@ -4570,7 +4584,7 @@
             scriptDialog.error ? h("p", { key: "err", className: "movc-status", "data-error": "true" }, scriptDialog.error) : null,
             h("div", { key: "ops", className: "movc-bar" }, [
               h("button", { key: "cancel", type: "button", className: "mov-btn", disabled: scriptDialog.busy, onClick: () => setScriptDialog(null) }, "\u53D6\u6D88"),
-              h("button", { key: "write", type: "button", className: "mov-btn", disabled: scriptDialog.busy, title: "\u7528\u8BBE\u7F6E\u9875\u91CC\u914D\u7F6E\u7684\u6587\u672C\u6A21\u578B\u628A\u9700\u6C42\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF0C\u4F1A\u8C03\u7528\u4E00\u6B21\u6587\u672C\u6A21\u578B", onClick: () => void writeWithModel() }, "AI \u5199\u811A\u672C"),
+              h("button", { key: "write", type: "button", className: "mov-btn", disabled: scriptDialog.busy, title: "\u7528\u8BBE\u7F6E\u9875\u91CC\u914D\u7F6E\u7684\u6587\u672C\u6A21\u578B\u628A\u9700\u6C42\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF0C\u4F1A\u8C03\u7528\u4E00\u6B21\u6587\u672C\u6A21\u578B", onClick: () => void writeWithModel() }, scriptDialog.writing ? "\u6B63\u5728\u5199\u811A\u672C\u2026" : "AI \u5199\u811A\u672C"),
               h("button", { key: "preview", type: "button", className: "mov-btn", disabled: scriptDialog.busy, onClick: () => void previewScript() }, "\u9884\u89C8\u5206\u6BB5"),
               h("button", { key: "ok", type: "button", className: "mov-btn mov-btn-primary", disabled: scriptDialog.busy, onClick: () => void createFromScript() }, "\u751F\u6210\u5236\u4F5C\u8282\u70B9")
             ])

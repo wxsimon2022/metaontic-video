@@ -551,16 +551,16 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 
 未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。
 
-## 待确认：连拍会把已有成果的段重新排进方案（既有问题，未改）
+## 连拍会把已有成果的段重新排进方案（canvas.8 自查发现，canvas.14 已修）
 
-自查时发现的一处既有问题，**不在本次改动范围内，故意没有动**，因为它落在付费路径上：
+canvas.8 自查时发现的一处既有问题。它落在付费路径上，当时按约定先记录、先与用户确认；用户确认后已在 canvas.14 修掉，诊断与修法都保留在下面：
 
 - `pendingVideoOrder` 的函数注释写「成果节点与已产出节点不参与」，但过滤条件只有 `type === 'video' && !metaonticSourceNode && !data.assetId`，画布内制作出来的成果是**独立节点**（`publishCanvasResult` 另建一个带 `metaonticSourceNode` 的节点），来源节点自己的 `data.assetId` 始终为空 —— 所以「已产出」这个条件实际上没有生效。
 - 结果：`chainPlan` 会把已经有成果的视频节点也排进连拍方案并估算费用。实测（临时代码探针）：v1 已有成果、v2/v3 没有时，连拍顺序是 `["v1","v2","v3"]`。用户先单独「制作」了第 1 段、再点「连拍」，第 1 段会被重新生成一次；更常见的是**跑完连拍后再加一段、重新点连拍**——`chainStart` 只用「整条方案签名」跟**上一次的连拍记录**比对，新增一段会改掉签名，于是前面已经出成的几段会被重新提交计费。
 - 不能简单地在 `pendingVideoOrder` 里加过滤：`filmSegments` 也用它来枚举**全部**视频段并列出缺成果的段，过滤掉已产出的会让成片少拼几段还一声不响。
-- 合理的修法是保留「全部视频段」的枚举，在 `chainPlan` 里跳过已有成果的段，并把这些段的既有成果当作下一段的续拍输入（`carry`）；方案预览要标出哪几段是「已有成果、本次跳过」，费用估算也只算本次要生成的部分。这会改动 `chain` 记录里段序的含义与连拍弹窗的编号，属于付费转换口径的变化，按约定先与用户确认再做。
+- 合理的修法是保留「全部视频段」的枚举，在 `chainPlan` 里跳过已有成果的段，并把这些段的既有成果当作下一段的续拍输入（`carry`）；方案预览要标出哪几段是「已有成果、本次跳过」，费用估算也只算本次要生成的部分。
 
-临时探针与结论都留在本机 `/tmp/probe-chain.mjs`，不入库。
+**canvas.14 已按上面这条修法落地**：跳过段的判定复用新导出的 `latestVideoResult`，费用只算本次要生成的部分（`chainCost`），跳过段带着已有成果顺延成下一段的续拍输入；整条链路都已有成果时不再进连拍。实现与验证细节见文末「写脚本提速 + 连拍不再重复生成已有成果的段 3.24.0-canvas.14」一节。临时探针与当时的结论留在本机 `/tmp/probe-chain.mjs`，不入库。
 
 ## 按 LibTV 口径补「画面」节点：剧本 → 分镜 → 每段画面 → 视频 3.24.0-canvas.10
 
@@ -590,4 +590,56 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 
 **已确认的范围缺口（未做）**：助手侧投影（`canvas-project.ts`）没有跟着铺画面节点。那里一张 `video` 制作节点累积**整条片子**的多段成果（外加每段一个只读文本说明节点），「每段一个画面」在那种结构里没有对应位置，硬加会变成「一个视频节点对应多张画面」的错配；要一起改，得先决定助手侧是否也改成「一段一个视频节点 + 一个画面节点」，那是投影结构的调整，涉及既有 `managed` 差异保护与旧画布迁移，先不动，等用户确认。
 
-另：`pendingVideoOrder` 会把已有成果的段重新排进连拍方案（既有问题，未改，见上一条待确认记录），本轮未触碰。
+另：`pendingVideoOrder` 会把已有成果的段重新排进连拍方案（本轮未触碰；更新：canvas.14 已修复，见文末 3.24.0-canvas.14 一节）。
+
+## 写脚本提速 + 连拍不再重复生成已有成果的段 3.24.0-canvas.14
+
+用户要求「定位下现在生成脚本很慢，慢在哪儿、如何优化」，并确认「按照建议全部修改」。整轮改动分两块：把生成脚本这条路上可以省掉的时间从流程里拿掉，以及顺手修掉 canvas.8 自查发现、当时留给用户确认的连拍重复计费问题。
+
+### 慢在哪儿（真实日志，不是推测）
+
+拿真实一轮（民勤，`~/.dsh/logs/metaontic-video/20261115/requests.jsonl`）逐条对：`script_design` 97.0 秒 + `storyboard_design` 31.0 秒 + `script_present` 10.7 秒 ≈ 139 秒；同一时间段的插件工具调用合计不到 1 秒。也就是说时间全在模型生成上，其中三段是可以不发生的：
+
+- 正文写脚本 68.3 秒（3,986 字）——模型逐字生成，这属于必要的创作时间；
+- 助手另外手写了一份 15.6 KB 的 `draw_storyboard.py` 画分镜（`storyboard_design` 31.0 秒），还落在用户项目目录里；
+- 正文再把整份脚本复述一遍（`script_present` 10.7 秒）——脚本在正文已经写过一次，第二次只是为了配合当时的审核守卫。
+
+另一轮（naiman）合计约 108 秒，构成一样。
+
+### 插件就地渲染分镜示意图
+
+新增 `workflow/storyboard-image.ts`（`renderStoryboardSvg` / `storyboardFileName` / `nextStoryboardVersion` / `titleOf` / `wrapText`）与新的 `video_project(action:'storyboard', projectId, scriptPath, captureScript)`：读脚本 → 按分镜表逐镜头画卡（镜号 / 景别运镜 / 画面 / 时长 / 台词 / 声音，XML 转义，底部写明「分镜示意，非实际生成画面」与「本地渲染、不调用付费出图模型」）→ 落在脚本旁边 `storyboard-v<N>.svg`，版本号按目录里已有文件递增 → 返回 `path / version / shots / bytes / markdown / link / hint`。脚本里没有可解析的分镜表时返回空表提示（「先补一个带『镜号 / 镜别 / 运镜 / 画面 / 时长』的分镜表」），不编内容。助手不再写 Python/SVG 画分镜，也不必为画图多开一轮生成；脚本分镜解析抽到 `workflow/storyboard-shots.ts`（`canvas-project.ts` 改为导入并继续转发，行为不变）。
+
+### 脚本只在正文写一遍，插件落 script.md
+
+`captureScript: true` 时插件把本轮用户可见正文里的脚本落成 `script.md`（新增 `workflow/script-capture.ts` 的 `captureScriptBody`：从第一个 `# ` 标题起截取，去掉尾部空行、分隔线、图片链接与 `<target>` 行；正文不足 200 字、只是摘要或只给链接时返回空并直接报错，不编造）。`storyboard` 与 `review` 两个动作都支持；落盘同时结束 `script_design` 计时并记 `script_saved`（文件名、新建或改写、字数、脚本版本）。老路子（助手自己用写文件工具写）仍然可用。
+
+### 提示词与减少往返
+
+`prompts/guidance.ts` 与 `skills/video-director/SKILL.md` 同步新口径：分镜必须走 `storyboard` 动作、禁止自写绘图代码与 Python/SVG、脚本只在正文写一次；并新增「减少往返与空转」一条：同一轮里把可以并行的只读调用一起发。注意 `video_project` 仍然是 `isConcurrencySafe() { return false }`（它按住付费路径上的方案与审核状态，串行更安全），同轮多调用会被宿主串行执行——省下的是模型往返，而不是并发。
+
+### 画布内「AI 写脚本」的等待口径
+
+`providers/text.ts`：
+
+- 默认流式（`stream: true` + `stream_options.include_usage`），边收边拼正文、顺手攒 usage 与结束原因；
+- 按段数给输出上限 `textMaxTokens = min(8000, 1600 + 段数 × 800)`，`finish_reason: 'length'` 时回报 `truncated`，画布提示「脚本可能不完整，把目标时长调短一些或分两次写」；
+- 增量之间超过 30 秒没有输出就报错（`TEXT_IDLE_TIMEOUT_MS`，可用 `idleTimeoutMs` 覆盖），不再只有一个 120 秒总超时干等；
+- 画布侧 RPC 超时从默认 20 秒改成 `TEXT_WRITE_TIMEOUT_MS = 180000`：原来一次 40–70 秒的写脚本必然在 20 秒被客户端掐断，而服务端还在写，用户看到的是「没写出脚本」；现在弹窗里显示「文本模型正在写：已等待 N 秒」，并按 10 秒节奏记 `text_model_progress`，结束时记 `text_model_done`（用时、字数、是否截断），失败记 `text_model_failed`（原因）。
+
+### 连拍不再重复生成已有成果的段
+
+- `pendingVideoOrder` 继续枚举**全部**视频段（成片拼段要用它），`chainPlan` 逐段用新增的 `latestVideoResult(doc, nodeId)` 判断是否已有成果：有成果的段标 `skip: true`，不估费、不进签名；它已有的视频地址顺延成下一段的 `carry`（续拍输入），产出的段却没有可用视频地址时直接报「上一段「…」的成果没有可用的视频地址…」。`filmSegments` 也改用同一个 `latestVideoResult`。
+- 费用只算本次要生成的部分：新增模块级 `chainCost(segments)`（只合计非跳过段），`chainView` 与 `chainPlan` 共用同一口径；`chainSignature` 带上 `skip`，加一段不会再让前面的段重新提交。
+- `chainStart` 在待生成段为 0 时直接报「画布上的视频段都已有成果，不需要再连拍；要重做某一段，点那个节点自己的「制作」」，不再空转提交；`runChainSegment` 跳过已完成段（`chain.jobs[i] = null`，carry 从画布现有成果取），`chainNext` 不再重复这段逻辑。
+- 画布弹窗：标题写「连拍方案：本次生成 N 段（另有 M 段已有成果，跳过不重复生成）…」，跳过行标「✓ 第N段「…」…：已有成果，本次跳过（不重复生成、不重复计费）」（`data-skip='true'`），批量清单、就绪判断与「开始连拍」按钮都以 `chainPlanPending` 为准；整条链路都已有成果时给一行单独说明。
+
+### 验证与本地成品
+
+验证：类型检查通过；**546 项自动测试**全过（新增 `tests/storyboard-image.test.mjs` 4 条、`tests/script-capture.test.mjs` 3 条、`tests/text-model.test.mjs` 3 条流式用例、`tests/canvas-native.test.mjs` 连拍与截断 5 条、`tests/canvas-view-layout.test.mjs` 2 条、`tests/project-workflow.test.mjs` 2 条）；`git diff --check` 通过。探针 `/tmp/probe-chain2.mjs`：v1 已有成果时连拍方案 3 段、`pending 2`、费用只算 2 段（¥36.288）、首段提交体里带着 v1 的 `https://x/1.mp4` 当续拍输入。README（中英）与说明书已同步：脚本只写一遍、分镜图由插件本地渲染、写脚本慢的排查口径。
+
+本地成品：`.local/test/3.24.0-canvas.14/metaontic-video-3.24.0-canvas.14.tgz`，1,322,610 字节，SHA-256 `f1333fbd3e69eb6b400dd569a7eab4eb44c7e549fc008f8a26b7b3e0566d0c9b`；包内 `MetaOnticVideo使用说明书.pdf` SHA-256 `4bd03d42235ccd047204d260e7441bb1e60b1e4a631d6f123d9faa9fff593b70`（与工作区一致）。desktop profile 已从 3.24.0-canvas.13 升到 3.24.0-canvas.14；按转义还原后逐项确认包内 `index.js` 含 `storyboardFileName` / `captureScript` / `text_model_done` / `textMaxTokens` / `chainCost` / `latestVideoResult` / `stream_options` / `idleTimeoutMs` / `秒没有输出` / `不需要再连拍` / `本地渲染，不调用付费出图模型`，`client.js` 含 `truncated` / `正在写脚本` / `已等待` / `已有成果，本次跳过` / `不重复计费`，包内技能与说明书都含本轮口径。未上传、未创建标签或 Release；源码正式版本与 releaseNotes 仍保持 3.24.1。CLI 未返回 applied/restart-required，不能据此断言运行窗口已热加载，未要求重启。本节文字写在打包之后，只影响工程记录（包内不含 `docs/engineering/`）。
+
+诚实边界：本轮没有真实会话的前后对照（要跑一次真的生成），所以只把「这段时间从流程里彻底消失」的部分当作已确认收益——脚本不再写第二遍（实测那一步 10.7 秒）、分镜不再由模型写代码画（实测 31.0 秒加上写文件本身）。正文写脚本那 68.3 秒仍要花。
+
+未覆盖：真实 Harness 桌面窗口里的观感（需重载后人工复核）；Windows 未实测。

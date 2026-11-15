@@ -2,6 +2,10 @@
  *  并在图片/视频节点内完成「生成 → 费用确认 → 结果审核 → 续拍」，不依赖任何第三方画布插件。 */
 import { FRAME_MARK, MATERIAL_MARK, STAGE_LABELS, STAGE_STATE_TEXT, canvasReadiness, canvasSegmentStats, canvasSegments, flowAuthors, pendingStageAction, requirementNodeData, requirementNodeOf, rewriteStageNodes, sealedStageData, stageAction, stageNodeId, stagePrefixOf, stageSpot, stageSummary } from '../integrations/canvas-stages.js';
 
+/** 文本模型写脚本是画布上最慢的一次等待（实测 40–70 秒）：默认 20 秒的 RPC 超时会把它掐掉，
+ *  这里单独放宽，配合弹窗里的等待计数让用户知道还在写而不是卡住。 */
+export const TEXT_WRITE_TIMEOUT_MS = 180000;
+
 /** 画布内制作服务：与内置画布同一个插件、同一份配置，费用确认沿用插件设置里的API密钥。 */
 export async function canvasNativeRpc(args: any, fetcher: any = fetch, timeoutMs = 20000) {
   const response = await fetcher('/metaontic-video/canvas-native', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(args), signal: AbortSignal.timeout(timeoutMs) });
@@ -313,6 +317,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
     const [inline, setInline] = React.useState(null as any);
     const [createDialog, setCreateDialog] = React.useState(null as any);
     const [scriptDialog, setScriptDialog] = React.useState(null as any);
+    const [clock, setClock] = React.useState(0);
     const [chainDialog, setChainDialog] = React.useState(null as any);
     const [filmDialog, setFilmDialog] = React.useState(null as any);
     const [importing, setImporting] = React.useState(false);
@@ -327,6 +332,12 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
     const alive = React.useRef(true);
     const stageRef = React.useRef(null as any);
     React.useEffect(() => () => { alive.current = false; if (timer.current) clearInterval(timer.current); if (chainTimer.current) clearInterval(chainTimer.current); }, []);
+    // 写脚本那几十秒里每秒走一下表：把「还在写」和「卡住了」区分开。
+    React.useEffect(() => {
+      if (!scriptDialog?.writing) return undefined;
+      const ticker = setInterval(() => setClock(Date.now()), 1000);
+      return () => clearInterval(ticker);
+    }, [scriptDialog?.writing]);
 
     const load = React.useCallback(async (projectId?: string) => {
       try {
@@ -603,14 +614,15 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
       if (!canvas || !scriptDialog) return;
       const idea = String(scriptDialog.idea || '').trim();
       if (!idea) { patchScriptDialog({ error: '先写一句想拍什么，文本模型才有得写。' }); return; }
-      patchScriptDialog({ busy: true, error: '', plan: null });
+      patchScriptDialog({ busy: true, writing: true, writingSince: Date.now(), error: '', plan: null });
       try {
         const result = await canvasNativeRpc({ action: 'write', projectId: canvas.projectId, idea,
-          totalSeconds: scriptDialog.totalSeconds, segmentSeconds: scriptDialog.segmentSeconds, ratio: scriptDialog.ratio });
+          totalSeconds: scriptDialog.totalSeconds, segmentSeconds: scriptDialog.segmentSeconds, ratio: scriptDialog.ratio }, fetch, TEXT_WRITE_TIMEOUT_MS);
         if (!alive.current) return;
-        patchScriptDialog({ busy: false, text: result.script, error: '' });
+        patchScriptDialog({ busy: false, writing: false, writingSince: 0, text: result.script,
+          error: result.truncated === true ? '文本模型写到了输出上限，脚本可能不完整：把目标时长调短一些，或分两次写，再核对分镜表。' : '' });
         setNotice(`文本模型（${result.model}）已写出剧本：核对分镜表后点「预览分段」，再生成制作节点。`);
-      } catch (e: any) { if (alive.current) patchScriptDialog({ busy: false, error: e?.message || '文本模型没有写出脚本。' }); }
+      } catch (e: any) { if (alive.current) patchScriptDialog({ busy: false, writing: false, writingSince: 0, error: e?.message || '文本模型没有写出脚本。' }); }
     }, [canvas, scriptDialog, patchScriptDialog]);
 
     /** 先出计划：让用户看清会被拆成几段、每段多少秒、每段提示词是什么，再决定要不要建节点。 */
@@ -1446,7 +1458,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
           h('label', { key: 'text', className: 'movc-field' }, ['脚本内容（可以直接写，也可以让文本模型写）', h('textarea', { value: scriptDialog.text,
             placeholder: '写下要拍的内容。写成 Markdown 分镜表（表头含「镜号」「镜别」「运镜」「画面」列）时会按分镜切段；否则按句子、段落按字数均分。写多少拆多少，不自动编内容。',
             onChange: (e: any) => patchScriptDialog({ text: e.target.value, error: '' }) })]),
-          h('p', { key: 'note', className: 'movc-status' }, `「AI 写脚本」会按设置页的文本模型（${scriptDialog.textModel || '文本模型'}）把需求写成剧本与分镜表，单独按文本计费；要改时长、画幅或清晰度，先回上一步「改需求」。`),
+          h('p', { key: 'note', className: 'movc-status' }, `「AI 写脚本」会按设置页的文本模型（${scriptDialog.textModel || '文本模型'}）把需求写成剧本与分镜表，单独按文本计费；要改时长、画幅或清晰度，先回上一步「改需求」。${scriptDialog.writing ? ` 文本模型正在写：已等待 ${Math.max(0, Math.round((clock - (scriptDialog.writingSince || clock)) / 1000))} 秒（一次通常 30–90 秒，可以先去别的地方看看）。` : ''}`),
           scriptDialog.plan ? h('div', { key: 'plan', className: 'movc-plan' }, [
             h('div', { key: 'head' }, `分段计划：${scriptDialog.plan.segments.length} 段 · 共 ${scriptDialog.plan.totalSeconds} 秒${scriptDialog.plan.shots?.length ? ` · 识别到 ${scriptDialog.plan.shots.length} 个分镜` : ''}`),
             ...scriptDialog.plan.segments.map((segment: any, index: number) => h('div', { key: `s${index}` }, `第${index + 1}段 ${segment.seconds} 秒（${segment.kind === 'extend' ? '续拍' : '首段'}）：${String(segment.prompt).slice(0, 90)}${String(segment.prompt).length > 90 ? '…' : ''}`)),
@@ -1454,7 +1466,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
           scriptDialog.error ? h('p', { key: 'err', className: 'movc-status', 'data-error': 'true' }, scriptDialog.error) : null,
           h('div', { key: 'ops', className: 'movc-bar' }, [
             h('button', { key: 'cancel', type: 'button', className: 'mov-btn', disabled: scriptDialog.busy, onClick: () => setScriptDialog(null) }, '取消'),
-            h('button', { key: 'write', type: 'button', className: 'mov-btn', disabled: scriptDialog.busy, title: '用设置页里配置的文本模型把需求写成剧本与分镜表，会调用一次文本模型', onClick: () => void writeWithModel() }, 'AI 写脚本'),
+            h('button', { key: 'write', type: 'button', className: 'mov-btn', disabled: scriptDialog.busy, title: '用设置页里配置的文本模型把需求写成剧本与分镜表，会调用一次文本模型', onClick: () => void writeWithModel() }, scriptDialog.writing ? '正在写脚本…' : 'AI 写脚本'),
             h('button', { key: 'preview', type: 'button', className: 'mov-btn', disabled: scriptDialog.busy, onClick: () => void previewScript() }, '预览分段'),
             h('button', { key: 'ok', type: 'button', className: 'mov-btn mov-btn-primary', disabled: scriptDialog.busy, onClick: () => void createFromScript() }, '生成制作节点'),
           ]),
