@@ -42,7 +42,7 @@ function scriptSaveOf(event) {
 }
 
 /** 脚本头里的版本标记只作日志参考，取不到就不写这条字段。 */
-function scriptVersion(content) {
+export function scriptVersion(content) {
   const match = /版本[:：]\s*(第?\s*\d+\s*版)/.exec(String(content ?? ''));
   return match ? match[1].replace(/\s+/g, '') : undefined;
 }
