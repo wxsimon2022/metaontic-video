@@ -257,3 +257,18 @@ test('service: bundled host serves the server method again instead of refusing i
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('script writing starts from a director pass instead of a checklist', async () => {
+  const host = harness({ connectionMode: 'metaontic', metaonticApiKey: 'test' }, '/tmp');
+  const prompt = host.prompt();
+  for (const needle of ['导演工作法', '观众与记忆点', '情绪曲线', '视觉母题', '不展示给用户']) {
+    assert.ok(prompt.includes(needle), needle);
+  }
+  const skill = await readFile(new URL('../skills/video-director/SKILL.md', import.meta.url), 'utf8');
+  assert.match(skill, /导演工作法/, '技能写脚本一步指向导演工作法');
+  const reference = await readFile(new URL('../skills/video-director/references/scriptwriting.md', import.meta.url), 'utf8');
+  for (const needle of ['## 导演工作法（动笔前先想一遍）', '观众与记忆点', '情绪曲线', '视觉母题', '一条主线']) {
+    assert.ok(reference.includes(needle), needle);
+  }
+  host.dispose();
+});

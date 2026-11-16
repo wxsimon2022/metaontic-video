@@ -28,8 +28,8 @@ test('文本模型写脚本：请求走同一中转站的 chat 接口，提示�
   assert.ok(prompt.includes('视角列只填一个标准视角词') && prompt.includes('第一人称主观（POV）') && prompt.includes('过肩') && prompt.includes('荷兰角（倾斜）'), '视角单独成列，并给出标准视角词表');
   assert.ok(prompt.includes('视角由这一段的内容和场景决定，不要硬加') && prompt.includes('平视是默认'), '视角要符合场景，不为变化硬加');
   assert.ok(prompt.includes('封闭室内不写航拍'), '场景里没有的条件不许写');
-  assert.ok(prompt.includes('运镜列写清这一段镜头怎么动'), '运镜写清方式、方向与速度');
-  assert.ok(prompt.includes('画面列是这一段要拍的详情'), '画面列要求写全主体、动作、环境、光线与氛围');
+  assert.ok(prompt.includes('运镜列写这一段镜头怎么动'), '运镜写清方式、方向与速度');
+  assert.ok(prompt.includes('画面列是这一段要拍的详情') && prompt.includes('用「先…随后…最后…」'), '画面列要求写全主体、动作、环境、光线与氛围，并能写段内的推进');
   assert.ok(prompt.includes('整片要有变化') && prompt.includes('相邻两段的镜别与视角不要连着用同一组'), '整片要有变化，避免每个镜头都用同一组景别与视角');
   assert.ok(prompt.includes('不为变化硬换'), '要求变化仍要符合场景，不是硬凑');
   assert.ok(prompt.includes('正好 2 行'), '段数写死');
@@ -168,4 +168,23 @@ test('关了共用密钥以后文本模型用自己那把 API密钥，没填就�
   const fetcher = async (url, options) => { calls.push(options.headers.authorization); return response({ choices: [{ message: { content: '# 片名' } }] }); };
   await api.writeScript(own, { idea: '青旅天台的清晨' }, { fetcher });
   assert.deepEqual(calls, ['Bearer text-key']);
+});
+
+test('画布写脚本按专业导演口径：先定观众与记忆点，再交可直接开拍的镜头与声音', async () => {
+  const calls = [];
+  const fetcher = async (url, options) => {
+    calls.push(JSON.parse(options.body));
+    return response({ model: 'deepseek v4.1 flash', choices: [{ message: { content: '# 深夜面馆\n\n| 镜号 | 镜别 | 视角 | 运镜 | 画面 | 时长 | 台词 |\n| --- | --- | --- | --- | --- | --- | --- |\n| 1 | 中景 | 平视 | 缓慢推近 | 面汤冒气，老板抬头看门口 | 15秒 | — |\n' } }], usage: { prompt_tokens: 90, completion_tokens: 180 } });
+  };
+  await api.writeScript(config, { idea: '深夜面馆的最后一碗面', totalSeconds: 15, segmentSeconds: 15, segments: 1 }, { fetcher });
+  const prompt = calls[0].messages[1].content;
+  assert.ok(prompt.includes('你是这条片子的导演兼分镜师'), '画布写脚本用导演口径，不是填表口径');
+  for (const needle of ['导演前置', '观众与记忆点', '情绪曲线', '视觉母题', '一条主线']) {
+    assert.ok(prompt.includes(needle), needle);
+  }
+  for (const needle of ['至少一处特写或前景遮挡后的揭示', '每 3–5 秒一个看得见的变化', '表演与情绪',
+    '声音必须和画面一起设计', '开场和结尾都要具体', '不要写：抽象空词']) {
+    assert.ok(prompt.includes(needle), needle);
+  }
+  assert.ok(prompt.includes('按每秒 3–4 字估时长'), '台词按时长预算，不靠倍速硬塞');
 });
