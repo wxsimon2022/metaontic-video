@@ -30,6 +30,8 @@ test('文本模型写脚本：请求走同一中转站的 chat 接口，提示�
   assert.ok(prompt.includes('封闭室内不写航拍'), '场景里没有的条件不许写');
   assert.ok(prompt.includes('运镜列写清这一段镜头怎么动'), '运镜写清方式、方向与速度');
   assert.ok(prompt.includes('画面列是这一段要拍的详情'), '画面列要求写全主体、动作、环境、光线与氛围');
+  assert.ok(prompt.includes('整片要有变化') && prompt.includes('相邻两段的镜别与视角不要连着用同一组'), '整片要有变化，避免每个镜头都用同一组景别与视角');
+  assert.ok(prompt.includes('不为变化硬换'), '要求变化仍要符合场景，不是硬凑');
   assert.ok(prompt.includes('正好 2 行'), '段数写死');
   assert.equal(result.script.startsWith('# 青旅的清晨'), true, '去掉代码块围栏');
   assert.equal(result.script.includes('```'), false);

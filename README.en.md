@@ -10,7 +10,7 @@ A DeepSeek Harness plugin for **beginner-friendly video creation and a low-cost 
 
 Describe what you want to make and follow the assistant through your first video, without first learning prompting or editing workflows.
 
-1. **Share your idea**: start with a brief thought or a complete concept. Any refinement stays true to your original idea.
+1. **Share your idea**: start with a brief thought or a complete concept. Refinement keeps your original idea and adds richer detail and more varied shots.
 2. **Review the script**: read what will be filmed, ask for changes in plain language, then confirm production.
 3. **Watch the result**: preview the generated video and keep the finished file locally.
 
@@ -33,13 +33,13 @@ Paste an online installation URL into Harness → Plugins → Add plugin. Window
 Gitee:
 
 ```text
-https://gitee.com/hackloop/metaontic-video/releases/download/v3.27.0/metaontic-video-3.27.0.tgz
+https://gitee.com/hackloop/metaontic-video/releases/download/v3.28.0/metaontic-video-3.28.0.tgz
 ```
 
 GitHub mirror:
 
 ```text
-https://github.com/wxsimon2022/metaontic-video/releases/download/v3.27.0/metaontic-video-3.27.0.tgz
+https://github.com/wxsimon2022/metaontic-video/releases/download/v3.28.0/metaontic-video-3.28.0.tgz
 ```
 
 Open plugin settings, choose **MetaOntic AI**, enter your API key and save. Select **视频创作助手** in a conversation to begin; **宣传视频助手** is also available for product, brand or event content. Both assistants share the production workflow. Standard mode remains general-purpose.

@@ -1197,7 +1197,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "3.27.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.28.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1628,7 +1628,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.27.0",
+    version: "3.28.0",
     description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1734,12 +1734,12 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.27.0",
+      version: "3.28.0",
       prerelease: false,
-      publishedAt: "2026-11-16T07:45:06.127Z",
+      publishedAt: "2026-11-16T07:55:07.834Z",
       items: [
-        "\u65B0\u589E\uFF1A\u63D2\u4EF6\u5DE6\u4FA7\u680F\u5165\u53E3\u67E5\u5230\u65B0\u7248\u672C\u65F6\u663E\u793A\u300C\u6709\u66F4\u65B0\u300D\uFF0C\u4FA7\u680F\u6536\u8D77\u65F6\u56FE\u6807\u89D2\u4E0A\u6709\u5C0F\u5706\u70B9\u3002",
-        "\u4F18\u5316\uFF1A\u4ECE\u63D0\u793A\u6253\u5F00\u7684\u9762\u677F\u9876\u90E8\u5373\u53EF\u66F4\u65B0\uFF0C\u4E24\u6B65\u786E\u8BA4\u540E\u5B89\u88C5\u6700\u65B0\u6B63\u5F0F\u7248\uFF0C\u70B9\u300C\u7A0D\u540E\u518D\u8BF4\u300D\u53EA\u538B\u4F4F\u8FD9\u4E00\u7248\u3002"
+        "\u4F18\u5316\uFF1A\u300C\u5E2E\u6211\u5B8C\u5584\u300D\u4F1A\u8865\u9F50\u573A\u666F\u4E0E\u9053\u5177\u3001\u52A8\u4F5C\u5C42\u6B21\u3001\u753B\u9762\u5C42\u6B21\u4E0E\u8282\u594F\uFF0C\u6210\u7247\u753B\u9762\u66F4\u6709\u53D8\u5316\uFF0C\u4E0D\u518D\u5355\u8C03\u3002",
+        "\u4F18\u5316\uFF1A\u753B\u5E03\u300CAI \u5199\u811A\u672C\u300D\u4F1A\u907F\u514D\u76F8\u90BB\u5206\u955C\u7528\u540C\u4E00\u7EC4\u666F\u522B\u4E0E\u89C6\u89D2\uFF0C\u6574\u7247\u955C\u5934\u4E0D\u518D\u91CD\u590D\u96F7\u540C\u3002"
       ]
     }
   };

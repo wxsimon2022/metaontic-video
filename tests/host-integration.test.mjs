@@ -69,6 +69,24 @@ test('conversation stays inside video creation and configuration is read-only in
   host.dispose();
 });
 
+test('refine guidance asks for a richer pass instead of rewording the same idea', async () => {
+  const host = harness({ connectionMode: 'metaontic', metaonticApiKey: 'test' }, '/tmp');
+  const prompt = host.prompt();
+  for (const needle of ['按六项补齐', '场景与道具', '主体外形与状态', '动作层次与反应', '同一场景相邻段不连续用同一组', '已确认时长内的事件节奏']) {
+    assert.ok(prompt.includes(needle), needle);
+  }
+  assert.ok(prompt.includes('不借完善加人物或支线'), '丰富不等于加人物或支线');
+  assert.ok(prompt.includes('不为变化硬加视角'), '丰富仍不许硬加视角');
+  const skill = await readFile(new URL('../skills/video-director/SKILL.md', import.meta.url), 'utf8');
+  assert.match(skill, /完善要够丰富/, '技能里同样写明完善要够丰富');
+  assert.match(skill, /不靠加镜头数代替丰富度|不借完善加人物、支线或付费分段/);
+  const reference = await readFile(new URL('../skills/video-director/references/scriptwriting.md', import.meta.url), 'utf8');
+  for (const needle of ['完善时怎么算够丰富', '画面层次', '事件节奏', '靠加镜头或拆更多付费分段凑丰富']) {
+    assert.ok(reference.includes(needle), needle);
+  }
+  host.dispose();
+});
+
 test('style guidance asks only when the idea has no style, then refines along the choice', async () => {
   const host = harness({ connectionMode: 'metaontic', metaonticApiKey: 'test' }, '/tmp');
   const prompt = host.prompt();

@@ -10,7 +10,7 @@ DeepSeek Harness 视频创作插件：**新手快速上手，低成本制作长�
 
 不用先研究提示词或剪辑流程，把想拍的内容说出来，跟着助手完成第一条视频。
 
-1. **说想法**：一句灵感或完整创意都可以，助手帮你整理；需要完善时沿着你的原意补充。
+1. **说想法**：一句灵感或完整创意都可以，助手帮你整理；需要完善时沿着你的原意补足细节与画面层次，画面更有变化。
 2. **看脚本**：先看懂要拍什么，再用口语提修改意见，满意后确认制作。
 3. **看结果**：生成后直接预览，完成的视频保存到本机。
 
@@ -33,13 +33,13 @@ DeepSeek Harness 视频创作插件：**新手快速上手，低成本制作长�
 Gitee：
 
 ```text
-https://gitee.com/hackloop/metaontic-video/releases/download/v3.27.0/metaontic-video-3.27.0.tgz
+https://gitee.com/hackloop/metaontic-video/releases/download/v3.28.0/metaontic-video-3.28.0.tgz
 ```
 
 GitHub 同版备用：
 
 ```text
-https://github.com/wxsimon2022/metaontic-video/releases/download/v3.27.0/metaontic-video-3.27.0.tgz
+https://github.com/wxsimon2022/metaontic-video/releases/download/v3.28.0/metaontic-video-3.28.0.tgz
 ```
 
 安装后打开插件设置，选择 **MetaOntic AI**，填写 API密钥并保存；在会话中选择 **视频创作助手** 开始。制作产品、品牌或活动内容时，也可选择 **宣传视频助手**。这两个助手使用相同的制作流程，标准模式保持通用用途。
@@ -70,6 +70,13 @@ flowchart TB
 
 <details>
 <summary>最新更新</summary>
+
+## v3.28.0 更新内容
+
+### 优化
+
+- 「帮我完善」会补齐场景与道具、动作层次、画面层次与节奏，成片画面更有变化，不再单调。
+- 画布「AI 写脚本」会避免相邻分镜用同一组景别与视角，整片镜头不再重复雷同。
 
 ## v3.27.0 更新内容
 
