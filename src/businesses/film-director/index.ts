@@ -5,12 +5,12 @@ import { dshHome } from '../video/media/references.js';
 import { DATA_DIR } from '../../core/hardcoded-config.js';
 import { sessionOwner } from '../video/workflow/project.js';
 import { STAGES, commitArtifact, exportMarkdown } from './project.js';
-import { CREATIVE_GUIDANCE } from './creative.js';
+import { FILM_WORKFLOW_GUIDANCE } from './creative.js';
 import type { BusinessModule } from '../../core/runtime.js';
 const locks = new Set<string>();
 export const filmDirectorBusiness: BusinessModule = {
   id: 'film-director',
-  prompt: () => CREATIVE_GUIDANCE + '\n用户要求专业分阶段创作或超过120秒的剧本规划时使用film_project，创作范围15–3600秒，首期只输出创作计划，不自动生成视频。create后按creative/script/assets/shots/prompts/review提交结构化JSON。创意和剧本分别调用approve取得真实用户批准。使用read返回的revision提交，改稿后补全失效下游。不得声称存在独立子Agent；同一助手按职责顺序创作。普通视频制作沿现有video_project流程。',
+  prompt: () => FILM_WORKFLOW_GUIDANCE,
   apply(runtime) {
     runtime.tools.register('film-director', {
       name: 'film_project', description: '专业创作项目：create/read/submit/approve/export。磁盘保存，创意与剧本独立人工批准，不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets含characters/scenes；shots含shots；prompts含prompts；review含score/passed/issues。',

@@ -22,5 +22,5 @@ test('时间轴拒绝缺口、重复镜号与总时长错误',()=>{
 test('提示词覆盖与审核阻断由程序检查',()=>{
  const state={artifacts:{shots:{data:{shots:[{shot_id:'s1'}]}}}};
  assert.throws(()=>api.validateArtifact('prompts',{prompts:[]},state),/COVERAGE/);
- assert.throws(()=>api.validateArtifact('review',{score:99,passed:true,issues:[{severity:'blocker'}]},state),/REVIEW_BLOCKED/);
+ assert.throws(()=>api.validateArtifact('review',{score:99,passed:true,issues:[{severity:'BLOCKER'}]},state),/REVIEW_BLOCKED/);
 });

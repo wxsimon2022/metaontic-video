@@ -34,7 +34,7 @@ export function validateArtifact(stage: string, value: any, state: any) {
     const ids = value.prompts.map(p => p.shot_id);
     if (new Set(ids).size !== ids.length || ids.length !== shots.length || shots.some(s => !ids.includes(s.shot_id)) || value.prompts.some(p => typeof p.prompt !== 'string' || !p.prompt.trim())) throw Error('PROMPT_COVERAGE');
   }
-  if (stage === 'review' && (!Number.isInteger(value.score) || value.score < 85 || value.score > 100 || !Array.isArray(value.issues) || value.issues.some(i => i.severity === 'blocker') || value.passed !== true)) throw Error('REVIEW_BLOCKED');
+  if (stage === 'review' && (!Number.isInteger(value.score) || value.score < 85 || value.score > 100 || !Array.isArray(value.issues) || value.issues.some(i => String(i.severity).toLowerCase() === 'blocker') || value.passed !== true)) throw Error('REVIEW_BLOCKED');
 }
 export function commitArtifact(state: any, stage: string, value: any, expected: number) {
   if (state.revision !== expected) throw Error('REVISION_CONFLICT');
