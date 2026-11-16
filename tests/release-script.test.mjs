@@ -44,6 +44,17 @@ test('release dry run changes no files, tags or git index and starts no publicat
   assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/DRY RUN/);assert.match(result.stdout,/metaontic-video-1.0.1.tgz/);
   // 默认只发 Gitee：不碰 GitHub，也不会打印 GitHub 的发布页与附件地址。
   assert.match(result.stdout,/仅 Gitee/);assert.doesNotMatch(result.stdout,/github\.com/);
+  // 默认发版走 Gitee Go 流水线：本机只推标签，打包与发布都在流水线上，同时归档到制品库。
+  assert.match(result.stdout,/Gitee Go 流水线按标签构建、测试、打包/);assert.match(result.stdout,/归档制品库/);
+  assert.doesNotMatch(result.stdout,/上传并核对 Gitee Release 附件/);
+  // 流水线不可用时用 --local 才在本机打包并发布；--ci 是默认行为的同义写法。
+  const local=spawnSync(process.execPath,[path.join(dir,'scripts/release.mjs'),'1.0.1','--notes',path.join(dir,'plan.json'),'--dry-run','--local'],{encoding:'utf8',timeout:10000,env});
+  assert.equal(local.status,0,local.stderr);assert.match(local.stdout,/上传并核对 Gitee Release 附件/);
+  assert.doesNotMatch(local.stdout,/Gitee Go 流水线按标签构建、测试、打包/);
+  const ciAlias=spawnSync(process.execPath,[path.join(dir,'scripts/release.mjs'),'1.0.1','--notes',path.join(dir,'plan.json'),'--dry-run','--ci'],{encoding:'utf8',timeout:10000,env});
+  assert.equal(ciAlias.status,0,ciAlias.stderr);assert.match(ciAlias.stdout,/Gitee Go 流水线按标签构建、测试、打包/);
+  const conflict=spawnSync(process.execPath,[path.join(dir,'scripts/release.mjs'),'1.0.1','--notes',path.join(dir,'plan.json'),'--dry-run','--ci','--local'],{encoding:'utf8',timeout:10000,env});
+  assert.notEqual(conflict.status,0);assert.match(conflict.stderr,/不能同时用/);
   const both=spawnSync(process.execPath,[path.join(dir,'scripts/release.mjs'),'1.0.1','--notes',path.join(dir,'plan.json'),'--dry-run','--both'],{encoding:'utf8',timeout:10000,env});
   assert.equal(both.status,0,both.stderr);assert.match(both.stdout,/Gitee \+ GitHub/);assert.match(both.stdout,/github\.com\/wxsimon2022\/metaontic-video\/releases\/tag\/v1\.0\.1/);
   assert.equal(git('status','--porcelain'),before);assert.equal(git('tag'),tags);assert.equal(git('rev-parse','HEAD'),head);assert.equal(await readFile(path.join(dir,'package.json'),'utf8'),pkg);
