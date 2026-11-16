@@ -1,3 +1,4 @@
+import { INTENTS, routeIntent, ROLE_PROMPTS } from './roles/index.js';
 import { reviseEntities, scheduleTask, taskResult } from './revisions.js';
 import { nextTask, compileProduction } from './orchestration.js';
 import { estimatePlan } from '../video/workflow/costs.js';
@@ -9,19 +10,20 @@ import { dshHome } from '../video/media/references.js';
 import { DATA_DIR } from '../../core/hardcoded-config.js';
 import { sessionOwner } from '../video/workflow/project.js';
 import { STAGES, commitArtifact, exportMarkdown } from './project.js';
-import { FILM_WORKFLOW_GUIDANCE, ORCHESTRATION_GUIDANCE } from './creative.js';
+import { FILM_WORKFLOW_GUIDANCE, ORCHESTRATION_GUIDANCE, INTENT_GUIDANCE } from './creative.js';
 import type { BusinessModule } from '../../core/runtime.js';
 const locks = new Set<string>();
 export const filmDirectorBusiness: BusinessModule = {
   id: 'film-director',
-  prompt: () => FILM_WORKFLOW_GUIDANCE + ORCHESTRATION_GUIDANCE,
+  prompt: () => ROLE_PROMPTS.director + FILM_WORKFLOW_GUIDANCE + ORCHESTRATION_GUIDANCE + INTENT_GUIDANCE,
   apply(runtime) {
     runtime.tools.register('film-director', {
       name: 'film_project', description: '专业创作项目：create/read/submit/approve/export。磁盘保存，创意与剧本独立人工批准，不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets含characters/scenes；shots含shots；prompts含prompts；review含score/passed/issues。',
       parameters: { type:'object', properties: {
+        intent:{type:'string',enum:[...INTENTS]}, entityIds:{type:'array',items:{type:'string'}},
         taskKey:{type:'string'}, taskStatus:{type:'string',enum:['running','completed','failed']}, errorCode:{type:'string'},
         ratio:{type:'string',enum:['16:9','9:16']}, resolution:{type:'string',enum:['480p','720p']},
-        action:{type:'string',enum:['create','read','submit','approve','export','next','compile','revise','schedule','task_result']}, projectId:{type:'string'}, title:{type:'string'}, sourceBrief:{type:'string'}, durationSeconds:{type:'integer'}, stage:{type:'string',enum:[...STAGES]}, content:{type:'string'}, expectedRevision:{type:'integer'},
+        action:{type:'string',enum:['create','read','submit','approve','export','next','compile','revise','schedule','task_result','route']}, projectId:{type:'string'}, title:{type:'string'}, sourceBrief:{type:'string'}, durationSeconds:{type:'integer'}, stage:{type:'string',enum:[...STAGES]}, content:{type:'string'}, expectedRevision:{type:'integer'},
       }, required:['action'] },
       output:{schema:{type:'object'},render(_args,value){return [{type:'text',text:JSON.stringify(value)}];}},
       isConcurrencySafe(){return false;},
@@ -41,6 +43,7 @@ export const filmDirectorBusiness: BusinessModule = {
           } else state=JSON.parse(await readFile(file,'utf8'));
           if (args.action === 'read') return {...state,nextTask:nextTask(state)};
           if (args.action === 'next') return nextTask(state);
+          if (args.action === 'route') return routeIntent(state,args.intent,args.entityIds);
           if (['revise','schedule','task_result'].includes(args.action) && state.revision!==args.expectedRevision) throw Error('REVISION_CONFLICT');
           if (args.action === 'revise') state=reviseEntities(state,args.stage,JSON.parse(args.content),args.expectedRevision);
           if (args.action === 'schedule') scheduleTask(state,nextTask(state));

@@ -1,3 +1,4 @@
+import { ROLE_PROMPTS } from './roles/index.js';
 import { STAGES, validateArtifact } from './project.js';
 /** 程序选择下一许可动作；角色仅读取直接依赖，不重复加载全项目。 */
 export function nextTask(state: any) {
@@ -39,10 +40,7 @@ export function compileProduction(state: any, plan: any[], ratio: string, resolu
 }
 
 const ROLE_INSTRUCTIONS = {
- creative:'只策划主题、logline、受众、段落目的、时长预算与风险；不提前写正式分镜。未知事实列待核实。',
- script:'依据已批准创意写完整screenplay和章节；逐场记录目标、动作、对白与旁白、进入退出状态；不改创意核心。',
- assets:'人物与场景分两项职责整理，合并characters/scenes提交；稳定ID、服装状态、声音、场景布局与道具位置；不新增剧情。',
- shots:'依据剧本和资产逐镜写叙事目的、构图、视角、运动、表演、声画与连续性；整数毫秒连续覆盖全片，不按生成次数拆镜头。',
- prompts:'每个shot_id一个自包含prompt，复制相关资产锚点；保留原对白及语言。未知模型能力标generic，风险与替代方案单列。',
- review:'独立审核需求、因果、连续性、时长、覆盖与模型风险；列问题定位和最小修复，不重写上游、不把自评分当程序验证。',
+ creative:ROLE_PROMPTS.creative,script:ROLE_PROMPTS.screenwriter,
+ assets:ROLE_PROMPTS.character+'\n\n'+ROLE_PROMPTS.scene,
+ shots:ROLE_PROMPTS.storyboard,prompts:ROLE_PROMPTS['prompt-engineer'],review:ROLE_PROMPTS.reviewer,
 };

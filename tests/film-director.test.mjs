@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-const result=await build({stdin:{contents:"export * from './src/businesses/film-director/project.ts'; export * from './src/businesses/film-director/orchestration.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
+const result=await build({stdin:{contents:"export * from './src/businesses/film-director/project.ts'; export * from './src/businesses/film-director/orchestration.ts'; export * from './src/businesses/film-director/roles/index.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
 const api=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
 const initial=()=>({revision:0,duration_ms:15000,artifacts:{},approvals:{}});
 test('创意未批准阻止剧本，旧版本不能覆盖，改稿失效下游',()=>{
@@ -39,4 +39,22 @@ test('生成编译映射跨段镜头，拒绝旧素材和未确认规格',()=>{
  assert.equal(plan.segments.length,2);assert.deepEqual(plan.segments[1].shot_ids,['s']);assert.equal(plan.specification.duration,15);
  assert.throws(()=>api.compileProduction(state,[{seconds:15}],'bad','720p'),/SPEC/);
  state.artifacts.shots.stale=true;assert.throws(()=>api.compileProduction(state,[{seconds:15}],'16:9','720p'),/STALE/);
+});
+
+test('八个角色独立提示词与全部意图均可路由，不改写项目',()=>{
+ const state=initial();const before=JSON.stringify(state);
+ assert.equal(Object.keys(api.ROLE_PROMPTS).length,8);
+ for(const intent of api.INTENTS){const r=api.routeIntent(state,intent);assert.ok(api.ROLE_PROMPTS[r.role]);assert.ok(r.instructions.includes('共同约束'));}
+ assert.equal(JSON.stringify(state),before);
+ for(const [intent,role] of [['revise_dialogue','screenwriter'],['revise_camera','storyboard'],['revise_character','character'],['revise_scene','scene'],['adapt_model','prompt-engineer'],['verify_facts','reviewer']])assert.equal(api.routeIntent(state,intent).role,role);
+});
+test('意图路由不绕过批准，局部修改缺目标需澄清，非法实体拒绝',()=>{
+ const state=initial();state.artifacts.creative={revision:1,data:{theme:'a',logline:'b'}};
+ assert.equal(api.routeIntent(state,'write_script').status,'needs_input');
+ state.approvals.creative=1;
+ assert.equal(api.routeIntent(state,'write_script').status,'ready');
+ assert.equal(api.routeIntent(state,'revise_camera').scope_required,true);
+ state.artifacts.shots={revision:2,data:{shots:[{shot_id:'s1'}]}};
+ assert.throws(()=>api.routeIntent(state,'revise_camera',['s9']),/UNKNOWN_ENTITY/);
+ assert.throws(()=>api.routeIntent(state,'approve_everything'),/UNKNOWN_INTENT/);
 });
