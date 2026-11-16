@@ -17,7 +17,7 @@ var __export = (target, all) => {
 var PLUGIN_VERSION;
 var init_version = __esm({
   "src/core/version.ts"() {
-    PLUGIN_VERSION = true ? "3.24.2".trim().replace(/^v/i, "") : "";
+    PLUGIN_VERSION = true ? "3.25.0".trim().replace(/^v/i, "") : "";
   }
 });
 
@@ -58,7 +58,8 @@ var init_hardcoded_config = __esm({
     UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
     RELAY = {
       baseUrl: "https://ai.bileego.com",
-      signupUrl: "https://ai.bileego.com/sign-up?aff=VzYr",
+      //signupUrl: 'https://ai.bileego.com/sign-up?aff=VzYr',
+      signupUrl: "https://ai.bileego.com",
       pricingUrl: "https://ai.bileego.com/pricing",
       submitPath: "/doubao/api/v3/contents/generations/tasks",
       queryPath: "/doubao/api/v3/contents/generations/tasks/{task_id}",

@@ -596,7 +596,8 @@
   var releaseDownloadUrl = (version, channel = "gitee") => `${(channel === "github" ? GITHUB : GITEE).web}/releases/download/v${version}/${releaseArchiveName(version)}`;
   var RELAY = {
     baseUrl: "https://ai.bileego.com",
-    signupUrl: "https://ai.bileego.com/sign-up?aff=VzYr",
+    //signupUrl: 'https://ai.bileego.com/sign-up?aff=VzYr',
+    signupUrl: "https://ai.bileego.com",
     pricingUrl: "https://ai.bileego.com/pricing",
     submitPath: "/doubao/api/v3/contents/generations/tasks",
     queryPath: "/doubao/api/v3/contents/generations/tasks/{task_id}",
@@ -1194,7 +1195,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "3.24.2".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.25.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1625,7 +1626,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.24.2",
+    version: "3.25.0",
     description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1731,12 +1732,11 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.24.2",
+      version: "3.25.0",
       prerelease: false,
-      publishedAt: "2026-11-15T14:39:59.746Z",
+      publishedAt: "2026-11-16T05:43:02.391Z",
       items: [
-        "\u65B0\u589E\uFF1A\u6D41\u7A0B\u753B\u5E03\u53EF\u89C6\u5316\u521B\u4F5C\uFF1A\u4E03\u5F20\u9636\u6BB5\u5361\u4E32\u8D77\u9700\u6C42\u5230\u6210\u7247\uFF0C\u4E24\u6B65\u521B\u4F5C\u94FA\u51FA\u5267\u672C\u3001\u5206\u955C\u3001\u753B\u9762\u4E0E\u89C6\u9891\u8282\u70B9\uFF0C\u811A\u672C\u5BA1\u6838\u5728\u753B\u5E03\u5B8C\u6210\u3002",
-        "\u4F18\u5316\uFF1A\u5199\u811A\u672C\u66F4\u5FEB\uFF1A\u5206\u955C\u793A\u610F\u56FE\u672C\u5730\u6E32\u67D3\u3001\u811A\u672C\u53EA\u5199\u4E00\u6B21\uFF1B\u8FDE\u62CD\u8DF3\u8FC7\u5DF2\u6709\u6210\u679C\u7684\u6BB5\uFF0C\u4E0D\u91CD\u590D\u751F\u6210\u4E0E\u8BA1\u8D39\u3002"
+        "\u65B0\u589E\uFF1A\u6B63\u5F0F\u7248\u4F1A\u540C\u6B65\u53D1\u5E03\u5230 GitHub\uFF0C\u540C\u4E00\u5B89\u88C5\u5305\u591A\u4E00\u4E2A\u5B98\u65B9\u4E0B\u8F7D\u6E20\u9053\u3002"
       ]
     }
   };

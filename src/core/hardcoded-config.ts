@@ -49,7 +49,8 @@ export const releaseDownloadUrl = (version, channel = 'gitee') =>
 /** 中转站（MetaOntic AI）：留空时按这里的默认值调用。 */
 export const RELAY = {
   baseUrl: 'https://ai.bileego.com',
-  signupUrl: 'https://ai.bileego.com/sign-up?aff=VzYr',
+  //signupUrl: 'https://ai.bileego.com/sign-up?aff=VzYr',
+  signupUrl: 'https://ai.bileego.com',
   pricingUrl: 'https://ai.bileego.com/pricing',
   submitPath: '/doubao/api/v3/contents/generations/tasks',
   queryPath: '/doubao/api/v3/contents/generations/tasks/{task_id}',
