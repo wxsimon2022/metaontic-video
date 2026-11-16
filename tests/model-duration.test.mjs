@@ -7,7 +7,7 @@ for (const [model, max] of [['doubao-seedance-2-0-mini-260615', 15], ['doubao-se
   assert.equal(context.resolveSingleMax(config), max);
   assert.equal(context.resolveSegmentSeconds(config), max);
   assert.equal(context.resolveSegmentSeconds(config, 99), max);
-  for (let total = 4; total <= 120; total++) {
+  for (let total = 4; total <= 3600; total++) {
    const plan = context.planVideoSegments(total, max, max);
    assert.equal(plan.reduce((n, s) => n + s.seconds, 0), total);
    assert.ok(plan.every(s => s.seconds >= 4 && s.seconds <= max));

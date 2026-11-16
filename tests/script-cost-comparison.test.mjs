@@ -75,7 +75,7 @@ test('plans match minimum-duration tails, custom segments, and previous segment 
 });
 test('unknown models, unsupported ratios and unresolved resolution fail rather than invent prices',async()=>{
  const tool=setup(base).tool;
- for(const bad of [{...args,resolution:undefined},{...args,ratio:'1:1'},{...args,duration:121},{...args,duration:5.5},{...args,groupRatio:NaN}])await assert.rejects(()=>tool.execute(bad));
+ for(const bad of [{...args,resolution:undefined},{...args,ratio:'1:1'},{...args,duration:3601},{...args,duration:5.5},{...args,groupRatio:NaN}])await assert.rejects(()=>tool.execute(bad));
  await assert.rejects(()=>setup({...base,model:'unknown'}).tool.execute(args),/可靠价目/);
 });
 test('all connection modes instruct the assistant to estimate while writing the script',()=>{

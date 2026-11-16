@@ -1335,6 +1335,55 @@ ${JSON.stringify(state.artifacts[s].data, null, 2)}
 \`\`\``).join("\n\n");
 }
 
+// src/businesses/film-director/revisions.ts
+function reviseEntities(state, stage, replacements, expected) {
+  const fields = { assets: ["characters", "scenes"], shots: ["shots"], prompts: ["prompts"] };
+  const keys = { characters: "character_id", scenes: "scene_id", shots: "shot_id", prompts: "shot_id" };
+  if (!fields[stage] || !Array.isArray(replacements) || !replacements.length) throw Error("INVALID_REVISION_SCOPE");
+  const artifact = state.artifacts[stage];
+  if (!artifact || artifact.stale) throw Error("UPSTREAM_REQUIRED");
+  const data = structuredClone(artifact.data);
+  const changed = /* @__PURE__ */ new Set();
+  for (const replacement of replacements) {
+    if (!fields[stage].includes(replacement.collection)) throw Error("INVALID_COLLECTION");
+    const key = keys[replacement.collection];
+    const id = replacement.entity?.[key];
+    const index = data[replacement.collection].findIndex((v) => v[key] === id);
+    if (index < 0 || changed.has(id)) throw Error("UNKNOWN_OR_DUPLICATE_ENTITY");
+    data[replacement.collection][index] = replacement.entity;
+    changed.add(id);
+  }
+  const next = commitArtifact(state, stage, data, expected);
+  const affected = stage === "assets" ? state.artifacts.shots?.data.shots.filter((s) => changed.has(s.scene_id) || s.character_ids.some((id) => changed.has(id))).map((s) => s.shot_id) || [] : [...changed];
+  for (const downstream of STAGES.slice(STAGES.indexOf(stage) + 1)) {
+    if (next.artifacts[downstream]) next.artifacts[downstream].stale_entity_ids = affected;
+  }
+  next.last_change = { stage, entity_ids: [...changed], affected_shot_ids: affected };
+  return next;
+}
+function scheduleTask(state, task) {
+  const key = `${task.action}:${task.stage || "production"}:${state.revision}`;
+  const tasks = state.tasks || [];
+  const existing = tasks.find((t) => t.key === key);
+  if (existing) return existing;
+  const result = { key, status: "ready", attempts: 0, source_revision: state.revision, ...task };
+  state.tasks = [...tasks, result];
+  return result;
+}
+function taskResult(state, key, status, errorCode) {
+  const task = state.tasks?.find((t) => t.key === key);
+  if (!task || task.source_revision !== state.revision) throw Error("STALE_TASK");
+  if (!["running", "completed", "failed"].includes(status)) throw Error("INVALID_TASK_STATUS");
+  if (task.status === "completed") return task;
+  if (status === "running") {
+    if (task.attempts >= 3) throw Error("RETRY_EXHAUSTED");
+    task.attempts++;
+  }
+  task.status = status;
+  task.error_code = errorCode || null;
+  return task;
+}
+
 // src/businesses/film-director/orchestration.ts
 function nextTask(state) {
   for (const stage of STAGES) {
@@ -2767,9 +2816,12 @@ var filmDirectorBusiness = {
       name: "film_project",
       description: "\u4E13\u4E1A\u521B\u4F5C\u9879\u76EE\uFF1Acreate/read/submit/approve/export\u3002\u78C1\u76D8\u4FDD\u5B58\uFF0C\u521B\u610F\u4E0E\u5267\u672C\u72EC\u7ACB\u4EBA\u5DE5\u6279\u51C6\uFF0C\u4E0D\u63D0\u4EA4\u4ED8\u8D39\u89C6\u9891\u3002submit\u7684content\u4E3AJSON\u5B57\u7B26\u4E32\uFF1Acreative\u542Btheme/logline\uFF1Bscript\u542Bscreenplay/chapters\uFF08duration_ms\uFF09\uFF1Bassets\u542Bcharacters/scenes\uFF1Bshots\u542Bshots\uFF1Bprompts\u542Bprompts\uFF1Breview\u542Bscore/passed/issues\u3002",
       parameters: { type: "object", properties: {
+        taskKey: { type: "string" },
+        taskStatus: { type: "string", enum: ["running", "completed", "failed"] },
+        errorCode: { type: "string" },
         ratio: { type: "string", enum: ["16:9", "9:16"] },
         resolution: { type: "string", enum: ["480p", "720p"] },
-        action: { type: "string", enum: ["create", "read", "submit", "approve", "export", "next", "compile"] },
+        action: { type: "string", enum: ["create", "read", "submit", "approve", "export", "next", "compile", "revise", "schedule", "task_result"] },
         projectId: { type: "string" },
         title: { type: "string" },
         sourceBrief: { type: "string" },
@@ -2800,6 +2852,10 @@ var filmDirectorBusiness = {
           } else state = JSON.parse(await readFile5(file, "utf8"));
           if (args.action === "read") return { ...state, nextTask: nextTask(state) };
           if (args.action === "next") return nextTask(state);
+          if (["revise", "schedule", "task_result"].includes(args.action) && state.revision !== args.expectedRevision) throw Error("REVISION_CONFLICT");
+          if (args.action === "revise") state = reviseEntities(state, args.stage, JSON.parse(args.content), args.expectedRevision);
+          if (args.action === "schedule") scheduleTask(state, nextTask(state));
+          if (args.action === "task_result") taskResult(state, args.taskKey, args.taskStatus, args.errorCode);
           if (args.action === "compile") {
             if (state.revision !== args.expectedRevision) throw Error("REVISION_CONFLICT");
             const plan = compileProduction(state, estimatePlan(runtime.config, "video_generate", { duration: state.duration_ms / 1e3 }), args.ratio, args.resolution);
@@ -2828,7 +2884,7 @@ ${JSON.stringify(artifact.data)}
             state.revision++;
             state.status = args.stage === "creative" ? "SCRIPT_WRITING" : "ASSET_DESIGN";
           }
-          if (!["create", "submit", "approve", "compile"].includes(args.action)) throw Error("INVALID_ACTION");
+          if (!["create", "submit", "approve", "compile", "revise", "schedule", "task_result"].includes(args.action)) throw Error("INVALID_ACTION");
           await mkdir6(path8.join(dir, "snapshots"), { recursive: true, mode: 448 });
           const body = JSON.stringify(state, null, 2);
           await writeFile4(path8.join(dir, "snapshots", `${state.revision}-${randomUUID3()}.json`), body, { mode: 384, flag: "wx" });

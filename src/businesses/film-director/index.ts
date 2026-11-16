@@ -1,3 +1,4 @@
+import { reviseEntities, scheduleTask, taskResult } from './revisions.js';
 import { nextTask, compileProduction } from './orchestration.js';
 import { estimatePlan } from '../video/workflow/costs.js';
 import { createProject, writeProject } from '../video/workflow/project.js';
@@ -18,8 +19,9 @@ export const filmDirectorBusiness: BusinessModule = {
     runtime.tools.register('film-director', {
       name: 'film_project', description: '专业创作项目：create/read/submit/approve/export。磁盘保存，创意与剧本独立人工批准，不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets含characters/scenes；shots含shots；prompts含prompts；review含score/passed/issues。',
       parameters: { type:'object', properties: {
+        taskKey:{type:'string'}, taskStatus:{type:'string',enum:['running','completed','failed']}, errorCode:{type:'string'},
         ratio:{type:'string',enum:['16:9','9:16']}, resolution:{type:'string',enum:['480p','720p']},
-        action:{type:'string',enum:['create','read','submit','approve','export','next','compile']}, projectId:{type:'string'}, title:{type:'string'}, sourceBrief:{type:'string'}, durationSeconds:{type:'integer'}, stage:{type:'string',enum:[...STAGES]}, content:{type:'string'}, expectedRevision:{type:'integer'},
+        action:{type:'string',enum:['create','read','submit','approve','export','next','compile','revise','schedule','task_result']}, projectId:{type:'string'}, title:{type:'string'}, sourceBrief:{type:'string'}, durationSeconds:{type:'integer'}, stage:{type:'string',enum:[...STAGES]}, content:{type:'string'}, expectedRevision:{type:'integer'},
       }, required:['action'] },
       output:{schema:{type:'object'},render(_args,value){return [{type:'text',text:JSON.stringify(value)}];}},
       isConcurrencySafe(){return false;},
@@ -39,6 +41,10 @@ export const filmDirectorBusiness: BusinessModule = {
           } else state=JSON.parse(await readFile(file,'utf8'));
           if (args.action === 'read') return {...state,nextTask:nextTask(state)};
           if (args.action === 'next') return nextTask(state);
+          if (['revise','schedule','task_result'].includes(args.action) && state.revision!==args.expectedRevision) throw Error('REVISION_CONFLICT');
+          if (args.action === 'revise') state=reviseEntities(state,args.stage,JSON.parse(args.content),args.expectedRevision);
+          if (args.action === 'schedule') scheduleTask(state,nextTask(state));
+          if (args.action === 'task_result') taskResult(state,args.taskKey,args.taskStatus,args.errorCode);
           if (args.action === 'compile') {
             if (state.revision!==args.expectedRevision) throw Error('REVISION_CONFLICT');
             const plan=compileProduction(state,estimatePlan(runtime.config,'video_generate',{duration:state.duration_ms/1000}),args.ratio,args.resolution);
@@ -64,7 +70,7 @@ export const filmDirectorBusiness: BusinessModule = {
             state.decisions.push({stage:args.stage,revision:artifact.revision,decision:'approve',approved_at:new Date().toISOString()});
             state.revision++; state.status=args.stage==='creative'?'SCRIPT_WRITING':'ASSET_DESIGN';
           }
-          if (!['create','submit','approve','compile'].includes(args.action)) throw Error('INVALID_ACTION');
+          if (!['create','submit','approve','compile','revise','schedule','task_result'].includes(args.action)) throw Error('INVALID_ACTION');
           await mkdir(path.join(dir,'snapshots'),{recursive:true,mode:0o700});
           const body=JSON.stringify(state,null,2);
           // 不可变快照先写入，project.json原子替换为唯一提交点；中断遗留快照不代表提交。

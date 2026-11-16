@@ -23,7 +23,7 @@ test('explicit user duration skips the dialog and an explicit change clears prio
  const h=fixture();await h.run(45);assert.equal(h.asks.length,0);h.project.approved={old:true};await h.run(60);
  assert.equal(h.project.duration,60);assert.equal(h.project.approved,null);
 });
-for(const answer of [null,{selected:[]},{selected:['15 秒','30 秒']},{custom:'2.5秒'},{custom:'121秒'}])test(`unresolved or invalid answer never defaults: ${JSON.stringify(answer)}`,async()=>{
+for(const answer of [null,{selected:[]},{selected:['15 秒','30 秒']},{custom:'2.5秒'},{custom:'3601秒'}])test(`unresolved or invalid answer never defaults: ${JSON.stringify(answer)}`,async()=>{
  const h=fixture([answer]);assert.equal((await h.run()).status,'pending');assert.equal(h.project.duration,undefined);
 });
 test('cancelling custom input preserves the choice and resumes input without re-asking suggestions',async()=>{
