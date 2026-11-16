@@ -1215,7 +1215,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "3.29.1".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.29.2".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1646,7 +1646,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.29.1",
+    version: "3.29.2",
     description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1752,12 +1752,11 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.29.1",
+      version: "3.29.2",
       prerelease: false,
-      publishedAt: "2026-11-16T08:32:58.467Z",
+      publishedAt: "2026-11-16T13:02:02.321Z",
       items: [
-        "\u4F18\u5316\uFF1A\u52A9\u624B\u628A\u5DE5\u5177\u53C2\u6570\u5199\u9519\uFF08\u4F8B\u5982 480p \u5C11\u4E86\u5F15\u53F7\uFF09\u5BFC\u81F4\u8FD9\u4E00\u8F6E\u5931\u8D25\u65F6\uFF0C\u4F1A\u8BF4\u660E\u6CA1\u6709\u8C03\u7528\u6A21\u578B\u3001\u4E5F\u6CA1\u6709\u6263\u8D39\uFF0C\u5E76\u63D0\u793A\u6309\u539F\u53C2\u6570\u91CD\u8BD5\u3002",
-        "\u4F18\u5316\uFF1A\u6E05\u6670\u5EA6\u5199\u6210 480\u3001480P\u3001720 \u8FD9\u7C7B\u5199\u6CD5\u90FD\u80FD\u6B63\u5E38\u8BC6\u522B\uFF0C\u4E0D\u518D\u76F4\u63A5\u62A5\u9519\u3002"
+        "\u4F18\u5316\uFF1A\u5DE6\u4FA7\u680F\u7684\u66F4\u65B0\u7EA2\u70B9\u79FB\u5230\u300C\u89C6\u9891\u521B\u4F5C\u52A9\u624B\u300D\u6700\u540E\u4E00\u4E2A\u5B57\u7684\u53F3\u4E0A\u89D2\uFF0C\u663E\u793A\u6210\u89D2\u6807\uFF1B\u4FA7\u680F\u6536\u8D77\u65F6\u7EA2\u70B9\u4ECD\u5728\u56FE\u6807\u89D2\u4E0A\u3002"
       ]
     }
   };
@@ -2244,13 +2243,12 @@
     background: var(--dsw-alias-state-error-primary, #e5533d);
     box-shadow: 0 0 0 2px var(--dsw-specific-sidebar-fill, transparent);
   }
-  /* \u5C55\u5F00\u4FA7\u680F\uFF1A\u8FD9\u4E00\u884C\u6709\u540D\u5B57\uFF0C\u7EC4\u4EF6\u91CC\u7684\u5706\u70B9\u6536\u8D77\uFF0C\u6539\u5728\u540D\u5B57\u540E\u9762\u70B9\u4E00\u4E2A\u540C\u6837\u5927\u5C0F\u7684\u7EA2\u70B9 */
+  /* \u5C55\u5F00\u4FA7\u680F\uFF1A\u8FD9\u4E00\u884C\u6709\u540D\u5B57\uFF0C\u7EC4\u4EF6\u91CC\u7684\u5706\u70B9\u6536\u8D77\uFF0C\u6539\u5728\u540D\u5B57\u6700\u540E\u4E00\u4E2A\u5B57\u7684\u53F3\u4E0A\u89D2\u70B9\u4E00\u4E2A\u89D2\u6807\uFF1B\u8D34\u7740\u5B57\u4E0D\u538B\u5B57\uFF0C\u6240\u4EE5\u4E0D\u63CF\u8FB9 */
   button:has(.mov-rail-dot):has(> span:nth-child(2)) .mov-rail-dot { display: none; }
   button:has(.mov-rail-dot):has(> span:nth-child(2)) > span:nth-child(2)::after {
-    content: ""; display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%;
+    content: ""; display: inline-block; width: 8px; height: 8px; margin-left: -1px; border-radius: 50%;
     background: var(--dsw-alias-state-error-primary, #e5533d);
-    box-shadow: 0 0 0 2px var(--dsw-specific-sidebar-fill, transparent);
-    vertical-align: middle;
+    vertical-align: super;
   }
 `;
   function ensureUpdateHintStyles(doc = typeof document === "undefined" ? null : document) {

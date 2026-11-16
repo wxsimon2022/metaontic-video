@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "3.29.1",
+  "version": "3.29.2",
   "description": "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
@@ -106,12 +106,11 @@
   },
   "dependencies": {},
   "releaseNotes": {
-    "version": "3.29.1",
+    "version": "3.29.2",
     "prerelease": false,
-    "publishedAt": "2026-11-16T08:32:58.467Z",
+    "publishedAt": "2026-11-16T13:02:02.321Z",
     "items": [
-      "优化：助手把工具参数写错（例如 480p 少了引号）导致这一轮失败时，会说明没有调用模型、也没有扣费，并提示按原参数重试。",
-      "优化：清晰度写成 480、480P、720 这类写法都能正常识别，不再直接报错。"
+      "优化：左侧栏的更新红点移到「视频创作助手」最后一个字的右上角，显示成角标；侧栏收起时红点仍在图标角上。"
     ]
   }
 }

@@ -4,8 +4,9 @@
 import { createUpdateActions, renderUpdateNotice } from './updates.js';
 
 /** 左侧栏入口的更新提示样式：宿主那一行由宿主渲染，圆点只有一处，位置按行内有没有名字分两种。
- *  展开侧栏时名字就是第二个 span，红点改由名字后面的伪元素画出来，正好落在原来写「有更新」的位置；
- *  收起侧栏只剩图标，红点回到图标右上角。只看样式也够判断，不用在组件里猜宿主当前是展开还是收起。 */
+ *  展开侧栏时名字就是第二个 span，红点由名字那个 span 的伪元素画成上标角标，落在最后一个字的右上角
+ *  （原来写「有更新」的位置）；收起侧栏只剩图标，红点回到图标右上角。
+ *  只看样式就够判断，不用在组件里猜宿主当前是展开还是收起。 */
 export const UPDATE_HINT_CSS = `
   .mov-rail-hint { position: relative; display: inline-flex; align-items: center; }
   /* 收起侧栏：红点落在图标右上角 */
@@ -14,13 +15,12 @@ export const UPDATE_HINT_CSS = `
     background: var(--dsw-alias-state-error-primary, #e5533d);
     box-shadow: 0 0 0 2px var(--dsw-specific-sidebar-fill, transparent);
   }
-  /* 展开侧栏：这一行有名字，组件里的圆点收起，改在名字后面点一个同样大小的红点 */
+  /* 展开侧栏：这一行有名字，组件里的圆点收起，改在名字最后一个字的右上角点一个角标；贴着字不压字，所以不描边 */
   button:has(.mov-rail-dot):has(> span:nth-child(2)) .mov-rail-dot { display: none; }
   button:has(.mov-rail-dot):has(> span:nth-child(2)) > span:nth-child(2)::after {
-    content: ""; display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%;
+    content: ""; display: inline-block; width: 8px; height: 8px; margin-left: -1px; border-radius: 50%;
     background: var(--dsw-alias-state-error-primary, #e5533d);
-    box-shadow: 0 0 0 2px var(--dsw-specific-sidebar-fill, transparent);
-    vertical-align: middle;
+    vertical-align: super;
   }
 `;
 

@@ -182,8 +182,9 @@ test('红点样式只注入一次，并在展开的左侧栏里贴到入口那�
   assert.match(injected.css, /--dsw-alias-state-error-primary/, '红点跟着宿主的报错色，深浅色主题都不刺眼');
   assert.match(injected.css, /:has\(> span:nth-child\(2\)\)/, '按有没有名字区分展开与收起');
   assert.match(injected.css, /:has\(> span:nth-child\(2\)\) \.mov-rail-dot \{ display: none; \}/, '展开时组件里的圆点收起，只留名字后面那一个');
-  assert.match(injected.css, /> span:nth-child\(2\)::after/, '展开时红点画在入口名字后面，就是原来写「有更新」的位置');
-  assert.match(injected.css, /margin-left: 6px/, '红点紧跟名字，中间留一点间距');
+  assert.match(injected.css, /> span:nth-child\(2\)::after/, '展开时红点画在入口名字那个 span 上');
+  assert.match(injected.css, /vertical-align: super/, '红点做成上标，落在最后一个字的右上角');
+  assert.match(injected.css, /margin-left: -1px/, '红点贴住字的右上角，不往外飘');
   assert.equal(context.ensureUpdateHintStyles(doc), true, '已经有样式就不重复注入');
   assert.equal(context.ensureUpdateHintStyles(null), false, '没有 DOM 时直接跳过');
 });
