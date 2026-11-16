@@ -109,7 +109,8 @@
     "clean:releases": "node scripts/clean-releases.mjs",
     "pack:test": "node scripts/pack-test.mjs",
     "market:index": "node scripts/market-index.mjs",
-    "npm:publish": "node scripts/publish-npm.mjs"
+    "npm:publish": "node scripts/publish-npm.mjs",
+    "npm:token": "node scripts/npm-token.mjs"
   },
   "dependencies": {},
   "releaseNotes": {

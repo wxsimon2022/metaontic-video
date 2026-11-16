@@ -74,17 +74,22 @@ DSH 里的表现：插件管理页会在 `registry.npmjs.org/-/ping` 与 `regist
 发布成品包：
 
 ```bash
-npm login --registry https://registry.npmjs.org/   # 登录的是 npmjs，不是 npmmirror
-npm run npm:publish                                # 默认发 package.json 的当前版本
-npm run npm:publish -- --dry-run                   # 只检查不上传
-npm run npm:publish -- --otp 123456                # 账号开了 2FA 时带一次性验证码
-NPM_TOKEN=xxxx npm run npm:publish                 # CI：带 bypass 2FA 的 automation/granular token
+npm run npm:token -- npm_xxxxxxxx        # 一次性：把令牌存到本地，之后不用再贴
+npm run npm:token                       # 看当前凭据来源；--check 联网校验，--clear 删除
+npm run npm:publish                     # 发布 package.json 的当前版本，自动读取本地令牌
+npm run npm:publish -- --dry-run         # 只检查不上传
+npm run npm:publish -- --otp 123456      # 账号开了 2FA 又没令牌时，用一次性验证码
+NPM_TOKEN=xxxx npm run npm:publish       # CI：带 Bypass 2FA 的 granular token，优先于本地令牌
 ```
 
 **登录 npmmirror 不能发布**：它只接受同步，不接受上传。账号开启 2FA 后，npmjs 会对发布返回
 `E403 ... granular access token with bypass 2fa enabled is required`，此时只能二选一：
-带 `--otp` 发一次性验证码，或到 npmjs 生成带 bypass 2FA 的 automation/granular token 走 `NPM_TOKEN`。
-`scripts/publish-npm.mjs` 会把 `NPM_TOKEN` 写进临时 userconfig（用完删除，不打印内容），不改动本机 `~/.npmrc`；
+带 `--otp` 发一次性验证码，或到 npmjs 生成带 Bypass 2FA 的 granular access token。
+
+**凭据按 NPM_TOKEN → 本地令牌文件 → npm 登录态（`~/.npmrc`）的顺序取。** 本地令牌存在
+`.local/npm-token`（写入时 0600）：`.local/` 已被 `.gitignore` 忽略，既不进源码仓库、也不进发布包，
+脚本还会确认它没有被 git 跟踪；发布时令牌只写进临时 userconfig（用完即删），不改动本机 `~/.npmrc`，
+日志里也从不回显令牌内容。换令牌时重跑一次 `npm run npm:token -- <新令牌>` 覆盖即可。
 
 `scripts/publish-npm.mjs` 发布的是 Gitee 那个**同一个成品包**
 （`.local/releases/<版本>/metaontic-video-<版本>.tgz`），并会先确认包内没有 `README.md`
