@@ -1,3 +1,6 @@
+import { nextTask, compileProduction } from './orchestration.js';
+import { estimatePlan } from '../video/workflow/costs.js';
+import { createProject, writeProject } from '../video/workflow/project.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
@@ -5,17 +8,18 @@ import { dshHome } from '../video/media/references.js';
 import { DATA_DIR } from '../../core/hardcoded-config.js';
 import { sessionOwner } from '../video/workflow/project.js';
 import { STAGES, commitArtifact, exportMarkdown } from './project.js';
-import { FILM_WORKFLOW_GUIDANCE } from './creative.js';
+import { FILM_WORKFLOW_GUIDANCE, ORCHESTRATION_GUIDANCE } from './creative.js';
 import type { BusinessModule } from '../../core/runtime.js';
 const locks = new Set<string>();
 export const filmDirectorBusiness: BusinessModule = {
   id: 'film-director',
-  prompt: () => FILM_WORKFLOW_GUIDANCE,
+  prompt: () => FILM_WORKFLOW_GUIDANCE + ORCHESTRATION_GUIDANCE,
   apply(runtime) {
     runtime.tools.register('film-director', {
       name: 'film_project', description: '专业创作项目：create/read/submit/approve/export。磁盘保存，创意与剧本独立人工批准，不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets含characters/scenes；shots含shots；prompts含prompts；review含score/passed/issues。',
       parameters: { type:'object', properties: {
-        action:{type:'string',enum:['create','read','submit','approve','export']}, projectId:{type:'string'}, title:{type:'string'}, sourceBrief:{type:'string'}, durationSeconds:{type:'integer'}, stage:{type:'string',enum:[...STAGES]}, content:{type:'string'}, expectedRevision:{type:'integer'},
+        ratio:{type:'string',enum:['16:9','9:16']}, resolution:{type:'string',enum:['480p','720p']},
+        action:{type:'string',enum:['create','read','submit','approve','export','next','compile']}, projectId:{type:'string'}, title:{type:'string'}, sourceBrief:{type:'string'}, durationSeconds:{type:'integer'}, stage:{type:'string',enum:[...STAGES]}, content:{type:'string'}, expectedRevision:{type:'integer'},
       }, required:['action'] },
       output:{schema:{type:'object'},render(_args,value){return [{type:'text',text:JSON.stringify(value)}];}},
       isConcurrencySafe(){return false;},
@@ -33,7 +37,19 @@ export const filmDirectorBusiness: BusinessModule = {
             if (!Number.isInteger(args.durationSeconds) || args.durationSeconds<15 || args.durationSeconds>3600 || !args.title?.trim() || !args.sourceBrief?.trim()) throw Error('INVALID_REQUIREMENTS');
             state={schema_version:'2.0.0',project_id:id,title:args.title,source_brief:args.sourceBrief,duration_ms:args.durationSeconds*1000,revision:0,status:'REQUIREMENT_ANALYSIS',artifacts:{},approvals:{},decisions:[]};
           } else state=JSON.parse(await readFile(file,'utf8'));
-          if (args.action === 'read') return state;
+          if (args.action === 'read') return {...state,nextTask:nextTask(state)};
+          if (args.action === 'next') return nextTask(state);
+          if (args.action === 'compile') {
+            if (state.revision!==args.expectedRevision) throw Error('REVISION_CONFLICT');
+            const plan=compileProduction(state,estimatePlan(runtime.config,'video_generate',{duration:state.duration_ms/1000}),args.ratio,args.resolution);
+            if (!state.production || state.production.source_revision!==state.revision || state.production.ratio!==args.ratio || state.production.resolution!==args.resolution) {
+              const project:any=await createProject(exec,state.artifacts.assets.data.characters.length?'fixed_subject':'scenery');
+              project.duration=state.duration_ms/1000;
+              project.filmSource={path:file,revision:state.revision};
+              await writeProject(project);
+              state.production={...plan,videoProjectId:project.id};
+            }
+          }
           if (args.action === 'export') return { project:state, markdown:exportMarkdown(state), status:state.status };
           if (args.action === 'submit') state=commitArtifact(state,args.stage,JSON.parse(args.content),args.expectedRevision);
           if (args.action === 'approve') {
@@ -48,14 +64,14 @@ export const filmDirectorBusiness: BusinessModule = {
             state.decisions.push({stage:args.stage,revision:artifact.revision,decision:'approve',approved_at:new Date().toISOString()});
             state.revision++; state.status=args.stage==='creative'?'SCRIPT_WRITING':'ASSET_DESIGN';
           }
-          if (!['create','submit','approve'].includes(args.action)) throw Error('INVALID_ACTION');
+          if (!['create','submit','approve','compile'].includes(args.action)) throw Error('INVALID_ACTION');
           await mkdir(path.join(dir,'snapshots'),{recursive:true,mode:0o700});
           const body=JSON.stringify(state,null,2);
           // 不可变快照先写入，project.json原子替换为唯一提交点；中断遗留快照不代表提交。
           await writeFile(path.join(dir,'snapshots',`${state.revision}-${randomUUID()}.json`),body,{mode:0o600,flag:'wx'});
           const temp=path.join(dir,`${randomUUID()}.tmp`);
           await writeFile(temp,body,{mode:0o600,flag:'wx'}); await rename(temp,file);
-          return {...state,sha256:createHash('sha256').update(body).digest('hex')};
+          return {...state,nextTask:nextTask(state),sha256:createHash('sha256').update(body).digest('hex')};
         } finally {locks.delete(id);}
       },
     });

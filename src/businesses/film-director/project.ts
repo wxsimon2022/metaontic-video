@@ -7,6 +7,7 @@ export function validateTimeline(shots: any[], duration: number) {
   for (const shot of shots) {
     if (!shot.shot_id || ids.has(shot.shot_id)) throw Error('DUPLICATE_OR_MISSING_ID');
     ids.add(shot.shot_id);
+    if (shot.duration_ms !== undefined && shot.duration_ms !== shot.end_ms-shot.start_ms) throw Error('SHOT_DURATION_MISMATCH');
     if (!Number.isSafeInteger(shot.start_ms) || !Number.isSafeInteger(shot.end_ms) || shot.start_ms !== end || shot.end_ms <= end) throw Error('GAP_OR_OVERLAP');
     end = shot.end_ms;
   }
@@ -34,6 +35,7 @@ export function validateArtifact(stage: string, value: any, state: any) {
     const ids = value.prompts.map(p => p.shot_id);
     if (new Set(ids).size !== ids.length || ids.length !== shots.length || shots.some(s => !ids.includes(s.shot_id)) || value.prompts.some(p => typeof p.prompt !== 'string' || !p.prompt.trim())) throw Error('PROMPT_COVERAGE');
   }
+  if (stage === 'review' && Array.isArray(value.issues) && value.issues.some(i => !i || !['blocker','major','minor','info'].includes(String(i.severity).toLowerCase()))) throw Error('INVALID_SEVERITY');
   if (stage === 'review' && (!Number.isInteger(value.score) || value.score < 85 || value.score > 100 || !Array.isArray(value.issues) || value.issues.some(i => String(i.severity).toLowerCase() === 'blocker') || value.passed !== true)) throw Error('REVIEW_BLOCKED');
 }
 export function commitArtifact(state: any, stage: string, value: any, expected: number) {

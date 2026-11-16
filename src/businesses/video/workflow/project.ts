@@ -97,6 +97,10 @@ export async function assertProjectApproved(config, exec, args) {
   const data = await readProject(candidate.projectId, exec);
   if (!resumeDirOf(args?.resume) && args.duration == null) throw new Error('生成前必须传入用户已确认的视频时长duration，不得使用默认15秒。');
   if (data.approved?.resumeDir && resumeDirOf(args.resume) !== data.approved.resumeDir) throw new Error('此次审核绑定了原续做目录，请使用原resume。');
+  if (data.filmSource) {
+    const source = JSON.parse(await readFile(data.filmSource.path,'utf8'));
+    if (source.revision !== data.filmSource.revision) throw new Error('创作项目已改稿，请重新编译制作计划并审核。');
+  }
   if (!data.approved) throw new Error('本项目脚本尚未审核通过，请先展示脚本和分镜，再调用 video_project(action:review)。');
   if (await scriptDigest(data.approved.scriptPath) !== data.approved.scriptHash) throw new Error('脚本已修改，请重新审核当前版本。');
   // 续做时沿用完整审核参数，只覆盖用户本次明确传入的字段。
