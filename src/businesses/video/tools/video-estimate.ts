@@ -13,7 +13,7 @@ const PRICE_DATE = '2026-11-07';
 
 function compareVideoCosts(config, args) {
   const duration = args?.duration;
-  if (!Number.isInteger(duration) || duration < 4 || duration > 120) throw new Error('目标时长须为4–120秒整数。');
+  if (!Number.isInteger(duration) || duration < 4 || duration > 3600) throw new Error('目标时长须为4–3600秒整数。');
   const resolution = normalizeResolution(args?.resolution);
   if (!resolution) throw new Error('请先由用户确认480P或720P，再试算。');
   const ratio = args?.ratio ?? ref(config, 'ratio', '9:16');
@@ -59,7 +59,7 @@ export function estimateTool(config) {
     name: 'video_estimate',
     description: '脚本审核前必须调用的只读双方案费用试算：火山官方方案与当前MetaOnticVideo插件方案。duration为完整目标时长，resolution须用户已确认；首段按无视频输入，后续续拍按有视频输入计价并计入上一段完整视频时长；参考图不算视频输入。必须在脚本末尾展示逐段档位、输入/输出秒数、单价及金额，不能只给合计。不会生成视频、扣费、查余额或修改配置。未知模型/画幅拒绝猜价。每次改稿涉及时长、清晰度、模型或分段须重算。',
     parameters: { type: 'object', properties: {
-      duration: { type: 'integer', minimum: 4, maximum: 120, description: '当前完整脚本的目标总时长' },
+      duration: { type: 'integer', minimum: 4, maximum: 3600, description: '当前完整脚本的目标总时长' },
       resolution: { type: 'string', enum: ['480p', '720p'], description: '用户已确认的视频清晰度。必须写成带引号的字符串，例如 "480p"；写成裸值 480p 会让这次调用直接失败。' },
       ratio: { type: 'string', enum: ['16:9', '9:16'], description: '脚本画幅，其他画幅暂不可靠试算。同样要写成带引号的字符串，例如 "16:9"。' },
       segmentSeconds: { type: 'integer', minimum: 4, maximum: 30, description: '与实际生成一致的续拍分段时长上限' },

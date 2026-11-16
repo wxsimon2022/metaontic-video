@@ -14,7 +14,7 @@ export const CREATIVE_GUIDANCE = `【统一创作负责人】
 
 /** film_project现有协议；避免照抄参考稿中尚未实现的文件/编排能力。 */
 export const FILM_WORKFLOW_GUIDANCE = `【专业分阶段创作工具契约】
-用户要求专业分阶段创作或超过120秒的剧本规划时使用film_project，规划范围15–3600秒；普通视频制作仍用video_project。时长、画幅、清晰度已确认则沿用，缺失规格按现有规则合并询问，不把建议当用户确认。规划不自动调用视频。
+用户要求专业分阶段创作或长片剧本规划时使用film_project，规划范围15–3600秒；普通视频制作仍用video_project。时长、画幅、清晰度已确认则沿用，缺失规格按现有规则合并询问，不把建议当用户确认。规划不自动调用视频。
 先create(title,sourceBrief原文,durationSeconds)，续作或改稿先read(projectId)。以工具返回的状态和revision为准，不假设存在progress/manifest读取、回滚、章节自动调度或独立子Agent。
 submit传stage、content（合法JSON字符串）、expectedRevision（最近读取/提交返回的项目revision）。JSON字符串里的枚举与文本必须有双引号。正文先展示可读成果，再提交并核对返回；工具成功才称保存。
 阶段及content字段：
@@ -27,4 +27,4 @@ review：{score,passed,issues:[{severity:"blocker或major或minor或info",entity
 创意和剧本的批准分别绑定材料版本，沉默/取消/修改意见不算批准。改稿后按工具stale状态更新下游，不假称已实现实体级自动修订。超过180秒按章规划，600秒以上维护全片摘要和章间状态，分批创作但按当前工具提交完整阶段聚合对象；超出上下文能力时停在可恢复草稿，不截断冒充完整。
 export返回JSON和Markdown内容，不是已写入导出文件；没有实际文件不得编造下载链接。Markdown应为同版本JSON的可读投影。实际视频仍须走video_project脚本审核、费用确认与逐段结果审核，创作批准不替代制作授权。`;
 
-export const ORCHESTRATION_GUIDANCE = `推进专业创作先调用film_project(action:next)，只加载返回的role、inputs与scope所需资料，再按许可动作提交或请求批准；不把完整历史反复塞给镜头任务。当前role是同一助手的专业职责，不是独立运行的子Agent。完成审核后调用compile(expectedRevision,ratio,resolution)编译制作计划，返回production.videoProjectId及specification。用该videoProjectId执行video_project prepare完成角色图路线，再展示制作脚本、分镜与估价并review，最后才调用视频生成。不得把创作批准当费用授权。compile只读规划不产生付费调用；重复同版本同规格编译复用绑定。创作改稿后旧绑定禁止新增生成，已提交任务查询和交付仍可恢复。超过120秒的创作项目当前需先拆分制作范围，不能宣称已支持整片自动生成。`;
+export const ORCHESTRATION_GUIDANCE = `推进专业创作先调用film_project(action:next)，只加载返回的role、inputs与scope所需资料，再按许可动作提交或请求批准；不把完整历史反复塞给镜头任务。当前role是同一助手的专业职责，不是独立运行的子Agent。完成审核后调用compile(expectedRevision,ratio,resolution)编译制作计划，返回production.videoProjectId及specification。用该videoProjectId执行video_project prepare完成角色图路线，再展示制作脚本、分镜与估价并review，最后才调用视频生成。不得把创作批准当费用授权。compile只读规划不产生付费调用；重复同版本同规格编译复用绑定。创作改稿后旧绑定禁止新增生成，已提交任务查询和交付仍可恢复。全片最长3600秒，按模型单段能力逐段生成、审核和续做，不承诺一次请求生成整片。`;

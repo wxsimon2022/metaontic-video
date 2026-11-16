@@ -648,7 +648,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
       patchScriptDialog({ busy: true, error: '' });
       try {
         const projectId = canvas.projectId;
-        const seconds = Math.max(4, Math.min(120, Number(scriptDialog.totalSeconds) || 15));
+        const seconds = Math.max(4, Math.min(3600, Number(scriptDialog.totalSeconds) || 15));
         const resolution = scriptDialog.resolution;
         const ratio = scriptDialog.ratio;
         const segmentSeconds = Math.max(4, Math.min(Number(scriptDialog.segmentSeconds) || 15, scriptDialog.singleMax || 15));
@@ -1431,7 +1431,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
             placeholder: '一句话就够，例如：青旅天台的清晨，一个人拖着行李住进城市。',
             onChange: (e: any) => patchScriptDialog({ idea: e.target.value, error: '' }) })]),
           h('div', { key: 'spec', className: 'movc-row' }, [
-            h('label', { key: 'total', className: 'movc-field' }, ['目标总时长（秒）', h('input', { type: 'number', min: 4, max: 120, value: scriptDialog.totalSeconds, onChange: (e: any) => patchScriptDialog({ totalSeconds: e.target.value }) })]),
+            h('label', { key: 'total', className: 'movc-field' }, ['目标总时长（秒）', h('input', { type: 'number', min: 4, max: 3600, value: scriptDialog.totalSeconds, onChange: (e: any) => patchScriptDialog({ totalSeconds: e.target.value }) })]),
             h('label', { key: 'segment', className: 'movc-field' }, ['每段时长（秒）', h('input', { type: 'number', min: 4, max: scriptDialog.singleMax || 15, value: scriptDialog.segmentSeconds, onChange: (e: any) => patchScriptDialog({ segmentSeconds: e.target.value }) })]),
           ]),
           h('div', { key: 'spec2', className: 'movc-row' }, [

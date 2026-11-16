@@ -138,7 +138,7 @@ export const videoConfigFields = {
 
 const DEFAULT_MODEL = VIDEO_MODEL;
 
-export const MAX_SEGMENTS = 10;
+export const MAX_SEGMENTS = 900;
 
 export const MIN_SECONDS = 4;
 
@@ -148,10 +148,10 @@ export const MIN_SEGMENT_SECONDS = 4;
 export const MAX_SEGMENT_SECONDS = 15;
 
 /**
- * 单条成片的目标时长上限：段数上限内排得出来的最长时长，先按 120 秒卡住。
- * 段数越少接缝越少，但一条片子拖太长可用的质检/重跑余地也小，所以这里封顶 120 秒。
+ * 单条成片的目标时长上限：段数上限内排得出来的最长时长，支持最长60分钟。
+ * 段数越少接缝越少，但一条片子拖太长可用的质检/重跑余地也小，仍逐段审核与确认费用。
  */
-export const MAX_TOTAL_SECONDS = 120;
+export const MAX_TOTAL_SECONDS = 3600;
 
 /** 旧导出保留为默认值，实际清晰度由 resolveResolution 统一解析。 */
 export const FIXED_RESOLUTION = '720p';

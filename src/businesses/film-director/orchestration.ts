@@ -6,7 +6,7 @@ export function nextTask(state: any) {
     if (!artifact || artifact.stale) {
       const roles = {creative:'creative',script:'screenwriter',assets:'character + scene',shots:'storyboard',prompts:'prompt-engineer',review:'reviewer'};
       const dependencies = {creative:[],script:['creative'],assets:['script'],shots:['script','assets'],prompts:['assets','shots'],review:[...STAGES.slice(0,5)]};
-      return { action:'submit', stage, role:roles[stage], inputs:Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]])), expectedRevision:state.revision };
+      return { action:'submit', stage, role:roles[stage], inputs:Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]])), instructions:ROLE_INSTRUCTIONS[stage],expectedRevision:state.revision };
     }
     if (['creative','script'].includes(stage) && state.approvals[stage] !== artifact.revision) return {action:'approve',stage,expectedRevision:state.revision};
   }
@@ -24,7 +24,7 @@ export function validateCurrent(state: any) {
 export function compileProduction(state: any, plan: any[], ratio: string, resolution: string) {
   validateCurrent(state);
   if (!['16:9','9:16'].includes(ratio) || !['480p','720p'].includes(resolution)) throw Error('CONFIRMED_SPEC_REQUIRED');
-  if (state.duration_ms>120000) throw Error('PRODUCTION_SCOPE_REQUIRED:当前执行仅支持120秒内项目，长片请先拆分已审核制作范围');
+  if (!Number.isSafeInteger(state.duration_ms) || state.duration_ms < 15000 || state.duration_ms > 3600000) throw Error('INVALID_PROJECT_DURATION');
   const shots=state.artifacts.shots.data.shots;
   const prompts=state.artifacts.prompts.data.prompts;
   let start=0;
@@ -37,3 +37,12 @@ export function compileProduction(state: any, plan: any[], ratio: string, resolu
   if (start!==state.duration_ms || segments.some(s=>!s.prompt)) throw Error('PRODUCTION_DURATION_MISMATCH');
   return {source_project_id:state.project_id,source_revision:state.revision,ratio,resolution,segments,specification:{prompt:segments[0].prompt,segmentPrompts:segments.map(s=>s.prompt),duration:state.duration_ms/1000,ratio,resolution}};
 }
+
+const ROLE_INSTRUCTIONS = {
+ creative:'只策划主题、logline、受众、段落目的、时长预算与风险；不提前写正式分镜。未知事实列待核实。',
+ script:'依据已批准创意写完整screenplay和章节；逐场记录目标、动作、对白与旁白、进入退出状态；不改创意核心。',
+ assets:'人物与场景分两项职责整理，合并characters/scenes提交；稳定ID、服装状态、声音、场景布局与道具位置；不新增剧情。',
+ shots:'依据剧本和资产逐镜写叙事目的、构图、视角、运动、表演、声画与连续性；整数毫秒连续覆盖全片，不按生成次数拆镜头。',
+ prompts:'每个shot_id一个自包含prompt，复制相关资产锚点；保留原对白及语言。未知模型能力标generic，风险与替代方案单列。',
+ review:'独立审核需求、因果、连续性、时长、覆盖与模型风险；列问题定位和最小修复，不重写上游、不把自评分当程序验证。',
+};

@@ -65,7 +65,7 @@ export function videoTool(liveConfig, deps, ctx) {
         duration: {
           type: 'integer',
           minimum: 4,
-          maximum: 120,
+          maximum: 3600,
           description:
             '目标总时长（秒）。不超过模型单段上限（2.0 为 15、2.5 为 30）时就一次直出（整条视频只生成一次，'
             + '禁止拆成多段/多镜再拼）；超过就先直出上限长度再逐段延长，最后合并。'

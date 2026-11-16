@@ -3738,7 +3738,7 @@
         patchScriptDialog({ busy: true, error: "" });
         try {
           const projectId = canvas.projectId;
-          const seconds = Math.max(4, Math.min(120, Number(scriptDialog.totalSeconds) || 15));
+          const seconds = Math.max(4, Math.min(3600, Number(scriptDialog.totalSeconds) || 15));
           const resolution = scriptDialog.resolution;
           const ratio = scriptDialog.ratio;
           const segmentSeconds = Math.max(4, Math.min(Number(scriptDialog.segmentSeconds) || 15, scriptDialog.singleMax || 15));
@@ -4838,7 +4838,7 @@
               onChange: (e) => patchScriptDialog({ idea: e.target.value, error: "" })
             })]),
             h("div", { key: "spec", className: "movc-row" }, [
-              h("label", { key: "total", className: "movc-field" }, ["\u76EE\u6807\u603B\u65F6\u957F\uFF08\u79D2\uFF09", h("input", { type: "number", min: 4, max: 120, value: scriptDialog.totalSeconds, onChange: (e) => patchScriptDialog({ totalSeconds: e.target.value }) })]),
+              h("label", { key: "total", className: "movc-field" }, ["\u76EE\u6807\u603B\u65F6\u957F\uFF08\u79D2\uFF09", h("input", { type: "number", min: 4, max: 3600, value: scriptDialog.totalSeconds, onChange: (e) => patchScriptDialog({ totalSeconds: e.target.value }) })]),
               h("label", { key: "segment", className: "movc-field" }, ["\u6BCF\u6BB5\u65F6\u957F\uFF08\u79D2\uFF09", h("input", { type: "number", min: 4, max: scriptDialog.singleMax || 15, value: scriptDialog.segmentSeconds, onChange: (e) => patchScriptDialog({ segmentSeconds: e.target.value }) })])
             ]),
             h("div", { key: "spec2", className: "movc-row" }, [

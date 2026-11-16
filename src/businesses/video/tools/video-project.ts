@@ -38,7 +38,7 @@ export function projectTool(config, ctx, reviewGuard, generationProperties, exte
       resume: { type: 'string', description: 'review_segment审核已完成分段，传原resumeDir；先正文展示视频，再调用本动作弹结果确认窗。' },
       action: { type: 'string', enum: ['prepare', 'review', 'storyboard', 'status', 'review_segment'] }, projectId: { type: 'string' },
       captureScript: { type: 'boolean', description: '传true时插件把本轮用户可见正文里的完整脚本落成script.md：脚本只需在正文生成一次，不要再用写文件工具写一遍。storyboard与review都支持；正文里没有完整脚本会报错。' },
-      duration: { type: 'integer', description: 'prepare时仅传用户已明确指定或回答确认的目标总秒数（4–120）；原始需求未写但已在完善创意中回答也必须传值；同项目沿用已保存值，只有从未确认才省略。续拍指本次新增的总秒数，不是每段时长。' },
+      duration: { type: 'integer', description: 'prepare时仅传用户已明确指定或回答确认的目标总秒数（4–3600）；原始需求未写但已在完善创意中回答也必须传值；同项目沿用已保存值，只有从未确认才省略。续拍指本次新增的总秒数，不是每段时长。' },
       subjectType: { type: 'string', enum: ['fixed_subject', 'scenery', 'provided_images'] },
       resetCharacterChoice: { type: 'boolean', description: '仅用户明确改变角色图路线时传true' },
       toolName: { type: 'string', enum: ['video_generate', 'video_extend'] },
