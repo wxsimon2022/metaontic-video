@@ -134,6 +134,12 @@ test('流水线发版接在 Gitee Go 流水线的打包步骤后面，只对 v �
   assert.match(workflow, /RELEASE_TAG:\n\s+type: TEXT/);
   assert.match(workflow, /RELEASE_NOTES:\n\s+type: TEXT/);
   assert.match(workflow, /if \[ -n "\$RELEASE_TAG" \]; then echo "手动填写的标签：\$RELEASE_TAG"; TAG="\$RELEASE_TAG"; fi/);
+  // 成品要进制品库长期留档：只声明 artifacts 只是当次运行的暂存构建物，必须有「上传制品」步骤。
+  assert.match(workflow, /- name: PLUGIN_PACKAGE\n\s+path:\n\s+- \.\/dist/);
+  assert.match(workflow, /- step: publish@general_artifacts/);
+  assert.match(workflow, /dependArtifact: PLUGIN_PACKAGE/);
+  assert.match(workflow, /artifactName: metaontic-video/);
+  assert.match(workflow, /dependsOn: build_test/);
 });
 
 test('流水线发版的发布核对写真话：成品来自流水线、本机未打包未上传', () => {

@@ -97,6 +97,14 @@ stages:
         notify: []
         strategy:
           retry: '0'
+      # 打包好的成品上传到本仓库的制品库（永久留档），可在 Gitee「制品库」里按制品名 metaontic-video 下载；
+      # 上面 build 步骤里的 artifacts 只是当次运行的暂存构建物，有过期时间，不能当长期存档。
+      - step: publish@general_artifacts
+        name: publish_general_artifacts
+        displayName: 上传制品到制品库
+        dependArtifact: PLUGIN_PACKAGE
+        artifactName: metaontic-video
+        dependsOn: build_test
 # 手动运行这条流水线时可以填这两个变量：RELEASE_TAG（要发布的标签，不填就用 git 上的标签）
 # 与 RELEASE_NOTES（这一版的发版描述，按「新增：…」「优化：…」逐行写，合计不超过 100 字；不填就用 package.json 的 releaseNotes）。
 # 令牌用流水线变量 GITEE_TOKEN（别名 GITEE_ACCESS_TOKEN / TOKEN_GITEE / GITEE_API_TOKEN），勾选私密，不写在这个文件里。
