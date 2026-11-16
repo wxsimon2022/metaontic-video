@@ -1,6 +1,6 @@
 {
   "name": "metaontic-video",
-  "version": "3.26.0",
+  "version": "3.27.0",
   "description": "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
@@ -106,12 +106,12 @@
   },
   "dependencies": {},
   "releaseNotes": {
-    "version": "3.26.0",
+    "version": "3.27.0",
     "prerelease": false,
-    "publishedAt": "2026-11-16T07:20:36.937Z",
+    "publishedAt": "2026-11-16T07:45:06.127Z",
     "items": [
-      "新增：AI 写脚本的分镜表增加「视角」列，按场景为每个镜头挑视角，平视是默认，不硬加。",
-      "优化：视角与镜别、运镜一起写进每段提示词，画布分镜与镜头示意图同步显示。"
+      "新增：插件左侧栏入口查到新版本时显示「有更新」，侧栏收起时图标角上有小圆点。",
+      "优化：从提示打开的面板顶部即可更新，两步确认后安装最新正式版，点「稍后再说」只压住这一版。"
     ]
   }
 }

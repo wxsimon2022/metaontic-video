@@ -1197,7 +1197,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "3.26.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.27.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1628,7 +1628,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.26.0",
+    version: "3.27.0",
     description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1734,12 +1734,12 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.26.0",
+      version: "3.27.0",
       prerelease: false,
-      publishedAt: "2026-11-16T07:20:36.937Z",
+      publishedAt: "2026-11-16T07:45:06.127Z",
       items: [
-        "\u65B0\u589E\uFF1AAI \u5199\u811A\u672C\u7684\u5206\u955C\u8868\u589E\u52A0\u300C\u89C6\u89D2\u300D\u5217\uFF0C\u6309\u573A\u666F\u4E3A\u6BCF\u4E2A\u955C\u5934\u6311\u89C6\u89D2\uFF0C\u5E73\u89C6\u662F\u9ED8\u8BA4\uFF0C\u4E0D\u786C\u52A0\u3002",
-        "\u4F18\u5316\uFF1A\u89C6\u89D2\u4E0E\u955C\u522B\u3001\u8FD0\u955C\u4E00\u8D77\u5199\u8FDB\u6BCF\u6BB5\u63D0\u793A\u8BCD\uFF0C\u753B\u5E03\u5206\u955C\u4E0E\u955C\u5934\u793A\u610F\u56FE\u540C\u6B65\u663E\u793A\u3002"
+        "\u65B0\u589E\uFF1A\u63D2\u4EF6\u5DE6\u4FA7\u680F\u5165\u53E3\u67E5\u5230\u65B0\u7248\u672C\u65F6\u663E\u793A\u300C\u6709\u66F4\u65B0\u300D\uFF0C\u4FA7\u680F\u6536\u8D77\u65F6\u56FE\u6807\u89D2\u4E0A\u6709\u5C0F\u5706\u70B9\u3002",
+        "\u4F18\u5316\uFF1A\u4ECE\u63D0\u793A\u6253\u5F00\u7684\u9762\u677F\u9876\u90E8\u5373\u53EF\u66F4\u65B0\uFF0C\u4E24\u6B65\u786E\u8BA4\u540E\u5B89\u88C5\u6700\u65B0\u6B63\u5F0F\u7248\uFF0C\u70B9\u300C\u7A0D\u540E\u518D\u8BF4\u300D\u53EA\u538B\u4F4F\u8FD9\u4E00\u7248\u3002"
       ]
     }
   };
@@ -5048,7 +5048,8 @@
             order: 31,
             locale: NS,
             label: () => t("canvasPanelLabel")
-          }, railIcon)),
+            // 更新入口在视频创作面板顶部，画布这一行不加圆点：点了也看不到更新，会误导。
+          }, PanelIcon)),
           () => ctx.slots.inject("main", () => ctx.slots.register({
             name: "main",
             key: CANVAS_PANEL_ID,
