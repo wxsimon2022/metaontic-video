@@ -87,6 +87,18 @@ stages:
           - 'if [ -n "$RELEASE_TAG" ]; then echo "手动填写的标签：$RELEASE_TAG"; TAG="$RELEASE_TAG"; fi'
           - 'if [ -n "$RELEASE_NOTES" ]; then echo "本次发版描述用手动填写的内容（$(printf %s "$RELEASE_NOTES" | wc -c) 字节）"; fi'
           - 'if [ -n "$TAG" ] && [ "${TAG#v}" != "$TAG" ]; then node scripts/ci-release.mjs --dist dist --tag "$TAG"; else echo "本次不是正式版标签，只出制品、不发布 Release"; fi'
+          # 正式版再把标签推到 GitHub：GitHub 侧发现 Gitee 已经有这一版，就镜像同一份成品并跑双平台安装检查，
+          # 然后建 GitHub Release（不重新打包）。令牌用流水线变量 GITHUB_TOKEN（GitHub 细粒度令牌，需 contents:write），勾选私密，不写在这个文件里。
+          - 'if [ -z "$TAG" ] || [ "${TAG#v}" = "$TAG" ]; then echo "本次不是正式版标签，不同步 GitHub"'
+          - 'elif [ -z "$GITHUB_TOKEN" ]; then echo "没有配置 GITHUB_TOKEN，跳过 GitHub 镜像：在 Gitee 流水线变量里加上 GitHub 细粒度令牌（contents:write）后，这里会自动把标签推到 GitHub 发布"'
+          - 'else'
+          - 'set +x'
+          - 'printf "#!/bin/sh\necho \"$GITHUB_TOKEN\"\n" > /tmp/gh-askpass.sh; chmod +x /tmp/gh-askpass.sh'
+          - 'GHURL="https://x-access-token@github.com/wxsimon2022/metaontic-video.git"'
+          - 'REF="refs/tags/$TAG"; git rev-parse --verify -q "$REF" >/dev/null 2>&1 || REF="HEAD:refs/tags/$TAG"'
+          - 'GIT_ASKPASS=/tmp/gh-askpass.sh GIT_TERMINAL_PROMPT=0 git push "$GHURL" "$REF" && echo "已把 $TAG 推到 GitHub：GitHub 会镜像同一份成品、跑 Windows/macOS 安装检查并建发行版" || echo "推送 $TAG 到 GitHub 失败：检查网络与令牌权限（contents:write），可在 GitHub 侧用 publish 手动流程补发"'
+          - 'set -x'
+          - 'fi'
         artifacts:
           - name: PLUGIN_PACKAGE
             path:
@@ -108,6 +120,7 @@ stages:
 # 手动运行这条流水线时可以填这两个变量：RELEASE_TAG（要发布的标签，不填就用 git 上的标签）
 # 与 RELEASE_NOTES（这一版的发版描述，按「新增：…」「优化：…」逐行写，合计不超过 100 字；不填就用 package.json 的 releaseNotes）。
 # 令牌用流水线变量 GITEE_TOKEN（别名 GITEE_ACCESS_TOKEN / TOKEN_GITEE / GITEE_API_TOKEN），勾选私密，不写在这个文件里。
+# 想把正式版镜像到 GitHub，再加一个 GITHUB_TOKEN（GitHub 细粒度令牌，contents:write），同样勾选私密、不写在这个文件里。
 variables:
   RELEASE_TAG:
     type: TEXT

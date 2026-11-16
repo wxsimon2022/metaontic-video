@@ -31,13 +31,18 @@ for (const prerelease of [false,true]) test(`Gitee publishes and verifies ${prer
       if (path.endsWith('/attach_files')) return { ok: true, json: async () => attachments };
       return release ? { ok: true, json: async () => release } : { ok: false, status: 404 };
     };
-    const args = { token: 'test-token', tag, prerelease, archive, notes: 'release notes', request };
+    const skipped = [];
+    const args = { token: 'test-token', tag, prerelease, archive, notes: 'release notes', request, log: line => skipped.push(String(line)) };
     assert.ok((await publishGitee(args)).endsWith(tag));
     release.prerelease = !prerelease;
     release.body = 'stale notes';
     await publishGitee(args); assert.equal(release.body, 'release notes'); assert.equal(creates, 1); assert.equal(uploads, 1);
+    // 同版本已有同名附件时只核对、不重复上传：本机发布后流水线又按标签跑一遍也不会互相覆盖。
     attachments[0].size = 9;
-    await assert.rejects(publishGitee(args), /different size/);
+    assert.ok((await publishGitee(args)).endsWith(tag));
+    assert.equal(uploads, 1, '已有附件时不再上传');
+    assert.equal(attachments[0].size, 9, '先发布的那份成品保持不动');
+    assert.ok(skipped.some(line => /只核对不覆盖/.test(line)), skipped.join(' | '));
     await assert.rejects(publishGitee({ ...args, token: '' }), /Missing GITEE_TOKEN/);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });

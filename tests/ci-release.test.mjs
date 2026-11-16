@@ -140,6 +140,28 @@ test('流水线发版接在 Gitee Go 流水线的打包步骤后面，只对 v �
   assert.match(workflow, /dependArtifact: PLUGIN_PACKAGE/);
   assert.match(workflow, /artifactName: metaontic-video/);
   assert.match(workflow, /dependsOn: build_test/);
+  // 正式版发完 Gitee Release 后把标签推到 GitHub：令牌走 GIT_ASKPASS，不能出现在命令行与日志里。
+  assert.match(workflow, /if \[ -z "\$TAG" \] \|\| \[ "\$\{TAG#v\}" = "\$TAG" \]; then echo "本次不是正式版标签，不同步 GitHub"/);
+  assert.match(workflow, /elif \[ -z "\$GITHUB_TOKEN" \]; then echo "没有配置 GITHUB_TOKEN/);
+  assert.match(workflow, /GIT_ASKPASS=\/tmp\/gh-askpass\.sh GIT_TERMINAL_PROMPT=0 git push "\$GHURL" "\$REF"/);
+  assert.match(workflow, /github\.com\/wxsimon2022\/metaontic-video\.git/);
+  assert.doesNotMatch(workflow, /github\.com[^"\n]*\$GITHUB_TOKEN/, '令牌不能直接拼进推送地址');
+});
+
+test('GitHub 侧按标签发布时优先镜像 Gitee 同一份成品，没有才自己打包', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/publish.yml', import.meta.url), 'utf8');
+  // 标签触发：先看 Gitee 有没有这一版，有就镜像同一个 tgz（不重打包），没有才自己构建打包。
+  assert.match(workflow, /releases\/tags\/v\$VERSION/);
+  assert.match(workflow, /echo "mirror=1" >> "\$GITHUB_OUTPUT"; echo "version=\$VERSION" >> "\$GITHUB_OUTPUT"; echo "sha=-" >> "\$GITHUB_OUTPUT"/);
+  assert.match(workflow, /if: \$\{\{ steps\.source\.outputs\.mirror != '1' \}\}/);
+  assert.match(workflow, /if: \$\{\{ steps\.source\.outputs\.mirror == '1' \}\}/);
+  assert.match(workflow, /python3 scripts\/download-published-release\.py "\$\{\{ steps\.source\.outputs\.version \}\}" dist "\$\{\{ steps\.source\.outputs\.sha \}\}"/);
+  // 手动镜像（existing_version）仍必须带上原成品 sha256，不能退化成不校验。
+  assert.match(workflow, /test "\$SYNC_VERSION" = "\$VERSION"/);
+  assert.match(workflow, /echo "sha=\$SYNC_SHA256" >> "\$GITHUB_OUTPUT"/);
+  // 双平台安装检查照跑在要发布的那份成品上。
+  assert.match(workflow, /os: \[windows-latest, macos-latest\]/);
+  assert.match(workflow, /node scripts\/check-package-install\.mjs dist\/\*\.tgz/);
 });
 
 test('流水线发版的发布核对写真话：成品来自流水线、本机未打包未上传', () => {

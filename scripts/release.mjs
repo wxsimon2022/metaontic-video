@@ -60,9 +60,9 @@ const help = `一键发布（准备好完整说明与指南后执行）：
   node scripts/release.mjs 3.13.3 --notes release-plan.json
   node scripts/release.mjs 3.13.3 --notes release-plan.json --dry-run
   node scripts/release.mjs 3.13.3 --resume
-默认只发 Gitee，且默认走 Gitee Go 流水线：本机只做准备、提交、打标签并推送，成品打包、制品库归档与 Gitee Release 都由流水线按标签完成（scripts/ci-release.mjs），本机不需要 GITEE_TOKEN。
-流水线不可用时才在本机打包并发布，加 --local；--ci 是默认行为的同义写法。
-需要同时同步 GitHub（含双平台安装校验）时加 --both，或 --github <地址>；--both 走本机收尾，不要再并跑流水线发布。
+默认只发 Gitee，并在本机打包后直接创建 Release、上传核对成品（需要本机 GITEE_TOKEN）。
+想交给 Gitee Go 流水线打包发布时加 --pipeline（--ci 是同义写法）：本机只做准备、提交、打标签并推送，成品打包、制品库归档与 Gitee Release 都由流水线按标签完成，本机不需要 GITEE_TOKEN。
+需要同时同步 GitHub（含双平台安装校验）时加 --both，或 --github <地址>；--both 走本机收尾，不要与 --pipeline 同时用。
 可选：--gitee <Gitee仓库地址> --branch master
 --dry-run 只显示范围与计划，不写文件、不改版本、不提交、不联网发布。
 --resume 仅续跑已提交且同一标签的发布，不改旧标签。
@@ -73,7 +73,7 @@ export async function main(argv) {
     const {createInterface}=await import('node:readline/promises');
     const input=createInterface({input:process.stdin,output:process.stdout});
     let entered;
-    try { console.log('正式发布：请先填写release-plan.json并同步指南；默认由 Gitee Go 流水线按标签打包发布（本机只推标签）。'); entered=(await input.question('请输入正式版本号（如3.13.3，留空退出）：')).trim(); } finally { input.close(); }
+    try { console.log('正式发布：请先填写release-plan.json并同步指南；默认在本机打包并发布 Gitee Release（加 --pipeline 交给流水线）。'); entered=(await input.question('请输入正式版本号（如3.13.3，留空退出）：')).trim(); } finally { input.close(); }
     if(!entered)return;
     return main([entered,...argv.slice(1)]);
   }
@@ -83,8 +83,8 @@ export async function main(argv) {
   for(let i=1;i<argv.length;i++) {
     const key=argv[i];
     if(['--dry-run','--resume','--no-promo'].includes(key)) opts[key.slice(2)]=true;
-    // 发版默认由 Gitee Go 流水线发布：本机只做准备并推标签；--local 才在本机打包发布，--ci 是默认行为的同义写法。
-    else if(key==='--ci') opts.ci=true;
+    // 默认在本机打包发布（需要 GITEE_TOKEN）；--pipeline（--ci 同义）才交给 Gitee Go 流水线，--local 是同义写法。
+    else if(key==='--pipeline'||key==='--ci') opts.pipeline=true;
     else if(key==='--local') opts.local=true;
     // --both 要等 GitHub CI 的成品再收尾，所以仍然在本机打包发布。
     else if(key==='--both') { opts.targets='both'; opts.local=true; }
@@ -93,9 +93,9 @@ export async function main(argv) {
     else if(['--notes','--github','--gitee','--branch'].includes(key) && argv[i+1] && !argv[i+1].startsWith('--')) { opts[key.slice(2)]=argv[++i]; if(key==='--github')opts.targets='both'; }
     else throw Error(`未知参数或缺少参数值：${key}`);
   }
-  if(opts.ci&&opts.local)throw Error('--ci 与 --local 不能同时用：默认（含 --ci）由 Gitee Go 流水线发布，--local 才在本机打包发布');
-  // 发布路径：默认流水线（本机只推标签），--local / --both 才在本机打包并发 Release。
-  const pipeline=!opts.local;
+  if(opts.pipeline&&opts.local)throw Error('--pipeline（或 --ci）与 --local（或 --both）不能同时用：前者交给 Gitee Go 流水线发布，后者在本机打包发布');
+  // 发布路径：默认本机打包并发 Release；--pipeline / --ci 才交给 Gitee Go 流水线（本机只推标签）。
+  const pipeline=Boolean(opts.pipeline);
   if(!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(opts.branch)||opts.branch.includes('..'))throw Error('无效分支');
   const github=repository(opts.github,'github.com'),gitee=repository(opts.gitee,'gitee.com');
   const includeGithub=opts.targets!=='gitee';
@@ -141,7 +141,7 @@ export async function main(argv) {
     const promo=promoStatus(version);
     console.log(promo.file?`宣传页：${promo.file}${promo.needsSync?`（待同步到 v${version}）`:`（已是 v${version}）`}`:'宣传页：未找到，发布时需手动同步安装地址');
     const route=pipeline
-      ? '提交/标签 → 推送 → Gitee Go 流水线按标签构建、测试、打包 → 发布 Gitee Release 并归档制品库'
+      ? '提交/标签 → 推送标签 → Gitee Go 流水线按标签构建、测试、打包 → 发布 Gitee Release 并归档制品库'
       : (includeGithub?'打包/核对 → 提交/标签 → 推送 → 等待双平台CI → 核对两处附件':'打包/核对 → 提交/标签 → 推送 → 上传并核对 Gitee Release 附件');
     console.log(`\nDRY RUN（${includeGithub?'Gitee + GitHub':'仅 Gitee'}）：计划检查 → 构建/测试 → ${route}。`);printLinks();return;
   }
@@ -268,6 +268,7 @@ export async function main(argv) {
       await publishGitee({token,tag,archive:file,notes:notesText,prerelease:false});
     }
     console.log(`Gitee Release 附件已核对：${assets.join('、')}`);
+    console.log('同标签也会触发 Gitee Go 流水线：它只核对已有附件、不重复上传，成品以本次本机发布的为准。');
     printLinks();return;
   }
   // Poll by tag: never watch some unrelated release's run.
