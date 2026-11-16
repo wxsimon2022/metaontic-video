@@ -1,7 +1,7 @@
 version: '1.0'
 # 流水线唯一标识，对应 Gitee 网页上已有的这条流水线，改名会与网页记录对不上，请勿随意修改
 name: 流水线-202611021547
-displayName: MetaOnticVideo 构建与测试
+displayName: MetaOnticVideo-版本发布
 triggers:
   # 开启自动触发
   trigger: auto
