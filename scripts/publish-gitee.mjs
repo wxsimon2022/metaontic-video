@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export async function publishGitee({ token, tag, archive, notes, prerelease = false, request = fetch, retry = { attempts: 4, delayMs: 20000 } }) {
+export async function publishGitee({ token, tag, archive, notes, prerelease = false, request = fetch, retry = { attempts: 4, delayMs: 20000 }, log = console.log }) {
   if (!token) throw new Error('Missing GITEE_TOKEN. Add it to GitHub Actions repository secrets.');
   if (!/^v\d+\.\d+\.\d+(?:-beta\.[1-9]\d*)?$/.test(tag)) throw new Error('A version tag is required.');
   const base = 'https://gitee.com/api/v5/repos/hackloop/metaontic-video';
@@ -45,7 +45,11 @@ export async function publishGitee({ token, tag, archive, notes, prerelease = fa
   const stored = list => listed(list) && list.some(item => (item.name || item.file_name) === name && Number(item.size) === bytes.length);
   const existing = attachments.find(item => (item.name || item.file_name) === name);
   if (existing) {
-    if (Number(existing.size) !== bytes.length) throw new Error('Existing Gitee attachment has a different size; refusing to replace it.');
+    // 同版本已有同名附件就不再上传：谁先发布谁作数。本机发布后流水线还会按标签跑一遍，
+    // 两边各打一份包时大小会不同，这里只核对、不覆盖，也不会把先发布的那份换成另一份成品。
+    log(Number(existing.size) === bytes.length
+      ? `Gitee ${tag} 已有同大小附件 ${name}，只核对不重复上传。`
+      : `Gitee ${tag} 已有附件 ${name}（${existing.size} 字节，本次成品 ${bytes.length} 字节）：只核对不覆盖，成品以先发布的那份为准。`);
   } else {
     // 海外 runner 到 Gitee 的上传速度波动很大，实测同一个包第一次成功、第二次 HTTP 400；
     // 失败先复查附件表（Gitee 可能在客户端放弃后才收完），再按退避重试，避免整次发布因一次慢上传失败。
@@ -62,7 +66,8 @@ export async function publishGitee({ token, tag, archive, notes, prerelease = fa
     }
     if (failure) throw new Error(`Gitee 上传 ${name} 重试 ${attempts} 次仍失败：${failure.message}`);
   }
-  if (!stored(await api(path))) throw new Error('Gitee attachment verification failed.');
+  const finalList = await api(path);
+  if (!(existing ? listed(finalList) : stored(finalList))) throw new Error('Gitee attachment verification failed.');
   return `https://gitee.com/hackloop/metaontic-video/releases/tag/${tag}`;
 }
 

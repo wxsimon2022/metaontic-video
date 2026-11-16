@@ -66,7 +66,7 @@ npm pack --dry-run
 4. 同步锁文件，构建并执行相关验证，检查打包清单，确认包含更新后的操作指南。
 5. 提交源码、构建产物与说明。
 6. 创建**附注标签（annotated tag）**，仅包含版本标题和用户可感知的新增、优化。
-7. 默认只发 Gitee：推送分支和标签到 Gitee，由发布脚本用本地成品直接创建 Gitee Release、仅上传通用 `.tgz` 并核对附件；需要同步 GitHub、拿到双平台安装校验证据时，再给发布脚本加 `--both`，等 GitHub Actions 通过后上传两处附件。
+7. 默认只发 Gitee：推送分支和标签到 Gitee，由发布脚本用本地成品直接创建 Gitee Release、仅上传通用 `.tgz` 并核对附件（推送标签后 Gitee Go 流水线也会跑一遍，它只在还没有同名附件时才发布，已有则只核对不覆盖）；要让流水线打包发布就给发布脚本加 `--pipeline`，需要同步 GitHub、拿到双平台安装校验证据时再加 `--both`，等 GitHub Actions 通过后上传两处附件。
 
 标签说明统一格式如下；只保留本次适用分类；验证结果与限制仅写入工程发布记录：
 
@@ -97,11 +97,11 @@ git show --no-patch "v<版本>"
 
 版本包在 [GitHub Releases](https://github.com/wxsimon2022/metaontic-video/releases) 或 [Gitee Releases](https://gitee.com/hackloop/metaontic-video/releases) 下载，通用插件包为 `metaontic-video-<版本>.tgz`。Windows与Mac使用同一个 `.tgz`，不再发布ZIP；指南和PDF已包含在通用包中。不再向 npm 注册表发布，无需配置 `NPM_TOKEN` 或 Trusted Publishing。
 
-`v*` 标签触发完整构建与测试，通过双平台安装检查后，使用 GitHub 自动令牌上传通用tgz。`--both`发布脚本再下载这个同一成品，用本地 `GITEE_TOKEN` 发布Gitee；CI未通过时不上传Gitee，不将单仓成功报告为双仓成功。手动运行工作流时须选择与包版本匹配的标签。只让流水线发 Gitee 时，本地用 `node scripts/release.mjs X.Y.Z --notes release-plan.json --ci`：本机仍做构建与测试、版本与更新内容、README/CHANGELOG、指南地址与宣传页同步，然后提交、打标签并推送，打包与 Gitee Release 交给流水线，本地不需要 `GITEE_TOKEN`；这条路不要再并跑 `--both`，否则 GitHub 那份成品会再打一次，与流水线成品大小不同而被拒绝。
+`v*` 标签触发完整构建与测试，通过双平台安装检查后，使用 GitHub 自动令牌上传通用tgz。`--both`发布脚本再下载这个同一成品，用本地 `GITEE_TOKEN` 发布Gitee；CI未通过时不上传Gitee，不将单仓成功报告为双仓成功。手动运行工作流时须选择与包版本匹配的标签。发版默认仍由本机打包发布：`node scripts/release.mjs X.Y.Z --notes release-plan.json` 在本机构建、测试、打包后直接建 Gitee Release 并核对附件（需要本机 `GITEE_TOKEN`）；要让流水线打包发布则加 `--pipeline`（`--ci` 是同义写法），本机只做准备、提交并推标签，打包、制品库归档与 Gitee Release 都交给流水线，本地不需要 `GITEE_TOKEN`。两条路径不会互相覆盖：同标签已有同名附件时后到的一方只核对、不再上传，成品以先发布的那份为准。
 
 某次发布只补齐镜像时，手动运行 `sync-gitee` 工作流并填写对应标签；它从 GitHub Release 取回该版本的 通用 `.tgz`，逐个补传到 Gitee 发布页并核对大小，不会覆盖或改动已有附件。
 
-Gitee 侧另有一条 Gitee Go 流水线（`.workflow/MetaOnticVideo.yml`）：向 `master` 推送、发起面向 `master` 的 PR 或推送 `v*` 标签时，在 Gitee 构建机上安装依赖、构建并运行单元测试，再校验版本元数据；每次运行都会打出成品：既作为当次运行的暂存构建物留在运行结果页可直接下载（有保留期），也由紧随其后的「上传制品」步骤（`publish@general_artifacts`，制品名 `metaontic-video`）写进本仓库的制品库长期保留。`metaontic-video-<版本>.tgz` 总会生成，两平台共用一个 tgz，不再生成 Windows ZIP。标签触发时还会核对 `v<版本>` 标签与 `package.json` 里的版本是否一致，不一致直接失败，保证成品按标签出。想在发版前演练一次按标签的流程，可以打以 `ci-` 开头的演练标签（如 `ci-test`）：它同样触发构建与打包，但跳过标签与版本的强校验，制品只作演练用。这条流水线同时承担 Gitee 侧的打包与发版：`v*` 标签触发时，打包步骤跑完紧接执行 `node scripts/ci-release.mjs --dist dist --tag "$TAG"`，把本次成品发布成 Gitee Release，发行说明直接从 `package.json` 的 `releaseNotes` 生成（只发正式版；`ci-` 演练标签与分支、PR 运行只出制品、不发布）。手动运行这条流水线（Gitee「运行流水线」）时可以填两个变量：`RELEASE_TAG` 指定要发布的标签（不填就用本次 git 检出上的标签），`RELEASE_NOTES` 指定这一版的发版描述（按「新增：…」「优化：…」逐行写，也接受整段发行版正文，合计不超过 100 字；不填就用 `package.json` 里的 `releaseNotes`）。两者都走同一套校验：标签必须与包内版本一致、描述只收新增与优化；描述与仓库里的 `releaseNotes` 不一致时流程照常发布、并在日志里提示把同一份描述同步回仓库。发版令牌来自流水线变量 `GITEE_TOKEN`（也认 `GITEE_ACCESS_TOKEN`、`TOKEN_GITEE`、`GITEE_API_TOKEN` 这几个别名）：在 Gitee 流水线设置里添加并勾选私密，仓库和流水线 YAML 里都不写令牌。发布是幂等的：同版本已经有同大小附件时只核对、不重建、不覆盖，所以本地发版与流水线发版可以并存；万一两边各打了一份包，后到的一方会因为附件大小不同被拒绝并给出提示，不会出现两份成品混用。流水线不依赖 Gitee 下拉里提供的版本：构建机上没有可用 Node 时，它会自己从 npmmirror 下载 Node 20（按 glibc 自动选择官方构建或 glibc 2.17 兼容版），并缓存到 `~/.local/node`；因此免费构建机即使镜像较旧也能跑通。
+Gitee 侧另有一条 Gitee Go 流水线（`.workflow/MetaOnticVideo.yml`）：向 `master` 推送、发起面向 `master` 的 PR 或推送 `v*` 标签时，在 Gitee 构建机上安装依赖、构建并运行单元测试，再校验版本元数据；每次运行都会打出成品：既作为当次运行的暂存构建物留在运行结果页可直接下载（有保留期），也由紧随其后的「上传制品」步骤（`publish@general_artifacts`，制品名 `metaontic-video`）写进本仓库的制品库长期保留。`metaontic-video-<版本>.tgz` 总会生成，两平台共用一个 tgz，不再生成 Windows ZIP。标签触发时还会核对 `v<版本>` 标签与 `package.json` 里的版本是否一致，不一致直接失败，保证成品按标签出。想在发版前演练一次按标签的流程，可以打以 `ci-` 开头的演练标签（如 `ci-test`）：它同样触发构建与打包，但跳过标签与版本的强校验，制品只作演练用。这条流水线同时承担 Gitee 侧的打包与发版：`v*` 标签触发时，打包步骤跑完紧接执行 `node scripts/ci-release.mjs --dist dist --tag "$TAG"`，把本次成品发布成 Gitee Release，发行说明直接从 `package.json` 的 `releaseNotes` 生成（只发正式版；`ci-` 演练标签与分支、PR 运行只出制品、不发布）。手动运行这条流水线（Gitee「运行流水线」）时可以填两个变量：`RELEASE_TAG` 指定要发布的标签（不填就用本次 git 检出上的标签），`RELEASE_NOTES` 指定这一版的发版描述（按「新增：…」「优化：…」逐行写，也接受整段发行版正文，合计不超过 100 字；不填就用 `package.json` 里的 `releaseNotes`）。两者都走同一套校验：标签必须与包内版本一致、描述只收新增与优化；描述与仓库里的 `releaseNotes` 不一致时流程照常发布、并在日志里提示把同一份描述同步回仓库。发版令牌来自流水线变量 `GITEE_TOKEN`（也认 `GITEE_ACCESS_TOKEN`、`TOKEN_GITEE`、`GITEE_API_TOKEN` 这几个别名）：在 Gitee 流水线设置里添加并勾选私密，仓库和流水线 YAML 里都不写令牌。发布是幂等的：同版本已经有同名附件时只核对、不重建、不覆盖，所以本机发版与流水线发版可以并存，谁先发布谁作数；两边各打了一份包时大小可能不同，日志会写明「只核对不覆盖，成品以先发布的那份为准」，不会出现两份成品混用。流水线不依赖 Gitee 下拉里提供的版本：构建机上没有可用 Node 时，它会自己从 npmmirror 下载 Node 20（按 glibc 自动选择官方构建或 glibc 2.17 兼容版），并缓存到 `~/.local/node`；因此免费构建机即使镜像较旧也能跑通。
 
 本机打包可执行 `npm pack --pack-destination /tmp`。需要目录安装时，将 `.tgz` 解压后使用其中的 `package` 目录：
 
@@ -210,7 +210,7 @@ npm run release -- 3.13.3 --dry-run
 npm run release -- 3.13.3
 ```
 
-脚本显示待发布范围与说明，更新版本、锁文件和发布元数据，构建、测试、打包、创建提交及附注标签，推送仓库（默认只推 Gitee，加 `--both` 时与 GitHub 并行推送、各自失败退避重试三次），然后用本地成品直接创建 Gitee Release 并上传核对通用 `.tgz`；带 `--both` 时还会等待 GitHub Actions 的双平台安装/升级检查与附件上传，最后输出发布页及 `.tgz` 安装地址。使用说明书不写入版本记录。失败立即停止，不强推或覆盖旧标签。
+脚本显示待发布范围与说明，更新版本、锁文件和发布元数据，构建、测试、打包，创建提交及附注标签，推送仓库（默认只推 Gitee，加 `--both` 时与 GitHub 并行推送、各自失败退避重试三次）。默认随后在本机用 `GITEE_TOKEN` 直接创建 Gitee Release 并上传核对通用 `.tgz`；加 `--pipeline` 才把打包与发布交给 Gitee Go 流水线（本机只推标签，制品库归档也在流水线）；带 `--both` 时还会等待 GitHub Actions 的双平台安装/升级检查与附件上传。最后输出发布页及 `.tgz` 安装地址。使用说明书不写入版本记录。失败立即停止，不强推或覆盖旧标签。
 
 发布文件已提交但上传中断时，保留同一版本续跑：
 
@@ -218,9 +218,9 @@ npm run release -- 3.13.3
 npm run release -- 3.13.3 --resume
 ```
 
-也可指定 `--notes /你的实际路径/说明.json`、`--branch master`、`--both`、`--github https://github.com/wxsimon2022/metaontic-video.git`、`--gitee https://gitee.com/hackloop/metaontic-video.git`。默认只发 Gitee，`--both`（或带地址的 `--github`）才同步 GitHub，默认使用当前仓库的 SSH 443 地址；Gitee 发布需要环境变量 `GITEE_TOKEN`，Gitee 目标与当前 CI 镜像配置绑定，修改项目归属前需同步 CI，不会静默发布到其他仓库。
+也可指定 `--notes /你的实际路径/说明.json`、`--branch master`、`--both`、`--github https://github.com/wxsimon2022/metaontic-video.git`、`--gitee https://gitee.com/hackloop/metaontic-video.git`。默认只发 Gitee 且默认在本机打包发布，交给流水线用 `--pipeline`（`--ci` 同义），`--both`（或带地址的 `--github`）才同步 GitHub，默认使用当前仓库的 SSH 443 地址；本机发 Gitee Release 需要环境变量 `GITEE_TOKEN`（`--pipeline` 时由流水线变量提供），Gitee 目标与当前 CI 镜像配置绑定，修改项目归属前需同步 CI，不会静默发布到其他仓库。
 
-脚本依赖事先写好的完整说明，不能自动判断业务变化或代替指南审核。推送或上传中断时会明确报告未全部完成，使用 `--resume` 重试，不要重新递增版本；默认的仅 Gitee 发布不含 GitHub 双平台安装校验，缺少 Windows 实测证据时要在发布记录里写明。
+脚本依赖事先写好的完整说明，不能自动判断业务变化或代替指南审核。推送或上传中断时会明确报告未全部完成，使用 `--resume` 重试，不要重新递增版本；默认的仅 Gitee 发布不含 GitHub 双平台安装校验，缺少 Windows 实测证据时要在发布记录里写明；流水线发布失败时先看流水线日志（标签与包版本、成品路径、令牌来源、sha256），不要重新打版本。
 
 ### 测试包（发给他人试用，不进发布页）
 
