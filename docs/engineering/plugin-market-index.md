@@ -74,10 +74,17 @@ DSH 里的表现：插件管理页会在 `registry.npmjs.org/-/ping` 与 `regist
 发布成品包：
 
 ```bash
-npm login --registry https://registry.npmjs.org/   # 或在 CI 里用 NPM_TOKEN
+npm login --registry https://registry.npmjs.org/   # 登录的是 npmjs，不是 npmmirror
 npm run npm:publish                                # 默认发 package.json 的当前版本
 npm run npm:publish -- --dry-run                   # 只检查不上传
+npm run npm:publish -- --otp 123456                # 账号开了 2FA 时带一次性验证码
+NPM_TOKEN=xxxx npm run npm:publish                 # CI：带 bypass 2FA 的 automation/granular token
 ```
+
+**登录 npmmirror 不能发布**：它只接受同步，不接受上传。账号开启 2FA 后，npmjs 会对发布返回
+`E403 ... granular access token with bypass 2fa enabled is required`，此时只能二选一：
+带 `--otp` 发一次性验证码，或到 npmjs 生成带 bypass 2FA 的 automation/granular token 走 `NPM_TOKEN`。
+`scripts/publish-npm.mjs` 会把 `NPM_TOKEN` 写进临时 userconfig（用完删除，不打印内容），不改动本机 `~/.npmrc`；
 
 `scripts/publish-npm.mjs` 发布的是 Gitee 那个**同一个成品包**
 （`.local/releases/<版本>/metaontic-video-<版本>.tgz`），并会先确认包内没有 `README.md`

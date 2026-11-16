@@ -1712,7 +1712,12 @@
       "presets/icons/*.svg"
     ],
     engines: {
-      node: ">=20"
+      node: ">=20",
+      dsh: ">=0.2.0"
+    },
+    publishConfig: {
+      access: "public",
+      registry: "https://registry.npmjs.org/"
     },
     dsh: {
       bundle: {
@@ -1748,7 +1753,9 @@
       preview: "node scripts/preview.mjs",
       release: "node scripts/release.mjs",
       "clean:releases": "node scripts/clean-releases.mjs",
-      "pack:test": "node scripts/pack-test.mjs"
+      "pack:test": "node scripts/pack-test.mjs",
+      "market:index": "node scripts/market-index.mjs",
+      "npm:publish": "node scripts/publish-npm.mjs"
     },
     dependencies: {},
     releaseNotes: {
