@@ -41,9 +41,23 @@
   }
 
   // src/client/auth-notice.ts
+  var TOOL_ARGS_JSON = /Tool call[^\n]*JSON|Expected ',' or '\}' after property value|Unexpected (?:token|end of JSON input)/i;
   function createAuthNotice({ h, Original, hostT, t }) {
     return function AuthNotice(props) {
-      if (props.node?.data?.code !== "AUTH") return h(Original, { ...props, t: hostT });
+      const data = props.node?.data;
+      if (data?.code !== "AUTH") {
+        if (typeof data?.message === "string" && TOOL_ARGS_JSON.test(data.message)) {
+          return h("div", { role: "status", "data-field": "tool-args-notice", style: { display: "flex", gap: 10, padding: "10px 0", alignItems: "flex-start" } }, [
+            h("span", { key: "dot", "aria-hidden": true, style: { flex: "0 0 auto", width: 7, height: 7, marginTop: 6, borderRadius: "50%", background: "var(--dsw-alias-state-error-primary,#d9534f)" } }),
+            h("div", { key: "copy", style: { minWidth: 0, fontSize: 13, lineHeight: 1.65, color: "var(--dsw-alias-label-primary,inherit)" } }, [
+              h("strong", { key: "title", style: { fontWeight: 500 } }, t("toolArgsNoticeTitle")),
+              h("div", { key: "hint", style: { color: "var(--dsw-alias-label-secondary,inherit)" } }, t("toolArgsNoticeHint")),
+              h("div", { key: "raw", style: { marginTop: 4, fontSize: 12, color: "var(--dsw-alias-label-caption,inherit)", wordBreak: "break-word" } }, data.message)
+            ])
+          ]);
+        }
+        return h(Original, { ...props, t: hostT });
+      }
       return h("div", { role: "status", "data-field": "auth-notice", style: { display: "flex", gap: 10, padding: "10px 0", alignItems: "flex-start" } }, [
         h("span", { key: "dot", "aria-hidden": true, style: { flex: "0 0 auto", width: 7, height: 7, marginTop: 6, borderRadius: "50%", background: "var(--dsw-alias-state-error-primary,#d9534f)" } }),
         h("div", { key: "copy", style: { minWidth: 0, fontSize: 13, lineHeight: 1.65, color: "var(--dsw-alias-label-primary,inherit)" } }, [
@@ -841,6 +855,8 @@
       advancedStats: "\u4F7F\u7528\u7EDF\u8BA1",
       usageStatsEnabled: "\u533F\u540D\u4F7F\u7528\u7EDF\u8BA1",
       usageStatsHint: "\u7528\u4E8E\u7EDF\u8BA1\u9996\u6B21\u542F\u7528\u3001\u542F\u52A8\u548C\u529F\u80FD\u4F7F\u7528\u60C5\u51B5\uFF0C\u4EC5\u4E0A\u62A5\u533F\u540D\u6807\u8BC6\u3001\u7248\u672C\u3001\u57FA\u7840\u8BBE\u5907\u4FE1\u606F\u4E0E\u8C03\u7528\u7ED3\u679C\uFF0C\u4E0D\u542B\u5BF9\u8BDD\u3001\u7D20\u6750\u6216API\u5BC6\u94A5\u3002\u5173\u95ED\u4E0D\u5F71\u54CD\u89C6\u9891\u521B\u4F5C\u3002",
+      toolArgsNoticeTitle: "\u8FD9\u4E00\u8F6E\u52A9\u624B\u628A\u5DE5\u5177\u53C2\u6570\u5199\u6210\u4E86\u4E0D\u5408\u6CD5\u7684 JSON",
+      toolArgsNoticeHint: "\u591A\u534A\u662F 480p\u300116:9 \u8FD9\u7C7B\u503C\u5C11\u4E86\u5F15\u53F7\uFF0C\u672C\u8F6E\u6CA1\u6709\u771F\u6B63\u8C03\u7528\u5DE5\u5177\u3001\u4E5F\u6CA1\u6709\u4EA7\u751F\u8D39\u7528\uFF1B\u56DE\u4E00\u53E5\u300C\u6309\u539F\u53C2\u6570\u91CD\u8BD5\u300D\u5373\u53EF\uFF0C\u52A9\u624B\u4F1A\u8865\u9F50\u5F15\u53F7\u6309\u539F\u6765\u7684\u6E05\u6670\u5EA6\u3001\u753B\u5E45\u548C\u65F6\u957F\u91CD\u53D1\u3002",
       authNoticeTitle: "\u670D\u52A1\u8FDE\u63A5\u9A8C\u8BC1\u672A\u901A\u8FC7",
       authNoticeHint: "\u8BF7\u5230 Harness \u7684\u6A21\u578B\u8BBE\u7F6E\u68C0\u67E5\u5F53\u524D API\u5BC6\u94A5\u548C\u4E2D\u8F6C\u5730\u5740\uFF1B\u5982\u679C\u914D\u7F6E\u65E0\u8BEF\uFF0C\u8BF7\u8054\u7CFB\u5BA2\u670D\u6838\u67E5\u3002",
       supportClose: "\u5173\u95ED",
@@ -998,6 +1014,8 @@
       advancedStats: "Usage statistics",
       usageStatsEnabled: "Anonymous usage statistics",
       usageStatsHint: "Reports an anonymous installation ID, version, basic device information and operation results. No conversations, media or API keys. Turning it off does not affect video creation.",
+      toolArgsNoticeTitle: "The assistant wrote invalid JSON for a tool call",
+      toolArgsNoticeHint: "Usually a value like 480p or 16:9 is missing its quotes. Nothing was executed and nothing was billed; reply \u201Cretry with the same settings\u201D and the assistant will re-send with the same resolution, aspect ratio and duration.",
       authNoticeTitle: "Service authentication could not be verified",
       authNoticeHint: "Check the API key and relay URL in Harness model settings. If they are correct, contact support.",
       supportClose: "Close",
@@ -1197,7 +1215,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "3.29.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.29.1".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1628,7 +1646,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.29.0",
+    version: "3.29.1",
     description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1734,11 +1752,12 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.29.0",
+      version: "3.29.1",
       prerelease: false,
-      publishedAt: "2026-11-16T08:21:13.271Z",
+      publishedAt: "2026-11-16T08:32:58.467Z",
       items: [
-        "\u4F18\u5316\uFF1A\u5DE6\u4FA7\u680F\u7684\u66F4\u65B0\u63D0\u793A\u4ECE\u6587\u5B57\u6539\u6210\u4E00\u4E2A\u5C0F\u7EA2\u70B9\uFF0C\u8DDF\u5728\u300C\u89C6\u9891\u521B\u4F5C\u52A9\u624B\u300D\u540D\u5B57\u540E\u9762\uFF1B\u4FA7\u680F\u6536\u8D77\u65F6\u7EA2\u70B9\u843D\u5728\u56FE\u6807\u89D2\u4E0A\u3002"
+        "\u4F18\u5316\uFF1A\u52A9\u624B\u628A\u5DE5\u5177\u53C2\u6570\u5199\u9519\uFF08\u4F8B\u5982 480p \u5C11\u4E86\u5F15\u53F7\uFF09\u5BFC\u81F4\u8FD9\u4E00\u8F6E\u5931\u8D25\u65F6\uFF0C\u4F1A\u8BF4\u660E\u6CA1\u6709\u8C03\u7528\u6A21\u578B\u3001\u4E5F\u6CA1\u6709\u6263\u8D39\uFF0C\u5E76\u63D0\u793A\u6309\u539F\u53C2\u6570\u91CD\u8BD5\u3002",
+        "\u4F18\u5316\uFF1A\u6E05\u6670\u5EA6\u5199\u6210 480\u3001480P\u3001720 \u8FD9\u7C7B\u5199\u6CD5\u90FD\u80FD\u6B63\u5E38\u8BC6\u522B\uFF0C\u4E0D\u518D\u76F4\u63A5\u62A5\u9519\u3002"
       ]
     }
   };

@@ -54,7 +54,7 @@ npm pack --dry-run
 
 插件版本卡片只保留“检查更新”和更新到最新正式版。左侧栏入口在发现新版本时只点一个红点，不改入口文字：展开侧栏时红点在入口名字后面（原来写「有更新」的位置，由名字那个 span 的伪元素画），收起侧栏时落在图标角上（`src/client/update-hint.ts` 的轻量 store，读写设置页同一份缓存；红点由自己的订阅重渲染，不需要重注册 `sidebar.panellist`，样式用 `ensureUpdateHintStyles` 注入一次，按 `button:has(.mov-rail-hint)` 定位）。过滤草稿与预发布，仅远端版本严格高于本机时显示更新入口，二次确认后安装对应 Release 成品包；Gitee 不可用时仅尝试同版 GitHub 附件。不提供历史版本选择、同版本重装或降级，不回退默认分支，也不先卸载现有插件。
 
-版本采用语义化版本号：修复用patch，新增兼容功能用minor，不兼容变更用major。
+版本采用语义化版本号，并按改动量把版本号升到最低那位：修复、样式/文案/交互微调、没有新增能力的调整只升 patch（第三位，如 `3.28.1`）；只有成规模的新增兼容能力或行为变化才升 minor（第二位），不兼容变更才升 major（第一位）。小改不要习惯性升第二位。
 
 更新内容只展示**新增**与**优化**两类（修复并入优化，不单列一节），而且要短：整篇合计不超过 **100 字**（不含分类前缀），只写用户能感知的结论，不写实现细节、内部开关与提交记录；`scripts/release.mjs` 的 `notesFor` 会校验分类并按 `notesLength` 统计字数，出现修复分类或超限都直接失败，模板见 `docs/engineering/release-plan.example.json`。
 
@@ -204,7 +204,7 @@ npm run release -- 3.13.3 --dry-run
 
 也可双击根目录 `release.cmd`（Windows），或双击 `release.command`（Mac；也可运行 `bash release.command`），按提示输入版本号。它们会执行正式发布，不是预览；需要先准备好 `release-plan.json`。
 
-一键正式发布（示例版本号需改为实际目标）：
+一键正式发布（示例版本号需改为实际目标；小改只升第三位，成规模的新增或行为变化才升第二位）：
 
 ```text
 npm run release -- 3.13.3

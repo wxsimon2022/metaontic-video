@@ -55,11 +55,12 @@ export function releaseVerification(includeGithub, promoLine = '', pipeline = fa
     + promoLine + '- 桌面GUI与付费调用未由发布脚本自动验证。\n';
 }
 const help = `一键发布（准备好完整说明与指南后执行）：
+版本号按改动量选：修复、样式/文案/交互微调等小改只升第三位（如 3.29.1），成规模的新增或行为变化才升第二位，别习惯性升第二位。
 说明要求：只写「新增」与「优化」两类（修复并入优化），合计不超过 ${NOTES_LIMIT} 字。
 发版会同时把使用说明书的成品地址与宣传页（服务端仓库，可用 METAONTIC_PROMO_PATH 指定，--no-promo 跳过）同步到本次版本。
-  node scripts/release.mjs 3.13.3 --notes release-plan.json
-  node scripts/release.mjs 3.13.3 --notes release-plan.json --dry-run
-  node scripts/release.mjs 3.13.3 --resume
+  node scripts/release.mjs 3.13.4 --notes release-plan.json
+  node scripts/release.mjs 3.13.4 --notes release-plan.json --dry-run
+  node scripts/release.mjs 3.13.4 --resume
 默认只发 Gitee，并在本机打包后直接创建 Release、上传核对成品（需要本机 GITEE_TOKEN）。
 想交给 Gitee Go 流水线打包发布时加 --pipeline（--ci 是同义写法）：本机只做准备、提交、打标签并推送，成品打包、制品库归档与 Gitee Release 都由流水线按标签完成，本机不需要 GITEE_TOKEN。
 需要同时同步 GitHub（含双平台安装校验）时加 --both，或 --github <地址>；--both 走本机收尾，不要与 --pipeline 同时用。
@@ -73,7 +74,7 @@ export async function main(argv) {
     const {createInterface}=await import('node:readline/promises');
     const input=createInterface({input:process.stdin,output:process.stdout});
     let entered;
-    try { console.log('正式发布：请先填写release-plan.json并同步指南；默认在本机打包并发布 Gitee Release（加 --pipeline 交给流水线）。'); entered=(await input.question('请输入正式版本号（如3.13.3，留空退出）：')).trim(); } finally { input.close(); }
+    try { console.log('正式发布：请先填写release-plan.json并同步指南；默认在本机打包并发布 Gitee Release（加 --pipeline 交给流水线）。'); entered=(await input.question('请输入正式版本号（小改升第三位，如3.13.4；留空退出）：')).trim(); } finally { input.close(); }
     if(!entered)return;
     return main([entered,...argv.slice(1)]);
   }

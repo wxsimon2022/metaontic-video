@@ -182,7 +182,7 @@ Windows解压目录安装在更新时出现空目录/locale缺失：先核对成
 
 Agent组件图标使用<完整预设模块>/icon导出，SVG在presets/icons，场记板蓝紫/扩音器橙红区分两个预设；需核对宿主readPluginMeta返回各自图标、成品入包和24/40px明暗背景显示，不修改插件总Logo。
 
-鉴权提示分层：聊天“本轮运行失败/API密钥无效”来自宿主AUTH turn-error，与视频接口工具错误不同。客户端通过conversation.chat.node官方keyed扩展包装原renderer，仅AUTH使用友好提示并引导Harness模型设置，其他code委托原组件；不得覆盖宿主词典或写宿主安装文件。视频HTTP401/403在classifyError中保留provider_auth与状态码，提示插件设置及客服，不直断密钥无效、不回显原始鉴权报错，不改轮询重试与防重。
+鉴权提示分层：聊天“本轮运行失败/API密钥无效”来自宿主AUTH turn-error，与视频接口工具错误不同。客户端通过conversation.chat.node官方keyed扩展包装原renderer，仅AUTH使用友好提示并引导Harness模型设置，其余code里再认一类「工具参数不是合法 JSON」：模型把 480p、16:9 这类值裸写、不带引号时，宿主只在解析参数阶段抛 Json 报错，用户只看到「本轮运行失败」；这类换成「没真正调用工具、也没产生费用，回一句按原参数重试」的说法并保留原始报错，其他消息原样委托原组件。参数说明与动态提示词都要写明枚举值要带引号，试算/画布侧还要把 480、480P 这类写法归一成 480p，双保险；不得覆盖宿主词典或写宿主安装文件。视频HTTP401/403在classifyError中保留provider_auth与状态码，提示插件设置及客服，不直断密钥无效、不回显原始鉴权报错，不改轮询重试与防重。
 
 说明书源码仓库政策：用户要求MD/PDF及其docs/guide配图仅留本地。git rm --cached保留本地，.gitignore阻止误提交；README统一链接https://ai.mybfs.cn，不重写历史。成品包是否附带属于独立范围，未明确要求时不擅自移除包内说明书。
 

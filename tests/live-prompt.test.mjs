@@ -29,6 +29,9 @@ test('an existing prompt registration reads current configuration on each reques
   assert.match(prompt,/这三项都不出现在提问中/);
   assert.doesNotMatch(prompt,/地址、时长等/);
   assert.match(prompt,/不得借完善另起创意/);
+  assert.match(prompt,/工具参数必须是合法 JSON/);
+  assert.match(prompt,/把 480p、16:9 这类枚举值裸写（不加引号）会让本轮调用在解析参数时就失败/);
+  assert.match(prompt,/按原参数补齐引号重试一次/);
   assert.doesNotMatch(prompt,/完整方案不增加完善询问|不完善且尚未授权时/);
   assert.equal(section.text({}),'');
   assert.equal(section.text({agent:{session:{header:{agentPreset:null}}}}),'');

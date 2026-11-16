@@ -12,6 +12,22 @@ test('chat AUTH uses actionable copy while all other failures retain the host re
   assert.equal(delegated.type,Original);assert.equal(delegated.props.node,node);assert.equal(delegated.props.t,hostT);assert.equal(delegated.props.extra,1);
  }
 });
+test('工具参数不是合法 JSON 时给一句看得懂的说明，其他失败仍交给宿主',()=>{
+ const Original=()=>{};
+ const Notice=api.createAuthNotice({h,Original,hostT:()=>{},t:key=>({toolArgsNoticeTitle:'这一轮助手把工具参数写成了不合法的 JSON',toolArgsNoticeHint:'多半是 480p、16:9 这类值少了引号，本轮没有真正调用工具、也没有产生费用'}[key])});
+ const message='Tool call "video_estimate": Expected \',\' or \'}\' after property value in JSON at position 34 (line 1 column 35) Received arguments: {"duration": 60, "resolution": 480p}';
+ const rendered=Notice({node:{data:{code:undefined,message}}});
+ const json=JSON.stringify(rendered);
+ assert.match(json,/不合法的 JSON/);
+ assert.match(json,/没有真正调用工具、也没有产生费用/);
+ assert.match(json,/Expected ',' or /,'原始报错保留下来，方便核对');
+ assert.match(json,/resolution/, '把原始报错一并显示，方便核对是哪次调用');
+ for(const detail of ['host detail','rate limit exceeded','JSON 里写错了模型名']){
+  const node={data:{code:undefined,message:detail}};
+  assert.equal(Notice({node}).type,Original,`${detail} 仍用宿主原样展示`);
+ }
+});
+
 test('authentication slot is reversible and missing host capabilities do not break the plugin',()=>{
  assert.equal(api.registerAuthNotice({slots:{}},h,()=>{}),undefined);
  let options,view;const dispose=()=>{};const Original=()=>{};

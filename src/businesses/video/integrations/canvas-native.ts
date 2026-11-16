@@ -22,7 +22,7 @@ import { canvasScriptPreview, scriptStoryboardShots } from './canvas-project.js'
 import { refreshStageNodes } from './canvas-stages.js';
 import { appendRequestLog } from '../../../core/utils/logging.js';
 import { clampInteger } from '../../../core/utils/validation.js';
-import { MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_TOTAL_SECONDS } from '../config.js';
+import { MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_TOTAL_SECONDS, normalizeResolution } from '../config.js';
 
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const validToken = value => /^[a-f0-9-]{36}$/.test(String(value || ''));
@@ -174,7 +174,7 @@ export function planCanvasNative(input, config, operation = 'generate', draft: a
   if (!Number.isInteger(duration) || duration < 4 || duration > modelMaxSeconds(config)) throw new Error(`每个节点本次制作4–${modelMaxSeconds(config)}秒，请调整时长；长视频审核后逐节点续拍。`);
   args.duration = duration;
   args.resolution = String(draft.resolution ?? node.resolution).toLowerCase();
-  if (!['480p', '720p'].includes(args.resolution)) throw new Error('请在节点明确选择480P或720P。');
+  if (!normalizeResolution(args.resolution)) throw new Error('请在节点明确选择480P或720P。');
   if (operation === 'extend') {
     // 连拍时上段成果还在内存记录里（成果节点是刚刚回填出来的），用 carry 传进来，语义与节点字段完全一致。
     const from = carry?.videoUrl ? { videoUrl: String(carry.videoUrl), seconds: Number(carry.seconds) } : null;

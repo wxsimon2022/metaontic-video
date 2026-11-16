@@ -1,5 +1,5 @@
 /** 脚本审核用的只读双方案试算，不调用模型、不查余额、不读取密钥。 */
-import { ref } from '../config.js';
+import { normalizeResolution, ref } from '../config.js';
 import { resolveModel, isVolcengine, isMetaontic } from '../providers/connection.js';
 import { planVideoSegments, resolveTargetPlan } from '../workflow/planning.js';
 
@@ -14,7 +14,8 @@ const PRICE_DATE = '2026-11-07';
 function compareVideoCosts(config, args) {
   const duration = args?.duration;
   if (!Number.isInteger(duration) || duration < 4 || duration > 120) throw new Error('目标时长须为4–120秒整数。');
-  if (!['480p', '720p'].includes(args?.resolution)) throw new Error('请先由用户确认480P或720P，再试算。');
+  const resolution = normalizeResolution(args?.resolution);
+  if (!resolution) throw new Error('请先由用户确认480P或720P，再试算。');
   const ratio = args?.ratio ?? ref(config, 'ratio', '9:16');
   if (!['16:9', '9:16'].includes(ratio)) throw new Error('当前仅有16:9和9:16的像素计费依据，其他画幅需核对实际宽高后试算，不能套用横屏价格。');
   const model = resolveModel(config);
@@ -33,7 +34,7 @@ function compareVideoCosts(config, args) {
   const officialRates = RATES.find(([prefix]) => officialModel.startsWith(prefix))![1];
   const officialPlan = planVideoSegments(duration, 30, 30);
   function calculate(id, plan, price, multiplier) {
-    const pixels = args.resolution === '720p' ? [1280, 720] : id.startsWith('doubao-seedance-2-5') ? [854, 480] : [864, 496];
+    const pixels = resolution === '720p' ? [1280, 720] : id.startsWith('doubao-seedance-2-5') ? [854, 480] : [864, 496];
     const dimensions = ratio === '9:16' ? [...pixels].reverse() : pixels;
     const segments = plan.map((step, index) => {
       const inputSeconds = index ? plan[index - 1].seconds : 0;
@@ -44,7 +45,7 @@ function compareVideoCosts(config, args) {
     return { model: id, dimensions, groupRatio: multiplier, segments, cny: Math.round(segments.reduce((sum, s) => sum + s.cny, 0) * 10000) / 10000 };
   }
   return {
-    duration, resolution: args.resolution, ratio, fps: 24, priceDate: PRICE_DATE, currency: 'CNY', estimateType: '基础公式估价',
+    duration, resolution, ratio, fps: 24, priceDate: PRICE_DATE, currency: 'CNY', estimateType: '基础公式估价',
     official: calculate(officialModel, officialPlan, officialRates, 1),
     plugin: calculate(model, planned.plan, rates[1], groupRatio),
     pluginChannel: isVolcengine(config) ? '火山直连（无中转折扣）' : 'MetaOnticVideo中转制作方案',
@@ -59,8 +60,8 @@ export function estimateTool(config) {
     description: '脚本审核前必须调用的只读双方案费用试算：火山官方方案与当前MetaOnticVideo插件方案。duration为完整目标时长，resolution须用户已确认；首段按无视频输入，后续续拍按有视频输入计价并计入上一段完整视频时长；参考图不算视频输入。必须在脚本末尾展示逐段档位、输入/输出秒数、单价及金额，不能只给合计。不会生成视频、扣费、查余额或修改配置。未知模型/画幅拒绝猜价。每次改稿涉及时长、清晰度、模型或分段须重算。',
     parameters: { type: 'object', properties: {
       duration: { type: 'integer', minimum: 4, maximum: 120, description: '当前完整脚本的目标总时长' },
-      resolution: { type: 'string', enum: ['480p', '720p'], description: '用户已确认的视频清晰度' },
-      ratio: { type: 'string', enum: ['16:9', '9:16'], description: '脚本画幅，其他画幅暂不可靠试算' },
+      resolution: { type: 'string', enum: ['480p', '720p'], description: '用户已确认的视频清晰度。必须写成带引号的字符串，例如 "480p"；写成裸值 480p 会让这次调用直接失败。' },
+      ratio: { type: 'string', enum: ['16:9', '9:16'], description: '脚本画幅，其他画幅暂不可靠试算。同样要写成带引号的字符串，例如 "16:9"。' },
       segmentSeconds: { type: 'integer', minimum: 4, maximum: 30, description: '与实际生成一致的续拍分段时长上限' },
       groupRatio: { type: 'number', minimum: 0, maximum: 10, description: '仅在已核对 API密钥分组权限和实际倍率时传入；不得为了显示低价假设0.8' },
     }, required: ['duration', 'resolution'] },
@@ -81,8 +82,9 @@ export function estimateSegmentCosts(config, args, plan) {
   if (!entry) throw new Error(`尚无${model}的可靠价目`);
   const ratio = args.ratio ?? ref(config, 'ratio', '9:16');
   if (!['16:9', '9:16'].includes(ratio)) throw new Error('此画幅缺少可靠像素计费依据');
-  if (!['480p', '720p'].includes(args.resolution)) throw new Error('未明确480P或720P');
-  const pixels = args.resolution === '720p' ? [1280, 720] : model.startsWith('doubao-seedance-2-5') ? [854, 480] : [864, 496];
+  const resolution = normalizeResolution(args.resolution);
+  if (!resolution) throw new Error('未明确480P或720P');
+  const pixels = resolution === '720p' ? [1280, 720] : model.startsWith('doubao-seedance-2-5') ? [854, 480] : [864, 496];
   const segments = plan.map((step, index) => {
     const input = step.kind === 'extend' || step.usesVideoInput === true
       ? Number(step.inputSeconds ?? (index ? plan[index - 1].seconds : args.inputVideoSeconds)) : 0;

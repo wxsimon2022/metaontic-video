@@ -21,6 +21,24 @@ test('script estimate is read-only and includes reference input for 30s continua
   assert.equal(r.currency,'CNY');
  }finally{globalThis.fetch=original;}
 });
+test('resolution 写法宽容、参数说明写明要带引号：模型裸写值也不会算错',async()=>{
+ const {tool}=setup(base);
+ const plain=await tool.execute({...args,resolution:'720p',groupRatio:.8});
+ for(const written of ['720P',' 720p ',720]){
+  const r=await tool.execute({...args,resolution:written,groupRatio:.8});
+  assert.equal(r.resolution,'720p',`${JSON.stringify(written)} 归一成 720p`);
+  assert.equal(r.plugin.cny,plain.plugin.cny);
+ }
+ const low=await tool.execute({...args,resolution:'480P',groupRatio:.8});
+ assert.equal(low.resolution,'480p');
+ assert.deepEqual(low.plugin.dimensions,[864,496]);
+ await assert.rejects(()=>tool.execute({...args,resolution:'1080p'}),/480P或720P/);
+ await assert.rejects(()=>tool.execute({...args,resolution:undefined}),/480P或720P/);
+ assert.match(tool.parameters.properties.resolution.description,/带引号的字符串/,'参数说明写明要带引号，减少裸值导致的解析失败');
+ assert.match(tool.parameters.properties.resolution.description,/"480p"/);
+ assert.match(tool.parameters.properties.ratio.description,/带引号/);
+});
+
 test('manual keys have no assumed discount; service and direct retain their own rates',async()=>{
  const manual=await setup({...base,estimateGroupRatio:.8}).tool.execute(args);
  assert.equal(manual.plugin.groupRatio,1);assert.equal(manual.plugin.cny,26.244);

@@ -155,9 +155,16 @@ export const MAX_TOTAL_SECONDS = 120;
 
 /** 旧导出保留为默认值，实际清晰度由 resolveResolution 统一解析。 */
 export const FIXED_RESOLUTION = '720p';
+/** 把清晰度写法归一：480 / '480P' / ' 480p ' 都算 480p；认不出来返回空串，由调用方决定报错还是用默认值。 */
+export function normalizeResolution(value) {
+  const text = String(value ?? '').trim().toLowerCase().replace(/\s+/g, '');
+  const matched = /^(480|720)p?$/.exec(text);
+  return matched ? `${matched[1]}p` : '';
+}
+
 export function resolveResolution(config, args: any = {}) {
-  const resolution = String(args?.resolution ?? FIXED_RESOLUTION).toLowerCase();
-  if (!['480p', '720p'].includes(resolution)) throw new Error('视频清晰度仅支持 480P 或 720P。');
+  const resolution = normalizeResolution(args?.resolution ?? FIXED_RESOLUTION);
+  if (!resolution) throw new Error('视频清晰度仅支持 480P 或 720P。');
   return resolution;
 }
 
