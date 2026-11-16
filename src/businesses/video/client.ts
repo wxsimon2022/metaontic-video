@@ -9,7 +9,7 @@ import { createDictionaries } from './client/locale.js';
 import { createSettingsState } from './client/state.js';
 import { createUpdates } from '../../client/updates.js';
 import { createSettingsPage } from './client/settings.js';
-import { createUpdateHint, createUpdateHintView } from '../../client/update-hint.js';
+import { createUpdateHint, createUpdateHintView, ensureUpdateHintStyles } from '../../client/update-hint.js';
 import { createSidebarPanel } from './client/panel.js';
 import { createCanvasView } from './client/canvas-view.js';
 import iconMark from '../../../icon.svg';
@@ -83,42 +83,32 @@ export function createVideoClient(require) {
         // 流程画布只做独立页面：左侧栏有单独入口，视频创作面板里不再内嵌画布。
         const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS, PAGE_CSS });
         const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: iconMark });
-        // 有更新时左侧栏入口名字后面写「· 有更新」，收起状态只看得见图标，所以在图标角上再点一个圆点。
-        // 状态放在 update-hint 的轻量 store 里：宿主渲染左侧栏那一行，拿不到设置页的 state。
+        // 有更新时只在入口那一行点一个红点：展开时贴在这行右端（原来写「有更新」的位置），收起时落在图标角上，
+        // 入口名字本身不带文字。状态放在 update-hint 的轻量 store 里：宿主渲染那一行，拿不到设置页的 state。
+        ensureUpdateHintStyles();
         const updateHint = createUpdateHint({ version: PLUGIN_VERSION, isNewerVersion, fetchRecentVersions, cacheKey: UPDATE_CACHE_KEY, maxAge: UPDATE_MAX_AGE_MS });
         const { UpdateHintDot, UpdateHintBanner } = createUpdateHintView({
           React, h, t, hint: updateHint, version: PLUGIN_VERSION, isNewerVersion, manager: pluginManager,
           pluginPackage: PLUGIN_PACKAGE, updateSpec: UPDATE_SPEC, updateAttempts: UPDATE_ATTEMPTS,
           cacheKey: UPDATE_CACHE_KEY, maxAge: UPDATE_MAX_AGE_MS,
         });
-        const railIcon = (props: any) => h('span', {
-          className: 'mov-rail-hint', style: { position: 'relative', display: 'inline-flex' },
-        }, [h(PanelIcon, props), h(UpdateHintDot, { key: 'dot' })]);
-        const sidebarEntryLabel = () => t('panelSidebarLabel') + (updateHint.pending() ? ` · ${t('sidebarUpdateBadge')}` : '');
+        const railIcon = (props: any) => h('span', { className: 'mov-rail-hint' },
+          [h(PanelIcon, props), h(UpdateHintDot, { key: 'dot' })]);
         // 左侧栏入口与面板本体是宿主 root 作用域的两个 slot，用同一个 id 关联：
         // sidebar.panellist 只放一行图标（收到 {size, active}），点它切到 main 里同 id 的面板。
         // 老版本宿主没有这两个 slot 时 inject 不会触发，其余界面与工具不受影响。
         ctx.effect(() => {
-          const registerEntry = () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+          const off = ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
             name: 'sidebar.panellist',
             id: PANEL_ID,
             order: 30,
             locale: NS,
-            // 左侧那一行显示的名字，比面板标题更完整，方便在图标列表里认出来；有更新时后面接一句提示。
-            label: sidebarEntryLabel,
+            // 左侧那一行显示的名字，比面板标题更完整，方便在图标列表里认出来；有更新只加红点，不改文字。
+            label: () => t('panelSidebarLabel'),
           }, railIcon));
-          let off = registerEntry();
-          let shown = updateHint.pending();
-          // 宿主只在注册变化或切语言时重读这一行的文字，所以查到新版本（或更新完）后重注册一次。
-          const unsubscribe = updateHint.subscribe(() => {
-            const next = updateHint.pending();
-            if (next === shown) return;
-            shown = next;
-            off?.();
-            off = registerEntry();
-          });
+          // 开工时静默查一次：查到新版本由圆点自己重渲染，不需要重注册这一行。
           void updateHint.refresh(false);
-          return () => { unsubscribe?.(); off?.(); };
+          return () => off?.();
         }, 'metaontic-video: sidebar entry');
         ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({
           name: 'main',

@@ -1197,7 +1197,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "3.28.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.29.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1628,7 +1628,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.28.0",
+    version: "3.29.0",
     description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1734,12 +1734,11 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.28.0",
+      version: "3.29.0",
       prerelease: false,
-      publishedAt: "2026-11-16T07:55:07.834Z",
+      publishedAt: "2026-11-16T08:21:13.271Z",
       items: [
-        "\u4F18\u5316\uFF1A\u300C\u5E2E\u6211\u5B8C\u5584\u300D\u4F1A\u8865\u9F50\u573A\u666F\u4E0E\u9053\u5177\u3001\u52A8\u4F5C\u5C42\u6B21\u3001\u753B\u9762\u5C42\u6B21\u4E0E\u8282\u594F\uFF0C\u6210\u7247\u753B\u9762\u66F4\u6709\u53D8\u5316\uFF0C\u4E0D\u518D\u5355\u8C03\u3002",
-        "\u4F18\u5316\uFF1A\u753B\u5E03\u300CAI \u5199\u811A\u672C\u300D\u4F1A\u907F\u514D\u76F8\u90BB\u5206\u955C\u7528\u540C\u4E00\u7EC4\u666F\u522B\u4E0E\u89C6\u89D2\uFF0C\u6574\u7247\u955C\u5934\u4E0D\u518D\u91CD\u590D\u96F7\u540C\u3002"
+        "\u4F18\u5316\uFF1A\u5DE6\u4FA7\u680F\u7684\u66F4\u65B0\u63D0\u793A\u4ECE\u6587\u5B57\u6539\u6210\u4E00\u4E2A\u5C0F\u7EA2\u70B9\uFF0C\u8DDF\u5728\u300C\u89C6\u9891\u521B\u4F5C\u52A9\u624B\u300D\u540D\u5B57\u540E\u9762\uFF1B\u4FA7\u680F\u6536\u8D77\u65F6\u7EA2\u70B9\u843D\u5728\u56FE\u6807\u89D2\u4E0A\u3002"
       ]
     }
   };
@@ -2218,6 +2217,32 @@
   }
 
   // src/client/update-hint.ts
+  var UPDATE_HINT_CSS = `
+  .mov-rail-hint { position: relative; display: inline-flex; align-items: center; }
+  /* \u6536\u8D77\u4FA7\u680F\uFF1A\u7EA2\u70B9\u843D\u5728\u56FE\u6807\u53F3\u4E0A\u89D2 */
+  .mov-rail-dot {
+    position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--dsw-alias-state-error-primary, #e5533d);
+    box-shadow: 0 0 0 2px var(--dsw-specific-sidebar-fill, transparent);
+  }
+  /* \u5C55\u5F00\u4FA7\u680F\uFF1A\u8FD9\u4E00\u884C\u6709\u540D\u5B57\uFF0C\u7EC4\u4EF6\u91CC\u7684\u5706\u70B9\u6536\u8D77\uFF0C\u6539\u5728\u540D\u5B57\u540E\u9762\u70B9\u4E00\u4E2A\u540C\u6837\u5927\u5C0F\u7684\u7EA2\u70B9 */
+  button:has(.mov-rail-dot):has(> span:nth-child(2)) .mov-rail-dot { display: none; }
+  button:has(.mov-rail-dot):has(> span:nth-child(2)) > span:nth-child(2)::after {
+    content: ""; display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%;
+    background: var(--dsw-alias-state-error-primary, #e5533d);
+    box-shadow: 0 0 0 2px var(--dsw-specific-sidebar-fill, transparent);
+    vertical-align: middle;
+  }
+`;
+  function ensureUpdateHintStyles(doc = typeof document === "undefined" ? null : document) {
+    if (!doc || typeof doc.createElement !== "function" || !doc.head) return false;
+    if (doc.head.querySelector("style[data-mov-update-hint]")) return true;
+    const style = doc.createElement("style");
+    style.setAttribute("data-mov-update-hint", "");
+    style.textContent = UPDATE_HINT_CSS;
+    doc.head.append(style);
+    return true;
+  }
   function createUpdateHint({ version = "", isNewerVersion, fetchRecentVersions, cacheKey, maxAge, deferKey = `${cacheKey}.deferred` }) {
     const listeners = /* @__PURE__ */ new Set();
     let latest = "", versions = [], at = 0, deferred = readDeferred(), checking = null;
@@ -2359,16 +2384,7 @@
     function UpdateHintDot() {
       const state = useUpdateHint();
       if (!state.pending) return null;
-      return h("span", { key: "dot", className: "mov-rail-dot", "aria-hidden": true, style: {
-        position: "absolute",
-        top: "0",
-        right: "0",
-        width: "7px",
-        height: "7px",
-        borderRadius: "50%",
-        background: "var(--mov-dot, #e5533d)",
-        boxShadow: "0 0 0 2px rgba(0,0,0,.35)"
-      } });
+      return h("span", { key: "dot", className: "mov-rail-dot", "aria-hidden": true, title: t("sidebarUpdateBadge") });
     }
     function UpdateHintBanner() {
       const state = useUpdateHint();
@@ -4977,6 +4993,7 @@
         settings.register({ id: "video", namespace: NAMESPACE, locale: NS, Page });
         const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS, PAGE_CSS });
         const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: icon_default });
+        ensureUpdateHintStyles();
         const updateHint = createUpdateHint({ version: PLUGIN_VERSION, isNewerVersion, fetchRecentVersions, cacheKey: UPDATE_CACHE_KEY2, maxAge: UPDATE_MAX_AGE_MS2 });
         const { UpdateHintDot, UpdateHintBanner } = createUpdateHintView({
           React,
@@ -4992,34 +5009,22 @@
           cacheKey: UPDATE_CACHE_KEY2,
           maxAge: UPDATE_MAX_AGE_MS2
         });
-        const railIcon = (props) => h("span", {
-          className: "mov-rail-hint",
-          style: { position: "relative", display: "inline-flex" }
-        }, [h(PanelIcon, props), h(UpdateHintDot, { key: "dot" })]);
-        const sidebarEntryLabel = () => t("panelSidebarLabel") + (updateHint.pending() ? ` \xB7 ${t("sidebarUpdateBadge")}` : "");
+        const railIcon = (props) => h(
+          "span",
+          { className: "mov-rail-hint" },
+          [h(PanelIcon, props), h(UpdateHintDot, { key: "dot" })]
+        );
         ctx.effect(() => {
-          const registerEntry = () => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
+          const off = ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
             name: "sidebar.panellist",
             id: PANEL_ID,
             order: 30,
             locale: NS,
-            // 左侧那一行显示的名字，比面板标题更完整，方便在图标列表里认出来；有更新时后面接一句提示。
-            label: sidebarEntryLabel
+            // 左侧那一行显示的名字，比面板标题更完整，方便在图标列表里认出来；有更新只加红点，不改文字。
+            label: () => t("panelSidebarLabel")
           }, railIcon));
-          let off = registerEntry();
-          let shown = updateHint.pending();
-          const unsubscribe = updateHint.subscribe(() => {
-            const next = updateHint.pending();
-            if (next === shown) return;
-            shown = next;
-            off?.();
-            off = registerEntry();
-          });
           void updateHint.refresh(false);
-          return () => {
-            unsubscribe?.();
-            off?.();
-          };
+          return () => off?.();
         }, "metaontic-video: sidebar entry");
         ctx.effect(() => ctx.slots.inject("main", () => ctx.slots.register({
           name: "main",

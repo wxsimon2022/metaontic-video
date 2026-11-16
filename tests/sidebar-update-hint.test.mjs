@@ -55,7 +55,7 @@ function setup({ local = '3.26.0', list = ['3.26.1', '3.26.0'] } = {}) {
     pluginPackage: 'metaontic-video', updateSpec: 'git+https://example.invalid/plugin.git', updateAttempts: 1,
     cacheKey: CACHE, maxAge: 60 * 60 * 1000,
   });
-  return { hint, view, react, saved, state, network, setList: (next) => { list = next; state.version = next[0]; } };
+  return { hint, view, react, saved, state, network, context, setList: (next) => { list = next; state.version = next[0]; } };
 }
 
 test('左侧栏提示只看真实检查结果：没缓存先查一次，缓存新鲜就不再联网', async () => {
@@ -114,6 +114,7 @@ test('左侧栏圆点只在新版本存在时出现', async () => {
   const dot = view.UpdateHintDot();
   assert.equal(dot.props.className, 'mov-rail-dot');
   assert.equal(dot.props['aria-hidden'], true, '圆点是纯装饰，读屏靠入口文案');
+  assert.equal(dot.props.title, 'sidebarUpdateBadge', '鼠标停在红点上仍能看出这是更新提示');
 });
 
 test('面板顶部的更新入口两步确认：第一下转确认，第二下才装', async () => {
@@ -157,10 +158,32 @@ test('面板顶部的「稍后再说」不再提示这一版，也不会触发�
   assert.equal(view.UpdateHintBanner(), null, '没有更新也不显示空面板');
 });
 
-test('左侧栏入口在有更新时重注册一次，好让宿主重读入口文字', () => {
+test('左侧栏入口只画红点：名字不带「有更新」，也不再为重读文字重注册', () => {
   const source = readFileSync(new URL('../src/businesses/video/client.ts', import.meta.url), 'utf8');
-  assert.match(source, /updateHint\.subscribe\(/, '状态变化后重注册左侧栏入口');
   assert.match(source, /updateBanner: \(\) => h\(UpdateHintBanner/, '点入口进来就有更新入口');
-  assert.match(source, /const railIcon = \(props: any\)/, '收起状态只有图标，圆点画在图标角上');
+  assert.match(source, /const railIcon = \(props: any\)/);
+  assert.match(source, /className: 'mov-rail-hint'/, '圆点挂在入口图标外面那层壳上');
+  assert.match(source, /label: \(\) => t\('panelSidebarLabel'\)/, '入口名字就是插件名');
+  assert.doesNotMatch(source, /panelSidebarLabel'\) \+/, '不再把「有更新」拼进入口名字');
+  assert.doesNotMatch(source, /updateHint\.subscribe\(/, '红点自己随状态重渲染，不用重注册入口');
+  assert.match(source, /ensureUpdateHintStyles\(\)/, '圆点样式只注入一次');
   assert.equal(source.match(/\}, railIcon\)\)/g)?.length, 1, '只有带更新入口的那一行才画圆点，画布入口不带');
+});
+
+test('红点样式只注入一次，并在展开的左侧栏里贴到入口那一行的右端', () => {
+  const { context } = setup();
+  let injected = null;
+  const doc = {
+    head: { querySelector: (selector) => (injected && selector === 'style[data-mov-update-hint]' ? injected : null), append: (element) => { injected = element; } },
+    createElement: () => ({ setAttribute(name) { this.attr = name; }, set textContent(value) { this.css = value; } }),
+  };
+  assert.equal(context.ensureUpdateHintStyles(doc), true);
+  assert.match(injected.css, /\.mov-rail-dot \{/, '红点样式走注入的样式表，组件里不再写内联样式');
+  assert.match(injected.css, /--dsw-alias-state-error-primary/, '红点跟着宿主的报错色，深浅色主题都不刺眼');
+  assert.match(injected.css, /:has\(> span:nth-child\(2\)\)/, '按有没有名字区分展开与收起');
+  assert.match(injected.css, /:has\(> span:nth-child\(2\)\) \.mov-rail-dot \{ display: none; \}/, '展开时组件里的圆点收起，只留名字后面那一个');
+  assert.match(injected.css, /> span:nth-child\(2\)::after/, '展开时红点画在入口名字后面，就是原来写「有更新」的位置');
+  assert.match(injected.css, /margin-left: 6px/, '红点紧跟名字，中间留一点间距');
+  assert.equal(context.ensureUpdateHintStyles(doc), true, '已经有样式就不重复注入');
+  assert.equal(context.ensureUpdateHintStyles(null), false, '没有 DOM 时直接跳过');
 });

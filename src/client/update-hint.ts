@@ -3,6 +3,38 @@
  *  读写的是设置页同一份本地缓存，只读检查结果；真正的安装动作仍走 client/updates 的同一套流程。 */
 import { createUpdateActions, renderUpdateNotice } from './updates.js';
 
+/** 左侧栏入口的更新提示样式：宿主那一行由宿主渲染，圆点只有一处，位置按行内有没有名字分两种。
+ *  展开侧栏时名字就是第二个 span，红点改由名字后面的伪元素画出来，正好落在原来写「有更新」的位置；
+ *  收起侧栏只剩图标，红点回到图标右上角。只看样式也够判断，不用在组件里猜宿主当前是展开还是收起。 */
+export const UPDATE_HINT_CSS = `
+  .mov-rail-hint { position: relative; display: inline-flex; align-items: center; }
+  /* 收起侧栏：红点落在图标右上角 */
+  .mov-rail-dot {
+    position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--dsw-alias-state-error-primary, #e5533d);
+    box-shadow: 0 0 0 2px var(--dsw-specific-sidebar-fill, transparent);
+  }
+  /* 展开侧栏：这一行有名字，组件里的圆点收起，改在名字后面点一个同样大小的红点 */
+  button:has(.mov-rail-dot):has(> span:nth-child(2)) .mov-rail-dot { display: none; }
+  button:has(.mov-rail-dot):has(> span:nth-child(2)) > span:nth-child(2)::after {
+    content: ""; display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%;
+    background: var(--dsw-alias-state-error-primary, #e5533d);
+    box-shadow: 0 0 0 2px var(--dsw-specific-sidebar-fill, transparent);
+    vertical-align: middle;
+  }
+`;
+
+/** 样式只注入一次；测试与无 DOM 环境直接返回 false。 */
+export function ensureUpdateHintStyles(doc = typeof document === 'undefined' ? null : document) {
+  if (!doc || typeof doc.createElement !== 'function' || !doc.head) return false;
+  if (doc.head.querySelector('style[data-mov-update-hint]')) return true;
+  const style = doc.createElement('style');
+  style.setAttribute('data-mov-update-hint', '');
+  style.textContent = UPDATE_HINT_CSS;
+  doc.head.append(style);
+  return true;
+}
+
 /** 一份不持有 React 状态的小 store：订阅者（左侧栏的图标、面板顶部的提示）自己重渲染。 */
 export function createUpdateHint({ version = '', isNewerVersion, fetchRecentVersions, cacheKey, maxAge, deferKey = `${cacheKey}.deferred` }: any) {
   const listeners = new Set();
@@ -80,14 +112,11 @@ export function createUpdateHintView({
     return value;
   }
 
-  /** 收起状态的左侧栏只看得见图标：有更新时在图标角上点一个小圆点。 */
+  /** 有更新时画一个小圆点：展开的左侧栏贴在这一行右端（原来写「有更新」的位置），收起时落在图标角上。 */
   function UpdateHintDot() {
     const state = useUpdateHint();
     if (!state.pending) return null;
-    return h('span', { key: 'dot', className: 'mov-rail-dot', 'aria-hidden': true, style: {
-      position: 'absolute', top: '0', right: '0', width: '7px', height: '7px', borderRadius: '50%',
-      background: 'var(--mov-dot, #e5533d)', boxShadow: '0 0 0 2px rgba(0,0,0,.35)',
-    } });
+    return h('span', { key: 'dot', className: 'mov-rail-dot', 'aria-hidden': true, title: t('sidebarUpdateBadge') });
   }
 
   /**

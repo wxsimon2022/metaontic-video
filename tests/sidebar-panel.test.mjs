@@ -180,10 +180,9 @@ test('入口用同一个 id 注册左侧栏图标与 main 面板', () => {
   assert.match(shared, /export const PLUGIN_ID = 'metaontic-video';/);
   assert.match(shared, /export const PANEL_ID = PLUGIN_ID;/);
   assert.match(source, /name: 'sidebar\.panellist',\s*id: PANEL_ID/);
-  // 左侧栏那一行的文字走同一个 thunk：有更新时在后面接一句提示，宿主重读时就能看到。
-  assert.match(source, /label: sidebarEntryLabel/);
-  assert.match(source, /t\('sidebarUpdateBadge'\)/, '查到新版本时在入口名字后面写「有更新」');
-  assert.match(source, /updateHint\.pending\(\)/, '提示只在确实有新版本时出现');
+  // 入口名字只写插件名；有更新改成这一行右端的红点，不再往名字后面接文字。
+  assert.match(source, /label: \(\) => t\('panelSidebarLabel'\)/);
+  assert.doesNotMatch(source, /panelSidebarLabel'\) \+/, '入口名字里不再拼「有更新」');
   assert.match(source, /name: 'main',\s*key: PANEL_ID/);
   assert.match(source, /agentPreset: 'video-director'/);
   assert.match(source, /openBundle\(NAMESPACE\)/);
