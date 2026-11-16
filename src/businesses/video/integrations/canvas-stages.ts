@@ -22,7 +22,7 @@ export const STAGE_STATE_TEXT: Record<string, string> = { done: '已完成', act
 export const STAGE_ACTIONS: Record<string, { label: string; hint: string }> = {
   requirement: { label: '填需求', hint: '写想拍什么、总时长、每段时长、画幅与清晰度，也可以让文本模型把想法写成剧本（文本按用量单独计费）；铺节点本身不产生视频费用' },
   script: { label: '看剧本', hint: '打开剧本节点核对或修改内容，分镜与分段计划随脚本一起铺开；这一步只改节点内容，不生成视频、不计费' },
-  storyboard: { label: '看分镜', hint: '打开分镜节点核对每个镜头的画面、景别与运镜；没识别到分镜表时按场景与句子切段，这一步只改内容、不生成视频、不计费' },
+  storyboard: { label: '看分镜', hint: '打开分镜节点核对每个镜头的画面、景别、视角与运镜；没识别到分镜表时按场景与句子切段，这一步只改内容、不生成视频、不计费' },
   assets: { label: '准备素材', hint: '逐段生成前把角色图、首帧或参考图准备好：可以导入自己的图，也可以在图片节点里让模型生成（图片单独计费并要审核）；真人照片要先转成非真人二维动画风格' },
   cost: { label: '看估价', hint: '列出每段提示词、时长与整条链路的预估合计，确认方案与费用后才开跑' },
   segments: { label: '做这一段', hint: '打开当前还没成果的制作节点，核对制作方案并单独确认费用后才会调用模型' },

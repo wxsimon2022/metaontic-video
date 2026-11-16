@@ -116,6 +116,16 @@ test('写脚本分段：按分镜表或句子切分，内容不足直接报错�
   const richSplit = api.splitScriptPrompts(storyboard, 2, richShots);
   assert.ok(richSplit[0].includes('镜别：近景') && richSplit[0].includes('运镜：平稳右摇') && richSplit[0].includes('老人把玉米'));
   assert.ok(richSplit[1].includes('镜别：特写') && !richSplit[1].includes('老人把玉米'));
+  // 带视角列的分镜表：视角单独成一行，不能因为表头里也有「运镜」就把视角当成运镜。
+  const angleShots = api.scriptStoryboardShots(['| 镜号 | 镜别 | 视角 | 运镜 | 画面 | 时长 |', '| --- | --- | --- | --- | --- | --- |',
+    '| 1 | 中景 | 过肩 | 缓慢推近 | 老人把玉米放进竹筐 | 5秒 |',
+    '| 2 | 大特写 | 平视 | 固定镜头 | 手背青筋与玉米须 | 5秒 |'].join('\n'));
+  assert.equal(angleShots.length, 2);
+  assert.equal(angleShots[0].camera, '中景 · 过肩 · 缓慢推近', '镜别、视角与运镜三列按表头顺序都保留');
+  assert.equal(api.shotPrompt(angleShots[0]), '镜别：中景\n视角：过肩\n运镜：缓慢推近\n画面：老人把玉米放进竹筐');
+  assert.equal(api.shotPrompt(angleShots[1]), '镜别：大特写\n视角：平视\n运镜：固定镜头\n画面：手背青筋与玉米须', '平视也要带进提示词');
+  const angleSplit = api.splitScriptPrompts(storyboard, 2, angleShots);
+  assert.ok(angleSplit[0].includes('视角：过肩') && angleSplit[1].includes('视角：平视'), '视角随分段进入逐段提示词');
   assert.throws(() => api.splitScriptPrompts('只有一句话。', 2), /只够拆成 1 段/);
   assert.throws(() => api.splitScriptPrompts('   ', 1), /先写下脚本内容/);
 });

@@ -291,8 +291,8 @@ test('真实分镜独立于制作段，保留时间、镜头、声音和对白�
  const shots=api.scriptStoryboardShots('```\n| 镜头 | 画面 |\n| --- | --- |\n| 假镜头 | 不同步 |\n```\n| 镜头 | 时间 | 景别及运镜 | 画面 | 台词 | 声音 |\n| --- | --- | --- | --- | --- | --- |\n| 一 | 0—7秒 | 远景推进 | 日出\\|船影 | 你好 | 海浪 |\n| 二 | 7秒至15秒 | 近景 | 水面 | 无 | 风声 |');
  assert.equal(shots.length,2);assert.equal(shots[0].duration,7);assert.equal(shots[1].duration,8);
  assert.ok(shots[0].visual.includes('日出|船影'));assert.equal(shots[0].camera,'远景推进');assert.equal(shots[0].sfx,'海浪');
- const rich=api.scriptStoryboardShots('| 镜号 | 镜别 | 运镜 | 画面 | 时长 | 台词 |\n| --- | --- | --- | --- | --- | --- |\n| 1 | 中景 | 缓慢推近 | 老人坐在院门口剥玉米，暖色斜阳从左侧照入 | 5秒 | — |');
- assert.equal(rich.length,1);assert.equal(rich[0].title,'1');assert.equal(rich[0].camera,'中景 · 缓慢推近','镜别与运镜两列都保留');
+ const rich=api.scriptStoryboardShots('| 镜号 | 镜别 | 视角 | 运镜 | 画面 | 时长 | 台词 |\n| --- | --- | --- | --- | --- | --- | --- |\n| 1 | 中景 | 过肩 | 缓慢推近 | 老人坐在院门口剥玉米，暖色斜阳从左侧照入 | 5秒 | — |');
+ assert.equal(rich.length,1);assert.equal(rich[0].title,'1');assert.equal(rich[0].camera,'中景 · 过肩 · 缓慢推近','镜别、视角与运镜三列都保留');
  assert.ok(rich[0].visual.includes('画面：老人坐在院门口剥玉米'));
  assert.deepEqual(api.scriptStoryboardShots('只有完整剧本，没有表格'),[]);
 });

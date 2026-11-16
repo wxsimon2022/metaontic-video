@@ -1456,7 +1456,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
             placeholder: '一句话就够，例如：青旅天台的清晨，一个人拖着行李住进城市。',
             onChange: (e: any) => patchScriptDialog({ idea: e.target.value, error: '' }) })]) : null,
           h('label', { key: 'text', className: 'movc-field' }, ['脚本内容（可以直接写，也可以让文本模型写）', h('textarea', { value: scriptDialog.text,
-            placeholder: '写下要拍的内容。写成 Markdown 分镜表（表头含「镜号」「镜别」「运镜」「画面」列）时会按分镜切段；否则按句子、段落按字数均分。写多少拆多少，不自动编内容。',
+            placeholder: '写下要拍的内容。写成 Markdown 分镜表（表头含「镜号」「镜别」「视角」「运镜」「画面」列）时会按分镜切段，镜别、视角与运镜会一起带进该段提示词；否则按句子、段落按字数均分。写多少拆多少，不自动编内容。',
             onChange: (e: any) => patchScriptDialog({ text: e.target.value, error: '' }) })]),
           h('p', { key: 'note', className: 'movc-status' }, `「AI 写脚本」会按设置页的文本模型（${scriptDialog.textModel || '文本模型'}）把需求写成剧本与分镜表，单独按文本计费；要改时长、画幅或清晰度，先回上一步「改需求」。${scriptDialog.writing ? ` 文本模型正在写：已等待 ${Math.max(0, Math.round((clock - (scriptDialog.writingSince || clock)) / 1000))} 秒（一次通常 30–90 秒，可以先去别的地方看看）。` : ''}`),
           scriptDialog.plan ? h('div', { key: 'plan', className: 'movc-plan' }, [

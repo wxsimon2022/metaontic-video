@@ -15,8 +15,12 @@ export function scriptStoryboardShots(script: string) {
     const visualAt = header.findIndex(x => /画面|visual|详情|描述/i.test(x));
     if (titleAt < 0 || visualAt < 0 || titleAt === visualAt) continue;
     const timeAt = header.findIndex(x => /时间|时长|time|duration/i.test(x));
-    // 镜别与运镜分成两列时都要保留，按表头顺序拼成一段运镜说明。
-    const cameraAt = header.map((x, j) => (/景别|镜别|运镜|视角|camera|movement/i.test(x) ? j : -1)).filter(j => j >= 0);
+    // 镜别、视角与运镜分成多列时都要保留，按表头顺序拼成一段镜头说明；
+    // 一列里若同时写了景别与运镜（如「景别及运镜」），同一列只算一次，不重复拼。
+    const framingAt = header.findIndex(x => /景别|镜别|shot\s*size/i.test(x));
+    const viewAt = header.findIndex(x => /视角|机位角度|view\s*angle|angle|perspective/i.test(x));
+    const moveAt = header.findIndex(x => /运镜|camera|movement/i.test(x));
+    const cameraAt = [...new Set([framingAt, viewAt, moveAt].filter(j => j >= 0))].sort((a, b) => a - b);
     const soundAt = header.findIndex(x => /声音|音效|sound|sfx/i.test(x));
     const dialogueAt = header.findIndex(x => /台词|对白|dialogue/i.test(x));
     for (i += 2; i < lines.length && lines[i].includes('|') && lines[i].trim(); i++) {

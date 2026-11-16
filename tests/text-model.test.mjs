@@ -14,7 +14,7 @@ test('文本模型写脚本：请求走同一中转站的 chat 接口，提示�
   const calls = [];
   const fetcher = async (url, options) => {
     calls.push({ url, options, body: JSON.parse(options.body) });
-    return response({ model: 'deepseek v4.1 flash', choices: [{ message: { content: '```markdown\n# 青旅的清晨\n\n| 镜号 | 镜别 | 运镜 | 画面 | 时长 | 台词 |\n| --- | --- | --- | --- | --- | --- |\n| 1 | 远景 | 固定镜头 | 天台晨光 | 15秒 | — |\n| 2 | 中景 | 缓慢推近 | 前台接待 | 15秒 | — |\n```' } }], usage: { prompt_tokens: 120, completion_tokens: 300 } });
+    return response({ model: 'deepseek v4.1 flash', choices: [{ message: { content: '```markdown\n# 青旅的清晨\n\n| 镜号 | 镜别 | 视角 | 运镜 | 画面 | 时长 | 台词 |\n| --- | --- | --- | --- | --- | --- | --- |\n| 1 | 远景 | 平视 | 固定镜头 | 天台晨光 | 15秒 | — |\n| 2 | 中景 | 过肩 | 缓慢推近 | 前台接待 | 15秒 | — |\n```' } }], usage: { prompt_tokens: 120, completion_tokens: 300 } });
   };
   const result = await api.writeScript(config, { idea: '青旅天台的清晨', totalSeconds: 30, segmentSeconds: 15, segments: 2, ratio: '9:16' }, { fetcher });
   assert.equal(calls.length, 1);
@@ -23,8 +23,11 @@ test('文本模型写脚本：请求走同一中转站的 chat 接口，提示�
   assert.equal(calls[0].body.model, api.resolveTextModel(config));
   const prompt = calls[0].body.messages[1].content;
   assert.ok(prompt.includes('青旅天台的清晨') && prompt.includes('9:16'), prompt.slice(0, 80));
-  assert.ok(prompt.includes('| 镜号 | 镜别 | 运镜 | 画面 | 时长 | 台词 |'), '把分镜表表头写死，分段解析才有依据');
+  assert.ok(prompt.includes('| 镜号 | 镜别 | 视角 | 运镜 | 画面 | 时长 | 台词 |'), '把分镜表表头写死，分段解析才有依据');
   assert.ok(prompt.includes('镜别列只填一个标准景别词'), '镜别单独成列，不能用运镜代替');
+  assert.ok(prompt.includes('视角列只填一个标准视角词') && prompt.includes('第一人称主观（POV）') && prompt.includes('过肩') && prompt.includes('荷兰角（倾斜）'), '视角单独成列，并给出标准视角词表');
+  assert.ok(prompt.includes('视角由这一段的内容和场景决定，不要硬加') && prompt.includes('平视是默认'), '视角要符合场景，不为变化硬加');
+  assert.ok(prompt.includes('封闭室内不写航拍'), '场景里没有的条件不许写');
   assert.ok(prompt.includes('运镜列写清这一段镜头怎么动'), '运镜写清方式、方向与速度');
   assert.ok(prompt.includes('画面列是这一段要拍的详情'), '画面列要求写全主体、动作、环境、光线与氛围');
   assert.ok(prompt.includes('正好 2 行'), '段数写死');
@@ -53,8 +56,8 @@ test('文本模型写脚本：默认流式增量收正文，按段数给输出�
     calls.push(JSON.parse(options.body));
     return sseResponse([
       { model: 'deepseek v4.1 flash', choices: [{ delta: { content: '# 青旅的清晨\n\n' } }] },
-      { choices: [{ delta: { content: '| 镜号 | 镜别 | 运镜 | 画面 | 时长 | 台词 |\n' } }] },
-      { choices: [{ delta: { content: '| 1 | 远景 | 固定镜头 | 天台晨光 | 15秒 | — |' } }], usage: { prompt_tokens: 12, completion_tokens: 34 } },
+      { choices: [{ delta: { content: '| 镜号 | 镜别 | 视角 | 运镜 | 画面 | 时长 | 台词 |\n' } }] },
+      { choices: [{ delta: { content: '| 1 | 远景 | 平视 | 固定镜头 | 天台晨光 | 15秒 | — |' } }], usage: { prompt_tokens: 12, completion_tokens: 34 } },
       { choices: [{ delta: {}, finish_reason: 'length' }] },
     ]);
   };
@@ -65,7 +68,7 @@ test('文本模型写脚本：默认流式增量收正文，按段数给输出�
   assert.deepEqual(calls[0].stream_options, { include_usage: true }, '流式里也要 usage，费用与用量才可核对');
   assert.equal(calls[0].max_tokens, api.textMaxTokens(2), '按段数给输出上限，既够长又有封顶');
   assert.ok(calls[0].max_tokens >= 3000, `上限要装得下带分镜表的整份脚本：${calls[0].max_tokens}`);
-  assert.equal(result.script, '# 青旅的清晨\n\n| 镜号 | 镜别 | 运镜 | 画面 | 时长 | 台词 |\n| 1 | 远景 | 固定镜头 | 天台晨光 | 15秒 | — |', '把增量按顺序拼回正文');
+  assert.equal(result.script, '# 青旅的清晨\n\n| 镜号 | 镜别 | 视角 | 运镜 | 画面 | 时长 | 台词 |\n| 1 | 远景 | 平视 | 固定镜头 | 天台晨光 | 15秒 | — |', '把增量按顺序拼回正文');
   assert.equal(result.model, 'deepseek v4.1 flash');
   assert.deepEqual(result.usage, { promptTokens: 12, completionTokens: 34 });
   assert.equal(result.truncated, true, '写到输出上限要回报，客户端据此提醒用户补写而不是当完整脚本用');

@@ -69,7 +69,7 @@ function titleOf(script: any) {
 const dialogueOf = (shot: any) => (Array.isArray(shot?.dialogue) ? shot.dialogue : [])
   .map((line: any) => String(line?.line || line?.text || '').trim()).filter(Boolean).join(' / ');
 
-/** 分镜示意图：片名 + 规格 + 每镜头一张卡（镜号、景别运镜、画面、时长、台词）。只画解析到的镜头。 */
+/** 分镜示意图：片名 + 规格 + 每镜头一张卡（镜号、景别视角运镜、画面、时长、台词）。只画解析到的镜头。 */
 export function renderStoryboardSvg(script: any, options: any = {}) {
   const shots = Array.isArray(options.shots) ? options.shots : scriptStoryboardShots(String(script ?? ''));
   const title = String(options.title || '').trim() || titleOf(script) || '分镜示意图';
@@ -97,7 +97,7 @@ export function renderStoryboardSvg(script: any, options: any = {}) {
   out.push(`<text x="${pad}" y="94" font-size="20" fill="#6e6c68">${escapeXml(meta)}</text>`);
   out.push(`<text x="${pad}" y="122" font-size="17" fill="#8a8880">分镜示意，非实际生成画面；按脚本分镜表逐镜头对应。</text>`);
   if (!cards.length) {
-    out.push(`<text x="${pad}" y="${headHeight + 40}" font-size="22" fill="#8a8880">脚本里还没有可分镜的表格：先补一个带「镜号 / 镜别 / 运镜 / 画面 / 时长」的分镜表。</text>`);
+    out.push(`<text x="${pad}" y="${headHeight + 40}" font-size="22" fill="#8a8880">脚本里还没有可分镜的表格：先补一个带「镜号 / 镜别 / 视角 / 运镜 / 画面 / 时长」的分镜表。</text>`);
   }
   let y = headHeight;
   for (const card of cards) {
