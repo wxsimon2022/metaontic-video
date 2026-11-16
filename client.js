@@ -769,6 +769,7 @@
       summaryEmpty: "\u8BF7\u9009\u62E9\u63A5\u5165\u65B9\u5F0F\uFF0C\u586B\u5199 API\u5BC6\u94A5\u540E\u4FDD\u5B58\u3002",
       panelTitle: "\u89C6\u9891\u521B\u4F5C",
       panelSidebarLabel: "\u89C6\u9891\u521B\u4F5C\u52A9\u624B",
+      sidebarUpdateBadge: "\u6709\u66F4\u65B0",
       panelIntro: "\u5728\u5BF9\u8BDD\u91CC\u8BF4\u6E05\u521B\u610F\u3001\u65F6\u957F\u4E0E\u753B\u5E45\uFF0C\u811A\u672C\u3001\u5206\u955C\u3001\u751F\u6210\u548C\u672C\u673A\u5408\u5E76\u90FD\u7531\u63D2\u4EF6\u5B8C\u6210\u3002",
       panelStart: "\u5F00\u59CB\u521B\u4F5C",
       panelNew: "\u65B0\u5EFA\u89C6\u9891\u521B\u4F5C\u4F1A\u8BDD",
@@ -925,6 +926,7 @@
       summaryEmpty: "Choose a connection method, then log in or enter an API key and save.",
       panelTitle: "Video",
       panelSidebarLabel: "Video Creator",
+      sidebarUpdateBadge: "Update available",
       panelIntro: "Describe the idea, duration and aspect ratio in the conversation; the plugin handles script, storyboard, generation and local merging.",
       panelStart: "Start creating",
       panelNew: "New video session",
@@ -2215,11 +2217,258 @@
     return { makePage };
   }
 
+  // src/client/update-hint.ts
+  function createUpdateHint({ version = "", isNewerVersion, fetchRecentVersions, cacheKey, maxAge, deferKey = `${cacheKey}.deferred` }) {
+    const listeners = /* @__PURE__ */ new Set();
+    let latest = "", versions = [], at = 0, deferred = readDeferred(), checking = null;
+    function storage() {
+      try {
+        return window.localStorage;
+      } catch {
+        return null;
+      }
+    }
+    function readDeferred() {
+      try {
+        return String(storage()?.getItem(deferKey) || "");
+      } catch {
+        return "";
+      }
+    }
+    function readCache() {
+      try {
+        const saved = JSON.parse(String(storage()?.getItem(cacheKey) || "null"));
+        if (!saved || typeof saved !== "object") return { latest: "", versions: [], at: 0 };
+        return {
+          latest: String(saved.latest || ""),
+          versions: Array.isArray(saved.versions) ? saved.versions.filter((item) => /^\d+\.\d+\.\d+$/.test(String(item))).slice(0, 3) : [],
+          at: Number(saved.at) || 0
+        };
+      } catch {
+        return { latest: "", versions: [], at: 0 };
+      }
+    }
+    function writeCache() {
+      try {
+        storage()?.setItem(cacheKey, JSON.stringify({ at, latest, versions }));
+      } catch {
+      }
+    }
+    function newer(remote) {
+      try {
+        return isNewerVersion?.(remote, version) === true;
+      } catch {
+        return false;
+      }
+    }
+    const pending = () => Boolean(latest) && latest !== deferred && newer(latest);
+    function snapshot() {
+      return { latest, versions: [...versions], at, deferred, version, checking: Boolean(checking), pending: pending() };
+    }
+    function emit() {
+      for (const listener of [...listeners]) {
+        try {
+          listener(snapshot());
+        } catch {
+        }
+      }
+    }
+    function subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    }
+    function sync() {
+      const cached = readCache(), nextDeferred = readDeferred();
+      const changed = cached.latest !== latest || cached.at !== at || nextDeferred !== deferred;
+      latest = cached.latest;
+      versions = cached.versions;
+      at = cached.at;
+      deferred = nextDeferred;
+      if (changed) emit();
+      return snapshot();
+    }
+    function refresh(force = false) {
+      sync();
+      if (checking) return checking;
+      if (!force && at && Date.now() - at < maxAge) return Promise.resolve(snapshot());
+      checking = (async () => {
+        try {
+          const list = await fetchRecentVersions();
+          const next = (Array.isArray(list) ? list : []).map(String).filter((item) => /^\d+\.\d+\.\d+$/.test(item)).slice(0, 3);
+          if (next.length) {
+            latest = next[0];
+            versions = next;
+            at = Date.now();
+            writeCache();
+          }
+        } catch {
+        } finally {
+          checking = null;
+          emit();
+        }
+        return snapshot();
+      })();
+      emit();
+      return checking;
+    }
+    function defer() {
+      deferred = latest;
+      try {
+        storage()?.setItem(deferKey, latest);
+      } catch {
+      }
+      emit();
+      return snapshot();
+    }
+    function forget() {
+      latest = "";
+      versions = [];
+      at = 0;
+      deferred = "";
+      try {
+        storage()?.removeItem(cacheKey);
+        storage()?.removeItem(deferKey);
+      } catch {
+      }
+      emit();
+      return snapshot();
+    }
+    return { snapshot, pending, subscribe, sync, refresh, defer, forget, readCache };
+  }
+  function createUpdateHintView({
+    React,
+    h,
+    t,
+    hint,
+    version,
+    isNewerVersion,
+    manager,
+    pluginPackage,
+    updateSpec,
+    updateAttempts,
+    cacheKey,
+    maxAge
+  }) {
+    function useUpdateHint() {
+      const [value, setValue] = React.useState(() => hint.snapshot());
+      React.useEffect(() => hint.subscribe(() => setValue(hint.snapshot())), []);
+      return value;
+    }
+    function UpdateHintDot() {
+      const state = useUpdateHint();
+      if (!state.pending) return null;
+      return h("span", { key: "dot", className: "mov-rail-dot", "aria-hidden": true, style: {
+        position: "absolute",
+        top: "0",
+        right: "0",
+        width: "7px",
+        height: "7px",
+        borderRadius: "50%",
+        background: "var(--mov-dot, #e5533d)",
+        boxShadow: "0 0 0 2px rgba(0,0,0,.35)"
+      } });
+    }
+    function UpdateHintBanner() {
+      const state = useUpdateHint();
+      const [status, setStatus] = React.useState("idle");
+      const [message, setMessage] = React.useState("");
+      const [confirm, setConfirm] = React.useState(false);
+      const { forgetUpdateCheck, runOnlineUpdate } = createUpdateActions({
+        get UPDATE_CACHE_KEY() {
+          return cacheKey;
+        },
+        get UPDATE_MAX_AGE_MS() {
+          return maxAge;
+        },
+        get PLUGIN_VERSION() {
+          return version;
+        },
+        get isNewerVersion() {
+          return isNewerVersion;
+        },
+        get PLUGIN_PACKAGE() {
+          return pluginPackage;
+        },
+        get UPDATE_SPEC() {
+          return updateSpec;
+        },
+        get UPDATE_ATTEMPTS() {
+          return updateAttempts;
+        },
+        get manager() {
+          return manager;
+        },
+        get t() {
+          return t;
+        },
+        get updateLatest() {
+          return hint.snapshot().latest;
+        },
+        get updateConfirm() {
+          return confirm === true;
+        },
+        get forgetUpdateCheck() {
+          return forgetUpdateCheck;
+        },
+        setUpdateConfirm(value) {
+          setConfirm(value === true);
+        },
+        setUpdateStatus(value) {
+          setStatus(value);
+        },
+        setUpdateMessage(value) {
+          setMessage(value);
+        },
+        setUpdateLatest() {
+        },
+        setUpdateAt() {
+        },
+        setUpdateDeferred() {
+        }
+      });
+      React.useEffect(() => {
+        void hint.refresh(false);
+      }, []);
+      if (!state.pending && status === "idle") return null;
+      const line = status === "installing" ? t("versionUpdating") : message;
+      return h("div", { key: "update-hint", className: "mov-panel-update", "data-field": "panel-update" }, [
+        renderUpdateNotice({
+          h,
+          t,
+          available: state.pending,
+          latest: state.latest,
+          deferred: state.deferred,
+          status,
+          confirmed: confirm,
+          onLater: () => {
+            setConfirm(false);
+            hint.defer();
+          },
+          onUpdate: () => {
+            if (!confirm) {
+              setConfirm(true);
+              return;
+            }
+            void runOnlineUpdate().then(() => hint.sync());
+          }
+        }),
+        line ? h("p", { key: "line", className: "mov-panel-update-line", "data-field": "panel-update-line" }, line) : null
+      ]);
+    }
+    return { useUpdateHint, UpdateHintDot, UpdateHintBanner };
+  }
+
   // src/businesses/video/client/panel.ts
   function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID: PANEL_ID2, GUIDE_URL: GUIDE_URL2, LOGO_SVG }) {
     const LOGO_SRC = LOGO_SVG ? `data:image/svg+xml,${encodeURIComponent(LOGO_SVG)}` : "";
     const PANEL_CSS = `
       .mov-panel { width: 100%; max-width: 880px; margin: 0 auto; padding: 30px 32px 44px; display: flex; flex-direction: column; gap: 18px; }
+      /* \u6709\u66F4\u65B0\u65F6\u7684\u9876\u90E8\u63D0\u793A\uFF1A\u6CBF\u7528\u8BBE\u7F6E\u9875\u7684 .mov-notice\uFF0C\u53EA\u8865\u9762\u677F\u91CC\u7684\u95F4\u8DDD\u4E0E\u5DE6\u4FA7\u8272\u6761 */
+      .mov-panel-update { display: flex; flex-direction: column; gap: 8px; padding: 13px 14px; border: 1px solid ${TOKENS.border}; border-left: 3px solid ${TOKENS.primaryFill}; border-radius: 12px; background: ${TOKENS.cardFill}; }
+      .mov-panel-update .mov-notice strong { display: block; font-size: 13px; color: ${TOKENS.text}; }
+      .mov-panel-update-line { margin: 0; font-size: 12px; line-height: 1.5; color: ${TOKENS.muted}; }
       /* \u54C1\u724C\u5934\u56FE\uFF1A\u63D2\u4EF6 logo + \u6807\u9898/\u7B80\u4ECB\uFF0C\u7ED9\u7A7A\u8361\u7684\u5185\u5BB9\u533A\u4E00\u4E2A\u89C6\u89C9\u951A\u70B9 */
       .mov-panel-hero { display: flex; align-items: center; gap: 14px; }
       .mov-panel-mark { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; color: ${TOKENS.primaryFill}; }
@@ -2383,6 +2632,8 @@
       });
       return h("div", { className: "mov-panel" }, [
         h("style", { key: "styles" }, PAGE_CSS + PANEL_CSS),
+        // 有更新时面板最上面插一条提示：入口由 client.ts 用真实 React 渲染，面板本身不持有更新状态。
+        props?.updateBanner?.() || null,
         h("header", { key: "hero", className: "mov-panel-hero" }, [
           h(
             "span",
@@ -4679,7 +4930,7 @@
     const { PLUGIN_OWNED_KEYS, SELECTS, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, NS, NAMESPACE } = createClientConfig();
     const { zh, en } = createDictionaries();
     const { useSnapshot, same, validateSettings, persistConnection, persistBatch } = createSettingsState({ React });
-    const { PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, PLUGIN_PACKAGE: PLUGIN_PACKAGE2, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell } = createUpdates({ h });
+    const { PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, fetchRecentVersions, PLUGIN_PACKAGE: PLUGIN_PACKAGE2, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell } = createUpdates({ h });
     const { makePage } = createSettingsPage({ useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS, persistBatch, PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, SELECTS, inputStyle, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE: PLUGIN_PACKAGE2, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell, PAGE_CSS });
     return {
       inject: ["slots", "locale", "configForms", "uiSession"],
@@ -4726,14 +4977,50 @@
         settings.register({ id: "video", namespace: NAMESPACE, locale: NS, Page });
         const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS, PAGE_CSS });
         const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: icon_default });
-        ctx.effect(() => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
-          name: "sidebar.panellist",
-          id: PANEL_ID,
-          order: 30,
-          locale: NS,
-          // 左侧那一行显示的名字，比面板标题更完整，方便在图标列表里认出来。
-          label: () => t("panelSidebarLabel")
-        }, PanelIcon)), "metaontic-video: sidebar entry");
+        const updateHint = createUpdateHint({ version: PLUGIN_VERSION, isNewerVersion, fetchRecentVersions, cacheKey: UPDATE_CACHE_KEY2, maxAge: UPDATE_MAX_AGE_MS2 });
+        const { UpdateHintDot, UpdateHintBanner } = createUpdateHintView({
+          React,
+          h,
+          t,
+          hint: updateHint,
+          version: PLUGIN_VERSION,
+          isNewerVersion,
+          manager: pluginManager,
+          pluginPackage: PLUGIN_PACKAGE2,
+          updateSpec: UPDATE_SPEC2,
+          updateAttempts: UPDATE_ATTEMPTS2,
+          cacheKey: UPDATE_CACHE_KEY2,
+          maxAge: UPDATE_MAX_AGE_MS2
+        });
+        const railIcon = (props) => h("span", {
+          className: "mov-rail-hint",
+          style: { position: "relative", display: "inline-flex" }
+        }, [h(PanelIcon, props), h(UpdateHintDot, { key: "dot" })]);
+        const sidebarEntryLabel = () => t("panelSidebarLabel") + (updateHint.pending() ? ` \xB7 ${t("sidebarUpdateBadge")}` : "");
+        ctx.effect(() => {
+          const registerEntry = () => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
+            name: "sidebar.panellist",
+            id: PANEL_ID,
+            order: 30,
+            locale: NS,
+            // 左侧那一行显示的名字，比面板标题更完整，方便在图标列表里认出来；有更新时后面接一句提示。
+            label: sidebarEntryLabel
+          }, railIcon));
+          let off = registerEntry();
+          let shown = updateHint.pending();
+          const unsubscribe = updateHint.subscribe(() => {
+            const next = updateHint.pending();
+            if (next === shown) return;
+            shown = next;
+            off?.();
+            off = registerEntry();
+          });
+          void updateHint.refresh(false);
+          return () => {
+            unsubscribe?.();
+            off?.();
+          };
+        }, "metaontic-video: sidebar entry");
         ctx.effect(() => ctx.slots.inject("main", () => ctx.slots.register({
           name: "main",
           key: PANEL_ID,
@@ -4742,7 +5029,9 @@
           inject: () => ({
             startSession: () => ctx.get("uiWorkspace")?.startSession(void 0, { agentPreset: "video-director" }),
             openSettings: () => ctx.get("pluginNavigation")?.openBundle(NAMESPACE),
-            manager: pluginManager
+            manager: pluginManager,
+            // 面板顶部的更新入口：与设置页同一套两步确认，点左侧栏的「有更新」进来就能更新。
+            updateBanner: () => h(UpdateHintBanner, { key: "update-hint" })
           })
         }, VideoPanel)), "metaontic-video: sidebar panel");
         const canvasSwitchOn = () => {
@@ -4759,7 +5048,7 @@
             order: 31,
             locale: NS,
             label: () => t("canvasPanelLabel")
-          }, PanelIcon)),
+          }, railIcon)),
           () => ctx.slots.inject("main", () => ctx.slots.register({
             name: "main",
             key: CANVAS_PANEL_ID,

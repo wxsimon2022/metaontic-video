@@ -9,6 +9,7 @@ import { createDictionaries } from './client/locale.js';
 import { createSettingsState } from './client/state.js';
 import { createUpdates } from '../../client/updates.js';
 import { createSettingsPage } from './client/settings.js';
+import { createUpdateHint, createUpdateHintView } from '../../client/update-hint.js';
 import { createSidebarPanel } from './client/panel.js';
 import { createCanvasView } from './client/canvas-view.js';
 import iconMark from '../../../icon.svg';
@@ -25,7 +26,7 @@ export function createVideoClient(require) {
     const { PLUGIN_OWNED_KEYS, SELECTS, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, NS, NAMESPACE } = createClientConfig();
     const { zh, en } = createDictionaries();
     const { useSnapshot, same, validateSettings, persistConnection, persistBatch } = createSettingsState({ React });
-    const { PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell } = createUpdates({ h });
+    const { PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, fetchRecentVersions, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell } = createUpdates({ h });
     // 设置页的依赖统一走一个对象：宿主 React（React/h/useSnapshot）、主题与字段
     // （TOKENS/inputStyle/SELECTS/optionLabel/FIELD_BY_KEY/SECTIONS/formatMoney/PAGE_CSS）、
     // 设置状态（same/validateSettings/persistConnection/persistBatch/PLUGIN_OWNED_KEYS）、
@@ -82,17 +83,43 @@ export function createVideoClient(require) {
         // 流程画布只做独立页面：左侧栏有单独入口，视频创作面板里不再内嵌画布。
         const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS, PAGE_CSS });
         const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: iconMark });
+        // 有更新时左侧栏入口名字后面写「· 有更新」，收起状态只看得见图标，所以在图标角上再点一个圆点。
+        // 状态放在 update-hint 的轻量 store 里：宿主渲染左侧栏那一行，拿不到设置页的 state。
+        const updateHint = createUpdateHint({ version: PLUGIN_VERSION, isNewerVersion, fetchRecentVersions, cacheKey: UPDATE_CACHE_KEY, maxAge: UPDATE_MAX_AGE_MS });
+        const { UpdateHintDot, UpdateHintBanner } = createUpdateHintView({
+          React, h, t, hint: updateHint, version: PLUGIN_VERSION, isNewerVersion, manager: pluginManager,
+          pluginPackage: PLUGIN_PACKAGE, updateSpec: UPDATE_SPEC, updateAttempts: UPDATE_ATTEMPTS,
+          cacheKey: UPDATE_CACHE_KEY, maxAge: UPDATE_MAX_AGE_MS,
+        });
+        const railIcon = (props: any) => h('span', {
+          className: 'mov-rail-hint', style: { position: 'relative', display: 'inline-flex' },
+        }, [h(PanelIcon, props), h(UpdateHintDot, { key: 'dot' })]);
+        const sidebarEntryLabel = () => t('panelSidebarLabel') + (updateHint.pending() ? ` · ${t('sidebarUpdateBadge')}` : '');
         // 左侧栏入口与面板本体是宿主 root 作用域的两个 slot，用同一个 id 关联：
         // sidebar.panellist 只放一行图标（收到 {size, active}），点它切到 main 里同 id 的面板。
         // 老版本宿主没有这两个 slot 时 inject 不会触发，其余界面与工具不受影响。
-        ctx.effect(() => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
-          name: 'sidebar.panellist',
-          id: PANEL_ID,
-          order: 30,
-          locale: NS,
-          // 左侧那一行显示的名字，比面板标题更完整，方便在图标列表里认出来。
-          label: () => t('panelSidebarLabel'),
-        }, PanelIcon)), 'metaontic-video: sidebar entry');
+        ctx.effect(() => {
+          const registerEntry = () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+            name: 'sidebar.panellist',
+            id: PANEL_ID,
+            order: 30,
+            locale: NS,
+            // 左侧那一行显示的名字，比面板标题更完整，方便在图标列表里认出来；有更新时后面接一句提示。
+            label: sidebarEntryLabel,
+          }, railIcon));
+          let off = registerEntry();
+          let shown = updateHint.pending();
+          // 宿主只在注册变化或切语言时重读这一行的文字，所以查到新版本（或更新完）后重注册一次。
+          const unsubscribe = updateHint.subscribe(() => {
+            const next = updateHint.pending();
+            if (next === shown) return;
+            shown = next;
+            off?.();
+            off = registerEntry();
+          });
+          void updateHint.refresh(false);
+          return () => { unsubscribe?.(); off?.(); };
+        }, 'metaontic-video: sidebar entry');
         ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({
           name: 'main',
           key: PANEL_ID,
@@ -102,6 +129,8 @@ export function createVideoClient(require) {
             startSession: () => ctx.get('uiWorkspace')?.startSession(undefined, { agentPreset: 'video-director' }),
             openSettings: () => ctx.get('pluginNavigation')?.openBundle(NAMESPACE),
             manager: pluginManager,
+            // 面板顶部的更新入口：与设置页同一套两步确认，点左侧栏的「有更新」进来就能更新。
+            updateBanner: () => h(UpdateHintBanner, { key: 'update-hint' }),
           }),
         }, VideoPanel)), 'metaontic-video: sidebar panel');
         // 流程画布是可开关的组件：设置页「流程画布」总开关打开时才注册左侧栏入口与画布页。
@@ -116,6 +145,7 @@ export function createVideoClient(require) {
             order: 31,
             locale: NS,
             label: () => t('canvasPanelLabel'),
+            // 更新入口在视频创作面板顶部，画布这一行不加圆点：点了也看不到更新，会误导。
           }, PanelIcon)),
           () => ctx.slots.inject('main', () => ctx.slots.register({
             name: 'main',

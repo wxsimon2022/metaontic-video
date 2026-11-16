@@ -180,10 +180,21 @@ test('入口用同一个 id 注册左侧栏图标与 main 面板', () => {
   assert.match(shared, /export const PLUGIN_ID = 'metaontic-video';/);
   assert.match(shared, /export const PANEL_ID = PLUGIN_ID;/);
   assert.match(source, /name: 'sidebar\.panellist',\s*id: PANEL_ID/);
-  assert.match(source, /label: \(\) => t\('panelSidebarLabel'\)/);
+  // 左侧栏那一行的文字走同一个 thunk：有更新时在后面接一句提示，宿主重读时就能看到。
+  assert.match(source, /label: sidebarEntryLabel/);
+  assert.match(source, /t\('sidebarUpdateBadge'\)/, '查到新版本时在入口名字后面写「有更新」');
+  assert.match(source, /updateHint\.pending\(\)/, '提示只在确实有新版本时出现');
   assert.match(source, /name: 'main',\s*key: PANEL_ID/);
   assert.match(source, /agentPreset: 'video-director'/);
   assert.match(source, /openBundle\(NAMESPACE\)/);
+});
+
+test('面板顶部给更新提示留了位置：注入就显示，不注入不影响其余内容', () => {
+  const withBanner = harness({ props: { updateBanner: () => ({ type: 'div', props: { 'data-field': 'panel-update' } }) } });
+  assert.ok(find(withBanner.tree, (node) => node.props?.['data-field'] === 'panel-update'), '有更新时顶部显示提示');
+  const without = harness({});
+  assert.equal(find(without.tree, (node) => node.props?.['data-field'] === 'panel-update'), null, '没有更新时不留空壳');
+  assert.ok(texts(without.tree).includes('新建视频创作会话'), '不注入更新入口时面板其余内容照旧');
 });
 
 test('视频创作面板不再内嵌流程画布，也没有第三方画布安装入口', () => {

@@ -11,6 +11,10 @@ export function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GU
      */
     const PANEL_CSS = `
       .mov-panel { width: 100%; max-width: 880px; margin: 0 auto; padding: 30px 32px 44px; display: flex; flex-direction: column; gap: 18px; }
+      /* 有更新时的顶部提示：沿用设置页的 .mov-notice，只补面板里的间距与左侧色条 */
+      .mov-panel-update { display: flex; flex-direction: column; gap: 8px; padding: 13px 14px; border: 1px solid ${TOKENS.border}; border-left: 3px solid ${TOKENS.primaryFill}; border-radius: 12px; background: ${TOKENS.cardFill}; }
+      .mov-panel-update .mov-notice strong { display: block; font-size: 13px; color: ${TOKENS.text}; }
+      .mov-panel-update-line { margin: 0; font-size: 12px; line-height: 1.5; color: ${TOKENS.muted}; }
       /* 品牌头图：插件 logo + 标题/简介，给空荡的内容区一个视觉锚点 */
       .mov-panel-hero { display: flex; align-items: center; gap: 14px; }
       .mov-panel-mark { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; color: ${TOKENS.primaryFill}; }
@@ -169,6 +173,8 @@ export function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GU
       });
       return h('div', { className: 'mov-panel' }, [
         h('style', { key: 'styles' }, PAGE_CSS + PANEL_CSS),
+        // 有更新时面板最上面插一条提示：入口由 client.ts 用真实 React 渲染，面板本身不持有更新状态。
+        props?.updateBanner?.() || null,
         h('header', { key: 'hero', className: 'mov-panel-hero' }, [
           h('span', { key: 'mark', className: 'mov-panel-mark' },
             LOGO_SRC
