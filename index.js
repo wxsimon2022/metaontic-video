@@ -13,25 +13,6 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// src/core/version.ts
-var PLUGIN_VERSION;
-var init_version = __esm({
-  "src/core/version.ts"() {
-    PLUGIN_VERSION = true ? "3.29.2".trim().replace(/^v/i, "") : "";
-  }
-});
-
-// src/core/settings/value.ts
-function ref(config, key, fallback) {
-  const raw = config?.[key];
-  const value = raw && typeof raw.get === "function" ? raw.get() : raw;
-  return value === void 0 || value === null || value === "" ? fallback : value;
-}
-var init_value = __esm({
-  "src/core/settings/value.ts"() {
-  }
-});
-
 // src/core/hardcoded-config.ts
 var PLUGIN_ID, PLUGIN_PACKAGE, CANVAS_PANEL_ID, ANALYTICS_URL, GITEE, GITHUB, CHANGELOG_URL, UPDATE_SPEC, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, RELAY, VOLCENGINE, VIDEO_MODEL, IMAGE_MODEL, RETIRED_IMAGE_MODELS, TEXT_MODELS, TEXT_MODEL, RETIRED_TEXT_MODELS, DATA_DIR, DEFAULT_OUTPUT_DIR, REFERENCE_TMP_DIR, FFMPEG_INSTALLS;
 var init_hardcoded_config = __esm({
@@ -94,6 +75,25 @@ var init_hardcoded_config = __esm({
       linux: { label: "Linux\uFF08Debian / Ubuntu\uFF09", command: "sudo apt update && sudo apt install -y ffmpeg" },
       linuxDnf: { label: "Linux\uFF08Fedora / RHEL / CentOS\uFF09", command: "sudo dnf install -y ffmpeg" }
     };
+  }
+});
+
+// src/core/settings/value.ts
+function ref(config, key, fallback) {
+  const raw = config?.[key];
+  const value = raw && typeof raw.get === "function" ? raw.get() : raw;
+  return value === void 0 || value === null || value === "" ? fallback : value;
+}
+var init_value = __esm({
+  "src/core/settings/value.ts"() {
+  }
+});
+
+// src/core/version.ts
+var PLUGIN_VERSION;
+var init_version = __esm({
+  "src/core/version.ts"() {
+    PLUGIN_VERSION = true ? "3.29.2".trim().replace(/^v/i, "") : "";
   }
 });
 
@@ -361,17 +361,17 @@ function getInner(value) {
 function extractKeys(data) {
   return filterKeys(data ?? {}, (key) => !key.startsWith("$"));
 }
-function validateVolatileSchema(schema, path24 = [], blocked2 = false, seen = /* @__PURE__ */ new Map()) {
+function validateVolatileSchema(schema, path25 = [], blocked2 = false, seen = /* @__PURE__ */ new Map()) {
   const states = seen.get(schema) ?? /* @__PURE__ */ new Set();
   if (states.has(blocked2)) return;
   states.add(blocked2);
   seen.set(schema, states);
-  if (schema.meta?.volatile && blocked2) throw new ValidationError("volatile fields require a fixed object path without an enclosing volatile field", { path: path24 });
+  if (schema.meta?.volatile && blocked2) throw new ValidationError("volatile fields require a fixed object path without an enclosing volatile field", { path: path25 });
   const nested = blocked2 || !!schema.meta?.volatile;
-  if (schema.dict) for (const [key, child] of Object.entries(schema.dict)) validateVolatileSchema(child, [...path24, key], nested, seen);
-  if (schema.sKey) validateVolatileSchema(schema.sKey, [...path24, "<key>"], true, seen);
-  if (schema.inner && (schema.type !== "lazy" || schema.inner[kSchema])) validateVolatileSchema(schema.inner, [...path24, "*"], true, seen);
-  if (schema.list) for (let index = 0; index < schema.list.length; index++) validateVolatileSchema(schema.list[index], [...path24, String(index)], true, seen);
+  if (schema.dict) for (const [key, child] of Object.entries(schema.dict)) validateVolatileSchema(child, [...path25, key], nested, seen);
+  if (schema.sKey) validateVolatileSchema(schema.sKey, [...path25, "<key>"], true, seen);
+  if (schema.inner && (schema.type !== "lazy" || schema.inner[kSchema])) validateVolatileSchema(schema.inner, [...path25, "*"], true, seen);
+  if (schema.list) for (let index = 0; index < schema.list.length; index++) validateVolatileSchema(schema.list[index], [...path25, String(index)], true, seen);
 }
 function checkWithinRange(data, meta, description, options, skipMin = false) {
   const { max = Infinity, min = -Infinity } = meta;
@@ -1179,8 +1179,8 @@ function resolveSubmitPath(config) {
 }
 function resolveQueryPath(config, taskId) {
   if (isVolcengine(config)) return VOLCENGINE.queryPath.replace("{task_id}", encodeURIComponent(taskId));
-  const path24 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
-  return path24.replace("{task_id}", encodeURIComponent(taskId));
+  const path25 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
+  return path25.replace("{task_id}", encodeURIComponent(taskId));
 }
 function resolveModel(config) {
   const preset = relayPreset();
@@ -1259,56 +1259,10 @@ var init_connection = __esm({
   }
 });
 
-// src/core/agent-registry.ts
-function selectedAgentId(context, ctx) {
-  const agent = context?.agent;
-  const session = agent?.session;
-  if (!session) return null;
-  for (const owner of [agent?.ctx, ctx]) {
-    try {
-      const registry = owner?.get?.("agentPresets");
-      if (typeof registry?.presetForSession === "function") return registry.presetForSession(session) ?? null;
-    } catch {
-      return null;
-    }
-  }
-  return session.header?.agentPreset ?? null;
-}
-function createAgentRegistry(definitions) {
-  const agents2 = /* @__PURE__ */ new Map();
-  for (const definition of definitions) {
-    if (!definition.id || agents2.has(definition.id)) throw new Error(`\u91CD\u590D\u6216\u65E0\u6548\u7684 Agent\uFF1A${definition.id}`);
-    agents2.set(definition.id, Object.freeze({ ...definition, businesses: Object.freeze([...definition.businesses]), skills: Object.freeze([...definition.skills]) }));
-  }
-  const resolve3 = (context, ctx) => agents2.get(selectedAgentId(context, ctx)) ?? null;
-  return Object.freeze({
-    list: () => [...agents2.values()],
-    get: (id) => agents2.get(id) ?? null,
-    resolve: resolve3,
-    hasBusiness: (context, ctx, business) => resolve3(context, ctx)?.businesses.includes(business) ?? false
-  });
-}
-var active = /* @__PURE__ */ new WeakMap();
-function registryForContext(ctx, fallback) {
-  return ctx && active.get(ctx)?.at(-1)?.registry || fallback;
-}
-function bindAgentRegistry(ctx, registry) {
-  const stack = active.get(ctx) || [];
-  const entry = { registry };
-  stack.push(entry);
-  active.set(ctx, stack);
-  return () => {
-    const index = stack.indexOf(entry);
-    if (index >= 0) stack.splice(index, 1);
-    if (!stack.length && active.get(ctx) === stack) active.delete(ctx);
-  };
-}
-
-// src/core/telemetry/reporter.ts
-import { randomUUID, createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path2 from "node:path";
-import os2 from "node:os";
+// src/businesses/film-director/index.ts
+import { randomUUID as randomUUID3, createHash as createHash2 } from "node:crypto";
+import { mkdir as mkdir6, readFile as readFile5, writeFile as writeFile4, rename as rename5 } from "node:fs/promises";
+import path8 from "node:path";
 
 // src/core/paths.ts
 import os from "node:os";
@@ -1318,1200 +1272,11 @@ function dshHome() {
   return fromEnv || path.join(os.homedir(), ".dsh");
 }
 
-// src/core/telemetry/reporter.ts
-init_version();
-init_value();
-init_hardcoded_config();
-init_hardcoded_config();
-var STATE = /* @__PURE__ */ Symbol.for(`${PLUGIN_ID}.analytics.process`);
-var EVENTS = /* @__PURE__ */ new Set(["plugin_started", "tool_started", "tool_finished", "video_task_created", "video_task_finished"]);
-var TOOLS = /* @__PURE__ */ new Set(["video_generate", "video_extend", "video_status", "video_project", "video_prepare_image", "video_estimate", "video_config", "video_setup", "video_stage", "media_submission", "video_canvas", "video_hyperframes"]);
-var STATUSES = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled", "unknown", "timeout", "approved", "pending", "paused", "prepared", "draft", "blocked", "review_required", "submission_unknown", "ok"]);
-var ERRORS = /* @__PURE__ */ new Set(["provider_auth", "provider_failed", "provider_network_error", "provider_rate_limited", "provider_quota_exceeded", "provider_price_config_error", "provider_bad_response", "content_rejected", "real_person_rejected", "submission_unknown", "waiting_stopped", "ABORTED"]);
-function processState() {
-  const owner = globalThis;
-  return owner[STATE] ||= { identities: /* @__PURE__ */ new Map(), started: /* @__PURE__ */ new Set() };
-}
-function identityFiles() {
-  const dir = path2.join(dshHome(), "state", DATA_DIR);
-  return { dir, files: [path2.join(dir, "analytics-id.json"), path2.join(dir, "analytics-anchor.json")] };
-}
-async function analyticsIdentity() {
-  const { dir, files } = identityFiles();
-  const state = processState();
-  if (!state.identities.has(dir)) state.identities.set(dir, (async () => {
-    const parse = (raw) => {
-      try {
-        const id2 = JSON.parse(raw).installationId;
-        return /^[a-f0-9-]{36}$/i.test(id2) ? id2 : null;
-      } catch {
-        return null;
-      }
-    };
-    const present = [];
-    for (const file of files) {
-      try {
-        present.push(parse(await readFile(file, "utf8")));
-      } catch {
-        present.push(null);
-      }
-    }
-    let id = present[0] || present[1];
-    await mkdir(dir, { recursive: true, mode: 448 });
-    if (!id) {
-      const created = randomUUID();
-      try {
-        await writeFile(files[0], JSON.stringify({ installationId: created }), { mode: 384, flag: "wx" });
-        id = created;
-      } catch (error) {
-        if (error.code !== "EEXIST") throw error;
-        id = parse(await readFile(files[0], "utf8").catch(() => ""));
-        if (!id) {
-          id = created;
-          await writeFile(files[0], JSON.stringify({ installationId: id }), { mode: 384 });
-        }
-      }
-    }
-    for (const [index, file] of files.entries()) {
-      if (present[index] === id) continue;
-      try {
-        await writeFile(file, JSON.stringify({ installationId: id }), { mode: 384 });
-      } catch {
-      }
-    }
-    return id;
-  })().catch(() => null));
-  return state.identities.get(dir);
-}
-function analyticsFields(input = {}) {
-  const value = {};
-  if (TOOLS.has(input.tool)) value.tool = input.tool;
-  if (["video-director", "promo-video", "standard"].includes(input.mode)) value.mode = input.mode;
-  if (STATUSES.has(input.status)) value.status = input.status;
-  if (typeof input.durationMs === "number" && Number.isFinite(input.durationMs)) value.durationMs = Math.round(Math.max(0, Math.min(864e5, input.durationMs)));
-  if (typeof input.errorCode === "string") value.errorCode = ERRORS.has(input.errorCode) ? input.errorCode : "other";
-  return value;
-}
-function deviceText(value, allowSpace) {
-  return String(value ?? "").replace(allowSpace ? /[^a-zA-Z0-9.+_ -]/g : /[^a-zA-Z0-9.+_-]/g, "").slice(0, 64) || "unknown";
-}
-function isReleaseVersion(version) {
-  return /^\d+\.\d+\.\d+$/.test(String(version ?? "").trim().replace(/^v/i, ""));
-}
-function createAnalyticsReporter(config, options = {}) {
-  const releaseBuild = options.releaseBuild || (() => isReleaseVersion(PLUGIN_VERSION));
-  if (!releaseBuild()) return { record() {
-  }, start() {
-  }, dispose() {
-  }, flush: async () => {
-  }, pending: () => 0 };
-  const enabled = options.enabled || (() => process.env.METAONTIC_VIDEO_ANALYTICS_DISABLED !== "1" && ref(config, "usageStatsEnabled", true) !== false);
-  const request = options.request || ((...args) => globalThis.fetch(...args));
-  const identity = options.identity || analyticsIdentity;
-  const device = options.device || (() => ({
-    arch: ["arm64", "x64", "ia32", "arm"].includes(os2.arch()) ? os2.arch() : "other",
-    osRelease: deviceText(os2.release(), true),
-    memoryGb: Math.max(1, Math.min(4096, Math.round(os2.totalmem() / 1024 ** 3))),
-    harnessVersion: deviceText(process.env.DSH_CLIENT_VERSION || process.env.DSH_APP_VERSION, false)
-  }));
-  const delay = options.delayMs ?? 1e3;
-  const timeout = options.timeoutMs ?? 1500;
-  const maxQueue = options.maxQueue ?? 200;
-  let queue = [], timer, controller = null;
-  let disposed = false, sending = false;
-  const allowed = () => {
-    try {
-      return !disposed && enabled();
-    } catch {
-      return false;
-    }
-  };
-  function schedule(ms = delay) {
-    if (!allowed() || timer || sending || !queue.length) return;
-    timer = setTimeout(() => {
-      timer = null;
-      void flush();
-    }, ms);
-    timer.unref?.();
-  }
-  async function flush() {
-    if (!allowed()) {
-      queue = [];
-      return;
-    }
-    if (sending || !queue.length) return;
-    sending = true;
-    const batch = queue.splice(0, 20);
-    let watchdog;
-    try {
-      const installationId = await identity();
-      if (!installationId || !allowed()) return;
-      controller = new AbortController();
-      const abort = new Promise((_, reject) => {
-        watchdog = setTimeout(() => {
-          controller?.abort();
-          reject(new Error("analytics timeout"));
-        }, timeout);
-        watchdog.unref?.();
-      });
-      const response = await Promise.race([Promise.resolve().then(() => request(ANALYTICS_URL, {
-        method: "POST",
-        redirect: "error",
-        credentials: "omit",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({ installationId, device: device(), events: batch.map(({ attempts, ...event }) => event) })
-      })), abort]);
-      try {
-        void response?.body?.cancel()?.catch(() => {
-        });
-      } catch {
-      }
-      if (!response?.ok) throw new Error("analytics rejected");
-    } catch {
-      if (allowed()) {
-        const retry = batch.map((event) => ({ ...event, attempts: event.attempts + 1 })).filter((event) => event.attempts < 3);
-        queue = [...retry, ...queue].slice(-maxQueue);
-      }
-    } finally {
-      clearTimeout(watchdog);
-      controller = null;
-      sending = false;
-      if (allowed() && queue.length) schedule(queue[0].attempts ? Math.min(3e4, 1e3 * 5 ** queue[0].attempts) : delay);
-    }
-  }
-  function record(name, input = {}, dedupeKey = "") {
-    try {
-      if (!allowed()) {
-        queue = [];
-        return;
-      }
-      if (!EVENTS.has(name)) return;
-      const fields = analyticsFields(input);
-      if (name !== "plugin_started" && !fields.tool) return;
-      const event = {
-        eventId: randomUUID(),
-        name,
-        occurredAt: (/* @__PURE__ */ new Date()).toISOString(),
-        version: PLUGIN_VERSION,
-        platform: ["darwin", "win32", "linux"].includes(process.platform) ? process.platform : "other",
-        ...fields,
-        attempts: 0
-      };
-      if (dedupeKey) {
-        void Promise.resolve().then(() => identity()).then((id) => {
-          if (!id || !allowed()) return;
-          event.eventId = createHash("sha256").update(`${id}:${name}:${dedupeKey}`).digest("hex");
-          queue.push(event);
-          queue = queue.slice(-maxQueue);
-          schedule();
-        }).catch(() => {
-        });
-      } else {
-        queue.push(event);
-        queue = queue.slice(-maxQueue);
-        schedule();
-      }
-    } catch {
-    }
-  }
-  function start() {
-    void Promise.resolve().then(() => allowed() ? identity() : null).then((id) => {
-      if (!id || !allowed()) return;
-      const starts = options.started || processState().started;
-      if (!starts.has(id)) {
-        starts.add(id);
-        record("plugin_started");
-      }
-    }).catch(() => {
-    });
-  }
-  function dispose() {
-    disposed = true;
-    queue = [];
-    clearTimeout(timer);
-    controller?.abort();
-  }
-  return { record, start, dispose, flush, pending: () => queue.length };
-}
-function reportUsage(exec, name, fields, key = "") {
-  try {
-    exec?.metaonticAnalytics?.record(name, fields, key);
-  } catch {
-  }
-}
-function withUsageAnalytics(tool, reporter, mode = (_exec) => "standard") {
-  return { ...tool, async execute(args, exec) {
-    const started = Date.now();
-    let selected = "standard";
-    try {
-      selected = mode(exec);
-    } catch {
-    }
-    try {
-      reporter.record("tool_started", { tool: tool.name, mode: selected });
-    } catch {
-    }
-    try {
-      const result = await tool.execute(args, { ...exec, name: tool.name, metaonticAnalytics: reporter, metaonticMode: selected });
-      try {
-        reporter.record("tool_finished", { tool: tool.name, mode: selected, status: result?.status || "ok", durationMs: Date.now() - started, errorCode: result?.errorCode });
-      } catch {
-      }
-      return result;
-    } catch (error) {
-      try {
-        reporter.record("tool_finished", { tool: tool.name, mode: selected, status: "failed", durationMs: Date.now() - started, errorCode: error?.code || "other" });
-      } catch {
-      }
-      throw error;
-    }
-  } };
-}
-
-// src/core/utils/timing.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
-import { performance } from "node:perf_hooks";
-
-// src/core/utils/logging.ts
-import { AsyncLocalStorage } from "node:async_hooks";
-import path3 from "node:path";
-init_version();
-init_hardcoded_config();
-import { mkdir as mkdir2, appendFile } from "node:fs/promises";
-var requestLogContext = new AsyncLocalStorage();
-function requestLogPath() {
-  const now = /* @__PURE__ */ new Date();
-  const date2 = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-  return path3.join(dshHome(), "logs", DATA_DIR, date2, "requests.jsonl");
-}
-var preparedDirs = /* @__PURE__ */ new Set();
-async function ensureLogDir(dir) {
-  if (preparedDirs.has(dir)) return;
-  await mkdir2(dir, { recursive: true, mode: 448 });
-  if (preparedDirs.size > 32) preparedDirs.clear();
-  preparedDirs.add(dir);
-}
-async function appendRequestLog(record) {
-  try {
-    const file = requestLogPath();
-    await ensureLogDir(path3.dirname(file));
-    await appendFile(file, JSON.stringify({ time: (/* @__PURE__ */ new Date()).toISOString(), pluginVersion: PLUGIN_VERSION, ...requestLogContext.getStore(), ...record }) + "\n", { mode: 384 });
-  } catch {
-  }
-}
-
-// src/core/utils/timing.ts
-async function timedStage(stage, operation) {
-  const spanId = randomUUID2();
-  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
-  const start = performance.now();
-  await appendRequestLog({ event: "stage_started", stage, spanId, startedAt });
-  let outcome = "error";
-  try {
-    const result = await operation();
-    outcome = ["failed", "unknown", "timeout", "cancelled", "pending", "review_required"].includes(result?.status) ? result.status : "success";
-    return result;
-  } catch (error) {
-    outcome = error?.name === "AbortError" || error?.code === "ABORTED" ? "cancelled" : "error";
-    throw error;
-  } finally {
-    await appendRequestLog({
-      event: "stage_finished",
-      stage,
-      spanId,
-      startedAt,
-      finishedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      elapsedMs: Math.round((performance.now() - start) * 1e3) / 1e3,
-      outcome
-    });
-  }
-}
-function withStageTiming(tool) {
-  return { ...tool, async execute(args, exec) {
-    const context = { ...requestLogContext.getStore(), callId: exec?.callId || randomUUID2(), tool: tool.name };
-    return requestLogContext.run(context, () => timedStage(`tool:${tool.name}`, () => tool.execute(args, exec)));
-  } };
-}
-
-// src/core/tool-registry.ts
-function createToolRegistry(ctx, agents2, analytics, defer = () => {
-}) {
-  const owners = /* @__PURE__ */ new Map();
-  function allowed(business, exec) {
-    const agent = agents2.resolve({ agent: exec?.agent }, ctx);
-    return !agent || agent.businesses.includes(business);
-  }
-  function register(business, tool, registrationContext = ctx) {
-    if (owners.has(tool.name)) throw new Error(`\u5DE5\u5177\u540D\u79F0\u91CD\u590D\uFF1A${tool.name}`);
-    owners.set(tool.name, business);
-    const guarded = { ...tool, async execute(args, exec) {
-      if (!allowed(business, exec)) throw new Error("\u5F53\u524D\u52A9\u624B\u672A\u542F\u7528\u6B64\u4E1A\u52A1\uFF0C\u8BF7\u5207\u6362\u5230\u5BF9\u5E94\u52A9\u624B\u540E\u91CD\u8BD5\u3002");
-      return tool.execute(args, exec);
-    } };
-    let dispose;
-    try {
-      dispose = registrationContext.tools.register(withStageTiming(withUsageAnalytics(
-        guarded,
-        analytics,
-        (exec) => agents2.resolve({ agent: exec?.agent }, ctx)?.id || "standard"
-      )));
-    } catch (error) {
-      owners.delete(tool.name);
-      throw error;
-    }
-    let disposed = false;
-    const cleanup = () => {
-      if (disposed) return;
-      disposed = true;
-      owners.delete(tool.name);
-      if (typeof dispose === "function") dispose();
-    };
-    defer(cleanup);
-    return cleanup;
-  }
-  return { register, allowed, owner: (name) => owners.get(name) };
-}
-
-// src/core/runtime.ts
-init_hardcoded_config();
-
-// src/core/installation/update-lockfile.ts
-init_hardcoded_config();
-import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import path4 from "node:path";
-import { fileURLToPath } from "node:url";
-var PACKAGE_NAME = PLUGIN_PACKAGE;
-var LOCKFILE = "pnpm-lock.yaml";
-var RELEASE_HOSTS = [GITEE, GITHUB].map(({ web }) => web.replace(/^https?:\/\//, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-var RELEASE_URL = new RegExp(`^https?://(?:${RELEASE_HOSTS.join("|")})/releases/download/`, "i");
-var SHA = /^sha\d+-[A-Za-z0-9+/=]+$/;
-var indentOf = (line) => line.length - line.trimStart().length;
-function integrityOf(block) {
-  const match = /integrity:\s*([^,\s}]+)/.exec(block);
-  return match ? match[1] : "";
-}
-function remoteEntry(line) {
-  const match = /^ {2}(\S+)@(https?:\/\/\S+?):(?:\s.*)?$/.exec(line);
-  return match ? { name: match[1], url: match[2] } : null;
-}
-function blockEnd(lines, start, indent) {
-  let end = start + 1;
-  while (end < lines.length) {
-    const line = lines[end];
-    if (!line.trim()) {
-      end += 1;
-      continue;
-    }
-    if (indentOf(line) <= indent) break;
-    end += 1;
-  }
-  return end;
-}
-function stripUnverifiableEntries(text) {
-  const newline = text.includes("\r\n") ? "\r\n" : "\n";
-  const lines = text.split(/\r?\n/);
-  const ours = /* @__PURE__ */ new Set();
-  const verified = /* @__PURE__ */ new Set();
-  for (let index = 0; index < lines.length; index += 1) {
-    const entry = remoteEntry(lines[index]);
-    if (!entry || entry.name !== PACKAGE_NAME) continue;
-    const end = blockEnd(lines, index, 2);
-    const block = lines.slice(index, end).join("\n");
-    if (!RELEASE_URL.test(entry.url) && !/tarball:\s*https?:\/\//.test(block)) continue;
-    ours.add(entry.url);
-    if (SHA.test(integrityOf(block))) verified.add(entry.url);
-  }
-  const poisoned = new Set([...ours].filter((url) => !verified.has(url)));
-  if (!poisoned.size) return { text, removed: [] };
-  const removed = /* @__PURE__ */ new Set();
-  for (let index = 0; index < lines.length; index += 1) {
-    const entry = remoteEntry(lines[index]);
-    if (!entry || entry.name !== PACKAGE_NAME || !poisoned.has(entry.url)) continue;
-    const end = blockEnd(lines, index, 2);
-    removed.add(entry.name + "@" + entry.url);
-    lines.splice(index, end - index);
-    index -= 1;
-  }
-  for (let index = 0; index < lines.length; index += 1) {
-    if (!/^ {6}metaontic-video:\s*$/.test(lines[index])) continue;
-    const specifier = (/^\s+specifier:\s*(\S+)\s*$/.exec(lines[index + 1] || "") || [])[1] || (/^\s+version:\s*(\S+)\s*$/.exec(lines[index + 2] || "") || [])[1] || "";
-    if (!poisoned.has(specifier)) continue;
-    lines.splice(index, blockEnd(lines, index, 6) - index);
-    index -= 1;
-  }
-  return { text: lines.join(newline), removed: [...removed] };
-}
-function locateProfileDir(moduleUrl) {
-  let dir = fileURLToPath(moduleUrl);
-  for (let up = 0; up < 3; up += 1) dir = path4.dirname(dir);
-  return dir;
-}
-function repairLockfileAt(lockfile, log = () => {
-}) {
-  if (!existsSync(lockfile)) return { status: "unavailable" };
-  let before = "";
-  try {
-    before = readFileSync(lockfile, "utf8");
-  } catch {
-    return { status: "unavailable" };
-  }
-  const { text, removed } = stripUnverifiableEntries(before);
-  if (!removed.length) return { status: "clean", lockfile };
-  const backup = lockfile + ".metaontic-backup-" + (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-  const temporary = lockfile + ".metaontic-" + process.pid + ".tmp";
-  try {
-    writeFileSync(backup, before);
-    writeFileSync(temporary, text);
-    renameSync(temporary, lockfile);
-  } catch (error) {
-    try {
-      if (existsSync(temporary)) unlinkSync(temporary);
-    } catch {
-    }
-    return { status: "failed", message: error && error.message || String(error) };
-  }
-  log("\u5DF2\u6E05\u7406 " + removed.length + " \u6761\u7F3A\u5C11 integrity \u7684\u9501\u6587\u4EF6\u8BB0\u5F55\uFF08" + removed.join("\u3001") + "\uFF09\uFF0C\u5907\u4EFD\u5728 " + path4.basename(backup) + "\uFF1B\u4E4B\u540E\u53EF\u4EE5\u5728\u7EBF\u66F4\u65B0\u3002");
-  return { status: "repaired", lockfile, backup, removed };
-}
-function locateLockfiles(dir, depth = 2) {
-  const found = [];
-  const walk = (current, level) => {
-    const candidate = path4.join(current, LOCKFILE);
-    try {
-      if (existsSync(candidate)) found.push(candidate);
-    } catch {
-    }
-    if (level <= 0) return;
-    let entries = [];
-    try {
-      entries = readdirSync(current, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name === "node_modules") continue;
-      walk(path4.join(current, entry.name), level - 1);
-    }
-  };
-  walk(dir, depth);
-  return found;
-}
-function locateStagingLockfiles(profileDir) {
-  const parent = path4.dirname(profileDir);
-  let entries = [];
-  try {
-    entries = readdirSync(parent, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  const found = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory() || !/staging/i.test(entry.name)) continue;
-    const dir = path4.join(parent, entry.name);
-    if (dir === profileDir) continue;
-    found.push(...locateLockfiles(dir, 1));
-  }
-  return found;
-}
-function updateLockfilesToWatch(profileDir) {
-  return [.../* @__PURE__ */ new Set([...locateLockfiles(profileDir), ...locateStagingLockfiles(profileDir)])];
-}
-function startUpdateLockfileRepair(moduleUrl, intervalMs = 2e3, log) {
-  let stopped = false;
-  const stamps = /* @__PURE__ */ new Map();
-  const check = () => {
-    if (stopped) return;
-    try {
-      const dir = locateProfileDir(moduleUrl);
-      if (!existsSync(path4.join(dir, "package.json"))) return;
-      for (const lockfile of updateLockfilesToWatch(dir)) {
-        let stamp = "";
-        try {
-          const info = statSync(lockfile);
-          stamp = info.mtimeMs + ":" + info.size;
-        } catch {
-          continue;
-        }
-        if (stamps.get(lockfile) === stamp) continue;
-        stamps.set(lockfile, stamp);
-        repairLockfileAt(lockfile, log);
-      }
-    } catch {
-    }
-  };
-  check();
-  const timer = setInterval(check, intervalMs);
-  if (timer.unref) timer.unref();
-  return () => {
-    stopped = true;
-    clearInterval(timer);
-  };
-}
-
-// src/core/runtime.ts
-function createPluginRuntime(definitions) {
-  const agents2 = createAgentRegistry(definitions.agents);
-  const businesses = /* @__PURE__ */ new Map();
-  for (const module of definitions.businesses) {
-    if (!module.id || businesses.has(module.id)) throw new Error(`\u91CD\u590D\u6216\u65E0\u6548\u7684\u4E1A\u52A1\uFF1A${module.id}`);
-    businesses.set(module.id, module);
-  }
-  for (const agent of agents2.list()) for (const id of agent.businesses) {
-    if (!businesses.has(id)) throw new Error(`Agent ${agent.id} \u7F3A\u5C11\u4E1A\u52A1\u6A21\u5757\uFF1A${id}`);
-  }
-  return function apply2(ctx, config = {}) {
-    const disposers = [];
-    let disposed = false;
-    const defer = (value) => {
-      if (typeof value !== "function") return;
-      if (disposed) value();
-      else disposers.push(value);
-    };
-    const dispose = () => {
-      if (disposed) return;
-      disposed = true;
-      for (const cleanup of disposers.reverse()) {
-        try {
-          cleanup();
-        } catch {
-          ctx.logger?.warn?.("\u63D2\u4EF6\u6A21\u5757\u6E05\u7406\u5931\u8D25\uFF0C\u5DF2\u7EE7\u7EED\u6E05\u7406\u5176\u4F59\u6A21\u5757\u3002");
-        }
-      }
-    };
-    const analytics = createAnalyticsReporter(config);
-    defer(() => analytics.dispose());
-    defer(bindAgentRegistry(ctx, agents2));
-    const tools = createToolRegistry(ctx, agents2, analytics, defer);
-    const runtime = { ctx, config, agents: agents2, tools, defer };
-    try {
-      for (const business of businesses.values()) defer(business.apply(runtime));
-      defer(ctx.inject(["systemPrompt"], (promptCtx) => promptCtx.systemPrompt.section({
-        name: `plugin:${PLUGIN_ID}`,
-        order: 5200,
-        text: (context) => {
-          const agent = agents2.resolve(context, ctx);
-          if (!agent) return "";
-          return [...agent.businesses.map((id) => businesses.get(id)?.prompt?.(config) || ""), agent.prompt?.(config) || ""].filter(Boolean).join("\n\n");
-        }
-      })));
-      try {
-        defer(startUpdateLockfileRepair(import.meta.url, void 0, (message) => ctx.logger?.warn?.(`metaontic-video: ${message}`)));
-      } catch {
-        ctx.logger?.warn?.("metaontic-video: \u5B89\u88C5\u76EE\u5F55\u9501\u6587\u4EF6\u81EA\u6108\u672A\u542F\u7528\u3002");
-      }
-      analytics.start();
-      return dispose;
-    } catch (error) {
-      dispose();
-      throw error;
-    }
-  };
-}
-
-// src/agents/video-director/index.ts
-var videoDirector = {
-  id: "video-director",
-  name: "\u89C6\u9891\u521B\u4F5C\u52A9\u624B",
-  businesses: ["video"],
-  skills: ["video-director"],
-  icon: "presets/icons/video-director.svg"
-};
-
-// src/agents/promo-video/instructions.ts
-function promoVideoGuidance() {
-  return [
-    "\u3010\u5F53\u524D\u6A21\u5F0F\uFF1A\u5BA3\u4F20\u89C6\u9891\u52A9\u624B\u3011\u4F60\u8D1F\u8D23\u5C06\u7528\u6237\u7684\u4EA7\u54C1\u3001\u54C1\u724C\u3001\u670D\u52A1\u6216\u6D3B\u52A8\u521B\u610F\u505A\u6210\u5BA3\u4F20\u89C6\u9891\u3002\u5199\u811A\u672C\u524D\u8BFB\u53D6promo-video\u4E0Evideo-director\u6280\u80FD\uFF1B\u4F7F\u7528\u771F\u5B9E\u53EF\u7528\u7684\u89C6\u9891\u5DE5\u5177\uFF0C\u4E0D\u51ED\u7A7A\u58F0\u79F0\u5DF2\u751F\u6210\u3002",
-    "\u5148\u4ECE\u7528\u6237\u539F\u6587\u63D0\u53D6\u5BA3\u4F20\u4E3B\u4F53\u3001\u53D7\u4F17\u3001\u76EE\u6807\u3001\u5DF2\u7ED9\u5356\u70B9\u3001\u7D20\u6750\u548C\u7ED3\u5C3E\u884C\u52A8\uFF1B\u7F3A\u5C11\u5F71\u54CD\u5236\u4F5C\u7684\u5173\u952E\u4FE1\u606F\u624D\u95EE\uFF0C\u4E0E\u5B8C\u5584\u521B\u610F\u53CA\u7F3A\u5931\u89C4\u683C\u540C\u8F6E\u8BE2\u95EE\u3002\u7528\u6237\u5DF2\u7ED930\u79D2\u7AD6\u5C4F720P\u7B49\u4FE1\u606F\u76F4\u63A5\u6CBF\u7528\uFF0C\u4E0D\u91CD\u590D\u95EE\uFF1B\u4EA7\u54C1\u4FE1\u606F\u5B8C\u6574\u4E5F\u786E\u8BA4\u662F\u5426\u5B8C\u5584\uFF0C\u5DF2\u660E\u786E\u6388\u6743\u4E0D\u91CD\u590D\u95EE\u3002",
-    "\u5B8C\u5584\u53EA\u5F3A\u5316\u539F\u6709\u5356\u70B9\u7684\u753B\u9762\u8868\u8FBE\u3001\u4FE1\u606F\u987A\u5E8F\u548C\u8282\u594F\uFF0C\u4FDD\u7559\u539F\u4E3B\u9898\u3001\u60C5\u8282\u3001\u4EBA\u7269\u5173\u7CFB\u3001\u98CE\u683C\u4E0E\u7ED3\u5C3E\uFF0C\u4E0D\u6362\u4EA7\u54C1\u3001\u4E0D\u64C5\u81EA\u6362\u5BA3\u4F20\u65B9\u5411\uFF1B\u5B9E\u8D28\u8C03\u6574\u5148\u5F81\u5F97\u540C\u610F\u3002\u4E0D\u5F97\u7F16\u9020\u4EF7\u683C\u3001\u4F18\u60E0\u3001\u9500\u91CF\u3001\u7528\u6237\u8BC4\u4EF7\u3001\u8BA4\u8BC1\u3001\u4F7F\u7528\u6548\u679C\u6216\u672A\u63D0\u4F9B\u7684\u529F\u80FD\u3002",
-    "\u6309\u5185\u5BB9\u9009\u62E9\u5F00\u573A\u770B\u70B9\u3001\u4EF7\u503C\u5C55\u793A\u3001\u4EA7\u54C1\u6216\u6D3B\u52A8\u6F14\u793A\u3001\u7ED3\u5C3E\u884C\u52A8\uFF1B\u4E0D\u5F3A\u5236\u771F\u4EBA\u53E3\u64AD\u3001\u4E0D\u786C\u52A0\u51B2\u7A81\u53CD\u8F6C\u3002\u5BA3\u4F20\u5206\u955C\u4E0D\u7B49\u4E8E\u4ED8\u8D39\u4EFB\u52A1\uFF0C\u5355\u6BB5\u4E0A\u9650\u5185\u7684\u5207\u955C\u5199\u8FDB\u540C\u4E00\u6B21\u751F\u6210\uFF1B\u989D\u5916\u72EC\u7ACB\u955C\u5934\u3001\u56FE\u7247\u6216\u5176\u4ED6\u4ED8\u8D39\u8C03\u7528\u987B\u660E\u786E\u65B9\u6848\u4E0E\u8D39\u7528\u3002",
-    "\u771F\u5B9ELogo\u3001\u4EA7\u54C1\u5916\u89C2\u3001\u754C\u9762\u53CA\u54C1\u724C\u6587\u5B57\u4EE5\u7528\u6237\u7D20\u6750\u4E3A\u51C6\uFF0C\u7F3A\u5931\u65F6\u8BE2\u95EE\u6216\u660E\u786E\u6807\u4E3A\u793A\u610F\uFF1B\u4E0D\u627F\u8BFA\u89C6\u9891\u6A21\u578B\u51C6\u786E\u751F\u6210\u6587\u5B57\u6216\u771F\u5B9E\u754C\u9762\u3002\u672A\u8981\u6C42\u5B57\u5E55\u4E0D\u64C5\u81EA\u6DFB\u52A0\uFF1B\u7528\u6237\u8981\u6C42\u51C6\u786E\u6587\u6848\u65F6\u5148\u786E\u8BA4\u5236\u4F5C\u65B9\u5F0F\u3002",
-    "\u5B8C\u6574\u5C55\u793A\u5BA3\u4F20\u811A\u672C\u3001\u5206\u955C\u548C\u8D39\u7528\u9884\u4F30\uFF0C\u518D\u7528video_project\u5BA1\u6838\u3002\u89C6\u9891\u5DE5\u5177\u4ED8\u8D39\u5BA1\u6279\u5C31\u662F\u5236\u4F5C\u786E\u8BA4\uFF1B\u9010\u6BB5\u5C55\u793A\u89C6\u9891\u5E76\u5BA1\u6838\u7ED3\u679C\u540E\u624D\u7EED\u505A\uFF0C\u5931\u8D25\u67E5\u539F\u4EFB\u52A1\u3001\u4E0D\u91CD\u590D\u63D0\u4EA4\u3002\u6807\u51C6\u6A21\u5F0F\u4E0D\u5E94\u7528\u672C\u4E13\u9898\u89C4\u5219\u3002"
-  ].join("\n");
-}
-
-// src/agents/promo-video/index.ts
-var promoVideo = {
-  id: "promo-video",
-  name: "\u5BA3\u4F20\u89C6\u9891\u52A9\u624B",
-  businesses: ["video"],
-  skills: ["video-director", "promo-video"],
-  icon: "presets/icons/promo-video.svg",
-  prompt: promoVideoGuidance
-};
-
-// src/agents/index.ts
-var agents = [videoDirector, promoVideo];
-var agentRegistry = createAgentRegistry(agents);
-
-// src/businesses/video/workflow/result-state.ts
-function videoResultState(value = {}) {
-  value ??= {};
-  const segments = Array.isArray(value.segments) ? value.segments : [];
-  const completed = segments.filter((s) => s?.status === "succeeded" && (s.localPath || s.videoUrl));
-  const multi = segments.length > 1 || Boolean(value.paused && value.remainingSeconds > 0);
-  const local = Boolean(value.videoPath || completed.some((s) => s.localPath));
-  const delivery = value.merged && value.videoPath ? multi ? "merged" : "single" : value.videoPath && !multi ? "single" : local ? multi ? "segments" : "single" : value.videoUrl || completed.length ? "remote" : "none";
-  let phase;
-  if (value.status === "review_required")
-    phase = "reference_review";
-  else if (value.pendingTaskId || ["unknown", "timeout"].includes(value.status) || segments.some((s) => ["unknown", "timeout", "running", "queued"].includes(s?.status)))
-    phase = "task_pending";
-  else if (value.deliveryError || value.ffmpegMissing)
-    phase = "delivery_pending";
-  else if (value.paused)
-    phase = "segment_review";
-  else if (value.partial)
-    phase = "partial";
-  else if (["failed", "cancelled", "canceled"].includes(value.status) || segments.some((s) => ["failed", "cancelled", "canceled"].includes(s?.status)))
-    phase = completed.length ? "partial" : "failed";
-  else if (value.status !== "succeeded" || delivery === "none")
-    phase = "unknown";
-  else
-    phase = ["merged", "single"].includes(delivery) ? "complete" : "generated";
-  const details = { delivery, completedCount: completed.length };
-  if (phase === "complete")
-    return { ...details, phase, isFinal: true, canPresent: true };
-  if (phase === "generated")
-    return { ...details, phase, isFinal: true, canPresent: false };
-  return { ...details, phase, isFinal: false, canPresent: false };
-}
-function validatePauseRecord(data, file = "paused-plan.json") {
-  const invalid = () => {
-    throw new Error(`\u6682\u505C\u8BB0\u5F55\u5185\u5BB9\u4E0D\u5BF9\uFF1A${file}\u3002\u8BF7\u4FDD\u7559\u539F\u6587\u4EF6\u5E76\u6838\u5BF9\u539F\u4EFB\u52A1\uFF0C\u4E0D\u8981\u91CD\u65B0\u63D0\u4EA4\u3002`);
-  };
-  if (!data || data.plugin !== "metaontic-video" || data.version != null && data.version !== 1 || !Array.isArray(data.plan) || !data.plan.length)
-    invalid();
-  if (data.plan.some((step) => !step || !["generate", "extend"].includes(step.kind) || !Number.isFinite(step.seconds) || step.seconds <= 0))
-    invalid();
-  const done = data.done ?? 0;
-  if (!Number.isInteger(done) || done < 0 || done > data.plan.length)
-    invalid();
-  if (data.cursor != null && !Number.isFinite(data.cursor))
-    invalid();
-  if (data.steps != null && (!Array.isArray(data.steps) || data.steps.length !== done))
-    invalid();
-  if (done > 0 && !Array.isArray(data.steps))
-    invalid();
-  if (data.steps?.some((step, index) => !step || step.index !== index + 1 || !["generate", "extend"].includes(step.kind) || step.seconds != null && (!Number.isFinite(step.seconds) || step.seconds <= 0) || !step.taskId || !step.videoUrl))
-    invalid();
-  if (data.pendingTask && (!data.pendingTask.taskId || data.pendingTask.index != null && data.pendingTask.index !== done + 1 || done >= data.plan.length))
-    invalid();
-  return data;
-}
-
-// src/businesses/video/workflow/media-preview.ts
-var PREVIEW_TOOLS = /* @__PURE__ */ new Set(["video_generate", "video_extend", "video_status", "video_prepare_image"]);
-function mediaPreviewMeta(value, toolName) {
-  const media = [];
-  const seen = /* @__PURE__ */ new Set();
-  function add(kind, label, localPath, url) {
-    const file = typeof localPath === "string" && /^(?:\/(?!\/)|[a-z]:[/\\])/i.test(localPath) && !/[\u0000-\u001f]/.test(localPath) ? localPath : "";
-    let remote = "";
-    try {
-      const parsed = new URL(String(url || ""));
-      if (["https:", "http:"].includes(parsed.protocol) && !parsed.username && !parsed.password) remote = parsed.href;
-    } catch {
-    }
-    const key = file || remote;
-    if (!key || seen.has(key) || media.length >= 40) return;
-    seen.add(key);
-    media.push({ kind, label, ...file ? { localPath: file } : {}, ...remote ? { url: remote } : {} });
-  }
-  if (toolName === "video_prepare_image") add("image", "\u89D2\u8272\u53C2\u8003\u56FE", value?.localPath, value?.imageUrl);
-  else {
-    if (value?.videoPath && value?.merged) add("video", videoResultState(value).isFinal ? "\u5B8C\u6574\u89C6\u9891" : "\u5DF2\u5B8C\u6210\u90E8\u5206\u5408\u5E76\u89C6\u9891", value.videoPath, "");
-    const segments = (value?.segments || []).filter((s) => s.status === "succeeded");
-    for (const segment of segments) add("video", `\u7B2C${segment.index}\u6BB5`, segment.localPath, segment.videoUrl);
-    if (!segments.length && value?.status === "succeeded") add("video", value.paused ? "\u672C\u6BB5\u89C6\u9891" : "\u89C6\u9891", value.previewPath || value.videoPath, value.videoUrl);
-    for (const [i, item] of (value?.convertedReferences || []).entries()) add("image", `\u8F6C\u6362\u53C2\u8003\u56FE${i + 1}`, item.localPath, item.imageUrl);
-  }
-  return { version: 1, media };
-}
-function withMediaPreview(tool) {
-  if (!PREVIEW_TOOLS.has(tool.name)) return tool;
-  return { ...tool, output: {
-    ...tool.output,
-    presentationMeta(args, value) {
-      return { ...tool.output.presentationMeta?.(args, value) || {}, metaonticMedia: mediaPreviewMeta(value, tool.name) };
-    }
-  } };
-}
-
-// src/businesses/video/workflow/segment-review.ts
-import path9 from "node:path";
-import { readFile as readFile5, writeFile as writeFile4, rename as rename4, rm as rm4, stat as stat3 } from "node:fs/promises";
-import { randomUUID as randomUUID4 } from "node:crypto";
-
-// src/businesses/video/workflow/resume.ts
-init_config();
-import path6 from "node:path";
-import { readFile as readFile2, open, rm, mkdir as mkdir4, writeFile as writeFile2, rename } from "node:fs/promises";
-
-// src/businesses/video/utils/files.ts
-init_config();
-init_value();
-import path5 from "node:path";
-import { mkdir as mkdir3, stat } from "node:fs/promises";
-function tail(text, limit = 600) {
-  const clean = String(text || "").trim();
-  return clean.length > limit ? `\u2026${clean.slice(-limit)}` : clean;
-}
-function formatSeconds(value) {
-  const number2 = Number(value);
-  if (!Number.isFinite(number2)) return String(value ?? "");
-  return Number.isInteger(number2) ? String(number2) : number2.toFixed(1);
-}
-var tempSequence = 0;
-function uniqueSuffix(prefix = "tmp") {
-  tempSequence = (tempSequence + 1) % 1e9;
-  return `${prefix}-${process.pid}-${tempSequence}-${Math.random().toString(36).slice(2, 8)}`;
-}
-function fileStamp(date2 = /* @__PURE__ */ new Date()) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${date2.getFullYear()}${pad(date2.getMonth() + 1)}${pad(date2.getDate())}-${pad(date2.getHours())}${pad(date2.getMinutes())}${pad(date2.getSeconds())}`;
-}
-async function allocateStamp(outDir, base) {
-  const parent = path5.join(outDir, "segments");
-  await mkdir3(parent, { recursive: true });
-  for (let attempt = 1; attempt <= 100; attempt += 1) {
-    const stamp = attempt === 1 ? base : `${base}-${attempt}`;
-    const dir = path5.join(parent, stamp);
-    try {
-      await mkdir3(dir);
-      return { stamp, segmentsDir: dir };
-    } catch (error) {
-      if (error?.code !== "EEXIST") throw error;
-    }
-  }
-  throw new Error(`\u65E0\u6CD5\u5728 ${parent} \u4E0B\u5206\u914D\u552F\u4E00\u7684\u5206\u6BB5\u76EE\u5F55\uFF08\u540C\u540D\u592A\u591A\uFF09\u3002`);
-}
-async function exists(file) {
-  try {
-    await stat(file);
-    return true;
-  } catch {
-    return false;
-  }
-}
-async function resolveOutputDir(config, exec, deps) {
-  const configured = String(ref(config, "outputDir", "")).trim();
-  if (configured) return path5.resolve(configured);
-  let cwd = "";
-  if (deps?.workdir && exec?.agent) {
-    try {
-      cwd = await deps.workdir.ensure(exec.agent, exec.signal) || "";
-    } catch {
-      cwd = "";
-    }
-  }
-  return path5.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
-}
-
-// src/businesses/video/workflow/resume.ts
-import os3 from "node:os";
-init_connection();
-
-// src/businesses/video/workflow/planning.ts
-init_connection();
-
-// src/core/utils/validation.ts
-function clampInteger(value, min, max, fallback) {
-  const number2 = Number(value);
-  if (!Number.isFinite(number2)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(number2)));
-}
-function finiteNumber(value) {
-  const number2 = Number(value);
-  return Number.isFinite(number2) ? number2 : null;
-}
-
-// src/businesses/video/workflow/planning.ts
-init_config();
-function modelMaxSeconds(config) {
-  return isOmniExtendModel(resolveModel(config)) ? 30 : 15;
-}
-function resolveSingleMax(config) {
-  return modelMaxSeconds(config);
-}
-function resolveSegmentSeconds(config, requested = void 0) {
-  const max = modelMaxSeconds(config);
-  return clampInteger(requested, MIN_SEGMENT_SECONDS, max, max);
-}
-function maxTargetSeconds(singleMax, segmentSeconds) {
-  return Math.min(MAX_TOTAL_SECONDS, singleMax + (MAX_SEGMENTS - 1) * segmentSeconds);
-}
-function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
-  if (totalSeconds <= singleMax) return [{ kind: "generate", seconds: totalSeconds }];
-  let base = singleMax;
-  let remaining = totalSeconds - base;
-  if (remaining < MIN_SEGMENT_SECONDS) {
-    const trimmed = MIN_SEGMENT_SECONDS - remaining;
-    if (base - trimmed >= MIN_SEGMENT_SECONDS) {
-      base -= trimmed;
-      remaining = totalSeconds - base;
-    }
-  }
-  const slots = MAX_SEGMENTS - 1;
-  const count = Math.min(slots, Math.max(1, Math.ceil(remaining / segmentSeconds)));
-  const sizes = [];
-  let left = remaining;
-  for (let index = count; index > 0 && left > 0; index -= 1) {
-    let size = Math.min(segmentSeconds, Math.ceil(left / index));
-    if (size < MIN_SEGMENT_SECONDS) size = Math.min(segmentSeconds, MIN_SEGMENT_SECONDS);
-    sizes.push(size);
-    left -= size;
-  }
-  const plan = [{ kind: "generate", seconds: base }];
-  for (const seconds of sizes) {
-    if (plan.length >= MAX_SEGMENTS) break;
-    plan.push({ kind: "extend", seconds });
-  }
-  return plan;
-}
-function resolveSegmentPrompts(prompts, planLength) {
-  if (prompts === void 0 && planLength === 1) return null;
-  if (!Array.isArray(prompts) || prompts.length !== planLength || prompts.some((value) => typeof value !== "string" || !value.trim())) {
-    throw new Error(`\u8BF7\u6309\u5B8C\u6574\u751F\u6210\u8BA1\u5212\u63D0\u4F9B segmentPrompts\uFF1A${planLength} \u6761\u975E\u7A7A\u7684\u9010\u6BB5\u63D0\u793A\u8BCD\uFF0C\u6BCF\u6761\u4EC5\u542B\u672C\u6BB5\u52A8\u4F5C\u4E0E\u5BF9\u767D\u3002\u5148\u8865\u9F50\u63D0\u793A\u8BCD\u518D\u63D0\u4EA4\uFF0C\u4E0D\u8981\u91CD\u65B0\u751F\u6210\u5DF2\u5B8C\u6210\u5206\u6BB5\u3002`);
-  }
-  return prompts.map((value) => value.trim());
-}
-function resolveTargetPlan(config, args) {
-  const singleMax = resolveSingleMax(config);
-  const segmentSeconds = resolveSegmentSeconds(config, args?.segmentSeconds);
-  const cap = maxTargetSeconds(singleMax, segmentSeconds);
-  const asked = clampInteger(
-    args?.duration ?? singleMax,
-    MIN_SECONDS,
-    Number.MAX_SAFE_INTEGER,
-    singleMax
-  );
-  const total = Math.min(asked, cap);
-  return {
-    plan: planVideoSegments(total, singleMax, segmentSeconds),
-    singleMax,
-    segmentSeconds,
-    cap,
-    asked,
-    total
-  };
-}
-function sumStepSeconds(steps) {
-  return (steps || []).reduce((sum, step) => sum + (Number(step?.seconds) || 0), 0);
-}
-function validateExtensionDuration(config, args) {
-  const value = args?.duration;
-  if (value !== void 0 && (!Number.isInteger(value) || value < MIN_SECONDS || value > modelMaxSeconds(config))) {
-    throw new Error(`\u7EED\u62CDduration\u662F\u6BCF\u6BB5\u65B0\u589E\u79D2\u6570\uFF0C\u987B\u4E3A${MIN_SECONDS}\u2013${modelMaxSeconds(config)}\u79D2\u6574\u6570\uFF1B\u66F4\u957F\u65F6\u8BF7\u7528segments\u5B89\u6392\u591A\u6BB5\u5E76\u91CD\u65B0\u5BA1\u6838\uFF0C\u4E0D\u4F1A\u81EA\u52A8\u7F29\u77ED\u3002`);
-  }
-  if (args?.segments !== void 0 && (!Number.isInteger(args.segments) || args.segments < 1 || args.segments > MAX_SEGMENTS)) {
-    throw new Error(`\u7EED\u62CDsegments\u987B\u4E3A1\u2013${MAX_SEGMENTS}\u6574\u6570\uFF0C\u8BF7\u5148\u786E\u8BA4\u5B8C\u6574\u5206\u6BB5\u8BA1\u5212\u3002`);
-  }
-}
-
-// src/businesses/video/workflow/resume.ts
-var PAUSE_FILE = "paused-plan.json";
-function resumeDirOf(value) {
-  const raw = typeof value === "string" ? value : value?.dir ?? value?.path ?? value?.resumeDir ?? value?.token ?? "";
-  const dir = String(raw ?? "").trim();
-  return dir ? path6.resolve(dir) : "";
-}
-async function readPauseFile(dir) {
-  const file = path6.join(dir, PAUSE_FILE);
-  let text;
-  try {
-    text = await readFile2(file, "utf8");
-  } catch {
-    throw new Error(
-      `\u6CA1\u6709\u627E\u5230\u6682\u505C\u8BB0\u5F55\uFF1A${file}\u3002resume \u8981\u4F20\u4E0A\u4E00\u6B21\u7ED3\u679C\u91CC\u7684 resumeDir\uFF08\u7528\u6237\u9009\u62E9\u5148\u4E0D\u7EE7\u7EED\u65F6\uFF0C\u7ED3\u679C\u91CC\u7ED9\u7684\u90A3\u4E2A\u5206\u6BB5\u76EE\u5F55\uFF09\uFF0C\u4E0D\u8981\u81EA\u5DF1\u62FC\u8DEF\u5F84\u3002`
-    );
-  }
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(`\u6682\u505C\u8BB0\u5F55\u4E0D\u662F\u5408\u6CD5 JSON\uFF1A${file}\u3002`);
-  }
-  return validatePauseRecord(data, file);
-}
-var RESUME_LOCK = "resume.lock";
-function resumeLockStaleMs(config) {
-  const minutes = Number(ref(config, "resumeLockStaleMinutes", 60));
-  if (!Number.isFinite(minutes) || minutes <= 0) return 0;
-  return minutes * 60 * 1e3;
-}
-async function resumeLockExpired(file, staleMs) {
-  const raw = await readFile2(file, "utf8").catch(() => null);
-  if (raw === null) return true;
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    return true;
-  }
-  const started = Date.parse(String(data?.startedAt || ""));
-  if (!Number.isFinite(started)) return true;
-  if (!staleMs) return false;
-  return Date.now() - started > staleMs;
-}
-async function describeResumeLock(file) {
-  const raw = await readFile2(file, "utf8").catch(() => null);
-  if (!raw) return "";
-  try {
-    const data = JSON.parse(raw);
-    const bits = [data?.tool, data?.startedAt && `${data.startedAt} \u5F00\u59CB`, data?.pid && `pid ${data.pid}`].filter(Boolean);
-    return bits.length ? `\uFF08${bits.join("\uFF0C")}\uFF09` : "";
-  } catch {
-    return "";
-  }
-}
-async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
-  const empty = { file: null, async release() {
-  } };
-  const file = path6.join(dir, RESUME_LOCK);
-  const token = uniqueSuffix("lock");
-  const record = {
-    tool: toolName,
-    callId: callId || null,
-    pid: process.pid,
-    host: os3.hostname(),
-    startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    token
-  };
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const handle = await open(file, "wx");
-      try {
-        await handle.writeFile(`${JSON.stringify(record, null, 2)}
-`, "utf8");
-      } finally {
-        await handle.close();
-      }
-      return {
-        file,
-        async release() {
-          const raw = await readFile2(file, "utf8").catch(() => null);
-          if (raw) {
-            try {
-              if (JSON.parse(raw)?.token !== token) return;
-            } catch {
-              return;
-            }
-          }
-          await rm(file, { force: true }).catch(() => {
-          });
-        }
-      };
-    } catch (failure) {
-      if (failure?.code === "ENOENT") return empty;
-      if (failure?.code !== "EEXIST") throw failure;
-      if (attempt === 0 && await resumeLockExpired(file, staleMs)) {
-        await rm(file, { force: true }).catch(() => {
-        });
-        continue;
-      }
-      const holder = await describeResumeLock(file);
-      const minutes = staleMs ? Math.round(staleMs / 6e4) : 0;
-      throw Object.assign(new Error(
-        `\u8FD9\u4EFD\u6682\u505C\u8FDB\u5EA6\u5DF2\u7ECF\u6709\u4E00\u6B21\u300C\u7EE7\u7EED\u300D\u5728\u8DD1\u4E86${holder}\uFF0C\u672C\u6B21\u7EED\u505A\u5DF2\u62E6\u622A\uFF0C\u672A\u65B0\u589E\u751F\u6210\u4EFB\u52A1\u3002\u8BF7\u7B49\u5F85\u73B0\u6709\u8C03\u7528\u5B8C\u6210\uFF0C\u907F\u514D\u5E76\u53D1\u63D0\u4EA4\u5BFC\u81F4\u91CD\u590D\u8BA1\u8D39\u3002\u4E4B\u540E\u6309\u539F resume \u6062\u590D\u8FDB\u5EA6\uFF0C\u6587\u4EF6\u4F4D\u7F6E\u4EE5\u8FD4\u56DE\u7ED3\u679C\u4E3A\u51C6\u3002` + (minutes ? `\u5982\u679C\u786E\u8BA4\u90A3\u4E00\u6B21\u5DF2\u7ECF\u4E2D\u65AD\u4E86\uFF0C\u7B49 ${minutes} \u5206\u949F\u9501\u4F1A\u81EA\u52A8\u8FC7\u671F\uFF0C\u4E5F\u53EF\u4EE5\u628A ${file} \u5220\u6389\u518D\u8BD5\u3002` : `\u786E\u8BA4\u90A3\u4E00\u6B21\u5DF2\u7ECF\u4E2D\u65AD\u4E86\u5C31\u5220\u6389 ${file} \u518D\u8BD5\u3002`)
-      ), { code: "resume_locked" });
-    }
-  }
-  throw new Error(`\u62FF\u4E0D\u5230 ${file} \u7684\u9501\uFF08\u540C\u540D\u6587\u4EF6\u4E00\u76F4\u88AB\u62A2\uFF09\uFF0C\u7A0D\u540E\u91CD\u8BD5\u3002`);
-}
-function withResumeLock(tool, toolName, config) {
-  return {
-    ...tool,
-    async execute(args, exec) {
-      return requestLogContext.run({ callId: exec?.callId || uniqueSuffix("call"), tool: toolName }, async () => {
-        const started = Date.now();
-        const dir = resumeDirOf(args?.resume);
-        let lock;
-        await appendRequestLog({
-          event: "tool_started",
-          provider: isVolcengine(config) ? "volcengine" : "metaontic",
-          model: resolveModel(config),
-          duration: args?.duration,
-          segmentSeconds: args?.segmentSeconds,
-          resuming: Boolean(dir),
-          resumeDir: dir || void 0
-        });
-        try {
-          if (dir) {
-            lock = await acquireResumeLock(dir, { toolName, callId: exec?.callId, staleMs: resumeLockStaleMs(config) });
-            await appendRequestLog({ event: "resume_lock_acquired", resumeDir: dir });
-          }
-          const result = await tool.execute(args, exec);
-          if (result?.resumeDir && args?.cumulativePreview !== true) {
-            const record = await readPauseFile(result.resumeDir);
-            record.deliveryPending = Boolean(result.deliveryError || result.ffmpegMissing);
-            await writePauseFile(result.resumeDir, record);
-          }
-          await appendRequestLog({
-            event: "tool_completed",
-            elapsedMs: Date.now() - started,
-            status: result?.status,
-            paused: result?.paused,
-            videoPath: result?.videoPath,
-            segmentsDir: result?.segmentsDir,
-            segmentCount: result?.segments?.length,
-            actualSeconds: result?.actualSeconds,
-            errorCode: result?.errorCode
-          });
-          return result;
-        } catch (error) {
-          await appendRequestLog({ event: "tool_failed", elapsedMs: Date.now() - started, errorCode: String(error?.code || "tool_error") });
-          throw error;
-        } finally {
-          if (lock) {
-            await lock.release();
-            await appendRequestLog({ event: "resume_lock_released", resumeDir: dir });
-          }
-        }
-      });
-    }
-  };
-}
-async function writePauseFile(dir, data) {
-  await mkdir4(dir, { recursive: true, mode: 448 });
-  const file = path6.join(dir, PAUSE_FILE);
-  const temp = `${file}.${uniqueSuffix("part")}`;
-  try {
-    await writeFile2(temp, `${JSON.stringify(data, null, 2)}
-`, { encoding: "utf8", mode: 384 });
-    await rename(temp, file);
-  } catch (failure) {
-    await rm(temp, { force: true }).catch(() => {
-    });
-    throw failure;
-  }
-}
-function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
-  const done = Number(data.done) || 0;
-  const cursor = Number(data.cursor) || 0;
-  const fullPlan = (data.plan || []).map((step) => ({ ...step }));
-  const remaining = fullPlan.slice(done).map((step) => ({ ...step }));
-  const wanted = Number.isFinite(askedTotal) ? Math.min(askedTotal, MAX_TOTAL_SECONDS) : 0;
-  const cap = segmentSeconds > 0 ? segmentSeconds : MAX_SEGMENT_SECONDS;
-  let total = cursor + sumStepSeconds(remaining);
-  while (wanted > total && fullPlan.length < MAX_SEGMENTS && total + MIN_SECONDS <= wanted) {
-    const seconds = Math.max(MIN_SECONDS, Math.min(cap, wanted - total));
-    fullPlan.push({ kind: "extend", seconds });
-    remaining.push({ kind: "extend", seconds });
-    total += seconds;
-  }
-  return { fullPlan, plan: remaining, cursor, total };
-}
-function pickResumeOptions(args) {
-  const keys = [
-    "projectId",
-    "mode",
-    "ratio",
-    "generateAudio",
-    "watermark",
-    "segmentPrompts",
-    "transitionDescription",
-    "merge",
-    // 这几个是 video_extend 的口径（延长方向、提示词写法、整片时间轴位置）
-    "direction",
-    "wording",
-    "startAt",
-    "inputVideoSeconds",
-    "firstFrameUrl",
-    "lastFrameUrl",
-    "referenceImages",
-    "characterReferenceImages",
-    "resolution",
-    "seed",
-    "user",
-    "returnLastFrame"
-  ];
-  const options = {};
-  for (const key of keys) {
-    if (args?.[key] !== void 0) options[key] = args[key];
-  }
-  return options;
-}
-function pauseRecordAt({ stamp, prompt, fullPlan, done, cursor, lastVideoUrl, options, segments }) {
-  return {
-    plugin: "metaontic-video",
-    kind: "paused-plan",
-    version: 1,
-    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-    stamp,
-    prompt,
-    plan: fullPlan,
-    done,
-    cursor,
-    lastVideoUrl,
-    options,
-    steps: segments.map((segment) => ({
-      index: segment.index,
-      kind: segment.kind,
-      seconds: segment.seconds,
-      taskId: segment.taskId,
-      videoUrl: segment.videoUrl
-    }))
-  };
-}
-function resumeHint(dir, remainingSeconds, toolName = "video_generate") {
-  return `\u8981\u63A5\u7740\u505A\u5C31\u628A resume="${dir}" \u518D\u8C03\u4E00\u6B21 ${toolName}\uFF08prompt \u53EF\u4EE5\u7701\u7565\uFF0C\u5176\u4F59\u53C2\u6570\u7167\u65E7\uFF09\uFF1A\u63D2\u4EF6\u4F1A\u63A5\u7740\u5DF2\u7ECF\u751F\u6210\u7684\u5206\u6BB5\u7EE7\u7EED\uFF0C\u5DF2\u5B8C\u6210\u5206\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\uFF1B\u5269\u4F59 ${remainingSeconds} \u79D2\u4ECD\u9700\u786E\u8BA4\u8D39\u7528\u5E76\u8BA1\u8D39\u3002`;
-}
-function progressConnection(config) {
-  return {
-    provider: isVolcengine(config) ? "volcengine" : "metaontic",
-    model: resolveModel(config),
-    baseUrl: resolveBaseUrl(config),
-    submitPath: resolveSubmitPath(config),
-    queryPath: resolveQueryPath(config, "{task_id}")
-  };
-}
-function assertResumeConnection(data, config, args) {
-  if (!data?.connection) return;
-  if (JSON.stringify(data.connection) === JSON.stringify(progressConnection(config))) return;
-  if (data.pendingTask || Object.values(data.operationState || {}).some((state) => state.phase === "converting" || state.phase === "review" || state.retryUsed && !state.retryResult)) throw new Error("\u8FD9\u4EFD\u8FDB\u5EA6\u8FD8\u6709\u5DF2\u63D0\u4EA4\u7684\u4EFB\u52A1\uFF0C\u8BF7\u6062\u590D\u539F\u6A21\u578B\u548C\u63A5\u5165\u6E20\u9053\u540E\u67E5\u8BE2\uFF0C\u4E0D\u80FD\u5207\u6362\u6E20\u9053\u91CD\u590D\u63D0\u4EA4\u3002");
-  if (args?.resumeWithCurrentConfig === true) {
-    if (data.plan.slice(Number(data.done) || 0).some((step) => step.seconds > modelMaxSeconds(config))) {
-      throw new Error("\u539F\u8FDB\u5EA6\u4E2D\u7684\u5206\u6BB5\u8D85\u8FC7\u5F53\u524D\u6A21\u578B\u5355\u6BB5\u4E0A\u9650\uFF0C\u8BF7\u6062\u590D\u539F\u6A21\u578B\u540E\u7EE7\u7EED\uFF0C\u4E0D\u81EA\u52A8\u7F29\u77ED\u5DF2\u5BA1\u6838\u5206\u6BB5\u3002");
-    }
-    return;
-  }
-  throw new Error("\u5F53\u524D\u6A21\u578B\u6216\u63A5\u5165\u6E20\u9053\u4E0E\u539F\u8FDB\u5EA6\u4E0D\u4E00\u81F4\u3002\u8BF7\u6062\u590D\u539F\u914D\u7F6E\uFF1B\u5982\u9700\u66F4\u6362\uFF0C\u5148\u5411\u7528\u6237\u8BF4\u660E\u53D8\u5316\u5E76\u786E\u8BA4\uFF0C\u518D\u4F20 resumeWithCurrentConfig:true\u3002");
-}
-async function saveProgress(dir, { config, toolName, stamp, prompt, fullPlan, cursor, referenceUrl, options, segments, pendingTask, operationState = {}, characterReferences = void 0 }) {
-  const completed = segments.filter((step) => step.status === "succeeded" && step.videoUrl);
-  const record = pauseRecordAt({
-    stamp,
-    prompt,
-    fullPlan,
-    done: completed.length,
-    cursor,
-    lastVideoUrl: referenceUrl,
-    options,
-    segments: completed
-  });
-  Object.assign(record, {
-    toolName,
-    connection: progressConnection(config),
-    deliveryPending: !pendingTask && completed.length > 0,
-    state: pendingTask ? "pending" : completed.length >= fullPlan.length ? "completed" : "paused",
-    pendingTask: pendingTask || null,
-    operationState,
-    ...characterReferences !== void 0 ? { characterReferences } : {}
-  });
-  await writePauseFile(dir, record);
-}
-
-// src/businesses/video/workflow/project.ts
-import { createHash as createHash2, randomUUID as randomUUID3 } from "node:crypto";
-import { mkdir as mkdir6, readdir as readdir2, readFile as readFile4, writeFile as writeFile3, rename as rename3, rm as rm3 } from "node:fs/promises";
-import path8 from "node:path";
-
 // src/businesses/video/media/references.ts
 init_hardcoded_config();
-import path7 from "node:path";
-import os4 from "node:os";
-import { stat as stat2, mkdir as mkdir5, rename as rename2, rm as rm2, open as open2, readdir, readFile as readFile3 } from "node:fs/promises";
+import path3 from "node:path";
+import os2 from "node:os";
+import { stat as stat2, mkdir as mkdir2, rename, rm, open, readdir, readFile } from "node:fs/promises";
 
 // src/businesses/video/media/ffmpeg.ts
 init_config();
@@ -2768,6 +1533,66 @@ async function probeMedia(file, config, signal) {
   }
 }
 
+// src/businesses/video/utils/files.ts
+init_config();
+init_value();
+import path2 from "node:path";
+import { mkdir, stat } from "node:fs/promises";
+function tail(text, limit = 600) {
+  const clean = String(text || "").trim();
+  return clean.length > limit ? `\u2026${clean.slice(-limit)}` : clean;
+}
+function formatSeconds(value) {
+  const number2 = Number(value);
+  if (!Number.isFinite(number2)) return String(value ?? "");
+  return Number.isInteger(number2) ? String(number2) : number2.toFixed(1);
+}
+var tempSequence = 0;
+function uniqueSuffix(prefix = "tmp") {
+  tempSequence = (tempSequence + 1) % 1e9;
+  return `${prefix}-${process.pid}-${tempSequence}-${Math.random().toString(36).slice(2, 8)}`;
+}
+function fileStamp(date2 = /* @__PURE__ */ new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date2.getFullYear()}${pad(date2.getMonth() + 1)}${pad(date2.getDate())}-${pad(date2.getHours())}${pad(date2.getMinutes())}${pad(date2.getSeconds())}`;
+}
+async function allocateStamp(outDir, base) {
+  const parent = path2.join(outDir, "segments");
+  await mkdir(parent, { recursive: true });
+  for (let attempt = 1; attempt <= 100; attempt += 1) {
+    const stamp = attempt === 1 ? base : `${base}-${attempt}`;
+    const dir = path2.join(parent, stamp);
+    try {
+      await mkdir(dir);
+      return { stamp, segmentsDir: dir };
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+    }
+  }
+  throw new Error(`\u65E0\u6CD5\u5728 ${parent} \u4E0B\u5206\u914D\u552F\u4E00\u7684\u5206\u6BB5\u76EE\u5F55\uFF08\u540C\u540D\u592A\u591A\uFF09\u3002`);
+}
+async function exists(file) {
+  try {
+    await stat(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function resolveOutputDir(config, exec, deps) {
+  const configured = String(ref(config, "outputDir", "")).trim();
+  if (configured) return path2.resolve(configured);
+  let cwd = "";
+  if (deps?.workdir && exec?.agent) {
+    try {
+      cwd = await deps.workdir.ensure(exec.agent, exec.signal) || "";
+    } catch {
+      cwd = "";
+    }
+  }
+  return path2.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
+}
+
 // src/businesses/video/media/references.ts
 init_connection();
 var IMAGE_EXT_TO_MIME = {
@@ -2801,7 +1626,7 @@ function canvasSize(ratio) {
   return CANVAS_SIZES[String(ratio ?? "").trim()] || null;
 }
 function referenceCacheDir() {
-  return path7.join(os4.tmpdir(), REFERENCE_TMP_DIR);
+  return path3.join(os2.tmpdir(), REFERENCE_TMP_DIR);
 }
 async function isUsableFit(dest, width, height, config, signal) {
   const info = await stat2(dest).catch(() => null);
@@ -2821,21 +1646,21 @@ async function pruneReferenceCache(dir, { now = Date.now(), force = false } = {}
   const files = [];
   for (const entry of entries) {
     if (!entry.isFile()) continue;
-    const file = path7.join(dir, entry.name);
+    const file = path3.join(dir, entry.name);
     const info = await stat2(file).catch(() => null);
     if (!info) continue;
     const inFlight = entry.name.includes(".fit-") && now - info.mtimeMs < REFERENCE_CACHE_FRESH_MS;
     if (inFlight) continue;
     files.push({ file, mtimeMs: info.mtimeMs, stale: now - info.mtimeMs > REFERENCE_CACHE_MAX_AGE_MS });
   }
-  for (const item of files) if (item.stale) await rm2(item.file, { force: true }).catch(() => {
+  for (const item of files) if (item.stale) await rm(item.file, { force: true }).catch(() => {
   });
   const rest = files.filter((item) => !item.stale);
   if (rest.length <= REFERENCE_CACHE_MAX_FILES) return;
   rest.sort((a, b) => a.mtimeMs - b.mtimeMs);
   for (const item of rest.slice(0, rest.length - REFERENCE_CACHE_MAX_FILES)) {
     if (now - item.mtimeMs <= REFERENCE_CACHE_FRESH_MS) continue;
-    await rm2(item.file, { force: true }).catch(() => {
+    await rm(item.file, { force: true }).catch(() => {
     });
   }
 }
@@ -2845,8 +1670,8 @@ async function fitImageToCanvas(absPath, size, config, signal) {
   const media = await probeMedia(absPath, config, signal);
   if (media?.width === width && media?.height === height) return absPath;
   const info = await stat2(absPath).catch(() => null);
-  const key = `${path7.basename(absPath, path7.extname(absPath))}-${info?.size ?? 0}-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`;
-  const dest = path7.join(referenceCacheDir(), key);
+  const key = `${path3.basename(absPath, path3.extname(absPath))}-${info?.size ?? 0}-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`;
+  const dest = path3.join(referenceCacheDir(), key);
   if (await isUsableFit(dest, width, height, config, signal)) return dest;
   const running = fitInFlight.get(dest);
   if (running) {
@@ -2856,7 +1681,7 @@ async function fitImageToCanvas(absPath, size, config, signal) {
     if (signal?.aborted) return absPath;
   }
   const task = (async () => {
-    await mkdir5(referenceCacheDir(), { recursive: true });
+    await mkdir2(referenceCacheDir(), { recursive: true });
     const graph = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},gblur=sigma=24[bg];[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1`;
     const temp = `${dest.replace(/\.jpg$/, "")}.${uniqueSuffix("fit")}.jpg`;
     try {
@@ -2875,12 +1700,12 @@ async function fitImageToCanvas(absPath, size, config, signal) {
       if (code !== 0) return;
       const fitted = await probeMedia(temp, config, signal);
       if (fitted?.width === width && fitted?.height === height) {
-        await rename2(temp, dest);
+        await rename(temp, dest);
         await pruneReferenceCache(referenceCacheDir());
       }
     } catch {
     } finally {
-      await rm2(temp, { force: true }).catch(() => {
+      await rm(temp, { force: true }).catch(() => {
       });
     }
   })();
@@ -2895,12 +1720,12 @@ async function fitImageToCanvas(absPath, size, config, signal) {
 var UPLOAD_ALIAS_PATTERN = /^(?:latest|newest|recent|最近上传(?:的图片)?|最新上传(?:的图片)?|刚上传(?:的图片)?|最新图片|刚拖进来的图片)$/i;
 var UPLOAD_WINDOW_MS = 2 * 60 * 60 * 1e3;
 function attachmentObjectsDir() {
-  return path7.join(dshHome(), "attachments", "v1", "objects");
+  return path3.join(dshHome(), "attachments", "v1", "objects");
 }
 async function sniffFileImage(file) {
   let handle;
   try {
-    handle = await open2(file, "r");
+    handle = await open(file, "r");
     const head = Buffer.alloc(32);
     const { bytesRead } = await handle.read(head, 0, head.length, 0);
     return sniffImageMime(head.subarray(0, bytesRead));
@@ -2918,11 +1743,11 @@ async function findRecentUploadedImages(windowMs = UPLOAD_WINDOW_MS) {
   const found = [];
   for (const shard of shards) {
     if (!shard.isDirectory()) continue;
-    const dir = path7.join(root, shard.name);
+    const dir = path3.join(root, shard.name);
     const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
       if (!entry.isFile()) continue;
-      const abs = path7.join(dir, entry.name);
+      const abs = path3.join(dir, entry.name);
       const info = await stat2(abs).catch(() => null);
       if (!info || info.mtimeMs < cutoff) continue;
       const mime = await sniffFileImage(abs);
@@ -2983,8 +1808,8 @@ async function resolveImageInput(value, label, fit = null) {
       uploadIndex: index
     };
   } else {
-    abs = path7.resolve(raw.startsWith("~/") || raw === "~" ? path7.join(os4.homedir(), raw.slice(1)) : raw);
-    const ext = path7.extname(abs).toLowerCase();
+    abs = path3.resolve(raw.startsWith("~/") || raw === "~" ? path3.join(os2.homedir(), raw.slice(1)) : raw);
+    const ext = path3.extname(abs).toLowerCase();
     if (!IMAGE_EXT_TO_MIME[ext]) {
       throw new Error(
         `${label} \u65E2\u4E0D\u662F http(s) \u94FE\u63A5\u3001base64\uFF0C\u4E5F\u4E0D\u662F\u652F\u6301\u7684\u56FE\u7247\u6587\u4EF6\uFF1A${brief(raw)}\u3002\u672C\u673A\u56FE\u7247\u8BF7\u7528 ${Object.keys(IMAGE_EXT_TO_MIME).join(" / ")} \u4E4B\u4E00\uFF0C\u7528\u6237\u521A\u5728\u5BF9\u8BDD\u91CC\u4E0A\u4F20\u7684\u56FE\u76F4\u63A5\u5199 latest\u3002`
@@ -3007,7 +1832,7 @@ async function resolveImageInput(value, label, fit = null) {
       `${label} \u592A\u5927\uFF08${(size / 1048576).toFixed(1)} MB\uFF09\uFF0C\u8BF7\u538B\u5230 ${MAX_IMAGE_BYTES / 1048576} MB \u4EE5\u5185\u518D\u4F20\uFF1A${abs}`
     );
   }
-  const buffer = await readFile3(submitPath);
+  const buffer = await readFile(submitPath);
   const mime = sniffImageMime(buffer);
   if (!mime) throw new Error(`${label} \u4E0D\u662F\u6709\u6548\u7684\u56FE\u7247\u6587\u4EF6\uFF08\u8BFB\u5230\u7684\u5185\u5BB9\u4E0D\u662F jpg/png/webp/bmp/gif/tiff\uFF09\uFF1A${abs}`);
   const resolved = {
@@ -3035,12 +1860,596 @@ function validateImageRoles(args, model) {
   return { refs, limit };
 }
 
+// src/businesses/film-director/index.ts
+init_hardcoded_config();
+
+// src/businesses/video/workflow/segment-review.ts
+import path6 from "node:path";
+import { readFile as readFile3, writeFile as writeFile2, rename as rename3, rm as rm3, stat as stat3 } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+
+// src/businesses/video/workflow/result-state.ts
+function videoResultState(value = {}) {
+  value ??= {};
+  const segments = Array.isArray(value.segments) ? value.segments : [];
+  const completed = segments.filter((s) => s?.status === "succeeded" && (s.localPath || s.videoUrl));
+  const multi = segments.length > 1 || Boolean(value.paused && value.remainingSeconds > 0);
+  const local = Boolean(value.videoPath || completed.some((s) => s.localPath));
+  const delivery = value.merged && value.videoPath ? multi ? "merged" : "single" : value.videoPath && !multi ? "single" : local ? multi ? "segments" : "single" : value.videoUrl || completed.length ? "remote" : "none";
+  let phase;
+  if (value.status === "review_required")
+    phase = "reference_review";
+  else if (value.pendingTaskId || ["unknown", "timeout"].includes(value.status) || segments.some((s) => ["unknown", "timeout", "running", "queued"].includes(s?.status)))
+    phase = "task_pending";
+  else if (value.deliveryError || value.ffmpegMissing)
+    phase = "delivery_pending";
+  else if (value.paused)
+    phase = "segment_review";
+  else if (value.partial)
+    phase = "partial";
+  else if (["failed", "cancelled", "canceled"].includes(value.status) || segments.some((s) => ["failed", "cancelled", "canceled"].includes(s?.status)))
+    phase = completed.length ? "partial" : "failed";
+  else if (value.status !== "succeeded" || delivery === "none")
+    phase = "unknown";
+  else
+    phase = ["merged", "single"].includes(delivery) ? "complete" : "generated";
+  const details = { delivery, completedCount: completed.length };
+  if (phase === "complete")
+    return { ...details, phase, isFinal: true, canPresent: true };
+  if (phase === "generated")
+    return { ...details, phase, isFinal: true, canPresent: false };
+  return { ...details, phase, isFinal: false, canPresent: false };
+}
+function validatePauseRecord(data, file = "paused-plan.json") {
+  const invalid = () => {
+    throw new Error(`\u6682\u505C\u8BB0\u5F55\u5185\u5BB9\u4E0D\u5BF9\uFF1A${file}\u3002\u8BF7\u4FDD\u7559\u539F\u6587\u4EF6\u5E76\u6838\u5BF9\u539F\u4EFB\u52A1\uFF0C\u4E0D\u8981\u91CD\u65B0\u63D0\u4EA4\u3002`);
+  };
+  if (!data || data.plugin !== "metaontic-video" || data.version != null && data.version !== 1 || !Array.isArray(data.plan) || !data.plan.length)
+    invalid();
+  if (data.plan.some((step) => !step || !["generate", "extend"].includes(step.kind) || !Number.isFinite(step.seconds) || step.seconds <= 0))
+    invalid();
+  const done = data.done ?? 0;
+  if (!Number.isInteger(done) || done < 0 || done > data.plan.length)
+    invalid();
+  if (data.cursor != null && !Number.isFinite(data.cursor))
+    invalid();
+  if (data.steps != null && (!Array.isArray(data.steps) || data.steps.length !== done))
+    invalid();
+  if (done > 0 && !Array.isArray(data.steps))
+    invalid();
+  if (data.steps?.some((step, index) => !step || step.index !== index + 1 || !["generate", "extend"].includes(step.kind) || step.seconds != null && (!Number.isFinite(step.seconds) || step.seconds <= 0) || !step.taskId || !step.videoUrl))
+    invalid();
+  if (data.pendingTask && (!data.pendingTask.taskId || data.pendingTask.index != null && data.pendingTask.index !== done + 1 || done >= data.plan.length))
+    invalid();
+  return data;
+}
+
+// src/businesses/video/workflow/resume.ts
+init_config();
+import path5 from "node:path";
+import { readFile as readFile2, open as open2, rm as rm2, mkdir as mkdir4, writeFile, rename as rename2 } from "node:fs/promises";
+import os3 from "node:os";
+
+// src/core/utils/logging.ts
+import { AsyncLocalStorage } from "node:async_hooks";
+import path4 from "node:path";
+init_version();
+init_hardcoded_config();
+import { mkdir as mkdir3, appendFile } from "node:fs/promises";
+var requestLogContext = new AsyncLocalStorage();
+function requestLogPath() {
+  const now = /* @__PURE__ */ new Date();
+  const date2 = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  return path4.join(dshHome(), "logs", DATA_DIR, date2, "requests.jsonl");
+}
+var preparedDirs = /* @__PURE__ */ new Set();
+async function ensureLogDir(dir) {
+  if (preparedDirs.has(dir)) return;
+  await mkdir3(dir, { recursive: true, mode: 448 });
+  if (preparedDirs.size > 32) preparedDirs.clear();
+  preparedDirs.add(dir);
+}
+async function appendRequestLog(record) {
+  try {
+    const file = requestLogPath();
+    await ensureLogDir(path4.dirname(file));
+    await appendFile(file, JSON.stringify({ time: (/* @__PURE__ */ new Date()).toISOString(), pluginVersion: PLUGIN_VERSION, ...requestLogContext.getStore(), ...record }) + "\n", { mode: 384 });
+  } catch {
+  }
+}
+
+// src/businesses/video/workflow/resume.ts
+init_connection();
+
+// src/businesses/video/workflow/planning.ts
+init_connection();
+
+// src/core/utils/validation.ts
+function clampInteger(value, min, max, fallback) {
+  const number2 = Number(value);
+  if (!Number.isFinite(number2)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(number2)));
+}
+function finiteNumber(value) {
+  const number2 = Number(value);
+  return Number.isFinite(number2) ? number2 : null;
+}
+
+// src/businesses/video/workflow/planning.ts
+init_config();
+function modelMaxSeconds(config) {
+  return isOmniExtendModel(resolveModel(config)) ? 30 : 15;
+}
+function resolveSingleMax(config) {
+  return modelMaxSeconds(config);
+}
+function resolveSegmentSeconds(config, requested = void 0) {
+  const max = modelMaxSeconds(config);
+  return clampInteger(requested, MIN_SEGMENT_SECONDS, max, max);
+}
+function maxTargetSeconds(singleMax, segmentSeconds) {
+  return Math.min(MAX_TOTAL_SECONDS, singleMax + (MAX_SEGMENTS - 1) * segmentSeconds);
+}
+function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
+  if (totalSeconds <= singleMax) return [{ kind: "generate", seconds: totalSeconds }];
+  let base = singleMax;
+  let remaining = totalSeconds - base;
+  if (remaining < MIN_SEGMENT_SECONDS) {
+    const trimmed = MIN_SEGMENT_SECONDS - remaining;
+    if (base - trimmed >= MIN_SEGMENT_SECONDS) {
+      base -= trimmed;
+      remaining = totalSeconds - base;
+    }
+  }
+  const slots = MAX_SEGMENTS - 1;
+  const count = Math.min(slots, Math.max(1, Math.ceil(remaining / segmentSeconds)));
+  const sizes = [];
+  let left = remaining;
+  for (let index = count; index > 0 && left > 0; index -= 1) {
+    let size = Math.min(segmentSeconds, Math.ceil(left / index));
+    if (size < MIN_SEGMENT_SECONDS) size = Math.min(segmentSeconds, MIN_SEGMENT_SECONDS);
+    sizes.push(size);
+    left -= size;
+  }
+  const plan = [{ kind: "generate", seconds: base }];
+  for (const seconds of sizes) {
+    if (plan.length >= MAX_SEGMENTS) break;
+    plan.push({ kind: "extend", seconds });
+  }
+  return plan;
+}
+function resolveSegmentPrompts(prompts, planLength) {
+  if (prompts === void 0 && planLength === 1) return null;
+  if (!Array.isArray(prompts) || prompts.length !== planLength || prompts.some((value) => typeof value !== "string" || !value.trim())) {
+    throw new Error(`\u8BF7\u6309\u5B8C\u6574\u751F\u6210\u8BA1\u5212\u63D0\u4F9B segmentPrompts\uFF1A${planLength} \u6761\u975E\u7A7A\u7684\u9010\u6BB5\u63D0\u793A\u8BCD\uFF0C\u6BCF\u6761\u4EC5\u542B\u672C\u6BB5\u52A8\u4F5C\u4E0E\u5BF9\u767D\u3002\u5148\u8865\u9F50\u63D0\u793A\u8BCD\u518D\u63D0\u4EA4\uFF0C\u4E0D\u8981\u91CD\u65B0\u751F\u6210\u5DF2\u5B8C\u6210\u5206\u6BB5\u3002`);
+  }
+  return prompts.map((value) => value.trim());
+}
+function resolveTargetPlan(config, args) {
+  const singleMax = resolveSingleMax(config);
+  const segmentSeconds = resolveSegmentSeconds(config, args?.segmentSeconds);
+  const cap = maxTargetSeconds(singleMax, segmentSeconds);
+  const asked = clampInteger(
+    args?.duration ?? singleMax,
+    MIN_SECONDS,
+    Number.MAX_SAFE_INTEGER,
+    singleMax
+  );
+  const total = Math.min(asked, cap);
+  return {
+    plan: planVideoSegments(total, singleMax, segmentSeconds),
+    singleMax,
+    segmentSeconds,
+    cap,
+    asked,
+    total
+  };
+}
+function sumStepSeconds(steps) {
+  return (steps || []).reduce((sum, step) => sum + (Number(step?.seconds) || 0), 0);
+}
+function validateExtensionDuration(config, args) {
+  const value = args?.duration;
+  if (value !== void 0 && (!Number.isInteger(value) || value < MIN_SECONDS || value > modelMaxSeconds(config))) {
+    throw new Error(`\u7EED\u62CDduration\u662F\u6BCF\u6BB5\u65B0\u589E\u79D2\u6570\uFF0C\u987B\u4E3A${MIN_SECONDS}\u2013${modelMaxSeconds(config)}\u79D2\u6574\u6570\uFF1B\u66F4\u957F\u65F6\u8BF7\u7528segments\u5B89\u6392\u591A\u6BB5\u5E76\u91CD\u65B0\u5BA1\u6838\uFF0C\u4E0D\u4F1A\u81EA\u52A8\u7F29\u77ED\u3002`);
+  }
+  if (args?.segments !== void 0 && (!Number.isInteger(args.segments) || args.segments < 1 || args.segments > MAX_SEGMENTS)) {
+    throw new Error(`\u7EED\u62CDsegments\u987B\u4E3A1\u2013${MAX_SEGMENTS}\u6574\u6570\uFF0C\u8BF7\u5148\u786E\u8BA4\u5B8C\u6574\u5206\u6BB5\u8BA1\u5212\u3002`);
+  }
+}
+
+// src/businesses/video/workflow/resume.ts
+var PAUSE_FILE = "paused-plan.json";
+function resumeDirOf(value) {
+  const raw = typeof value === "string" ? value : value?.dir ?? value?.path ?? value?.resumeDir ?? value?.token ?? "";
+  const dir = String(raw ?? "").trim();
+  return dir ? path5.resolve(dir) : "";
+}
+async function readPauseFile(dir) {
+  const file = path5.join(dir, PAUSE_FILE);
+  let text;
+  try {
+    text = await readFile2(file, "utf8");
+  } catch {
+    throw new Error(
+      `\u6CA1\u6709\u627E\u5230\u6682\u505C\u8BB0\u5F55\uFF1A${file}\u3002resume \u8981\u4F20\u4E0A\u4E00\u6B21\u7ED3\u679C\u91CC\u7684 resumeDir\uFF08\u7528\u6237\u9009\u62E9\u5148\u4E0D\u7EE7\u7EED\u65F6\uFF0C\u7ED3\u679C\u91CC\u7ED9\u7684\u90A3\u4E2A\u5206\u6BB5\u76EE\u5F55\uFF09\uFF0C\u4E0D\u8981\u81EA\u5DF1\u62FC\u8DEF\u5F84\u3002`
+    );
+  }
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`\u6682\u505C\u8BB0\u5F55\u4E0D\u662F\u5408\u6CD5 JSON\uFF1A${file}\u3002`);
+  }
+  return validatePauseRecord(data, file);
+}
+var RESUME_LOCK = "resume.lock";
+function resumeLockStaleMs(config) {
+  const minutes = Number(ref(config, "resumeLockStaleMinutes", 60));
+  if (!Number.isFinite(minutes) || minutes <= 0) return 0;
+  return minutes * 60 * 1e3;
+}
+async function resumeLockExpired(file, staleMs) {
+  const raw = await readFile2(file, "utf8").catch(() => null);
+  if (raw === null) return true;
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return true;
+  }
+  const started = Date.parse(String(data?.startedAt || ""));
+  if (!Number.isFinite(started)) return true;
+  if (!staleMs) return false;
+  return Date.now() - started > staleMs;
+}
+async function describeResumeLock(file) {
+  const raw = await readFile2(file, "utf8").catch(() => null);
+  if (!raw) return "";
+  try {
+    const data = JSON.parse(raw);
+    const bits = [data?.tool, data?.startedAt && `${data.startedAt} \u5F00\u59CB`, data?.pid && `pid ${data.pid}`].filter(Boolean);
+    return bits.length ? `\uFF08${bits.join("\uFF0C")}\uFF09` : "";
+  } catch {
+    return "";
+  }
+}
+async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
+  const empty = { file: null, async release() {
+  } };
+  const file = path5.join(dir, RESUME_LOCK);
+  const token = uniqueSuffix("lock");
+  const record = {
+    tool: toolName,
+    callId: callId || null,
+    pid: process.pid,
+    host: os3.hostname(),
+    startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    token
+  };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const handle = await open2(file, "wx");
+      try {
+        await handle.writeFile(`${JSON.stringify(record, null, 2)}
+`, "utf8");
+      } finally {
+        await handle.close();
+      }
+      return {
+        file,
+        async release() {
+          const raw = await readFile2(file, "utf8").catch(() => null);
+          if (raw) {
+            try {
+              if (JSON.parse(raw)?.token !== token) return;
+            } catch {
+              return;
+            }
+          }
+          await rm2(file, { force: true }).catch(() => {
+          });
+        }
+      };
+    } catch (failure) {
+      if (failure?.code === "ENOENT") return empty;
+      if (failure?.code !== "EEXIST") throw failure;
+      if (attempt === 0 && await resumeLockExpired(file, staleMs)) {
+        await rm2(file, { force: true }).catch(() => {
+        });
+        continue;
+      }
+      const holder = await describeResumeLock(file);
+      const minutes = staleMs ? Math.round(staleMs / 6e4) : 0;
+      throw Object.assign(new Error(
+        `\u8FD9\u4EFD\u6682\u505C\u8FDB\u5EA6\u5DF2\u7ECF\u6709\u4E00\u6B21\u300C\u7EE7\u7EED\u300D\u5728\u8DD1\u4E86${holder}\uFF0C\u672C\u6B21\u7EED\u505A\u5DF2\u62E6\u622A\uFF0C\u672A\u65B0\u589E\u751F\u6210\u4EFB\u52A1\u3002\u8BF7\u7B49\u5F85\u73B0\u6709\u8C03\u7528\u5B8C\u6210\uFF0C\u907F\u514D\u5E76\u53D1\u63D0\u4EA4\u5BFC\u81F4\u91CD\u590D\u8BA1\u8D39\u3002\u4E4B\u540E\u6309\u539F resume \u6062\u590D\u8FDB\u5EA6\uFF0C\u6587\u4EF6\u4F4D\u7F6E\u4EE5\u8FD4\u56DE\u7ED3\u679C\u4E3A\u51C6\u3002` + (minutes ? `\u5982\u679C\u786E\u8BA4\u90A3\u4E00\u6B21\u5DF2\u7ECF\u4E2D\u65AD\u4E86\uFF0C\u7B49 ${minutes} \u5206\u949F\u9501\u4F1A\u81EA\u52A8\u8FC7\u671F\uFF0C\u4E5F\u53EF\u4EE5\u628A ${file} \u5220\u6389\u518D\u8BD5\u3002` : `\u786E\u8BA4\u90A3\u4E00\u6B21\u5DF2\u7ECF\u4E2D\u65AD\u4E86\u5C31\u5220\u6389 ${file} \u518D\u8BD5\u3002`)
+      ), { code: "resume_locked" });
+    }
+  }
+  throw new Error(`\u62FF\u4E0D\u5230 ${file} \u7684\u9501\uFF08\u540C\u540D\u6587\u4EF6\u4E00\u76F4\u88AB\u62A2\uFF09\uFF0C\u7A0D\u540E\u91CD\u8BD5\u3002`);
+}
+function withResumeLock(tool, toolName, config) {
+  return {
+    ...tool,
+    async execute(args, exec) {
+      return requestLogContext.run({ callId: exec?.callId || uniqueSuffix("call"), tool: toolName }, async () => {
+        const started = Date.now();
+        const dir = resumeDirOf(args?.resume);
+        let lock;
+        await appendRequestLog({
+          event: "tool_started",
+          provider: isVolcengine(config) ? "volcengine" : "metaontic",
+          model: resolveModel(config),
+          duration: args?.duration,
+          segmentSeconds: args?.segmentSeconds,
+          resuming: Boolean(dir),
+          resumeDir: dir || void 0
+        });
+        try {
+          if (dir) {
+            lock = await acquireResumeLock(dir, { toolName, callId: exec?.callId, staleMs: resumeLockStaleMs(config) });
+            await appendRequestLog({ event: "resume_lock_acquired", resumeDir: dir });
+          }
+          const result = await tool.execute(args, exec);
+          if (result?.resumeDir && args?.cumulativePreview !== true) {
+            const record = await readPauseFile(result.resumeDir);
+            record.deliveryPending = Boolean(result.deliveryError || result.ffmpegMissing);
+            await writePauseFile(result.resumeDir, record);
+          }
+          await appendRequestLog({
+            event: "tool_completed",
+            elapsedMs: Date.now() - started,
+            status: result?.status,
+            paused: result?.paused,
+            videoPath: result?.videoPath,
+            segmentsDir: result?.segmentsDir,
+            segmentCount: result?.segments?.length,
+            actualSeconds: result?.actualSeconds,
+            errorCode: result?.errorCode
+          });
+          return result;
+        } catch (error) {
+          await appendRequestLog({ event: "tool_failed", elapsedMs: Date.now() - started, errorCode: String(error?.code || "tool_error") });
+          throw error;
+        } finally {
+          if (lock) {
+            await lock.release();
+            await appendRequestLog({ event: "resume_lock_released", resumeDir: dir });
+          }
+        }
+      });
+    }
+  };
+}
+async function writePauseFile(dir, data) {
+  await mkdir4(dir, { recursive: true, mode: 448 });
+  const file = path5.join(dir, PAUSE_FILE);
+  const temp = `${file}.${uniqueSuffix("part")}`;
+  try {
+    await writeFile(temp, `${JSON.stringify(data, null, 2)}
+`, { encoding: "utf8", mode: 384 });
+    await rename2(temp, file);
+  } catch (failure) {
+    await rm2(temp, { force: true }).catch(() => {
+    });
+    throw failure;
+  }
+}
+function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
+  const done = Number(data.done) || 0;
+  const cursor = Number(data.cursor) || 0;
+  const fullPlan = (data.plan || []).map((step) => ({ ...step }));
+  const remaining = fullPlan.slice(done).map((step) => ({ ...step }));
+  const wanted = Number.isFinite(askedTotal) ? Math.min(askedTotal, MAX_TOTAL_SECONDS) : 0;
+  const cap = segmentSeconds > 0 ? segmentSeconds : MAX_SEGMENT_SECONDS;
+  let total = cursor + sumStepSeconds(remaining);
+  while (wanted > total && fullPlan.length < MAX_SEGMENTS && total + MIN_SECONDS <= wanted) {
+    const seconds = Math.max(MIN_SECONDS, Math.min(cap, wanted - total));
+    fullPlan.push({ kind: "extend", seconds });
+    remaining.push({ kind: "extend", seconds });
+    total += seconds;
+  }
+  return { fullPlan, plan: remaining, cursor, total };
+}
+function pickResumeOptions(args) {
+  const keys = [
+    "projectId",
+    "mode",
+    "ratio",
+    "generateAudio",
+    "watermark",
+    "segmentPrompts",
+    "transitionDescription",
+    "merge",
+    // 这几个是 video_extend 的口径（延长方向、提示词写法、整片时间轴位置）
+    "direction",
+    "wording",
+    "startAt",
+    "inputVideoSeconds",
+    "firstFrameUrl",
+    "lastFrameUrl",
+    "referenceImages",
+    "characterReferenceImages",
+    "resolution",
+    "seed",
+    "user",
+    "returnLastFrame"
+  ];
+  const options = {};
+  for (const key of keys) {
+    if (args?.[key] !== void 0) options[key] = args[key];
+  }
+  return options;
+}
+function pauseRecordAt({ stamp, prompt, fullPlan, done, cursor, lastVideoUrl, options, segments }) {
+  return {
+    plugin: "metaontic-video",
+    kind: "paused-plan",
+    version: 1,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    stamp,
+    prompt,
+    plan: fullPlan,
+    done,
+    cursor,
+    lastVideoUrl,
+    options,
+    steps: segments.map((segment) => ({
+      index: segment.index,
+      kind: segment.kind,
+      seconds: segment.seconds,
+      taskId: segment.taskId,
+      videoUrl: segment.videoUrl
+    }))
+  };
+}
+function resumeHint(dir, remainingSeconds, toolName = "video_generate") {
+  return `\u8981\u63A5\u7740\u505A\u5C31\u628A resume="${dir}" \u518D\u8C03\u4E00\u6B21 ${toolName}\uFF08prompt \u53EF\u4EE5\u7701\u7565\uFF0C\u5176\u4F59\u53C2\u6570\u7167\u65E7\uFF09\uFF1A\u63D2\u4EF6\u4F1A\u63A5\u7740\u5DF2\u7ECF\u751F\u6210\u7684\u5206\u6BB5\u7EE7\u7EED\uFF0C\u5DF2\u5B8C\u6210\u5206\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\uFF1B\u5269\u4F59 ${remainingSeconds} \u79D2\u4ECD\u9700\u786E\u8BA4\u8D39\u7528\u5E76\u8BA1\u8D39\u3002`;
+}
+function progressConnection(config) {
+  return {
+    provider: isVolcengine(config) ? "volcengine" : "metaontic",
+    model: resolveModel(config),
+    baseUrl: resolveBaseUrl(config),
+    submitPath: resolveSubmitPath(config),
+    queryPath: resolveQueryPath(config, "{task_id}")
+  };
+}
+function assertResumeConnection(data, config, args) {
+  if (!data?.connection) return;
+  if (JSON.stringify(data.connection) === JSON.stringify(progressConnection(config))) return;
+  if (data.pendingTask || Object.values(data.operationState || {}).some((state) => state.phase === "converting" || state.phase === "review" || state.retryUsed && !state.retryResult)) throw new Error("\u8FD9\u4EFD\u8FDB\u5EA6\u8FD8\u6709\u5DF2\u63D0\u4EA4\u7684\u4EFB\u52A1\uFF0C\u8BF7\u6062\u590D\u539F\u6A21\u578B\u548C\u63A5\u5165\u6E20\u9053\u540E\u67E5\u8BE2\uFF0C\u4E0D\u80FD\u5207\u6362\u6E20\u9053\u91CD\u590D\u63D0\u4EA4\u3002");
+  if (args?.resumeWithCurrentConfig === true) {
+    if (data.plan.slice(Number(data.done) || 0).some((step) => step.seconds > modelMaxSeconds(config))) {
+      throw new Error("\u539F\u8FDB\u5EA6\u4E2D\u7684\u5206\u6BB5\u8D85\u8FC7\u5F53\u524D\u6A21\u578B\u5355\u6BB5\u4E0A\u9650\uFF0C\u8BF7\u6062\u590D\u539F\u6A21\u578B\u540E\u7EE7\u7EED\uFF0C\u4E0D\u81EA\u52A8\u7F29\u77ED\u5DF2\u5BA1\u6838\u5206\u6BB5\u3002");
+    }
+    return;
+  }
+  throw new Error("\u5F53\u524D\u6A21\u578B\u6216\u63A5\u5165\u6E20\u9053\u4E0E\u539F\u8FDB\u5EA6\u4E0D\u4E00\u81F4\u3002\u8BF7\u6062\u590D\u539F\u914D\u7F6E\uFF1B\u5982\u9700\u66F4\u6362\uFF0C\u5148\u5411\u7528\u6237\u8BF4\u660E\u53D8\u5316\u5E76\u786E\u8BA4\uFF0C\u518D\u4F20 resumeWithCurrentConfig:true\u3002");
+}
+async function saveProgress(dir, { config, toolName, stamp, prompt, fullPlan, cursor, referenceUrl, options, segments, pendingTask, operationState = {}, characterReferences = void 0 }) {
+  const completed = segments.filter((step) => step.status === "succeeded" && step.videoUrl);
+  const record = pauseRecordAt({
+    stamp,
+    prompt,
+    fullPlan,
+    done: completed.length,
+    cursor,
+    lastVideoUrl: referenceUrl,
+    options,
+    segments: completed
+  });
+  Object.assign(record, {
+    toolName,
+    connection: progressConnection(config),
+    deliveryPending: !pendingTask && completed.length > 0,
+    state: pendingTask ? "pending" : completed.length >= fullPlan.length ? "completed" : "paused",
+    pendingTask: pendingTask || null,
+    operationState,
+    ...characterReferences !== void 0 ? { characterReferences } : {}
+  });
+  await writePauseFile(dir, record);
+}
+
+// src/businesses/video/workflow/segment-review.ts
+async function segmentSnapshot(dir) {
+  const saved = await readPauseFile(dir);
+  const done = Number(saved.done) || 0;
+  const last = saved.steps?.at(-1);
+  if (!done || !last?.taskId) throw new Error("\u8FD9\u4EFD\u8FDB\u5EA6\u6CA1\u6709\u53EF\u5BA1\u6838\u7684\u5DF2\u5B8C\u6210\u5206\u6BB5\uFF0C\u8BF7\u5148\u67E5\u8BE2\u539F\u4EFB\u52A1\u3002");
+  return {
+    saved,
+    key: `${done}:${last.taskId}`,
+    done,
+    last,
+    file: path6.join(dir, `${String(last.index).padStart(2, "0")}-${last.kind}.mp4`)
+  };
+}
+var reviewFile = (dir) => path6.join(dir, "segment-review.json");
+async function accepted(dir, key, exec) {
+  try {
+    const data = JSON.parse(await readFile3(reviewFile(dir), "utf8"));
+    return data.version === 1 && data.owner === sessionOwner(exec) && data.key === key && data.approved === true;
+  } catch {
+    return false;
+  }
+}
+async function assertSegmentReviewed(exec, args) {
+  const dir = resumeDirOf(args?.resume);
+  if (!dir || args.cumulativePreview === true) return;
+  const saved = await readPauseFile(dir);
+  if (saved.pendingTask || saved.deliveryPending || !(Number(saved.done) > 0)) return;
+  const done = Number(saved.done);
+  const appending = Number(args.duration) > Number(saved.cursor) || args.segments != null;
+  if (done >= saved.plan.length && !appending) return;
+  const snap = await segmentSnapshot(dir);
+  if (!await accepted(dir, snap.key, exec)) throw new Error("\u4E0A\u4E00\u6BB5\u89C6\u9891\u5C1A\u672A\u901A\u8FC7\u7ED3\u679C\u5BA1\u6838\uFF0C\u672A\u63D0\u4EA4\u4E0B\u4E00\u6BB5\u3002\u8BF7\u5148\u5728\u6B63\u6587\u5C55\u793A\u672C\u6BB5\u89C6\u9891\u7684\u53EF\u70B9\u51FB\u94FE\u63A5\uFF0C\u518D\u8C03\u7528video_project(action:review_segment,resume:\u539FresumeDir)\u5F39\u51FA\u7ED3\u679C\u786E\u8BA4\u7A97\uFF1B\u4E0D\u80FD\u7528\u6587\u5B57\u95EE\u53E5\u6216\u5236\u4F5C\u8D39\u7528\u5BA1\u6279\u66FF\u4EE3\u3002");
+}
+function createSegmentReview(ctx) {
+  const shown = /* @__PURE__ */ new WeakMap();
+  function observe(session, event) {
+    if (!session || event?.type !== "assistant/message") return;
+    const content = event.data?.message?.content;
+    const text = (Array.isArray(content) ? content : []).filter((x) => x.type === "text").map((x) => x.text || "").join("\n");
+    let links = shown.get(session);
+    if (!links) {
+      links = /* @__PURE__ */ new Set();
+      shown.set(session, links);
+    }
+    for (const match of text.matchAll(/\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))\s*\)/g)) {
+      const target = match[1] || match[2];
+      try {
+        links.add(/^https?:\/\//i.test(target) ? target : path6.resolve(session.header?.cwd || process.cwd(), decodeURI(target)));
+      } catch {
+      }
+    }
+  }
+  async function review(args, exec) {
+    const dir = resumeDirOf(args?.resume);
+    if (!dir) throw new Error("\u5206\u6BB5\u5BA1\u6838\u9700\u8981\u539FresumeDir\uFF0C\u4E0D\u91CD\u65B0\u751F\u6210\u3002");
+    return lockProject(`segment:${dir}`, async () => {
+      const snap = await segmentSnapshot(dir);
+      const owner = sessionOwner(exec);
+      if (await accepted(dir, snap.key, exec)) return { status: "approved", done: snap.done, resumeDir: dir, reused: true };
+      const links = shown.get(exec?.agent?.session);
+      let localReady = false;
+      try {
+        localReady = (await stat3(snap.file)).isFile();
+      } catch {
+      }
+      if (!(localReady && links?.has(snap.file)) && !links?.has(snap.last.videoUrl)) return { status: "blocked", resumeDir: dir, reason: "\u8BF7\u5148\u5728\u7528\u6237\u53EF\u89C1\u6B63\u6587\u7528\u53EF\u70B9\u51FB\u94FE\u63A5\u5C55\u793A\u521A\u5B8C\u6210\u7684\u5206\u6BB5\uFF0C\u518D\u8C03\u7528review_segment\uFF1B\u6587\u4EF6\u767B\u8BB0\u3001\u5DE5\u5177\u770B\u89C6\u9891\u6216\u7EAF\u6587\u5B57\u8DEF\u5F84\u4E0D\u7B97\u5C55\u793A\u3002", videoPath: localReady ? snap.file : void 0, videoUrl: snap.last.videoUrl };
+      const service = exec.agent?.ctx?.get?.("userQuestions") || ctx.get?.("userQuestions");
+      if (typeof service?.ask !== "function") return { status: "pending", resumeDir: dir, reason: "\u7ED3\u679C\u786E\u8BA4\u5F39\u7A97\u4E0D\u53EF\u7528\uFF0C\u672A\u6388\u6743\u4E0B\u4E00\u6BB5\uFF0C\u8BF7\u6062\u590D\u4EA4\u4E92\u80FD\u529B\u540E\u91CD\u8BD5\u5BA1\u6838\u3002" };
+      const id = "segment_result_review";
+      const result = await service.ask({ agent: exec.agent, signal: exec.signal, ...exec.callId ? { wait: { callId: exec.callId } } : {}, questions: [{ id, header: "\u5206\u6BB5\u7ED3\u679C\u786E\u8BA4", question: `\u8BF7\u5148\u770B\u7B2C${snap.done}\u6BB5\u89C6\u9891\uFF0C\u6548\u679C\u662F\u5426\u53EF\u4EE5\uFF1F\u901A\u8FC7\u540E\u624D\u80FD\u8FDB\u5165\u4E0B\u4E00\u6BB5\u7684\u8D39\u7528\u786E\u8BA4\u3002`, multiSelect: false, options: [{ label: "\u6548\u679C\u53EF\u4EE5\uFF0C\u7EE7\u7EED\u4E0B\u4E00\u6BB5", description: "\u8BA4\u53EF\u8FD9\u6BB5\u6548\u679C\uFF0C\u968F\u540E\u5355\u72EC\u786E\u8BA4\u4E0B\u4E00\u6BB5\u8D39\u7528\u3002" }, { label: "\u5148\u6682\u505C\uFF0C\u6682\u4E0D\u7EE7\u7EED", description: "\u4FDD\u7559\u73B0\u6709\u89C6\u9891\uFF0C\u4E0D\u63D0\u4EA4\u65B0\u4EFB\u52A1\uFF1B\u4E0D\u6EE1\u610F\u53EF\u8BF4\u660E\u4FEE\u6539\u8981\u6C42\u3002" }] }] });
+      const answer = result?.answers?.find((a) => a.id === id);
+      const approved = !exec.signal?.aborted && !answer?.custom && answer?.selected?.length === 1 && answer.selected[0] === "\u6548\u679C\u53EF\u4EE5\uFF0C\u7EE7\u7EED\u4E0B\u4E00\u6BB5";
+      if (!approved) return { status: "paused", resumeDir: dir, reason: "\u672A\u901A\u8FC7\u672C\u6BB5\u7ED3\u679C\u5BA1\u6838\uFF0C\u4E0D\u63D0\u4EA4\u4E0B\u4E00\u6BB5\uFF0C\u4E0D\u81EA\u52A8\u91CD\u505A\u5DF2\u5B8C\u6210\u89C6\u9891\u3002" };
+      if ((await segmentSnapshot(dir)).key !== snap.key) throw new Error("\u7B49\u5F85\u5BA1\u6838\u671F\u95F4\u5206\u6BB5\u8FDB\u5EA6\u5DF2\u6539\u53D8\uFF0C\u8BF7\u5C55\u793A\u6700\u65B0\u4E00\u6BB5\u5E76\u91CD\u65B0\u786E\u8BA4\u3002");
+      const temp = `${reviewFile(dir)}.${randomUUID()}.tmp`;
+      try {
+        await writeFile2(temp, JSON.stringify({ version: 1, owner, key: snap.key, approved: true, reviewedAt: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" });
+        await rename3(temp, reviewFile(dir));
+      } finally {
+        await rm3(temp, { force: true }).catch(() => {
+        });
+      }
+      await appendRequestLog({ event: "segment_review_approved", done: snap.done, resumeDir: dir });
+      return { status: "approved", done: snap.done, resumeDir: dir, nextAction: `\u4F7F\u7528${snap.saved.toolName || "video_generate"}\u7684\u539Fresume\u7EE7\u7EED\uFF1B\u4E0B\u4E00\u6BB5\u4ECD\u9700\u8D39\u7528\u5BA1\u6279\uFF0C\u4E0D\u91CD\u590D\u751F\u6210\u9996\u6BB5\u3002` };
+    });
+  }
+  return { observe, review };
+}
+
 // src/businesses/video/workflow/project.ts
+import { createHash, randomUUID as randomUUID2 } from "node:crypto";
+import { mkdir as mkdir5, readdir as readdir2, readFile as readFile4, writeFile as writeFile3, rename as rename4, rm as rm4 } from "node:fs/promises";
+import path7 from "node:path";
 init_hardcoded_config();
 init_config();
 init_connection();
 var locks = /* @__PURE__ */ new Set();
-var hash = (value) => createHash2("sha256").update(value).digest("hex");
+var hash = (value) => createHash("sha256").update(value).digest("hex");
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().filter((k) => value[k] !== void 0).map((k) => [k, stable(value[k])]));
@@ -3053,13 +2462,13 @@ function sessionOwner(exec) {
   return hash(id);
 }
 async function allProjects() {
-  const dir = path8.join(dshHome(), DATA_DIR, "projects");
+  const dir = path7.join(dshHome(), DATA_DIR, "projects");
   const names = await readdir2(dir).catch(() => []);
   const found = [];
   for (const name of names) {
     if (!name.endsWith(".json")) continue;
     try {
-      found.push(JSON.parse(await readFile4(path8.join(dir, name), "utf8")));
+      found.push(JSON.parse(await readFile4(path7.join(dir, name), "utf8")));
     } catch {
     }
   }
@@ -3076,7 +2485,7 @@ async function projectsOfSession(session) {
 }
 function projectFile(id) {
   if (!/^[a-f0-9-]{36}$/.test(String(id || ""))) throw new Error("\u7F3A\u5C11\u6709\u6548 projectId\uFF0C\u8BF7\u5148\u8C03\u7528 video_project(action:prepare)\u3002");
-  return path8.join(dshHome(), DATA_DIR, "projects", `${id}.json`);
+  return path7.join(dshHome(), DATA_DIR, "projects", `${id}.json`);
 }
 async function readProject(id, exec) {
   const data = JSON.parse(await readFile4(projectFile(id), "utf8"));
@@ -3085,13 +2494,13 @@ async function readProject(id, exec) {
 }
 async function writeProject(data) {
   const file = projectFile(data.id);
-  await mkdir6(path8.dirname(file), { recursive: true, mode: 448 });
-  const temp = `${file}.${randomUUID3()}.tmp`;
+  await mkdir5(path7.dirname(file), { recursive: true, mode: 448 });
+  const temp = `${file}.${randomUUID2()}.tmp`;
   try {
     await writeFile3(temp, JSON.stringify(data), { mode: 384, flag: "wx" });
-    await rename3(temp, file);
+    await rename4(temp, file);
   } finally {
-    await rm3(temp, { force: true }).catch(() => {
+    await rm4(temp, { force: true }).catch(() => {
     });
   }
 }
@@ -3105,7 +2514,7 @@ async function lockProject(id, fn) {
   }
 }
 async function createProject(exec, subjectType) {
-  const data = { version: 1, id: randomUUID3(), owner: sessionOwner(exec), subjectType, choice: "", approved: null };
+  const data = { version: 1, id: randomUUID2(), owner: sessionOwner(exec), subjectType, choice: "", approved: null };
   await writeProject(data);
   return data;
 }
@@ -3171,94 +2580,843 @@ function withProjectApproval(tool, config) {
   } };
 }
 
-// src/businesses/video/workflow/segment-review.ts
-async function segmentSnapshot(dir) {
-  const saved = await readPauseFile(dir);
-  const done = Number(saved.done) || 0;
-  const last = saved.steps?.at(-1);
-  if (!done || !last?.taskId) throw new Error("\u8FD9\u4EFD\u8FDB\u5EA6\u6CA1\u6709\u53EF\u5BA1\u6838\u7684\u5DF2\u5B8C\u6210\u5206\u6BB5\uFF0C\u8BF7\u5148\u67E5\u8BE2\u539F\u4EFB\u52A1\u3002");
-  return {
-    saved,
-    key: `${done}:${last.taskId}`,
-    done,
-    last,
-    file: path9.join(dir, `${String(last.index).padStart(2, "0")}-${last.kind}.mp4`)
+// src/businesses/film-director/project.ts
+var STAGES = ["creative", "script", "assets", "shots", "prompts", "review"];
+function validateTimeline(shots, duration) {
+  let end = 0;
+  const ids = /* @__PURE__ */ new Set();
+  for (const shot of shots) {
+    if (!shot.shot_id || ids.has(shot.shot_id)) throw Error("DUPLICATE_OR_MISSING_ID");
+    ids.add(shot.shot_id);
+    if (!Number.isSafeInteger(shot.start_ms) || !Number.isSafeInteger(shot.end_ms) || shot.start_ms !== end || shot.end_ms <= end) throw Error("GAP_OR_OVERLAP");
+    end = shot.end_ms;
+  }
+  if (end !== duration) throw Error("DURATION_MISMATCH");
+}
+function validateArtifact(stage, value, state) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("INVALID_ARTIFACT");
+  const nonempty = (key) => {
+    if (typeof value[key] !== "string" || !value[key].trim()) throw Error(`MISSING_FIELD:${key}`);
   };
-}
-var reviewFile = (dir) => path9.join(dir, "segment-review.json");
-async function accepted(dir, key, exec) {
-  try {
-    const data = JSON.parse(await readFile5(reviewFile(dir), "utf8"));
-    return data.version === 1 && data.owner === sessionOwner(exec) && data.key === key && data.approved === true;
-  } catch {
-    return false;
+  if (stage === "creative") {
+    nonempty("theme");
+    nonempty("logline");
   }
-}
-async function assertSegmentReviewed(exec, args) {
-  const dir = resumeDirOf(args?.resume);
-  if (!dir || args.cumulativePreview === true) return;
-  const saved = await readPauseFile(dir);
-  if (saved.pendingTask || saved.deliveryPending || !(Number(saved.done) > 0)) return;
-  const done = Number(saved.done);
-  const appending = Number(args.duration) > Number(saved.cursor) || args.segments != null;
-  if (done >= saved.plan.length && !appending) return;
-  const snap = await segmentSnapshot(dir);
-  if (!await accepted(dir, snap.key, exec)) throw new Error("\u4E0A\u4E00\u6BB5\u89C6\u9891\u5C1A\u672A\u901A\u8FC7\u7ED3\u679C\u5BA1\u6838\uFF0C\u672A\u63D0\u4EA4\u4E0B\u4E00\u6BB5\u3002\u8BF7\u5148\u5728\u6B63\u6587\u5C55\u793A\u672C\u6BB5\u89C6\u9891\u7684\u53EF\u70B9\u51FB\u94FE\u63A5\uFF0C\u518D\u8C03\u7528video_project(action:review_segment,resume:\u539FresumeDir)\u5F39\u51FA\u7ED3\u679C\u786E\u8BA4\u7A97\uFF1B\u4E0D\u80FD\u7528\u6587\u5B57\u95EE\u53E5\u6216\u5236\u4F5C\u8D39\u7528\u5BA1\u6279\u66FF\u4EE3\u3002");
-}
-function createSegmentReview(ctx) {
-  const shown = /* @__PURE__ */ new WeakMap();
-  function observe(session, event) {
-    if (!session || event?.type !== "assistant/message") return;
-    const content = event.data?.message?.content;
-    const text = (Array.isArray(content) ? content : []).filter((x) => x.type === "text").map((x) => x.text || "").join("\n");
-    let links = shown.get(session);
-    if (!links) {
-      links = /* @__PURE__ */ new Set();
-      shown.set(session, links);
-    }
-    for (const match of text.matchAll(/\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))\s*\)/g)) {
-      const target = match[1] || match[2];
-      try {
-        links.add(/^https?:\/\//i.test(target) ? target : path9.resolve(session.header?.cwd || process.cwd(), decodeURI(target)));
-      } catch {
-      }
-    }
+  if (stage === "script") {
+    nonempty("screenplay");
+    if (!Array.isArray(value.chapters) || !value.chapters.length || value.chapters.some((c) => !Number.isSafeInteger(c.duration_ms) || c.duration_ms <= 0) || value.chapters.reduce((n, c) => n + c.duration_ms, 0) !== state.duration_ms) throw Error("CHAPTER_DURATION_MISMATCH");
   }
-  async function review(args, exec) {
-    const dir = resumeDirOf(args?.resume);
-    if (!dir) throw new Error("\u5206\u6BB5\u5BA1\u6838\u9700\u8981\u539FresumeDir\uFF0C\u4E0D\u91CD\u65B0\u751F\u6210\u3002");
-    return lockProject(`segment:${dir}`, async () => {
-      const snap = await segmentSnapshot(dir);
-      const owner = sessionOwner(exec);
-      if (await accepted(dir, snap.key, exec)) return { status: "approved", done: snap.done, resumeDir: dir, reused: true };
-      const links = shown.get(exec?.agent?.session);
-      let localReady = false;
-      try {
-        localReady = (await stat3(snap.file)).isFile();
-      } catch {
+  if (stage === "assets") for (const key of ["characters", "scenes"]) {
+    if (!Array.isArray(value[key])) throw Error(`MISSING_FIELD:${key}`);
+    const ids = value[key].map((v) => v[key === "characters" ? "character_id" : "scene_id"]);
+    if (ids.some((id) => typeof id !== "string" || !id) || new Set(ids).size !== ids.length) throw Error("INVALID_ASSET_ID");
+  }
+  if (stage === "shots") {
+    if (!Array.isArray(value.shots)) throw Error("MISSING_SHOTS");
+    validateTimeline(value.shots, state.duration_ms);
+    const assets = state.artifacts.assets.data;
+    for (const shot of value.shots) if (!assets.scenes.some((s) => s.scene_id === shot.scene_id) || !Array.isArray(shot.character_ids) || shot.character_ids.some((id) => !assets.characters.some((c) => c.character_id === id))) throw Error("MISSING_REF");
+  }
+  if (stage === "prompts") {
+    if (!Array.isArray(value.prompts)) throw Error("MISSING_PROMPTS");
+    const shots = state.artifacts.shots.data.shots;
+    const ids = value.prompts.map((p) => p.shot_id);
+    if (new Set(ids).size !== ids.length || ids.length !== shots.length || shots.some((s) => !ids.includes(s.shot_id)) || value.prompts.some((p) => typeof p.prompt !== "string" || !p.prompt.trim())) throw Error("PROMPT_COVERAGE");
+  }
+  if (stage === "review" && (!Number.isInteger(value.score) || value.score < 85 || value.score > 100 || !Array.isArray(value.issues) || value.issues.some((i) => i.severity === "blocker") || value.passed !== true)) throw Error("REVIEW_BLOCKED");
+}
+function commitArtifact(state, stage, value, expected) {
+  if (state.revision !== expected) throw Error("REVISION_CONFLICT");
+  const index = STAGES.indexOf(stage);
+  if (index < 0) throw Error("INVALID_STAGE");
+  for (const upstream of STAGES.slice(0, index)) {
+    if (!state.artifacts[upstream] || state.artifacts[upstream].stale) throw Error("UPSTREAM_REQUIRED");
+    if (["creative", "script"].includes(upstream) && state.approvals[upstream] !== state.artifacts[upstream].revision) throw Error("APPROVAL_REQUIRED");
+  }
+  validateArtifact(stage, value, state);
+  const next = structuredClone(state);
+  next.revision++;
+  next.artifacts[stage] = { revision: next.revision, data: value, stale: false };
+  for (const downstream of STAGES.slice(index + 1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
+  for (const approved of ["creative", "script"]) if (STAGES.indexOf(approved) >= index) delete next.approvals[approved];
+  next.status = ["creative", "script"].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === "review" ? "FINAL_DELIVERY" : `${stage.toUpperCase()}_READY`;
+  return next;
+}
+function exportMarkdown(state) {
+  return `# ${state.title}
+
+Revision: ${state.revision}
+
+` + STAGES.filter((s) => state.artifacts[s]).map((s) => `## ${s}${state.artifacts[s].stale ? " (stale)" : ""}
+
+\`\`\`json
+${JSON.stringify(state.artifacts[s].data, null, 2)}
+\`\`\``).join("\n\n");
+}
+
+// src/businesses/film-director/creative.ts
+var CREATIVE_GUIDANCE = `\u4F60\u662F\u7EDF\u4E00\u521B\u4F5C\u8D1F\u8D23\u4EBA\uFF0C\u517C\u5177\u4E13\u4E1A\u7F16\u5267\u3001\u5BFC\u6F14\u3001\u5206\u955C\u5E08\u548CAI\u89C6\u9891\u63D0\u793A\u8BCD\u5DE5\u7A0B\u5E08\u80FD\u529B\u3002
+\u6309\u9700\u6C42\u6F84\u6E05\u2192\u6545\u4E8B\u5F00\u53D1\u2192\u5BFC\u6F14\u8BBE\u8BA1\u2192\u5206\u955C\u8BBE\u8BA1\u2192\u751F\u6210\u5236\u4F5C\u2192\u6210\u7247\u9A8C\u6536\u63A8\u8FDB\uFF1B\u5267\u60C5\u770B\u4EBA\u7269\u52A8\u673A\u3001\u56E0\u679C\u4E0E\u8F6C\u6298\uFF0C\u5BA3\u4F20\u770B\u771F\u5B9E\u5356\u70B9\u4E0E\u884C\u52A8\u5F15\u5BFC\uFF0C\u98CE\u666F\u4E0D\u786C\u52A0\u51B2\u7A81\u3002
+\u7F16\u5267\u4EA4\u4ED8\u4E3B\u9898\u3001\u4EBA\u7269\u76EE\u6807\u3001\u573A\u666F\u884C\u52A8\u548C\u81EA\u7136\u5BF9\u767D\uFF1B\u5BFC\u6F14\u4EA4\u4ED8\u5F71\u8C03\u3001\u5149\u7EBF\u3001\u8868\u6F14\u3001\u58F0\u97F3\u4E0E\u8282\u594F\uFF0C\u62BD\u8C61\u98CE\u683C\u5FC5\u987B\u843D\u4E3A\u53EF\u6267\u884C\u9009\u62E9\u3002
+\u5206\u955C\u4EA4\u4ED8\u7A33\u5B9A\u955C\u53F7\u3001\u53D9\u4E8B\u76EE\u7684\u3001\u65F6\u957F\u3001\u6784\u56FE\u3001\u666F\u522B\u3001\u89C6\u89D2\u3001\u8FD0\u955C\u3001\u52A8\u4F5C\u8D77\u6B62\u548C\u8854\u63A5\uFF1B\u955C\u5934\u53D8\u5316\u670D\u52A1\u5185\u5BB9\uFF0C\u7528\u6237\u6307\u5B9A\u56FA\u5B9A\u955C\u5934\u6216\u4E00\u955C\u5230\u5E95\u65F6\u5C0A\u91CD\u9009\u62E9\u3002
+\u63D0\u793A\u8BCD\u5DE5\u7A0B\u5148\u5F62\u6210\u6A21\u578B\u65E0\u5173\u7684\u955C\u5934\u63CF\u8FF0\uFF0C\u518D\u6839\u636E\u5F53\u524D\u6A21\u578B\u516C\u5F00\u53C2\u6570\u7F16\u8BD1\u4E3B\u4F53\u3001\u52A8\u4F5C\u3001\u573A\u666F\u3001\u5149\u5F71\u3001\u955C\u5934\u3001\u58F0\u97F3\u4E0E\u7EA6\u675F\uFF1B\u955C\u5934\u4E0D\u7B49\u4E8E\u4ED8\u8D39\u751F\u6210\u5355\u5143\uFF0C\u4E0D\u6309\u955C\u5934\u6570\u589E\u52A0\u8C03\u7528\u3002
+\u89D2\u8272\u5916\u8C8C\u3001\u670D\u88C5\u3001\u9053\u5177\u3001\u573A\u666F\u5E03\u5C40\u91C7\u7528\u7A33\u5B9A\u6807\u8BC6\uFF0C\u672A\u77E5\u4E8B\u5B9E\u6807\u5F85\u786E\u8BA4\uFF0C\u4E0D\u7F16\u9020\u7D20\u6750\u6216\u6A21\u578B\u80FD\u529B\u3002\u5BA1\u6838\u4EBA\u7269\u4E00\u81F4\u6027\u3001\u7A7A\u95F4\u4E0E\u52A8\u4F5C\u8FDE\u7EED\u6027\u3001\u5BF9\u767D\u65F6\u957F\u53CA\u52A8\u4F5C\u590D\u6742\u5EA6\u3002
+\u53EA\u4FEE\u6539\u7528\u6237\u8981\u6C42\u7684\u90E8\u5206\u5E76\u4FDD\u7559\u6EE1\u610F\u5185\u5BB9\uFF1B\u4E0A\u6E38\u53D8\u5316\u6807\u8BB0\u53D7\u5F71\u54CD\u955C\u5934\u3001\u63D0\u793A\u8BCD\u548C\u751F\u6210\u65B9\u6848\uFF0C\u5DF2\u6709\u89C6\u9891\u4E0D\u5220\u9664\u3001\u4E0D\u81EA\u52A8\u91CD\u505A\u3002\u7ED3\u679C\u672A\u5B9E\u9645\u89C2\u770B/\u8BD5\u542C\u6807\u5F85\u4EBA\u5DE5\u9A8C\u6536\uFF0C\u4E0D\u628A\u751F\u6210\u6210\u529F\u5F53\u9A8C\u6536\u901A\u8FC7\u3002`;
+
+// src/businesses/film-director/index.ts
+var locks2 = /* @__PURE__ */ new Set();
+var filmDirectorBusiness = {
+  id: "film-director",
+  prompt: () => CREATIVE_GUIDANCE + "\n\u7528\u6237\u8981\u6C42\u4E13\u4E1A\u5206\u9636\u6BB5\u521B\u4F5C\u6216\u8D85\u8FC7120\u79D2\u7684\u5267\u672C\u89C4\u5212\u65F6\u4F7F\u7528film_project\uFF0C\u521B\u4F5C\u8303\u56F415\u20133600\u79D2\uFF0C\u9996\u671F\u53EA\u8F93\u51FA\u521B\u4F5C\u8BA1\u5212\uFF0C\u4E0D\u81EA\u52A8\u751F\u6210\u89C6\u9891\u3002create\u540E\u6309creative/script/assets/shots/prompts/review\u63D0\u4EA4\u7ED3\u6784\u5316JSON\u3002\u521B\u610F\u548C\u5267\u672C\u5206\u522B\u8C03\u7528approve\u53D6\u5F97\u771F\u5B9E\u7528\u6237\u6279\u51C6\u3002\u4F7F\u7528read\u8FD4\u56DE\u7684revision\u63D0\u4EA4\uFF0C\u6539\u7A3F\u540E\u8865\u5168\u5931\u6548\u4E0B\u6E38\u3002\u4E0D\u5F97\u58F0\u79F0\u5B58\u5728\u72EC\u7ACB\u5B50Agent\uFF1B\u540C\u4E00\u52A9\u624B\u6309\u804C\u8D23\u987A\u5E8F\u521B\u4F5C\u3002\u666E\u901A\u89C6\u9891\u5236\u4F5C\u6CBF\u73B0\u6709video_project\u6D41\u7A0B\u3002",
+  apply(runtime) {
+    runtime.tools.register("film-director", {
+      name: "film_project",
+      description: "\u4E13\u4E1A\u521B\u4F5C\u9879\u76EE\uFF1Acreate/read/submit/approve/export\u3002\u78C1\u76D8\u4FDD\u5B58\uFF0C\u521B\u610F\u4E0E\u5267\u672C\u72EC\u7ACB\u4EBA\u5DE5\u6279\u51C6\uFF0C\u4E0D\u63D0\u4EA4\u4ED8\u8D39\u89C6\u9891\u3002submit\u7684content\u4E3AJSON\u5B57\u7B26\u4E32\uFF1Acreative\u542Btheme/logline\uFF1Bscript\u542Bscreenplay/chapters\uFF08duration_ms\uFF09\uFF1Bassets\u542Bcharacters/scenes\uFF1Bshots\u542Bshots\uFF1Bprompts\u542Bprompts\uFF1Breview\u542Bscore/passed/issues\u3002",
+      parameters: { type: "object", properties: {
+        action: { type: "string", enum: ["create", "read", "submit", "approve", "export"] },
+        projectId: { type: "string" },
+        title: { type: "string" },
+        sourceBrief: { type: "string" },
+        durationSeconds: { type: "integer" },
+        stage: { type: "string", enum: [...STAGES] },
+        content: { type: "string" },
+        expectedRevision: { type: "integer" }
+      }, required: ["action"] },
+      output: { schema: { type: "object" }, render(_args, value) {
+        return [{ type: "text", text: JSON.stringify(value) }];
+      } },
+      isConcurrencySafe() {
+        return false;
+      },
+      async execute(args, exec) {
+        const owner = sessionOwner(exec);
+        const id = args.action === "create" ? randomUUID3() : args.projectId;
+        if (!/^[a-f0-9-]{36}$/.test(id || "")) throw Error("INVALID_PROJECT_ID");
+        if (locks2.has(id)) throw Error("PROJECT_BUSY");
+        locks2.add(id);
+        try {
+          const dir = path8.join(dshHome(), DATA_DIR, "film-projects", owner, id);
+          const file = path8.join(dir, "project.json");
+          let state;
+          if (args.action === "create") {
+            if (!Number.isInteger(args.durationSeconds) || args.durationSeconds < 15 || args.durationSeconds > 3600 || !args.title?.trim() || !args.sourceBrief?.trim()) throw Error("INVALID_REQUIREMENTS");
+            state = { schema_version: "2.0.0", project_id: id, title: args.title, source_brief: args.sourceBrief, duration_ms: args.durationSeconds * 1e3, revision: 0, status: "REQUIREMENT_ANALYSIS", artifacts: {}, approvals: {}, decisions: [] };
+          } else state = JSON.parse(await readFile5(file, "utf8"));
+          if (args.action === "read") return state;
+          if (args.action === "export") return { project: state, markdown: exportMarkdown(state), status: state.status };
+          if (args.action === "submit") state = commitArtifact(state, args.stage, JSON.parse(args.content), args.expectedRevision);
+          if (args.action === "approve") {
+            const artifact = state.artifacts[args.stage];
+            if (!["creative", "script"].includes(args.stage) || !artifact || artifact.stale || state.revision !== args.expectedRevision) throw Error("INVALID_APPROVAL_REVISION");
+            const service = runtime.ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
+            if (!service?.ask) return { status: "needs_input", reason: "\u4EBA\u5DE5\u786E\u8BA4\u670D\u52A1\u4E0D\u53EF\u7528" };
+            const answer = await service.ask({ agent: exec.agent, signal: exec.signal, questions: [{ id: "film_approval", header: "\u521B\u4F5C\u5BA1\u6838", question: `\u5BA1\u6838${args.stage} revision ${artifact.revision}\uFF1A
+${JSON.stringify(artifact.data)}
+\u662F\u5426\u6279\u51C6\u672C\u7248\u8FDB\u5165\u4E0B\u4E00\u9636\u6BB5\uFF1F`, multiSelect: false, options: [{ label: "\u6279\u51C6\u672C\u7248", description: "\u7EE7\u7EED\u4E0B\u4E00\u521B\u4F5C\u9636\u6BB5" }, { label: "\u9700\u8981\u4FEE\u6539", description: "\u4FDD\u7559\u8349\u7A3F\u5E76\u4FEE\u6539" }] }] });
+            const decision = answer?.answers?.find((a) => a.id === "film_approval");
+            if (exec.signal?.aborted || decision?.custom || decision?.selected?.length !== 1 || decision.selected[0] !== "\u6279\u51C6\u672C\u7248") return { status: "needs_input", projectId: id };
+            state.approvals[args.stage] = artifact.revision;
+            state.decisions.push({ stage: args.stage, revision: artifact.revision, decision: "approve", approved_at: (/* @__PURE__ */ new Date()).toISOString() });
+            state.revision++;
+            state.status = args.stage === "creative" ? "SCRIPT_WRITING" : "ASSET_DESIGN";
+          }
+          if (!["create", "submit", "approve"].includes(args.action)) throw Error("INVALID_ACTION");
+          await mkdir6(path8.join(dir, "snapshots"), { recursive: true, mode: 448 });
+          const body = JSON.stringify(state, null, 2);
+          await writeFile4(path8.join(dir, "snapshots", `${state.revision}-${randomUUID3()}.json`), body, { mode: 384, flag: "wx" });
+          const temp = path8.join(dir, `${randomUUID3()}.tmp`);
+          await writeFile4(temp, body, { mode: 384, flag: "wx" });
+          await rename5(temp, file);
+          return { ...state, sha256: createHash2("sha256").update(body).digest("hex") };
+        } finally {
+          locks2.delete(id);
+        }
       }
-      if (!(localReady && links?.has(snap.file)) && !links?.has(snap.last.videoUrl)) return { status: "blocked", resumeDir: dir, reason: "\u8BF7\u5148\u5728\u7528\u6237\u53EF\u89C1\u6B63\u6587\u7528\u53EF\u70B9\u51FB\u94FE\u63A5\u5C55\u793A\u521A\u5B8C\u6210\u7684\u5206\u6BB5\uFF0C\u518D\u8C03\u7528review_segment\uFF1B\u6587\u4EF6\u767B\u8BB0\u3001\u5DE5\u5177\u770B\u89C6\u9891\u6216\u7EAF\u6587\u5B57\u8DEF\u5F84\u4E0D\u7B97\u5C55\u793A\u3002", videoPath: localReady ? snap.file : void 0, videoUrl: snap.last.videoUrl };
-      const service = exec.agent?.ctx?.get?.("userQuestions") || ctx.get?.("userQuestions");
-      if (typeof service?.ask !== "function") return { status: "pending", resumeDir: dir, reason: "\u7ED3\u679C\u786E\u8BA4\u5F39\u7A97\u4E0D\u53EF\u7528\uFF0C\u672A\u6388\u6743\u4E0B\u4E00\u6BB5\uFF0C\u8BF7\u6062\u590D\u4EA4\u4E92\u80FD\u529B\u540E\u91CD\u8BD5\u5BA1\u6838\u3002" };
-      const id = "segment_result_review";
-      const result = await service.ask({ agent: exec.agent, signal: exec.signal, ...exec.callId ? { wait: { callId: exec.callId } } : {}, questions: [{ id, header: "\u5206\u6BB5\u7ED3\u679C\u786E\u8BA4", question: `\u8BF7\u5148\u770B\u7B2C${snap.done}\u6BB5\u89C6\u9891\uFF0C\u6548\u679C\u662F\u5426\u53EF\u4EE5\uFF1F\u901A\u8FC7\u540E\u624D\u80FD\u8FDB\u5165\u4E0B\u4E00\u6BB5\u7684\u8D39\u7528\u786E\u8BA4\u3002`, multiSelect: false, options: [{ label: "\u6548\u679C\u53EF\u4EE5\uFF0C\u7EE7\u7EED\u4E0B\u4E00\u6BB5", description: "\u8BA4\u53EF\u8FD9\u6BB5\u6548\u679C\uFF0C\u968F\u540E\u5355\u72EC\u786E\u8BA4\u4E0B\u4E00\u6BB5\u8D39\u7528\u3002" }, { label: "\u5148\u6682\u505C\uFF0C\u6682\u4E0D\u7EE7\u7EED", description: "\u4FDD\u7559\u73B0\u6709\u89C6\u9891\uFF0C\u4E0D\u63D0\u4EA4\u65B0\u4EFB\u52A1\uFF1B\u4E0D\u6EE1\u610F\u53EF\u8BF4\u660E\u4FEE\u6539\u8981\u6C42\u3002" }] }] });
-      const answer = result?.answers?.find((a) => a.id === id);
-      const approved = !exec.signal?.aborted && !answer?.custom && answer?.selected?.length === 1 && answer.selected[0] === "\u6548\u679C\u53EF\u4EE5\uFF0C\u7EE7\u7EED\u4E0B\u4E00\u6BB5";
-      if (!approved) return { status: "paused", resumeDir: dir, reason: "\u672A\u901A\u8FC7\u672C\u6BB5\u7ED3\u679C\u5BA1\u6838\uFF0C\u4E0D\u63D0\u4EA4\u4E0B\u4E00\u6BB5\uFF0C\u4E0D\u81EA\u52A8\u91CD\u505A\u5DF2\u5B8C\u6210\u89C6\u9891\u3002" };
-      if ((await segmentSnapshot(dir)).key !== snap.key) throw new Error("\u7B49\u5F85\u5BA1\u6838\u671F\u95F4\u5206\u6BB5\u8FDB\u5EA6\u5DF2\u6539\u53D8\uFF0C\u8BF7\u5C55\u793A\u6700\u65B0\u4E00\u6BB5\u5E76\u91CD\u65B0\u786E\u8BA4\u3002");
-      const temp = `${reviewFile(dir)}.${randomUUID4()}.tmp`;
-      try {
-        await writeFile4(temp, JSON.stringify({ version: 1, owner, key: snap.key, approved: true, reviewedAt: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" });
-        await rename4(temp, reviewFile(dir));
-      } finally {
-        await rm4(temp, { force: true }).catch(() => {
-        });
-      }
-      await appendRequestLog({ event: "segment_review_approved", done: snap.done, resumeDir: dir });
-      return { status: "approved", done: snap.done, resumeDir: dir, nextAction: `\u4F7F\u7528${snap.saved.toolName || "video_generate"}\u7684\u539Fresume\u7EE7\u7EED\uFF1B\u4E0B\u4E00\u6BB5\u4ECD\u9700\u8D39\u7528\u5BA1\u6279\uFF0C\u4E0D\u91CD\u590D\u751F\u6210\u9996\u6BB5\u3002` };
     });
   }
-  return { observe, review };
+};
+
+// src/core/agent-registry.ts
+function selectedAgentId(context, ctx) {
+  const agent = context?.agent;
+  const session = agent?.session;
+  if (!session) return null;
+  for (const owner of [agent?.ctx, ctx]) {
+    try {
+      const registry = owner?.get?.("agentPresets");
+      if (typeof registry?.presetForSession === "function") return registry.presetForSession(session) ?? null;
+    } catch {
+      return null;
+    }
+  }
+  return session.header?.agentPreset ?? null;
+}
+function createAgentRegistry(definitions) {
+  const agents2 = /* @__PURE__ */ new Map();
+  for (const definition of definitions) {
+    if (!definition.id || agents2.has(definition.id)) throw new Error(`\u91CD\u590D\u6216\u65E0\u6548\u7684 Agent\uFF1A${definition.id}`);
+    agents2.set(definition.id, Object.freeze({ ...definition, businesses: Object.freeze([...definition.businesses]), skills: Object.freeze([...definition.skills]) }));
+  }
+  const resolve3 = (context, ctx) => agents2.get(selectedAgentId(context, ctx)) ?? null;
+  return Object.freeze({
+    list: () => [...agents2.values()],
+    get: (id) => agents2.get(id) ?? null,
+    resolve: resolve3,
+    hasBusiness: (context, ctx, business) => resolve3(context, ctx)?.businesses.includes(business) ?? false
+  });
+}
+var active = /* @__PURE__ */ new WeakMap();
+function registryForContext(ctx, fallback) {
+  return ctx && active.get(ctx)?.at(-1)?.registry || fallback;
+}
+function bindAgentRegistry(ctx, registry) {
+  const stack = active.get(ctx) || [];
+  const entry = { registry };
+  stack.push(entry);
+  active.set(ctx, stack);
+  return () => {
+    const index = stack.indexOf(entry);
+    if (index >= 0) stack.splice(index, 1);
+    if (!stack.length && active.get(ctx) === stack) active.delete(ctx);
+  };
+}
+
+// src/core/telemetry/reporter.ts
+import { randomUUID as randomUUID4, createHash as createHash3 } from "node:crypto";
+import { mkdir as mkdir7, readFile as readFile6, writeFile as writeFile5 } from "node:fs/promises";
+import path9 from "node:path";
+import os4 from "node:os";
+init_version();
+init_value();
+init_hardcoded_config();
+init_hardcoded_config();
+var STATE = /* @__PURE__ */ Symbol.for(`${PLUGIN_ID}.analytics.process`);
+var EVENTS = /* @__PURE__ */ new Set(["plugin_started", "tool_started", "tool_finished", "video_task_created", "video_task_finished"]);
+var TOOLS = /* @__PURE__ */ new Set(["video_generate", "video_extend", "video_status", "video_project", "video_prepare_image", "video_estimate", "video_config", "video_setup", "video_stage", "media_submission", "video_canvas", "video_hyperframes"]);
+var STATUSES = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled", "unknown", "timeout", "approved", "pending", "paused", "prepared", "draft", "blocked", "review_required", "submission_unknown", "ok"]);
+var ERRORS = /* @__PURE__ */ new Set(["provider_auth", "provider_failed", "provider_network_error", "provider_rate_limited", "provider_quota_exceeded", "provider_price_config_error", "provider_bad_response", "content_rejected", "real_person_rejected", "submission_unknown", "waiting_stopped", "ABORTED"]);
+function processState() {
+  const owner = globalThis;
+  return owner[STATE] ||= { identities: /* @__PURE__ */ new Map(), started: /* @__PURE__ */ new Set() };
+}
+function identityFiles() {
+  const dir = path9.join(dshHome(), "state", DATA_DIR);
+  return { dir, files: [path9.join(dir, "analytics-id.json"), path9.join(dir, "analytics-anchor.json")] };
+}
+async function analyticsIdentity() {
+  const { dir, files } = identityFiles();
+  const state = processState();
+  if (!state.identities.has(dir)) state.identities.set(dir, (async () => {
+    const parse = (raw) => {
+      try {
+        const id2 = JSON.parse(raw).installationId;
+        return /^[a-f0-9-]{36}$/i.test(id2) ? id2 : null;
+      } catch {
+        return null;
+      }
+    };
+    const present = [];
+    for (const file of files) {
+      try {
+        present.push(parse(await readFile6(file, "utf8")));
+      } catch {
+        present.push(null);
+      }
+    }
+    let id = present[0] || present[1];
+    await mkdir7(dir, { recursive: true, mode: 448 });
+    if (!id) {
+      const created = randomUUID4();
+      try {
+        await writeFile5(files[0], JSON.stringify({ installationId: created }), { mode: 384, flag: "wx" });
+        id = created;
+      } catch (error) {
+        if (error.code !== "EEXIST") throw error;
+        id = parse(await readFile6(files[0], "utf8").catch(() => ""));
+        if (!id) {
+          id = created;
+          await writeFile5(files[0], JSON.stringify({ installationId: id }), { mode: 384 });
+        }
+      }
+    }
+    for (const [index, file] of files.entries()) {
+      if (present[index] === id) continue;
+      try {
+        await writeFile5(file, JSON.stringify({ installationId: id }), { mode: 384 });
+      } catch {
+      }
+    }
+    return id;
+  })().catch(() => null));
+  return state.identities.get(dir);
+}
+function analyticsFields(input = {}) {
+  const value = {};
+  if (TOOLS.has(input.tool)) value.tool = input.tool;
+  if (["video-director", "promo-video", "standard"].includes(input.mode)) value.mode = input.mode;
+  if (STATUSES.has(input.status)) value.status = input.status;
+  if (typeof input.durationMs === "number" && Number.isFinite(input.durationMs)) value.durationMs = Math.round(Math.max(0, Math.min(864e5, input.durationMs)));
+  if (typeof input.errorCode === "string") value.errorCode = ERRORS.has(input.errorCode) ? input.errorCode : "other";
+  return value;
+}
+function deviceText(value, allowSpace) {
+  return String(value ?? "").replace(allowSpace ? /[^a-zA-Z0-9.+_ -]/g : /[^a-zA-Z0-9.+_-]/g, "").slice(0, 64) || "unknown";
+}
+function isReleaseVersion(version) {
+  return /^\d+\.\d+\.\d+$/.test(String(version ?? "").trim().replace(/^v/i, ""));
+}
+function createAnalyticsReporter(config, options = {}) {
+  const releaseBuild = options.releaseBuild || (() => isReleaseVersion(PLUGIN_VERSION));
+  if (!releaseBuild()) return { record() {
+  }, start() {
+  }, dispose() {
+  }, flush: async () => {
+  }, pending: () => 0 };
+  const enabled = options.enabled || (() => process.env.METAONTIC_VIDEO_ANALYTICS_DISABLED !== "1" && ref(config, "usageStatsEnabled", true) !== false);
+  const request = options.request || ((...args) => globalThis.fetch(...args));
+  const identity = options.identity || analyticsIdentity;
+  const device = options.device || (() => ({
+    arch: ["arm64", "x64", "ia32", "arm"].includes(os4.arch()) ? os4.arch() : "other",
+    osRelease: deviceText(os4.release(), true),
+    memoryGb: Math.max(1, Math.min(4096, Math.round(os4.totalmem() / 1024 ** 3))),
+    harnessVersion: deviceText(process.env.DSH_CLIENT_VERSION || process.env.DSH_APP_VERSION, false)
+  }));
+  const delay = options.delayMs ?? 1e3;
+  const timeout = options.timeoutMs ?? 1500;
+  const maxQueue = options.maxQueue ?? 200;
+  let queue = [], timer, controller = null;
+  let disposed = false, sending = false;
+  const allowed = () => {
+    try {
+      return !disposed && enabled();
+    } catch {
+      return false;
+    }
+  };
+  function schedule(ms = delay) {
+    if (!allowed() || timer || sending || !queue.length) return;
+    timer = setTimeout(() => {
+      timer = null;
+      void flush();
+    }, ms);
+    timer.unref?.();
+  }
+  async function flush() {
+    if (!allowed()) {
+      queue = [];
+      return;
+    }
+    if (sending || !queue.length) return;
+    sending = true;
+    const batch = queue.splice(0, 20);
+    let watchdog;
+    try {
+      const installationId = await identity();
+      if (!installationId || !allowed()) return;
+      controller = new AbortController();
+      const abort = new Promise((_, reject) => {
+        watchdog = setTimeout(() => {
+          controller?.abort();
+          reject(new Error("analytics timeout"));
+        }, timeout);
+        watchdog.unref?.();
+      });
+      const response = await Promise.race([Promise.resolve().then(() => request(ANALYTICS_URL, {
+        method: "POST",
+        redirect: "error",
+        credentials: "omit",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({ installationId, device: device(), events: batch.map(({ attempts, ...event }) => event) })
+      })), abort]);
+      try {
+        void response?.body?.cancel()?.catch(() => {
+        });
+      } catch {
+      }
+      if (!response?.ok) throw new Error("analytics rejected");
+    } catch {
+      if (allowed()) {
+        const retry = batch.map((event) => ({ ...event, attempts: event.attempts + 1 })).filter((event) => event.attempts < 3);
+        queue = [...retry, ...queue].slice(-maxQueue);
+      }
+    } finally {
+      clearTimeout(watchdog);
+      controller = null;
+      sending = false;
+      if (allowed() && queue.length) schedule(queue[0].attempts ? Math.min(3e4, 1e3 * 5 ** queue[0].attempts) : delay);
+    }
+  }
+  function record(name, input = {}, dedupeKey = "") {
+    try {
+      if (!allowed()) {
+        queue = [];
+        return;
+      }
+      if (!EVENTS.has(name)) return;
+      const fields = analyticsFields(input);
+      if (name !== "plugin_started" && !fields.tool) return;
+      const event = {
+        eventId: randomUUID4(),
+        name,
+        occurredAt: (/* @__PURE__ */ new Date()).toISOString(),
+        version: PLUGIN_VERSION,
+        platform: ["darwin", "win32", "linux"].includes(process.platform) ? process.platform : "other",
+        ...fields,
+        attempts: 0
+      };
+      if (dedupeKey) {
+        void Promise.resolve().then(() => identity()).then((id) => {
+          if (!id || !allowed()) return;
+          event.eventId = createHash3("sha256").update(`${id}:${name}:${dedupeKey}`).digest("hex");
+          queue.push(event);
+          queue = queue.slice(-maxQueue);
+          schedule();
+        }).catch(() => {
+        });
+      } else {
+        queue.push(event);
+        queue = queue.slice(-maxQueue);
+        schedule();
+      }
+    } catch {
+    }
+  }
+  function start() {
+    void Promise.resolve().then(() => allowed() ? identity() : null).then((id) => {
+      if (!id || !allowed()) return;
+      const starts = options.started || processState().started;
+      if (!starts.has(id)) {
+        starts.add(id);
+        record("plugin_started");
+      }
+    }).catch(() => {
+    });
+  }
+  function dispose() {
+    disposed = true;
+    queue = [];
+    clearTimeout(timer);
+    controller?.abort();
+  }
+  return { record, start, dispose, flush, pending: () => queue.length };
+}
+function reportUsage(exec, name, fields, key = "") {
+  try {
+    exec?.metaonticAnalytics?.record(name, fields, key);
+  } catch {
+  }
+}
+function withUsageAnalytics(tool, reporter, mode = (_exec) => "standard") {
+  return { ...tool, async execute(args, exec) {
+    const started = Date.now();
+    let selected = "standard";
+    try {
+      selected = mode(exec);
+    } catch {
+    }
+    try {
+      reporter.record("tool_started", { tool: tool.name, mode: selected });
+    } catch {
+    }
+    try {
+      const result = await tool.execute(args, { ...exec, name: tool.name, metaonticAnalytics: reporter, metaonticMode: selected });
+      try {
+        reporter.record("tool_finished", { tool: tool.name, mode: selected, status: result?.status || "ok", durationMs: Date.now() - started, errorCode: result?.errorCode });
+      } catch {
+      }
+      return result;
+    } catch (error) {
+      try {
+        reporter.record("tool_finished", { tool: tool.name, mode: selected, status: "failed", durationMs: Date.now() - started, errorCode: error?.code || "other" });
+      } catch {
+      }
+      throw error;
+    }
+  } };
+}
+
+// src/core/utils/timing.ts
+import { randomUUID as randomUUID5 } from "node:crypto";
+import { performance } from "node:perf_hooks";
+async function timedStage(stage, operation) {
+  const spanId = randomUUID5();
+  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const start = performance.now();
+  await appendRequestLog({ event: "stage_started", stage, spanId, startedAt });
+  let outcome = "error";
+  try {
+    const result = await operation();
+    outcome = ["failed", "unknown", "timeout", "cancelled", "pending", "review_required"].includes(result?.status) ? result.status : "success";
+    return result;
+  } catch (error) {
+    outcome = error?.name === "AbortError" || error?.code === "ABORTED" ? "cancelled" : "error";
+    throw error;
+  } finally {
+    await appendRequestLog({
+      event: "stage_finished",
+      stage,
+      spanId,
+      startedAt,
+      finishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      elapsedMs: Math.round((performance.now() - start) * 1e3) / 1e3,
+      outcome
+    });
+  }
+}
+function withStageTiming(tool) {
+  return { ...tool, async execute(args, exec) {
+    const context = { ...requestLogContext.getStore(), callId: exec?.callId || randomUUID5(), tool: tool.name };
+    return requestLogContext.run(context, () => timedStage(`tool:${tool.name}`, () => tool.execute(args, exec)));
+  } };
+}
+
+// src/core/tool-registry.ts
+function createToolRegistry(ctx, agents2, analytics, defer = () => {
+}) {
+  const owners = /* @__PURE__ */ new Map();
+  function allowed(business, exec) {
+    const agent = agents2.resolve({ agent: exec?.agent }, ctx);
+    return !agent || agent.businesses.includes(business);
+  }
+  function register(business, tool, registrationContext = ctx) {
+    if (owners.has(tool.name)) throw new Error(`\u5DE5\u5177\u540D\u79F0\u91CD\u590D\uFF1A${tool.name}`);
+    owners.set(tool.name, business);
+    const guarded = { ...tool, async execute(args, exec) {
+      if (!allowed(business, exec)) throw new Error("\u5F53\u524D\u52A9\u624B\u672A\u542F\u7528\u6B64\u4E1A\u52A1\uFF0C\u8BF7\u5207\u6362\u5230\u5BF9\u5E94\u52A9\u624B\u540E\u91CD\u8BD5\u3002");
+      return tool.execute(args, exec);
+    } };
+    let dispose;
+    try {
+      dispose = registrationContext.tools.register(withStageTiming(withUsageAnalytics(
+        guarded,
+        analytics,
+        (exec) => agents2.resolve({ agent: exec?.agent }, ctx)?.id || "standard"
+      )));
+    } catch (error) {
+      owners.delete(tool.name);
+      throw error;
+    }
+    let disposed = false;
+    const cleanup = () => {
+      if (disposed) return;
+      disposed = true;
+      owners.delete(tool.name);
+      if (typeof dispose === "function") dispose();
+    };
+    defer(cleanup);
+    return cleanup;
+  }
+  return { register, allowed, owner: (name) => owners.get(name) };
+}
+
+// src/core/runtime.ts
+init_hardcoded_config();
+
+// src/core/installation/update-lockfile.ts
+init_hardcoded_config();
+import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import path10 from "node:path";
+import { fileURLToPath } from "node:url";
+var PACKAGE_NAME = PLUGIN_PACKAGE;
+var LOCKFILE = "pnpm-lock.yaml";
+var RELEASE_HOSTS = [GITEE, GITHUB].map(({ web }) => web.replace(/^https?:\/\//, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+var RELEASE_URL = new RegExp(`^https?://(?:${RELEASE_HOSTS.join("|")})/releases/download/`, "i");
+var SHA = /^sha\d+-[A-Za-z0-9+/=]+$/;
+var indentOf = (line) => line.length - line.trimStart().length;
+function integrityOf(block) {
+  const match = /integrity:\s*([^,\s}]+)/.exec(block);
+  return match ? match[1] : "";
+}
+function remoteEntry(line) {
+  const match = /^ {2}(\S+)@(https?:\/\/\S+?):(?:\s.*)?$/.exec(line);
+  return match ? { name: match[1], url: match[2] } : null;
+}
+function blockEnd(lines, start, indent) {
+  let end = start + 1;
+  while (end < lines.length) {
+    const line = lines[end];
+    if (!line.trim()) {
+      end += 1;
+      continue;
+    }
+    if (indentOf(line) <= indent) break;
+    end += 1;
+  }
+  return end;
+}
+function stripUnverifiableEntries(text) {
+  const newline = text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = text.split(/\r?\n/);
+  const ours = /* @__PURE__ */ new Set();
+  const verified = /* @__PURE__ */ new Set();
+  for (let index = 0; index < lines.length; index += 1) {
+    const entry = remoteEntry(lines[index]);
+    if (!entry || entry.name !== PACKAGE_NAME) continue;
+    const end = blockEnd(lines, index, 2);
+    const block = lines.slice(index, end).join("\n");
+    if (!RELEASE_URL.test(entry.url) && !/tarball:\s*https?:\/\//.test(block)) continue;
+    ours.add(entry.url);
+    if (SHA.test(integrityOf(block))) verified.add(entry.url);
+  }
+  const poisoned = new Set([...ours].filter((url) => !verified.has(url)));
+  if (!poisoned.size) return { text, removed: [] };
+  const removed = /* @__PURE__ */ new Set();
+  for (let index = 0; index < lines.length; index += 1) {
+    const entry = remoteEntry(lines[index]);
+    if (!entry || entry.name !== PACKAGE_NAME || !poisoned.has(entry.url)) continue;
+    const end = blockEnd(lines, index, 2);
+    removed.add(entry.name + "@" + entry.url);
+    lines.splice(index, end - index);
+    index -= 1;
+  }
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^ {6}metaontic-video:\s*$/.test(lines[index])) continue;
+    const specifier = (/^\s+specifier:\s*(\S+)\s*$/.exec(lines[index + 1] || "") || [])[1] || (/^\s+version:\s*(\S+)\s*$/.exec(lines[index + 2] || "") || [])[1] || "";
+    if (!poisoned.has(specifier)) continue;
+    lines.splice(index, blockEnd(lines, index, 6) - index);
+    index -= 1;
+  }
+  return { text: lines.join(newline), removed: [...removed] };
+}
+function locateProfileDir(moduleUrl) {
+  let dir = fileURLToPath(moduleUrl);
+  for (let up = 0; up < 3; up += 1) dir = path10.dirname(dir);
+  return dir;
+}
+function repairLockfileAt(lockfile, log = () => {
+}) {
+  if (!existsSync(lockfile)) return { status: "unavailable" };
+  let before = "";
+  try {
+    before = readFileSync(lockfile, "utf8");
+  } catch {
+    return { status: "unavailable" };
+  }
+  const { text, removed } = stripUnverifiableEntries(before);
+  if (!removed.length) return { status: "clean", lockfile };
+  const backup = lockfile + ".metaontic-backup-" + (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+  const temporary = lockfile + ".metaontic-" + process.pid + ".tmp";
+  try {
+    writeFileSync(backup, before);
+    writeFileSync(temporary, text);
+    renameSync(temporary, lockfile);
+  } catch (error) {
+    try {
+      if (existsSync(temporary)) unlinkSync(temporary);
+    } catch {
+    }
+    return { status: "failed", message: error && error.message || String(error) };
+  }
+  log("\u5DF2\u6E05\u7406 " + removed.length + " \u6761\u7F3A\u5C11 integrity \u7684\u9501\u6587\u4EF6\u8BB0\u5F55\uFF08" + removed.join("\u3001") + "\uFF09\uFF0C\u5907\u4EFD\u5728 " + path10.basename(backup) + "\uFF1B\u4E4B\u540E\u53EF\u4EE5\u5728\u7EBF\u66F4\u65B0\u3002");
+  return { status: "repaired", lockfile, backup, removed };
+}
+function locateLockfiles(dir, depth = 2) {
+  const found = [];
+  const walk = (current, level) => {
+    const candidate = path10.join(current, LOCKFILE);
+    try {
+      if (existsSync(candidate)) found.push(candidate);
+    } catch {
+    }
+    if (level <= 0) return;
+    let entries = [];
+    try {
+      entries = readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name === "node_modules") continue;
+      walk(path10.join(current, entry.name), level - 1);
+    }
+  };
+  walk(dir, depth);
+  return found;
+}
+function locateStagingLockfiles(profileDir) {
+  const parent = path10.dirname(profileDir);
+  let entries = [];
+  try {
+    entries = readdirSync(parent, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const found = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !/staging/i.test(entry.name)) continue;
+    const dir = path10.join(parent, entry.name);
+    if (dir === profileDir) continue;
+    found.push(...locateLockfiles(dir, 1));
+  }
+  return found;
+}
+function updateLockfilesToWatch(profileDir) {
+  return [.../* @__PURE__ */ new Set([...locateLockfiles(profileDir), ...locateStagingLockfiles(profileDir)])];
+}
+function startUpdateLockfileRepair(moduleUrl, intervalMs = 2e3, log) {
+  let stopped = false;
+  const stamps = /* @__PURE__ */ new Map();
+  const check = () => {
+    if (stopped) return;
+    try {
+      const dir = locateProfileDir(moduleUrl);
+      if (!existsSync(path10.join(dir, "package.json"))) return;
+      for (const lockfile of updateLockfilesToWatch(dir)) {
+        let stamp = "";
+        try {
+          const info = statSync(lockfile);
+          stamp = info.mtimeMs + ":" + info.size;
+        } catch {
+          continue;
+        }
+        if (stamps.get(lockfile) === stamp) continue;
+        stamps.set(lockfile, stamp);
+        repairLockfileAt(lockfile, log);
+      }
+    } catch {
+    }
+  };
+  check();
+  const timer = setInterval(check, intervalMs);
+  if (timer.unref) timer.unref();
+  return () => {
+    stopped = true;
+    clearInterval(timer);
+  };
+}
+
+// src/core/runtime.ts
+function createPluginRuntime(definitions) {
+  const agents2 = createAgentRegistry(definitions.agents);
+  const businesses = /* @__PURE__ */ new Map();
+  for (const module of definitions.businesses) {
+    if (!module.id || businesses.has(module.id)) throw new Error(`\u91CD\u590D\u6216\u65E0\u6548\u7684\u4E1A\u52A1\uFF1A${module.id}`);
+    businesses.set(module.id, module);
+  }
+  for (const agent of agents2.list()) for (const id of agent.businesses) {
+    if (!businesses.has(id)) throw new Error(`Agent ${agent.id} \u7F3A\u5C11\u4E1A\u52A1\u6A21\u5757\uFF1A${id}`);
+  }
+  return function apply2(ctx, config = {}) {
+    const disposers = [];
+    let disposed = false;
+    const defer = (value) => {
+      if (typeof value !== "function") return;
+      if (disposed) value();
+      else disposers.push(value);
+    };
+    const dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      for (const cleanup of disposers.reverse()) {
+        try {
+          cleanup();
+        } catch {
+          ctx.logger?.warn?.("\u63D2\u4EF6\u6A21\u5757\u6E05\u7406\u5931\u8D25\uFF0C\u5DF2\u7EE7\u7EED\u6E05\u7406\u5176\u4F59\u6A21\u5757\u3002");
+        }
+      }
+    };
+    const analytics = createAnalyticsReporter(config);
+    defer(() => analytics.dispose());
+    defer(bindAgentRegistry(ctx, agents2));
+    const tools = createToolRegistry(ctx, agents2, analytics, defer);
+    const runtime = { ctx, config, agents: agents2, tools, defer };
+    try {
+      for (const business of businesses.values()) defer(business.apply(runtime));
+      defer(ctx.inject(["systemPrompt"], (promptCtx) => promptCtx.systemPrompt.section({
+        name: `plugin:${PLUGIN_ID}`,
+        order: 5200,
+        text: (context) => {
+          const agent = agents2.resolve(context, ctx);
+          if (!agent) return "";
+          return [...agent.businesses.map((id) => businesses.get(id)?.prompt?.(config) || ""), agent.prompt?.(config) || ""].filter(Boolean).join("\n\n");
+        }
+      })));
+      try {
+        defer(startUpdateLockfileRepair(import.meta.url, void 0, (message) => ctx.logger?.warn?.(`metaontic-video: ${message}`)));
+      } catch {
+        ctx.logger?.warn?.("metaontic-video: \u5B89\u88C5\u76EE\u5F55\u9501\u6587\u4EF6\u81EA\u6108\u672A\u542F\u7528\u3002");
+      }
+      analytics.start();
+      return dispose;
+    } catch (error) {
+      dispose();
+      throw error;
+    }
+  };
+}
+
+// src/agents/video-director/index.ts
+var videoDirector = {
+  id: "video-director",
+  name: "\u89C6\u9891\u521B\u4F5C\u52A9\u624B",
+  businesses: ["video", "film-director"],
+  skills: ["video-director"],
+  icon: "presets/icons/video-director.svg"
+};
+
+// src/agents/promo-video/instructions.ts
+function promoVideoGuidance() {
+  return [
+    "\u3010\u5F53\u524D\u6A21\u5F0F\uFF1A\u5BA3\u4F20\u89C6\u9891\u52A9\u624B\u3011\u4F60\u8D1F\u8D23\u5C06\u7528\u6237\u7684\u4EA7\u54C1\u3001\u54C1\u724C\u3001\u670D\u52A1\u6216\u6D3B\u52A8\u521B\u610F\u505A\u6210\u5BA3\u4F20\u89C6\u9891\u3002\u5199\u811A\u672C\u524D\u8BFB\u53D6promo-video\u4E0Evideo-director\u6280\u80FD\uFF1B\u4F7F\u7528\u771F\u5B9E\u53EF\u7528\u7684\u89C6\u9891\u5DE5\u5177\uFF0C\u4E0D\u51ED\u7A7A\u58F0\u79F0\u5DF2\u751F\u6210\u3002",
+    "\u5148\u4ECE\u7528\u6237\u539F\u6587\u63D0\u53D6\u5BA3\u4F20\u4E3B\u4F53\u3001\u53D7\u4F17\u3001\u76EE\u6807\u3001\u5DF2\u7ED9\u5356\u70B9\u3001\u7D20\u6750\u548C\u7ED3\u5C3E\u884C\u52A8\uFF1B\u7F3A\u5C11\u5F71\u54CD\u5236\u4F5C\u7684\u5173\u952E\u4FE1\u606F\u624D\u95EE\uFF0C\u4E0E\u5B8C\u5584\u521B\u610F\u53CA\u7F3A\u5931\u89C4\u683C\u540C\u8F6E\u8BE2\u95EE\u3002\u7528\u6237\u5DF2\u7ED930\u79D2\u7AD6\u5C4F720P\u7B49\u4FE1\u606F\u76F4\u63A5\u6CBF\u7528\uFF0C\u4E0D\u91CD\u590D\u95EE\uFF1B\u4EA7\u54C1\u4FE1\u606F\u5B8C\u6574\u4E5F\u786E\u8BA4\u662F\u5426\u5B8C\u5584\uFF0C\u5DF2\u660E\u786E\u6388\u6743\u4E0D\u91CD\u590D\u95EE\u3002",
+    "\u5B8C\u5584\u53EA\u5F3A\u5316\u539F\u6709\u5356\u70B9\u7684\u753B\u9762\u8868\u8FBE\u3001\u4FE1\u606F\u987A\u5E8F\u548C\u8282\u594F\uFF0C\u4FDD\u7559\u539F\u4E3B\u9898\u3001\u60C5\u8282\u3001\u4EBA\u7269\u5173\u7CFB\u3001\u98CE\u683C\u4E0E\u7ED3\u5C3E\uFF0C\u4E0D\u6362\u4EA7\u54C1\u3001\u4E0D\u64C5\u81EA\u6362\u5BA3\u4F20\u65B9\u5411\uFF1B\u5B9E\u8D28\u8C03\u6574\u5148\u5F81\u5F97\u540C\u610F\u3002\u4E0D\u5F97\u7F16\u9020\u4EF7\u683C\u3001\u4F18\u60E0\u3001\u9500\u91CF\u3001\u7528\u6237\u8BC4\u4EF7\u3001\u8BA4\u8BC1\u3001\u4F7F\u7528\u6548\u679C\u6216\u672A\u63D0\u4F9B\u7684\u529F\u80FD\u3002",
+    "\u6309\u5185\u5BB9\u9009\u62E9\u5F00\u573A\u770B\u70B9\u3001\u4EF7\u503C\u5C55\u793A\u3001\u4EA7\u54C1\u6216\u6D3B\u52A8\u6F14\u793A\u3001\u7ED3\u5C3E\u884C\u52A8\uFF1B\u4E0D\u5F3A\u5236\u771F\u4EBA\u53E3\u64AD\u3001\u4E0D\u786C\u52A0\u51B2\u7A81\u53CD\u8F6C\u3002\u5BA3\u4F20\u5206\u955C\u4E0D\u7B49\u4E8E\u4ED8\u8D39\u4EFB\u52A1\uFF0C\u5355\u6BB5\u4E0A\u9650\u5185\u7684\u5207\u955C\u5199\u8FDB\u540C\u4E00\u6B21\u751F\u6210\uFF1B\u989D\u5916\u72EC\u7ACB\u955C\u5934\u3001\u56FE\u7247\u6216\u5176\u4ED6\u4ED8\u8D39\u8C03\u7528\u987B\u660E\u786E\u65B9\u6848\u4E0E\u8D39\u7528\u3002",
+    "\u771F\u5B9ELogo\u3001\u4EA7\u54C1\u5916\u89C2\u3001\u754C\u9762\u53CA\u54C1\u724C\u6587\u5B57\u4EE5\u7528\u6237\u7D20\u6750\u4E3A\u51C6\uFF0C\u7F3A\u5931\u65F6\u8BE2\u95EE\u6216\u660E\u786E\u6807\u4E3A\u793A\u610F\uFF1B\u4E0D\u627F\u8BFA\u89C6\u9891\u6A21\u578B\u51C6\u786E\u751F\u6210\u6587\u5B57\u6216\u771F\u5B9E\u754C\u9762\u3002\u672A\u8981\u6C42\u5B57\u5E55\u4E0D\u64C5\u81EA\u6DFB\u52A0\uFF1B\u7528\u6237\u8981\u6C42\u51C6\u786E\u6587\u6848\u65F6\u5148\u786E\u8BA4\u5236\u4F5C\u65B9\u5F0F\u3002",
+    "\u5B8C\u6574\u5C55\u793A\u5BA3\u4F20\u811A\u672C\u3001\u5206\u955C\u548C\u8D39\u7528\u9884\u4F30\uFF0C\u518D\u7528video_project\u5BA1\u6838\u3002\u89C6\u9891\u5DE5\u5177\u4ED8\u8D39\u5BA1\u6279\u5C31\u662F\u5236\u4F5C\u786E\u8BA4\uFF1B\u9010\u6BB5\u5C55\u793A\u89C6\u9891\u5E76\u5BA1\u6838\u7ED3\u679C\u540E\u624D\u7EED\u505A\uFF0C\u5931\u8D25\u67E5\u539F\u4EFB\u52A1\u3001\u4E0D\u91CD\u590D\u63D0\u4EA4\u3002\u6807\u51C6\u6A21\u5F0F\u4E0D\u5E94\u7528\u672C\u4E13\u9898\u89C4\u5219\u3002"
+  ].join("\n");
+}
+
+// src/agents/promo-video/index.ts
+var promoVideo = {
+  id: "promo-video",
+  name: "\u5BA3\u4F20\u89C6\u9891\u52A9\u624B",
+  businesses: ["video", "film-director"],
+  skills: ["video-director", "promo-video"],
+  icon: "presets/icons/promo-video.svg",
+  prompt: promoVideoGuidance
+};
+
+// src/agents/index.ts
+var agents = [videoDirector, promoVideo];
+var agentRegistry = createAgentRegistry(agents);
+
+// src/businesses/video/workflow/media-preview.ts
+var PREVIEW_TOOLS = /* @__PURE__ */ new Set(["video_generate", "video_extend", "video_status", "video_prepare_image"]);
+function mediaPreviewMeta(value, toolName) {
+  const media = [];
+  const seen = /* @__PURE__ */ new Set();
+  function add(kind, label, localPath, url) {
+    const file = typeof localPath === "string" && /^(?:\/(?!\/)|[a-z]:[/\\])/i.test(localPath) && !/[\u0000-\u001f]/.test(localPath) ? localPath : "";
+    let remote = "";
+    try {
+      const parsed = new URL(String(url || ""));
+      if (["https:", "http:"].includes(parsed.protocol) && !parsed.username && !parsed.password) remote = parsed.href;
+    } catch {
+    }
+    const key = file || remote;
+    if (!key || seen.has(key) || media.length >= 40) return;
+    seen.add(key);
+    media.push({ kind, label, ...file ? { localPath: file } : {}, ...remote ? { url: remote } : {} });
+  }
+  if (toolName === "video_prepare_image") add("image", "\u89D2\u8272\u53C2\u8003\u56FE", value?.localPath, value?.imageUrl);
+  else {
+    if (value?.videoPath && value?.merged) add("video", videoResultState(value).isFinal ? "\u5B8C\u6574\u89C6\u9891" : "\u5DF2\u5B8C\u6210\u90E8\u5206\u5408\u5E76\u89C6\u9891", value.videoPath, "");
+    const segments = (value?.segments || []).filter((s) => s.status === "succeeded");
+    for (const segment of segments) add("video", `\u7B2C${segment.index}\u6BB5`, segment.localPath, segment.videoUrl);
+    if (!segments.length && value?.status === "succeeded") add("video", value.paused ? "\u672C\u6BB5\u89C6\u9891" : "\u89C6\u9891", value.previewPath || value.videoPath, value.videoUrl);
+    for (const [i, item] of (value?.convertedReferences || []).entries()) add("image", `\u8F6C\u6362\u53C2\u8003\u56FE${i + 1}`, item.localPath, item.imageUrl);
+  }
+  return { version: 1, media };
+}
+function withMediaPreview(tool) {
+  if (!PREVIEW_TOOLS.has(tool.name)) return tool;
+  return { ...tool, output: {
+    ...tool.output,
+    presentationMeta(args, value) {
+      return { ...tool.output.presentationMeta?.(args, value) || {}, metaonticMedia: mediaPreviewMeta(value, tool.name) };
+    }
+  } };
 }
 
 // src/businesses/video/prompts/scope.ts
@@ -3332,7 +3490,7 @@ async function ensureProjectDuration(ctx, exec, project, requested, save2) {
 }
 
 // src/businesses/video/tools/video-project.ts
-import { mkdir as mkdir8, readFile as readFile7, readdir as readdir3, writeFile as writeFile6 } from "node:fs/promises";
+import { mkdir as mkdir9, readFile as readFile8, readdir as readdir3, writeFile as writeFile7 } from "node:fs/promises";
 
 // src/businesses/video/workflow/costs.ts
 init_config();
@@ -3354,12 +3512,12 @@ function estimatePlan(config, toolName, args) {
 }
 
 // src/businesses/video/tools/video-project.ts
-import path11 from "node:path";
+import path12 from "node:path";
 
 // src/businesses/video/workflow/character-choice.ts
-import { createHash as createHash3 } from "node:crypto";
-import { mkdir as mkdir7, readFile as readFile6, writeFile as writeFile5, rename as rename5, rm as rm5 } from "node:fs/promises";
-import path10 from "node:path";
+import { createHash as createHash4 } from "node:crypto";
+import { mkdir as mkdir8, readFile as readFile7, writeFile as writeFile6, rename as rename6, rm as rm5 } from "node:fs/promises";
+import path11 from "node:path";
 init_connection();
 var waiting = /* @__PURE__ */ new Map();
 var localIds = /* @__PURE__ */ new WeakMap();
@@ -3378,14 +3536,14 @@ async function characterChoiceGate(ctx, config, exec, args) {
   if (!session || typeof session !== "object") return deny("\u63D0\u4EA4\u5DF2\u505C\u6B62\uFF1A\u7EAF\u6587\u751F\u89C6\u9891\u987B\u5148\u8BE2\u95EE\u662F\u5426\u751F\u6210\u89D2\u8272\u53C2\u8003\u56FE\uFF0C\u5F53\u524D\u7F3A\u5C11\u53EF\u4EA4\u4E92\u4F1A\u8BDD\u3002");
   const stableId = typeof session.id === "string" ? session.id : typeof session.header?.id === "string" ? session.header.id : null;
   if (!localIds.has(session)) localIds.set(session, `live-${++nextId}`);
-  const key = createHash3("sha256").update(JSON.stringify(project ? [project.id] : [stableId || localIds.get(session), args?.prompt || "", args?.duration, args?.resolution, args?.ratio])).digest("hex");
-  const file = path10.join(dshHome(), "metaontic-video", "character-choices", key + ".json");
+  const key = createHash4("sha256").update(JSON.stringify(project ? [project.id] : [stableId || localIds.get(session), args?.prompt || "", args?.duration, args?.resolution, args?.ratio])).digest("hex");
+  const file = path11.join(dshHome(), "metaontic-video", "character-choices", key + ".json");
   try {
     async function choose() {
       if (project?.choice && args?.resetCharacterChoice !== true) return project.choice;
       if (!project && stableId && args?.resetCharacterChoice !== true) {
         try {
-          const saved = JSON.parse(await readFile6(file, "utf8"));
+          const saved = JSON.parse(await readFile7(file, "utf8"));
           if (saved.version === 1 && ["text_only", "generate_first"].includes(saved.choice)) return saved.choice;
         } catch (error) {
           if (error?.code !== "ENOENT") return null;
@@ -3416,11 +3574,11 @@ async function characterChoiceGate(ctx, config, exec, args) {
         project.approved = null;
         await writeProject(project);
       } else if (stableId) {
-        await mkdir7(path10.dirname(file), { recursive: true, mode: 448 });
+        await mkdir8(path11.dirname(file), { recursive: true, mode: 448 });
         const temp = file + "." + Date.now() + ".tmp";
         try {
-          await writeFile5(temp, JSON.stringify({ version: 1, choice: choice2, time: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" });
-          await rename5(temp, file);
+          await writeFile6(temp, JSON.stringify({ version: 1, choice: choice2, time: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" });
+          await rename6(temp, file);
         } finally {
           await rm5(temp, { force: true }).catch(() => {
           });
@@ -3783,9 +3941,9 @@ function captureScriptBody(text) {
 }
 
 // src/businesses/video/tools/video-stage.ts
-import { randomUUID as randomUUID5 } from "node:crypto";
+import { randomUUID as randomUUID6 } from "node:crypto";
 import { performance as performance2 } from "node:perf_hooks";
-var STAGES = ["script_design", "storyboard_design", "script_present", "script_review_wait", "production_confirm_wait", "reference_review_wait", "segment_review_wait", "result_present"];
+var STAGES2 = ["script_design", "storyboard_design", "script_present", "script_review_wait", "production_confirm_wait", "reference_review_wait", "segment_review_wait", "result_present"];
 var pendingStages = /* @__PURE__ */ new Map();
 async function closePendingStage(stage, source) {
   let target;
@@ -3810,7 +3968,7 @@ function stageTool() {
   return {
     name: "video_stage",
     description: "\u4EC5\u8BB0\u5F55\u9636\u6BB5\u8BA1\u65F6\uFF0C\u4E0D\u8C03\u7528\u751F\u6210\u63A5\u53E3\u3001\u4E0D\u4EA7\u751F\u6A21\u578B\u8D39\u7528\u3001\u4E0D\u6539\u914D\u7F6E\u3002\u811A\u672C\u8BBE\u8BA1/\u793A\u610F\u56FE/\u5C55\u793A/\u7B49\u5F85\u5BA1\u6838\u7B49\u9636\u6BB5\u5F00\u59CB\u65F6action=start\uFF0C\u7ED3\u675F\u65F6action=finish\u5E76\u4F20\u539FspanId\u3002\u811A\u672C\u8BBE\u8BA1\u4E00\u6BB5\u5728\u811A\u672C\u4FDD\u5B58\u5230script.md\u540E\u7531\u63D2\u4EF6\u81EA\u52A8\u7ED3\u675F\uFF0C\u6B64\u65F6\u4E0D\u5FC5\u518D\u8C03finish\uFF1B\u811A\u672C\u4E0D\u662F\u7528\u5199\u6587\u4EF6\u5DE5\u5177\u4FDD\u5B58\u65F6\u518D\u8865finish\u3002\u8017\u65F6\u662F\u6807\u8BB0\u8FB9\u754C\u95F4\u5899\u949F\u65F6\u95F4\uFF08\u5305\u542B\u5DE5\u5177\u8C03\u5EA6\uFF09\uFF0C\u4E0D\u662F\u6A21\u578B\u7EAF\u63A8\u7406\u8017\u65F6\uFF1B\u7B49\u5F85\u7528\u6237\u5355\u72EC\u8BB0\u9636\u6BB5\u3002\u7F3A\u5931\u5F00\u59CB\u6216\u70ED\u91CD\u8F7D\u4E22\u5931\u6807\u8BB0\u65F6\u8FD4\u56DEunavailable\uFF0C\u4E0D\u731C\u8017\u65F6\u3002",
-    parameters: { type: "object", properties: { action: { type: "string", enum: ["start", "finish"] }, stage: { type: "string", enum: STAGES }, spanId: { type: "string" }, outcome: { type: "string", enum: ["success", "cancelled", "error"] } }, required: ["action", "stage"] },
+    parameters: { type: "object", properties: { action: { type: "string", enum: ["start", "finish"] }, stage: { type: "string", enum: STAGES2 }, spanId: { type: "string" }, outcome: { type: "string", enum: ["success", "cancelled", "error"] } }, required: ["action", "stage"] },
     output: { schema: { type: "object", properties: { status: { type: "string" }, spanId: { type: "string" }, elapsedMs: { type: "number" } } }, render(_args, value) {
       return [{ type: "text", text: JSON.stringify(value) }];
     } },
@@ -3819,10 +3977,10 @@ function stageTool() {
       return true;
     },
     async execute(args) {
-      if (!STAGES.includes(args?.stage)) throw new Error("\u672A\u77E5\u8BA1\u65F6\u9636\u6BB5");
+      if (!STAGES2.includes(args?.stage)) throw new Error("\u672A\u77E5\u8BA1\u65F6\u9636\u6BB5");
       if (args.action === "start") {
         if (pendingStages.size >= 512) return { status: "unavailable" };
-        const spanId = randomUUID5(), startedAt = (/* @__PURE__ */ new Date()).toISOString();
+        const spanId = randomUUID6(), startedAt = (/* @__PURE__ */ new Date()).toISOString();
         pendingStages.set(spanId, { stage: args.stage, startedAt, start: performance2.now() });
         await appendRequestLog({ event: "stage_started", stage: args.stage, spanId, startedAt, source: "assistant_marker" });
         return { status: "started", spanId };
@@ -4069,8 +4227,8 @@ function renderStoryboardSvg(script, options = {}) {
 async function captureScriptFile(scriptPath, text) {
   const body = captureScriptBody(text);
   if (!body) return null;
-  await mkdir8(path11.dirname(scriptPath), { recursive: true, mode: 448 });
-  await writeFile6(scriptPath, `${body}
+  await mkdir9(path12.dirname(scriptPath), { recursive: true, mode: 448 });
+  await writeFile7(scriptPath, `${body}
 `, { mode: 384 });
   const closed = await closePendingStage("script_design", "script_saved");
   await appendRequestLog({
@@ -4121,17 +4279,17 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
       }
       if (args.action === "storyboard") {
         const session = exec.agent?.session;
-        const scriptPath = path11.resolve(session?.header?.cwd || process.cwd(), String(args.scriptPath || ""));
+        const scriptPath = path12.resolve(session?.header?.cwd || process.cwd(), String(args.scriptPath || ""));
         if (!/\.md$/i.test(scriptPath)) throw new Error("storyboard\u9700\u4F20\u811A\u672C\u6587\u4EF6\u8DEF\u5F84scriptPath\uFF08.md\uFF09\u3002");
         if (args.captureScript === true && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(session) || "")) {
           throw new Error("\u6B63\u6587\u91CC\u6CA1\u6709\u627E\u5230\u5B8C\u6574\u811A\u672C\uFF1A\u5148\u628A\u672C\u7248\u811A\u672C\u6B63\u6587\u5B8C\u6574\u8D34\u8FDB\u7528\u6237\u53EF\u89C1\u6B63\u6587\uFF08\u6458\u8981\u3001\u94FE\u63A5\u3001\u793A\u610F\u56FE\u90FD\u4E0D\u7B97\uFF09\uFF0C\u518D\u8BA9\u63D2\u4EF6\u51FA\u5206\u955C\u793A\u610F\u56FE\u3002");
         }
-        const script = await readFile7(scriptPath, "utf8").catch(() => "");
+        const script = await readFile8(scriptPath, "utf8").catch(() => "");
         if (!String(script).trim()) throw new Error("\u8FD8\u6CA1\u8BFB\u5230\u811A\u672C\u6587\u4EF6\uFF1A\u5148\u5728\u6B63\u6587\u8D34\u51FA\u5B8C\u6574\u811A\u672C\u5E76\u4F20captureScript\uFF0C\u6216\u5148\u628A\u811A\u672C\u5199\u5230scriptPath\u3002");
-        const version = nextStoryboardVersion(await readdir3(path11.dirname(scriptPath)).catch(() => []));
+        const version = nextStoryboardVersion(await readdir3(path12.dirname(scriptPath)).catch(() => []));
         const svg = renderStoryboardSvg(script, { version });
-        const target = path11.join(path11.dirname(scriptPath), storyboardFileName(version));
-        await writeFile6(target, svg, { mode: 384 });
+        const target = path12.join(path12.dirname(scriptPath), storyboardFileName(version));
+        await writeFile7(target, svg, { mode: 384 });
         return {
           path: target,
           version,
@@ -4180,13 +4338,13 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         if (name === "video_extend") validateExtensionDuration(config, spec);
         const requestedTotal = name === "video_extend" ? Number(spec.duration) * Number(spec.segments || 1) : Number(spec.duration);
         if (requestedTotal !== data.duration && !spec.resume) throw new Error("\u811A\u672C\u65F6\u957F\u4E0E\u7528\u6237\u786E\u8BA4\u7684\u603B\u65F6\u957F\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u5148\u7528prepare\u786E\u8BA4\u53D8\u66F4\uFF0C\u518D\u91CD\u65B0\u5BA1\u6838\u3002");
-        const scriptPath = path11.resolve(exec.agent.session.header?.cwd || process.cwd(), String(args.scriptPath || ""));
+        const scriptPath = path12.resolve(exec.agent.session.header?.cwd || process.cwd(), String(args.scriptPath || ""));
         if (!/\.md$/i.test(scriptPath)) throw new Error("scriptPath\u9700\u4E3AMarkdown\u811A\u672C\u6587\u4EF6\u3002");
         if (args.captureScript === true && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(exec.agent.session) || "")) {
           throw new Error("\u6B63\u6587\u91CC\u6CA1\u6709\u627E\u5230\u5B8C\u6574\u811A\u672C\uFF1A\u8BF7\u5148\u628A\u672C\u7248\u811A\u672C\u6B63\u6587\u5B8C\u6574\u8D34\u8FDB\u7528\u6237\u53EF\u89C1\u6B63\u6587\uFF08\u6458\u8981\u3001\u94FE\u63A5\u3001\u793A\u610F\u56FE\u90FD\u4E0D\u7B97\uFF09\uFF0C\u518D\u8C03\u7528review\uFF1B\u811A\u672C\u53EA\u9700\u5728\u6B63\u6587\u5199\u8FD9\u4E00\u6B21\uFF0C\u63D2\u4EF6\u4F1A\u636E\u6B64\u843D\u6210script.md\u3002");
         }
         const scriptHash = await scriptDigest(scriptPath);
-        const scriptBody = (await readFile7(scriptPath, "utf8")).replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
+        const scriptBody = (await readFile8(scriptPath, "utf8")).replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
         if (!scriptBody) throw new Error("\u811A\u672C\u6B63\u6587\u4E0D\u80FD\u4E3A\u7A7A\u3002");
         if (name === "video_generate" && !spec.resume) resolveSegmentPrompts(spec.segmentPrompts, estimatePlan(config, name, spec).length);
         const fingerprint = productionFingerprint(config, name, spec);
@@ -4221,7 +4379,7 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
 }
 
 // src/businesses/video/workflow/storyboard-review.ts
-import path12 from "node:path";
+import path13 from "node:path";
 import { stat as stat4, readdir as readdir4 } from "node:fs/promises";
 var STORYBOARD_FILE = /storyboard|分镜|示意/i;
 var IMAGE_FILE = /\.(png|jpe?g|webp|svg)$/i;
@@ -4283,9 +4441,9 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
       for (const match of text.matchAll(/!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))\s*\)/g)) {
         const target = match[1] || match[2];
         try {
-          const full = path12.resolve(session.header?.cwd || process.cwd(), decodeURI(target));
+          const full = path13.resolve(session.header?.cwd || process.cwd(), decodeURI(target));
           state.shown.add(full);
-          if (STORYBOARD_FILE.test(path12.basename(full))) storyboard = true;
+          if (STORYBOARD_FILE.test(path13.basename(full))) storyboard = true;
         } catch {
         }
       }
@@ -4302,7 +4460,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
       }
     }
     const byDir = /* @__PURE__ */ new Map();
-    for (const [file, time] of fresh) byDir.set(path12.dirname(file), Math.max(byDir.get(path12.dirname(file)) || 0, time));
+    for (const [file, time] of fresh) byDir.set(path13.dirname(file), Math.max(byDir.get(path13.dirname(file)) || 0, time));
     for (const [dir, time] of byDir) {
       let entries;
       try {
@@ -4313,7 +4471,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
       let newest = "";
       for (const entry of entries) {
         if (!IMAGE_FILE.test(entry) || !STORYBOARD_FILE.test(entry)) continue;
-        const full = path12.join(dir, entry);
+        const full = path13.join(dir, entry);
         if (fresh.has(full)) continue;
         try {
           const info = await stat4(full);
@@ -4350,7 +4508,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
         return { kind: "deny", reason: `\u811A\u672C\u5BA1\u6838\u6682\u672A\u6253\u5F00\uFF1A\u672C\u7248script.md\u6B63\u6587\u53EA\u5728\u672C\u8F6E\u7528\u6237\u53EF\u89C1\u6B63\u6587\u91CC\u51FA\u73B0 ${percent2}%\u3002\u8BF7\u628Ascript.md\u6B63\u6587\u539F\u6837\u8D34\u8FDB\u672C\u8F6E\u6B63\u6587\u518D\u5355\u72EC\u8C03\u7528review\uFF1B\u6807\u9898\u3001\u52A0\u7C97\u3001\u8868\u683C\u8FD9\u7C7B\u6392\u7248\u5DEE\u5F02\u4E0D\u7B97\u95EE\u9898\uFF0C\u4F46\u4E0D\u8981\u6539\u5199\u63AA\u8F9E\u3001\u5220\u6BB5\uFF0C\u4E5F\u4E0D\u8981\u53EA\u7ED9\u6587\u4EF6\u94FE\u63A5\u6216\u6458\u8981\u3002` };
       }
     }
-    const embedded = [...state?.shown || []].filter((target2) => STORYBOARD_FILE.test(path12.basename(target2)));
+    const embedded = [...state?.shown || []].filter((target2) => STORYBOARD_FILE.test(path13.basename(target2)));
     let ready = embedded.length > 0;
     if (ready) {
       for (const file of embedded) {
@@ -4374,7 +4532,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
 }
 
 // src/businesses/video/workflow/delivery-order.ts
-import path13 from "node:path";
+import path14 from "node:path";
 import { stat as stat5 } from "node:fs/promises";
 function createDeliveryOrderGuard() {
   const sessions = /* @__PURE__ */ new WeakMap();
@@ -4390,14 +4548,14 @@ function createDeliveryOrderGuard() {
     const value = String(target ?? "").trim();
     if (!value) return "";
     try {
-      return path13.resolve(session?.header?.cwd || process.cwd(), value);
+      return path14.resolve(session?.header?.cwd || process.cwd(), value);
     } catch {
       return "";
     }
   }
   const nameOf = (target) => {
     try {
-      return path13.basename(target).toLowerCase();
+      return path14.basename(target).toLowerCase();
     } catch {
       return "";
     }
@@ -4546,8 +4704,8 @@ async function fetchActualCost(config, taskIds, signal) {
   const base = resolveBaseUrl(config).replace(/\/v1\/?$/, "");
   if (!key || !base) return pending("\u8D39\u7528\u5F85\u67E5\u8BE2\uFF1A\u539F\u8C03\u7528\u8FDE\u63A5\u4E0D\u53EF\u7528\u3002");
   const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(8e3)]) : AbortSignal.timeout(8e3);
-  async function get(path24, authenticated) {
-    const response = await fetch(`${base}${path24}`, {
+  async function get(path25, authenticated) {
+    const response = await fetch(`${base}${path25}`, {
       method: "GET",
       redirect: "error",
       signal: requestSignal,
@@ -4647,7 +4805,7 @@ function withActualCost(tool, liveConfig) {
 
 // src/businesses/video/workflow/execution.ts
 import { createRequire } from "node:module";
-import path14 from "node:path";
+import path15 from "node:path";
 import { fileURLToPath as fileURLToPath2, pathToFileURL } from "node:url";
 var progressRecordModule;
 async function appendVideoExecution(exec, phase) {
@@ -4655,7 +4813,7 @@ async function appendVideoExecution(exec, phase) {
   try {
     const resolver = createRequire(import.meta.url);
     const modulePath = resolver.resolve("@deepseek-ai/dsh-session", {
-      paths: [path14.dirname(process.argv[1] || process.execPath), path14.dirname(fileURLToPath2(import.meta.url))]
+      paths: [path15.dirname(process.argv[1] || process.execPath), path15.dirname(fileURLToPath2(import.meta.url))]
     });
     progressRecordModule ??= import(pathToFileURL(modulePath).href);
     const { appendPluginRecord } = await progressRecordModule;
@@ -4730,9 +4888,9 @@ function jsonSafeTool(tool) {
 }
 
 // src/businesses/video/providers/submissions.ts
-import path15 from "node:path";
-import { createHash as createHash4, randomUUID as randomUUID6 } from "node:crypto";
-import { mkdir as mkdir9, readFile as readFile8, writeFile as writeFile7, rename as rename6, rm as rm6, open as open3, readdir as readdir5 } from "node:fs/promises";
+import path16 from "node:path";
+import { createHash as createHash5, randomUUID as randomUUID7 } from "node:crypto";
+import { mkdir as mkdir10, readFile as readFile9, writeFile as writeFile8, rename as rename7, rm as rm6, open as open3, readdir as readdir5 } from "node:fs/promises";
 init_hardcoded_config();
 init_connection();
 
@@ -4757,14 +4915,14 @@ function findKey(payload, keys, depth = Infinity) {
   }
   return void 0;
 }
-function collectUrls(payload, path24 = [], found = []) {
+function collectUrls(payload, path25 = [], found = []) {
   if (typeof payload === "string") {
-    if (/^https?:\/\//i.test(payload)) found.push([path24, payload]);
+    if (/^https?:\/\//i.test(payload)) found.push([path25, payload]);
   } else if (Array.isArray(payload)) {
-    for (const item of payload) collectUrls(item, path24, found);
+    for (const item of payload) collectUrls(item, path25, found);
   } else if (payload && typeof payload === "object") {
     for (const [key, value] of Object.entries(payload)) {
-      collectUrls(value, [...path24, key], found);
+      collectUrls(value, [...path25, key], found);
     }
   }
   return found;
@@ -4782,22 +4940,22 @@ function extractTaskId(payload) {
 }
 function extractVideoUrl(payload) {
   const candidates = collectUrls(payload).filter(
-    ([path24, url]) => !looksLikeImageUrl(url) && !path24.some(isImageKey)
+    ([path25, url]) => !looksLikeImageUrl(url) && !path25.some(isImageKey)
   );
   if (!candidates.length) return void 0;
   for (const wanted of VIDEO_URL_KEYS) {
-    for (const [path24, url] of candidates) {
-      if (path24.length && String(path24.at(-1)).toLowerCase() === wanted) return url;
+    for (const [path25, url] of candidates) {
+      if (path25.length && String(path25.at(-1)).toLowerCase() === wanted) return url;
     }
   }
-  for (const [path24, url] of candidates) {
-    if (path24.length && GENERIC_URL_KEYS.has(String(path24.at(-1)).toLowerCase())) return url;
+  for (const [path25, url] of candidates) {
+    if (path25.length && GENERIC_URL_KEYS.has(String(path25.at(-1)).toLowerCase())) return url;
   }
   return candidates[0][1];
 }
 function extractImageUrl(payload) {
   const found = collectUrls(payload).find(
-    ([path24, url]) => looksLikeImageUrl(url) || path24.some(isImageKey)
+    ([path25, url]) => looksLikeImageUrl(url) || path25.some(isImageKey)
   );
   return found?.[1];
 }
@@ -4854,8 +5012,8 @@ async function relayRequest(config, requestPath, options = {}) {
     throw error;
   }
 }
-async function relayRequestCore(config, path24, { method = "GET", body, signal } = {}, trace = {}) {
-  const url = `${resolveBaseUrl(config)}${path24}`;
+async function relayRequestCore(config, path25, { method = "GET", body, signal } = {}, trace = {}) {
+  const url = `${resolveBaseUrl(config)}${path25}`;
   const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   const serialized = body === void 0 ? void 0 : JSON.stringify(body);
@@ -4991,18 +5149,18 @@ async function waitForCompletion(config, taskId, signal) {
 }
 
 // src/businesses/video/providers/submissions.ts
-var hash2 = (value) => createHash4("sha256").update(value).digest("hex");
+var hash2 = (value) => createHash5("sha256").update(value).digest("hex");
 function submissionIdentity(config) {
   return hash2(JSON.stringify([isVolcengine(config) ? "volcengine" : "metaontic", resolveBaseUrl(config), hash2(resolveApiKey(config))]));
 }
 function directory() {
-  return path15.join(dshHome(), "state", DATA_DIR, "submissions");
+  return path16.join(dshHome(), "state", DATA_DIR, "submissions");
 }
 async function save(file, record) {
-  const temporary = `${file}.${randomUUID6()}.tmp`;
+  const temporary = `${file}.${randomUUID7()}.tmp`;
   try {
-    await writeFile7(temporary, JSON.stringify(record), { mode: 384 });
-    await rename6(temporary, file);
+    await writeFile8(temporary, JSON.stringify(record), { mode: 384 });
+    await rename7(temporary, file);
   } finally {
     await rm6(temporary, { force: true }).catch(() => {
     });
@@ -5015,8 +5173,8 @@ async function guardedSubmit(config, requestPath, body, signal, scope = "") {
   if (signal?.aborted) throw abortError();
   const identity = submissionIdentity(config);
   const id = hash2(JSON.stringify([identity, requestPath, body]));
-  await mkdir9(directory(), { recursive: true, mode: 448 });
-  const file = path15.join(directory(), `${id}.json`);
+  await mkdir10(directory(), { recursive: true, mode: 448 });
+  const file = path16.join(directory(), `${id}.json`);
   let handle;
   try {
     handle = await open3(file, "wx", 384);
@@ -5057,7 +5215,7 @@ async function guardedSubmit(config, requestPath, body, signal, scope = "") {
 }
 async function finishSubmission(config, requestPath, body) {
   const id = hash2(JSON.stringify([submissionIdentity(config), requestPath, body]));
-  await rm6(path15.join(directory(), `${id}.json`), { force: true });
+  await rm6(path16.join(directory(), `${id}.json`), { force: true });
 }
 async function finishKnownTask(config, taskId) {
   const identity = submissionIdentity(config);
@@ -5066,8 +5224,8 @@ async function finishKnownTask(config, taskId) {
     throw error;
   })) {
     if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
-    const file = path15.join(directory(), name);
-    const raw = await readFile8(file, "utf8").catch((error) => {
+    const file = path16.join(directory(), name);
+    const raw = await readFile9(file, "utf8").catch((error) => {
       if (error.code === "ENOENT") return null;
       throw error;
     });
@@ -5078,7 +5236,7 @@ async function finishKnownTask(config, taskId) {
 }
 async function readSubmission(id) {
   if (!/^[a-f0-9]{64}$/.test(String(id))) throw new Error("\u63D0\u4EA4\u8BB0\u5F55 ID \u683C\u5F0F\u4E0D\u6B63\u786E\u3002");
-  const record = JSON.parse(await readFile8(path15.join(directory(), `${id}.json`), "utf8"));
+  const record = JSON.parse(await readFile9(path16.join(directory(), `${id}.json`), "utf8"));
   if (record.id !== id) throw new Error("\u63D0\u4EA4\u8BB0\u5F55\u635F\u574F\uFF0C\u5DF2\u505C\u6B62\u3002");
   return record;
 }
@@ -5086,7 +5244,7 @@ async function reconcileSubmission(config, id, taskId, confirmedNotCreated) {
   const record = await readSubmission(id);
   if (/\/tasks\/doubao$/.test(record.requestPath)) config = imageConfig(config);
   if (record.identity !== submissionIdentity(config)) throw new Error("\u8BF7\u6062\u590D\u539F\u63A5\u5165\u65B9\u5F0F\u3001\u5730\u5740\u548C API\u5BC6\u94A5\u540E\u6838\u5BF9\u63D0\u4EA4\u3002");
-  const file = path15.join(directory(), `${id}.json`);
+  const file = path16.join(directory(), `${id}.json`);
   if (record.status === "submitting" && Date.now() - Date.parse(record.createdAt) < 15e4) throw new Error("\u539F\u63D0\u4EA4\u4ECD\u53EF\u80FD\u6B63\u5728\u6267\u884C\uFF0C\u8BF7\u7B49\u5F85\u5176\u8FD4\u56DE\u540E\u518D\u6838\u5BF9\u3002");
   if (taskId) {
     const image = /\/tasks\/doubao$/.test(record.requestPath);
@@ -5136,39 +5294,39 @@ function submissionTool(liveConfig) {
 }
 
 // src/businesses/video/integrations/canvas.ts
-import { createHash as createHash6, randomUUID as randomUUID8 } from "node:crypto";
-import { mkdir as mkdir12, readFile as readFile10, writeFile as writeFile9, rename as rename9, copyFile, stat as stat7, open as open4 } from "node:fs/promises";
-import path18 from "node:path";
+import { createHash as createHash7, randomUUID as randomUUID9 } from "node:crypto";
+import { mkdir as mkdir13, readFile as readFile11, writeFile as writeFile10, rename as rename10, copyFile, stat as stat7, open as open4 } from "node:fs/promises";
+import path19 from "node:path";
 init_hardcoded_config();
 
 // src/businesses/video/integrations/canvas-builtin.ts
-import { mkdir as mkdir10, readFile as readFile9, writeFile as writeFile8, rename as rename7, readdir as readdir6, stat as stat6 } from "node:fs/promises";
+import { mkdir as mkdir11, readFile as readFile10, writeFile as writeFile9, rename as rename8, readdir as readdir6, stat as stat6 } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { createHash as createHash5, randomUUID as randomUUID7 } from "node:crypto";
-import path16 from "node:path";
+import { createHash as createHash6, randomUUID as randomUUID8 } from "node:crypto";
+import path17 from "node:path";
 init_hardcoded_config();
 var BUILTIN_BACKEND = "builtin";
 var validId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
-var storeDir = () => path16.join(dshHome(), DATA_DIR, "canvas");
-var docsDir = () => path16.join(storeDir(), "projects");
-var dataRootOf = () => path16.join(storeDir(), "data");
-var assetsFile = () => path16.join(storeDir(), "assets.json");
+var storeDir = () => path17.join(dshHome(), DATA_DIR, "canvas");
+var docsDir = () => path17.join(storeDir(), "projects");
+var dataRootOf = () => path17.join(storeDir(), "data");
+var assetsFile = () => path17.join(storeDir(), "assets.json");
 var docFile = (id) => {
   if (!validId(id)) throw new Error("\u753B\u5E03\u9879\u76EE\u6807\u8BC6\u65E0\u6548");
-  return path16.join(docsDir(), `${id}.json`);
+  return path17.join(docsDir(), `${id}.json`);
 };
 async function readJson(file, fallback = null) {
   try {
-    return JSON.parse(await readFile9(file, "utf8"));
+    return JSON.parse(await readFile10(file, "utf8"));
   } catch {
     return fallback;
   }
 }
 async function writeJson(file, value) {
-  await mkdir10(path16.dirname(file), { recursive: true, mode: 448 });
-  const temp = `${file}.${randomUUID7()}.tmp`;
-  await writeFile8(temp, JSON.stringify(value), { mode: 384, flag: "wx" });
-  await rename7(temp, file);
+  await mkdir11(path17.dirname(file), { recursive: true, mode: 448 });
+  const temp = `${file}.${randomUUID8()}.tmp`;
+  await writeFile9(temp, JSON.stringify(value), { mode: 384, flag: "wx" });
+  await rename8(temp, file);
 }
 async function builtinCanvasExists(projectId) {
   if (!validId(projectId)) return false;
@@ -5184,7 +5342,7 @@ async function allDocs() {
   const names = await readdir6(docsDir()).catch(() => []);
   const docs = [];
   for (const name of names) if (name.endsWith(".json")) {
-    const doc = await readJson(path16.join(docsDir(), name));
+    const doc = await readJson(path17.join(docsDir(), name));
     if (doc?.id && !doc.deleted) docs.push(doc);
   }
   return docs.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
@@ -5267,7 +5425,7 @@ function builtinRpc() {
     async projectDirGet(args) {
       const id = String(args?.projectId || "");
       if (!validId(id)) return { ok: false };
-      return { ok: true, dataRoot: dataRootOf(), abs: path16.join(dataRootOf(), "projects", id) };
+      return { ok: true, dataRoot: dataRootOf(), abs: path17.join(dataRootOf(), "projects", id) };
     },
     async canvasCreateProject(args) {
       const name = String(args?.name || "").trim().slice(0, 80) || "MetaOntic \u521B\u4F5C\u753B\u5E03";
@@ -5301,7 +5459,7 @@ function createBuiltinConnect() {
     if (!doc.nodes[from2] || !doc.nodes[to]) return { ok: false };
     if ((doc.edges || []).some((edge2) => edge2.fromNode === from2 && edge2.toNode === to)) return { ok: true, already: true };
     const edge = {
-      id: `mov_conn_${randomUUID7().replaceAll("-", "").slice(0, 16)}`,
+      id: `mov_conn_${randomUUID8().replaceAll("-", "").slice(0, 16)}`,
       fromNode: from2,
       toNode: to,
       ...args?.fromPort ? { fromPort: args.fromPort } : {},
@@ -5316,7 +5474,7 @@ function createBuiltinConnect() {
 }
 function builtinCanvasAdapter() {
   const rpc = builtinRpc();
-  return { backend: BUILTIN_BACKEND, rpc, assetPath: (root, asset) => path16.resolve(root, String(asset?.rel || "")), connect: createBuiltinConnect() };
+  return { backend: BUILTIN_BACKEND, rpc, assetPath: (root, asset) => path17.resolve(root, String(asset?.rel || "")), connect: createBuiltinConnect() };
 }
 async function builtinCanvasList() {
   return (await allDocs()).map((doc) => ({ projectId: doc.id, name: doc.name, updatedAt: doc.updatedAt || 0, nodeCount: Object.keys(doc.nodes || {}).length }));
@@ -5359,15 +5517,15 @@ async function builtinCanvasImport(args) {
   if (bytes.length > IMPORT_LIMIT_BYTES) throw new Error("\u5355\u5F20\u56FE\u7247\u4E0D\u80FD\u8D85\u8FC7 32MB\u3002");
   const extension = imageExtension(args?.mime, bytes);
   if (!extension) throw new Error("\u53EA\u652F\u6301 PNG\u3001JPEG\u3001WebP \u56FE\u7247\u3002");
-  const id = `mov_img_${createHash5("sha256").update(bytes).digest("hex").slice(0, 24)}`;
+  const id = `mov_img_${createHash6("sha256").update(bytes).digest("hex").slice(0, 24)}`;
   const label = String(args?.name || "").trim().slice(0, 80) || `\u5BFC\u5165\u56FE\u7247${extension}`;
   const rel = `projects/${doc.id}/image/${id}${extension}`;
-  const dest = path16.join(dataRootOf(), rel);
-  await mkdir10(path16.dirname(dest), { recursive: true, mode: 448 });
+  const dest = path17.join(dataRootOf(), rel);
+  await mkdir11(path17.dirname(dest), { recursive: true, mode: 448 });
   if (!(await stat6(dest).catch(() => null))?.isFile()) {
-    const temp = `${dest}.${randomUUID7()}.tmp`;
-    await writeFile8(temp, bytes, { mode: 384, flag: "wx" });
-    await rename7(temp, dest);
+    const temp = `${dest}.${randomUUID8()}.tmp`;
+    await writeFile9(temp, bytes, { mode: 384, flag: "wx" });
+    await rename8(temp, dest);
   }
   const mime = IMAGE_MIME[extension];
   await builtinRpc().assetCreate({ projectName: doc.name || "", asset: { id, projectId: doc.id, kind: "image", mime, name: label, rel, size: bytes.length, createdAt: Date.now(), stored: "disk", source: "metaontic-video" } });
@@ -5464,7 +5622,7 @@ async function builtinCanvasHandle(args) {
     const existing = (doc.edges || []).find((edge2) => edge2.fromNode === from2 && edge2.toNode === to);
     if (existing) return { canvas: { projectId: doc.id, edge: existing, already: true } };
     const edge = {
-      id: `mov_connect_${randomUUID7().replaceAll("-", "").slice(0, 16)}`,
+      id: `mov_connect_${randomUUID8().replaceAll("-", "").slice(0, 16)}`,
       fromNode: from2,
       toNode: to,
       fromPort: String(params.fromPort || "out").slice(0, 24),
@@ -5503,8 +5661,8 @@ function registerBuiltinCanvas(ctx) {
         const asset = assets[String(url.searchParams.get("assetId") || "")];
         const root = dataRootOf();
         if (!asset?.rel) throw new Error("\u7D20\u6750\u4E0D\u5B58\u5728\u3002");
-        const file = path16.resolve(root, String(asset.rel));
-        if (!file.startsWith(root + path16.sep)) throw new Error("\u7D20\u6750\u8DEF\u5F84\u65E0\u6548\u3002");
+        const file = path17.resolve(root, String(asset.rel));
+        if (!file.startsWith(root + path17.sep)) throw new Error("\u7D20\u6750\u8DEF\u5F84\u65E0\u6548\u3002");
         const info = await stat6(file);
         if (!info.isFile()) throw new Error("\u7D20\u6750\u4E0D\u5B58\u5728\u3002");
         res.setHeader("content-type", asset.mime || "application/octet-stream");
@@ -5763,14 +5921,14 @@ function preserveCanvasConfirmations(prev, next) {
 }
 
 // src/businesses/video/media/download.ts
-import { mkdir as mkdir11, rename as rename8, rm as rm7 } from "node:fs/promises";
-import path17 from "node:path";
+import { mkdir as mkdir12, rename as rename9, rm as rm7 } from "node:fs/promises";
+import path18 from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { createWriteStream } from "node:fs";
 var DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1e3;
 async function downloadFile(url, destPath, { signal } = {}) {
-  await mkdir11(path17.dirname(destPath), { recursive: true });
+  await mkdir12(path18.dirname(destPath), { recursive: true });
   const partial = `${destPath}.${uniqueSuffix("part")}`;
   const timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -5787,7 +5945,7 @@ async function downloadFile(url, destPath, { signal } = {}) {
       });
     }
     await pipeline(Readable.fromWeb(response.body), createWriteStream(partial));
-    await rename8(partial, destPath);
+    await rename9(partial, destPath);
     return destPath;
   } catch (error) {
     await rm7(partial, { force: true }).catch(() => {
@@ -5827,7 +5985,7 @@ var canvasLinkSchema = { type: "object", properties: {
   nodeId: { type: "string" },
   fingerprint: { type: "string" }
 }, required: ["projectId", "nodeId", "fingerprint"], description: "video_canvas(action:read)\u8FD4\u56DE\u7684\u6D41\u7A0B\u753B\u5E03\u5B9A\u4F4D\u4E0E\u5185\u5BB9\u6458\u8981\uFF1B\u539F\u6837\u4F20\u5165\uFF0C\u4E0D\u731C\u6D4B\u3002" };
-var digest = (value) => createHash6("sha256").update(JSON.stringify(value)).digest("hex");
+var digest = (value) => createHash7("sha256").update(JSON.stringify(value)).digest("hex");
 var validId2 = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 function location(link) {
   if (!validId2(link?.projectId) || !validId2(link?.nodeId) || link.canvasId && !validId2(link.canvasId)) throw new Error("\u753B\u5E03\u9879\u76EE\u6216\u8282\u70B9\u6807\u8BC6\u65E0\u6548");
@@ -5915,14 +6073,14 @@ async function readCanvasInput(adapter, link) {
 }
 function resultFile(token) {
   if (!/^[a-f0-9-]{36}$/.test(String(token || ""))) throw new Error("\u56DE\u586B\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548");
-  return path18.join(dshHome(), DATA_DIR, "canvas-results", `${token}.json`);
+  return path19.join(dshHome(), DATA_DIR, "canvas-results", `${token}.json`);
 }
 async function saveRecord(record) {
   const file = resultFile(record.id);
-  await mkdir12(path18.dirname(file), { recursive: true, mode: 448 });
-  const temp = `${file}.${randomUUID8()}.tmp`;
-  await writeFile9(temp, JSON.stringify(record), { mode: 384, flag: "wx" });
-  await rename9(temp, file);
+  await mkdir13(path19.dirname(file), { recursive: true, mode: 448 });
+  const temp = `${file}.${randomUUID9()}.tmp`;
+  await writeFile10(temp, JSON.stringify(record), { mode: 384, flag: "wx" });
+  await rename10(temp, file);
 }
 async function publishCanvasResult(adapter, record) {
   const loc = location(record.canvas);
@@ -5935,7 +6093,7 @@ async function publishCanvasResult(adapter, record) {
   for (const [index, media] of record.media.entries()) {
     const id = `mov_${digest({ canvas: record.canvas, media }).slice(0, 24)}`;
     const extension = media.kind === "image" ? ".png" : ".mp4";
-    let dest = path18.join(dir.abs, media.kind, `${id}${extension}`);
+    let dest = path19.join(dir.abs, media.kind, `${id}${extension}`);
     let rel = `projects/${record.canvas.projectId}/${media.kind}/${id}${extension}`;
     if (media.kind === "image") {
       for (const suffix of [".jpg", ".webp"]) {
@@ -5948,11 +6106,11 @@ async function publishCanvasResult(adapter, record) {
       }
     }
     if (!(await stat7(dest).catch(() => null))?.isFile()) {
-      await mkdir12(path18.dirname(dest), { recursive: true });
+      await mkdir13(path19.dirname(dest), { recursive: true });
       if (media.localPath) {
-        const tmp = `${dest}.${randomUUID8()}.tmp`;
+        const tmp = `${dest}.${randomUUID9()}.tmp`;
         await copyFile(media.localPath, tmp);
-        await rename9(tmp, dest);
+        await rename10(tmp, dest);
       } else {
         const url = new URL(media.url);
         if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("\u6210\u679CURL\u683C\u5F0F\u65E0\u6548");
@@ -5975,7 +6133,7 @@ async function publishCanvasResult(adapter, record) {
     if (dest.endsWith(".png") && (mime === "image/jpeg" || mime === "image/webp")) {
       const suffix = mime === "image/jpeg" ? ".jpg" : ".webp";
       const corrected = dest.replace(/\.png$/, suffix);
-      await rename9(dest, corrected);
+      await rename10(dest, corrected);
       dest = corrected;
       rel = rel.replace(/\.png$/, suffix);
     }
@@ -6037,7 +6195,7 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
     if (busy.has(token)) throw new Error("\u6B64\u6210\u679C\u6B63\u5728\u56DE\u586B\uFF0C\u8BF7\u7A0D\u540E\u67E5\u8BE2\u3002");
     busy.add(token);
     try {
-      const record = JSON.parse(await readFile10(resultFile(token), "utf8"));
+      const record = JSON.parse(await readFile11(resultFile(token), "utf8"));
       if (record.owner !== sessionOwner(exec)) throw new Error("\u6B64\u6210\u679C\u4E0D\u5C5E\u4E8E\u5F53\u524D\u4F1A\u8BDD");
       return await publishCanvasResult(await resolveCanvasAdapter(record?.canvas?.projectId, load), record);
     } finally {
@@ -6090,7 +6248,7 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
       if (!canvas || !result || typeof result !== "object") return result;
       const media = mediaPreviewMeta(result, tool2.name).media;
       if (!media.length) return { ...result, canvasSync: { status: "no_media", reason: "\u5C1A\u65E0\u6210\u529F\u7D20\u6750\uFF0C\u672A\u56DE\u586B\u865A\u6784\u6210\u679C\u3002" } };
-      const record = { id: randomUUID8(), owner: sessionOwner(exec), canvas, media, ratio: args.ratio, phase: tool2.name === "video_prepare_image" ? "reference_review" : videoResultState(result).phase, createdAt: Date.now() };
+      const record = { id: randomUUID9(), owner: sessionOwner(exec), canvas, media, ratio: args.ratio, phase: tool2.name === "video_prepare_image" ? "reference_review" : videoResultState(result).phase, createdAt: Date.now() };
       try {
         await saveRecord(record);
       } catch {
@@ -6125,11 +6283,11 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
 }
 
 // src/businesses/video/integrations/canvas-project.ts
-import { createHash as createHash7 } from "node:crypto";
-import { readFile as readFile11 } from "node:fs/promises";
-import path19 from "node:path";
+import { createHash as createHash8 } from "node:crypto";
+import { readFile as readFile12 } from "node:fs/promises";
+import path20 from "node:path";
 init_config();
-var digest2 = (value) => createHash7("sha256").update(JSON.stringify(value)).digest("hex");
+var digest2 = (value) => createHash8("sha256").update(JSON.stringify(value)).digest("hex");
 async function adapterForNewCanvas(binding, load) {
   if (binding?.projectId) return resolveCanvasAdapter(binding.projectId, load);
   if (load !== loadCanvasAdapter) return load();
@@ -6189,9 +6347,9 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
       if (!doc?.nodes || doc.deleted) throw new Error("\u81EA\u52A8\u753B\u5E03\u5DF2\u5220\u9664\u6216\u4E0D\u53EF\u7528\uFF0C\u4E0D\u4F1A\u91CD\u65B0\u521B\u5EFA\u5DF2\u5220\u9664\u7684\u9879\u76EE\u3002");
       let script = "";
       if (draft.scriptPath) {
-        const scriptPath = path19.resolve(exec.agent.session.header?.cwd || process.cwd(), draft.scriptPath);
+        const scriptPath = path20.resolve(exec.agent.session.header?.cwd || process.cwd(), draft.scriptPath);
         if (!/\.md$/i.test(scriptPath)) throw new Error("\u81EA\u52A8\u540C\u6B65\u811A\u672C\u9700\u8981Markdown\u6587\u4EF6\u3002");
-        script = await readFile11(scriptPath, "utf8");
+        script = await readFile12(scriptPath, "utf8");
         if (script.length > 2e5) throw new Error("\u811A\u672C\u8FC7\u5927\uFF0C\u81EA\u52A8\u753B\u5E03\u672A\u8986\u76D6\u65E7\u8282\u70B9\u3002");
       }
       const specification = draft.specification || null;
@@ -6420,9 +6578,9 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
 }
 
 // src/businesses/video/integrations/canvas-native.ts
-import path21 from "node:path";
-import { createHash as createHash9, randomUUID as randomUUID9 } from "node:crypto";
-import { mkdir as mkdir14, readFile as readFile12, writeFile as writeFile11, rename as rename11, stat as stat9 } from "node:fs/promises";
+import path22 from "node:path";
+import { createHash as createHash10, randomUUID as randomUUID10 } from "node:crypto";
+import { mkdir as mkdir15, readFile as readFile13, writeFile as writeFile12, rename as rename12, stat as stat9 } from "node:fs/promises";
 init_hardcoded_config();
 init_connection();
 
@@ -6494,7 +6652,7 @@ function endWithPunctuation(text) {
 }
 
 // src/businesses/video/workflow/real-person.ts
-import { createHash as createHash8 } from "node:crypto";
+import { createHash as createHash9 } from "node:crypto";
 
 // src/businesses/video/tools/results.ts
 import { resolve as resolve2 } from "node:path";
@@ -6856,7 +7014,7 @@ async function recoverRealPersonImages(config, body, ctx, exec, final, state = {
   try {
     for (const item of images) {
       const source = String(item.image_url.url);
-      const key = createHash8("sha256").update(source).digest("hex");
+      const key = createHash9("sha256").update(source).digest("hex");
       const entry = state.images[key] ||= {};
       if (entry.failed) throw new Error(`\u56FE\u7247\u4EFB\u52A1 ${entry.taskId || ""} \u5DF2\u660E\u786E\u5931\u8D25\uFF1A${entry.failed}\u3002\u4E0D\u81EA\u52A8\u518D\u6B21\u51FA\u56FE\u3002`);
       if (!entry.imageUrl) {
@@ -7135,6 +7293,7 @@ function scriptPrompt(brief2) {
   if (!idea) throw new Error("\u8BF7\u5148\u5199\u4E0B\u60F3\u62CD\u4EC0\u4E48\uFF0C\u518D\u8BA9\u6587\u672C\u6A21\u578B\u5199\u811A\u672C\u3002");
   const seconds = Math.min(total, MAX_TOTAL_SECONDS);
   return [
+    CREATIVE_GUIDANCE,
     "\u4F60\u662F\u8FD9\u6761\u7247\u5B50\u7684\u5BFC\u6F14\u517C\u5206\u955C\u5E08\uFF1A\u5148\u628A\u5B83\u5F53\u4F5C\u54C1\u60F3\u6E05\u695A\uFF0C\u518D\u4EA4\u4E00\u4EFD\u53EF\u4EE5\u76F4\u63A5\u5F00\u62CD\u7684\u5206\u955C\u7A3F\uFF08Markdown\uFF09\u3002",
     "",
     `\u3010\u60F3\u6CD5\u3011${idea}`,
@@ -7313,8 +7472,8 @@ async function writeScript(config, brief2, options = {}) {
 // src/businesses/video/media/merge.ts
 init_config();
 init_connection();
-import { rm as rm8, mkdir as mkdir13, writeFile as writeFile10, rename as rename10, stat as stat8, copyFile as copyFile2 } from "node:fs/promises";
-import path20 from "node:path";
+import { rm as rm8, mkdir as mkdir14, writeFile as writeFile11, rename as rename11, stat as stat8, copyFile as copyFile2 } from "node:fs/promises";
+import path21 from "node:path";
 function evenNumber(value, fallback) {
   const number2 = Number(value);
   if (!Number.isFinite(number2) || number2 <= 0) return fallback;
@@ -7377,7 +7536,7 @@ async function cleanupSegmentTemps(temps) {
 }
 async function mergeClips(config, files, outPath, { signal } = {}) {
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  await mkdir13(path20.dirname(outPath), { recursive: true });
+  await mkdir14(path21.dirname(outPath), { recursive: true });
   const work = `${outPath}.${uniqueSuffix("work")}.mp4`;
   let copyError = "";
   let audioError = "";
@@ -7398,7 +7557,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
     if (mergeMode !== "reencode" && paramsMatch) {
       const listPath = `${work}.concat.txt`;
       const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
-      await writeFile10(listPath, `${lines}
+      await writeFile11(listPath, `${lines}
 `, "utf8");
       try {
         const { code: code2, stderr: stderr2 } = await runProcess(binary, [
@@ -7416,7 +7575,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
           work
         ], { signal });
         if (code2 === 0 && await exists(work)) {
-          await rename10(work, outPath);
+          await rename11(work, outPath);
           return { path: outPath, mode: "copy", trimmed };
         }
         copyError = stderr2.trim().slice(-400);
@@ -7452,7 +7611,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
       ].join(";");
       const { code: code2, stderr: stderr2 } = await encode(filter2, ["-map", "[v]", "-map", "[a]"], true);
       if (code2 === 0 && await exists(work)) {
-        await rename10(work, outPath);
+        await rename11(work, outPath);
         return { path: outPath, mode: "reencode", trimmed };
       }
       audioError = stderr2.trim().slice(-400);
@@ -7460,7 +7619,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
     const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(";");
     const { code, stderr } = await encode(filter, ["-map", "[v]"], false);
     if (code === 0 && await exists(work)) {
-      await rename10(work, outPath);
+      await rename11(work, outPath);
       return { path: outPath, mode: withAudio ? "reencode-video-only" : "reencode", trimmed };
     }
     const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
@@ -7558,7 +7717,7 @@ async function downloadSegmentsAndMerge(config, {
   const deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0);
   const ffmpegReady = segments.length > 1 ? await hasFfmpeg(config, signal) : true;
   let probeWarned = false;
-  const destOf = (segment) => path20.join(
+  const destOf = (segment) => path21.join(
     segmentsDir,
     `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`
   );
@@ -7637,17 +7796,17 @@ async function downloadSegmentsAndMerge(config, {
       installHint: guide.hint
     };
   }
-  const finalPath = path20.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
+  const finalPath = path21.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
   try {
     if (files.length === 1 && keepSingleFile) {
       return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "segment", videoPath: files[0] };
     }
     if (files.length === 1) {
-      await mkdir13(path20.dirname(finalPath), { recursive: true });
+      await mkdir14(path21.dirname(finalPath), { recursive: true });
       const copy = `${finalPath}.${uniqueSuffix("copy")}.mp4`;
       try {
         await copyFile2(files[0], copy);
-        await rename10(copy, finalPath);
+        await rename11(copy, finalPath);
       } finally {
         await rm8(copy, { force: true }).catch(() => {
         });
@@ -7698,7 +7857,7 @@ async function downloadSegmentsAndMerge(config, {
 
 // src/businesses/video/integrations/canvas-native.ts
 init_config();
-var hash3 = (value) => createHash9("sha256").update(JSON.stringify(value)).digest("hex");
+var hash3 = (value) => createHash10("sha256").update(JSON.stringify(value)).digest("hex");
 var validToken = (value) => /^[a-f0-9-]{36}$/.test(String(value || ""));
 var terminal = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled"]);
 function splitEvenly(items, count) {
@@ -7871,39 +8030,39 @@ function planCanvasNative(input, config, operation = "generate", draft = {}, car
 function createCanvasNativeService(liveConfig, options = {}) {
   const load = options.load || loadCanvasAdapter;
   const adapterFor = (link) => options.resolve ? options.resolve(link) : resolveCanvasAdapter(link?.projectId, load);
-  const directory2 = options.directory || path21.join(dshHome(), DATA_DIR, "canvas-native");
-  const snapshots = /* @__PURE__ */ new Map(), running = /* @__PURE__ */ new Map(), locks2 = /* @__PURE__ */ new Set();
+  const directory2 = options.directory || path22.join(dshHome(), DATA_DIR, "canvas-native");
+  const snapshots = /* @__PURE__ */ new Map(), running = /* @__PURE__ */ new Map(), locks3 = /* @__PURE__ */ new Set();
   const proposals = /* @__PURE__ */ new Map();
-  const chainDirectory = options.chainDirectory || path21.join(directory2, "chains");
+  const chainDirectory = options.chainDirectory || path22.join(directory2, "chains");
   let disposed = false;
   const file = (id) => {
     if (!validToken(id)) throw new Error("\u5236\u4F5C\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548\u3002");
-    return path21.join(directory2, `${id}.json`);
+    return path22.join(directory2, `${id}.json`);
   };
-  const pointer = (link) => path21.join(directory2, `node-${hash3([link.projectId, link.canvasId || "", link.nodeId])}.json`);
+  const pointer = (link) => path22.join(directory2, `node-${hash3([link.projectId, link.canvasId || "", link.nodeId])}.json`);
   async function save2(job) {
-    await mkdir14(directory2, { recursive: true, mode: 448 });
-    const dest = file(job.id), temp = `${dest}.${randomUUID9()}.tmp`;
-    await writeFile11(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
-    await rename11(temp, dest);
+    await mkdir15(directory2, { recursive: true, mode: 448 });
+    const dest = file(job.id), temp = `${dest}.${randomUUID10()}.tmp`;
+    await writeFile12(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
+    await rename12(temp, dest);
   }
-  const read = async (id) => JSON.parse(await readFile12(file(id), "utf8"));
+  const read = async (id) => JSON.parse(await readFile13(file(id), "utf8"));
   const chainFile = (id) => {
     if (!validToken(id)) throw new Error("\u8FDE\u62CD\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548\u3002");
-    return path21.join(chainDirectory, `${id}.json`);
+    return path22.join(chainDirectory, `${id}.json`);
   };
-  const chainPointer = (link) => path21.join(chainDirectory, `canvas-${hash3([link.projectId, link.canvasId || ""])}.json`);
+  const chainPointer = (link) => path22.join(chainDirectory, `canvas-${hash3([link.projectId, link.canvasId || ""])}.json`);
   async function saveChain(chain) {
-    await mkdir14(chainDirectory, { recursive: true, mode: 448 });
-    const dest = chainFile(chain.id), temp = `${dest}.${randomUUID9()}.tmp`;
-    await writeFile11(temp, JSON.stringify(chain), { mode: 384, flag: "wx" });
-    await rename11(temp, dest);
+    await mkdir15(chainDirectory, { recursive: true, mode: 448 });
+    const dest = chainFile(chain.id), temp = `${dest}.${randomUUID10()}.tmp`;
+    await writeFile12(temp, JSON.stringify(chain), { mode: 384, flag: "wx" });
+    await rename12(temp, dest);
   }
-  const readChain = async (id) => JSON.parse(await readFile12(chainFile(id), "utf8"));
+  const readChain = async (id) => JSON.parse(await readFile13(chainFile(id), "utf8"));
   async function previousChain(link) {
     let id;
     try {
-      id = JSON.parse(await readFile12(chainPointer(link), "utf8")).id;
+      id = JSON.parse(await readFile13(chainPointer(link), "utf8")).id;
     } catch (e) {
       if (e.code === "ENOENT") return null;
       throw e;
@@ -7913,7 +8072,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
   async function previous(link) {
     let id;
     try {
-      id = JSON.parse(await readFile12(pointer(link), "utf8")).id;
+      id = JSON.parse(await readFile13(pointer(link), "utf8")).id;
     } catch (e) {
       if (e.code === "ENOENT") return null;
       throw e;
@@ -8021,22 +8180,22 @@ function createCanvasNativeService(liveConfig, options = {}) {
   async function launchSegment(chain, segment, planned, config) {
     const { canvas, plan } = planned;
     const key = pointer(canvas);
-    if (locks2.has(key)) throw new Error("\u6B64\u8282\u70B9\u6B63\u5728\u786E\u8BA4\u5236\u4F5C\u3002");
-    locks2.add(key);
+    if (locks3.has(key)) throw new Error("\u6B64\u8282\u70B9\u6B63\u5728\u786E\u8BA4\u5236\u4F5C\u3002");
+    locks3.add(key);
     try {
       const old = await previous(canvas);
       if (old && (!terminal.has(old.state) || old.media?.length && !old.reviewed || old.sync?.status === "pending")) return old;
-      const job = { version: 1, id: randomUUID9(), canvas, plan, identity: chain.identity, createdAt: Date.now(), state: "running", reviewed: false, chain: chain.id };
+      const job = { version: 1, id: randomUUID10(), canvas, plan, identity: chain.identity, createdAt: Date.now(), state: "running", reviewed: false, chain: chain.id };
       await save2(job);
-      const temp = `${key}.${randomUUID9()}.tmp`;
-      await writeFile11(temp, JSON.stringify({ id: job.id }), { mode: 384, flag: "wx" });
-      await rename11(temp, key);
+      const temp = `${key}.${randomUUID10()}.tmp`;
+      await writeFile12(temp, JSON.stringify({ id: job.id }), { mode: 384, flag: "wx" });
+      await rename12(temp, key);
       snapshots.set(job.id, config);
       void perform(job, config).catch(() => {
       });
       return job;
     } finally {
-      locks2.delete(key);
+      locks3.delete(key);
     }
   }
   async function runChainSegment(chain, config) {
@@ -8172,19 +8331,19 @@ function createCanvasNativeService(liveConfig, options = {}) {
     const root = (await adapter.rpc.dataRootGet()).dataRoot;
     if (!root) throw new Error("\u753B\u5E03\u6570\u636E\u76EE\u5F55\u4E0D\u53EF\u7528\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\u6743\u9650\u3002");
     const records = (await adapter.rpc.assetsGet({ ids: segments.map((x) => x.assetId).filter(Boolean) })).items || [];
-    const work = path21.join(directory2, "film-work");
-    await mkdir14(work, { recursive: true, mode: 448 });
+    const work = path22.join(directory2, "film-work");
+    await mkdir15(work, { recursive: true, mode: 448 });
     const files = [];
     for (const segment of segments) {
       const asset = records.find((a) => a.id === segment.assetId);
-      const local = asset?.rel ? path21.resolve(root, String(asset.rel)) : "";
+      const local = asset?.rel ? path22.resolve(root, String(asset.rel)) : "";
       if (local && (await stat9(local).catch(() => null))?.isFile()) {
         files.push(local);
         segment.bytes = (await stat9(local)).size;
         continue;
       }
       if (!segment.url) throw new Error(`\u7B2C ${segment.index + 1} \u6BB5\uFF08${segment.label}\uFF09\u7D20\u6750\u4E0D\u5728\u753B\u5E03\u6570\u636E\u76EE\u5F55\uFF0C\u4E5F\u6CA1\u6709\u53EF\u4E0B\u8F7D\u7684\u5730\u5740\u3002`);
-      const dest2 = path21.join(work, `${String(segment.index + 1).padStart(2, "0")}-segment.mp4`);
+      const dest2 = path22.join(work, `${String(segment.index + 1).padStart(2, "0")}-segment.mp4`);
       await downloadFile(segment.url, dest2, {});
       files.push(dest2);
       segment.bytes = (await stat9(dest2)).size;
@@ -8192,8 +8351,8 @@ function createCanvasNativeService(liveConfig, options = {}) {
     const stamp = hash3(segments.map((x) => [x.resultId, x.assetId, x.url, x.bytes]));
     const id = `mov_film_${stamp.slice(0, 24)}`;
     const rel = `projects/${link.projectId}/final/${id}.mp4`;
-    const dest = path21.join(root, rel);
-    await mkdir14(path21.dirname(dest), { recursive: true });
+    const dest = path22.join(root, rel);
+    await mkdir15(path22.dirname(dest), { recursive: true });
     await (options.mergeClips || mergeClips)(config, files, dest, {});
     const seconds = segments.reduce((sum, x) => sum + (x.seconds || 0), 0) || null;
     const film = {
@@ -8267,7 +8426,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       if (existing && chainSignature(existing.segments) === chainSignature(segments)) return { chain: chainView(existing, await currentJob(existing)) };
       const chain = {
         version: 1,
-        id: randomUUID9(),
+        id: randomUUID10(),
         projectId: args.projectId,
         ...args.canvasId ? { canvasId: args.canvasId } : {},
         identity: hash3(config),
@@ -8280,10 +8439,10 @@ function createCanvasNativeService(liveConfig, options = {}) {
         segments
       };
       await saveChain(chain);
-      await mkdir14(chainDirectory, { recursive: true, mode: 448 });
-      const temp = `${chainPointer(link)}.${randomUUID9()}.tmp`;
-      await writeFile11(temp, JSON.stringify({ id: chain.id }), { mode: 384, flag: "wx" });
-      await rename11(temp, chainPointer(link));
+      await mkdir15(chainDirectory, { recursive: true, mode: 448 });
+      const temp = `${chainPointer(link)}.${randomUUID10()}.tmp`;
+      await writeFile12(temp, JSON.stringify({ id: chain.id }), { mode: 384, flag: "wx" });
+      await rename12(temp, chainPointer(link));
       try {
         await runChainSegment(chain, config);
       } catch (error) {
@@ -8348,12 +8507,12 @@ function createCanvasNativeService(liveConfig, options = {}) {
     }
     if (args.action === "mergeFilm") {
       const config = snapshotConfig(liveConfig);
-      if (locks2.has(`film:${args.projectId}`)) throw new Error("\u8FD9\u6761\u753B\u5E03\u6B63\u5728\u5408\u6210\u6210\u7247\uFF0C\u8BF7\u7A0D\u7B49\u3002");
-      locks2.add(`film:${args.projectId}`);
+      if (locks3.has(`film:${args.projectId}`)) throw new Error("\u8FD9\u6761\u753B\u5E03\u6B63\u5728\u5408\u6210\u6210\u7247\uFF0C\u8BF7\u7A0D\u7B49\u3002");
+      locks3.add(`film:${args.projectId}`);
       try {
         return await mergeFilm({ projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} }, config);
       } finally {
-        locks2.delete(`film:${args.projectId}`);
+        locks3.delete(`film:${args.projectId}`);
       }
     }
     if (args.action === "write") {
@@ -8445,7 +8604,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       const config = snapshotConfig(liveConfig), plan = planCanvasNative(input, config, args.operation || "generate", args.draft || {});
       if (plan.kind === "image" && plan.args.ratio !== "1:1") throw new Error("\u672C\u7248\u56FE\u7247\u76F4\u63A5\u5236\u4F5C\u4EC5\u652F\u63011:1\uFF0C\u8BF7\u5148\u4FEE\u6539\u8282\u70B9\u753B\u5E45\u3002");
       assertConfigured(plan.kind === "image" ? imageConfig(config) : config, resolveApiKey(plan.kind === "image" ? imageConfig(config) : config));
-      const id = randomUUID9(), proposal = { id, canvas: input.canvas, plan, config, identity: hash3(config), expires: Date.now() + 10 * 6e4 };
+      const id = randomUUID10(), proposal = { id, canvas: input.canvas, plan, config, identity: hash3(config), expires: Date.now() + 10 * 6e4 };
       for (const [key, p] of proposals) if (p.expires < Date.now()) proposals.delete(key);
       if (proposals.size >= 100) throw new Error("\u5F85\u786E\u8BA4\u65B9\u6848\u8FC7\u591A\uFF0C\u8BF7\u5148\u5904\u7406\u5DF2\u6709\u65B9\u6848\u3002");
       proposals.set(id, proposal);
@@ -8478,8 +8637,8 @@ function createCanvasNativeService(liveConfig, options = {}) {
       const p = proposals.get(args.id);
       if (!p || p.expires < Date.now()) throw new Error("\u5236\u4F5C\u65B9\u6848\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u6838\u5BF9\u3002");
       const key = pointer(p.canvas);
-      if (locks2.has(key)) throw new Error("\u6B64\u8282\u70B9\u6B63\u5728\u786E\u8BA4\u5236\u4F5C\u3002");
-      locks2.add(key);
+      if (locks3.has(key)) throw new Error("\u6B64\u8282\u70B9\u6B63\u5728\u786E\u8BA4\u5236\u4F5C\u3002");
+      locks3.add(key);
       try {
         if (args.confirmPlan !== true || args.confirmCost !== true || p.plan.kind === "video" && !p.plan.images.length && p.plan.operation === "generate" && args.textOnly !== true) throw new Error("\u8BF7\u5206\u522B\u786E\u8BA4\u5236\u4F5C\u65B9\u6848\u3001\u8D39\u7528\u53CA\u7EAF\u6587\u751F\u9009\u62E9\u3002");
         if (hash3(snapshotConfig(liveConfig)) !== p.identity) throw new Error("\u63D2\u4EF6\u914D\u7F6E\u5DF2\u53D8\uFF0C\u8BF7\u91CD\u65B0\u786E\u8BA4\u3002");
@@ -8489,23 +8648,23 @@ function createCanvasNativeService(liveConfig, options = {}) {
         if (old && (!terminal.has(old.state) || old.media?.length && !old.reviewed || old.sync?.status === "pending")) return { job: view(old) };
         const job2 = { version: 1, id: p.id, canvas: p.canvas, plan: p.plan, identity: p.identity, createdAt: Date.now(), state: "running", reviewed: false };
         await save2(job2);
-        const temp = `${key}.${randomUUID9()}.tmp`;
-        await writeFile11(temp, JSON.stringify({ id: job2.id }), { mode: 384, flag: "wx" });
-        await rename11(temp, key);
+        const temp = `${key}.${randomUUID10()}.tmp`;
+        await writeFile12(temp, JSON.stringify({ id: job2.id }), { mode: 384, flag: "wx" });
+        await rename12(temp, key);
         proposals.delete(p.id);
         snapshots.set(job2.id, p.config);
         void perform(job2, p.config).catch(() => {
         });
         return { job: view(job2) };
       } finally {
-        locks2.delete(key);
+        locks3.delete(key);
       }
     }
     const job = await read(args.id);
     if (args.action === "status") return { job: view(job) };
     if (running.has(job.id)) return { job: view(job) };
-    if (locks2.has(job.id)) throw new Error("\u6B64\u5236\u4F5C\u8BB0\u5F55\u6B63\u5728\u5904\u7406\u3002");
-    locks2.add(job.id);
+    if (locks3.has(job.id)) throw new Error("\u6B64\u5236\u4F5C\u8BB0\u5F55\u6B63\u5728\u5904\u7406\u3002");
+    locks3.add(job.id);
     try {
       if (args.action === "review") {
         if (!job.media?.length || args.accept !== true) throw new Error("\u672A\u901A\u8FC7\u7ED3\u679C\u5BA1\u6838\uFF0C\u5DF2\u4FDD\u7559\u6210\u679C\uFF0C\u4E0D\u7EE7\u7EED\u5236\u4F5C\u3002");
@@ -8523,7 +8682,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       } else throw new Error("\u672A\u77E5\u753B\u5E03\u5236\u4F5C\u64CD\u4F5C\u3002");
       return { job: view(job) };
     } finally {
-      locks2.delete(job.id);
+      locks3.delete(job.id);
     }
   }
   return { handle, dispose() {
@@ -8597,7 +8756,7 @@ function approvedCharacterReferences(images, state) {
 
 // src/businesses/video/workflow/segment-run.ts
 init_config();
-import path22 from "node:path";
+import path23 from "node:path";
 import { stat as stat10 } from "node:fs/promises";
 var SEGMENT_PAUSE_NOTE = "\u672C\u6BB5\u5DF2\u5B8C\u6210\uFF1A\u8BF7\u5148\u5C55\u793A\u672C\u6B21\u89C6\u9891\u6210\u679C\uFF0C\u8BA9\u7528\u6237\u9884\u89C8\uFF1B\u6B63\u6587\u5C55\u793A\u540E\u7ACB\u5373\u8C03\u7528video_project(action:review_segment,resume:\u539FresumeDir)\u5F39\u51FA\u5206\u6BB5\u7ED3\u679C\u786E\u8BA4\u7A97\uFF1B\u901A\u8FC7\u540E\u624D\u7528resume\u8FDB\u5165\u4E0B\u4E00\u6BB5\u8D39\u7528\u5BA1\u6279\uFF0C\u4E0D\u4EE5\u6587\u5B57\u95EE\u53E5\u66FF\u4EE3\u5F39\u7A97\u3002";
 function recordSegmentResult({ final, segments, segment, submissionId, convertedReferences }) {
@@ -8674,7 +8833,7 @@ async function runSegmentDelivery({
   const previewOnly = paused && !cumulativePreview;
   if (previewOnly) {
     for (const segment of completed.slice(0, -1)) {
-      const file = path22.join(segmentsDir, `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`);
+      const file = path23.join(segmentsDir, `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`);
       try {
         if ((await stat10(file)).isFile()) segment.localPath = file;
       } catch {
@@ -9739,9 +9898,9 @@ function setupTool(config) {
 
 // src/businesses/video/internal/hyperframes.ts
 import { spawn as spawn2 } from "node:child_process";
-import path23 from "node:path";
+import path24 from "node:path";
 import { createRequire as createRequire2 } from "node:module";
-import { stat as stat11, mkdir as mkdir15 } from "node:fs/promises";
+import { stat as stat11, mkdir as mkdir16 } from "node:fs/promises";
 function runHyperframes(cli, args, cwd, config, signal) {
   return new Promise((resolve3, reject) => {
     if (signal?.aborted) return reject(new Error("Hyperframes \u5DF2\u53D6\u6D88\u3002"));
@@ -9756,7 +9915,7 @@ function runHyperframes(cli, args, cwd, config, signal) {
         ...Object.fromEntries([
           ["HYPERFRAMES_FFMPEG_PATH", resolveBinary(config, "ffmpegBinary", "ffmpeg")],
           ["HYPERFRAMES_FFPROBE_PATH", resolveBinary(config, "ffprobeBinary", "ffprobe")]
-        ].filter(([, binary]) => path23.isAbsolute(binary)))
+        ].filter(([, binary]) => path24.isAbsolute(binary)))
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true
@@ -9836,16 +9995,16 @@ function hyperframesTool(config, deps) {
       let cli;
       try {
         const require2 = createRequire2(import.meta.url);
-        cli = path23.join(path23.dirname(require2.resolve("hyperframes/package.json")), "bin/hyperframes.mjs");
+        cli = path24.join(path24.dirname(require2.resolve("hyperframes/package.json")), "bin/hyperframes.mjs");
       } catch {
         return { status: "dependency_missing", note: "Hyperframes \u4E3A\u5185\u90E8\u5F00\u53D1\u80FD\u529B\uFF0C\u516C\u5F00\u63D2\u4EF6\u5305\u4E0D\u5305\u542B\u8BE5\u4F9D\u8D56\uFF1B\u9700\u5728\u5F00\u53D1\u73AF\u5883\u5355\u72EC\u51C6\u5907\u3002" };
       }
       let cwd = process.cwd();
       if (deps.workdir && exec?.agent) cwd = await deps.workdir.ensure(exec.agent, exec.signal) || cwd;
-      const project = path23.resolve(cwd, args.projectDir || ".");
+      const project = path24.resolve(cwd, args.projectDir || ".");
       if (action !== "check") {
         if (!args.projectDir) throw new Error("lint/render \u5FC5\u987B\u6307\u5B9A projectDir\u3002");
-        if (!(await stat11(path23.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
+        if (!(await stat11(path24.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
       }
       let videoPath;
       let command = ["doctor", "--json"];
@@ -9853,9 +10012,9 @@ function hyperframesTool(config, deps) {
       if (action === "render") {
         if (args.fps !== void 0 && ![24, 25, 30, 50, 60].includes(args.fps)) throw new Error("\u4E0D\u652F\u6301\u7684\u5E27\u7387\u3002");
         const output = args.output || `renders/output-${Date.now()}.mp4`;
-        videoPath = path23.resolve(project, output);
-        const relative = path23.relative(project, videoPath);
-        if (!relative || relative === ".." || relative.startsWith(`..${path23.sep}`) || path23.isAbsolute(relative) || path23.extname(videoPath).toLowerCase() !== ".mp4") {
+        videoPath = path24.resolve(project, output);
+        const relative = path24.relative(project, videoPath);
+        if (!relative || relative === ".." || relative.startsWith(`..${path24.sep}`) || path24.isAbsolute(relative) || path24.extname(videoPath).toLowerCase() !== ".mp4") {
           throw new Error("\u8F93\u51FA\u5FC5\u987B\u662F\u9879\u76EE\u76EE\u5F55\u5185\u7684 .mp4 \u6587\u4EF6\u3002");
         }
         try {
@@ -9864,7 +10023,7 @@ function hyperframesTool(config, deps) {
         } catch (error) {
           if (error.code !== "ENOENT") throw error;
         }
-        await mkdir15(path23.dirname(videoPath), { recursive: true });
+        await mkdir16(path24.dirname(videoPath), { recursive: true });
         command = ["render", project, "--output", videoPath, "--fps", String(args.fps || 30), "--workers", "1", "--strict"];
       }
       const result = await runHyperframes(cli, command, action === "check" ? cwd : project, config, exec?.signal);
@@ -10068,6 +10227,7 @@ function buildPromptGuidance(config) {
   const canvasOn = ref(config, "canvasEnabled", false) === true;
   const autoCreate = canvasOn && ref(config, "autoCreateCanvas", true) === true;
   return [
+    CREATIVE_GUIDANCE,
     `\xB7 \u5F53\u524D\u6D41\u7A0B\u753B\u5E03\uFF1A${canvasOn ? `\u5F00\u542F\uFF1B\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\uFF1A${autoCreate ? "\u5F00\u542F" : "\u5173\u95ED"}` : "\u5173\u95ED\uFF08\u9ED8\u8BA4\u5173\u95ED\uFF0C\u53EF\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u6253\u5F00\uFF09"}\u3002\u8FD9\u4E24\u4E2A\u5F00\u5173\u53EA\u80FD\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u4FEE\u6539\uFF0Cvideo_config\u53EF\u53EA\u8BFB\u6838\u5BF9\u3002`,
     "\xB7 \u6D41\u7A0B\u753B\u5E03\u662F\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF08\u5DE6\u4FA7\u680F\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u90A3\u4E00\u884C\u6253\u5F00\u72EC\u7ACB\u9875\u9762\uFF0C\u89C6\u9891\u521B\u4F5C\u9762\u677F\u91CC\u4E0D\u518D\u5185\u5D4C\uFF09\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u4EFB\u4F55\u7B2C\u4E09\u65B9\u753B\u5E03\u63D2\u4EF6\uFF1B\u6309\u5F53\u524D\u5F00\u5173\u51B3\u5B9A\u662F\u5426\u81EA\u52A8\u6295\u5F71\u3002" + (!canvasOn ? "\u5F53\u524D\u6D41\u7A0B\u753B\u5E03\u5173\u95ED\uFF1A\u5DE6\u4FA7\u680F\u6CA1\u6709\u753B\u5E03\u5165\u53E3\uFF0C\u4E0D\u8981\u81EA\u52A8\u5EFA\u56FE\u3001\u4E0D\u8981\u81EA\u52A8\u540C\u6B65\uFF0C\u4E5F\u4E0D\u8981\u5BF9\u7528\u6237\u8BF4\u5DF2\u7ECF\u5EFA\u597D\u6216\u6253\u5F00\u4E86\u6D41\u7A0B\u753B\u5E03\uFF1B\u7528\u6237\u8981\u7528\u753B\u5E03\u65F6\u5148\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u6253\u5F00\u300C\u6D41\u7A0B\u753B\u5E03\u300D\uFF0C\u518D\u6309\u4E0B\u9762\u7684\u753B\u5E03\u8054\u52A8\u89C4\u5219\u624B\u52A8\u5904\u7406\u3002" : autoCreate ? "\u666E\u901A\u521B\u4F5C\u7167\u5E38\u8C03\u7528video_project prepare/review\uFF0C\u5DE5\u5177\u4F1A\u81EA\u52A8\u5EFA\u6D41\u7A0B\u753B\u5E03\u9879\u76EE\u3001\u540C\u6B65\u5B8C\u6574\u811A\u672C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\uFF0C\u5E76\u63D0\u793A\u7528\u6237\u5230\u5DE6\u4FA7\u680F\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u67E5\u770B\uFF1B\u4E0D\u8981\u8981\u6C42\u7528\u6237\u53E6\u5EFA\u9879\u76EE/\u8282\u70B9\u6216\u53E6\u95EE\u662F\u5426\u540C\u6B65\u3002" : "\u5F53\u524D\u6D41\u7A0B\u753B\u5E03\u5DF2\u6253\u5F00\u4F46\u5173\u95ED\u4E86\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\uFF1A\u4E0D\u8981\u81EA\u52A8\u5EFA\u56FE\u3001\u4E0D\u8981\u81EA\u52A8\u540C\u6B65\uFF0C\u4E5F\u4E0D\u8981\u5BF9\u7528\u6237\u8BF4\u5DF2\u7ECF\u81EA\u52A8\u5EFA\u597D\uFF1B\u7528\u6237\u660E\u786E\u9009\u4E2D\u753B\u5E03\u8282\u70B9\u65F6\u518D\u6309\u4E0B\u9762\u7684\u753B\u5E03\u8054\u52A8\u89C4\u5219\u624B\u52A8\u5904\u7406\u3002") + "\u5F00\u542F\u540E\u751F\u6210\u4F20projectId\uFF0C\u7EED\u505A\u4F20\u539Fresume\uFF0C\u6210\u679C\u56DE\u5230\u5DF2\u7ED1\u5B9A\u7684\u753B\u5E03\u8282\u70B9\uFF0C\u4E0D\u5FC5\u624B\u5DE5\u62FC\u81EA\u52A8canvas\u7ED1\u5B9A\u3002canvasProject\u4E3Adisabled\u8868\u793A\u672A\u5F00\u542F\u81EA\u52A8\u6295\u5F71\uFF0Cunavailable/pending\u5982\u5B9E\u8BF4\u660E\uFF0C\u7528video_project status\u91CD\u8BD5\u540C\u6B65\uFF0C\u4E0D\u91CD\u5EFA\u521B\u4F5C\u9879\u76EE\u6216\u91CD\u751F\u6210\uFF1B\u5185\u7F6E\u753B\u5E03\u53EA\u80FD\u7531\u7528\u6237\u81EA\u5DF1\u4ECE\u5DE6\u4FA7\u680F\u6253\u5F00\uFF0C\u5DE5\u5177\u65E0\u6CD5\u4EE3\u5F00\uFF0C\u4E0D\u8981\u58F0\u79F0\u5DF2\u6253\u5F00\u3002\u4ECD\u4FDD\u7559\u811A\u672C\u3001\u8D39\u7528\u548C\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838\u3002",
     "\xB7 \u6D41\u7A0B\u753B\u5E03\u8054\u52A8\uFF08\u7531\u7528\u6237\u660E\u786E\u9009\u4E2D\u753B\u5E03\u8282\u70B9\u89E6\u53D1\uFF0C\u4E0E\u8BBE\u7F6E\u91CC\u7684\u81EA\u52A8\u521B\u5EFA\u753B\u5E03\u5F00\u5173\u65E0\u5173\uFF09\uFF1A\u7528\u6237\u8981\u7528MetaOnticVideo\u5236\u4F5C\u753B\u5E03\u8282\u70B9\u65F6\uFF0C\u5148video_canvas(action:list/read)\u8BFB\u53D6\u76EE\u6807\u8282\u70B9\u3001\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u548C\u53C2\u8003\u7D20\u6750\u3002\u6309\u7AEF\u53E3/refOrder\u4FDD\u7559\u9996\u5E27\u3001\u5C3E\u5E27\u3001\u53C2\u8003\u89C6\u9891\u89D2\u8272\uFF0C\u660E\u786E\u7F3A\u5931\u89C4\u683C\uFF0C\u4E0D\u731C\u65F6\u957F\u548C\u6E05\u6670\u5EA6\u3002\u636E\u6B64\u5B8C\u6210\u73B0\u6709video_project\u51C6\u5907\u3001\u6B63\u6587\u5C55\u793A\u811A\u672C/\u5185\u5D4C\u5206\u955C\u53CAreview\uFF1B\u5B8C\u6574specification\u4E0E\u968F\u540Evideo_generate/video_extend\u53C2\u6570\u90FD\u5E26read\u8FD4\u56DE\u7684canvas\u5BF9\u8C61\u3002\u56FE\u7247\u8D70video_prepare_image\u5E76\u5E26canvas\uFF0C\u4ECD\u987B\u56FE\u7247\u8D39\u7528\u5BA1\u6279\u548C\u7ED3\u679C\u5BA1\u6838\u3002\u4E0D\u590D\u5236API\u5BC6\u94A5\u3002\u6210\u679C\u81EA\u52A8\u65B0\u589E\u5230\u6D41\u7A0B\u753B\u5E03\uFF0Cpaused\u4ECD\u987B\u5148\u4EA4\u4ED8\u5E76review_segment\uFF0C\u56DE\u586B\u4E0D\u4EE3\u8868\u7ED3\u679C\u5DF2\u5BA1\u6838\u6216\u6574\u7247\u5B8C\u6210\u3002\u56DE\u586Bpending\u65F6\u7528video_canvas(action:sync,token)\u8865\u4F20\uFF0C\u7EDD\u4E0D\u91CD\u65B0\u751F\u6210\u3002\u753B\u5E03\u6309\u8FDE\u7EBF\u987A\u5E8F\u6267\u884C\uFF1A\u5DE5\u5177\u6761\u6709\u300C\u5236\u4F5C\u300C\u8282\u70B9\u540D\u300D\u300D\u6309\u94AE\u4F9D\u6B21\u9A71\u52A8\u4E0B\u4E00\u4E2A\u672A\u5B8C\u6210\u8282\u70B9\uFF0C\u672A\u5B8C\u6210\u8282\u70B9\u7528\u865A\u7EBF\u6846\u6807\u51FA\uFF0C\u8FDB\u5EA6\u663E\u793A\u5728\u5DE5\u5177\u6761\u4E0A\uFF1B\u8282\u70B9\u5185\u7684\u300C\u5236\u4F5C\u300D\u6309\u94AE\u4E0E\u5B83\u90FD\u7531\u63D2\u4EF6\u63A5\u7BA1\u65B9\u6848\u3001\u8D39\u7528\u4E0E\u7ED3\u679C\u5BA1\u6838\u3002\u7528\u6237\u5728\u753B\u5E03\u5185\u81EA\u884C\u70B9\u51FB\u751F\u6210\u65F6\u540C\u6837\u5148\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002\u753B\u5E03\u672C\u8EAB\u5C31\u662F\u751F\u6210\u89C6\u9891\u7684\u6D41\u7A0B\uFF1A\u70B9\u753B\u5E03\u7A7A\u767D\u5904\uFF08\u6216\u5DE6\u4E0A\u89D2\u300C\uFF0B \u521B\u4F5C\u6D41\u7A0B\u300D\uFF09\u6253\u5F00\u300C\u521B\u4F5C\u6D41\u7A0B\u300D\u9762\u677F\uFF0C\u5199\u811A\u672C\u3001\u94FA\u5F00\u5236\u4F5C\u8282\u70B9\u4E0E\u5BFC\u5165\u53C2\u8003\u7D20\u6750\u90FD\u5728\u8FD9\u4E2A\u9762\u677F\u6216\u8282\u70B9\u7684\u5236\u4F5C\u7A97\u53E3\u91CC\uFF1B\u5DE5\u5177\u6761\u4E0A\u5DF2\u7ECF\u6CA1\u6709\u5EFA\u8282\u70B9\u6309\u94AE\uFF0C\u4E0D\u8981\u6307\u5F15\u7528\u6237\u53BB\u70B9\u4E0D\u5B58\u5728\u7684\u6309\u94AE\u3002\u753B\u5E03\u4E0A\u53E6\u6709\u4E03\u5F20\u53EF\u70B9\u7684\u6D41\u7A0B\u9636\u6BB5\u5361\uFF08\u9700\u6C42\u786E\u8BA4\uFF0F\u811A\u672C\u5BA1\u6838\uFF0F\u5206\u955C\u786E\u8BA4\uFF0F\u7D20\u6750\u51C6\u5907\uFF0F\u8D39\u7528\u786E\u8BA4\uFF0F\u9010\u6BB5\u5236\u4F5C\uFF0F\u5408\u6210\u6210\u7247\uFF09\uFF0C\u5361\u95F4\u7528\u865A\u7EBF\u7BAD\u5934\u8868\u793A\u5148\u540E\uFF1B\u70B9\u5361\u53EA\u662F\u8FDB\u5BF9\u5E94\u786E\u8BA4\u5165\u53E3\uFF0C\u4E0D\u4EE3\u66FF\u65B9\u6848\u4E0E\u8D39\u7528\u786E\u8BA4\u3002\u811A\u672C\u672A\u5BA1\u6838\u65F6\u9636\u6BB5\u5361\u2461\u4E0E\u5267\u672C\u8282\u70B9\u90FD\u5E26\u300C\u786E\u8BA4\u811A\u672C\u300D\uFF0C\u7528\u6237\u5728\u753B\u5E03\u5185\u70B9\u8FC7\u5C31\u7B97\u8FD9\u6761\u753B\u5E03\u6D41\u7A0B\u7684\u811A\u672C\u5BA1\u6838\u901A\u8FC7\uFF08\u753B\u5E03\u5185\u5236\u4F5C\u4E0D\u7ECF\u8FC7 video_project(action:review)\uFF09\uFF0C\u2461 \u6807\u4E3A\u5DF2\u5B8C\u6210\u3001\u4E0D\u4F1A\u88AB\u52A9\u624B\u4FA7\u65E7\u72B6\u6001\u56DE\u9000\uFF1B\u4F46\u7528\u6237\u8981\u4F60\u5728\u4F1A\u8BDD\u91CC\u9A71\u52A8\u751F\u6210\u65F6\uFF0C\u4ECD\u6309\u73B0\u6709 video_project(action:review) \u5B8C\u6210\u811A\u672C\u5BA1\u6838\uFF0C\u4E0D\u5F97\u7528\u753B\u5E03\u72B6\u6001\u66FF\u4EE3\u3002\u753B\u5E03\u91CC\u7684\u521B\u4F5C\u6D41\u7A0B\u8DDF\u5BF9\u8BDD\u987A\u5E8F\u4E00\u81F4\u5206\u4E24\u6B65\uFF1A\u5148\u300C\u521B\u5EFA\u9700\u6C42\u300D\uFF08\u53EA\u5EFA\u9700\u6C42\u8282\u70B9\u4E0E\u9636\u6BB5\u5361\uFF0C\u4E0D\u8C03\u7528\u6A21\u578B\u3001\u4E0D\u4EA7\u751F\u89C6\u9891\u8D39\u7528\uFF09\uFF0C\u518D\u70B9\u4E00\u6B21\u300C\u5199\u811A\u672C\u300D\u6309\u9700\u6C42\u5199\u5267\u672C\u4E0E\u5206\u955C\u3001\u5148\u300C\u9884\u89C8\u5206\u6BB5\u300D\u518D\u300C\u751F\u6210\u5236\u4F5C\u8282\u70B9\u300D\u2014\u2014\u4E00\u6B21\u94FA\u597D\u5267\u672C\u3001\u5206\u955C\u3001\u6BCF\u6BB5\u4E00\u4E2A\u300C\u753B\u9762\u300D\u8282\u70B9\u4E0E\u6BCF\u6BB5\u4E00\u4E2A\u89C6\u9891\u8282\u70B9\uFF0C\u753B\u9762\u51FA\u56FE\u540E\u4F5C\u4E3A\u8FD9\u4E00\u6BB5\u9996\u5E27\u63A5\u8FDB\u89C6\u9891\u8282\u70B9\uFF08\u6BCF\u6BB5\u5148\u51FA\u753B\u9762\u3001\u518D\u505A\u89C6\u9891\uFF09\uFF1B\u522B\u8BA9\u7528\u6237\u4EE5\u4E3A\u753B\u5E03\u4E0A\u4E00\u6B65\u5C31\u80FD\u4ECE\u60F3\u6CD5\u76F4\u63A5\u51FA\u89C6\u9891\uFF0C\u4E5F\u522B\u6307\u5F15\u7528\u6237\u53BB\u70B9\u5DF2\u7ECF\u4E0D\u5B58\u5728\u7684\u6309\u94AE\u3002\u753B\u5E03\u4E0A\u7684\u6D41\u7A0B\u6B65\u9AA4\u4E0E\u4E13\u4E1A\u753B\u5E03\u4E00\u81F4\uFF1A\u9700\u6C42 \u2192 \u811A\u672C \u2192 \u5206\u955C \u2192 \u753B\u9762\uFF08\u6BCF\u6BB5\u4E00\u5F20\u56FE\uFF0C\u51FA\u56FE\u540E\u5F53\u9996\u5E27\uFF09\u2192 \u7D20\u6750\uFF08\u89D2\u8272\u56FE/\u9996\u5E27/\u53C2\u8003\u56FE\uFF09\u2192 \u8D39\u7528 \u2192 \u9010\u6BB5\u5236\u4F5C \u2192 \u5408\u6210\uFF0C\u9636\u6BB5\u5361\u4F1A\u6309\u8FDB\u5EA6\u628A\u6309\u94AE\u6362\u6210\u300C\u6539\u9700\u6C42 / \u5199\u811A\u672C / \u786E\u8BA4\u811A\u672C / \u770B\u5267\u672C / \u751F\u6210\u5206\u955C / \u770B\u5206\u955C / \u51C6\u5907\u7D20\u6750 / \u770B\u4F30\u4EF7 / \u505A\u8FD9\u4E00\u6BB5 / \u5408\u6210\u6210\u7247\u300D\uFF1B\u8FDE\u62CD\uFF08\u6279\u91CF\u751F\u6210\uFF09\u524D\u4F1A\u5148\u5217\u300C\u786E\u8BA4\u955C\u5934 / \u51C6\u5907\u7D20\u6750 / \u786E\u8BA4\u8D39\u7528\u300D\uFF0C\u7528\u6237\u8981\u4F60\u5728\u4F1A\u8BDD\u91CC\u6279\u91CF\u63A8\u8FDB\u65F6\u4E5F\u6309\u8FD9\u4E2A\u987A\u5E8F\u5148\u786E\u8BA4\u8FD9\u4E09\u9879\uFF0C\u4E0D\u5F97\u8DF3\u8FC7\u811A\u672C\u5BA1\u6838\u4E0E\u9010\u6BB5\u8D39\u7528\u786E\u8BA4\uFF1B\u8FDE\u62CD\u53EA\u751F\u6210\u8FD8\u6CA1\u6709\u6210\u679C\u7684\u6BB5\uFF0C\u5DF2\u6709\u6210\u679C\u7684\u6BB5\u8DF3\u8FC7\u3001\u4E0D\u91CD\u590D\u751F\u6210\u4E5F\u4E0D\u91CD\u590D\u8BA1\u8D39\uFF0C\u5B83\u7684\u6210\u679C\u4F5C\u4E3A\u4E0B\u4E00\u6BB5\u7684\u7EED\u62CD\u8F93\u5165\uFF0C\u6574\u6761\u94FE\u8DEF\u90FD\u5DF2\u6709\u6210\u679C\u65F6\u8FDE\u62CD\u4E0D\u542F\u52A8\uFF08\u8981\u91CD\u505A\u5C31\u70B9\u90A3\u4E2A\u8282\u70B9\u81EA\u5DF1\u7684\u300C\u5236\u4F5C\u300D\uFF09\u3002\u753B\u5E03\u8FD8\u4F1A\u505A\u300C\u753B\u5E03\u4F53\u68C0\u300D\uFF1A\u7F3A\u6210\u679C\u7684\u5236\u4F5C\u6BB5\u3001\u8FD8\u6CA1\u51FA\u56FE\u7684\u753B\u9762\u8282\u70B9\u3001\u8FD8\u6CA1\u63A5\u5230\u4EFB\u4F55\u5236\u4F5C\u6BB5\u7684\u7D20\u6750\u56FE\u3001\u6307\u5230\u5DF2\u5220\u9664\u8282\u70B9\u7684\u65AD\u94FE\u3001\u6210\u7247\u6BB5\u6570\u4E0E\u73B0\u6709\u89C6\u9891\u6210\u679C\u5BF9\u4E0D\u4E0A\uFF0C\u90FD\u4F1A\u5728\u753B\u5E03\u63D0\u793A\u533A\u7ED9\u4E00\u884C\u6458\u8981\uFF0C\u70B9\u300C\u8FDE\u62CD\u300D\u770B\u5B8C\u6574\u6E05\u5355\u4E0E\u5904\u7406\u5EFA\u8BAE\uFF1B\u4F53\u68C0\u53EA\u8BFB\u753B\u5E03\u5185\u5BB9\uFF0C\u4E0D\u6D89\u53CA\u8D39\u7528\u4E0E\u5BA1\u6838\uFF0C\u4E5F\u4E0D\u4F1A\u81EA\u52A8\u6539\u52A8\u753B\u5E03\u3002\u7D20\u6750\uFF08\u53C2\u8003\u56FE\u8282\u70B9\u4E0E\u5BFC\u5165\u7684\u56FE\u7247\uFF09\u7B97\u8D44\u4EA7\u4E0D\u7B97\u5236\u4F5C\u6BB5\uFF0C\u6309\u811A\u672C\u81EA\u52A8\u94FA\u51FA\u7684\u300C\u753B\u9762\u300D\u8282\u70B9\u8DDF\u7740\u6D41\u7A0B\u6392\u961F\u4F46\u4E5F\u4E0D\u7B97\u5236\u4F5C\u6BB5\uFF0C\u90FD\u4E0D\u5360\u7528\u300C\u5236\u4F5C\u300C\u2026\u300D\u300D\u7684\u63A8\u8FDB\u987A\u5E8F\uFF1B\u753B\u9762\u6CA1\u51FA\u56FE\u65F6\u89C6\u9891\u5236\u4F5C\u4F1A\u62A5\u7F3A\u5C11\u9996\u5E27\uFF0C\u8981\u6307\u5F15\u7528\u6237\u5148\u5728\u753B\u9762\u8282\u70B9\u51FA\u56FE\uFF1B\u7528\u6237\u5728\u753B\u5E03\u4E0A\u8865\u7D20\u6750\u65F6\uFF0C\u7D20\u6750\u4F1A\u53CD\u7ED1\u5230\u5B83\u670D\u52A1\u7684\u5236\u4F5C\u6BB5\uFF0C\u2463 \u7D20\u6750\u51C6\u5907\u5361\u7684\u6587\u6848\u4F1A\u5199\u660E\u6709\u51E0\u5F20\u8FD8\u6CA1\u63A5\u4E0A\uFF0C\u52A9\u624B\u4FA7\u4E0D\u8981\u628A\u5B83\u7B97\u6210\u65B0\u7684\u5236\u4F5C\u6BB5\u6216\u8981\u6C42\u7528\u6237\u91CD\u65B0\u8FDE\u7EBF\u3002",
@@ -10254,7 +10414,7 @@ var Config = Schema.object({ ...commonConfigFields, ...videoConfigFields });
 
 // src/index.ts
 var inject = ["tools"];
-var apply = createPluginRuntime({ agents, businesses: [videoBusiness] });
+var apply = createPluginRuntime({ agents, businesses: [videoBusiness, filmDirectorBusiness] });
 export {
   Config,
   apply,

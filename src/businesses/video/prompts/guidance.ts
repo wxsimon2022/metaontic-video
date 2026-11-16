@@ -1,3 +1,4 @@
+import { CREATIVE_GUIDANCE } from '../../film-director/creative.js';
 /** prompts/guidance：从宿主入口拆出的独立职责模块。 */
 import { resolveSingleMax, resolveSegmentSeconds } from '../workflow/planning.js';
 import { isMetaontic, isVolcengine } from '../providers/connection.js';
@@ -13,6 +14,8 @@ export function buildPromptGuidance(config) {
   const canvasOn = ref(config, 'canvasEnabled', false) === true;
   const autoCreate = canvasOn && ref(config, 'autoCreateCanvas', true) === true;
   return [
+    CREATIVE_GUIDANCE,
+
     `· 当前流程画布：${canvasOn ? `开启；自动创建画布：${autoCreate ? '开启' : '关闭'}` : '关闭（默认关闭，可在插件设置页打开）'}。这两个开关只能在插件设置页修改，video_config可只读核对。`,
     '· 流程画布是插件自带组件（左侧栏「MetaOnticVideo流程画布」那一行打开独立页面，视频创作面板里不再内嵌），不需要安装任何第三方画布插件；按当前开关决定是否自动投影。'
       + (!canvasOn
