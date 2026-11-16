@@ -42,6 +42,12 @@ GitHub 同版备用：
 https://github.com/wxsimon2022/metaontic-video/releases/download/v3.29.2/metaontic-video-3.29.2.tgz
 ```
 
+也可以在 Harness「插件 → 发现」中添加插件市场索引源，浏览并安装：
+
+```text
+https://gitee.com/hackloop/metaontic-video/raw/master/market/index.json
+```
+
 安装后打开插件设置，选择 **MetaOntic AI**，填写 API密钥并保存；在会话中选择 **视频创作助手** 开始。制作产品、品牌或活动内容时，也可选择 **宣传视频助手**。这两个助手使用相同的制作流程，标准模式保持通用用途。
 
 [在线使用说明](https://ai.mybfs.cn) · [问题反馈](https://github.com/wxsimon2022/metaontic-video/issues) · [完整更新记录](./CHANGELOG.md) · [开发说明](./docs/engineering/development.md)

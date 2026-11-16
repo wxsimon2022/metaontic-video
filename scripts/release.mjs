@@ -170,7 +170,12 @@ export async function main(argv) {
   if(!opts.resume && latest && !newer(version,latest.replace(/^v/,'')))throw Error(`目标必须高于最新正式版${latest}`);
   const exists=run('git',['rev-parse','--verify',`refs/tags/${tag}`],{capture:true,optional:true});
   if(opts.resume) {
-    if(!exists||pkg.version!==version||git('rev-parse',`${tag}^{commit}`)!==git('rev-parse','HEAD')||dirty)throw Error('续跑要求：标签/版本/HEAD一致且工作区干净');
+    // 标签之后还会追加一个“刷新插件市场索引”的提交，所以续跑时 HEAD 允许正好是标签加这一个提交。
+    const tagCommit=git('rev-parse',`${tag}^{commit}`),headCommit=git('rev-parse','HEAD');
+    const indexRefreshOnly=headCommit!==tagCommit
+      && git('rev-parse','HEAD^')===tagCommit
+      && git('diff','--name-only',`${tagCommit}..HEAD`)==='market/index.json';
+    if(!exists||pkg.version!==version||(headCommit!==tagCommit&&!indexRefreshOnly)||dirty)throw Error('续跑要求：标签/版本/HEAD一致（或只多一个市场索引提交）且工作区干净');
   } else {
     if(exists)throw Error('标签已存在，禁止覆盖；如仅重试发布请使用--resume');
     run(process.execPath,['scripts/check-active-video.mjs']);
@@ -235,6 +240,11 @@ export async function main(argv) {
     const notes=path.join(out,'release-notes.txt');writeFileSync(notes,body);
     writeFileSync(`docs/engineering/release-${version}.md`,`# ${tag} 发布核对\n\n实际基线：${base}。\n\n${body}\n${verification}\n指南核对：${plan.guideReview}\n`);
     run('git',['add','-A']);run('git',['commit','-m',`release: ${tag}`]);run('git',['tag','-a',tag,'-F',notes]);
+    // 插件市场索引里的每个版本都要固定到发布提交，标签刚建好才拿得到这个提交，所以索引在这里单独刷新并提交。
+    run(process.execPath,['scripts/market-index.mjs']);
+    if(git('status','--short','--','market/index.json')) {
+      run('git',['add','market/index.json']);run('git',['commit','-m',`chore(market): 刷新插件市场索引到 ${tag}`]);
+    }
   }
   // 先确认发布渠道凭据，避免推送成功后才因为缺令牌停半路；走流水线时本机不发布，所以不需要令牌。
   const token=process.env.GITEE_TOKEN;

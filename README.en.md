@@ -42,6 +42,12 @@ GitHub mirror:
 https://github.com/wxsimon2022/metaontic-video/releases/download/v3.29.2/metaontic-video-3.29.2.tgz
 ```
 
+You can also add the plugin market index source in Harness → Plugins → Discover to browse and install:
+
+```text
+https://gitee.com/hackloop/metaontic-video/raw/master/market/index.json
+```
+
 Open plugin settings, choose **MetaOntic AI**, enter your API key and save. Select **视频创作助手** in a conversation to begin; **宣传视频助手** is also available for product, brand or event content. Both assistants share the production workflow. Standard mode remains general-purpose.
 
 [Online user guide](https://ai.mybfs.cn) · [Report an issue](https://github.com/wxsimon2022/metaontic-video/issues) · [Changelog](./CHANGELOG.md) · [Development](./docs/engineering/development.md)
