@@ -50,7 +50,7 @@ export function publicReleaseNotes(version, items) {
 }
 export function releaseVerification(includeGithub, promoLine = '', pipeline = false) {
   return '验证\n- 本地构建及测试通过。\n'
-    + (pipeline ? '- 成品打包与 Gitee Release 由 Gitee Go 流水线按标签完成（scripts/ci-release.mjs，幂等：已有同大小附件只核对不覆盖）；本机未打包、未上传附件。\n' : '')
+    + (pipeline ? '- 成品打包与 Gitee Release 由 Gitee Go 流水线按标签完成（scripts/ci-release.mjs，幂等：已有同大小附件只核对不覆盖）；成品同时由流水线的「上传制品」步骤归档到仓库制品库。本机未打包、未上传附件。\n' : '')
     + (includeGithub ? '- Windows/macOS成品安装及升级为CI上传前置条件。\n' : '- 本条按仅 Gitee 发布处理：未运行 GitHub 双平台 CI，也没做 Windows 桌面实测，Windows 兼容性只有构建与打包层面的保证。\n')
     + promoLine + '- 桌面GUI与付费调用未由发布脚本自动验证。\n';
 }
@@ -60,12 +60,12 @@ const help = `一键发布（准备好完整说明与指南后执行）：
   node scripts/release.mjs 3.13.3 --notes release-plan.json
   node scripts/release.mjs 3.13.3 --notes release-plan.json --dry-run
   node scripts/release.mjs 3.13.3 --resume
-默认只发 Gitee：本地成品直接建 Release 并上传，不再等 GitHub Actions 打包回传。
-需要同时同步 GitHub（含双平台安装校验）时加 --both，或 --github <地址>。
+默认只发 Gitee，且默认走 Gitee Go 流水线：本机只做准备、提交、打标签并推送，成品打包、制品库归档与 Gitee Release 都由流水线按标签完成（scripts/ci-release.mjs），本机不需要 GITEE_TOKEN。
+流水线不可用时才在本机打包并发布，加 --local；--ci 是默认行为的同义写法。
+需要同时同步 GitHub（含双平台安装校验）时加 --both，或 --github <地址>；--both 走本机收尾，不要再并跑流水线发布。
 可选：--gitee <Gitee仓库地址> --branch master
 --dry-run 只显示范围与计划，不写文件、不改版本、不提交、不联网发布。
 --resume 仅续跑已提交且同一标签的发布，不改旧标签。
---ci 流水线发版：本地只做准备、提交、打标签并推送，成品打包与 Gitee Release 交给 Gitee Go 流水线（scripts/ci-release.mjs）；不需要 GITEE_TOKEN。
 `;
 
 export async function main(argv) {
@@ -73,7 +73,7 @@ export async function main(argv) {
     const {createInterface}=await import('node:readline/promises');
     const input=createInterface({input:process.stdin,output:process.stdout});
     let entered;
-    try { console.log('正式发布：请先填写release-plan.json并同步指南。'); entered=(await input.question('请输入正式版本号（如3.13.3，留空退出）：')).trim(); } finally { input.close(); }
+    try { console.log('正式发布：请先填写release-plan.json并同步指南；默认由 Gitee Go 流水线按标签打包发布（本机只推标签）。'); entered=(await input.question('请输入正式版本号（如3.13.3，留空退出）：')).trim(); } finally { input.close(); }
     if(!entered)return;
     return main([entered,...argv.slice(1)]);
   }
@@ -82,13 +82,20 @@ export async function main(argv) {
   const opts={branch:'master',targets:'gitee',github:'git@ssh.github.com:wxsimon2022/metaontic-video.git',gitee:'git@ssh.gitee.com:hackloop/metaontic-video.git'};
   for(let i=1;i<argv.length;i++) {
     const key=argv[i];
-    if(['--dry-run','--resume','--no-promo','--ci'].includes(key)) opts[key.slice(2)]=true;
-    else if(key==='--both') opts.targets='both';
+    if(['--dry-run','--resume','--no-promo'].includes(key)) opts[key.slice(2)]=true;
+    // 发版默认由 Gitee Go 流水线发布：本机只做准备并推标签；--local 才在本机打包发布，--ci 是默认行为的同义写法。
+    else if(key==='--ci') opts.ci=true;
+    else if(key==='--local') opts.local=true;
+    // --both 要等 GitHub CI 的成品再收尾，所以仍然在本机打包发布。
+    else if(key==='--both') { opts.targets='both'; opts.local=true; }
     // GitHub 只在明确要求时同步；不带地址的 --github 表示“连同 GitHub 一起发”。
     else if(key==='--github' && (!argv[i+1] || argv[i+1].startsWith('--'))) opts.targets='both';
     else if(['--notes','--github','--gitee','--branch'].includes(key) && argv[i+1] && !argv[i+1].startsWith('--')) { opts[key.slice(2)]=argv[++i]; if(key==='--github')opts.targets='both'; }
     else throw Error(`未知参数或缺少参数值：${key}`);
   }
+  if(opts.ci&&opts.local)throw Error('--ci 与 --local 不能同时用：默认（含 --ci）由 Gitee Go 流水线发布，--local 才在本机打包发布');
+  // 发布路径：默认流水线（本机只推标签），--local / --both 才在本机打包并发 Release。
+  const pipeline=!opts.local;
   if(!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(opts.branch)||opts.branch.includes('..'))throw Error('无效分支');
   const github=repository(opts.github,'github.com'),gitee=repository(opts.gitee,'gitee.com');
   const includeGithub=opts.targets!=='gitee';
@@ -133,7 +140,10 @@ export async function main(argv) {
   if(opts['dry-run']) {
     const promo=promoStatus(version);
     console.log(promo.file?`宣传页：${promo.file}${promo.needsSync?`（待同步到 v${version}）`:`（已是 v${version}）`}`:'宣传页：未找到，发布时需手动同步安装地址');
-    console.log(`\nDRY RUN（${includeGithub?'Gitee + GitHub':'仅 Gitee'}）：计划检查 → 构建/测试 → 打包/核对 → 提交/标签 → 推送 → ${includeGithub?'等待双平台CI → 核对两处附件':'上传并核对 Gitee Release 附件'}。`);printLinks();return;
+    const route=pipeline
+      ? '提交/标签 → 推送 → Gitee Go 流水线按标签构建、测试、打包 → 发布 Gitee Release 并归档制品库'
+      : (includeGithub?'打包/核对 → 提交/标签 → 推送 → 等待双平台CI → 核对两处附件':'打包/核对 → 提交/标签 → 推送 → 上传并核对 Gitee Release 附件');
+    console.log(`\nDRY RUN（${includeGithub?'Gitee + GitHub':'仅 Gitee'}）：计划检查 → 构建/测试 → ${route}。`);printLinks();return;
   }
   // 最新正式版以发布渠道为准：Gitee 单仓发布时不能依赖 GitHub Release 列表。
   const latestOfficial=async()=>{
@@ -210,7 +220,7 @@ export async function main(argv) {
     run(process.execPath,['scripts/build.mjs']);
     run(process.execPath,['--test',...readdirSync('tests').filter(x=>x.endsWith('.test.mjs')).map(x=>'tests/'+x)]);
     run(process.execPath,['scripts/validate-release.mjs']);
-    if(opts.ci) console.log(`--ci：本机不打包，成品由 Gitee Go 流水线按标签 ${tag} 产出（scripts/ci-release.mjs 负责发布与核对）。`);
+    if(pipeline) console.log(`本机不打包：成品由 Gitee Go 流水线按标签 ${tag} 产出（scripts/ci-release.mjs 负责发布与核对，并归档到制品库）。`);
     else {
       run(process.execPath,[npmCli,'pack','--pack-destination',out]);
       // Python is a packaging tool only; Windows py launcher is accepted.
@@ -220,15 +230,15 @@ export async function main(argv) {
     }
     run('git',['diff','--check']);
     const body=publicReleaseNotes(version,plan.items);
-    const verification=releaseVerification(includeGithub,promoLine,opts.ci);
+    const verification=releaseVerification(includeGithub,promoLine,pipeline);
     const notes=path.join(out,'release-notes.txt');writeFileSync(notes,body);
     writeFileSync(`docs/engineering/release-${version}.md`,`# ${tag} 发布核对\n\n实际基线：${base}。\n\n${body}\n${verification}\n指南核对：${plan.guideReview}\n`);
     run('git',['add','-A']);run('git',['commit','-m',`release: ${tag}`]);run('git',['tag','-a',tag,'-F',notes]);
   }
-  // 先确认发布渠道凭据，避免推送成功后才因为缺令牌停半路；--ci 不本地发布，所以不需要令牌。
+  // 先确认发布渠道凭据，避免推送成功后才因为缺令牌停半路；走流水线时本机不发布，所以不需要令牌。
   const token=process.env.GITEE_TOKEN;
-  if(!token && !opts.ci)throw Error('缺少 GITEE_TOKEN，无法发布 Gitee Release 附件；设置后可用相同版本 --resume 续跑');
-  if(!token && opts.ci)console.log('--ci：本机不发布 Release，无需 GITEE_TOKEN；令牌配在 Gitee 流水线变量里（GITEE_TOKEN）。');
+  if(!token && !pipeline)throw Error('缺少 GITEE_TOKEN，无法发布 Gitee Release 附件；设置后可用相同版本 --resume 续跑');
+  if(!token && pipeline)console.log('本机不发布 Release，无需 GITEE_TOKEN；令牌配在 Gitee 流水线变量里（GITEE_TOKEN）。');
   // 双仓并行推送，单仓失败按退避重试三次；GitHub 走 ssh 443，实测偶尔整段连不通，单次就放弃最耗时。
   const push=async(repo,host,label)=>{
     const args=repo.transport.startsWith('git@ssh.')?['-c',`core.sshCommand=ssh -p 443 -o HostKeyAlias=${host} -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3`]:[];
@@ -242,12 +252,12 @@ export async function main(argv) {
   };
   const remotes=includeGithub?[[gitee,'gitee.com','Gitee'],[github,'github.com','GitHub']]:[[gitee,'gitee.com','Gitee']];
   if((await Promise.all(remotes.map(([repo,host,label])=>push(repo,host,label)))).some(ok=>!ok)) { printLinks();throw Error('有仓库推送失败；网络恢复后用相同版本 --resume 续跑，不要重新打版本'); }
-  if(opts.ci) {
-    // 流水线按标签触发：构建、测试、打包、发布与附件核对都在 Gitee 构建机上跑，完成后回来核对发布页。
-    console.log(`\n已推送 ${tag}：Gitee Go 流水线会按这个标签构建、打包并发布 Gitee Release（scripts/ci-release.mjs），发布页与附件核对结果见流水线日志。`);
+  if(pipeline) {
+    // 流水线按标签触发：构建、测试、打包、制品库归档、发布与附件核对都在 Gitee 构建机上跑，完成后回来核对发布页。
+    console.log(`\n已推送 ${tag}：Gitee Go 流水线会按这个标签构建、打包，把成品归档到制品库并发布 Gitee Release（scripts/ci-release.mjs），发布页与附件核对结果见流水线日志。`);
     printLinks();return;
   }
-  // Gitee 是默认发布渠道：本地成品直接建 Release 并上传，省掉 GitHub Actions 打包回传那一大段等待。
+  // --local 备用路径：本机成品直接建 Release 并上传，适合流水线不可用时。
   const {publishGitee}=await import('./publish-gitee.mjs');
   // 续跑也从结构化条目生成，避免旧的本地说明文件夹带验证信息。
   const notesText=publicReleaseNotes(version,plan.items);
