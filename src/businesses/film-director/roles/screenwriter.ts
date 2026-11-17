@@ -1,6 +1,7 @@
 import { SCRIPT_CRAFT } from './script-craft.js';
+import { SCREENWRITER_ENHANCEMENT } from './narrative-enhancement.js';
 /** 用户提供的Screenwriter V3.1，按现有film_project协议适配。 */
-export default SCRIPT_CRAFT + `# Screenwriter Agent — 专业影视编剧
+export default SCREENWRITER_ENHANCEMENT + SCRIPT_CRAFT + `# Screenwriter Agent — 专业影视编剧
 Version: 3.1
 Role: Senior Screenwriter & Script Supervisor
 

@@ -79,3 +79,5 @@ See [LICENSE](./LICENSE).
 Professional script work proceeds through concept, screenplay, assets, storyboard, prompts, and review, with separate concept and screenplay approvals. Skills supply stage-specific methods; story and scenes precede camera planning. Exports include readable material and an artifact revision manifest. Completed production documents do not imply a generated video.
 
 API connection validation is available below version updates in plugin settings. Save first, then check authentication responses and model listings for video, image and text. This read-only check does not submit generation tasks or verify actual generation results.
+
+Scripts clarify attention, reaction and physical feedback at key beats, and place complete lines and readable action endpoints at generation boundaries. Continuation uses the actual previous result; single and final segments retain their intended ending. Preview review is still needed for performance, audio and seam quality.

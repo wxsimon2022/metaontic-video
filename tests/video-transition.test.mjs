@@ -3,8 +3,17 @@ import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 const ctx=vm.createContext({FORWARD_TRANSITION:'FORWARD_DEFAULT',CLOSEUP_TRANSITION:'CLOSEUP_DEFAULT',CONTINUOUS_TRANSITION:'CONTINUOUS_DEFAULT',isOmniExtendModel:()=>false});
-vm.runInContext(sourceOf('businesses/video/prompts/generation')+'\nObject.assign(globalThis,{buildExtensionPrompt});',ctx);
+vm.runInContext(sourceOf('businesses/video/prompts/generation')+'\nObject.assign(globalThis,{buildExtensionPrompt,buildSegmentExecutionPrompt});',ctx);
 const args={prompt:'镜头1：女子抬眼，平静地说{我知道了。}',seconds:15,startAt:15,mode:'continuous'};
+test('完整单段允许结尾，多段首段不提前收尾，末段不再要求交接',()=>{
+ const prompt='女孩将钥匙放回抽屉，说{明天见。}';
+ const single=ctx.buildSegmentExecutionPrompt({prompt,kind:'generate',index:0,count:1});
+ assert.ok(single.includes(prompt));assert.match(single,/完整单段作品/);assert.doesNotMatch(single,/不做整片结束式收尾|在完整句结束/);
+ const first=ctx.buildSegmentExecutionPrompt({prompt,kind:'generate',index:0,count:2});
+ assert.ok(first.includes(prompt));assert.match(first,/不做整片结束式收尾/);assert.match(first,/交接/);
+ const last=ctx.buildSegmentExecutionPrompt({prompt,kind:'extend',index:1,count:2});
+ assert.ok(last.includes(prompt));assert.match(last,/完成本段的故事变化/);assert.doesNotMatch(last,/不做整片结束式收尾|在完整句结束/);
+});
 test('default continuation adds a real transition block while retaining continuous framing',()=>{
  const text=ctx.buildExtensionPrompt(args);
  assert.match(text,/^向后延长视频1/);assert.match(text,/【过渡画面】/);assert.match(text,/CONTINUOUS_DEFAULT/);
