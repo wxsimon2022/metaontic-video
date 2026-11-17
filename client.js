@@ -1263,7 +1263,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "3.29.2".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.30.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1729,7 +1729,7 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.29.2",
+    version: "3.30.0",
     description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1843,11 +1843,12 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.29.2",
+      version: "3.30.0",
       prerelease: false,
-      publishedAt: "2026-11-16T13:02:02.321Z",
+      publishedAt: "2026-11-17T03:47:45.792Z",
       items: [
-        "\u4F18\u5316\uFF1A\u5DE6\u4FA7\u680F\u7684\u66F4\u65B0\u7EA2\u70B9\u79FB\u5230\u300C\u89C6\u9891\u521B\u4F5C\u52A9\u624B\u300D\u6700\u540E\u4E00\u4E2A\u5B57\u7684\u53F3\u4E0A\u89D2\uFF0C\u663E\u793A\u6210\u89D2\u6807\uFF1B\u4FA7\u680F\u6536\u8D77\u65F6\u7EA2\u70B9\u4ECD\u5728\u56FE\u6807\u89D2\u4E0A\u3002"
+        "\u65B0\u589E\uFF1A\u5206\u9636\u6BB5\u5F71\u89C6\u521B\u4F5C\u3001\u6700\u957F60\u5206\u949F\u89C4\u5212\u3001API\u8FDE\u63A5\u9A8C\u8BC1\u53CA\u63D2\u4EF6\u5E02\u573A\u5B89\u88C5\u652F\u6301\u3002",
+        "\u4F18\u5316\uFF1A\u811A\u672C\u4E3B\u9898\u3001\u60C5\u8282\u4E0E\u753B\u9762\u7EC6\u8282\uFF0C\u5B8C\u5584\u521B\u610F\u548C\u5267\u672C\u5BA1\u6279\u3001\u5C40\u90E8\u6539\u7A3F\u53CA\u8FDE\u7EED\u6027\u68C0\u67E5\u3002"
       ]
     }
   };
@@ -2137,7 +2138,7 @@
             fields.filter((key) => (key !== "volcengineApiKey" || directMode) && (!["imageModel", "imageUseVideoKey", "imageApiKey"].includes(key) || !directMode) && (key !== "imageApiKey" || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) === false) && (key !== "metaonticApiKey" || selectedMode === "metaontic") && (key !== "autoCreateCanvas" || canvasOn)).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
           );
         };
-        const connectionBox = h("div", { key: "connection-check", className: "mov-section", "data-field": "connectionCheck" }, [
+        const connectionBox = h("div", { key: "connection-check", className: "mov-section", "data-field": "connectionCheck", style: { marginTop: 20 } }, [
           h("div", { key: "head", className: "mov-card-head" }, [
             h("span", { key: "title", className: "mov-card-title" }, t("connectionCheckTitle")),
             h("button", { key: "button", type: "button", className: "mov-btn", "data-action": "check-connection", disabled: pending.length > 0 || status === "saving" || snapshot.status !== "ready" || connectionCheck.status === "working", onClick: () => checkController.current.run(!pending.length && status !== "saving" && form.getSnapshot()?.status === "ready") }, t(connectionCheck.status === "working" ? "connectionChecking" : "connectionCheckButton"))
@@ -2148,7 +2149,6 @@
         const settingsRows = () => [
           h("div", { key: "generation", className: "mov-section" }, [
             h("div", { key: "title", className: "mov-section-title" }, t("sectionGeneration")),
-            connectionBox,
             ...SECTIONS.map((section) => h("div", { key: section.key, className: "mov-parameter-group" }, [
               h("div", { key: "heading", className: "mov-parameter-heading" }, t(section.key)),
               renderGrid(section)
@@ -2279,7 +2279,7 @@
         if (snapshot.status === "loading") notice = t("loading");
         else if (snapshot.value === void 0) notice = t("unavailable");
         else if (snapshot.writable === false) notice = t("readOnly");
-        const blobs = notice && !snapshot.value ? [] : [footer, versionBox, resetRow];
+        const blobs = notice && !snapshot.value ? [] : [footer, versionBox, connectionBox, resetRow];
         return h("div", { className: "mov-page" }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
           h("style", { key: "styles" }, PAGE_CSS),

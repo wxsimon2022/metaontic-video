@@ -33,13 +33,13 @@ Paste an online installation URL into Harness → Plugins → Add plugin. Window
 Gitee:
 
 ```text
-https://gitee.com/hackloop/metaontic-video/releases/download/v3.29.2/metaontic-video-3.29.2.tgz
+https://gitee.com/hackloop/metaontic-video/releases/download/v3.30.0/metaontic-video-3.30.0.tgz
 ```
 
 GitHub mirror:
 
 ```text
-https://github.com/wxsimon2022/metaontic-video/releases/download/v3.29.2/metaontic-video-3.29.2.tgz
+https://github.com/wxsimon2022/metaontic-video/releases/download/v3.30.0/metaontic-video-3.30.0.tgz
 ```
 
 You can also add the plugin market index source in Harness → Plugins → Discover to browse and install:
@@ -77,3 +77,5 @@ flowchart TB
 See [LICENSE](./LICENSE).
 
 Professional script work proceeds through concept, screenplay, assets, storyboard, prompts, and review, with separate concept and screenplay approvals. Skills supply stage-specific methods; story and scenes precede camera planning. Exports include readable material and an artifact revision manifest. Completed production documents do not imply a generated video.
+
+API connection validation is available below version updates in plugin settings. Save first, then check authentication responses and model listings for video, image and text. This read-only check does not submit generation tasks or verify actual generation results.

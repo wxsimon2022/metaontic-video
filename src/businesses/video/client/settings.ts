@@ -229,7 +229,7 @@ function makePage({ form, t, manager }) {
             && (key !== 'autoCreateCanvas' || canvasOn))
             .map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean));
         };
-        const connectionBox=h('div',{key:'connection-check',className:'mov-section','data-field':'connectionCheck'},[
+        const connectionBox=h('div',{key:'connection-check',className:'mov-section','data-field':'connectionCheck',style:{marginTop:20}},[
           h('div',{key:'head',className:'mov-card-head'},[
             h('span',{key:'title',className:'mov-card-title'},t('connectionCheckTitle')),
             h('button',{key:'button',type:'button',className:'mov-btn','data-action':'check-connection',disabled:pending.length>0||status==='saving'||snapshot.status!=='ready'||connectionCheck.status==='working',onClick:()=>checkController.current.run(!pending.length&&status!=='saving'&&form.getSnapshot()?.status==='ready')},t(connectionCheck.status==='working'?'connectionChecking':'connectionCheckButton')),
@@ -242,7 +242,6 @@ function makePage({ form, t, manager }) {
         const settingsRows = () => [
           h('div', { key: 'generation', className: 'mov-section' }, [
             h('div', { key: 'title', className: 'mov-section-title' }, t('sectionGeneration')),
-            connectionBox,
             ...SECTIONS.map(section =>
               h('div', { key: section.key, className: 'mov-parameter-group' }, [
                 h('div', { key: 'heading', className: 'mov-parameter-heading' }, t(section.key)),
@@ -418,7 +417,7 @@ function makePage({ form, t, manager }) {
         // 配置读不出来（没有表单 / 不可写）时只显示提示，配置项与卡片一律不渲染。
         const blobs = notice && !snapshot.value
           ? []
-          : [footer, versionBox, resetRow];
+          : [footer, versionBox, connectionBox, resetRow];
 
         return h('div', { className: 'mov-page' }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。

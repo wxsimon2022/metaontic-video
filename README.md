@@ -33,13 +33,13 @@ DeepSeek Harness 视频创作插件：**新手快速上手，低成本制作长�
 Gitee：
 
 ```text
-https://gitee.com/hackloop/metaontic-video/releases/download/v3.29.2/metaontic-video-3.29.2.tgz
+https://gitee.com/hackloop/metaontic-video/releases/download/v3.30.0/metaontic-video-3.30.0.tgz
 ```
 
 GitHub 同版备用：
 
 ```text
-https://github.com/wxsimon2022/metaontic-video/releases/download/v3.29.2/metaontic-video-3.29.2.tgz
+https://github.com/wxsimon2022/metaontic-video/releases/download/v3.30.0/metaontic-video-3.30.0.tgz
 ```
 
 也可以在 Harness「插件 → 发现」中添加插件市场索引源，浏览并安装：
@@ -76,6 +76,16 @@ flowchart TB
 
 <details>
 <summary>最新更新</summary>
+
+## v3.30.0 更新内容
+
+### 新增
+
+- 分阶段影视创作、最长60分钟规划、API连接验证及插件市场安装支持。
+
+### 优化
+
+- 脚本主题、情节与画面细节，完善创意和剧本审批、局部改稿及连续性检查。
 
 ## v3.29.2 更新内容
 
@@ -205,6 +215,8 @@ flowchart TB
 
 
 ## 专业分阶段创作
+
+设置页「版本更新」下方提供「API 连接验证」。先保存配置，再检查视频、图片、文本的鉴权响应及模型清单；只读验证不提交生成任务，通过不代表实际生成能力已实测。
 
 需要先完成专业策划时，可向助手提出“分阶段创作剧本与分镜”。创作项目支持15秒至60分钟的规划，先审核创意，再审核剧本，然后整理人物、场景、分镜与提示词。创作规划本身不提交视频生成；实际制作仍使用原有脚本审核与费用确认流程。修改上游材料后，相关下游材料需更新。
 
