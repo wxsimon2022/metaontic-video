@@ -7,11 +7,11 @@ export const CREATIVE_GUIDANCE = SHORT_VIDEO_COMMON + CONTENT_QUALITY + `【统�
 【创意策划】提炼不可改变的创意内核、观众观看动机、主题、logline、钩子、结构、视觉载体和声音方向。给一个推荐方案；替代方向须说明区别并经用户选择。剧情用目标/阻碍/选择/后果；喜剧用预期/升级/打破；纪录片用问题/资料/人物/证据；广告用需求/证据/价值/行动；风景不硬加人物冲突。
 【专业编剧】只基于已确认方向写可见动作、场景目标、信息增量、进入/退出状态。对白符合身份且不重复解释已知信息；画外旁白与画内对白分别记录。中文3–4字/秒仅作估计，留出反应、停顿与动作，完整句不跨生成段。并行音画不重复累计主轨时长。纪录片采访、数字、历史事件须有来源或标待核实，虚构重现明确标注。
 【人物设计】剧本中人物使用稳定character_id，记录可观察的外貌锚点、声音、关系、行为和visual_identity。服装/受伤/年龄变化创建状态，不覆盖原状态；未知细节最小补全并注明。reference_prompt只是文本，不代表已生成或授权参考图。
-【场景美术】使用稳定scene_id；同一地点不同机位不另建地点。描述空间布局、入口出口、固定地标、道具位置、光线方向、材质、色彩与环境声。时间/天气/道具变化创建场景状态，有剧情依据，跨镜头复用。
+【场景美术】区分稳定location_id（物理地点）、scene_id（剧本场次）与scene_state_id（环境状态）；同一地点不同机位不另建地点。描述空间布局、入口出口、固定地标、道具位置、光线方向、材质、色彩与环境声。时间/天气/道具变化创建场景状态，有剧情依据，跨镜头复用。
 【导演分镜】每镜一个视觉中心与主要动作，写叙事目的、景别、视角、运镜、构图、表演、动作起止、衔接及声音层。绑定人物与场景ID，核对轴线、视线、服装、光线和道具。镜头变化服务内容，不机械轮换，不为凑镜头重复画面；用户要求固定机位或一镜到底时尊重选择。特写不承担复杂全身动作，多人对话明确谁在画内/画外。
 【提示词工程】先形成模型无关镜头描述，再按当前已知模型能力适配。每镜独立可读，不写“同上”“继续刚才”。顺序为规格→主体视觉锚点与服装→场景→动作起点/过程/终点→表情→镜头→光色→声音→约束。对白保留原文、说话人、语言，旁白与口型要求分开。不擅加字幕、水印或新人物。模型能力未知时标generic与待适配，不编造音频、参考图、负面提示词或时长支持；不支持项提出待确认替代方案，不静默删除需求。
 镜头不等于付费生成单元；先规划shot到clip/实际段的映射，不按镜头数增加调用。复杂多人互动、手部、文字、长对白和连续性列风险，不承诺百分百一致。
-【质量审核】先核对程序校验结果，再评主题、因果、动机、对白、连续性、音画和可生成性。评分权重：创意10、剧本20、人物15、场景10、分镜20、时长10、提示词10、声音5。总分≥85且无blocker才建议通过；分数不能掩盖阻断项。问题记录entity_id、rule_id、evidence、owner、minimal_fix、downstream_impact；不得只说“更有电影感”。未执行的程序检查列unverified_checks，不能自称机器校验通过。
+【质量审核】先核对程序校验结果，再评主题、因果、动机、对白、连续性、音画和可生成性。专业项目按Reviewer V3.1八维权重评分，不适用项归一化；总分≥80且无未VERIFIED的CRITICAL/MAJOR才建议交付，分数不能掩盖阻断项。问题记录entity_id、rule_id、evidence、owner、minimal_fix、downstream_impact；不得只说“更有电影感”。未执行的程序检查列unverified_checks，不能自称机器校验通过。
 【修订与交付】只修改指定范围，保留满意内容与稳定ID，上游变化标记下游失效。自动业务修复最多2轮，仍失败交用户处理，不假称程序已实现自动循环。已有成果不删除、不自动付费重做。只报告工具实际返回的保存、审核和生成状态；未观看/试听的媒体标待人工验收。`;
 
 /** film_project现有协议；避免照抄参考稿中尚未实现的文件/编排能力。 */
@@ -25,7 +25,7 @@ script：screenplay完整剧本正文、chapters[{chapter_id,title,duration_ms,s
 assets：同一对象含characters数组及scenes数组；人物项必有character_id，场景项必有scene_id。人物/场景分别按专业职责整理后合并提交，不改变剧本。
 shots：{shots:[{shot_id,scene_id,character_ids,start_ms,end_ms,duration_ms,narrative_purpose,...镜头细节}]}。时间用整数毫秒，半开区间[start_ms,end_ms)，从0连续覆盖全片；引用必须存在，duration_ms=end_ms-start_ms。
 prompts：{prompts:[{shot_id,prompt,target_model,capability_warnings,...}]}，每镜恰有一个非空prompt；保留资产锚点与源版本，不把一镜一提示词误当一镜一次付费调用。
-review：{score,passed,issues:[{severity:"blocker或major或minor或info",entity_id,rule_id,evidence,owner,minimal_fix,downstream_impact}],dimension_scores,unverified_checks,summary}。失败报告先向用户展示，不为了提交而捏造passed:true；当前工具仅接受达标报告。
+review：新版Reviewer V3.1提交review_status、scores八维（不适用null）、issues、delivery_allowed、blocking_issue_count和真实reviewed_revisions等完整报告。CRITICAL/MAJOR未VERIFIED阻断；加权分由程序复算，失败报告也可保存但禁止编译。旧报告score/passed协议兼容。
 创意和剧本的批准分别绑定材料版本，沉默/取消/修改意见不算批准。改稿后按工具stale状态更新下游，不假称已实现实体级自动修订。超过180秒按章规划，600秒以上维护全片摘要和章间状态，分批创作但按当前工具提交完整阶段聚合对象；超出上下文能力时停在可恢复草稿，不截断冒充完整。
 export返回JSON和Markdown内容，不是已写入导出文件；没有实际文件不得编造下载链接。Markdown应为同版本JSON的可读投影。实际视频仍须走video_project脚本审核、费用确认与逐段结果审核，创作批准不替代制作授权。`;
 

@@ -1,3 +1,4 @@
+import { evaluateReview } from './review.js';
 import { ROLE_PROMPTS } from './roles/index.js';
 import { STAGES, validateArtifact } from './project.js';
 /** 程序选择下一许可动作；角色仅读取直接依赖，不重复加载全项目。 */
@@ -11,6 +12,8 @@ export function nextTask(state: any) {
     }
     if (['creative','script'].includes(stage) && state.approvals[stage] !== artifact.revision) return {action:'approve',stage,expectedRevision:state.revision};
   }
+  const report=state.artifacts.review.data;
+  if(report.review_status && !evaluateReview(report).passed) return {action:'repair',stage:'review',role:'director',issues:report.issues,expectedRevision:state.revision};
   return {action:'compile',expectedRevision:state.revision};
 }
 export function validateCurrent(state: any) {
@@ -19,6 +22,7 @@ export function validateCurrent(state: any) {
     if (!artifact || artifact.stale) throw Error(`STALE_OR_MISSING:${stage}`);
     if (['creative','script'].includes(stage) && state.approvals[stage]!==artifact.revision) throw Error('APPROVAL_REQUIRED');
     validateArtifact(stage,artifact.data,state);
+    if(stage==='review' && artifact.data.review_status && !evaluateReview(artifact.data).passed) throw Error('REVIEW_BLOCKED');
   }
 }
 /** 编译不付费；显式使用现有视频分段算法，镜头边界不改变调用次数。 */

@@ -74,3 +74,20 @@ test('编剧V3.1绑定创意版本与场景时长和引用',()=>{
  assert.throws(()=>api.validateArtifact('script',{...script,scenes:[{...script.scenes[0],duration_ms:14000}]},state),/SCENE_DURATION_MISMATCH/);
  assert.throws(()=>api.validateArtifact('script',{...script,dialogue:[{speaker_id:'',scene_id:'sc1'}]},state),/INVALID_DIALOGUE_REF/);
 });
+test('新版审核保存失败报告但不放行，评分和阻断数不能伪造',()=>{
+ const state=initial();
+ const report={review_status:'REVISE_REQUIRED',scores:{requirement_fidelity:95,narrative_quality:90,character_consistency:90,scene_consistency:90,cinematic_quality:90,temporal_consistency:90,prompt_executability:90,structural_completeness:90},issues:[{severity:'MAJOR',status:'OPEN'}],blocking_issue_count:1,delivery_allowed:false};
+ api.validateArtifact('review',report,state);
+ assert.throws(()=>api.validateArtifact('review',{...report,review_status:'PASS',delivery_allowed:true},state),/REVIEW/);
+ assert.throws(()=>api.validateArtifact('review',{...report,blocking_issue_count:0},state),/MISMATCH/);
+ api.validateArtifact('review',{...report,review_status:'PASS',issues:[],blocking_issue_count:0,delivery_allowed:true},state);
+});
+test('全部角色使用已提供的完整版本且职责独立',()=>{
+ assert.match(api.ROLE_PROMPTS.creative,/V3.0/);
+ for(const role of ['director','screenwriter','character','scene','storyboard','prompt-engineer','reviewer'])assert.match(api.ROLE_PROMPTS[role],/Version: 3.1/);
+ assert.match(api.ROLE_PROMPTS.character,/IDENTITY_LOCK/);
+ assert.match(api.ROLE_PROMPTS.scene,/location_id/);
+ assert.match(api.ROLE_PROMPTS.storyboard,/action_start/);
+ assert.match(api.ROLE_PROMPTS['prompt-engineer'],/一条批准shot_id/);
+ assert.match(api.ROLE_PROMPTS.reviewer,/NOT_EVALUATED/);
+});

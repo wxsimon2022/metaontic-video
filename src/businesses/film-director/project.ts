@@ -1,3 +1,4 @@
+import { evaluateReview } from './review.js';
 /** V2 创作数据与确定性校验。执行阶段独立于现有视频任务。 */
 export const STAGES = ['creative', 'script', 'assets', 'shots', 'prompts', 'review'] as const;
 export const ROLES = ['director', 'creative', 'screenwriter', 'character', 'scene', 'storyboard', 'prompt-engineer', 'reviewer'] as const;
@@ -61,6 +62,7 @@ export function validateArtifact(stage: string, value: any, state: any) {
     const ids = value.prompts.map(p => p.shot_id);
     if (new Set(ids).size !== ids.length || ids.length !== shots.length || shots.some(s => !ids.includes(s.shot_id)) || value.prompts.some(p => typeof p.prompt !== 'string' || !p.prompt.trim())) throw Error('PROMPT_COVERAGE');
   }
+  if (stage === 'review' && value.review_status !== undefined) { evaluateReview(value); return; }
   if (stage === 'review' && Array.isArray(value.issues) && value.issues.some(i => !i || !['blocker','major','minor','info'].includes(String(i.severity).toLowerCase()))) throw Error('INVALID_SEVERITY');
   if (stage === 'review' && (!Number.isInteger(value.score) || value.score < 85 || value.score > 100 || !Array.isArray(value.issues) || value.issues.some(i => String(i.severity).toLowerCase() === 'blocker') || value.passed !== true)) throw Error('REVIEW_BLOCKED');
 }
@@ -78,7 +80,7 @@ export function commitArtifact(state: any, stage: string, value: any, expected: 
   next.artifacts[stage] = { revision: next.revision, data: value, stale: false };
   for (const downstream of STAGES.slice(index+1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
   for (const approved of ['creative','script']) if (STAGES.indexOf(approved as any) >= index) delete next.approvals[approved];
-  next.status = ['creative','script'].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === 'review' ? 'FINAL_DELIVERY' : `${stage.toUpperCase()}_READY`;
+  next.status = ['creative','script'].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === 'review' ? (value.review_status && !evaluateReview(value).passed ? value.review_status : 'FINAL_DELIVERY') : `${stage.toUpperCase()}_READY`;
   return next;
 }
 export function exportMarkdown(state: any) {
