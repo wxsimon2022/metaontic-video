@@ -28,6 +28,15 @@ export function validateV31(stage: string, value: any, state: any) {
     array(value,'review_scope');array(value,'unverified_items');
     if(!value.reviewed_revisions||typeof value.reviewed_revisions!=='object')throw Error('MISSING_REVIEWED_REVISIONS');
     for(const stage of ['creative','script','assets','shots','prompts']) if(value.reviewed_revisions[stage]!==state.artifacts[stage]?.revision)throw Error(`REVIEW_REVISION_MISMATCH:${stage}`);
+    const final=value.review_status==='PASS'||value.review_status==='PASS_WITH_WARNINGS';
+    if(final) {
+      if(value.review_stage!=='FINAL_REVIEW')throw Error('FINAL_REVIEW_REQUIRED');
+      if(['creative','script','assets','shots','prompts'].some(s=>!value.review_scope.includes(s)))throw Error('FINAL_REVIEW_SCOPE_INCOMPLETE');
+      const required=['requirement_fidelity','narrative_quality','cinematic_quality','temporal_consistency','prompt_executability','structural_completeness'];
+      if(state.artifacts.assets?.data.characters?.length)required.push('character_consistency');
+      if(state.artifacts.assets?.data.scenes?.length)required.push('scene_consistency');
+      if(required.some(k=>typeof value.scores?.[k]!=='number'))throw Error('FINAL_REVIEW_SCORE_NOT_EVALUATED');
+    }
     const ids=new Set();
     for(const issue of value.issues || []) {
       for(const key of ['issue_id','description','evidence','location','responsible_agent','recheck_criteria'])text(issue,key);

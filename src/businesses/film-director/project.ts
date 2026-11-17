@@ -1,3 +1,4 @@
+import { validateIssueLifecycle, updateIssueRegistry } from './issues.js';
 import { validateV31 } from './schema.js';
 import { sourceRevisions } from './contracts.js';
 import { validateReferences } from './references.js';
@@ -67,7 +68,7 @@ export function validateArtifact(stage: string, value: any, state: any) {
     const ids = value.prompts.map(p => p.shot_id);
     if (new Set(ids).size !== ids.length || ids.length !== shots.length || shots.some(s => !ids.includes(s.shot_id)) || value.prompts.some(p => typeof p.prompt !== 'string' || !p.prompt.trim())) throw Error('PROMPT_COVERAGE');
   }
-  if (stage === 'review' && value.review_status !== undefined) { evaluateReview(value); return; }
+  if (stage === 'review' && value.review_status !== undefined) { evaluateReview(value); validateIssueLifecycle(value,state); return; }
   if (stage === 'review' && Array.isArray(value.issues) && value.issues.some(i => !i || !['blocker','major','minor','info'].includes(String(i.severity).toLowerCase()))) throw Error('INVALID_SEVERITY');
   if (stage === 'review' && (!Number.isInteger(value.score) || value.score < 85 || value.score > 100 || !Array.isArray(value.issues) || value.issues.some(i => String(i.severity).toLowerCase() === 'blocker') || value.passed !== true)) throw Error('REVIEW_BLOCKED');
 }
@@ -83,6 +84,7 @@ export function commitArtifact(state: any, stage: string, value: any, expected: 
   validateArtifact(stage,value,state);
   const next = structuredClone(state);
   next.revision++;
+  if(stage==='review' && state.schema_version==='3.1.0') updateIssueRegistry(next,value);
   next.artifacts[stage] = { revision: next.revision, source_revisions:sourceRevisions(state,stage), data: value, stale: false };
   for (const downstream of STAGES.slice(index+1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
   for (const approved of ['creative','script']) if (STAGES.indexOf(approved as any) >= index) delete next.approvals[approved];

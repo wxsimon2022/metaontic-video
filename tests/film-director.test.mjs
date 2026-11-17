@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-const result=await build({stdin:{contents:"export * from './src/businesses/film-director/project.ts'; export * from './src/businesses/film-director/orchestration.ts'; export * from './src/businesses/film-director/roles/index.ts'; export * from './src/businesses/film-director/revisions.ts'; export * from './src/businesses/film-director/deliverables.ts'; export * from './src/businesses/film-director/approvals.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
+const result=await build({stdin:{contents:"export * from './src/businesses/film-director/project.ts'; export * from './src/businesses/film-director/orchestration.ts'; export * from './src/businesses/film-director/roles/index.ts'; export * from './src/businesses/film-director/revisions.ts'; export * from './src/businesses/film-director/deliverables.ts'; export * from './src/businesses/film-director/approvals.ts'; export * from './src/businesses/film-director/issues.ts'; export * from './src/businesses/film-director/spec.ts'; export * from './src/businesses/film-director/storage.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
 const api=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
 const initial=()=>({revision:0,duration_ms:15000,artifacts:{},approvals:{}});
 test('创意未批准阻止剧本，旧版本不能覆盖，改稿失效下游',()=>{
@@ -166,4 +166,60 @@ test('审批修改与拒绝持久记录，拒绝后禁止继续提交制作',()=
  assert.throws(()=>api.commitArtifact(rejected,'creative',{theme:'a',logline:'b'},2),/PROJECT_STOPPED/);
  const approved=api.recordApprovalDecision(state,'creative','APPROVED',1);
  assert.equal(approved.approvals.creative,1);assert.equal(approved.decisions[0].artifact_revision,1);assert.ok(approved.decisions[0].decision_time);
+});
+function finalReview(state,overrides={}) {
+ return {review_id:'rev',review_stage:'FINAL_REVIEW',review_scope:['creative','script','assets','shots','prompts'],unverified_items:[],reviewed_revisions:Object.fromEntries(['creative','script','assets','shots','prompts'].map(s=>[s,state.artifacts[s].revision])),review_status:'PASS',scores:{requirement_fidelity:90,narrative_quality:90,character_consistency:90,scene_consistency:90,cinematic_quality:90,temporal_consistency:90,prompt_executability:90,structural_completeness:90},issues:[],delivery_allowed:true,blocking_issue_count:0,...overrides};
+}
+const critical=(status='OPEN')=>({issue_id:'ISSUE_001',severity:'CRITICAL',status,description:'原话错误',evidence:'剧本与提示词对比',location:'sh',responsible_agent:'prompt-engineer',recheck_criteria:'核对原文与说话人'});
+test('恢复任务自包含原始需求、目标时长、批准和统一依赖',()=>{
+ const state=v31Project();state.source_brief='两个老人河边钓鱼，原话不得更改';state.project_spec=api.createProjectSpec('作品',state.source_brief,15000,{aspect_ratio:'16:9',hard_constraints:['只许两个人']});
+ delete state.artifacts.prompts;
+ const task=api.nextTask(state);const route=api.routeIntent(state,'write_prompts');
+ assert.equal(task.original_idea,state.source_brief);assert.equal(task.target_duration_ms,15000);assert.deepEqual(task.project_spec.hard_constraints,['只许两个人']);
+ assert.deepEqual(Object.keys(task.inputs),['script','assets','shots']);assert.deepEqual(task.input_revisions,route.input_revisions);
+ const blank={...initial(),source_brief:'原始想法',duration_ms:60000};assert.equal(api.nextTask(blank).original_idea,'原始想法');assert.equal(api.nextTask(blank).target_duration_ms,60000);
+});
+test('终审禁止只审提示词或只评一项，不能自标VERIFIED',()=>{
+ const state=v31Project();const report=finalReview(state);
+ assert.throws(()=>api.validateArtifact('review',{...report,review_stage:'PROMPT_REVIEW'},state),/FINAL_REVIEW_REQUIRED/);
+ assert.throws(()=>api.validateArtifact('review',{...report,review_scope:['prompts']},state),/SCOPE_INCOMPLETE/);
+ assert.throws(()=>api.validateArtifact('review',{...report,scores:{...report.scores,narrative_quality:null}},state),/NOT_EVALUATED/);
+ assert.throws(()=>api.validateArtifact('review',{...report,issues:[critical('VERIFIED')]},state),/ISSUE_INITIAL_STATUS_REQUIRED|ISSUE_RECHECK_REQUIRED/);
+});
+test('重大问题不可消失降级，修复报告与复审登记绑定实际版本',()=>{
+ let state=v31Project();
+ const failed=finalReview(state,{review_status:'REVISE_REQUIRED',issues:[critical()],delivery_allowed:false,blocking_issue_count:1});
+ state=api.commitArtifact(state,'review',failed,state.revision);
+ assert.throws(()=>api.commitArtifact(state,'review',finalReview(state),state.revision),/UNRESOLVED_ISSUE_OMITTED/);
+ assert.throws(()=>api.commitArtifact(state,'review',finalReview(state,{issues:[{...critical(),severity:'MINOR'}]}),state.revision),/ISSUE_SEVERITY_DOWNGRADE/);
+ assert.throws(()=>api.verifyIssue(state,'ISSUE_001',{evidence:'通过'}),/NOT_RESOLVED/);
+ assert.throws(()=>api.commitArtifact(state,'review',{...failed,issues:[critical('RESOLVED')]},state.revision),/ISSUE_REPAIR_ARTIFACT_REQUIRED/);
+ state=api.commitArtifact(state,'prompts',{prompts:state.artifacts.prompts.data.prompts.map(p=>({...p,prompt:p.prompt+' 保持原台词与角色。'}))},state.revision);
+ state=api.commitArtifact(state,'review',finalReview(state,{review_status:'REVISE_REQUIRED',issues:[critical('RESOLVED')],delivery_allowed:false,blocking_issue_count:1}),state.revision);
+ assert.equal(api.nextTask(state).action,'recheck');
+ const source_revisions=finalReview(state).reviewed_revisions;
+ assert.throws(()=>api.verifyIssue(state,'ISSUE_001',{evidence:'逐字对照',review_revision:0,source_revisions}),/INVALID_RECHECK/);
+ api.verifyIssue(state,'ISSUE_001',{evidence:'逐字对照当前d原文，sh说话人一致',review_revision:state.artifacts.review.revision,source_revisions});
+ state=api.commitArtifact(state,'review',finalReview(state,{issues:[critical('VERIFIED')]}),state.revision);
+ api.validateCurrent(state);
+ state=api.commitArtifact(state,'prompts',state.artifacts.prompts.data,state.revision);
+ assert.throws(()=>api.commitArtifact(state,'review',finalReview(state,{issues:[critical('VERIFIED')]}),state.revision),/ISSUE_RECHECK_REQUIRED/);
+ assert.throws(()=>api.commitArtifact(state,'review',finalReview(state),state.revision),/UNRESOLVED_ISSUE_OMITTED/);
+});
+test('制作编译禁止把完整镜头与对白切在两次生成中',()=>{
+ let state=v31Project();state=api.commitArtifact(state,'review',finalReview(state),state.revision);
+ assert.throws(()=>api.compileProduction(state,[{seconds:10},{seconds:5}],'16:9','720p'),/SHOT_SPLIT_REQUIRES/);
+ assert.equal(api.compileProduction(state,[{seconds:15}],'16:9','720p').segments.length,1);
+ state.project_spec=api.createProjectSpec('作品','故事',15000,{aspect_ratio:'9:16',resolution:'720p'});
+ assert.throws(()=>api.compileProduction(state,[{seconds:15}],'16:9','720p'),/PROJECT_SPEC_MISMATCH/);
+});
+test('磁盘排他锁阻止其他进程写同一项目，释放后可恢复',async()=>{
+ const {mkdtemp,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const path=await import('node:path');const {spawnSync}=await import('node:child_process');
+ const dir=await mkdtemp(path.join(tmpdir(),'film-lock-'));
+ try {
+  const release=await api.acquireProjectLock(dir);
+  const child=spawnSync(process.execPath,['--input-type=module','-e',"import{open}from'node:fs/promises';try{await open(process.argv[1],'wx');process.exitCode=1;}catch(e){process.exitCode=e.code==='EEXIST'?0:2;}",path.join(dir,'.write.lock')]);
+  assert.equal(child.status,0);await assert.rejects(()=>api.acquireProjectLock(dir),/PROJECT_LOCKED/);
+  await release();const releaseAgain=await api.acquireProjectLock(dir);await releaseAgain();
+ }finally{await rm(dir,{recursive:true,force:true});}
 });
