@@ -66,3 +66,11 @@ test('创意V3拒绝时长不守恒、重复段落和过量确认，兼容旧稿
  assert.throws(()=>api.validateArtifact('creative',{...draft,approval_questions:['a','b','c','d']},state),/TOO_MANY/);
  api.validateArtifact('creative',{theme:'旧主题',logline:'旧故事'},state);
 });
+test('编剧V3.1绑定创意版本与场景时长和引用',()=>{
+ const state=initial();state.approvals.creative=2;
+ const script={screenplay:'正文',approved_creative_revision:2,chapters:[{chapter_id:'c1',duration_ms:15000,scene_ids:['sc1']}],scenes:[{scene_id:'sc1',chapter_id:'c1',duration_ms:15000}],dialogue:[{speaker_id:'ch1',scene_id:'sc1',text:'你好'}]};
+ api.validateArtifact('script',script,state);
+ assert.throws(()=>api.validateArtifact('script',{...script,approved_creative_revision:1},state),/CREATIVE_REVISION_MISMATCH/);
+ assert.throws(()=>api.validateArtifact('script',{...script,scenes:[{...script.scenes[0],duration_ms:14000}]},state),/SCENE_DURATION_MISMATCH/);
+ assert.throws(()=>api.validateArtifact('script',{...script,dialogue:[{speaker_id:'',scene_id:'sc1'}]},state),/INVALID_DIALOGUE_REF/);
+});

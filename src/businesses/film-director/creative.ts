@@ -21,7 +21,7 @@ export const FILM_WORKFLOW_GUIDANCE = `【专业分阶段创作工具契约】
 submit传stage、content（合法JSON字符串）、expectedRevision（最近读取/提交返回的项目revision）。JSON字符串里的枚举与文本必须有双引号。正文先展示可读成果，再提交并核对返回；工具成功才称保存。
 阶段及content字段：
 creative：新创作按CREATIVE V3.0角色返回的完整字段提交；structure使用beats与visual_evidence，段落正整数毫秒合计等于项目时长，approval_questions最多3项。旧项目保留已有字段，不把兼容读取当新稿完成标准。展示后approve(stage:creative)，只有真实批准才写剧本。
-script：screenplay完整剧本正文、chapters[{chapter_id,title,duration_ms,summary,scenes}]必填，章节时长总和等于项目duration_ms；scene保留动作、dialogues和voiceovers。展示后approve(stage:script)，只有真实批准才建资产。
+script：screenplay完整剧本正文、chapters[{chapter_id,title,duration_ms,summary,scene_ids}]必填，章节时长总和等于项目duration_ms；按Screenwriter V3.1在scenes规范列表保留动作和场景预算，dialogue关联speaker_id/scene_id，旁白分开；approved_creative_revision绑定实际批准创意。展示后approve(stage:script)，只有真实批准才建资产。
 assets：同一对象含characters数组及scenes数组；人物项必有character_id，场景项必有scene_id。人物/场景分别按专业职责整理后合并提交，不改变剧本。
 shots：{shots:[{shot_id,scene_id,character_ids,start_ms,end_ms,duration_ms,narrative_purpose,...镜头细节}]}。时间用整数毫秒，半开区间[start_ms,end_ms)，从0连续覆盖全片；引用必须存在，duration_ms=end_ms-start_ms。
 prompts：{prompts:[{shot_id,prompt,target_model,capability_warnings,...}]}，每镜恰有一个非空prompt；保留资产锚点与源版本，不把一镜一提示词误当一镜一次付费调用。

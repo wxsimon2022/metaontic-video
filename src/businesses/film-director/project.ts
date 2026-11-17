@@ -27,6 +27,23 @@ export function validateArtifact(stage: string, value: any, state: any) {
     if (value.approval_questions !== undefined && (!Array.isArray(value.approval_questions)||value.approval_questions.length>3)) throw Error('TOO_MANY_CREATIVE_QUESTIONS');
   }
   if (stage === 'script') { nonempty('screenplay'); if (!Array.isArray(value.chapters) || !value.chapters.length || value.chapters.some(c => !Number.isSafeInteger(c.duration_ms) || c.duration_ms <= 0) || value.chapters.reduce((n,c) => n+c.duration_ms,0) !== state.duration_ms) throw Error('CHAPTER_DURATION_MISMATCH'); }
+  if (stage === 'script') {
+    if (value.approved_creative_revision !== undefined && value.approved_creative_revision !== state.approvals.creative) throw Error('CREATIVE_REVISION_MISMATCH');
+    if (value.scenes !== undefined) {
+      if (!Array.isArray(value.scenes) || !value.scenes.length) throw Error('INVALID_SCRIPT_SCENES');
+      const ids=value.scenes.map(s=>s?.scene_id);
+      if (ids.some(id=>typeof id!=='string'||!id.trim()) || new Set(ids).size!==ids.length) throw Error('INVALID_SCENE_ID');
+      const chapterIds=value.chapters.map(c=>c.chapter_id);
+      if (chapterIds.some(id=>typeof id!=='string'||!id.trim()) || new Set(chapterIds).size!==chapterIds.length) throw Error('INVALID_CHAPTER_ID');
+      if (value.scenes.some(s=>!chapterIds.includes(s.chapter_id)||!Number.isSafeInteger(s.duration_ms)||s.duration_ms<=0)) throw Error('INVALID_SCENE_BUDGET');
+      for (const chapter of value.chapters) {
+        const scenes=value.scenes.filter(s=>s.chapter_id===chapter.chapter_id);
+        if (!scenes.length || scenes.reduce((n,s)=>n+s.duration_ms,0)!==chapter.duration_ms) throw Error('SCENE_DURATION_MISMATCH');
+        if (chapter.scene_ids !== undefined && (!Array.isArray(chapter.scene_ids)||chapter.scene_ids.length!==scenes.length||new Set(chapter.scene_ids).size!==scenes.length||chapter.scene_ids.some(id=>!scenes.some(s=>s.scene_id===id)))) throw Error('SCRIPT_SCENE_REF_MISMATCH');
+      }
+      if (value.dialogue !== undefined && (!Array.isArray(value.dialogue)||value.dialogue.some(d=>!d||typeof d.speaker_id!=='string'||!d.speaker_id.trim()||!ids.includes(d.scene_id)))) throw Error('INVALID_DIALOGUE_REF');
+    }
+  }
   if (stage === 'assets') for (const key of ['characters','scenes']) {
     if (!Array.isArray(value[key])) throw Error(`MISSING_FIELD:${key}`);
     const ids = value[key].map(v => v[key === 'characters' ? 'character_id' : 'scene_id']);
