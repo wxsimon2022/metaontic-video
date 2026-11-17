@@ -1,0 +1,32 @@
+# 专业数据与修订协议
+
+## 运行边界
+
+film_project当前以同一个助手切换八种专业职责。next/route返回角色指令、直接依赖、版本、范围和未知模型能力档案；不代表已运行独立Agent。不复制设计稿中的假设API或另建一套状态。
+
+顺序：creative→批准→script→批准→assets→shots→prompts→review。submit的content是合法JSON字符串，expectedRevision来自最近工具返回。创意和剧本的修改/拒绝由真实问题服务记录，不手写批准标记。
+
+## 规范字段
+
+- creative：theme/logline、structure（section_id和duration_ms）、must_preserve、assumptions等完整角色字段。working_title/story_beats等参考别名映射至统一结构，不维护冲突副本。
+- script：screenplay为完整正文，chapters引用scene_ids，scenes含scene_id/chapter_id/duration_ms，characters使用character_id；dialogue为dialogue_id/speaker_id/scene_id/exact_text数组。参考稿dialogue_lines映射为dialogue。对白与旁白区分。
+- assets：characters、scenes、locations、scene_states、props数组；场次引用location_id和scene_state_id。characters.costumes中的costume_id/character_id唯一且对应。人物参考图未生成就只列需求。
+- shots：每镜含shot_id/chapter_id/scene_id/location_id/scene_state_id、character_ids/costume_ids/prop_ids/dialogue_refs、叙事目的、start_ms/end_ms/duration_ms、场面调度和声音。地点与场次一致，台词不丢失。
+- prompts：每镜一条prompt，含shot_id/location_id/scene_state_id/duration_ms/generation_mode/dialogue_refs。提示词展开身份与环境锚点，原话逐字保留，不能写“同上”。
+- review：review_id/review_stage/review_status、reviewed_revisions、八维scores、issues、delivery_allowed、blocking_issue_count、review_scope和unverified_items。reviewed_revisions使用creative/script/assets/shots/prompts的实际修订号。
+
+时间为整数毫秒，[start_ms,end_ms)，duration_ms=end_ms-start_ms；镜头从0连续覆盖目标时长。场景、章节总预算同样闭合。source_revisions由提交运行时记录，自带时必须与实际依赖一致。
+
+## 修订与复审
+
+先read，再route意图与entityIds定位；revise支持已有assets.characters/assets.scenes、shots.shots、prompts.prompts实体替换，不擅自宣称可修改任意registry集合。修改地点/道具等完整资产对象时用submit聚合对象。对白改动由Screenwriter修改script并重走剧本批准。
+
+上游改动会标下游stale，定向修订返回affected_shot_ids供局部重写；程序仍要求相关阶段完整对象复核，不等于自动完成局部重建。保留章节、场次、人物与镜头ID，不能把一个人物换装拆为新人物。
+
+问题记录证据、位置、责任与复审条件；未复审不标VERIFIED。PASS/PASS_WITH_WARNINGS只在范围完整、无阻断且分数满足时交付。失败报告可保存，但不能编译制作。长片先全片结构，逐章草拟并保留连续性摘要；当前阶段提交需完整聚合，部分完成明确标PARTIAL，不冒充整片完成。
+
+## 实际制作
+
+逐镜提示词是创作任务单位，实际付费段使用compile返回的映射。当前执行器可能将多个镜头放入同一段，不能擅自把“每镜提示词”变成每镜一次付费调用。独立镜头生成方案需Director重规划，并走真实计划与费用审核。
+
+compile只编译、关联video_project，不付费、不生成视频。随后先读取execution-workflow.md，补齐参考素材、示意图、制作脚本与实际调用预算，video_project审核通过后才由视频工具发起费用确认。

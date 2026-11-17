@@ -1,4 +1,6 @@
-# 项目模板
+# 普通制作文档模板
+
+仅用于video_project实际制作材料；专业创作的规范字段见professional-workflow.md。以下内容不替代项目状态与真实审批记录，用户未指定的示例参数不得作为默认确认值。
 
 ## `brief.md`
 
@@ -27,10 +29,7 @@
 ---
 版本: 第1版
 状态: 草稿            # 草稿 | 已审核 | 已确认制作
-审核时间:             # 脚本审核通过后填本地时间
-审核人:
-制作确认时间:             # 用户确认制作后填本地时间
-制作确认人:
+审核状态来源: video_project工具返回（不要手写审核时间或制作同意）
 ---
 
 # 脚本
@@ -147,44 +146,10 @@
 
 ```
 
-两道关的顺序是：先把 `status` 从 `draft` 改成 `reviewed`（用户审核通过），用户确认制作后再改成 `approved`。
-脚本任何改动都要改回 `draft`，重新审核、重新确认制作。
+审批与制作状态以video_project及视频工具返回为准，不通过修改本文档状态获得批准。脚本或调用参数变更后展示当前版并重新审核。
 
-## `shots.json`
+## 专业项目与制作段的区别
 
-```json
-{
-  "project": "two-grandpas",
-  "script": {
-    "file": "script.md",
-    "status": "approved",
-    "approved_at": "2026-10-27T22:40:00+08:00"
-  },
-  "spec": {
-    "duration": 15,
-    "ratio": "9:16",
-    "resolution": "720p",
-    "audio": true,
-    "mode": "continuous"
-  },
-  "shots": [
-    {
-      "id": "01",
-      "seconds": 15,
-      "shot_size": "中景转近景",
-      "cast": ["李大爷", "王大爷", "采访者"],
-      "dialogue": [
-        {"at": "0:02", "speaker": "采访者", "line": "大爷，您家几个儿子啊？"},
-        {"at": "0:04", "speaker": "李大爷", "line": "仨。"}
-      ],
-      "prompt_file": "prompts/01-two-grandpas.txt",
-      "task_id": null,
-      "clip_path": null,
-      "status": "prompted"
-    }
-  ]
-}
-```
+专业镜头用shot_id，实际生成段用compile返回的段号，两者通过shot_ids映射；不能把每条shot记录当一次模型调用。专业JSON使用project_id、chapters、scenes、characters、dialogue、shots、prompts和source_revisions，按professional-workflow.md提交，不另存手工的批准时间或假任务状态。
 
-`status` 取值：`draft` → `prompted` → `generating` → `generated` → `accepted` / `rejected`。
-每条 shots 记录一次实际生成任务；单次上限内的叙事切镜统一写进同一任务提示词，不按分镜数拆调用。超过上限的连续剧情交给插件分段续拍；独立场景按已审核方案组织。重生成只改对应任务。
+运行时taskId、原始请求、结果文件和审核状态由实际工具产生。没有调用就不填假taskId，没有文件就不填假路径。新段或付费重做仍需费用确认，已有成功段不重复生成。
