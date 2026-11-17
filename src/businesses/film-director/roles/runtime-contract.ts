@@ -11,5 +11,6 @@ const ADAPTERS: Record<string,string> = {
 };
 export function runtimeContract(role:string) {
  return '\n\n## 当前工具数据适配\n'+ADAPTERS[role]
+  +(role==='storyboard'||role==='director'?'\n【分镜脚本与分镜示意图区分】shots JSON、镜头列表、时间轴或 Markdown 表格都是文字分镜，不能称为已经交付分镜示意图。用户要求看图，或进入 video_project 实际制作脚本审核前，必须依据当前已批准镜头绘制并保存真实的本地 SVG/PNG 构图草图；读取 video-director/references/segment-storyboard.md。图中应有对应画幅的画框、主体轮廓与站位、关键道具、动作/视线/运镜箭头和场景空间，不能只是空白卡片加镜头文字。单镜至少一格，多段每段至少一格关键构图；标注仅为构图示意，不冒充实际生成画面。先确认文件真实存在，再在用户可见正文内嵌图片并附原图链接；SVG无法内嵌时用已有本地工具转PNG，不能直接换成镜头列表。没有绘图能力时说明尚未出图，不能声称已完成。示意图默认免费本地绘制，不擅自调用付费出图、安装软件或把草图上传作参考图；不调用present登记过程图。专业创意、剧本阶段不提前要求最终示意图，不增加额外审批节点。':'' )
   +'\n提交前先调用 film_project(action="validate",projectId,stage,content) 校验候选，content 为合法 JSON 字符串，不带 Markdown 围栏、注释或多余字符。assets 顶层必须同时包含 characters/scenes/locations/scene_states/props 五个数组，道具属于 props，不是仅写在场景描述中；没有道具时显式 props:[]。校验失败只修复报告中的格式或字段，不重写已批准内容、不把真实道具清空、不编造道具。校验通过后使用返回的当前 expectedRevision 提交；validate 不代表保存、批准或视频成功。内部格式修复无需让用户处理 JSON，只在影响创意或已批准内容时请求决策。';
 }
