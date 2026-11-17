@@ -33,13 +33,13 @@ DeepSeek Harness 视频创作插件：**新手快速上手，低成本制作长�
 Gitee：
 
 ```text
-https://gitee.com/hackloop/metaontic-video/releases/download/v3.30.0/metaontic-video-3.30.0.tgz
+https://gitee.com/hackloop/metaontic-video/releases/download/v3.30.1/metaontic-video-3.30.1.tgz
 ```
 
 GitHub 同版备用：
 
 ```text
-https://github.com/wxsimon2022/metaontic-video/releases/download/v3.30.0/metaontic-video-3.30.0.tgz
+https://github.com/wxsimon2022/metaontic-video/releases/download/v3.30.1/metaontic-video-3.30.1.tgz
 ```
 
 也可以在 Harness「插件 → 发现」中添加插件市场索引源，浏览并安装：
@@ -76,6 +76,12 @@ flowchart TB
 
 <details>
 <summary>最新更新</summary>
+
+## v3.30.1 更新内容
+
+### 优化
+
+- 增强创意看点、剧情细节与视觉叙事，改善人物动作反应、分段衔接和声音延续，修正单段作品结尾收束。
 
 ## v3.30.0 更新内容
 

@@ -28,7 +28,7 @@ var init_value = __esm({
 var PLUGIN_VERSION;
 var init_version = __esm({
   "src/core/version.ts"() {
-    PLUGIN_VERSION = true ? "3.30.0".trim().replace(/^v/i, "") : "";
+    PLUGIN_VERSION = true ? "3.30.1".trim().replace(/^v/i, "") : "";
   }
 });
 
