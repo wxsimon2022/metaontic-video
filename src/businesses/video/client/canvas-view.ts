@@ -1,6 +1,7 @@
 /** 插件自带的流程画布组件：读取插件自己的画布文档，在面板内渲染、编辑、连线，
  *  并在图片/视频节点内完成「生成 → 费用确认 → 结果审核 → 续拍」，不依赖任何第三方画布插件。 */
 import { FRAME_MARK, MATERIAL_MARK, STAGE_LABELS, STAGE_STATE_TEXT, canvasReadiness, canvasSegmentStats, canvasSegments, flowAuthors, pendingStageAction, requirementNodeData, requirementNodeOf, rewriteStageNodes, sealedStageData, stageAction, stageNodeId, stagePrefixOf, stageSpot, stageSummary } from '../integrations/canvas-stages.js';
+import { availableProfiles } from '../../film-director/profiles/index.js';
 
 /** 文本模型写脚本是画布上最慢的一次等待（实测 40–70 秒）：默认 20 秒的 RPC 超时会把它掐掉，
  *  这里单独放宽，配合弹窗里的等待计数让用户知道还在写而不是卡住。 */
@@ -583,7 +584,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
       const spec = requirement?.data?.metaonticRequirementSpec || {};
       setScriptDialog({ step: 'requirement', text: '', idea: String(requirement?.data?.metaonticRequirementBrief || ''),
         totalSeconds: spec.seconds || 15, segmentSeconds: spec.segmentSeconds || 15, singleMax: 15,
-        ratio: spec.ratio || '16:9', resolution: spec.resolution || '720p', busy: false, error: '', plan: null });
+        ratio: spec.ratio || '16:9', resolution: spec.resolution || '720p', workType: spec.work_type || '', busy: false, error: '', plan: null });
       try {
         const info = await canvasNativeRpc({ action: 'info' });
         if (!alive.current) return;
@@ -600,7 +601,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
       const spec = requirement?.data?.metaonticRequirementSpec || {};
       setScriptDialog({ step: 'script', text: '', idea: String(requirement?.data?.metaonticRequirementBrief || ''),
         totalSeconds: spec.seconds || 15, segmentSeconds: spec.segmentSeconds || 15, singleMax: 15,
-        ratio: spec.ratio || '16:9', resolution: spec.resolution || '720p', busy: false, error: '', plan: null });
+        ratio: spec.ratio || '16:9', resolution: spec.resolution || '720p', workType: spec.work_type || '', busy: false, error: '', plan: null });
       try {
         const info = await canvasNativeRpc({ action: 'info' });
         if (!alive.current) return;
@@ -617,7 +618,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
       patchScriptDialog({ busy: true, writing: true, writingSince: Date.now(), error: '', plan: null });
       try {
         const result = await canvasNativeRpc({ action: 'write', projectId: canvas.projectId, idea,
-          totalSeconds: scriptDialog.totalSeconds, segmentSeconds: scriptDialog.segmentSeconds, ratio: scriptDialog.ratio }, fetch, TEXT_WRITE_TIMEOUT_MS);
+          totalSeconds: scriptDialog.totalSeconds, segmentSeconds: scriptDialog.segmentSeconds, ratio: scriptDialog.ratio, workType: scriptDialog.workType }, fetch, TEXT_WRITE_TIMEOUT_MS);
         if (!alive.current) return;
         patchScriptDialog({ busy: false, writing: false, writingSince: 0, text: result.script,
           error: result.truncated === true ? '文本模型写到了输出上限，脚本可能不完整：把目标时长调短一些，或分两次写，再核对分镜表。' : '' });
@@ -660,7 +661,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
         const existing = requirementNodeOf(canvas);
         const requirementId = existing?.id || `usr_${stamp}_requirement`;
         await saveNode(requirementId, { type: 'text', x: Number(existing?.x ?? baseX), y: Number(existing?.y ?? baseY), w: 420, h: 260,
-          data: requirementNodeData(brief, seconds, segmentSeconds, ratio, resolution) });
+          data: requirementNodeData(brief, seconds, segmentSeconds, ratio, resolution, scriptDialog.workType) });
         // 需求确认就把五张阶段卡铺出来：① 已完成，② 等第二步写脚本，后面几步按画布内容重算。
         const facts = { requirementSettled: true, duration: seconds, choice: '画布内创作', ratio, resolution,
           scriptDrafted: false, scriptApproved: false, specApproved: false, segmentTotal: 0 };
@@ -718,7 +719,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
         if (!requirementNodeOf(canvas)) {
           const brief = String(scriptDialog.idea || '').trim() || text.split(/\r?\n/)[0].slice(0, 80);
           await saveNode(`usr_${stamp}_requirement`, { type: 'text', x: baseX - 500, y: baseY, w: 420, h: 260,
-            data: requirementNodeData(brief, Number(scriptDialog.totalSeconds) || 15, Number(scriptDialog.segmentSeconds) || 15, ratio, resolution) });
+            data: requirementNodeData(brief, Number(scriptDialog.totalSeconds) || 15, Number(scriptDialog.segmentSeconds) || 15, ratio, resolution, scriptDialog.workType) });
         }
         // 同一套阶段卡：需求那一步已经铺过就复用同一批卡、只把事实推进到「脚本已写」，
         // 不另铺一套；之后回填与合成成片由服务端按画布内容重算，字段与助手建图完全一致。
@@ -1430,6 +1431,7 @@ export function createCanvasView({ React, h, TOKENS, PAGE_CSS = '' }: any) {
           h('label', { key: 'idea', className: 'movc-field' }, ['想拍什么', h('input', { value: scriptDialog.idea,
             placeholder: '一句话就够，例如：青旅天台的清晨，一个人拖着行李住进城市。',
             onChange: (e: any) => patchScriptDialog({ idea: e.target.value, error: '' }) })]),
+          h('label', { key: 'work-type', className: 'movc-field' }, ['作品类型', h('select', { value: scriptDialog.workType || '', onChange: (e: any) => patchScriptDialog({ workType: e.target.value }) }, [h('option', { key: 'unspecified', value: '' }, '未指定，保留原意'), ...availableProfiles().map(p => h('option', { key: p.work_type, value: p.work_type }, p.label))])]),
           h('div', { key: 'spec', className: 'movc-row' }, [
             h('label', { key: 'total', className: 'movc-field' }, ['目标总时长（秒）', h('input', { type: 'number', min: 4, max: 3600, value: scriptDialog.totalSeconds, onChange: (e: any) => patchScriptDialog({ totalSeconds: e.target.value }) })]),
             h('label', { key: 'segment', className: 'movc-field' }, ['每段时长（秒）', h('input', { type: 'number', min: 4, max: scriptDialog.singleMax || 15, value: scriptDialog.segmentSeconds, onChange: (e: any) => patchScriptDialog({ segmentSeconds: e.target.value }) })]),

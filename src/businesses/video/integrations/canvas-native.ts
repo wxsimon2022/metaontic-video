@@ -15,6 +15,7 @@ import { IMAGE_MODEL } from '../connection-defaults.js';
 import { modelMaxSeconds, planVideoSegments, resolveSegmentSeconds } from '../workflow/planning.js';
 import { estimateSegmentCosts } from '../tools/video-estimate.js';
 import { writeScript } from '../providers/text.js';
+import { profileRevision } from '../../film-director/profiles/index.js';
 import { mergeClips } from '../media/merge.js';
 import { hasFfmpeg, ffmpegInstallHint } from '../media/ffmpeg.js';
 import { downloadFile } from '../media/download.js';
@@ -553,6 +554,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
     }
     // 文本模型写脚本：一次调用，返回 Markdown 剧本；不建节点、不碰视频模型。
     if (args.action === 'write') {
+      if(args.workType)profileRevision(args.workType);
       const config = snapshotConfig(liveConfig);
       const singleMax = modelMaxSeconds(config);
       const totalSeconds = clampInteger(args.totalSeconds, MIN_SECONDS, MAX_TOTAL_SECONDS, Math.min(15, singleMax));
@@ -565,7 +567,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       const startedAt = Date.now(); let last = 0;
       let result;
       try {
-        result = await writer(config, { idea: args.idea, totalSeconds, segmentSeconds, segments: count, ratio: args.ratio || '16:9' },
+        result = await writer(config, { idea: args.idea, totalSeconds, segmentSeconds, segments: count, ratio: args.ratio || '16:9', ...(args.workType ? {work_type:args.workType} : {}) },
           { onProgress: (progress: any) => {
             const at = Date.now();
             if (at - last < 10000) return;

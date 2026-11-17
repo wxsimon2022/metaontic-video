@@ -38,6 +38,7 @@ function makeReact() {
 
 function harness(documents, native = {}) {
   const context = vm.createContext({
+    availableProfiles: api.availableProfiles,
     // canvasNativeRpc 用 AbortSignal.timeout 兜底；VM 上下文里要显式给。
     AbortSignal,
     setInterval,
@@ -258,7 +259,7 @@ test('点「美化布局」把新坐标写回画布，不改内容与连线', as
 });
 
 test('画布内写脚本：按脚本铺开剧本/分镜/分段视频节点并自动连线排版', async () => {
-  const calls = { nodes: [], edges: [], plans: [] };
+  const calls = { nodes: [], edges: [], plans: [], writes: [] };
   const doc = { projectId: 'p1', name: '青旅宣传片', dataRoot: '/tmp/canvas', nodes: {}, edges: [] };
   const { FlowCanvas, mini } = harness({
     list: { canvases: [{ projectId: 'p1', name: '青旅宣传片', nodeCount: 0 }] },
@@ -267,7 +268,7 @@ test('画布内写脚本：按脚本铺开剧本/分镜/分段视频节点并自
     edgeAdd: (args) => { const edge = { id: `e${calls.edges.length + 1}`, ...args }; doc.edges.push(edge); calls.edges.push(edge); return { canvas: { projectId: 'p1', edge } }; },
   }, {
     info: { singleMax: 15, videoReady: true, textModel: 'deepseek v4.1 flash', textReady: true },
-    write: (body) => ({ script: `# 青旅的清晨\n\n${body.idea}`, model: 'deepseek v4.1 flash', usage: { promptTokens: 1, completionTokens: 2 } }),
+    write: (body) => { calls.writes.push(body); return { script: `# 青旅的清晨\n\n${body.idea}`, model: 'deepseek v4.1 flash', usage: { promptTokens: 1, completionTokens: 2 } }; },
     plan: (body) => {
       calls.plans.push(body);
       const shots = body.script.includes('|') ? [{ index: 1, visual: '镜头：1\n画面：清晨天台' }, { index: 2, visual: '镜头：2\n画面：前台接待' }] : [];
@@ -289,6 +290,9 @@ test('画布内写脚本：按脚本铺开剧本/分镜/分段视频节点并自
   assert.ok(texts(modal).includes('创建需求'), '跟对话一样第一步是创建需求');
   // 第一步：写下想拍什么与规格，创建需求只建需求节点与五张阶段卡，不写脚本、不建制作节点。
   find(modal, (node) => node.type === 'input').props.onChange({ target: { value: '青旅天台的清晨' } });
+  const typeSelect = find(find(modal, node=>node.props.key==='work-type'),node=>node.type==='select');
+  assert.equal(typeSelect.children.length,7, '作品类型为未指定及六类实际配置');
+  typeSelect.props.onChange({target:{value:'LIFESTYLE'}});
   mini.begin(); tree = FlowCanvas();
   const createButton = find(find(tree, (node) => node.props.key === 'script-modal'), (node) => node.props.key === 'ok');
   assert.equal(texts(createButton).join(''), '创建需求', '第一步的按钮是「创建需求」');
@@ -297,6 +301,7 @@ test('画布内写脚本：按脚本铺开剧本/分镜/分段视频节点并自
   const requirement = calls.nodes.find((node) => node.data?.metaonticRequirement);
   assert.ok(requirement, '第一步建一个需求节点');
   assert.match(requirement.data.text, /想拍什么：青旅天台的清晨/);
+  assert.equal(requirement.data.metaonticRequirementSpec.work_type,'LIFESTYLE');
   assert.equal(calls.nodes.filter((node) => node.type === 'script').length, 0, '创建需求不写脚本、不建制作节点');
   const firstStages = calls.nodes.filter((node) => node.data?.metaonticStage);
   assert.equal(firstStages.length, 7, '需求确认就铺出整条阶段卡（需求→脚本→分镜→素材→费用→逐段制作→合成）');
@@ -320,6 +325,7 @@ test('画布内写脚本：按脚本铺开剧本/分镜/分段视频节点并自
   find(find(withIdea, (node) => node.props.key === 'script-modal'), (node) => node.props.key === 'write').props.onClick();
   await flush();
   mini.begin(); withIdea = FlowCanvas();
+  assert.equal(calls.writes[0].workType,'LIFESTYLE', '写脚本沿用需求保存的类型');
   const written = find(find(withIdea, (node) => node.props.key === 'script-modal'), (node) => node.type === 'textarea');
   assert.ok(written.props.value.includes('青旅天台的清晨'), `AI 写脚本应把正文填回来：${written.props.value}`);
   assert.ok(texts(withIdea).some((line) => line.includes('文本模型')), '给出文本模型提示');

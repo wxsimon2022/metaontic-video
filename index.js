@@ -1262,16 +1262,286 @@ var init_connection = __esm({
 // src/businesses/film-director/index.ts
 init_connection();
 
+// src/businesses/film-director/profiles/drama.ts
+var drama_default = {
+  "id": "DRAMA",
+  "revision": "1",
+  "label": "\u5267\u60C5\u77ED\u7247",
+  "strategy": "\u4EBA\u7269\u76EE\u6807\u2192\u963B\u788D\u2192\u9009\u62E9\u2192\u53EF\u89C1\u540E\u679C",
+  "boundary": "\u5141\u8BB8\u514B\u5236\u7684\u65E5\u5E38\u77DB\u76FE\uFF0C\u4E0D\u673A\u68B0\u6DFB\u52A0\u60B2\u60C5\u6216\u53CD\u8F6C\u3002",
+  "creative_fields": {
+    "character_goal": "\u4EBA\u7269\u6B64\u523B\u7684\u5177\u4F53\u76EE\u6807",
+    "choice_and_consequence": "\u5173\u952E\u9009\u62E9\u4E0E\u540E\u679C"
+  },
+  "script_fields": {
+    "causal_progression": "\u4E8B\u4EF6\u4E4B\u95F4\u7684\u56E0\u679C\u63A8\u8FDB",
+    "character_change": "\u4EBA\u7269\u6216\u5173\u7CFB\u7684\u53D8\u5316"
+  },
+  "review_criteria": [
+    {
+      "id": "drama_1",
+      "description": "\u52A8\u673A\u662F\u5426\u7531\u884C\u52A8\u4F53\u73B0"
+    },
+    {
+      "id": "drama_2",
+      "description": "\u9009\u62E9\u548C\u7ED3\u679C\u662F\u5426\u6709\u56E0\u679C\u4F9D\u636E"
+    }
+  ],
+  "role_rules": {
+    "screenwriter": "\u56F4\u7ED5\u4EBA\u7269\u9009\u62E9\u5199\u573A\u666F\uFF0C\u914D\u89D2\u6709\u81EA\u8EAB\u7406\u7531\uFF0C\u4E0D\u7528\u673A\u68B0\u8BEF\u4F1A\u5236\u9020\u963B\u788D\u3002",
+    "storyboard": "\u8BA9\u89C2\u4F17\u770B\u6E05\u9009\u62E9\u53D1\u751F\u7684\u77AC\u95F4\u4E0E\u540E\u679C\uFF0C\u53CD\u5E94\u955C\u5934\u627F\u62C5\u5173\u7CFB\u53D8\u5316\u3002"
+  }
+};
+
+// src/businesses/film-director/profiles/comedy.ts
+var comedy_default = {
+  "id": "COMEDY",
+  "revision": "1",
+  "label": "\u60C5\u666F\u559C\u5267",
+  "strategy": "\u9884\u671F\u2192\u5347\u7EA7\u2192\u53CD\u5DEE\u2192\u56DE\u6536",
+  "boundary": "\u7B11\u70B9\u6765\u81EA\u4EBA\u7269\u4E0E\u60C5\u5883\uFF0C\u4E0D\u4F9D\u8D56\u523B\u677F\u5370\u8C61\u3001\u5938\u5F20\u8868\u60C5\u6216\u97F3\u6548\u3002",
+  "creative_fields": {
+    "comic_premise": "\u89C2\u4F17\u9884\u671F\u4E0E\u559C\u5267\u524D\u63D0",
+    "payoff": "\u53CD\u5DEE\u843D\u70B9\u4E0E\u56DE\u6536"
+  },
+  "script_fields": {
+    "setup_payoff": "\u94FA\u57AB\u4E0E\u7B11\u70B9\u7684\u5BF9\u5E94",
+    "reaction_budget": "\u7B11\u70B9\u524D\u540E\u53CD\u5E94\u4E0E\u505C\u987F\u7684\u65F6\u95F4\u5B89\u6392"
+  },
+  "review_criteria": [
+    {
+      "id": "comedy_1",
+      "description": "\u7B11\u70B9\u662F\u5426\u6709\u53EF\u8FA8\u8BC6\u7684\u94FA\u57AB"
+    },
+    {
+      "id": "comedy_2",
+      "description": "\u53CD\u5DEE\u662F\u5426\u7531\u4EBA\u7269\u884C\u4E3A\u5F15\u53D1\u4E14\u6709\u53CD\u5E94\u65F6\u95F4"
+    }
+  ],
+  "role_rules": {
+    "screenwriter": "\u5148\u8BA9\u9884\u671F\u6210\u7ACB\u518D\u504F\u79BB\uFF0C\u907F\u514D\u89D2\u8272\u4E3A\u7B11\u8BDD\u7A81\u7136\u5931\u53BB\u5E38\u8BC6\u3002",
+    "storyboard": "\u5173\u952E\u7B11\u70B9\u4FE1\u606F\u4E0D\u53EF\u88AB\u8FD0\u955C\u906E\u4F4F\uFF0C\u7ED9\u89C2\u4F17\u8BFB\u61C2\u53CD\u5DEE\u548C\u4EBA\u7269\u53CD\u5E94\u7684\u65F6\u95F4\u3002"
+  }
+};
+
+// src/businesses/film-director/profiles/lifestyle.ts
+var lifestyle_default = {
+  "id": "LIFESTYLE",
+  "revision": "1",
+  "label": "\u751F\u6D3BVlog\uFF0F\u6C1B\u56F4\u7247",
+  "strategy": "\u4F53\u9A8C\u8D77\u70B9\u2192\u7EC6\u8282\u53D1\u73B0\u2192\u611F\u53D7\u53D8\u5316",
+  "boundary": "\u53EF\u4EE5\u65E0\u51B2\u7A81\u3001\u65E0\u5BF9\u767D\u3001\u65E0\u4EBA\u50CF\uFF1B\u751F\u6D3B\u8D28\u611F\u4E0E\u89C2\u5BDF\u987A\u5E8F\u6210\u7ACB\u5373\u53EF\uFF0C\u4E0D\u5F3A\u9020\u620F\u5267\u3002",
+  "creative_fields": {
+    "experience_line": "\u672C\u7247\u4F53\u9A8C\u6216\u89C2\u5BDF\u4E3B\u7EBF",
+    "detail_discovery": "\u503C\u5F97\u89C2\u770B\u7684\u5177\u4F53\u7EC6\u8282\u53D1\u73B0"
+  },
+  "script_fields": {
+    "observation_progression": "\u7EC6\u8282\u5982\u4F55\u9010\u6B65\u88AB\u53D1\u73B0",
+    "sensory_rhythm": "\u751F\u6D3B\u52A8\u4F5C\u3001\u73AF\u5883\u58F0\u53CA\u7559\u767D\u7684\u8282\u594F"
+  },
+  "review_criteria": [
+    {
+      "id": "lifestyle_1",
+      "description": "\u89C2\u5BDF\u662F\u5426\u6709\u63A8\u8FDB\u800C\u975E\u91CD\u590D\u98CE\u666F"
+    },
+    {
+      "id": "lifestyle_2",
+      "description": "\u751F\u6D3B\u52A8\u4F5C\u548C\u58F0\u97F3\u662F\u5426\u53EF\u4FE1\u4E14\u7B26\u5408\u7528\u6237\u6C1B\u56F4"
+    }
+  ],
+  "role_rules": {
+    "screenwriter": "\u4EE5\u751F\u6D3B\u52A8\u4F5C\u548C\u611F\u5B98\u53D1\u73B0\u7EC4\u7EC7\u5185\u5BB9\uFF0C\u5141\u8BB8\u7559\u767D\uFF0C\u4E0D\u865A\u6784\u82E6\u96BE\u6216\u786C\u52A0\u53CD\u8F6C\u3002",
+    "storyboard": "\u6784\u56FE\u8BA9\u89C2\u4F17\u53D1\u73B0\u7EC6\u8282\uFF0C\u7A7A\u95F4\u5149\u7EBF\u4E0E\u73AF\u5883\u58F0\u97F3\u53C2\u4E0E\u53D9\u4E8B\uFF0C\u56FA\u5B9A\u673A\u4F4D\u53EF\u4EE5\u6210\u7ACB\u3002"
+  }
+};
+
+// src/businesses/film-director/profiles/documentary.ts
+var documentary_default = {
+  "id": "DOCUMENTARY",
+  "revision": "1",
+  "label": "\u7EAA\u5F55\uFF0F\u77E5\u8BC6\u7247",
+  "strategy": "\u6838\u5FC3\u95EE\u9898\u2192\u8BC1\u636E\u4E0E\u4F8B\u5B50\u2192\u89E3\u91CA\u2192\u56DE\u5E94",
+  "boundary": "\u533A\u5206\u5DF2\u6838\u5B9E\u4E8B\u5B9E\u3001\u7528\u6237\u6750\u6599\u3001\u5F85\u6838\u5B9E\u5185\u5BB9\u4E0E\u620F\u5267\u5316\u91CD\u73B0\uFF1B\u4E0D\u7F16\u9020\u91C7\u8BBF\u548C\u771F\u5B9E\u7ECF\u5386\u3002",
+  "creative_fields": {
+    "central_question": "\u8981\u56DE\u5E94\u7684\u5177\u4F53\u95EE\u9898",
+    "evidence_plan": "\u5DF2\u6709\u6765\u6E90\u4E0E\u5F85\u8865\u8BC1\u636E\u8BA1\u5212"
+  },
+  "script_fields": {
+    "evidence_sources": "\u8BBA\u636E\u4E0E\u5BF9\u5E94\u6765\u6E90\uFF0C\u7F3A\u5931\u6807\u5F85\u6838\u5B9E",
+    "fact_fiction_boundary": "\u4E8B\u5B9E\u3001\u89E3\u91CA\u548C\u91CD\u73B0\u7684\u8FB9\u754C"
+  },
+  "review_criteria": [
+    {
+      "id": "documentary_1",
+      "description": "\u5173\u952E\u9648\u8FF0\u662F\u5426\u6709\u6765\u6E90\u6216\u660E\u786E\u5F85\u6838\u5B9E"
+    },
+    {
+      "id": "documentary_2",
+      "description": "\u4E8B\u5B9E\u4E0E\u865A\u6784\u91CD\u73B0\u662F\u5426\u6E05\u695A\u533A\u5206"
+    }
+  ],
+  "role_rules": {
+    "screenwriter": "\u7528\u53EF\u6838\u5B9E\u6750\u6599\u652F\u6491\u8BF4\u660E\uFF0C\u4E0D\u4E3A\u5236\u9020\u51B2\u7A81\u7F16\u9020\u771F\u5B9E\u4EBA\u7269\u5FC3\u7406\u3002",
+    "storyboard": "\u8BC1\u636E\u753B\u9762\u4E0E\u89E3\u91CA\u5BF9\u5E94\uFF0C\u91CD\u73B0\u987B\u660E\u786E\u6807\u8BC6\uFF0C\u753B\u9762\u4E0D\u80FD\u6697\u793A\u672A\u7ECF\u8BC1\u5B9E\u7684\u56E0\u679C\u3002"
+  }
+};
+
+// src/businesses/film-director/profiles/commercial.ts
+var commercial_default = {
+  "id": "COMMERCIAL",
+  "revision": "1",
+  "label": "\u4EA7\u54C1\u5E7F\u544A",
+  "strategy": "\u9700\u6C42\u2192\u4F7F\u7528\u8FC7\u7A0B\u2192\u4EF7\u503C\u8BC1\u636E\u2192\u884C\u52A8",
+  "boundary": "\u4EA7\u54C1\u5916\u89C2\u3001\u529F\u6548\u3001\u6570\u636E\u4E0E\u8BA4\u8BC1\u987B\u6709\u4F9D\u636E\uFF0C\u4E0D\u901A\u8FC7\u753B\u9762\u6697\u793A\u672A\u8BC1\u5B9E\u6548\u679C\u3002",
+  "creative_fields": {
+    "user_need": "\u5177\u4F53\u7528\u6237\u9700\u6C42",
+    "supported_benefit": "\u6709\u8D44\u6599\u652F\u6301\u7684\u4EA7\u54C1\u5229\u76CA"
+  },
+  "script_fields": {
+    "claims_and_evidence": "\u5356\u70B9\u53CA\u5BF9\u5E94\u4F9D\u636E\uFF0C\u7F3A\u5931\u6807\u5F85\u6838\u5B9E",
+    "usage_and_action": "\u53EF\u89C2\u5BDF\u4F7F\u7528\u8FC7\u7A0B\u4E0E\u884C\u52A8\u5F15\u5BFC"
+  },
+  "review_criteria": [
+    {
+      "id": "commercial_1",
+      "description": "\u5356\u70B9\u662F\u5426\u7531\u6750\u6599\u652F\u6301"
+    },
+    {
+      "id": "commercial_2",
+      "description": "\u4F7F\u7528\u8FC7\u7A0B\u662F\u5426\u6E05\u695A\u4E14\u4EA7\u54C1\u8EAB\u4EFD\u51C6\u786E"
+    }
+  ],
+  "role_rules": {
+    "screenwriter": "\u5C55\u793A\u771F\u5B9E\u9700\u6C42\u4E0E\u4F7F\u7528\u8FC7\u7A0B\uFF0C\u907F\u514D\u5806\u5356\u70B9\u53CA\u65E0\u4F9D\u636E\u524D\u540E\u6548\u679C\u3002",
+    "storyboard": "\u5173\u952E\u4EA7\u54C1\u7EC6\u8282\u548C\u4F7F\u7528\u6B65\u9AA4\u6E05\u695A\u53EF\u89C1\uFF0C\u54C1\u724C\u6587\u5B57\u4E0ELogo\u4F9D\u8D56\u6388\u6743\u7D20\u6750\u53CA\u540E\u671F\u80FD\u529B\u3002"
+  }
+};
+
+// src/businesses/film-director/profiles/promotional.ts
+var promotional_default = {
+  "id": "PROMOTIONAL",
+  "revision": "1",
+  "label": "\u54C1\u724C\uFF0F\u5730\u57DF\u5BA3\u4F20",
+  "strategy": "\u8BC6\u522B\u7279\u5F81\u2192\u5177\u4F53\u751F\u6D3B\u2192\u4EBA\u7269\u6216\u89C2\u5BDF\u5BF9\u8C61\u2192\u60C5\u7EEA\u843D\u70B9",
+  "boundary": "\u5730\u57DF\u548C\u54C1\u724C\u7279\u5F81\u5177\u4F53\u53EF\u4FE1\uFF0C\u4E0D\u7528\u7A7A\u6CDB\u8D5E\u7F8E\u66FF\u4EE3\u5185\u5BB9\uFF1B\u4E0D\u5F3A\u5236\u589E\u52A0\u4EBA\u7269\u3002",
+  "creative_fields": {
+    "recognizable_identity": "\u54C1\u724C\u6216\u5730\u57DF\u7684\u53EF\u8FA8\u8BC6\u7279\u5F81",
+    "emotional_anchor": "\u60C5\u7EEA\u843D\u70B9\u53CA\u5176\u5177\u4F53\u8F7D\u4F53"
+  },
+  "script_fields": {
+    "distinctive_details": "\u5177\u6709\u8FA8\u8BC6\u5EA6\u7684\u751F\u6D3B\u6216\u54C1\u724C\u7EC6\u8282",
+    "identity_progression": "\u7EC6\u8282\u5982\u4F55\u5171\u540C\u5448\u73B0\u4E3B\u9898"
+  },
+  "review_criteria": [
+    {
+      "id": "promotional_1",
+      "description": "\u753B\u9762\u662F\u5426\u5177\u6709\u5F53\u5730\u6216\u54C1\u724C\u8FA8\u8BC6\u5EA6"
+    },
+    {
+      "id": "promotional_2",
+      "description": "\u60C5\u7EEA\u662F\u5426\u7531\u5177\u4F53\u7EC6\u8282\u800C\u975E\u53E3\u53F7\u652F\u6491"
+    }
+  ],
+  "role_rules": {
+    "screenwriter": "\u628A\u8EAB\u4EFD\u7279\u5F81\u843D\u5728\u5177\u4F53\u4F7F\u7528\u6216\u751F\u6D3B\u7EC6\u8282\uFF0C\u771F\u5B9E\u5730\u70B9\u8D44\u6599\u4E0D\u8DB3\u6807\u5F85\u6838\u5B9E\u3002",
+    "storyboard": "\u7A7A\u95F4\u3001\u4EBA\u7269\u6216\u7269\u4EF6\u5173\u7CFB\u4F53\u73B0\u5730\u57DF\u54C1\u724C\u7279\u5F81\uFF0C\u4E0D\u7528\u901A\u7528\u822A\u62CD\u548C\u7D20\u6750\u5806\u780C\u66FF\u4EE3\u3002"
+  }
+};
+
+// src/businesses/film-director/profiles/index.ts
+var REGISTRY = Object.fromEntries([drama_default, comedy_default, lifestyle_default, documentary_default, commercial_default, promotional_default].map((p) => [p.id, p]));
+var WORK_TYPES = Object.keys(REGISTRY);
+var NARRATIVE_MODES = ["FICTION", "OBSERVATIONAL", "EXPLANATORY", "DEMONSTRATION", "POETIC", "MIXED"];
+function availableProfiles() {
+  return Object.values(REGISTRY).map((p) => ({ work_type: p.id, label: p.label, profile_revision: p.revision, strategy: p.strategy }));
+}
+function resolveProfile(spec) {
+  if (!spec?.work_type) return null;
+  if (!Object.hasOwn(REGISTRY, spec.work_type)) throw Error("UNKNOWN_WORK_TYPE");
+  const profile = REGISTRY[spec.work_type];
+  if (spec.profile_revision !== profile.revision) throw Error("UNSUPPORTED_PROFILE_REVISION");
+  return structuredClone(profile);
+}
+function profileRevision(workType) {
+  if (!Object.hasOwn(REGISTRY, workType)) throw Error("UNKNOWN_WORK_TYPE");
+  return REGISTRY[workType].revision;
+}
+function writingProfileInstructions(workType) {
+  if (!workType) return "\u4F5C\u54C1\u7C7B\u578B\u672A\u6307\u5B9A\uFF1A\u5C0A\u91CD\u60F3\u6CD5\u4E2D\u7684\u5185\u5BB9\u5F62\u5F0F\uFF0C\u4E0D\u9ED8\u8BA4\u5267\u60C5\u3001\u5F3A\u52A0\u4EBA\u7269\u51B2\u7A81\u6216\u53CD\u8F6C\u3002";
+  const p = resolveProfile({ work_type: workType, profile_revision: profileRevision(workType) });
+  return `\u3010\u4F5C\u54C1\u7C7B\u578B ${p.id}\u3011${p.label}\uFF1A${p.strategy}\u3002${p.boundary}
+${p.role_rules.screenwriter}
+${p.role_rules.storyboard}
+\u5236\u4F5C\u8BF4\u660E\u4E2D\u7B80\u6D01\u8BF4\u660E\u672C\u7C7B\u578B\u8981\u70B9\uFF1A${Object.values(p.script_fields).join("\uFF1B")}\u3002\u4ECD\u6309\u5F53\u524D\u5165\u53E3\u7684Markdown\u683C\u5F0F\u4EA4\u7A3F\uFF0C\u4E0D\u8F93\u51FAtype_details\u6216\u5BA1\u6838JSON\uFF0C\u4E0D\u8C03\u7528\u9879\u76EE\u5DE5\u5177\u3002`;
+}
+function profileContext(state) {
+  const profile = resolveProfile(state.project_spec);
+  return { status: profile ? "SELECTED" : state.project_spec && Object.hasOwn(state.project_spec, "work_type") ? "UNSELECTED" : "LEGACY_GENERIC", profile, available_profiles: profile ? [] : availableProfiles() };
+}
+function profileInstructions(state, role2) {
+  const p = resolveProfile(state.project_spec);
+  if (!p) return "\n\u3010\u4F5C\u54C1\u7C7B\u578B\u5F85\u786E\u8BA4\u3011\u4E0D\u5F97\u9ED8\u8BA4\u6240\u6709\u4F5C\u54C1\u90FD\u662F\u5267\u60C5\u7247\uFF1B\u6839\u636E\u539F\u610F\u63A8\u8350\u4E00\u4E2A\u4F5C\u54C1\u7C7B\u578B\uFF0C\u660E\u786E\u540E\u7528configure_profile\u4FDD\u5B58\u3002\u65E7\u9879\u76EE\u5141\u8BB8\u6CBF\u7528\u5DF2\u6709\u901A\u7528\u6D41\u7A0B\uFF0C\u4E0D\u64C5\u81EA\u8FC1\u79FB\u3002\u98CE\u683C\u3001\u53D9\u4E8B\u65B9\u5F0F\u4E0E\u751F\u6210\u6A21\u5F0F\u4E0D\u662F\u4F5C\u54C1\u7C7B\u578B\u3002";
+  const fields = role2 === "creative" ? p.creative_fields : role2 === "screenwriter" ? p.script_fields : null;
+  const roleRule = p.role_rules[role2] || ({ director: "\u6309\u672C\u7C7B\u578B\u7EC4\u7EC7\u89D2\u8272\u4E0E\u5BA1\u6279\uFF0C\u7C7B\u578B\u53D8\u66F4\u4F7F\u539F\u521B\u610F\u53CA\u4E0B\u6E38\u5931\u6548\uFF0C\u9700\u91CD\u65B0\u5BA1\u6279\u3002", creative: "\u5C06\u7B56\u7565\u8F6C\u4E3A\u53EF\u5BA1\u6279\u7684\u5185\u5BB9\u84DD\u56FE\uFF0C\u4E0D\u63D0\u524D\u5199\u6B63\u5F0F\u5267\u672C\u3002", character: "\u53EA\u8BBE\u8BA1\u5DF2\u6279\u51C6\u4E3B\u4F53\uFF1B\u65E0\u4EBA\u50CF\u5185\u5BB9\u5141\u8BB8characters\u4E3A\u7A7A\uFF0C\u4E0D\u5F3A\u52A0\u4EBA\u7269\u3002", scene: "\u73AF\u5883\u548C\u9053\u5177\u670D\u52A1\u672C\u7C7B\u578B\u7684\u5185\u5BB9\u63A8\u8FDB\uFF0C\u4E0D\u66F4\u6539\u5DF2\u6279\u51C6\u5730\u70B9\u4E0E\u4E8B\u4EF6\u3002", "prompt-engineer": "\u5C06\u672C\u7C7B\u578B\u7684\u5DF2\u6279\u51C6\u955C\u5934\u5FE0\u5B9E\u8F6C\u4E3A\u72EC\u7ACB\u63D0\u793A\u8BCD\uFF0C\u672A\u77E5\u80FD\u529B\u6807\u5F85\u9A8C\u8BC1\uFF0C\u4E0D\u65B0\u6DFB\u60C5\u8282\u3002", reviewer: "\u5171\u540C\u65F6\u95F4\u8F74\u3001\u5F15\u7528\u3001\u7248\u672C\u3001\u5BF9\u767D\u548C\u786C\u7EA6\u675F\u68C0\u67E5\u59CB\u7EC8\u9002\u7528\uFF1B\u827A\u672F\u5224\u65AD\u6309\u672C\u7C7B\u578B\u8BC4\u4F30\uFF0C\u4E0D\u4EE5\u7F3A\u5C11\u51B2\u7A81\u3001\u53CD\u8F6C\u6216\u5BF9\u767D\u5224\u6240\u6709\u4F5C\u54C1\u5931\u8D25\u3002" }[role2] || "\u6309\u5F53\u524D\u9636\u6BB5\u804C\u8D23\u6267\u884C\u3002");
+  return `
+\u3010\u4F5C\u54C1\u7C7B\u578B ${p.id} \xB7 \u914D\u7F6E ${p.revision}\u3011${p.label}
+\u5185\u5BB9\u7ED3\u6784\uFF1A${p.strategy}\u3002${p.boundary}
+\u5F53\u524D\u804C\u8D23\uFF1A${roleRule}
+\u53D9\u4E8B\u65B9\u5F0F\uFF1A${state.project_spec.narrative_mode || "\u672A\u6307\u5B9A"}\uFF1B\u89C6\u89C9\u98CE\u683C\uFF1A${state.project_spec.visual_style || "\u672A\u6307\u5B9A"}\u3002\u4E8C\u8005\u72EC\u7ACB\uFF0C\u4E0D\u4ECE\u98CE\u683C\u63A8\u65AD\u7C7B\u578B\u6216\u751F\u6210\u65B9\u5F0F\u3002
+` + (fields ? `\u672C\u9636\u6BB5\u989D\u5916\u8F93\u51FAtype_details\u5BF9\u8C61\uFF1A${JSON.stringify(fields)}\u3002\u5B57\u6BB5\u4E3A\u975E\u7A7A\u6587\u672C\uFF0C\u8BB0\u5F55\u5177\u4F53\u5185\u5BB9\u800C\u975E\u89C4\u5219\u590D\u8FF0\u3002
+` : "") + (role2 === "reviewer" ? `\u62A5\u544A\u589E\u52A0type_review\uFF1Awork_type=${p.id}\u3001profile_revision=${p.revision}\u3001checks\u6570\u7EC4\u3002\u6BCF\u9879\u542Bcriterion_id\u3001status\uFF08PASS/CONCERN/NOT_EVALUATED\uFF09\u3001evidence\uFF08\u5177\u4F53\u6750\u6599\u4F4D\u7F6E\u4E0E\u4F9D\u636E\uFF09\u3002\u5FC5\u987B\u8986\u76D6${JSON.stringify(p.review_criteria)}\u3002CONCERN\u5FC5\u987B\u5173\u8054issues\u4E2D\u7684MINOR/INFO\u827A\u672F\u5EFA\u8BAE\u6216\u6709\u5BA2\u89C2\u8BC1\u636E\u7684CRITICAL/MAJOR\uFF1BNOT_EVALUATED\u4E0D\u80FD\u901A\u8FC7\u7EC8\u5BA1\u3002\u4E0D\u80FD\u628A\u7C7B\u578B\u8BC4\u5206\u5F53\u5B9E\u9645\u5A92\u4F53\u6548\u679C\u9A8C\u8BC1\u3002
+` : "") + "\u7528\u6237\u786C\u7EA6\u675F\u548C\u6279\u51C6\u5185\u5BB9\u4F18\u5148\u3002\u7C7B\u578B\u7B56\u7565\u53EA\u5728\u672C\u7C7B\u578B\u9002\u7528\uFF0C\u4E0D\u5F3A\u5236\u6BCF\u7247\u90FD\u6709\u51B2\u7A81\u3001\u5BF9\u767D\u3001\u7B11\u70B9\u6216\u53CD\u8F6C\uFF1B\u65B0\u589E\u5173\u952E\u5185\u5BB9\u4ECD\u9700\u521B\u610F\u5BA1\u6279\u3002";
+}
+function validateProfileArtifact(stage, value, state) {
+  const p = resolveProfile(state.project_spec);
+  if (!p) return;
+  const fields = stage === "creative" ? p.creative_fields : stage === "script" ? p.script_fields : null;
+  if (fields) {
+    for (const key of Object.keys(fields)) if (typeof value.type_details?.[key] !== "string" || !value.type_details[key].trim()) throw Error(`TYPE_DETAIL_REQUIRED:${key}`);
+  }
+  if (stage !== "review") return;
+  const r = value.type_review;
+  if (r?.work_type !== p.id || r?.profile_revision !== p.revision || !Array.isArray(r.checks)) throw Error("TYPE_REVIEW_REQUIRED");
+  const ids = r.checks.map((c) => c?.criterion_id);
+  if (ids.length !== p.review_criteria.length || new Set(ids).size !== ids.length || p.review_criteria.some((c) => !ids.includes(c.id))) throw Error("TYPE_REVIEW_COVERAGE");
+  for (const check of r.checks) {
+    if (!["PASS", "CONCERN", "NOT_EVALUATED"].includes(check.status) || typeof check.evidence !== "string" || !check.evidence.trim()) throw Error("INVALID_TYPE_REVIEW_CHECK");
+    if (check.status === "CONCERN" && (!check.issue_id || !value.issues?.some((i) => i.issue_id === check.issue_id))) throw Error("TYPE_REVIEW_ISSUE_REQUIRED");
+  }
+  if (["PASS", "PASS_WITH_WARNINGS"].includes(value.review_status) && r.checks.some((c) => c.status === "NOT_EVALUATED")) throw Error("TYPE_REVIEW_NOT_EVALUATED");
+}
+
 // src/businesses/film-director/spec.ts
-var FIELDS = ["genre", "aspect_ratio", "resolution", "language", "visual_style", "target_audience", "distribution_channel", "target_model"];
+var FIELDS = ["genre", "aspect_ratio", "resolution", "language", "visual_style", "target_audience", "distribution_channel", "target_model", "work_type", "narrative_mode"];
 function createProjectSpec(title, idea, duration, input = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw Error("INVALID_PROJECT_SPEC");
   if (Object.keys(input).some((k) => !FIELDS.includes(k) && !["hard_constraints", "soft_preferences", "references"].includes(k))) throw Error("UNKNOWN_PROJECT_SPEC_FIELD");
   for (const key of FIELDS) if (input[key] !== void 0 && (typeof input[key] !== "string" || !input[key].trim())) throw Error(`INVALID_PROJECT_SPEC:${key}`);
   if (input.aspect_ratio && !["16:9", "9:16"].includes(input.aspect_ratio)) throw Error("INVALID_PROJECT_SPEC:aspect_ratio");
   if (input.resolution && !["480p", "720p"].includes(input.resolution)) throw Error("INVALID_PROJECT_SPEC:resolution");
+  if (input.work_type && !WORK_TYPES.includes(input.work_type)) throw Error("UNKNOWN_WORK_TYPE");
+  if (input.narrative_mode && !NARRATIVE_MODES.includes(input.narrative_mode)) throw Error("UNKNOWN_NARRATIVE_MODE");
   for (const key of ["hard_constraints", "soft_preferences", "references"]) if (input[key] !== void 0 && (!Array.isArray(input[key]) || input[key].some((v) => typeof v !== "string" || !v.trim()))) throw Error(`INVALID_PROJECT_SPEC:${key}`);
-  return { title, original_idea: idea, target_duration_ms: duration, ...Object.fromEntries(FIELDS.map((k) => [k, input[k] || null])), hard_constraints: input.hard_constraints || [], soft_preferences: input.soft_preferences || [], references: input.references || [], provenance: { title: "USER_SPECIFIED", original_idea: "USER_SPECIFIED", target_duration_ms: "USER_SPECIFIED", ...Object.fromEntries(FIELDS.map((k) => [k, input[k] ? "USER_SPECIFIED" : "UNKNOWN"])) } };
+  return { title, original_idea: idea, target_duration_ms: duration, ...Object.fromEntries(FIELDS.map((k) => [k, input[k] || null])), profile_revision: input.work_type ? profileRevision(input.work_type) : null, hard_constraints: input.hard_constraints || [], soft_preferences: input.soft_preferences || [], references: input.references || [], provenance: { title: "USER_SPECIFIED", original_idea: "USER_SPECIFIED", target_duration_ms: "USER_SPECIFIED", ...Object.fromEntries(FIELDS.map((k) => [k, input[k] ? "USER_SPECIFIED" : "UNKNOWN"])) } };
+}
+function configureProfile(state, input, expected) {
+  if (state.revision !== expected) throw Error("REVISION_CONFLICT");
+  if (state.status === "STOPPED") throw Error("PROJECT_STOPPED");
+  if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((k) => !["work_type", "narrative_mode"].includes(k)) || !WORK_TYPES.includes(input.work_type)) throw Error("INVALID_PROFILE_SELECTION");
+  if (input.narrative_mode !== void 0 && !NARRATIVE_MODES.includes(input.narrative_mode)) throw Error("UNKNOWN_NARRATIVE_MODE");
+  const old = state.project_spec || {};
+  const mode = input.narrative_mode ?? old.narrative_mode ?? null;
+  const revision = profileRevision(input.work_type);
+  if (old.work_type === input.work_type && old.narrative_mode === mode && old.profile_revision === revision) return structuredClone(state);
+  const next = structuredClone(state);
+  next.project_spec = { ...old, work_type: input.work_type, narrative_mode: mode, profile_revision: revision, provenance: { ...old.provenance, work_type: "USER_SPECIFIED", narrative_mode: input.narrative_mode ? "USER_SPECIFIED" : old.provenance?.narrative_mode || "UNKNOWN" } };
+  resolveProfile(next.project_spec);
+  next.revision++;
+  for (const artifact of Object.values(next.artifacts)) artifact.stale = true;
+  next.approvals = {};
+  next.status = "REQUIREMENT_ANALYSIS";
+  next.last_change = { stage: "project_spec", changed_fields: ["work_type", "narrative_mode", "profile_revision"], previous_profile: { work_type: old.work_type || null, profile_revision: old.profile_revision || null }, affected_artifacts: Object.keys(next.artifacts), approval_impact: "REAPPROVE_CREATIVE_AND_SCRIPT" };
+  return next;
 }
 
 // src/businesses/film-director/storage.ts
@@ -1373,9 +1643,10 @@ function recordApprovalDecision(state, stage, decision, expected) {
   const artifact = state.artifacts[stage];
   if (!["creative", "script"].includes(stage) || !artifact || artifact.stale || state.revision !== expected) throw Error("INVALID_APPROVAL_REVISION");
   if (!["APPROVED", "REVISE", "REJECTED"].includes(decision)) throw Error("INVALID_APPROVAL_DECISION");
+  if (decision === "APPROVED" && stage === "creative" && state.project_spec && Object.hasOwn(state.project_spec, "work_type") && !state.project_spec.work_type) throw Error("WORK_TYPE_REQUIRED_BEFORE_APPROVAL");
   const next = structuredClone(state);
   next.decisions ||= [];
-  next.decisions.push({ approval_id: `APPROVAL_${next.decisions.length + 1}`, project_id: state.project_id, gate: stage.toUpperCase(), stage, artifact_ref: `project.json#/artifacts/${stage}`, artifact_revision: artifact.revision, revision: artifact.revision, decision, decided_by: "USER", decision_time: (/* @__PURE__ */ new Date()).toISOString() });
+  next.decisions.push({ approval_id: `APPROVAL_${next.decisions.length + 1}`, project_id: state.project_id, gate: stage.toUpperCase(), stage, artifact_ref: `project.json#/artifacts/${stage}`, artifact_revision: artifact.revision, revision: artifact.revision, work_type: state.project_spec?.work_type || null, profile_revision: state.project_spec?.profile_revision || null, decision, decided_by: "USER", decision_time: (/* @__PURE__ */ new Date()).toISOString() });
   next.revision++;
   if (decision === "APPROVED") {
     next.approvals[stage] = artifact.revision;
@@ -1596,6 +1867,7 @@ function validateArtifact(stage, value, state) {
   };
   validateV31(stage, value, state);
   validateReferences(stage, value, state);
+  validateProfileArtifact(stage, value, state);
   if (stage === "creative") {
     nonempty("theme");
     nonempty("logline");
@@ -1666,7 +1938,7 @@ function commitArtifact(state, stage, value, expected) {
   const next = structuredClone(state);
   next.revision++;
   if (stage === "review" && state.schema_version === "3.1.0") updateIssueRegistry(next, value);
-  next.artifacts[stage] = { revision: next.revision, source_revisions: sourceRevisions(state, stage), data: value, stale: false };
+  next.artifacts[stage] = { revision: next.revision, source_revisions: sourceRevisions(state, stage), ...state.project_spec?.work_type ? { profile_ref: { work_type: state.project_spec.work_type, profile_revision: state.project_spec.profile_revision } } : {}, data: value, stale: false };
   for (const downstream of STAGES.slice(index + 1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
   for (const approved of ["creative", "script"]) if (STAGES.indexOf(approved) >= index) delete next.approvals[approved];
   next.status = ["creative", "script"].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === "review" ? value.review_status && !evaluateReview(value).passed ? value.review_status : "FINAL_DELIVERY" : `${stage.toUpperCase()}_READY`;
@@ -1677,7 +1949,7 @@ function commitArtifact(state, stage, value, expected) {
 function artifactManifest(state) {
   return STAGES.filter((s) => state.artifacts[s]).map((stage) => {
     const artifact = state.artifacts[stage];
-    return { stage, artifact_ref: `project.json#/artifacts/${stage}`, revision: artifact.revision, source_revisions: artifact.source_revisions || {}, stale: artifact.stale, sha256: createHash("sha256").update(JSON.stringify(artifact.data)).digest("hex") };
+    return { stage, artifact_ref: `project.json#/artifacts/${stage}`, revision: artifact.revision, source_revisions: artifact.source_revisions || {}, ...artifact.profile_ref ? { profile_ref: artifact.profile_ref } : {}, stale: artifact.stale, sha256: createHash("sha256").update(JSON.stringify(artifact.data)).digest("hex") };
   });
 }
 function printable(value) {
@@ -2051,6 +2323,9 @@ Markdown\u6709\u57FA\u7840\u7248\u672C\u4E0E\u771F\u5B9E\u5BA1\u6838\u65F6\u95F4
 // src/businesses/film-director/roles/index.ts
 var ROLE_TEXTS = { director: director_default, creative: creative_default, screenwriter: screenwriter_default, character: character_default, scene: scene_default, storyboard: storyboard_default, "prompt-engineer": prompt_engineer_default, reviewer: reviewer_default };
 var ROLE_PROMPTS = Object.fromEntries(Object.entries(ROLE_TEXTS).map(([key, text]) => [key, text + "\n" + COMMON_CONTRACT]));
+function roleInstructions(state, role2) {
+  return ROLE_PROMPTS[role2] + "\n" + profileInstructions(state, role2);
+}
 var INTENTS = ["new_project", "develop_idea", "write_script", "revise_dialogue", "revise_story", "design_character", "revise_character", "design_scene", "revise_scene", "design_shots", "revise_camera", "revise_timing", "write_prompts", "adapt_model", "review", "verify_facts", "resume", "produce", "clarify"];
 var ROUTES = {
   new_project: ["director", null],
@@ -2096,10 +2371,11 @@ function routeIntent(state, intent, entityIds = []) {
     approval_required: approvals,
     scope_required: scopeRequired,
     ...projectContext(state),
+    work_profile: profileContext(state),
     input_revisions: sourceRevisions(state, stage),
     model_profile: modelProfile(state),
     expectedRevision: state.revision,
-    instructions: ROLE_PROMPTS[role2],
+    instructions: roleInstructions(state, role2),
     inputs,
     next_action: scopeRequired ? "\u660E\u786E\u4FEE\u6539\u5BF9\u8C61ID\uFF1B\u4E0D\u8981\u731C\u6D4B\u6216\u6539\u5199\u5168\u7247" : missing.length || approvals.length ? "\u5B8C\u6210\u7F3A\u5931\u4E0A\u6E38\u6216\u6279\u51C6\u540E\u518D\u4FEE\u6539" : "\u6309\u804C\u8D23\u751F\u6210\u5019\u9009\uFF1B\u63D0\u4EA4\u4ECD\u53D7\u73B0\u6709\u72B6\u6001\u673A\u4E0E\u5BA1\u6279\u7EA6\u675F"
   };
@@ -2172,12 +2448,16 @@ function nextTask(state) {
     if (!artifact || artifact.stale || state.status === `${stage.toUpperCase()}_REVISE`) {
       const roles = { creative: "creative", script: "screenwriter", assets: "character + scene", shots: "storyboard", prompts: "prompt-engineer", review: "reviewer" };
       const dependencies = STAGE_DEPS;
-      return { action: "submit", ...projectContext(state), input_revisions: sourceRevisions(state, stage), revision_scope: artifact?.stale_entity_ids || [], model_profile: modelProfile(state), stage, role: roles[stage], inputs: Object.fromEntries(dependencies[stage].map((s) => [s, state.artifacts[s]])), instructions: ROLE_INSTRUCTIONS[stage], expectedRevision: state.revision };
+      const roleIds = { creative: ["creative"], script: ["screenwriter"], assets: ["character", "scene"], shots: ["storyboard"], prompts: ["prompt-engineer"], review: ["reviewer"] };
+      return { action: "submit", ...projectContext(state), work_profile: profileContext(state), input_revisions: sourceRevisions(state, stage), revision_scope: artifact?.stale_entity_ids || [], model_profile: modelProfile(state), stage, role: roles[stage], inputs: Object.fromEntries(dependencies[stage].map((s) => [s, state.artifacts[s]])), instructions: roleIds[stage].map((role2) => roleInstructions(state, role2)).join("\n\n"), expectedRevision: state.revision };
     }
-    if (["creative", "script"].includes(stage) && state.approvals[stage] !== artifact.revision) return { action: "approve", stage, expectedRevision: state.revision };
+    if (["creative", "script"].includes(stage) && state.approvals[stage] !== artifact.revision) {
+      if (stage === "creative" && profileContext(state).status === "UNSELECTED") return { action: "configure_profile", role: "director", ...projectContext(state), work_profile: profileContext(state), expectedRevision: state.revision, instructions: "\u521B\u610F\u6279\u51C6\u524D\u786E\u8BA4\u4F5C\u54C1\u7C7B\u578B\uFF0C\u7528configure_profile\u4FDD\u5B58\u9009\u62E9\uFF1B\u4FDD\u5B58\u4F1A\u4F7F\u5F53\u524D\u8349\u7A3F\u5931\u6548\uFF0C\u9700\u6309\u7C7B\u578B\u66F4\u65B0\u540E\u91CD\u65B0\u63D0\u4EA4\u3002\u4E0D\u5F97\u628A\u672A\u56DE\u7B54\u5F53\u4F5C\u540C\u610F\u3002" };
+      return { action: "approve", stage, work_profile: profileContext(state), expectedRevision: state.revision };
+    }
   }
   const report = state.artifacts.review.data;
-  if (report.review_status && !evaluateReview(report).passed && Object.values(state.issue_registry || {}).some((i) => i.status === "RESOLVED")) return { action: "recheck", role: "reviewer", stage: "review", ...projectContext(state), issues: Object.values(state.issue_registry).filter((i) => i.status === "RESOLVED"), input_revisions: sourceRevisions(state, "review"), review_revision: state.artifacts.review.revision, expectedRevision: state.revision, instructions: "\u9010\u9879\u6309recheck_criteria\u5BF9\u7167\u5F53\u524D\u7248\u672C\u5B9E\u9645\u590D\u5BA1\uFF1B\u901A\u8FC7\u540E\u8C03\u7528verify_issue\u767B\u8BB0\u8BC1\u636E\uFF0C\u4E0D\u901A\u8FC7\u8FD4\u56DE\u8D23\u4EFB\u89D2\u8272\u3002\u767B\u8BB0\u540E\u91CD\u65B0\u63D0\u4EA4\u5B8C\u6574\u6700\u7EC8\u5BA1\u6838\u62A5\u544A\uFF0C\u7981\u6B62\u4EC5\u9760\u81EA\u79F0VERIFIED\u3002" };
+  if (report.review_status && !evaluateReview(report).passed && Object.values(state.issue_registry || {}).some((i) => i.status === "RESOLVED")) return { action: "recheck", role: "reviewer", stage: "review", ...projectContext(state), work_profile: profileContext(state), issues: Object.values(state.issue_registry).filter((i) => i.status === "RESOLVED"), input_revisions: sourceRevisions(state, "review"), review_revision: state.artifacts.review.revision, expectedRevision: state.revision, instructions: roleInstructions(state, "reviewer") + "\n\u9010\u9879\u6309recheck_criteria\u5BF9\u7167\u5F53\u524D\u7248\u672C\u5B9E\u9645\u590D\u5BA1\uFF1B\u901A\u8FC7\u540E\u8C03\u7528verify_issue\u767B\u8BB0\u8BC1\u636E\uFF0C\u4E0D\u901A\u8FC7\u8FD4\u56DE\u8D23\u4EFB\u89D2\u8272\u3002\u767B\u8BB0\u540E\u91CD\u65B0\u63D0\u4EA4\u5B8C\u6574\u6700\u7EC8\u5BA1\u6838\u62A5\u544A\uFF0C\u7981\u6B62\u4EC5\u9760\u81EA\u79F0VERIFIED\u3002" };
   if (report.review_status && !evaluateReview(report).passed) return { action: "repair", stage: "review", role: "director", issues: report.issues, expectedRevision: state.revision };
   return { action: "compile", ...projectContext(state), expectedRevision: state.revision };
 }
@@ -2214,14 +2494,6 @@ function compileProduction(state, plan, ratio, resolution) {
   if (start !== state.duration_ms || segments.some((s) => !s.prompt)) throw Error("PRODUCTION_DURATION_MISMATCH");
   return { source_project_id: state.project_id, source_revision: state.revision, ratio, resolution, segments, specification: { prompt: segments[0].prompt, segmentPrompts: segments.map((s) => s.prompt), duration: state.duration_ms / 1e3, ratio, resolution } };
 }
-var ROLE_INSTRUCTIONS = {
-  creative: ROLE_PROMPTS.creative,
-  script: ROLE_PROMPTS.screenwriter,
-  assets: ROLE_PROMPTS.character + "\n\n" + ROLE_PROMPTS.scene,
-  shots: ROLE_PROMPTS.storyboard,
-  prompts: ROLE_PROMPTS["prompt-engineer"],
-  review: ROLE_PROMPTS.reviewer
-};
 
 // src/businesses/video/workflow/planning.ts
 init_connection();
@@ -3620,6 +3892,7 @@ var CREATIVE_GUIDANCE = SHORT_VIDEO_COMMON + CONTENT_QUALITY + SCRIPT_CRAFT + CR
 \u3010\u8D28\u91CF\u5BA1\u6838\u3011\u5148\u6838\u5BF9\u7A0B\u5E8F\u6821\u9A8C\u7ED3\u679C\uFF0C\u518D\u8BC4\u4E3B\u9898\u3001\u56E0\u679C\u3001\u52A8\u673A\u3001\u5BF9\u767D\u3001\u8FDE\u7EED\u6027\u3001\u97F3\u753B\u548C\u53EF\u751F\u6210\u6027\u3002\u4E13\u4E1A\u9879\u76EE\u6309Reviewer V3.1\u516B\u7EF4\u6743\u91CD\u8BC4\u5206\uFF0C\u4E0D\u9002\u7528\u9879\u5F52\u4E00\u5316\uFF1B\u603B\u5206\u226580\u4E14\u65E0\u672AVERIFIED\u7684CRITICAL/MAJOR\u624D\u5EFA\u8BAE\u4EA4\u4ED8\uFF0C\u5206\u6570\u4E0D\u80FD\u63A9\u76D6\u963B\u65AD\u9879\u3002\u95EE\u9898\u8BB0\u5F55entity_id\u3001rule_id\u3001evidence\u3001owner\u3001minimal_fix\u3001downstream_impact\uFF1B\u4E0D\u5F97\u53EA\u8BF4\u201C\u66F4\u6709\u7535\u5F71\u611F\u201D\u3002\u672A\u6267\u884C\u7684\u7A0B\u5E8F\u68C0\u67E5\u5217unverified_checks\uFF0C\u4E0D\u80FD\u81EA\u79F0\u673A\u5668\u6821\u9A8C\u901A\u8FC7\u3002
 \u3010\u4FEE\u8BA2\u4E0E\u4EA4\u4ED8\u3011\u53EA\u4FEE\u6539\u6307\u5B9A\u8303\u56F4\uFF0C\u4FDD\u7559\u6EE1\u610F\u5185\u5BB9\u4E0E\u7A33\u5B9AID\uFF0C\u4E0A\u6E38\u53D8\u5316\u6807\u8BB0\u4E0B\u6E38\u5931\u6548\u3002\u81EA\u52A8\u4E1A\u52A1\u4FEE\u590D\u6700\u591A2\u8F6E\uFF0C\u4ECD\u5931\u8D25\u4EA4\u7528\u6237\u5904\u7406\uFF0C\u4E0D\u5047\u79F0\u7A0B\u5E8F\u5DF2\u5B9E\u73B0\u81EA\u52A8\u5FAA\u73AF\u3002\u5DF2\u6709\u6210\u679C\u4E0D\u5220\u9664\u3001\u4E0D\u81EA\u52A8\u4ED8\u8D39\u91CD\u505A\u3002\u53EA\u62A5\u544A\u5DE5\u5177\u5B9E\u9645\u8FD4\u56DE\u7684\u4FDD\u5B58\u3001\u5BA1\u6838\u548C\u751F\u6210\u72B6\u6001\uFF1B\u672A\u89C2\u770B/\u8BD5\u542C\u7684\u5A92\u4F53\u6807\u5F85\u4EBA\u5DE5\u9A8C\u6536\u3002`;
 var FILM_WORKFLOW_GUIDANCE = `\u3010\u4E13\u4E1A\u5206\u9636\u6BB5\u521B\u4F5C\u5DE5\u5177\u5951\u7EA6\u3011
+\u3010\u4F5C\u54C1\u7C7B\u578B\u914D\u7F6E\u3011\u5148\u533A\u5206\u4F5C\u54C1\u7C7B\u578Bwork_type\u3001\u89C6\u89C9\u98CE\u683Cvisual_style\u3001\u53D9\u4E8B\u65B9\u5F0Fnarrative_mode\u548C\u751F\u6210\u6A21\u5F0F\u3002work_type\u652F\u6301DRAMA\u5267\u60C5\u3001COMEDY\u559C\u5267\u3001LIFESTYLE\u751F\u6D3BVlog/\u6C1B\u56F4\u3001DOCUMENTARY\u7EAA\u5F55/\u77E5\u8BC6\u3001COMMERCIAL\u4EA7\u54C1\u5E7F\u544A\u3001PROMOTIONAL\u54C1\u724C/\u5730\u57DF\u5BA3\u4F20\u3002\u7528\u6237\u5DF2\u660E\u786E\u7C7B\u578B\u76F4\u63A5\u91C7\u7528\uFF1B\u4E0D\u660E\u786E\u65F6\u63A8\u8350\u4E00\u4E2A\u65B9\u5411\uFF0C\u4E0E\u73B0\u6709\u7F3A\u5931\u521B\u610F\u95EE\u9898\u5408\u5E76\u786E\u8BA4\uFF0C\u4E0D\u628A\u63A8\u65AD\u5192\u5145\u7528\u6237\u786E\u8BA4\u3002create\u7684projectSpec\u53EF\u4FDD\u5B58\u7C7B\u578B\u4E0E\u53D9\u4E8B\u65B9\u5F0F\uFF1Bnext/route\u52A8\u6001\u52A0\u8F7D\u914D\u7F6E\u53CA\u5404\u89D2\u8272\u89C4\u5219\u3002\u7C7B\u578B\u672A\u9009\u7684\u65B0\u9879\u76EE\u987B\u5728\u521B\u610F\u6279\u51C6\u524Dconfigure_profile(projectSpec\u4E3Awork_type\u53CA\u53EF\u9009narrative_mode\u7684JSON\u5B57\u7B26\u4E32,expectedRevision)\u3002\u4FEE\u6539\u5DF2\u6279\u51C6\u9879\u76EE\u7C7B\u578B\u4F1A\u4FDD\u7559\u5168\u90E8\u6750\u6599\u4F46\u6807\u5931\u6548\u5E76\u6E05\u9664\u539F\u6279\u51C6\uFF0C\u91CD\u65B0\u8D70\u521B\u610F/\u5267\u672C\u5BA1\u6279\uFF1B\u4E0D\u81EA\u52A8\u4ED8\u8D39\u91CD\u505A\u3002\u65E7\u9879\u76EE\u6CA1\u6709\u7C7B\u578B\u5B57\u6BB5\u65F6\u6CBF\u539F\u6D41\u7A0B\uFF0C\u4E0D\u5F3A\u5236\u8FC1\u79FB\u3002profile_revision\u7531\u7CFB\u7EDF\u7ED1\u5B9A\uFF0C\u672A\u77E5\u7248\u672C\u505C\u6B62\u800C\u975E\u9759\u9ED8\u6362\u7B56\u7565\u3002creative/script\u589E\u52A0\u914D\u7F6E\u8981\u6C42\u7684type_details\uFF0C\u7EC8\u5BA1\u589E\u52A0type_review\u5E76\u9010\u9879\u7ED9\u8BC1\u636E\uFF1B\u4E0D\u5F97\u628A\u672A\u68C0\u67E5\u5199\u6210\u901A\u8FC7\u3002
 \u5BF9\u8BDD\u4E2D\u65B0\u5199\u5B8C\u6574\u89C6\u9891\u811A\u672C\u3001\u91CD\u6784\u6545\u4E8B\u6216\u4E13\u4E1A\u5206\u9636\u6BB5\u521B\u4F5C\uFF0C\u76EE\u680715\u20133600\u79D2\u65F6\u4F18\u5148\u4F7F\u7528film_project\uFF0C\u4E0D\u7B49\u7528\u6237\u8BF4\u201C\u4E13\u4E1A\u6A21\u5F0F\u201D\u624D\u542F\u7528\u3002\u5148read/next\u7EED\u4F5C\uFF0C\u6309\u521B\u610F\u6279\u51C6\u2192\u7F16\u5267\u2192\u5267\u672C\u6279\u51C6\u2192\u8D44\u4EA7\u2192\u5206\u955C\u2192\u63D0\u793A\u8BCD\u2192\u5BA1\u6838\u63A8\u8FDB\u3002\u5DF2\u6709\u666E\u901Avideo_project\u7EE7\u7EED\u6CBF\u5176\u5DF2\u5BA1\u6838\u7248\u672C\u6539\u7A3F\uFF0C\u4E0D\u5F3A\u5236\u8FC1\u79FB\u6216\u4E22\u5931\u72B6\u6001\uFF1B4\u201314\u79D2\u53CA\u7528\u6237\u660E\u786E\u53EA\u9700\u5FEB\u901F\u8349\u6848\u65F6\u8D70\u539F\u6D41\u7A0B\uFF0C\u4ECD\u91C7\u7528\u76F8\u540C\u7F16\u5267\u65B9\u6CD5\u5E76\u6807\u8349\u6848\u3002\u5B9E\u9645\u89C6\u9891\u5236\u4F5C\u4ECD\u7528video_project\u3002\u65F6\u957F\u3001\u753B\u5E45\u3001\u6E05\u6670\u5EA6\u5DF2\u786E\u8BA4\u5219\u6CBF\u7528\uFF0C\u7F3A\u5931\u89C4\u683C\u6309\u73B0\u6709\u89C4\u5219\u5408\u5E76\u8BE2\u95EE\uFF0C\u4E0D\u628A\u5EFA\u8BAE\u5F53\u7528\u6237\u786E\u8BA4\u3002\u89C4\u5212\u4E0D\u81EA\u52A8\u8C03\u7528\u89C6\u9891\u3002
 \u5148create(title,sourceBrief\u539F\u6587,durationSeconds,projectSpec)\uFF0CprojectSpec\u4E3A\u5DF2\u77E5\u89C4\u683CJSON\uFF08aspect_ratio/resolution/language/visual_style/genre/target_audience/distribution_channel/target_model/hard_constraints/soft_preferences/references\uFF09\uFF0C\u672A\u6307\u5B9A\u5B57\u6BB5\u7559\u7A7A\uFF0C\u5DE5\u5177\u6807UNKNOWN\uFF0C\u4E0D\u5F97\u5192\u5145\u7528\u6237\u786E\u8BA4\uFF0C\u7EED\u4F5C\u6216\u6539\u7A3F\u5148read(projectId)\u3002\u4EE5\u5DE5\u5177\u8FD4\u56DE\u7684\u72B6\u6001\u548Crevision\u4E3A\u51C6\uFF0C\u4E0D\u5047\u8BBE\u5B58\u5728progress/manifest\u8BFB\u53D6\u3001\u56DE\u6EDA\u3001\u7AE0\u8282\u81EA\u52A8\u8C03\u5EA6\u6216\u72EC\u7ACB\u5B50Agent\u3002
 submit\u4F20stage\u3001content\uFF08\u5408\u6CD5JSON\u5B57\u7B26\u4E32\uFF09\u3001expectedRevision\uFF08\u6700\u8FD1\u8BFB\u53D6/\u63D0\u4EA4\u8FD4\u56DE\u7684\u9879\u76EErevision\uFF09\u3002JSON\u5B57\u7B26\u4E32\u91CC\u7684\u679A\u4E3E\u4E0E\u6587\u672C\u5FC5\u987B\u6709\u53CC\u5F15\u53F7\u3002\u6B63\u6587\u5148\u5C55\u793A\u53EF\u8BFB\u6210\u679C\uFF0C\u518D\u63D0\u4EA4\u5E76\u6838\u5BF9\u8FD4\u56DE\uFF1B\u5DE5\u5177\u6210\u529F\u624D\u79F0\u4FDD\u5B58\u3002
@@ -3648,14 +3921,14 @@ var filmDirectorBusiness = {
       parameters: { type: "object", properties: {
         intent: { type: "string", enum: [...INTENTS] },
         entityIds: { type: "array", items: { type: "string" } },
-        projectSpec: { type: "string", description: "create\u53EF\u9009\u9879\u76EE\u89C4\u683CJSON\uFF1Agenre/aspect_ratio/resolution/language/visual_style/target_audience/distribution_channel/target_model/hard_constraints/soft_preferences/references\uFF0C\u4FDD\u7559\u7528\u6237\u6307\u5B9A\u503C" },
+        projectSpec: { type: "string", description: "create\u53EF\u9009\u9879\u76EE\u89C4\u683CJSON\uFF1Awork_type\uFF08DRAMA/COMEDY/LIFESTYLE/DOCUMENTARY/COMMERCIAL/PROMOTIONAL\uFF09\u3001narrative_mode\uFF08FICTION/OBSERVATIONAL/EXPLANATORY/DEMONSTRATION/POETIC/MIXED\uFF09\u3001genre/aspect_ratio/resolution/language/visual_style/target_audience/distribution_channel/target_model/hard_constraints/soft_preferences/references\u3002configure_profile\u65F6\u4EC5\u4F20work_type\u548C\u53EF\u9009narrative_mode\uFF1B\u7C7B\u578B\u4E0D\u540C\u4E8E\u98CE\u683C\u548C\u751F\u6210\u6A21\u5F0F\uFF0C\u4E0D\u731C\u6D4B\u7528\u6237\u786E\u8BA4\u3002\u914D\u7F6E\u4FEE\u8BA2\u7531\u8FD0\u884C\u65F6\u56FA\u5B9A\u3002" },
         issueId: { type: "string" },
         taskKey: { type: "string" },
         taskStatus: { type: "string", enum: ["running", "completed", "failed"] },
         errorCode: { type: "string" },
         ratio: { type: "string", enum: ["16:9", "9:16"] },
         resolution: { type: "string", enum: ["480p", "720p"] },
-        action: { type: "string", enum: ["create", "read", "submit", "approve", "export", "next", "compile", "revise", "schedule", "task_result", "route", "verify_issue"] },
+        action: { type: "string", enum: ["create", "read", "submit", "approve", "export", "next", "compile", "revise", "schedule", "task_result", "route", "verify_issue", "configure_profile"] },
         projectId: { type: "string" },
         title: { type: "string" },
         sourceBrief: { type: "string" },
@@ -3701,10 +3974,11 @@ var filmDirectorBusiness = {
             }
           };
           const taskFor = () => ({ ...nextTask(state), execution_plan: executionContext() });
-          if (args.action === "read") return { ...state, nextTask: taskFor() };
+          if (args.action === "read") return { ...state, work_profile: profileContext(state), nextTask: taskFor() };
           if (args.action === "next") return taskFor();
           if (args.action === "route") return { ...routeIntent(state, args.intent, args.entityIds), execution_plan: executionContext() };
-          if (["revise", "schedule", "task_result", "verify_issue"].includes(args.action) && state.revision !== args.expectedRevision) throw Error("REVISION_CONFLICT");
+          if (["revise", "schedule", "task_result", "verify_issue", "configure_profile"].includes(args.action) && state.revision !== args.expectedRevision) throw Error("REVISION_CONFLICT");
+          if (args.action === "configure_profile") state = configureProfile(state, JSON.parse(args.projectSpec), args.expectedRevision);
           if (args.action === "revise") state = reviseEntities(state, args.stage, JSON.parse(args.content), args.expectedRevision);
           if (args.action === "schedule") scheduleTask(state, taskFor());
           if (args.action === "verify_issue") verifyIssue(state, args.issueId, JSON.parse(args.content));
@@ -3726,6 +4000,7 @@ var filmDirectorBusiness = {
           if (args.action === "approve") {
             const artifact = state.artifacts[args.stage];
             if (!["creative", "script"].includes(args.stage) || !artifact || artifact.stale || state.revision !== args.expectedRevision) throw Error("INVALID_APPROVAL_REVISION");
+            if (args.stage === "creative" && state.project_spec && Object.hasOwn(state.project_spec, "work_type") && !state.project_spec.work_type) throw Error("WORK_TYPE_REQUIRED_BEFORE_APPROVAL");
             const service = runtime.ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
             if (!service?.ask) return { status: "needs_input", reason: "\u4EBA\u5DE5\u786E\u8BA4\u670D\u52A1\u4E0D\u53EF\u7528" };
             const answer = await service.ask({ agent: exec.agent, signal: exec.signal, questions: [{ id: "film_approval", header: "\u521B\u4F5C\u5BA1\u6838", question: `\u5BA1\u6838${args.stage} revision ${artifact.revision}\uFF1A
@@ -3735,7 +4010,7 @@ ${JSON.stringify(artifact.data)}
             if (exec.signal?.aborted || decision?.custom || decision?.selected?.length !== 1 || !["\u6279\u51C6\u672C\u7248", "\u9700\u8981\u4FEE\u6539", "\u62D2\u7EDD\u5F53\u524D\u65B9\u6848"].includes(decision.selected[0])) return { status: "needs_input", projectId: id };
             state = recordApprovalDecision(state, args.stage, { "\u6279\u51C6\u672C\u7248": "APPROVED", "\u9700\u8981\u4FEE\u6539": "REVISE", "\u62D2\u7EDD\u5F53\u524D\u65B9\u6848": "REJECTED" }[decision.selected[0]], args.expectedRevision);
           }
-          if (!["create", "submit", "approve", "compile", "revise", "schedule", "task_result", "verify_issue"].includes(args.action)) throw Error("INVALID_ACTION");
+          if (!["create", "submit", "approve", "compile", "revise", "schedule", "task_result", "verify_issue", "configure_profile"].includes(args.action)) throw Error("INVALID_ACTION");
           await mkdir6(path9.join(dir, "snapshots"), { recursive: true, mode: 448 });
           const body = JSON.stringify(state, null, 2);
           await writeFile4(path9.join(dir, "snapshots", `${state.revision}-${randomUUID3()}.json`), body, { mode: 384, flag: "wx" });
@@ -8404,6 +8679,7 @@ function scriptPrompt(brief2) {
   const seconds = Math.min(total, MAX_TOTAL_SECONDS);
   return [
     CREATIVE_GUIDANCE,
+    writingProfileInstructions(brief2?.work_type),
     "\u4F60\u8D1F\u8D23\u628A\u60F3\u6CD5\u53D1\u5C55\u6210\u5B8C\u6574\u6545\u4E8B\u4E0E\u573A\u666F\u5267\u672C\uFF0C\u518D\u6574\u7406\u4E3A\u53EF\u6267\u884C\u7684\u5236\u4F5C\u5206\u955C\uFF08Markdown\uFF09\u3002\u5148\u8BB2\u6E05\u53D1\u751F\u7684\u4E8B\uFF0C\u6444\u5F71\u8BBE\u8BA1\u670D\u52A1\u5DF2\u7ECF\u6210\u7ACB\u7684\u5185\u5BB9\u3002",
     "",
     `\u3010\u60F3\u6CD5\u3011${idea}`,
@@ -9629,6 +9905,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       }
     }
     if (args.action === "write") {
+      if (args.workType) profileRevision(args.workType);
       const config = snapshotConfig(liveConfig);
       const singleMax = modelMaxSeconds(config);
       const totalSeconds = clampInteger(args.totalSeconds, MIN_SECONDS, MAX_TOTAL_SECONDS, Math.min(15, singleMax));
@@ -9642,7 +9919,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       try {
         result = await writer(
           config,
-          { idea: args.idea, totalSeconds, segmentSeconds, segments: count, ratio: args.ratio || "16:9" },
+          { idea: args.idea, totalSeconds, segmentSeconds, segments: count, ratio: args.ratio || "16:9", ...args.workType ? { work_type: args.workType } : {} },
           { onProgress: (progress) => {
             const at = Date.now();
             if (at - last < 1e4) return;

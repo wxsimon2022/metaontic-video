@@ -41,3 +41,13 @@ next/route每次携带original_idea、target_duration_ms、project_spec、approv
 compile禁止在生成段边界截断完整镜头与台词，同一生成段不能混合不受支持的多地点组合；遇SHOT_SPLIT_REQUIRES_STORYBOARD_REVISION或MULTI_LOCATION_SEGMENT_REQUIRES_REPLAN，返回Storyboard按execution_plan重新规划，再更新提示词与审核。不得绕过错误重新复制整段台词。独立镜头执行器未接入，不承诺任意分镜自动转成任意模型请求。
 
 项目规格已锁定的画幅、清晰度和目标模型必须与制作一致。写入使用跨进程文件锁；PROJECT_LOCKED表示其他进程或中断写入需检查，不能按超时盲删锁或清空项目。只有确认持有进程已停止且没有活动任务，才能进行人工恢复。
+
+## 作品类型配置
+
+work_type与visual_style（视觉风格）、narrative_mode（叙事方式）、generation_mode（生成方式）独立。类型为DRAMA剧情、COMEDY喜剧、LIFESTYLE生活Vlog/氛围、DOCUMENTARY纪录/知识、COMMERCIAL产品广告、PROMOTIONAL品牌/地域宣传。用户已明确就采用；未明确推荐一个方向，合并到创意确认，不把推断当批准。create的projectSpec可带work_type与narrative_mode；配置修订由系统绑定，next/route返回work_profile及当前职责的类型规则。新项目在创意批准前须明确类型；旧项目缺少该字段时沿原流程，不强制迁移。
+
+修改类型用configure_profile，projectSpec为仅含work_type与可选narrative_mode的JSON字符串，expectedRevision来自最新状态。修改保留原材料并将全部标为stale、清除原创意/剧本批准、使制作绑定过期；先按新类型重写创意再走审批，不能继续用旧版制作。类型未变化时不无故重写。
+
+creative/script按角色指令增加type_details对象，填写当前配置所列字段的具体非空文本，不复述规则。六类侧重点分别是选择与后果、铺垫与回收、观察与感官节奏、证据来源与事实边界、卖点依据与使用过程、辨识细节与情绪载体。纪录和广告证据缺失标待核实，不编造。
+
+终审增加type_review（work_type、profile_revision、checks）；每个criterion_id匹配work_profile.profile.review_criteria，给status与evidence。status为PASS、CONCERN或NOT_EVALUATED；CONCERN另带issue_id关联已有问题，艺术建议不伪装客观错误；未评估项不能通过终审。共同的版本、时长、引用、对白、用户硬约束仍须检查，不因类型放宽。类型规则不会保证实际生成质量，不自动调用视频。

@@ -1,4 +1,5 @@
 import { CREATIVE_GUIDANCE } from '../../film-director/creative.js';
+import { writingProfileInstructions } from '../../film-director/profiles/index.js';
 /** providers/text：写脚本用的文本模型。走与视频同一个中转站的 OpenAI 兼容 /v1/chat/completions，
  *  同一把 API密钥；只负责把一段想法写成剧本与分镜表，不参与视频/图片生成，也不代替分镜解析。 */
 import { assertConfigured, resolveApiKey, resolveBaseUrl, resolveTextModel, textConfig } from './connection.js';
@@ -38,6 +39,7 @@ export function scriptPrompt(brief: any) {
   const seconds = Math.min(total, MAX_TOTAL_SECONDS);
   return [
     CREATIVE_GUIDANCE,
+    writingProfileInstructions(brief?.work_type),
     '你负责把想法发展成完整故事与场景剧本，再整理为可执行的制作分镜（Markdown）。先讲清发生的事，摄影设计服务已经成立的内容。',
     '',
     `【想法】${idea}`,

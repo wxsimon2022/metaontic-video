@@ -4,7 +4,7 @@ import { STAGES } from './project.js';
 export function artifactManifest(state: any) {
   return STAGES.filter(s=>state.artifacts[s]).map(stage=>{
     const artifact=state.artifacts[stage];
-    return {stage,artifact_ref:`project.json#/artifacts/${stage}`,revision:artifact.revision,source_revisions:artifact.source_revisions || {},stale:artifact.stale,sha256:createHash('sha256').update(JSON.stringify(artifact.data)).digest('hex')};
+    return {stage,artifact_ref:`project.json#/artifacts/${stage}`,revision:artifact.revision,source_revisions:artifact.source_revisions || {},...(artifact.profile_ref?{profile_ref:artifact.profile_ref}:{}),stale:artifact.stale,sha256:createHash('sha256').update(JSON.stringify(artifact.data)).digest('hex')};
   });
 }
 function printable(value: any): string {

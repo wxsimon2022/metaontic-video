@@ -1,6 +1,7 @@
 import { sourceRevisions, GENERIC_MODEL_PROFILE, STAGE_DEPS, projectContext, modelProfile } from './contracts.js';
 import { evaluateReview } from './review.js';
-import { ROLE_PROMPTS } from './roles/index.js';
+import { roleInstructions } from './roles/index.js';
+import { profileContext } from './profiles/index.js';
 import { STAGES, validateArtifact } from './project.js';
 /** 程序选择下一许可动作；角色仅读取直接依赖，不重复加载全项目。 */
 export function nextTask(state: any) {
@@ -10,12 +11,16 @@ export function nextTask(state: any) {
     if (!artifact || artifact.stale || state.status===`${stage.toUpperCase()}_REVISE`) {
       const roles = {creative:'creative',script:'screenwriter',assets:'character + scene',shots:'storyboard',prompts:'prompt-engineer',review:'reviewer'};
       const dependencies = STAGE_DEPS;
-      return { action:'submit', ...projectContext(state), input_revisions:sourceRevisions(state,stage), revision_scope:artifact?.stale_entity_ids || [], model_profile:modelProfile(state), stage, role:roles[stage], inputs:Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]])), instructions:ROLE_INSTRUCTIONS[stage],expectedRevision:state.revision };
+      const roleIds={creative:['creative'],script:['screenwriter'],assets:['character','scene'],shots:['storyboard'],prompts:['prompt-engineer'],review:['reviewer']};
+      return { action:'submit', ...projectContext(state), work_profile:profileContext(state), input_revisions:sourceRevisions(state,stage), revision_scope:artifact?.stale_entity_ids || [], model_profile:modelProfile(state), stage, role:roles[stage], inputs:Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]])), instructions:roleIds[stage].map(role=>roleInstructions(state,role)).join('\n\n'),expectedRevision:state.revision };
     }
-    if (['creative','script'].includes(stage) && state.approvals[stage] !== artifact.revision) return {action:'approve',stage,expectedRevision:state.revision};
+    if (['creative','script'].includes(stage) && state.approvals[stage] !== artifact.revision) {
+      if(stage==='creative'&&profileContext(state).status==='UNSELECTED')return {action:'configure_profile',role:'director',...projectContext(state),work_profile:profileContext(state),expectedRevision:state.revision,instructions:'创意批准前确认作品类型，用configure_profile保存选择；保存会使当前草稿失效，需按类型更新后重新提交。不得把未回答当作同意。'};
+      return {action:'approve',stage,work_profile:profileContext(state),expectedRevision:state.revision};
+    }
   }
   const report=state.artifacts.review.data;
-  if(report.review_status && !evaluateReview(report).passed && Object.values(state.issue_registry || {}).some((i:any)=>i.status==='RESOLVED')) return {action:'recheck',role:'reviewer',stage:'review',...projectContext(state),issues:Object.values(state.issue_registry).filter((i:any)=>i.status==='RESOLVED'),input_revisions:sourceRevisions(state,'review'),review_revision:state.artifacts.review.revision,expectedRevision:state.revision,instructions:'逐项按recheck_criteria对照当前版本实际复审；通过后调用verify_issue登记证据，不通过返回责任角色。登记后重新提交完整最终审核报告，禁止仅靠自称VERIFIED。'};
+  if(report.review_status && !evaluateReview(report).passed && Object.values(state.issue_registry || {}).some((i:any)=>i.status==='RESOLVED')) return {action:'recheck',role:'reviewer',stage:'review',...projectContext(state),work_profile:profileContext(state),issues:Object.values(state.issue_registry).filter((i:any)=>i.status==='RESOLVED'),input_revisions:sourceRevisions(state,'review'),review_revision:state.artifacts.review.revision,expectedRevision:state.revision,instructions:roleInstructions(state,'reviewer')+'\n逐项按recheck_criteria对照当前版本实际复审；通过后调用verify_issue登记证据，不通过返回责任角色。登记后重新提交完整最终审核报告，禁止仅靠自称VERIFIED。'};
   if(report.review_status && !evaluateReview(report).passed) return {action:'repair',stage:'review',role:'director',issues:report.issues,expectedRevision:state.revision};
   return {action:'compile',...projectContext(state),expectedRevision:state.revision};
 }
@@ -51,9 +56,3 @@ export function compileProduction(state: any, plan: any[], ratio: string, resolu
   if (start!==state.duration_ms || segments.some(s=>!s.prompt)) throw Error('PRODUCTION_DURATION_MISMATCH');
   return {source_project_id:state.project_id,source_revision:state.revision,ratio,resolution,segments,specification:{prompt:segments[0].prompt,segmentPrompts:segments.map(s=>s.prompt),duration:state.duration_ms/1000,ratio,resolution}};
 }
-
-const ROLE_INSTRUCTIONS = {
- creative:ROLE_PROMPTS.creative,script:ROLE_PROMPTS.screenwriter,
- assets:ROLE_PROMPTS.character+'\n\n'+ROLE_PROMPTS.scene,
- shots:ROLE_PROMPTS.storyboard,prompts:ROLE_PROMPTS['prompt-engineer'],review:ROLE_PROMPTS.reviewer,
-};

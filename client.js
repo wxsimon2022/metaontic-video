@@ -2874,7 +2874,7 @@
     return `${prefix}_stage_${key}`;
   }
   var REQUIREMENT_MARK = "metaonticRequirement";
-  function requirementNodeData(brief, seconds, segmentSeconds, ratio, resolution) {
+  function requirementNodeData(brief, seconds, segmentSeconds, ratio, resolution, workType) {
     const text = [
       `\u60F3\u62CD\u4EC0\u4E48\uFF1A${brief}`,
       `\u76EE\u6807\u603B\u65F6\u957F\uFF1A${seconds} \u79D2`,
@@ -2888,7 +2888,7 @@
       status: "done",
       [REQUIREMENT_MARK]: true,
       metaonticRequirementBrief: brief,
-      metaonticRequirementSpec: { seconds, segmentSeconds, ratio, resolution }
+      metaonticRequirementSpec: { seconds, segmentSeconds, ratio, resolution, ...workType ? { work_type: workType } : {} }
     };
   }
   function requirementNodeOf(doc) {
@@ -3116,6 +3116,199 @@
       changed.push(id);
     }
     return { nodes, changed };
+  }
+
+  // src/businesses/film-director/profiles/drama.ts
+  var drama_default = {
+    "id": "DRAMA",
+    "revision": "1",
+    "label": "\u5267\u60C5\u77ED\u7247",
+    "strategy": "\u4EBA\u7269\u76EE\u6807\u2192\u963B\u788D\u2192\u9009\u62E9\u2192\u53EF\u89C1\u540E\u679C",
+    "boundary": "\u5141\u8BB8\u514B\u5236\u7684\u65E5\u5E38\u77DB\u76FE\uFF0C\u4E0D\u673A\u68B0\u6DFB\u52A0\u60B2\u60C5\u6216\u53CD\u8F6C\u3002",
+    "creative_fields": {
+      "character_goal": "\u4EBA\u7269\u6B64\u523B\u7684\u5177\u4F53\u76EE\u6807",
+      "choice_and_consequence": "\u5173\u952E\u9009\u62E9\u4E0E\u540E\u679C"
+    },
+    "script_fields": {
+      "causal_progression": "\u4E8B\u4EF6\u4E4B\u95F4\u7684\u56E0\u679C\u63A8\u8FDB",
+      "character_change": "\u4EBA\u7269\u6216\u5173\u7CFB\u7684\u53D8\u5316"
+    },
+    "review_criteria": [
+      {
+        "id": "drama_1",
+        "description": "\u52A8\u673A\u662F\u5426\u7531\u884C\u52A8\u4F53\u73B0"
+      },
+      {
+        "id": "drama_2",
+        "description": "\u9009\u62E9\u548C\u7ED3\u679C\u662F\u5426\u6709\u56E0\u679C\u4F9D\u636E"
+      }
+    ],
+    "role_rules": {
+      "screenwriter": "\u56F4\u7ED5\u4EBA\u7269\u9009\u62E9\u5199\u573A\u666F\uFF0C\u914D\u89D2\u6709\u81EA\u8EAB\u7406\u7531\uFF0C\u4E0D\u7528\u673A\u68B0\u8BEF\u4F1A\u5236\u9020\u963B\u788D\u3002",
+      "storyboard": "\u8BA9\u89C2\u4F17\u770B\u6E05\u9009\u62E9\u53D1\u751F\u7684\u77AC\u95F4\u4E0E\u540E\u679C\uFF0C\u53CD\u5E94\u955C\u5934\u627F\u62C5\u5173\u7CFB\u53D8\u5316\u3002"
+    }
+  };
+
+  // src/businesses/film-director/profiles/comedy.ts
+  var comedy_default = {
+    "id": "COMEDY",
+    "revision": "1",
+    "label": "\u60C5\u666F\u559C\u5267",
+    "strategy": "\u9884\u671F\u2192\u5347\u7EA7\u2192\u53CD\u5DEE\u2192\u56DE\u6536",
+    "boundary": "\u7B11\u70B9\u6765\u81EA\u4EBA\u7269\u4E0E\u60C5\u5883\uFF0C\u4E0D\u4F9D\u8D56\u523B\u677F\u5370\u8C61\u3001\u5938\u5F20\u8868\u60C5\u6216\u97F3\u6548\u3002",
+    "creative_fields": {
+      "comic_premise": "\u89C2\u4F17\u9884\u671F\u4E0E\u559C\u5267\u524D\u63D0",
+      "payoff": "\u53CD\u5DEE\u843D\u70B9\u4E0E\u56DE\u6536"
+    },
+    "script_fields": {
+      "setup_payoff": "\u94FA\u57AB\u4E0E\u7B11\u70B9\u7684\u5BF9\u5E94",
+      "reaction_budget": "\u7B11\u70B9\u524D\u540E\u53CD\u5E94\u4E0E\u505C\u987F\u7684\u65F6\u95F4\u5B89\u6392"
+    },
+    "review_criteria": [
+      {
+        "id": "comedy_1",
+        "description": "\u7B11\u70B9\u662F\u5426\u6709\u53EF\u8FA8\u8BC6\u7684\u94FA\u57AB"
+      },
+      {
+        "id": "comedy_2",
+        "description": "\u53CD\u5DEE\u662F\u5426\u7531\u4EBA\u7269\u884C\u4E3A\u5F15\u53D1\u4E14\u6709\u53CD\u5E94\u65F6\u95F4"
+      }
+    ],
+    "role_rules": {
+      "screenwriter": "\u5148\u8BA9\u9884\u671F\u6210\u7ACB\u518D\u504F\u79BB\uFF0C\u907F\u514D\u89D2\u8272\u4E3A\u7B11\u8BDD\u7A81\u7136\u5931\u53BB\u5E38\u8BC6\u3002",
+      "storyboard": "\u5173\u952E\u7B11\u70B9\u4FE1\u606F\u4E0D\u53EF\u88AB\u8FD0\u955C\u906E\u4F4F\uFF0C\u7ED9\u89C2\u4F17\u8BFB\u61C2\u53CD\u5DEE\u548C\u4EBA\u7269\u53CD\u5E94\u7684\u65F6\u95F4\u3002"
+    }
+  };
+
+  // src/businesses/film-director/profiles/lifestyle.ts
+  var lifestyle_default = {
+    "id": "LIFESTYLE",
+    "revision": "1",
+    "label": "\u751F\u6D3BVlog\uFF0F\u6C1B\u56F4\u7247",
+    "strategy": "\u4F53\u9A8C\u8D77\u70B9\u2192\u7EC6\u8282\u53D1\u73B0\u2192\u611F\u53D7\u53D8\u5316",
+    "boundary": "\u53EF\u4EE5\u65E0\u51B2\u7A81\u3001\u65E0\u5BF9\u767D\u3001\u65E0\u4EBA\u50CF\uFF1B\u751F\u6D3B\u8D28\u611F\u4E0E\u89C2\u5BDF\u987A\u5E8F\u6210\u7ACB\u5373\u53EF\uFF0C\u4E0D\u5F3A\u9020\u620F\u5267\u3002",
+    "creative_fields": {
+      "experience_line": "\u672C\u7247\u4F53\u9A8C\u6216\u89C2\u5BDF\u4E3B\u7EBF",
+      "detail_discovery": "\u503C\u5F97\u89C2\u770B\u7684\u5177\u4F53\u7EC6\u8282\u53D1\u73B0"
+    },
+    "script_fields": {
+      "observation_progression": "\u7EC6\u8282\u5982\u4F55\u9010\u6B65\u88AB\u53D1\u73B0",
+      "sensory_rhythm": "\u751F\u6D3B\u52A8\u4F5C\u3001\u73AF\u5883\u58F0\u53CA\u7559\u767D\u7684\u8282\u594F"
+    },
+    "review_criteria": [
+      {
+        "id": "lifestyle_1",
+        "description": "\u89C2\u5BDF\u662F\u5426\u6709\u63A8\u8FDB\u800C\u975E\u91CD\u590D\u98CE\u666F"
+      },
+      {
+        "id": "lifestyle_2",
+        "description": "\u751F\u6D3B\u52A8\u4F5C\u548C\u58F0\u97F3\u662F\u5426\u53EF\u4FE1\u4E14\u7B26\u5408\u7528\u6237\u6C1B\u56F4"
+      }
+    ],
+    "role_rules": {
+      "screenwriter": "\u4EE5\u751F\u6D3B\u52A8\u4F5C\u548C\u611F\u5B98\u53D1\u73B0\u7EC4\u7EC7\u5185\u5BB9\uFF0C\u5141\u8BB8\u7559\u767D\uFF0C\u4E0D\u865A\u6784\u82E6\u96BE\u6216\u786C\u52A0\u53CD\u8F6C\u3002",
+      "storyboard": "\u6784\u56FE\u8BA9\u89C2\u4F17\u53D1\u73B0\u7EC6\u8282\uFF0C\u7A7A\u95F4\u5149\u7EBF\u4E0E\u73AF\u5883\u58F0\u97F3\u53C2\u4E0E\u53D9\u4E8B\uFF0C\u56FA\u5B9A\u673A\u4F4D\u53EF\u4EE5\u6210\u7ACB\u3002"
+    }
+  };
+
+  // src/businesses/film-director/profiles/documentary.ts
+  var documentary_default = {
+    "id": "DOCUMENTARY",
+    "revision": "1",
+    "label": "\u7EAA\u5F55\uFF0F\u77E5\u8BC6\u7247",
+    "strategy": "\u6838\u5FC3\u95EE\u9898\u2192\u8BC1\u636E\u4E0E\u4F8B\u5B50\u2192\u89E3\u91CA\u2192\u56DE\u5E94",
+    "boundary": "\u533A\u5206\u5DF2\u6838\u5B9E\u4E8B\u5B9E\u3001\u7528\u6237\u6750\u6599\u3001\u5F85\u6838\u5B9E\u5185\u5BB9\u4E0E\u620F\u5267\u5316\u91CD\u73B0\uFF1B\u4E0D\u7F16\u9020\u91C7\u8BBF\u548C\u771F\u5B9E\u7ECF\u5386\u3002",
+    "creative_fields": {
+      "central_question": "\u8981\u56DE\u5E94\u7684\u5177\u4F53\u95EE\u9898",
+      "evidence_plan": "\u5DF2\u6709\u6765\u6E90\u4E0E\u5F85\u8865\u8BC1\u636E\u8BA1\u5212"
+    },
+    "script_fields": {
+      "evidence_sources": "\u8BBA\u636E\u4E0E\u5BF9\u5E94\u6765\u6E90\uFF0C\u7F3A\u5931\u6807\u5F85\u6838\u5B9E",
+      "fact_fiction_boundary": "\u4E8B\u5B9E\u3001\u89E3\u91CA\u548C\u91CD\u73B0\u7684\u8FB9\u754C"
+    },
+    "review_criteria": [
+      {
+        "id": "documentary_1",
+        "description": "\u5173\u952E\u9648\u8FF0\u662F\u5426\u6709\u6765\u6E90\u6216\u660E\u786E\u5F85\u6838\u5B9E"
+      },
+      {
+        "id": "documentary_2",
+        "description": "\u4E8B\u5B9E\u4E0E\u865A\u6784\u91CD\u73B0\u662F\u5426\u6E05\u695A\u533A\u5206"
+      }
+    ],
+    "role_rules": {
+      "screenwriter": "\u7528\u53EF\u6838\u5B9E\u6750\u6599\u652F\u6491\u8BF4\u660E\uFF0C\u4E0D\u4E3A\u5236\u9020\u51B2\u7A81\u7F16\u9020\u771F\u5B9E\u4EBA\u7269\u5FC3\u7406\u3002",
+      "storyboard": "\u8BC1\u636E\u753B\u9762\u4E0E\u89E3\u91CA\u5BF9\u5E94\uFF0C\u91CD\u73B0\u987B\u660E\u786E\u6807\u8BC6\uFF0C\u753B\u9762\u4E0D\u80FD\u6697\u793A\u672A\u7ECF\u8BC1\u5B9E\u7684\u56E0\u679C\u3002"
+    }
+  };
+
+  // src/businesses/film-director/profiles/commercial.ts
+  var commercial_default = {
+    "id": "COMMERCIAL",
+    "revision": "1",
+    "label": "\u4EA7\u54C1\u5E7F\u544A",
+    "strategy": "\u9700\u6C42\u2192\u4F7F\u7528\u8FC7\u7A0B\u2192\u4EF7\u503C\u8BC1\u636E\u2192\u884C\u52A8",
+    "boundary": "\u4EA7\u54C1\u5916\u89C2\u3001\u529F\u6548\u3001\u6570\u636E\u4E0E\u8BA4\u8BC1\u987B\u6709\u4F9D\u636E\uFF0C\u4E0D\u901A\u8FC7\u753B\u9762\u6697\u793A\u672A\u8BC1\u5B9E\u6548\u679C\u3002",
+    "creative_fields": {
+      "user_need": "\u5177\u4F53\u7528\u6237\u9700\u6C42",
+      "supported_benefit": "\u6709\u8D44\u6599\u652F\u6301\u7684\u4EA7\u54C1\u5229\u76CA"
+    },
+    "script_fields": {
+      "claims_and_evidence": "\u5356\u70B9\u53CA\u5BF9\u5E94\u4F9D\u636E\uFF0C\u7F3A\u5931\u6807\u5F85\u6838\u5B9E",
+      "usage_and_action": "\u53EF\u89C2\u5BDF\u4F7F\u7528\u8FC7\u7A0B\u4E0E\u884C\u52A8\u5F15\u5BFC"
+    },
+    "review_criteria": [
+      {
+        "id": "commercial_1",
+        "description": "\u5356\u70B9\u662F\u5426\u7531\u6750\u6599\u652F\u6301"
+      },
+      {
+        "id": "commercial_2",
+        "description": "\u4F7F\u7528\u8FC7\u7A0B\u662F\u5426\u6E05\u695A\u4E14\u4EA7\u54C1\u8EAB\u4EFD\u51C6\u786E"
+      }
+    ],
+    "role_rules": {
+      "screenwriter": "\u5C55\u793A\u771F\u5B9E\u9700\u6C42\u4E0E\u4F7F\u7528\u8FC7\u7A0B\uFF0C\u907F\u514D\u5806\u5356\u70B9\u53CA\u65E0\u4F9D\u636E\u524D\u540E\u6548\u679C\u3002",
+      "storyboard": "\u5173\u952E\u4EA7\u54C1\u7EC6\u8282\u548C\u4F7F\u7528\u6B65\u9AA4\u6E05\u695A\u53EF\u89C1\uFF0C\u54C1\u724C\u6587\u5B57\u4E0ELogo\u4F9D\u8D56\u6388\u6743\u7D20\u6750\u53CA\u540E\u671F\u80FD\u529B\u3002"
+    }
+  };
+
+  // src/businesses/film-director/profiles/promotional.ts
+  var promotional_default = {
+    "id": "PROMOTIONAL",
+    "revision": "1",
+    "label": "\u54C1\u724C\uFF0F\u5730\u57DF\u5BA3\u4F20",
+    "strategy": "\u8BC6\u522B\u7279\u5F81\u2192\u5177\u4F53\u751F\u6D3B\u2192\u4EBA\u7269\u6216\u89C2\u5BDF\u5BF9\u8C61\u2192\u60C5\u7EEA\u843D\u70B9",
+    "boundary": "\u5730\u57DF\u548C\u54C1\u724C\u7279\u5F81\u5177\u4F53\u53EF\u4FE1\uFF0C\u4E0D\u7528\u7A7A\u6CDB\u8D5E\u7F8E\u66FF\u4EE3\u5185\u5BB9\uFF1B\u4E0D\u5F3A\u5236\u589E\u52A0\u4EBA\u7269\u3002",
+    "creative_fields": {
+      "recognizable_identity": "\u54C1\u724C\u6216\u5730\u57DF\u7684\u53EF\u8FA8\u8BC6\u7279\u5F81",
+      "emotional_anchor": "\u60C5\u7EEA\u843D\u70B9\u53CA\u5176\u5177\u4F53\u8F7D\u4F53"
+    },
+    "script_fields": {
+      "distinctive_details": "\u5177\u6709\u8FA8\u8BC6\u5EA6\u7684\u751F\u6D3B\u6216\u54C1\u724C\u7EC6\u8282",
+      "identity_progression": "\u7EC6\u8282\u5982\u4F55\u5171\u540C\u5448\u73B0\u4E3B\u9898"
+    },
+    "review_criteria": [
+      {
+        "id": "promotional_1",
+        "description": "\u753B\u9762\u662F\u5426\u5177\u6709\u5F53\u5730\u6216\u54C1\u724C\u8FA8\u8BC6\u5EA6"
+      },
+      {
+        "id": "promotional_2",
+        "description": "\u60C5\u7EEA\u662F\u5426\u7531\u5177\u4F53\u7EC6\u8282\u800C\u975E\u53E3\u53F7\u652F\u6491"
+      }
+    ],
+    "role_rules": {
+      "screenwriter": "\u628A\u8EAB\u4EFD\u7279\u5F81\u843D\u5728\u5177\u4F53\u4F7F\u7528\u6216\u751F\u6D3B\u7EC6\u8282\uFF0C\u771F\u5B9E\u5730\u70B9\u8D44\u6599\u4E0D\u8DB3\u6807\u5F85\u6838\u5B9E\u3002",
+      "storyboard": "\u7A7A\u95F4\u3001\u4EBA\u7269\u6216\u7269\u4EF6\u5173\u7CFB\u4F53\u73B0\u5730\u57DF\u54C1\u724C\u7279\u5F81\uFF0C\u4E0D\u7528\u901A\u7528\u822A\u62CD\u548C\u7D20\u6750\u5806\u780C\u66FF\u4EE3\u3002"
+    }
+  };
+
+  // src/businesses/film-director/profiles/index.ts
+  var REGISTRY = Object.fromEntries([drama_default, comedy_default, lifestyle_default, documentary_default, commercial_default, promotional_default].map((p) => [p.id, p]));
+  var WORK_TYPES = Object.keys(REGISTRY);
+  function availableProfiles() {
+    return Object.values(REGISTRY).map((p) => ({ work_type: p.id, label: p.label, profile_revision: p.revision, strategy: p.strategy }));
   }
 
   // src/businesses/video/client/canvas-view.ts
@@ -3726,6 +3919,7 @@
           singleMax: 15,
           ratio: spec.ratio || "16:9",
           resolution: spec.resolution || "720p",
+          workType: spec.work_type || "",
           busy: false,
           error: "",
           plan: null
@@ -3758,6 +3952,7 @@
           singleMax: 15,
           ratio: spec.ratio || "16:9",
           resolution: spec.resolution || "720p",
+          workType: spec.work_type || "",
           busy: false,
           error: "",
           plan: null
@@ -3790,7 +3985,8 @@
             idea,
             totalSeconds: scriptDialog.totalSeconds,
             segmentSeconds: scriptDialog.segmentSeconds,
-            ratio: scriptDialog.ratio
+            ratio: scriptDialog.ratio,
+            workType: scriptDialog.workType
           }, fetch, TEXT_WRITE_TIMEOUT_MS);
           if (!alive.current) return;
           patchScriptDialog({
@@ -3853,7 +4049,7 @@
             y: Number(existing?.y ?? baseY),
             w: 420,
             h: 260,
-            data: requirementNodeData(brief, seconds, segmentSeconds, ratio, resolution)
+            data: requirementNodeData(brief, seconds, segmentSeconds, ratio, resolution, scriptDialog.workType)
           });
           const facts = {
             requirementSettled: true,
@@ -3948,7 +4144,7 @@
               y: baseY,
               w: 420,
               h: 260,
-              data: requirementNodeData(brief, Number(scriptDialog.totalSeconds) || 15, Number(scriptDialog.segmentSeconds) || 15, ratio, resolution)
+              data: requirementNodeData(brief, Number(scriptDialog.totalSeconds) || 15, Number(scriptDialog.segmentSeconds) || 15, ratio, resolution, scriptDialog.workType)
             });
           }
           const facts = {
@@ -4936,6 +5132,7 @@
               placeholder: "\u4E00\u53E5\u8BDD\u5C31\u591F\uFF0C\u4F8B\u5982\uFF1A\u9752\u65C5\u5929\u53F0\u7684\u6E05\u6668\uFF0C\u4E00\u4E2A\u4EBA\u62D6\u7740\u884C\u674E\u4F4F\u8FDB\u57CE\u5E02\u3002",
               onChange: (e) => patchScriptDialog({ idea: e.target.value, error: "" })
             })]),
+            h("label", { key: "work-type", className: "movc-field" }, ["\u4F5C\u54C1\u7C7B\u578B", h("select", { value: scriptDialog.workType || "", onChange: (e) => patchScriptDialog({ workType: e.target.value }) }, [h("option", { key: "unspecified", value: "" }, "\u672A\u6307\u5B9A\uFF0C\u4FDD\u7559\u539F\u610F"), ...availableProfiles().map((p) => h("option", { key: p.work_type, value: p.work_type }, p.label))])]),
             h("div", { key: "spec", className: "movc-row" }, [
               h("label", { key: "total", className: "movc-field" }, ["\u76EE\u6807\u603B\u65F6\u957F\uFF08\u79D2\uFF09", h("input", { type: "number", min: 4, max: 3600, value: scriptDialog.totalSeconds, onChange: (e) => patchScriptDialog({ totalSeconds: e.target.value }) })]),
               h("label", { key: "segment", className: "movc-field" }, ["\u6BCF\u6BB5\u65F6\u957F\uFF08\u79D2\uFF09", h("input", { type: "number", min: 4, max: scriptDialog.singleMax || 15, value: scriptDialog.segmentSeconds, onChange: (e) => patchScriptDialog({ segmentSeconds: e.target.value }) })])

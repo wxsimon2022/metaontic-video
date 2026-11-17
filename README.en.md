@@ -81,3 +81,7 @@ Professional script work proceeds through concept, screenplay, assets, storyboar
 API connection validation is available below version updates in plugin settings. Save first, then check authentication responses and model listings for video, image and text. This read-only check does not submit generation tasks or verify actual generation results.
 
 Scripts clarify attention, reaction and physical feedback at key beats, and place complete lines and readable action endpoints at generation boundaries. Continuation uses the actual previous result; single and final segments retain their intended ending. Preview review is still needed for performance, audio and seam quality.
+
+## Work types
+
+Choose drama, comedy, lifestyle/atmosphere, documentary/educational, product advertising, or brand/place promotion. Work type is separate from visual style, narrative mode, and generation mode. Professional projects bind a versioned type profile to role guidance, creative/script extensions, and type-specific review checks. Changing type retains but invalidates existing artifacts and approvals; old projects retain their generic workflow. The canvas requirement dialog also saves an optional work type for AI script writing. Actual generation still requires existing review and cost approval.

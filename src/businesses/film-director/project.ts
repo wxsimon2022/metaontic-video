@@ -3,6 +3,7 @@ import { validateV31 } from './schema.js';
 import { sourceRevisions } from './contracts.js';
 import { validateReferences } from './references.js';
 import { evaluateReview } from './review.js';
+import { validateProfileArtifact } from './profiles/index.js';
 /** V2 创作数据与确定性校验。执行阶段独立于现有视频任务。 */
 export const STAGES = ['creative', 'script', 'assets', 'shots', 'prompts', 'review'] as const;
 export const ROLES = ['director', 'creative', 'screenwriter', 'character', 'scene', 'storyboard', 'prompt-engineer', 'reviewer'] as const;
@@ -23,6 +24,7 @@ export function validateArtifact(stage: string, value: any, state: any) {
   const nonempty = (key: string) => { if (typeof value[key] !== 'string' || !value[key].trim()) throw Error(`MISSING_FIELD:${key}`); };
   validateV31(stage,value,state);
   validateReferences(stage,value,state);
+  validateProfileArtifact(stage,value,state);
   if (stage === 'creative') {
     nonempty('theme'); nonempty('logline');
     if (value.structure !== undefined) {
@@ -85,7 +87,7 @@ export function commitArtifact(state: any, stage: string, value: any, expected: 
   const next = structuredClone(state);
   next.revision++;
   if(stage==='review' && state.schema_version==='3.1.0') updateIssueRegistry(next,value);
-  next.artifacts[stage] = { revision: next.revision, source_revisions:sourceRevisions(state,stage), data: value, stale: false };
+  next.artifacts[stage] = { revision: next.revision, source_revisions:sourceRevisions(state,stage), ...(state.project_spec?.work_type?{profile_ref:{work_type:state.project_spec.work_type,profile_revision:state.project_spec.profile_revision}}:{}), data: value, stale: false };
   for (const downstream of STAGES.slice(index+1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
   for (const approved of ['creative','script']) if (STAGES.indexOf(approved as any) >= index) delete next.approvals[approved];
   next.status = ['creative','script'].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === 'review' ? (value.review_status && !evaluateReview(value).passed ? value.review_status : 'FINAL_DELIVERY') : `${stage.toUpperCase()}_READY`;

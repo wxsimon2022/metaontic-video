@@ -67,11 +67,11 @@ export function pendingStageAction(key: string, facts: any) {
 export function stageNodeId(prefix: string, key: string) { return `${prefix}_stage_${key}`; }
 /** 第一步「创建需求」的产物：一个普通文本节点，承载想法与规格；第二步生成脚本时读它当输入。 */
 export const REQUIREMENT_MARK = 'metaonticRequirement';
-export function requirementNodeData(brief: string, seconds: number, segmentSeconds: number, ratio: string, resolution: string) {
+export function requirementNodeData(brief: string, seconds: number, segmentSeconds: number, ratio: string, resolution: string, workType?:string) {
   const text = [`想拍什么：${brief}`, `目标总时长：${seconds} 秒`, `每段时长：${segmentSeconds} 秒`,
     `画幅：${ratio}`, `清晰度：${String(resolution).toUpperCase()}`].join('\n');
   return { label: '需求', text, status: 'done', [REQUIREMENT_MARK]: true,
-    metaonticRequirementBrief: brief, metaonticRequirementSpec: { seconds, segmentSeconds, ratio, resolution } };
+    metaonticRequirementBrief: brief, metaonticRequirementSpec: { seconds, segmentSeconds, ratio, resolution, ...(workType?{work_type:workType}:{}) } };
 }
 /** 画布上已有的需求节点；第二步写脚本时用它当输入，不在对话里重复问一遍。 */
 export function requirementNodeOf(doc: any): any {
