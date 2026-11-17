@@ -4,9 +4,10 @@ import { ROLE_PROMPTS } from './roles/index.js';
 import { STAGES, validateArtifact } from './project.js';
 /** 程序选择下一许可动作；角色仅读取直接依赖，不重复加载全项目。 */
 export function nextTask(state: any) {
+  if(state.status==='STOPPED') return {action:'stop',status:'STOPPED',expectedRevision:state.revision};
   for (const stage of STAGES) {
     const artifact = state.artifacts[stage];
-    if (!artifact || artifact.stale) {
+    if (!artifact || artifact.stale || state.status===`${stage.toUpperCase()}_REVISE`) {
       const roles = {creative:'creative',script:'screenwriter',assets:'character + scene',shots:'storyboard',prompts:'prompt-engineer',review:'reviewer'};
       const dependencies = {creative:[],script:['creative'],assets:['script'],shots:['script','assets'],prompts:['assets','shots'],review:[...STAGES.slice(0,5)]};
       return { action:'submit', project_id:state.project_id, input_revisions:sourceRevisions(state,stage), revision_scope:artifact?.stale_entity_ids || [], model_profile:GENERIC_MODEL_PROFILE, stage, role:roles[stage], inputs:Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]])), instructions:ROLE_INSTRUCTIONS[stage],expectedRevision:state.revision };
@@ -18,6 +19,7 @@ export function nextTask(state: any) {
   return {action:'compile',expectedRevision:state.revision};
 }
 export function validateCurrent(state: any) {
+  if(state.status==='STOPPED') throw Error('PROJECT_STOPPED');
   for (const stage of STAGES) {
     const artifact=state.artifacts[stage];
     if (!artifact || artifact.stale) throw Error(`STALE_OR_MISSING:${stage}`);

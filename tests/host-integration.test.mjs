@@ -91,21 +91,16 @@ test('script guidance keeps visuals from going monotone without adding paid work
   const host = harness({ connectionMode: 'metaontic', metaonticApiKey: 'test' }, '/tmp');
   const prompt = host.prompt();
   for (const needle of [
-    '画面不单调的下限', '15 秒至少 2 次', '30 秒 3–4 次可见的景别或构图变化', '每 3–5 秒有一个看得见的变化',
-    '至少一处特写或前景遮挡后的揭示', '声音至少两层', '整段只有固定中景加缓慢推近即为不合格脚本', '不额外增加付费调用',
+    '画面内容与节奏检查', '每个镜头有明确叙事目的', '不机械规定切镜次数', '固定机位、一镜到底和必要留白可以成立', '不额外增加付费调用',
   ]) assert.ok(prompt.includes(needle), needle);
-  assert.ok(prompt.includes('一镜到底'), '一镜到底要给出替代手段而不是硬切镜');
+  assert.ok(!prompt.includes('整段只有固定中景加缓慢推近即为不合格脚本'));
   const skill = await readFile(new URL('../skills/video-director/SKILL.md', import.meta.url), 'utf8');
-  assert.match(skill, /画面不单调的下限/, '技能里指向同一套下限');
-  assert.match(skill, /整段只有固定中景加缓慢推近即为不合格脚本/);
+  assert.match(skill, /阶段技能参考入口/);
+  assert.match(skill, /不机械规定切镜次数/);
   const reference = await readFile(new URL('../skills/video-director/references/scriptwriting.md', import.meta.url), 'utf8');
-  for (const needle of ['### 画面不单调的下限', '每 3–5 秒一个看得见的变化', '前景遮挡后的揭示', '不拆更多付费分段']) {
-    assert.ok(reference.includes(needle), needle);
-  }
+  for (const needle of ['### 画面内容与节奏检查', '前景遮挡后的揭示', '不拆更多付费分段']) assert.ok(reference.includes(needle), needle);
   const playbook = await readFile(new URL('../skills/video-director/references/prompt-playbook.md', import.meta.url), 'utf8');
-  for (const needle of ['画面不单调的下限', '不靠增加镜头数、付费调用或更多分段']) {
-    assert.ok(playbook.includes(needle), needle);
-  }
+  assert.ok(playbook.includes('不靠增加镜头数、付费调用或更多分段'));
   host.dispose();
 });
 

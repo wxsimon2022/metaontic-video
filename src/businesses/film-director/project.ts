@@ -73,6 +73,7 @@ export function validateArtifact(stage: string, value: any, state: any) {
 }
 export function commitArtifact(state: any, stage: string, value: any, expected: number) {
   if (state.revision !== expected) throw Error('REVISION_CONFLICT');
+  if (state.status === 'STOPPED') throw Error('PROJECT_STOPPED');
   const index = STAGES.indexOf(stage as any);
   if (index < 0) throw Error('INVALID_STAGE');
   for (const upstream of STAGES.slice(0,index)) {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-const result=await build({stdin:{contents:"export * from './src/businesses/film-director/project.ts'; export * from './src/businesses/film-director/orchestration.ts'; export * from './src/businesses/film-director/roles/index.ts'; export * from './src/businesses/film-director/revisions.ts'; export * from './src/businesses/film-director/deliverables.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
+const result=await build({stdin:{contents:"export * from './src/businesses/film-director/project.ts'; export * from './src/businesses/film-director/orchestration.ts'; export * from './src/businesses/film-director/roles/index.ts'; export * from './src/businesses/film-director/revisions.ts'; export * from './src/businesses/film-director/deliverables.ts'; export * from './src/businesses/film-director/approvals.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
 const api=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
 const initial=()=>({revision:0,duration_ms:15000,artifacts:{},approvals:{}});
 test('创意未批准阻止剧本，旧版本不能覆盖，改稿失效下游',()=>{
@@ -90,4 +90,80 @@ test('全部角色使用已提供的完整版本且职责独立',()=>{
  assert.match(api.ROLE_PROMPTS.storyboard,/action_start/);
  assert.match(api.ROLE_PROMPTS['prompt-engineer'],/一条批准shot_id/);
  assert.match(api.ROLE_PROMPTS.reviewer,/NOT_EVALUATED/);
+});
+
+function v31Project(duration=15000) {
+ const state={...initial(),schema_version:'3.1.0',title:'专业短片',project_id:'p',duration_ms:duration};
+ const data={
+  creative:{theme:'选择',logline:'老人决定去见朋友',structure:[{section_id:'sec',duration_ms:duration}],must_preserve:[],assumptions:[]},
+  script:{screenplay:'老人合上存折，说：“走吧。”',chapters:[{chapter_id:'c',duration_ms:duration,scene_ids:['sc']}],scenes:[{scene_id:'sc',chapter_id:'c',duration_ms:duration}],characters:[{character_id:'ch'}],dialogue:[{dialogue_id:'d',scene_id:'sc',speaker_id:'ch',exact_text:'走吧。'}]},
+  assets:{characters:[{character_id:'ch',costumes:[{costume_id:'co',character_id:'ch'}]}],scenes:[{scene_id:'sc',location_id:'loc',scene_state_id:'st'}],locations:[{location_id:'loc'}],scene_states:[{scene_state_id:'st',location_id:'loc'}],props:[{prop_id:'pr'}]},
+  shots:{shots:[{shot_id:'sh',chapter_id:'c',scene_id:'sc',location_id:'loc',scene_state_id:'st',character_ids:['ch'],costume_ids:['co'],prop_ids:['pr'],dialogue_refs:['d'],start_ms:0,end_ms:duration,duration_ms:duration,narrative_purpose:'作出决定'}]},
+  prompts:{prompts:[{shot_id:'sh',location_id:'loc',scene_state_id:'st',duration_ms:duration,generation_mode:'TEXT_TO_VIDEO',dialogue_refs:['d'],prompt:'老人合上存折，轻声说：“走吧。”'}]},
+ };
+ let current=state;
+ for(const stage of ['creative','script','assets','shots','prompts']) {
+  current=api.commitArtifact(current,stage,data[stage],current.revision);
+  if(['creative','script'].includes(stage))current.approvals[stage]=current.artifacts[stage].revision;
+ }
+ return current;
+}
+test('V3.1完整链路校验地点状态道具服装与对白原文',()=>{
+ const state=v31Project();
+ for(const [key,bad] of [['location_id','missing'],['scene_state_id','missing'],['prop_ids',['missing']],['costume_ids',['missing']]]) {
+  const data=structuredClone(state.artifacts.shots.data);data.shots[0][key]=bad;
+  assert.throws(()=>api.validateArtifact('shots',data,state),/REFERENCE|MISMATCH/);
+ }
+ const prompts=structuredClone(state.artifacts.prompts.data);prompts.prompts[0].prompt='老人说“出发吧”。';
+ assert.throws(()=>api.validateArtifact('prompts',prompts,state),/DIALOGUE_TEXT_MISMATCH/);
+ const shots=structuredClone(state.artifacts.shots.data);shots.shots[0].dialogue_refs=[];
+ assert.throws(()=>api.validateArtifact('shots',shots,state),/DIALOGUE_COVERAGE_GAP/);
+});
+test('V3.1新稿强制结构与来源，旧项目保持可读',()=>{
+ const state=v31Project();
+ assert.deepEqual(state.artifacts.prompts.source_revisions,{script:2,assets:3,shots:4});
+ const data=structuredClone(state.artifacts.prompts.data);data.source_revisions={script:1,assets:3,shots:4};
+ assert.throws(()=>api.validateArtifact('prompts',data,state),/SOURCE_REVISION_MISMATCH/);
+ assert.throws(()=>api.validateArtifact('creative',{theme:'a',logline:'b'},state),/SCHEMA_REQUIRED/);
+ api.validateArtifact('creative',{theme:'a',logline:'b'},initial());
+});
+test('任务自称完成无产物被拒绝，真实提交后记录产物和校验',()=>{
+ let state=initial();state.project_id='p';
+ const task=api.scheduleTask(state,api.nextTask(state));
+ assert.equal(api.scheduleTask(state,api.nextTask(state)),task);
+ assert.throws(()=>api.taskResult(state,task.key,'completed'),/TASK_OUTPUT_REQUIRED/);
+ api.taskResult(state,task.key,'running');
+ state=api.commitArtifact(state,'creative',{theme:'a',logline:'b'},0);
+ const completed=api.taskResult(state,task.key,'completed');
+ assert.equal(completed.validation.status,'PASS');assert.equal(completed.output_refs[0].revision,1);
+});
+test('版本清单反映真实对象校验值，可读导出保留完整剧本',()=>{
+ const state=v31Project();
+ const before=api.artifactManifest(state);const markdown=api.renderDeliverables(state);
+ assert.match(markdown,/正式剧本/);assert.match(markdown,/老人合上存折/);assert.doesNotMatch(markdown,/```json/);
+ state.artifacts.prompts.data.prompts[0].prompt+='固定镜头';
+ const after=api.artifactManifest(state);
+ assert.notEqual(before.at(-1).sha256,after.at(-1).sha256);
+ assert.equal(before[0].sha256,after[0].sha256);
+});
+test('30分钟分章预算闭合，局部服装修改保留剧本并标记下游',()=>{
+ const state=v31Project(1800000);
+ const original=JSON.stringify(state.artifacts.script);
+ const next=api.reviseEntities(state,'assets',[{collection:'characters',entity:{...state.artifacts.assets.data.characters[0],costumes:[{costume_id:'co',character_id:'ch',description:'蓝色外套'}]}}],state.revision);
+ assert.equal(JSON.stringify(next.artifacts.script),original);
+ assert.deepEqual(next.artifacts.shots.stale_entity_ids,['sh']);assert.equal(next.artifacts.prompts.stale,true);
+ const script=structuredClone(state.artifacts.script.data);script.chapters=[{chapter_id:'c1',duration_ms:900000,scene_ids:['sc1']},{chapter_id:'c2',duration_ms:900000,scene_ids:['sc2']}];script.scenes=[{scene_id:'sc1',chapter_id:'c1',duration_ms:900000},{scene_id:'sc2',chapter_id:'c2',duration_ms:900000}];script.dialogue=[];
+ api.validateArtifact('script',script,state);
+ script.scenes[1].duration_ms--;
+ assert.throws(()=>api.validateArtifact('script',script,state),/SCENE_DURATION_MISMATCH/);
+});
+test('审批修改与拒绝持久记录，拒绝后禁止继续提交制作',()=>{
+ const state=api.commitArtifact(initial(),'creative',{theme:'a',logline:'b'},0);
+ const revise=api.recordApprovalDecision(state,'creative','REVISE',1);
+ assert.equal(api.nextTask(revise).action,'submit');assert.equal(revise.decisions[0].decision,'REVISE');assert.equal(revise.approvals.creative,undefined);
+ const rejected=api.recordApprovalDecision(state,'creative','REJECTED',1);
+ assert.equal(api.nextTask(rejected).action,'stop');
+ assert.throws(()=>api.commitArtifact(rejected,'creative',{theme:'a',logline:'b'},2),/PROJECT_STOPPED/);
+ const approved=api.recordApprovalDecision(state,'creative','APPROVED',1);
+ assert.equal(approved.approvals.creative,1);assert.equal(approved.decisions[0].artifact_revision,1);assert.ok(approved.decisions[0].decision_time);
 });

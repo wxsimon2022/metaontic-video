@@ -1,3 +1,4 @@
+import { recordApprovalDecision } from './approvals.js';
 import { artifactManifest, renderDeliverables } from './deliverables.js';
 import { INTENTS, routeIntent, ROLE_PROMPTS } from './roles/index.js';
 import { reviseEntities, scheduleTask, taskResult } from './revisions.js';
@@ -67,12 +68,10 @@ export const filmDirectorBusiness: BusinessModule = {
             if (!['creative','script'].includes(args.stage) || !artifact || artifact.stale || state.revision!==args.expectedRevision) throw Error('INVALID_APPROVAL_REVISION');
             const service=runtime.ctx.get?.('userQuestions') || (exec.agent as any)?.ctx?.get?.('userQuestions');
             if (!service?.ask) return {status:'needs_input',reason:'人工确认服务不可用'};
-            const answer=await service.ask({agent:exec.agent,signal:exec.signal,questions:[{id:'film_approval',header:'创作审核',question:`审核${args.stage} revision ${artifact.revision}：\n${JSON.stringify(artifact.data)}\n是否批准本版进入下一阶段？`,multiSelect:false,options:[{label:'批准本版',description:'继续下一创作阶段'},{label:'需要修改',description:'保留草稿并修改'}]}]});
+            const answer=await service.ask({agent:exec.agent,signal:exec.signal,questions:[{id:'film_approval',header:'创作审核',question:`审核${args.stage} revision ${artifact.revision}：\n${JSON.stringify(artifact.data)}\n是否批准本版进入下一阶段？`,multiSelect:false,options:[{label:'批准本版',description:'继续下一创作阶段'},{label:'需要修改',description:'保留草稿并修改'},{label:'拒绝当前方案',description:'停止当前创作流程，保留已有资料'}]}]});
             const decision=answer?.answers?.find(a=>a.id==='film_approval');
-            if (exec.signal?.aborted || decision?.custom || decision?.selected?.length!==1 || decision.selected[0]!=='批准本版') return {status:'needs_input',projectId:id};
-            state.approvals[args.stage]=artifact.revision;
-            state.decisions.push({approval_id:`APPROVAL_${state.decisions.length+1}`,project_id:id,stage:args.stage,gate:args.stage.toUpperCase(),artifact_ref:`project.json#/artifacts/${args.stage}`,revision:artifact.revision,artifact_revision:artifact.revision,decision:'APPROVED',decided_by:'USER',approved_at:new Date().toISOString()});
-            state.revision++; state.status=args.stage==='creative'?'SCRIPT_WRITING':'ASSET_DESIGN';
+            if (exec.signal?.aborted || decision?.custom || decision?.selected?.length!==1 || !['批准本版','需要修改','拒绝当前方案'].includes(decision.selected[0])) return {status:'needs_input',projectId:id};
+            state=recordApprovalDecision(state,args.stage,{'批准本版':'APPROVED','需要修改':'REVISE','拒绝当前方案':'REJECTED'}[decision.selected[0]],args.expectedRevision);
           }
           if (!['create','submit','approve','compile','revise','schedule','task_result'].includes(args.action)) throw Error('INVALID_ACTION');
           await mkdir(path.join(dir,'snapshots'),{recursive:true,mode:0o700});

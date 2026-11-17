@@ -171,27 +171,27 @@ function isArrayBufferLike(value) {
 function isArrayBufferSource(value) {
   return isArrayBufferLike(value) || ArrayBuffer.isView(value);
 }
-function clone(source, refs = /* @__PURE__ */ new Map()) {
+function clone(source, refs2 = /* @__PURE__ */ new Map()) {
   if (!source || typeof source !== "object") return source;
   if (is("Date", source)) return new Date(source.valueOf());
   if (is("RegExp", source)) return new RegExp(source.source, source.flags);
   if (isArrayBufferLike(source)) return source.slice(0);
   if (ArrayBuffer.isView(source)) return source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength);
-  const cached = refs.get(source);
+  const cached = refs2.get(source);
   if (cached) return cached;
   if (Array.isArray(source)) {
     const result2 = [];
-    refs.set(source, result2);
+    refs2.set(source, result2);
     source.forEach((value, index) => {
-      result2[index] = Reflect.apply(clone, null, [value, refs]);
+      result2[index] = Reflect.apply(clone, null, [value, refs2]);
     });
     return result2;
   }
   const result = Object.create(Object.getPrototypeOf(source));
-  refs.set(source, result);
+  refs2.set(source, result);
   for (const key of Reflect.ownKeys(source)) {
     const descriptor = { ...Reflect.getOwnPropertyDescriptor(source, key) };
-    if ("value" in descriptor) descriptor.value = Reflect.apply(clone, null, [descriptor.value, refs]);
+    if ("value" in descriptor) descriptor.value = Reflect.apply(clone, null, [descriptor.value, refs2]);
     Reflect.defineProperty(result, key, descriptor);
   }
   return result;
@@ -490,16 +490,16 @@ var init_lib2 = __esm({
         return Schema.resolve(data, schema, options2)[0];
       };
       if (options.refs) {
-        const refs = mapValues(options.refs, (options2) => new Schema(options2));
-        const getRef = (uid) => refs[uid];
-        for (const key in refs) {
-          const options2 = refs[key];
+        const refs2 = mapValues(options.refs, (options2) => new Schema(options2));
+        const getRef = (uid) => refs2[uid];
+        for (const key in refs2) {
+          const options2 = refs2[key];
           options2.sKey = getRef(options2.sKey);
           options2.inner = getRef(options2.inner);
           options2.list = options2.list && options2.list.map(getRef);
           options2.dict = options2.dict && mapValues(options2.dict, getRef);
         }
-        return refs[options.uid];
+        return refs2[options.uid];
       }
       Object.assign(schema, options);
       if (typeof schema.callback === "string") try {
@@ -1259,6 +1259,348 @@ var init_connection = __esm({
   }
 });
 
+// src/businesses/film-director/approvals.ts
+function recordApprovalDecision(state, stage, decision, expected) {
+  const artifact = state.artifacts[stage];
+  if (!["creative", "script"].includes(stage) || !artifact || artifact.stale || state.revision !== expected) throw Error("INVALID_APPROVAL_REVISION");
+  if (!["APPROVED", "REVISE", "REJECTED"].includes(decision)) throw Error("INVALID_APPROVAL_DECISION");
+  const next = structuredClone(state);
+  next.decisions ||= [];
+  next.decisions.push({ approval_id: `APPROVAL_${next.decisions.length + 1}`, project_id: state.project_id, gate: stage.toUpperCase(), stage, artifact_ref: `project.json#/artifacts/${stage}`, artifact_revision: artifact.revision, revision: artifact.revision, decision, decided_by: "USER", decision_time: (/* @__PURE__ */ new Date()).toISOString() });
+  next.revision++;
+  if (decision === "APPROVED") {
+    next.approvals[stage] = artifact.revision;
+    next.status = stage === "creative" ? "SCRIPT_WRITING" : "ASSET_DESIGN";
+  } else {
+    delete next.approvals[stage];
+    next.status = decision === "REJECTED" ? "STOPPED" : `${stage.toUpperCase()}_REVISE`;
+  }
+  return next;
+}
+
+// src/businesses/film-director/deliverables.ts
+import { createHash } from "node:crypto";
+
+// src/businesses/film-director/schema.ts
+function validateV31(stage, value, state) {
+  if (state.schema_version !== "3.1.0") return;
+  const array = (object2, key) => {
+    if (!Array.isArray(object2[key])) throw Error(`SCHEMA_REQUIRED_ARRAY:${key}`);
+  };
+  const text = (object2, key) => {
+    if (typeof object2[key] !== "string" || !object2[key].trim()) throw Error(`SCHEMA_REQUIRED_TEXT:${key}`);
+  };
+  const positive = (object2, key) => {
+    if (!Number.isSafeInteger(object2[key]) || object2[key] <= 0) throw Error(`SCHEMA_REQUIRED_DURATION:${key}`);
+  };
+  if (stage === "creative") {
+    array(value, "structure");
+    array(value, "must_preserve");
+    array(value, "assumptions");
+  }
+  if (stage === "script") {
+    array(value, "scenes");
+    array(value, "characters");
+    array(value, "dialogue");
+    for (const line of value.dialogue) {
+      text(line, "dialogue_id");
+      text(line, "exact_text");
+      text(line, "speaker_id");
+      text(line, "scene_id");
+    }
+  }
+  if (stage === "assets") {
+    for (const key of ["characters", "scenes", "locations", "scene_states", "props"]) array(value, key);
+    for (const scene of value.scenes) {
+      text(scene, "location_id");
+      text(scene, "scene_state_id");
+    }
+    for (const current of value.scene_states) text(current, "location_id");
+  }
+  if (stage === "shots") for (const shot of value.shots || []) {
+    for (const key of ["chapter_id", "scene_id", "location_id", "scene_state_id", "narrative_purpose"]) text(shot, key);
+    positive(shot, "duration_ms");
+    for (const key of ["character_ids", "prop_ids", "costume_ids", "dialogue_refs"]) array(shot, key);
+  }
+  if (stage === "prompts") for (const prompt of value.prompts || []) {
+    for (const key of ["location_id", "scene_state_id", "generation_mode"]) text(prompt, key);
+    positive(prompt, "duration_ms");
+    array(prompt, "dialogue_refs");
+  }
+  if (stage === "review") {
+    text(value, "review_status");
+    text(value, "review_id");
+    text(value, "review_stage");
+    array(value, "review_scope");
+    array(value, "unverified_items");
+    if (!value.reviewed_revisions || typeof value.reviewed_revisions !== "object") throw Error("MISSING_REVIEWED_REVISIONS");
+    for (const stage2 of ["creative", "script", "assets", "shots", "prompts"]) if (value.reviewed_revisions[stage2] !== state.artifacts[stage2]?.revision) throw Error(`REVIEW_REVISION_MISMATCH:${stage2}`);
+    const ids = /* @__PURE__ */ new Set();
+    for (const issue of value.issues || []) {
+      for (const key of ["issue_id", "description", "evidence", "location", "responsible_agent", "recheck_criteria"]) text(issue, key);
+      if (ids.has(issue.issue_id)) throw Error("DUPLICATE_ISSUE_ID");
+      ids.add(issue.issue_id);
+    }
+  }
+}
+
+// src/businesses/film-director/contracts.ts
+var COMMON_CONTRACT = `
+# COMMON_CONTRACT \u2014 \u5168\u5C40\u751F\u4EA7\u5951\u7EA6
+Version: 3.1
+\u7528\u6237\u786C\u7EA6\u675F\u4E0E\u5DF2\u6279\u51C6\u7248\u672C\u4F18\u5148\u3002\u6BCF\u6B21\u4EFB\u52A1\u63A5\u6536project_id\u3001task_id\u3001stage\u3001input_refs\u3001input_revisions\u3001revision_scope\uFF1B\u5173\u952E\u4F9D\u8D56\u7F3A\u5931\u8FD4\u56DEBLOCKED\u53CA\u7F3A\u5931\u9879\uFF0C\u4E0D\u7F16\u9020\u8F93\u5165\u3002
+\u4F7F\u7528\u7A33\u5B9APROJECT/CHAPTER/SCENE/LOC/CHAR/COSTUME/PROP/SHOT/TASK/ISSUE\u6807\u8BC6\uFF1B\u533A\u5206\u7269\u7406\u5730\u70B9\u3001\u5267\u672C\u573A\u6B21\u4E0E\u73AF\u5883\u72B6\u6001\u3002\u65F6\u95F4\u91C7\u7528\u6574\u6570\u6BEB\u79D2\u548C[start_ms,end_ms)\u3002
+\u533A\u5206USER_SPECIFIED\u3001APPROVED\u3001INFERRED\u3001DEFAULT\u3001RESEARCH_REQUIRED\uFF1B\u4E0D\u5F97\u628A\u63A8\u65AD\u5F53\u7528\u6237\u8981\u6C42\u6216\u4E8B\u5B9E\u3002
+\u65B0\u589E\u4EBA\u7269\u3001\u5267\u60C5\u3001\u5173\u952E\u9053\u5177\u3001\u5730\u70B9\u548C\u5BF9\u767D\u82E5\u5F71\u54CD\u6279\u51C6\u5185\u5BB9\uFF0C\u63D0\u4EA4Director\u51B3\u7B56\u5E76\u91CD\u8D70\u5BF9\u5E94\u5BA1\u6279\u3002
+\u4EA4\u4ED8\u540C\u7248\u672CMarkdown\u4E0EJSON\uFF0C\u4FDD\u7559source_revisions\u3001changed_fields\u3001unresolved_issues\u3001next_action\uFF1B\u53EA\u6539revision_scope\uFF0C\u5220\u9664\u5B9E\u4F53\u7559\u4E0B\u53D8\u66F4\u8BB0\u5F55\u3002
+\u5DE5\u5177\u72B6\u6001\u7531\u8FD0\u884C\u65F6\u63D0\u4F9B\uFF1B\u4E0D\u5F97\u9760\u6587\u5B57\u58F0\u79F0\u8C03\u7528\u3001\u4FDD\u5B58\u3001\u5B8C\u6210\u4EFB\u52A1\u6216\u901A\u8FC7\u5BA1\u6838\u3002\u5931\u8D25\u62A5\u544Aerror_code\u3001evidence\u3001affected_artifacts\u3001suggested_owner\u3001recovery_options\u3002
+\u5404\u89D2\u8272\u53EA\u627F\u62C5\u672C\u804C\u3002\u4E24\u6B21\u521B\u4F5C\u6279\u51C6\u4E0D\u66FF\u4EE3\u4ED8\u8D39\u6388\u6743\u548C\u5B9E\u9645\u89C6\u9891\u7ED3\u679C\u5BA1\u6838\u3002COMPLETED\u5FC5\u987B\u6709\u8FD0\u884C\u65F6\u6821\u9A8C\u8FC7\u7684\u4EA7\u7269\u5F15\u7528\u3002`;
+var STAGE_DEPS = { creative: [], script: ["creative"], assets: ["script"], shots: ["script", "assets"], prompts: ["script", "assets", "shots"], review: ["creative", "script", "assets", "shots", "prompts"] };
+function sourceRevisions(state, stage) {
+  return Object.fromEntries((STAGE_DEPS[stage] || []).filter((s) => state.artifacts[s]).map((s) => [s, state.artifacts[s].revision]));
+}
+var GENERIC_MODEL_PROFILE = { model_name: "generic", profile_revision: "1", capability_status: "UNVERIFIED", generation_modes: null, supported_durations_ms: null, supported_aspect_ratios: null, native_audio_supported: null, reference_image_supported: null, reference_video_supported: null, prompt_length_limit: null, verified_at: null };
+
+// src/businesses/film-director/references.ts
+function registry(items, key) {
+  if (!Array.isArray(items)) throw Error(`INVALID_REGISTRY:${key}`);
+  const ids = items.map((v) => v?.[key]);
+  if (ids.some((id) => typeof id !== "string" || !id.trim()) || new Set(ids).size !== ids.length) throw Error(`INVALID_REGISTRY_ID:${key}`);
+  return new Map(items.map((v) => [v[key], v]));
+}
+function refs(ids, map, kind) {
+  if (!Array.isArray(ids) || new Set(ids).size !== ids.length || ids.some((id) => !map.has(id))) throw Error(`INVALID_REFERENCE:${kind}`);
+}
+function validateReferences(stage, value, state) {
+  const expected = sourceRevisions(state, stage);
+  if (value.source_revisions !== void 0) {
+    if (!value.source_revisions || typeof value.source_revisions !== "object" || Array.isArray(value.source_revisions)) throw Error("INVALID_SOURCE_REVISIONS");
+    for (const [key, rev] of Object.entries(value.source_revisions)) if (expected[key] !== rev) throw Error(`SOURCE_REVISION_MISMATCH:${key}`);
+    if (state.schema_version === "3.1.0" && Object.keys(expected).some((k) => value.source_revisions[k] !== expected[k])) throw Error("INCOMPLETE_SOURCE_REVISIONS");
+  }
+  const script = stage === "script" ? value : state.artifacts.script?.data;
+  const lines = script?.dialogue_lines || script?.dialogue || [];
+  const dialogue = lines.some((d) => d.dialogue_id !== void 0) ? registry(lines, "dialogue_id") : /* @__PURE__ */ new Map();
+  if (stage === "script" && dialogue.size) {
+    for (const line of lines) if (typeof line.exact_text !== "string" || !line.exact_text.trim()) throw Error("INVALID_DIALOGUE_TEXT");
+  }
+  if (stage === "script" || stage === "creative") return;
+  const assets = stage === "assets" ? value : state.artifacts.assets?.data;
+  if (!assets) return;
+  const characters = registry(assets.characters, "character_id");
+  const scenes = registry(assets.scenes, "scene_id");
+  const locations = assets.locations === void 0 ? null : registry(assets.locations, "location_id");
+  const states = assets.scene_states === void 0 ? null : registry(assets.scene_states, "scene_state_id");
+  const props = assets.props === void 0 ? null : registry(assets.props, "prop_id");
+  const costumes = registry(assets.characters.flatMap((c) => c.costumes || []), "costume_id");
+  const check = (item) => {
+    if (item.character_ids !== void 0) refs(item.character_ids, characters, "character");
+    if (item.location_id !== void 0 && (!locations || !locations.has(item.location_id))) throw Error("INVALID_REFERENCE:location");
+    if (item.scene_state_id !== void 0) {
+      const current = states?.get(item.scene_state_id);
+      if (!current || item.location_id !== void 0 && current.location_id !== item.location_id) throw Error("INVALID_REFERENCE:scene_state");
+    }
+    if (item.prop_ids !== void 0) refs(item.prop_ids, props || /* @__PURE__ */ new Map(), "prop");
+    if (item.costume_ids !== void 0) refs(item.costume_ids, costumes, "costume");
+  };
+  if (stage === "assets") {
+    for (const scene of assets.scenes) {
+      check(scene);
+      if (script?.scenes && !script.scenes.some((s) => s.scene_id === scene.scene_id)) throw Error("SCRIPT_SCENE_REF_MISMATCH");
+    }
+    if (script?.scenes?.some((s) => !scenes.has(s.scene_id))) throw Error("MISSING_SCRIPT_SCENE");
+    for (const current of assets.scene_states || []) check(current);
+    for (const costume of costumes.values()) if (costume.character_id !== void 0 && !characters.has(costume.character_id)) throw Error("INVALID_REFERENCE:costume_owner");
+    if (script?.characters) {
+      const cast = registry(script.characters, "character_id");
+      if ([...cast.keys()].some((id) => !characters.has(id)) || [...characters.keys()].some((id) => !cast.has(id))) throw Error("SCRIPT_CHARACTER_COVERAGE");
+    }
+    for (const line of lines) if (!characters.has(line.speaker_id)) throw Error("INVALID_REFERENCE:speaker");
+  }
+  if (stage === "shots" || stage === "prompts") {
+    const shots = stage === "shots" ? value.shots : state.artifacts.shots.data.shots;
+    const shotMap = new Map(shots.map((s) => [s.shot_id, s]));
+    for (const item of stage === "shots" ? shots : value.prompts) {
+      check(item);
+      const shot = stage === "shots" ? item : shotMap.get(item.shot_id);
+      if (!shot) throw Error("INVALID_REFERENCE:shot");
+      if (stage === "shots") {
+        const scene = scenes.get(shot.scene_id);
+        if (!scene) throw Error("INVALID_REFERENCE:scene");
+        if (shot.location_id !== void 0 && scene.location_id !== shot.location_id) throw Error("SHOT_LOCATION_MISMATCH");
+        if (shot.chapter_id !== void 0 && script?.scenes && !script.scenes.some((s) => s.scene_id === shot.scene_id && s.chapter_id === shot.chapter_id)) throw Error("SHOT_CHAPTER_MISMATCH");
+        for (const id of shot.costume_ids || []) if (!shot.character_ids.includes(costumes.get(id)?.character_id)) throw Error("COSTUME_CHARACTER_MISMATCH");
+      }
+      if (item.dialogue_refs !== void 0) {
+        refs(item.dialogue_refs, dialogue, "dialogue");
+        for (const id of item.dialogue_refs) {
+          const line = dialogue.get(id);
+          if (line.scene_id !== shot.scene_id || !shot.character_ids.includes(line.speaker_id)) throw Error("DIALOGUE_CONTEXT_MISMATCH");
+          if (stage === "prompts" && !(shot.dialogue_refs || []).includes(id)) throw Error("DIALOGUE_NOT_IN_SHOT");
+        }
+      }
+      if (stage === "prompts") {
+        for (const id of shot.dialogue_refs || []) if (!item.prompt.includes(dialogue.get(id)?.exact_text)) throw Error("DIALOGUE_TEXT_MISMATCH");
+        for (const key of ["location_id", "scene_state_id", "duration_ms"]) if (item[key] !== void 0 && item[key] !== shot[key]) throw Error(`PROMPT_SHOT_MISMATCH:${key}`);
+      }
+    }
+    if (stage === "shots" && dialogue.size) {
+      const covered = new Set(shots.flatMap((s) => s.dialogue_refs || []));
+      if ([...dialogue.keys()].some((id) => !covered.has(id))) throw Error("DIALOGUE_COVERAGE_GAP");
+    }
+  }
+}
+
+// src/businesses/film-director/review.ts
+var WEIGHTS = { requirement_fidelity: 20, narrative_quality: 15, character_consistency: 10, scene_consistency: 10, cinematic_quality: 15, temporal_consistency: 10, prompt_executability: 15, structural_completeness: 5 };
+function evaluateReview(report) {
+  if (!["PASS", "PASS_WITH_WARNINGS", "REVISE_REQUIRED", "BLOCKED", "NOT_EVALUATED"].includes(report.review_status) || !report.scores || !Array.isArray(report.issues)) throw Error("INVALID_REVIEW_REPORT");
+  let sum = 0, weight = 0;
+  for (const [key, w] of Object.entries(WEIGHTS)) {
+    const value = report.scores[key];
+    if (value === null) continue;
+    if (!Number.isFinite(value) || value < 0 || value > 100) throw Error("INVALID_REVIEW_SCORE");
+    sum += value * w;
+    weight += w;
+  }
+  const score = weight ? Math.round(sum / weight * 100) / 100 : null;
+  for (const issue of report.issues) if (!issue || !["CRITICAL", "MAJOR", "MINOR", "INFO"].includes(issue.severity) || !["OPEN", "IN_PROGRESS", "RESOLVED", "VERIFIED", "WONT_FIX"].includes(issue.status)) throw Error("INVALID_REVIEW_ISSUE");
+  const blockers = report.issues.filter((i) => ["CRITICAL", "MAJOR"].includes(i.severity) && i.status !== "VERIFIED").length;
+  const passed = ["PASS", "PASS_WITH_WARNINGS"].includes(report.review_status) && score !== null && score >= 80 && blockers === 0;
+  if (report.delivery_allowed !== passed || report.passed !== void 0 && report.passed !== passed || report.blocking_issue_count !== void 0 && report.blocking_issue_count !== blockers) throw Error("REVIEW_DECISION_MISMATCH");
+  if (["PASS", "PASS_WITH_WARNINGS"].includes(report.review_status) && !passed) throw Error("REVIEW_BLOCKED");
+  if (report.weighted_score !== void 0 && report.weighted_score !== score) throw Error("REVIEW_SCORE_MISMATCH");
+  return { score, passed, blockers };
+}
+
+// src/businesses/film-director/project.ts
+var STAGES = ["creative", "script", "assets", "shots", "prompts", "review"];
+function validateTimeline(shots, duration) {
+  let end = 0;
+  const ids = /* @__PURE__ */ new Set();
+  for (const shot of shots) {
+    if (!shot.shot_id || ids.has(shot.shot_id)) throw Error("DUPLICATE_OR_MISSING_ID");
+    ids.add(shot.shot_id);
+    if (shot.duration_ms !== void 0 && shot.duration_ms !== shot.end_ms - shot.start_ms) throw Error("SHOT_DURATION_MISMATCH");
+    if (!Number.isSafeInteger(shot.start_ms) || !Number.isSafeInteger(shot.end_ms) || shot.start_ms !== end || shot.end_ms <= end) throw Error("GAP_OR_OVERLAP");
+    end = shot.end_ms;
+  }
+  if (end !== duration) throw Error("DURATION_MISMATCH");
+}
+function validateArtifact(stage, value, state) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("INVALID_ARTIFACT");
+  const nonempty = (key) => {
+    if (typeof value[key] !== "string" || !value[key].trim()) throw Error(`MISSING_FIELD:${key}`);
+  };
+  validateV31(stage, value, state);
+  validateReferences(stage, value, state);
+  if (stage === "creative") {
+    nonempty("theme");
+    nonempty("logline");
+    if (value.structure !== void 0) {
+      if (!Array.isArray(value.structure) || !value.structure.length) throw Error("INVALID_CREATIVE_STRUCTURE");
+      const ids = value.structure.map((s) => s?.section_id);
+      if (ids.some((id) => typeof id !== "string" || !id.trim()) || new Set(ids).size !== ids.length) throw Error("INVALID_SECTION_ID");
+      if (value.structure.some((s) => !Number.isSafeInteger(s.duration_ms) || s.duration_ms <= 0) || value.structure.reduce((n, s) => n + s.duration_ms, 0) !== state.duration_ms) throw Error("CREATIVE_DURATION_MISMATCH");
+    }
+    if (value.approval_questions !== void 0 && (!Array.isArray(value.approval_questions) || value.approval_questions.length > 3)) throw Error("TOO_MANY_CREATIVE_QUESTIONS");
+  }
+  if (stage === "script") {
+    nonempty("screenplay");
+    if (!Array.isArray(value.chapters) || !value.chapters.length || value.chapters.some((c) => !Number.isSafeInteger(c.duration_ms) || c.duration_ms <= 0) || value.chapters.reduce((n, c) => n + c.duration_ms, 0) !== state.duration_ms) throw Error("CHAPTER_DURATION_MISMATCH");
+  }
+  if (stage === "script") {
+    if (value.approved_creative_revision !== void 0 && value.approved_creative_revision !== state.approvals.creative) throw Error("CREATIVE_REVISION_MISMATCH");
+    if (value.scenes !== void 0) {
+      if (!Array.isArray(value.scenes) || !value.scenes.length) throw Error("INVALID_SCRIPT_SCENES");
+      const ids = value.scenes.map((s) => s?.scene_id);
+      if (ids.some((id) => typeof id !== "string" || !id.trim()) || new Set(ids).size !== ids.length) throw Error("INVALID_SCENE_ID");
+      const chapterIds = value.chapters.map((c) => c.chapter_id);
+      if (chapterIds.some((id) => typeof id !== "string" || !id.trim()) || new Set(chapterIds).size !== chapterIds.length) throw Error("INVALID_CHAPTER_ID");
+      if (value.scenes.some((s) => !chapterIds.includes(s.chapter_id) || !Number.isSafeInteger(s.duration_ms) || s.duration_ms <= 0)) throw Error("INVALID_SCENE_BUDGET");
+      for (const chapter of value.chapters) {
+        const scenes = value.scenes.filter((s) => s.chapter_id === chapter.chapter_id);
+        if (!scenes.length || scenes.reduce((n, s) => n + s.duration_ms, 0) !== chapter.duration_ms) throw Error("SCENE_DURATION_MISMATCH");
+        if (chapter.scene_ids !== void 0 && (!Array.isArray(chapter.scene_ids) || chapter.scene_ids.length !== scenes.length || new Set(chapter.scene_ids).size !== scenes.length || chapter.scene_ids.some((id) => !scenes.some((s) => s.scene_id === id)))) throw Error("SCRIPT_SCENE_REF_MISMATCH");
+      }
+      if (value.dialogue !== void 0 && (!Array.isArray(value.dialogue) || value.dialogue.some((d) => !d || typeof d.speaker_id !== "string" || !d.speaker_id.trim() || !ids.includes(d.scene_id)))) throw Error("INVALID_DIALOGUE_REF");
+    }
+  }
+  if (stage === "assets") for (const key of ["characters", "scenes"]) {
+    if (!Array.isArray(value[key])) throw Error(`MISSING_FIELD:${key}`);
+    const ids = value[key].map((v) => v[key === "characters" ? "character_id" : "scene_id"]);
+    if (ids.some((id) => typeof id !== "string" || !id) || new Set(ids).size !== ids.length) throw Error("INVALID_ASSET_ID");
+  }
+  if (stage === "shots") {
+    if (!Array.isArray(value.shots)) throw Error("MISSING_SHOTS");
+    validateTimeline(value.shots, state.duration_ms);
+    const assets = state.artifacts.assets.data;
+    for (const shot of value.shots) if (!assets.scenes.some((s) => s.scene_id === shot.scene_id) || !Array.isArray(shot.character_ids) || shot.character_ids.some((id) => !assets.characters.some((c) => c.character_id === id))) throw Error("MISSING_REF");
+  }
+  if (stage === "prompts") {
+    if (!Array.isArray(value.prompts)) throw Error("MISSING_PROMPTS");
+    const shots = state.artifacts.shots.data.shots;
+    const ids = value.prompts.map((p) => p.shot_id);
+    if (new Set(ids).size !== ids.length || ids.length !== shots.length || shots.some((s) => !ids.includes(s.shot_id)) || value.prompts.some((p) => typeof p.prompt !== "string" || !p.prompt.trim())) throw Error("PROMPT_COVERAGE");
+  }
+  if (stage === "review" && value.review_status !== void 0) {
+    evaluateReview(value);
+    return;
+  }
+  if (stage === "review" && Array.isArray(value.issues) && value.issues.some((i) => !i || !["blocker", "major", "minor", "info"].includes(String(i.severity).toLowerCase()))) throw Error("INVALID_SEVERITY");
+  if (stage === "review" && (!Number.isInteger(value.score) || value.score < 85 || value.score > 100 || !Array.isArray(value.issues) || value.issues.some((i) => String(i.severity).toLowerCase() === "blocker") || value.passed !== true)) throw Error("REVIEW_BLOCKED");
+}
+function commitArtifact(state, stage, value, expected) {
+  if (state.revision !== expected) throw Error("REVISION_CONFLICT");
+  if (state.status === "STOPPED") throw Error("PROJECT_STOPPED");
+  const index = STAGES.indexOf(stage);
+  if (index < 0) throw Error("INVALID_STAGE");
+  for (const upstream of STAGES.slice(0, index)) {
+    if (!state.artifacts[upstream] || state.artifacts[upstream].stale) throw Error("UPSTREAM_REQUIRED");
+    if (["creative", "script"].includes(upstream) && state.approvals[upstream] !== state.artifacts[upstream].revision) throw Error("APPROVAL_REQUIRED");
+  }
+  validateArtifact(stage, value, state);
+  const next = structuredClone(state);
+  next.revision++;
+  next.artifacts[stage] = { revision: next.revision, source_revisions: sourceRevisions(state, stage), data: value, stale: false };
+  for (const downstream of STAGES.slice(index + 1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
+  for (const approved of ["creative", "script"]) if (STAGES.indexOf(approved) >= index) delete next.approvals[approved];
+  next.status = ["creative", "script"].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === "review" ? value.review_status && !evaluateReview(value).passed ? value.review_status : "FINAL_DELIVERY" : `${stage.toUpperCase()}_READY`;
+  return next;
+}
+
+// src/businesses/film-director/deliverables.ts
+function artifactManifest(state) {
+  return STAGES.filter((s) => state.artifacts[s]).map((stage) => {
+    const artifact = state.artifacts[stage];
+    return { stage, artifact_ref: `project.json#/artifacts/${stage}`, revision: artifact.revision, source_revisions: artifact.source_revisions || {}, stale: artifact.stale, sha256: createHash("sha256").update(JSON.stringify(artifact.data)).digest("hex") };
+  });
+}
+function printable(value) {
+  if (value === null || value === void 0) return "\u2014";
+  if (typeof value !== "object") return String(value);
+  if (Array.isArray(value)) return value.length ? value.map((v) => typeof v === "object" ? printable(v) : `- ${v}`).join("\n\n") : "\u65E0";
+  return Object.entries(value).map(([key, v]) => typeof v === "object" ? `**${key}**
+
+${printable(v)}` : `**${key}**\uFF1A${printable(v)}`).join("\n\n");
+}
+function renderDeliverables(state) {
+  const names = { creative: "\u521B\u610F\u63D0\u6848", script: "\u6B63\u5F0F\u5267\u672C", assets: "\u4EBA\u7269\u4E0E\u573A\u666F\u6863\u6848", shots: "\u5BFC\u6F14\u5206\u955C", prompts: "\u89C6\u9891\u751F\u6210\u63D0\u793A\u8BCD", review: "\u8D28\u91CF\u5BA1\u6838" };
+  return `# ${state.title}
+
+\u9879\u76EE\uFF1A${state.project_id} \xB7 \u4FEE\u8BA2\uFF1A${state.revision}
+
+` + STAGES.filter((s) => state.artifacts[s]).map((stage) => {
+    const a = state.artifacts[stage];
+    const data = { ...a.data };
+    const screenplay = stage === "script" && typeof data.screenplay === "string" ? data.screenplay : "";
+    if (screenplay) delete data.screenplay;
+    return `## ${names[stage]}\uFF08\u4FEE\u8BA2 ${a.revision}${a.stale ? "\uFF0C\u5DF2\u5931\u6548\uFF0C\u5F85\u66F4\u65B0" : ""}\uFF09
+
+${screenplay ? screenplay + "\n\n" : ""}${printable(data)}`;
+  }).join("\n\n");
+}
+
 // src/businesses/film-director/roles/director.ts
 var director_default = `# Director Agent \u2014 \u4E13\u4E1A\u5F71\u89C6\u603B\u5BFC\u6F14
 Version: 3.1
@@ -1299,10 +1641,13 @@ Creative\u53EA\u7B56\u5212\uFF0CScreenwriter\u5199\u5267\u672C\uFF0CCharacter\u7
 `;
 
 // src/businesses/film-director/roles/creative.ts
-var creative_default = `# CREATIVE \u2014 AI Film Director V3.0
+var creative_default = `# CREATIVE \u2014 AI Film Director V3.1
 
 ## \u8EAB\u4EFD\u4E0E\u8FB9\u754C
 \u4F60\u662F\u5F71\u89C6\u521B\u610F\u603B\u76D1\uFF0C\u8D1F\u8D23\u4ECE\u7528\u6237\u60F3\u6CD5\u5F62\u6210\u53EF\u4F9B\u5BA1\u6279\u7684\u521B\u610F\u84DD\u56FE\u3002\u4E0D\u7F16\u5199\u6B63\u5F0F\u9010\u573A\u5267\u672C\u3001\u4E0D\u751F\u6210\u5BFC\u6F14\u5206\u955C\u6216AI\u89C6\u9891\u63D0\u793A\u8BCD\u3001\u4E0D\u66FF\u7528\u6237\u51B3\u5B9A\u672A\u7ECF\u6388\u6743\u7684\u5173\u952E\u7ED3\u5C40\u3002\u521B\u610F\u7684\u89C6\u89C9\u8BC1\u636E\u63CF\u8FF0\u4E8B\u4EF6\u6216\u53EF\u89C2\u5BDF\u5BF9\u8C61\uFF0C\u4E0D\u63D0\u524D\u6307\u5B9A\u9010\u955C\u6444\u5F71\u53C2\u6570\u3002
+
+## \u8BBE\u8BA1\u65B9\u6848\u5B57\u6BB5\u9002\u914D
+\u672C\u89D2\u8272\u91C7\u7528V3.1\u603B\u4F53\u65B9\u6848\uFF0C\u4FDD\u7559\u5DF2\u6709\u7EC6\u5316\u521B\u610F\u65B9\u6CD5\u3002working_title\u6620\u5C04title_options\u9996\u9879\uFF0Ccore_premise\u6620\u5C04premise\uFF0Cnarrative_hook\u6620\u5C04hook\uFF0Cstory_beats\u4E0Echapter_outline\u805A\u5408\u8FDBstructure\uFF1Bpreserved_user_elements\u6620\u5C04must_preserve\uFF0Cresearch_required\u6620\u5C04research_needed\u3002\u4E0D\u5F97\u7EF4\u62A4\u4E24\u4E2A\u76F8\u4E92\u77DB\u76FE\u7684\u6743\u5A01\u7ED3\u6784\u3002\u65B0\u7A3F\u660E\u786Eaudience_experience\u3001visual_direction\u3001sound_direction\u53CAapproval_summary\uFF1B\u65B9\u6848\u72B6\u6001\u4E3APROPOSED\uFF0C\u5BA1\u6279\u53EA\u7531\u5DE5\u5177\u8BB0\u5F55\u3002
 
 ## \u8F93\u5165\u4E0E\u57FA\u7EBF
 \u63A5\u6536original_idea\u3001project_spec\u3001audience\u3001distribution_channel\u3001references\u3001hard_constraints\u3001soft_preferences\u3001duration_ms\u3001research_notes\u53CA\u5F53\u524Drevision/scope\u3002
@@ -1557,7 +1902,8 @@ Markdown\u6709\u57FA\u7840\u7248\u672C\u4E0E\u771F\u5B9E\u5BA1\u6838\u65F6\u95F4
 `;
 
 // src/businesses/film-director/roles/index.ts
-var ROLE_PROMPTS = { director: director_default, creative: creative_default, screenwriter: screenwriter_default, character: character_default, scene: scene_default, storyboard: storyboard_default, "prompt-engineer": prompt_engineer_default, reviewer: reviewer_default };
+var ROLE_TEXTS = { director: director_default, creative: creative_default, screenwriter: screenwriter_default, character: character_default, scene: scene_default, storyboard: storyboard_default, "prompt-engineer": prompt_engineer_default, reviewer: reviewer_default };
+var ROLE_PROMPTS = Object.fromEntries(Object.entries(ROLE_TEXTS).map(([key, text]) => [key, text + "\n" + COMMON_CONTRACT]));
 var INTENTS = ["new_project", "develop_idea", "write_script", "revise_dialogue", "revise_story", "design_character", "revise_character", "design_scene", "revise_scene", "design_shots", "revise_camera", "revise_timing", "write_prompts", "adapt_model", "review", "verify_facts", "resume", "produce", "clarify"];
 var ROUTES = {
   new_project: ["director", null],
@@ -1602,137 +1948,14 @@ function routeIntent(state, intent, entityIds = []) {
     missing,
     approval_required: approvals,
     scope_required: scopeRequired,
+    project_id: state.project_id,
+    input_revisions: sourceRevisions(state, stage),
+    model_profile: GENERIC_MODEL_PROFILE,
     expectedRevision: state.revision,
     instructions: ROLE_PROMPTS[role2],
     inputs,
     next_action: scopeRequired ? "\u660E\u786E\u4FEE\u6539\u5BF9\u8C61ID\uFF1B\u4E0D\u8981\u731C\u6D4B\u6216\u6539\u5199\u5168\u7247" : missing.length || approvals.length ? "\u5B8C\u6210\u7F3A\u5931\u4E0A\u6E38\u6216\u6279\u51C6\u540E\u518D\u4FEE\u6539" : "\u6309\u804C\u8D23\u751F\u6210\u5019\u9009\uFF1B\u63D0\u4EA4\u4ECD\u53D7\u73B0\u6709\u72B6\u6001\u673A\u4E0E\u5BA1\u6279\u7EA6\u675F"
   };
-}
-
-// src/businesses/film-director/review.ts
-var WEIGHTS = { requirement_fidelity: 20, narrative_quality: 15, character_consistency: 10, scene_consistency: 10, cinematic_quality: 15, temporal_consistency: 10, prompt_executability: 15, structural_completeness: 5 };
-function evaluateReview(report) {
-  if (!["PASS", "PASS_WITH_WARNINGS", "REVISE_REQUIRED", "BLOCKED", "NOT_EVALUATED"].includes(report.review_status) || !report.scores || !Array.isArray(report.issues)) throw Error("INVALID_REVIEW_REPORT");
-  let sum = 0, weight = 0;
-  for (const [key, w] of Object.entries(WEIGHTS)) {
-    const value = report.scores[key];
-    if (value === null) continue;
-    if (!Number.isFinite(value) || value < 0 || value > 100) throw Error("INVALID_REVIEW_SCORE");
-    sum += value * w;
-    weight += w;
-  }
-  const score = weight ? Math.round(sum / weight * 100) / 100 : null;
-  for (const issue of report.issues) if (!issue || !["CRITICAL", "MAJOR", "MINOR", "INFO"].includes(issue.severity) || !["OPEN", "IN_PROGRESS", "RESOLVED", "VERIFIED", "WONT_FIX"].includes(issue.status)) throw Error("INVALID_REVIEW_ISSUE");
-  const blockers = report.issues.filter((i) => ["CRITICAL", "MAJOR"].includes(i.severity) && i.status !== "VERIFIED").length;
-  const passed = ["PASS", "PASS_WITH_WARNINGS"].includes(report.review_status) && score !== null && score >= 80 && blockers === 0;
-  if (report.delivery_allowed !== passed || report.passed !== void 0 && report.passed !== passed || report.blocking_issue_count !== void 0 && report.blocking_issue_count !== blockers) throw Error("REVIEW_DECISION_MISMATCH");
-  if (["PASS", "PASS_WITH_WARNINGS"].includes(report.review_status) && !passed) throw Error("REVIEW_BLOCKED");
-  if (report.weighted_score !== void 0 && report.weighted_score !== score) throw Error("REVIEW_SCORE_MISMATCH");
-  return { score, passed, blockers };
-}
-
-// src/businesses/film-director/project.ts
-var STAGES = ["creative", "script", "assets", "shots", "prompts", "review"];
-function validateTimeline(shots, duration) {
-  let end = 0;
-  const ids = /* @__PURE__ */ new Set();
-  for (const shot of shots) {
-    if (!shot.shot_id || ids.has(shot.shot_id)) throw Error("DUPLICATE_OR_MISSING_ID");
-    ids.add(shot.shot_id);
-    if (shot.duration_ms !== void 0 && shot.duration_ms !== shot.end_ms - shot.start_ms) throw Error("SHOT_DURATION_MISMATCH");
-    if (!Number.isSafeInteger(shot.start_ms) || !Number.isSafeInteger(shot.end_ms) || shot.start_ms !== end || shot.end_ms <= end) throw Error("GAP_OR_OVERLAP");
-    end = shot.end_ms;
-  }
-  if (end !== duration) throw Error("DURATION_MISMATCH");
-}
-function validateArtifact(stage, value, state) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("INVALID_ARTIFACT");
-  const nonempty = (key) => {
-    if (typeof value[key] !== "string" || !value[key].trim()) throw Error(`MISSING_FIELD:${key}`);
-  };
-  if (stage === "creative") {
-    nonempty("theme");
-    nonempty("logline");
-    if (value.structure !== void 0) {
-      if (!Array.isArray(value.structure) || !value.structure.length) throw Error("INVALID_CREATIVE_STRUCTURE");
-      const ids = value.structure.map((s) => s?.section_id);
-      if (ids.some((id) => typeof id !== "string" || !id.trim()) || new Set(ids).size !== ids.length) throw Error("INVALID_SECTION_ID");
-      if (value.structure.some((s) => !Number.isSafeInteger(s.duration_ms) || s.duration_ms <= 0) || value.structure.reduce((n, s) => n + s.duration_ms, 0) !== state.duration_ms) throw Error("CREATIVE_DURATION_MISMATCH");
-    }
-    if (value.approval_questions !== void 0 && (!Array.isArray(value.approval_questions) || value.approval_questions.length > 3)) throw Error("TOO_MANY_CREATIVE_QUESTIONS");
-  }
-  if (stage === "script") {
-    nonempty("screenplay");
-    if (!Array.isArray(value.chapters) || !value.chapters.length || value.chapters.some((c) => !Number.isSafeInteger(c.duration_ms) || c.duration_ms <= 0) || value.chapters.reduce((n, c) => n + c.duration_ms, 0) !== state.duration_ms) throw Error("CHAPTER_DURATION_MISMATCH");
-  }
-  if (stage === "script") {
-    if (value.approved_creative_revision !== void 0 && value.approved_creative_revision !== state.approvals.creative) throw Error("CREATIVE_REVISION_MISMATCH");
-    if (value.scenes !== void 0) {
-      if (!Array.isArray(value.scenes) || !value.scenes.length) throw Error("INVALID_SCRIPT_SCENES");
-      const ids = value.scenes.map((s) => s?.scene_id);
-      if (ids.some((id) => typeof id !== "string" || !id.trim()) || new Set(ids).size !== ids.length) throw Error("INVALID_SCENE_ID");
-      const chapterIds = value.chapters.map((c) => c.chapter_id);
-      if (chapterIds.some((id) => typeof id !== "string" || !id.trim()) || new Set(chapterIds).size !== chapterIds.length) throw Error("INVALID_CHAPTER_ID");
-      if (value.scenes.some((s) => !chapterIds.includes(s.chapter_id) || !Number.isSafeInteger(s.duration_ms) || s.duration_ms <= 0)) throw Error("INVALID_SCENE_BUDGET");
-      for (const chapter of value.chapters) {
-        const scenes = value.scenes.filter((s) => s.chapter_id === chapter.chapter_id);
-        if (!scenes.length || scenes.reduce((n, s) => n + s.duration_ms, 0) !== chapter.duration_ms) throw Error("SCENE_DURATION_MISMATCH");
-        if (chapter.scene_ids !== void 0 && (!Array.isArray(chapter.scene_ids) || chapter.scene_ids.length !== scenes.length || new Set(chapter.scene_ids).size !== scenes.length || chapter.scene_ids.some((id) => !scenes.some((s) => s.scene_id === id)))) throw Error("SCRIPT_SCENE_REF_MISMATCH");
-      }
-      if (value.dialogue !== void 0 && (!Array.isArray(value.dialogue) || value.dialogue.some((d) => !d || typeof d.speaker_id !== "string" || !d.speaker_id.trim() || !ids.includes(d.scene_id)))) throw Error("INVALID_DIALOGUE_REF");
-    }
-  }
-  if (stage === "assets") for (const key of ["characters", "scenes"]) {
-    if (!Array.isArray(value[key])) throw Error(`MISSING_FIELD:${key}`);
-    const ids = value[key].map((v) => v[key === "characters" ? "character_id" : "scene_id"]);
-    if (ids.some((id) => typeof id !== "string" || !id) || new Set(ids).size !== ids.length) throw Error("INVALID_ASSET_ID");
-  }
-  if (stage === "shots") {
-    if (!Array.isArray(value.shots)) throw Error("MISSING_SHOTS");
-    validateTimeline(value.shots, state.duration_ms);
-    const assets = state.artifacts.assets.data;
-    for (const shot of value.shots) if (!assets.scenes.some((s) => s.scene_id === shot.scene_id) || !Array.isArray(shot.character_ids) || shot.character_ids.some((id) => !assets.characters.some((c) => c.character_id === id))) throw Error("MISSING_REF");
-  }
-  if (stage === "prompts") {
-    if (!Array.isArray(value.prompts)) throw Error("MISSING_PROMPTS");
-    const shots = state.artifacts.shots.data.shots;
-    const ids = value.prompts.map((p) => p.shot_id);
-    if (new Set(ids).size !== ids.length || ids.length !== shots.length || shots.some((s) => !ids.includes(s.shot_id)) || value.prompts.some((p) => typeof p.prompt !== "string" || !p.prompt.trim())) throw Error("PROMPT_COVERAGE");
-  }
-  if (stage === "review" && value.review_status !== void 0) {
-    evaluateReview(value);
-    return;
-  }
-  if (stage === "review" && Array.isArray(value.issues) && value.issues.some((i) => !i || !["blocker", "major", "minor", "info"].includes(String(i.severity).toLowerCase()))) throw Error("INVALID_SEVERITY");
-  if (stage === "review" && (!Number.isInteger(value.score) || value.score < 85 || value.score > 100 || !Array.isArray(value.issues) || value.issues.some((i) => String(i.severity).toLowerCase() === "blocker") || value.passed !== true)) throw Error("REVIEW_BLOCKED");
-}
-function commitArtifact(state, stage, value, expected) {
-  if (state.revision !== expected) throw Error("REVISION_CONFLICT");
-  const index = STAGES.indexOf(stage);
-  if (index < 0) throw Error("INVALID_STAGE");
-  for (const upstream of STAGES.slice(0, index)) {
-    if (!state.artifacts[upstream] || state.artifacts[upstream].stale) throw Error("UPSTREAM_REQUIRED");
-    if (["creative", "script"].includes(upstream) && state.approvals[upstream] !== state.artifacts[upstream].revision) throw Error("APPROVAL_REQUIRED");
-  }
-  validateArtifact(stage, value, state);
-  const next = structuredClone(state);
-  next.revision++;
-  next.artifacts[stage] = { revision: next.revision, data: value, stale: false };
-  for (const downstream of STAGES.slice(index + 1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
-  for (const approved of ["creative", "script"]) if (STAGES.indexOf(approved) >= index) delete next.approvals[approved];
-  next.status = ["creative", "script"].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === "review" ? value.review_status && !evaluateReview(value).passed ? value.review_status : "FINAL_DELIVERY" : `${stage.toUpperCase()}_READY`;
-  return next;
-}
-function exportMarkdown(state) {
-  return `# ${state.title}
-
-Revision: ${state.revision}
-
-` + STAGES.filter((s) => state.artifacts[s]).map((s) => `## ${s}${state.artifacts[s].stale ? " (stale)" : ""}
-
-\`\`\`json
-${JSON.stringify(state.artifacts[s].data, null, 2)}
-\`\`\``).join("\n\n");
 }
 
 // src/businesses/film-director/revisions.ts
@@ -1766,15 +1989,25 @@ function scheduleTask(state, task) {
   const tasks = state.tasks || [];
   const existing = tasks.find((t) => t.key === key);
   if (existing) return existing;
-  const result = { key, status: "ready", attempts: 0, source_revision: state.revision, ...task };
+  const result = { ...task, key, task_id: `TASK_${String(tasks.length + 1).padStart(3, "0")}`, project_id: state.project_id, status: "ready", attempts: 0, source_revision: state.revision, input_revisions: sourceRevisions(state, task.stage), revision_scope: task.scope || [], expected_outputs: task.stage ? [`project.json#/artifacts/${task.stage}`] : [] };
   state.tasks = [...tasks, result];
   return result;
 }
 function taskResult(state, key, status, errorCode) {
   const task = state.tasks?.find((t) => t.key === key);
-  if (!task || task.source_revision !== state.revision) throw Error("STALE_TASK");
+  if (!task) throw Error("UNKNOWN_TASK");
+  if (task.source_revision !== state.revision && status !== "completed") throw Error("STALE_TASK");
   if (!["running", "completed", "failed"].includes(status)) throw Error("INVALID_TASK_STATUS");
   if (task.status === "completed") return task;
+  if (status === "completed") {
+    const artifact = state.artifacts[task.stage];
+    if (task.action !== "submit" || !artifact || artifact.stale || artifact.revision <= task.source_revision) throw Error("TASK_OUTPUT_REQUIRED");
+    const inputs = sourceRevisions(state, task.stage);
+    if (JSON.stringify(inputs) !== JSON.stringify(task.input_revisions)) throw Error("STALE_TASK_INPUTS");
+    validateArtifact(task.stage, artifact.data, state);
+    task.output_refs = [{ artifact_ref: `project.json#/artifacts/${task.stage}`, revision: artifact.revision }];
+    task.validation = { status: "PASS", validated_at: (/* @__PURE__ */ new Date()).toISOString() };
+  }
   if (status === "running") {
     if (task.attempts >= 3) throw Error("RETRY_EXHAUSTED");
     task.attempts++;
@@ -1786,12 +2019,13 @@ function taskResult(state, key, status, errorCode) {
 
 // src/businesses/film-director/orchestration.ts
 function nextTask(state) {
+  if (state.status === "STOPPED") return { action: "stop", status: "STOPPED", expectedRevision: state.revision };
   for (const stage of STAGES) {
     const artifact = state.artifacts[stage];
-    if (!artifact || artifact.stale) {
+    if (!artifact || artifact.stale || state.status === `${stage.toUpperCase()}_REVISE`) {
       const roles = { creative: "creative", script: "screenwriter", assets: "character + scene", shots: "storyboard", prompts: "prompt-engineer", review: "reviewer" };
       const dependencies = { creative: [], script: ["creative"], assets: ["script"], shots: ["script", "assets"], prompts: ["assets", "shots"], review: [...STAGES.slice(0, 5)] };
-      return { action: "submit", stage, role: roles[stage], inputs: Object.fromEntries(dependencies[stage].map((s) => [s, state.artifacts[s]])), instructions: ROLE_INSTRUCTIONS[stage], expectedRevision: state.revision };
+      return { action: "submit", project_id: state.project_id, input_revisions: sourceRevisions(state, stage), revision_scope: artifact?.stale_entity_ids || [], model_profile: GENERIC_MODEL_PROFILE, stage, role: roles[stage], inputs: Object.fromEntries(dependencies[stage].map((s) => [s, state.artifacts[s]])), instructions: ROLE_INSTRUCTIONS[stage], expectedRevision: state.revision };
     }
     if (["creative", "script"].includes(stage) && state.approvals[stage] !== artifact.revision) return { action: "approve", stage, expectedRevision: state.revision };
   }
@@ -1800,6 +2034,7 @@ function nextTask(state) {
   return { action: "compile", expectedRevision: state.revision };
 }
 function validateCurrent(state) {
+  if (state.status === "STOPPED") throw Error("PROJECT_STOPPED");
   for (const stage of STAGES) {
     const artifact = state.artifacts[stage];
     if (!artifact || artifact.stale) throw Error(`STALE_OR_MISSING:${stage}`);
@@ -2503,7 +2738,7 @@ function createSegmentReview(ctx) {
 }
 
 // src/businesses/video/workflow/project.ts
-import { createHash, randomUUID as randomUUID2 } from "node:crypto";
+import { createHash as createHash2, randomUUID as randomUUID2 } from "node:crypto";
 import { mkdir as mkdir5, readdir as readdir2, readFile as readFile4, writeFile as writeFile3, rename as rename4, rm as rm4 } from "node:fs/promises";
 import path7 from "node:path";
 
@@ -3024,15 +3259,15 @@ async function resolveImageInput(value, label, fit = null) {
   return resolved;
 }
 function validateImageRoles(args, model) {
-  const refs = Array.isArray(args.referenceImages) ? args.referenceImages : args.referenceImages ? [args.referenceImages] : [];
+  const refs2 = Array.isArray(args.referenceImages) ? args.referenceImages : args.referenceImages ? [args.referenceImages] : [];
   if (args.lastFrameUrl && !args.firstFrameUrl) throw new Error("\u5C3E\u5E27\u5FC5\u987B\u4E0E\u9996\u5E27\u4E00\u8D77\u4F20\u5165\u3002");
-  if (refs.length && (args.firstFrameUrl || args.lastFrameUrl)) {
+  if (refs2.length && (args.firstFrameUrl || args.lastFrameUrl)) {
     throw new Error("\u9996\u5C3E\u5E27\u4E0E\u53C2\u8003\u56FE\u6A21\u5F0F\u4E92\u65A5\uFF0C\u8BF7\u9009\u62E9\u4E00\u79CD\uFF1B\u5982\u9700\u7EC4\u5408\uFF0C\u7528\u53C2\u8003\u56FE\u6A21\u5F0F\u5E76\u5728\u63D0\u793A\u8BCD\u6307\u5B9A\u9996\u5C3E\u753B\u9762\u3002");
   }
   const limit = isOmniExtendModel(model) ? 30 : 9;
-  if (refs.length > limit) throw new Error(`\u5F53\u524D\u6A21\u578B\u6700\u591A\u652F\u6301 ${limit} \u5F20\u53C2\u8003\u56FE\u3002`);
-  if (refs.some((value) => typeof value !== "string" || !value.trim())) throw new Error("\u6BCF\u5F20\u53C2\u8003\u56FE\u5FC5\u987B\u662F\u975E\u7A7A\u5B57\u7B26\u4E32\u3002");
-  return { refs, limit };
+  if (refs2.length > limit) throw new Error(`\u5F53\u524D\u6A21\u578B\u6700\u591A\u652F\u6301 ${limit} \u5F20\u53C2\u8003\u56FE\u3002`);
+  if (refs2.some((value) => typeof value !== "string" || !value.trim())) throw new Error("\u6BCF\u5F20\u53C2\u8003\u56FE\u5FC5\u987B\u662F\u975E\u7A7A\u5B57\u7B26\u4E32\u3002");
+  return { refs: refs2, limit };
 }
 
 // src/businesses/video/workflow/project.ts
@@ -3040,7 +3275,7 @@ init_hardcoded_config();
 init_config();
 init_connection();
 var locks = /* @__PURE__ */ new Set();
-var hash = (value) => createHash("sha256").update(value).digest("hex");
+var hash = (value) => createHash2("sha256").update(value).digest("hex");
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().filter((k) => value[k] !== void 0).map((k) => [k, stable(value[k])]));
@@ -3176,7 +3411,7 @@ function withProjectApproval(tool, config) {
 }
 
 // src/businesses/film-director/index.ts
-import { randomUUID as randomUUID3, createHash as createHash2 } from "node:crypto";
+import { randomUUID as randomUUID3, createHash as createHash3 } from "node:crypto";
 import { mkdir as mkdir6, readFile as readFile5, writeFile as writeFile4, rename as rename5 } from "node:fs/promises";
 import path8 from "node:path";
 init_hardcoded_config();
@@ -3232,13 +3467,14 @@ var FILM_WORKFLOW_GUIDANCE = `\u3010\u4E13\u4E1A\u5206\u9636\u6BB5\u521B\u4F5C\u
 \u7528\u6237\u8981\u6C42\u4E13\u4E1A\u5206\u9636\u6BB5\u521B\u4F5C\u6216\u957F\u7247\u5267\u672C\u89C4\u5212\u65F6\u4F7F\u7528film_project\uFF0C\u89C4\u5212\u8303\u56F415\u20133600\u79D2\uFF1B\u666E\u901A\u89C6\u9891\u5236\u4F5C\u4ECD\u7528video_project\u3002\u65F6\u957F\u3001\u753B\u5E45\u3001\u6E05\u6670\u5EA6\u5DF2\u786E\u8BA4\u5219\u6CBF\u7528\uFF0C\u7F3A\u5931\u89C4\u683C\u6309\u73B0\u6709\u89C4\u5219\u5408\u5E76\u8BE2\u95EE\uFF0C\u4E0D\u628A\u5EFA\u8BAE\u5F53\u7528\u6237\u786E\u8BA4\u3002\u89C4\u5212\u4E0D\u81EA\u52A8\u8C03\u7528\u89C6\u9891\u3002
 \u5148create(title,sourceBrief\u539F\u6587,durationSeconds)\uFF0C\u7EED\u4F5C\u6216\u6539\u7A3F\u5148read(projectId)\u3002\u4EE5\u5DE5\u5177\u8FD4\u56DE\u7684\u72B6\u6001\u548Crevision\u4E3A\u51C6\uFF0C\u4E0D\u5047\u8BBE\u5B58\u5728progress/manifest\u8BFB\u53D6\u3001\u56DE\u6EDA\u3001\u7AE0\u8282\u81EA\u52A8\u8C03\u5EA6\u6216\u72EC\u7ACB\u5B50Agent\u3002
 submit\u4F20stage\u3001content\uFF08\u5408\u6CD5JSON\u5B57\u7B26\u4E32\uFF09\u3001expectedRevision\uFF08\u6700\u8FD1\u8BFB\u53D6/\u63D0\u4EA4\u8FD4\u56DE\u7684\u9879\u76EErevision\uFF09\u3002JSON\u5B57\u7B26\u4E32\u91CC\u7684\u679A\u4E3E\u4E0E\u6587\u672C\u5FC5\u987B\u6709\u53CC\u5F15\u53F7\u3002\u6B63\u6587\u5148\u5C55\u793A\u53EF\u8BFB\u6210\u679C\uFF0C\u518D\u63D0\u4EA4\u5E76\u6838\u5BF9\u8FD4\u56DE\uFF1B\u5DE5\u5177\u6210\u529F\u624D\u79F0\u4FDD\u5B58\u3002
+\u65B0\u5EFA\u9879\u76EE\u91C7\u75283.1\u4E25\u683C\u6570\u636E\u534F\u8BAE\uFF1B\u5404\u9636\u6BB5source_revisions\u7531\u5DE5\u5177\u8BB0\u5F55\uFF0C\u63D0\u4EA4\u65F6\u82E5\u81EA\u5E26\u5FC5\u987B\u5339\u914D\u771F\u5B9E\u4E0A\u6E38\u3002\u6240\u6709JSON\u5747\u4E3A\u89C4\u8303\u5B57\u6BB5\uFF0C\u53C2\u8003\u7A3F\u522B\u540D\u987B\u5148\u6620\u5C04\uFF0C\u4E0D\u5F97\u540C\u65F6\u7EF4\u62A4\u51B2\u7A81\u7248\u672C\u3002
 \u9636\u6BB5\u53CAcontent\u5B57\u6BB5\uFF1A
-creative\uFF1A\u65B0\u521B\u4F5C\u6309CREATIVE V3.0\u89D2\u8272\u8FD4\u56DE\u7684\u5B8C\u6574\u5B57\u6BB5\u63D0\u4EA4\uFF1Bstructure\u4F7F\u7528beats\u4E0Evisual_evidence\uFF0C\u6BB5\u843D\u6B63\u6574\u6570\u6BEB\u79D2\u5408\u8BA1\u7B49\u4E8E\u9879\u76EE\u65F6\u957F\uFF0Capproval_questions\u6700\u591A3\u9879\u3002\u65E7\u9879\u76EE\u4FDD\u7559\u5DF2\u6709\u5B57\u6BB5\uFF0C\u4E0D\u628A\u517C\u5BB9\u8BFB\u53D6\u5F53\u65B0\u7A3F\u5B8C\u6210\u6807\u51C6\u3002\u5C55\u793A\u540Eapprove(stage:creative)\uFF0C\u53EA\u6709\u771F\u5B9E\u6279\u51C6\u624D\u5199\u5267\u672C\u3002
-script\uFF1Ascreenplay\u5B8C\u6574\u5267\u672C\u6B63\u6587\u3001chapters[{chapter_id,title,duration_ms,summary,scene_ids}]\u5FC5\u586B\uFF0C\u7AE0\u8282\u65F6\u957F\u603B\u548C\u7B49\u4E8E\u9879\u76EEduration_ms\uFF1B\u6309Screenwriter V3.1\u5728scenes\u89C4\u8303\u5217\u8868\u4FDD\u7559\u52A8\u4F5C\u548C\u573A\u666F\u9884\u7B97\uFF0Cdialogue\u5173\u8054speaker_id/scene_id\uFF0C\u65C1\u767D\u5206\u5F00\uFF1Bapproved_creative_revision\u7ED1\u5B9A\u5B9E\u9645\u6279\u51C6\u521B\u610F\u3002\u5C55\u793A\u540Eapprove(stage:script)\uFF0C\u53EA\u6709\u771F\u5B9E\u6279\u51C6\u624D\u5EFA\u8D44\u4EA7\u3002
-assets\uFF1A\u540C\u4E00\u5BF9\u8C61\u542Bcharacters\u6570\u7EC4\u53CAscenes\u6570\u7EC4\uFF1B\u4EBA\u7269\u9879\u5FC5\u6709character_id\uFF0C\u573A\u666F\u9879\u5FC5\u6709scene_id\u3002\u4EBA\u7269/\u573A\u666F\u5206\u522B\u6309\u4E13\u4E1A\u804C\u8D23\u6574\u7406\u540E\u5408\u5E76\u63D0\u4EA4\uFF0C\u4E0D\u6539\u53D8\u5267\u672C\u3002
-shots\uFF1A{shots:[{shot_id,scene_id,character_ids,start_ms,end_ms,duration_ms,narrative_purpose,...\u955C\u5934\u7EC6\u8282}]}\u3002\u65F6\u95F4\u7528\u6574\u6570\u6BEB\u79D2\uFF0C\u534A\u5F00\u533A\u95F4[start_ms,end_ms)\uFF0C\u4ECE0\u8FDE\u7EED\u8986\u76D6\u5168\u7247\uFF1B\u5F15\u7528\u5FC5\u987B\u5B58\u5728\uFF0Cduration_ms=end_ms-start_ms\u3002
-prompts\uFF1A{prompts:[{shot_id,prompt,target_model,capability_warnings,...}]}\uFF0C\u6BCF\u955C\u6070\u6709\u4E00\u4E2A\u975E\u7A7Aprompt\uFF1B\u4FDD\u7559\u8D44\u4EA7\u951A\u70B9\u4E0E\u6E90\u7248\u672C\uFF0C\u4E0D\u628A\u4E00\u955C\u4E00\u63D0\u793A\u8BCD\u8BEF\u5F53\u4E00\u955C\u4E00\u6B21\u4ED8\u8D39\u8C03\u7528\u3002
-review\uFF1A\u65B0\u7248Reviewer V3.1\u63D0\u4EA4review_status\u3001scores\u516B\u7EF4\uFF08\u4E0D\u9002\u7528null\uFF09\u3001issues\u3001delivery_allowed\u3001blocking_issue_count\u548C\u771F\u5B9Ereviewed_revisions\u7B49\u5B8C\u6574\u62A5\u544A\u3002CRITICAL/MAJOR\u672AVERIFIED\u963B\u65AD\uFF1B\u52A0\u6743\u5206\u7531\u7A0B\u5E8F\u590D\u7B97\uFF0C\u5931\u8D25\u62A5\u544A\u4E5F\u53EF\u4FDD\u5B58\u4F46\u7981\u6B62\u7F16\u8BD1\u3002\u65E7\u62A5\u544Ascore/passed\u534F\u8BAE\u517C\u5BB9\u3002
+creative\uFF1A\u65B0\u521B\u4F5C\u6309CREATIVE V3.1\u89D2\u8272\u8FD4\u56DE\u7684\u5B8C\u6574\u5B57\u6BB5\u63D0\u4EA4\uFF1Bstructure\u4F7F\u7528beats\u4E0Evisual_evidence\uFF0C\u6BB5\u843D\u6B63\u6574\u6570\u6BEB\u79D2\u5408\u8BA1\u7B49\u4E8E\u9879\u76EE\u65F6\u957F\uFF0Capproval_questions\u6700\u591A3\u9879\u3002\u65E7\u9879\u76EE\u4FDD\u7559\u5DF2\u6709\u5B57\u6BB5\uFF0C\u4E0D\u628A\u517C\u5BB9\u8BFB\u53D6\u5F53\u65B0\u7A3F\u5B8C\u6210\u6807\u51C6\u3002\u5C55\u793A\u540Eapprove(stage:creative)\uFF0C\u53EA\u6709\u771F\u5B9E\u6279\u51C6\u624D\u5199\u5267\u672C\u3002
+script\uFF1Ascreenplay\u5B8C\u6574\u5267\u672C\u6B63\u6587\u3001chapters[{chapter_id,title,duration_ms,summary,scene_ids}]\u5FC5\u586B\uFF0C\u7AE0\u8282\u65F6\u957F\u603B\u548C\u7B49\u4E8E\u9879\u76EEduration_ms\uFF1B\u6309Screenwriter V3.1\u5728scenes\u89C4\u8303\u5217\u8868\u4FDD\u7559\u52A8\u4F5C\u548C\u573A\u666F\u9884\u7B97\uFF0Ccharacters\u4E3A\u7A33\u5B9Acharacter_id\u6E05\u5355\uFF0Cdialogue\u6BCF\u6761\u542Bdialogue_id/exact_text/speaker_id/scene_id\uFF08\u53C2\u8003\u7A3Fdialogue_lines\u6620\u5C04\u4E3Adialogue\uFF09\uFF0C\u65C1\u767D\u5206\u5F00\uFF1Bapproved_creative_revision\u7ED1\u5B9A\u5B9E\u9645\u6279\u51C6\u521B\u610F\u3002\u5C55\u793A\u540Eapprove(stage:script)\uFF0C\u53EA\u6709\u771F\u5B9E\u6279\u51C6\u624D\u5EFA\u8D44\u4EA7\u3002
+assets\uFF1A\u540C\u4E00\u5BF9\u8C61\u542Bcharacters\u3001scenes\u3001locations\u3001scene_states\u3001props\u6570\u7EC4\uFF08\u65E0\u5185\u5BB9\u7528\u7A7A\u6570\u7EC4\uFF09\uFF0Cscenes\u5173\u8054location_id/scene_state_id\uFF1B\u4EBA\u7269\u9879\u5FC5\u6709character_id\uFF0C\u573A\u666F\u9879\u5FC5\u6709scene_id\u3002\u4EBA\u7269/\u573A\u666F\u5206\u522B\u6309\u4E13\u4E1A\u804C\u8D23\u6574\u7406\u540E\u5408\u5E76\u63D0\u4EA4\uFF0C\u4E0D\u6539\u53D8\u5267\u672C\u3002
+shots\uFF1A{shots:[{shot_id,scene_id,character_ids,start_ms,end_ms,duration_ms,narrative_purpose,chapter_id,location_id,scene_state_id,costume_ids,prop_ids,dialogue_refs,...\u955C\u5934\u7EC6\u8282}]}\u3002\u65F6\u95F4\u7528\u6574\u6570\u6BEB\u79D2\uFF0C\u534A\u5F00\u533A\u95F4[start_ms,end_ms)\uFF0C\u4ECE0\u8FDE\u7EED\u8986\u76D6\u5168\u7247\uFF1B\u5F15\u7528\u5FC5\u987B\u5B58\u5728\uFF0Cduration_ms=end_ms-start_ms\u3002
+prompts\uFF1A{prompts:[{shot_id,prompt,target_model,location_id,scene_state_id,duration_ms,generation_mode,dialogue_refs,capability_warnings,...}]}\uFF0C\u6BCF\u955C\u6070\u6709\u4E00\u4E2A\u975E\u7A7Aprompt\uFF1B\u4FDD\u7559\u8D44\u4EA7\u951A\u70B9\u4E0E\u6E90\u7248\u672C\uFF0C\u4E0D\u628A\u4E00\u955C\u4E00\u63D0\u793A\u8BCD\u8BEF\u5F53\u4E00\u955C\u4E00\u6B21\u4ED8\u8D39\u8C03\u7528\u3002
+review\uFF1A\u65B0\u7248Reviewer V3.1\u63D0\u4EA4review_status\u3001scores\u516B\u7EF4\uFF08\u4E0D\u9002\u7528null\uFF09\u3001issues\u3001delivery_allowed\u3001blocking_issue_count\u548C\u771F\u5B9Ereviewed_revisions\uFF08creative/script/assets/shots/prompts\u5BF9\u5E94\u5B9E\u9645\u4FEE\u8BA2\u53F7\uFF09\u3001review_id/review_stage/review_scope/unverified_items\u7B49\u5B8C\u6574\u62A5\u544A\u3002CRITICAL/MAJOR\u672AVERIFIED\u963B\u65AD\uFF1B\u52A0\u6743\u5206\u7531\u7A0B\u5E8F\u590D\u7B97\uFF0C\u5931\u8D25\u62A5\u544A\u4E5F\u53EF\u4FDD\u5B58\u4F46\u7981\u6B62\u7F16\u8BD1\u3002\u65E7\u62A5\u544Ascore/passed\u534F\u8BAE\u517C\u5BB9\u3002
 \u521B\u610F\u548C\u5267\u672C\u7684\u6279\u51C6\u5206\u522B\u7ED1\u5B9A\u6750\u6599\u7248\u672C\uFF0C\u6C89\u9ED8/\u53D6\u6D88/\u4FEE\u6539\u610F\u89C1\u4E0D\u7B97\u6279\u51C6\u3002\u6539\u7A3F\u540E\u6309\u5DE5\u5177stale\u72B6\u6001\u66F4\u65B0\u4E0B\u6E38\uFF0C\u4E0D\u5047\u79F0\u5DF2\u5B9E\u73B0\u5B9E\u4F53\u7EA7\u81EA\u52A8\u4FEE\u8BA2\u3002\u8D85\u8FC7180\u79D2\u6309\u7AE0\u89C4\u5212\uFF0C600\u79D2\u4EE5\u4E0A\u7EF4\u62A4\u5168\u7247\u6458\u8981\u548C\u7AE0\u95F4\u72B6\u6001\uFF0C\u5206\u6279\u521B\u4F5C\u4F46\u6309\u5F53\u524D\u5DE5\u5177\u63D0\u4EA4\u5B8C\u6574\u9636\u6BB5\u805A\u5408\u5BF9\u8C61\uFF1B\u8D85\u51FA\u4E0A\u4E0B\u6587\u80FD\u529B\u65F6\u505C\u5728\u53EF\u6062\u590D\u8349\u7A3F\uFF0C\u4E0D\u622A\u65AD\u5192\u5145\u5B8C\u6574\u3002
 export\u8FD4\u56DEJSON\u548CMarkdown\u5185\u5BB9\uFF0C\u4E0D\u662F\u5DF2\u5199\u5165\u5BFC\u51FA\u6587\u4EF6\uFF1B\u6CA1\u6709\u5B9E\u9645\u6587\u4EF6\u4E0D\u5F97\u7F16\u9020\u4E0B\u8F7D\u94FE\u63A5\u3002Markdown\u5E94\u4E3A\u540C\u7248\u672CJSON\u7684\u53EF\u8BFB\u6295\u5F71\u3002\u5B9E\u9645\u89C6\u9891\u4ECD\u987B\u8D70video_project\u811A\u672C\u5BA1\u6838\u3001\u8D39\u7528\u786E\u8BA4\u4E0E\u9010\u6BB5\u7ED3\u679C\u5BA1\u6838\uFF0C\u521B\u4F5C\u6279\u51C6\u4E0D\u66FF\u4EE3\u5236\u4F5C\u6388\u6743\u3002`;
 var ORCHESTRATION_GUIDANCE = `\u63A8\u8FDB\u4E13\u4E1A\u521B\u4F5C\u5148\u8C03\u7528film_project(action:next)\uFF0C\u53EA\u52A0\u8F7D\u8FD4\u56DE\u7684role\u3001inputs\u4E0Escope\u6240\u9700\u8D44\u6599\uFF0C\u518D\u6309\u8BB8\u53EF\u52A8\u4F5C\u63D0\u4EA4\u6216\u8BF7\u6C42\u6279\u51C6\uFF1B\u4E0D\u628A\u5B8C\u6574\u5386\u53F2\u53CD\u590D\u585E\u7ED9\u955C\u5934\u4EFB\u52A1\u3002\u5F53\u524Drole\u662F\u540C\u4E00\u52A9\u624B\u7684\u4E13\u4E1A\u804C\u8D23\uFF0C\u4E0D\u662F\u72EC\u7ACB\u8FD0\u884C\u7684\u5B50Agent\u3002\u5B8C\u6210\u5BA1\u6838\u540E\u8C03\u7528compile(expectedRevision,ratio,resolution)\u7F16\u8BD1\u5236\u4F5C\u8BA1\u5212\uFF0C\u8FD4\u56DEproduction.videoProjectId\u53CAspecification\u3002\u7528\u8BE5videoProjectId\u6267\u884Cvideo_project prepare\u5B8C\u6210\u89D2\u8272\u56FE\u8DEF\u7EBF\uFF0C\u518D\u5C55\u793A\u5236\u4F5C\u811A\u672C\u3001\u5206\u955C\u4E0E\u4F30\u4EF7\u5E76review\uFF0C\u6700\u540E\u624D\u8C03\u7528\u89C6\u9891\u751F\u6210\u3002\u4E0D\u5F97\u628A\u521B\u4F5C\u6279\u51C6\u5F53\u8D39\u7528\u6388\u6743\u3002compile\u53EA\u8BFB\u89C4\u5212\u4E0D\u4EA7\u751F\u4ED8\u8D39\u8C03\u7528\uFF1B\u91CD\u590D\u540C\u7248\u672C\u540C\u89C4\u683C\u7F16\u8BD1\u590D\u7528\u7ED1\u5B9A\u3002\u521B\u4F5C\u6539\u7A3F\u540E\u65E7\u7ED1\u5B9A\u7981\u6B62\u65B0\u589E\u751F\u6210\uFF0C\u5DF2\u63D0\u4EA4\u4EFB\u52A1\u67E5\u8BE2\u548C\u4EA4\u4ED8\u4ECD\u53EF\u6062\u590D\u3002\u5168\u7247\u6700\u957F3600\u79D2\uFF0C\u6309\u6A21\u578B\u5355\u6BB5\u80FD\u529B\u9010\u6BB5\u751F\u6210\u3001\u5BA1\u6838\u548C\u7EED\u505A\uFF0C\u4E0D\u627F\u8BFA\u4E00\u6B21\u8BF7\u6C42\u751F\u6210\u6574\u7247\u3002`;
@@ -3252,7 +3488,7 @@ var filmDirectorBusiness = {
   apply(runtime) {
     runtime.tools.register("film-director", {
       name: "film_project",
-      description: "\u4E13\u4E1A\u521B\u4F5C\u9879\u76EE\uFF1Acreate/read/submit/approve/export\u3002\u78C1\u76D8\u4FDD\u5B58\uFF0C\u521B\u610F\u4E0E\u5267\u672C\u72EC\u7ACB\u4EBA\u5DE5\u6279\u51C6\uFF0C\u4E0D\u63D0\u4EA4\u4ED8\u8D39\u89C6\u9891\u3002submit\u7684content\u4E3AJSON\u5B57\u7B26\u4E32\uFF1Acreative\u542Btheme/logline\uFF1Bscript\u542Bscreenplay/chapters\uFF08duration_ms\uFF09\uFF1Bassets\u542Bcharacters/scenes\uFF1Bshots\u542Bshots\uFF1Bprompts\u542Bprompts\uFF1Breview\u542Bscore/passed/issues\u3002",
+      description: "\u4E13\u4E1A\u521B\u4F5C\u9879\u76EE\uFF1Acreate/read/submit/approve/export\u3002\u78C1\u76D8\u4FDD\u5B58\uFF0C\u521B\u610F\u4E0E\u5267\u672C\u72EC\u7ACB\u4EBA\u5DE5\u6279\u51C6\uFF0C\u4E0D\u63D0\u4EA4\u4ED8\u8D39\u89C6\u9891\u3002submit\u7684content\u4E3AJSON\u5B57\u7B26\u4E32\uFF1Acreative\u542Btheme/logline\uFF1Bscript\u542Bscreenplay/chapters\uFF08duration_ms\uFF09\uFF1Bassets\u542Bcharacters/scenes\uFF1Bshots\u542Bshots\uFF1Bprompts\u542Bprompts\uFF1Breview\u542Breview_status/scores/issues/delivery_allowed\uFF1Bexport\u8FD4\u56DE\u53EF\u8BFBMarkdown\u53CA\u7248\u672C\u6821\u9A8C\u6E05\u5355\u3002",
       parameters: { type: "object", properties: {
         intent: { type: "string", enum: [...INTENTS] },
         entityIds: { type: "array", items: { type: "string" } },
@@ -3288,7 +3524,7 @@ var filmDirectorBusiness = {
           let state;
           if (args.action === "create") {
             if (!Number.isInteger(args.durationSeconds) || args.durationSeconds < 15 || args.durationSeconds > 3600 || !args.title?.trim() || !args.sourceBrief?.trim()) throw Error("INVALID_REQUIREMENTS");
-            state = { schema_version: "2.0.0", project_id: id, title: args.title, source_brief: args.sourceBrief, duration_ms: args.durationSeconds * 1e3, revision: 0, status: "REQUIREMENT_ANALYSIS", artifacts: {}, approvals: {}, decisions: [] };
+            state = { schema_version: "3.1.0", project_id: id, title: args.title, source_brief: args.sourceBrief, duration_ms: args.durationSeconds * 1e3, revision: 0, status: "REQUIREMENT_ANALYSIS", artifacts: {}, approvals: {}, decisions: [] };
           } else state = JSON.parse(await readFile5(file, "utf8"));
           if (args.action === "read") return { ...state, nextTask: nextTask(state) };
           if (args.action === "next") return nextTask(state);
@@ -3308,7 +3544,7 @@ var filmDirectorBusiness = {
               state.production = { ...plan, videoProjectId: project.id };
             }
           }
-          if (args.action === "export") return { project: state, markdown: exportMarkdown(state), status: state.status };
+          if (args.action === "export") return { project: state, markdown: renderDeliverables(state), manifest: artifactManifest(state), status: state.status };
           if (args.action === "submit") state = commitArtifact(state, args.stage, JSON.parse(args.content), args.expectedRevision);
           if (args.action === "approve") {
             const artifact = state.artifacts[args.stage];
@@ -3317,13 +3553,10 @@ var filmDirectorBusiness = {
             if (!service?.ask) return { status: "needs_input", reason: "\u4EBA\u5DE5\u786E\u8BA4\u670D\u52A1\u4E0D\u53EF\u7528" };
             const answer = await service.ask({ agent: exec.agent, signal: exec.signal, questions: [{ id: "film_approval", header: "\u521B\u4F5C\u5BA1\u6838", question: `\u5BA1\u6838${args.stage} revision ${artifact.revision}\uFF1A
 ${JSON.stringify(artifact.data)}
-\u662F\u5426\u6279\u51C6\u672C\u7248\u8FDB\u5165\u4E0B\u4E00\u9636\u6BB5\uFF1F`, multiSelect: false, options: [{ label: "\u6279\u51C6\u672C\u7248", description: "\u7EE7\u7EED\u4E0B\u4E00\u521B\u4F5C\u9636\u6BB5" }, { label: "\u9700\u8981\u4FEE\u6539", description: "\u4FDD\u7559\u8349\u7A3F\u5E76\u4FEE\u6539" }] }] });
+\u662F\u5426\u6279\u51C6\u672C\u7248\u8FDB\u5165\u4E0B\u4E00\u9636\u6BB5\uFF1F`, multiSelect: false, options: [{ label: "\u6279\u51C6\u672C\u7248", description: "\u7EE7\u7EED\u4E0B\u4E00\u521B\u4F5C\u9636\u6BB5" }, { label: "\u9700\u8981\u4FEE\u6539", description: "\u4FDD\u7559\u8349\u7A3F\u5E76\u4FEE\u6539" }, { label: "\u62D2\u7EDD\u5F53\u524D\u65B9\u6848", description: "\u505C\u6B62\u5F53\u524D\u521B\u4F5C\u6D41\u7A0B\uFF0C\u4FDD\u7559\u5DF2\u6709\u8D44\u6599" }] }] });
             const decision = answer?.answers?.find((a) => a.id === "film_approval");
-            if (exec.signal?.aborted || decision?.custom || decision?.selected?.length !== 1 || decision.selected[0] !== "\u6279\u51C6\u672C\u7248") return { status: "needs_input", projectId: id };
-            state.approvals[args.stage] = artifact.revision;
-            state.decisions.push({ stage: args.stage, revision: artifact.revision, decision: "approve", approved_at: (/* @__PURE__ */ new Date()).toISOString() });
-            state.revision++;
-            state.status = args.stage === "creative" ? "SCRIPT_WRITING" : "ASSET_DESIGN";
+            if (exec.signal?.aborted || decision?.custom || decision?.selected?.length !== 1 || !["\u6279\u51C6\u672C\u7248", "\u9700\u8981\u4FEE\u6539", "\u62D2\u7EDD\u5F53\u524D\u65B9\u6848"].includes(decision.selected[0])) return { status: "needs_input", projectId: id };
+            state = recordApprovalDecision(state, args.stage, { "\u6279\u51C6\u672C\u7248": "APPROVED", "\u9700\u8981\u4FEE\u6539": "REVISE", "\u62D2\u7EDD\u5F53\u524D\u65B9\u6848": "REJECTED" }[decision.selected[0]], args.expectedRevision);
           }
           if (!["create", "submit", "approve", "compile", "revise", "schedule", "task_result"].includes(args.action)) throw Error("INVALID_ACTION");
           await mkdir6(path8.join(dir, "snapshots"), { recursive: true, mode: 448 });
@@ -3332,7 +3565,7 @@ ${JSON.stringify(artifact.data)}
           const temp = path8.join(dir, `${randomUUID3()}.tmp`);
           await writeFile4(temp, body, { mode: 384, flag: "wx" });
           await rename5(temp, file);
-          return { ...state, nextTask: nextTask(state), sha256: createHash2("sha256").update(body).digest("hex") };
+          return { ...state, nextTask: nextTask(state), sha256: createHash3("sha256").update(body).digest("hex") };
         } finally {
           locks2.delete(id);
         }
@@ -3348,8 +3581,8 @@ function selectedAgentId(context, ctx) {
   if (!session) return null;
   for (const owner of [agent?.ctx, ctx]) {
     try {
-      const registry = owner?.get?.("agentPresets");
-      if (typeof registry?.presetForSession === "function") return registry.presetForSession(session) ?? null;
+      const registry2 = owner?.get?.("agentPresets");
+      if (typeof registry2?.presetForSession === "function") return registry2.presetForSession(session) ?? null;
     } catch {
       return null;
     }
@@ -3374,9 +3607,9 @@ var active = /* @__PURE__ */ new WeakMap();
 function registryForContext(ctx, fallback) {
   return ctx && active.get(ctx)?.at(-1)?.registry || fallback;
 }
-function bindAgentRegistry(ctx, registry) {
+function bindAgentRegistry(ctx, registry2) {
   const stack = active.get(ctx) || [];
-  const entry = { registry };
+  const entry = { registry: registry2 };
   stack.push(entry);
   active.set(ctx, stack);
   return () => {
@@ -3387,7 +3620,7 @@ function bindAgentRegistry(ctx, registry) {
 }
 
 // src/core/telemetry/reporter.ts
-import { randomUUID as randomUUID4, createHash as createHash3 } from "node:crypto";
+import { randomUUID as randomUUID4, createHash as createHash4 } from "node:crypto";
 import { mkdir as mkdir7, readFile as readFile6, writeFile as writeFile5 } from "node:fs/promises";
 import path9 from "node:path";
 import os4 from "node:os";
@@ -3573,7 +3806,7 @@ function createAnalyticsReporter(config, options = {}) {
       if (dedupeKey) {
         void Promise.resolve().then(() => identity()).then((id) => {
           if (!id || !allowed()) return;
-          event.eventId = createHash3("sha256").update(`${id}:${name}:${dedupeKey}`).digest("hex");
+          event.eventId = createHash4("sha256").update(`${id}:${name}:${dedupeKey}`).digest("hex");
           queue.push(event);
           queue = queue.slice(-maxQueue);
           schedule();
@@ -4099,7 +4332,7 @@ import { mkdir as mkdir9, readFile as readFile8, readdir as readdir3, writeFile 
 import path12 from "node:path";
 
 // src/businesses/video/workflow/character-choice.ts
-import { createHash as createHash4 } from "node:crypto";
+import { createHash as createHash5 } from "node:crypto";
 import { mkdir as mkdir8, readFile as readFile7, writeFile as writeFile6, rename as rename6, rm as rm5 } from "node:fs/promises";
 import path11 from "node:path";
 init_connection();
@@ -4120,7 +4353,7 @@ async function characterChoiceGate(ctx, config, exec, args) {
   if (!session || typeof session !== "object") return deny("\u63D0\u4EA4\u5DF2\u505C\u6B62\uFF1A\u7EAF\u6587\u751F\u89C6\u9891\u987B\u5148\u8BE2\u95EE\u662F\u5426\u751F\u6210\u89D2\u8272\u53C2\u8003\u56FE\uFF0C\u5F53\u524D\u7F3A\u5C11\u53EF\u4EA4\u4E92\u4F1A\u8BDD\u3002");
   const stableId = typeof session.id === "string" ? session.id : typeof session.header?.id === "string" ? session.header.id : null;
   if (!localIds.has(session)) localIds.set(session, `live-${++nextId}`);
-  const key = createHash4("sha256").update(JSON.stringify(project ? [project.id] : [stableId || localIds.get(session), args?.prompt || "", args?.duration, args?.resolution, args?.ratio])).digest("hex");
+  const key = createHash5("sha256").update(JSON.stringify(project ? [project.id] : [stableId || localIds.get(session), args?.prompt || "", args?.duration, args?.resolution, args?.ratio])).digest("hex");
   const file = path11.join(dshHome(), "metaontic-video", "character-choices", key + ".json");
   try {
     async function choose() {
@@ -5473,7 +5706,7 @@ function jsonSafeTool(tool) {
 
 // src/businesses/video/providers/submissions.ts
 import path16 from "node:path";
-import { createHash as createHash5, randomUUID as randomUUID7 } from "node:crypto";
+import { createHash as createHash6, randomUUID as randomUUID7 } from "node:crypto";
 import { mkdir as mkdir10, readFile as readFile9, writeFile as writeFile8, rename as rename7, rm as rm6, open as open3, readdir as readdir5 } from "node:fs/promises";
 init_hardcoded_config();
 init_connection();
@@ -5733,7 +5966,7 @@ async function waitForCompletion(config, taskId, signal) {
 }
 
 // src/businesses/video/providers/submissions.ts
-var hash2 = (value) => createHash5("sha256").update(value).digest("hex");
+var hash2 = (value) => createHash6("sha256").update(value).digest("hex");
 function submissionIdentity(config) {
   return hash2(JSON.stringify([isVolcengine(config) ? "volcengine" : "metaontic", resolveBaseUrl(config), hash2(resolveApiKey(config))]));
 }
@@ -5878,7 +6111,7 @@ function submissionTool(liveConfig) {
 }
 
 // src/businesses/video/integrations/canvas.ts
-import { createHash as createHash7, randomUUID as randomUUID9 } from "node:crypto";
+import { createHash as createHash8, randomUUID as randomUUID9 } from "node:crypto";
 import { mkdir as mkdir13, readFile as readFile11, writeFile as writeFile10, rename as rename10, copyFile, stat as stat7, open as open4 } from "node:fs/promises";
 import path19 from "node:path";
 init_hardcoded_config();
@@ -5886,7 +6119,7 @@ init_hardcoded_config();
 // src/businesses/video/integrations/canvas-builtin.ts
 import { mkdir as mkdir11, readFile as readFile10, writeFile as writeFile9, rename as rename8, readdir as readdir6, stat as stat6 } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { createHash as createHash6, randomUUID as randomUUID8 } from "node:crypto";
+import { createHash as createHash7, randomUUID as randomUUID8 } from "node:crypto";
 import path17 from "node:path";
 init_hardcoded_config();
 var BUILTIN_BACKEND = "builtin";
@@ -6101,7 +6334,7 @@ async function builtinCanvasImport(args) {
   if (bytes.length > IMPORT_LIMIT_BYTES) throw new Error("\u5355\u5F20\u56FE\u7247\u4E0D\u80FD\u8D85\u8FC7 32MB\u3002");
   const extension = imageExtension(args?.mime, bytes);
   if (!extension) throw new Error("\u53EA\u652F\u6301 PNG\u3001JPEG\u3001WebP \u56FE\u7247\u3002");
-  const id = `mov_img_${createHash6("sha256").update(bytes).digest("hex").slice(0, 24)}`;
+  const id = `mov_img_${createHash7("sha256").update(bytes).digest("hex").slice(0, 24)}`;
   const label = String(args?.name || "").trim().slice(0, 80) || `\u5BFC\u5165\u56FE\u7247${extension}`;
   const rel = `projects/${doc.id}/image/${id}${extension}`;
   const dest = path17.join(dataRootOf(), rel);
@@ -6569,7 +6802,7 @@ var canvasLinkSchema = { type: "object", properties: {
   nodeId: { type: "string" },
   fingerprint: { type: "string" }
 }, required: ["projectId", "nodeId", "fingerprint"], description: "video_canvas(action:read)\u8FD4\u56DE\u7684\u6D41\u7A0B\u753B\u5E03\u5B9A\u4F4D\u4E0E\u5185\u5BB9\u6458\u8981\uFF1B\u539F\u6837\u4F20\u5165\uFF0C\u4E0D\u731C\u6D4B\u3002" };
-var digest = (value) => createHash7("sha256").update(JSON.stringify(value)).digest("hex");
+var digest = (value) => createHash8("sha256").update(JSON.stringify(value)).digest("hex");
 var validId2 = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 function location(link) {
   if (!validId2(link?.projectId) || !validId2(link?.nodeId) || link.canvasId && !validId2(link.canvasId)) throw new Error("\u753B\u5E03\u9879\u76EE\u6216\u8282\u70B9\u6807\u8BC6\u65E0\u6548");
@@ -6867,11 +7100,11 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
 }
 
 // src/businesses/video/integrations/canvas-project.ts
-import { createHash as createHash8 } from "node:crypto";
+import { createHash as createHash9 } from "node:crypto";
 import { readFile as readFile12 } from "node:fs/promises";
 import path20 from "node:path";
 init_config();
-var digest2 = (value) => createHash8("sha256").update(JSON.stringify(value)).digest("hex");
+var digest2 = (value) => createHash9("sha256").update(JSON.stringify(value)).digest("hex");
 async function adapterForNewCanvas(binding, load) {
   if (binding?.projectId) return resolveCanvasAdapter(binding.projectId, load);
   if (load !== loadCanvasAdapter) return load();
@@ -7163,7 +7396,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
 
 // src/businesses/video/integrations/canvas-native.ts
 import path22 from "node:path";
-import { createHash as createHash10, randomUUID as randomUUID10 } from "node:crypto";
+import { createHash as createHash11, randomUUID as randomUUID10 } from "node:crypto";
 import { mkdir as mkdir15, readFile as readFile13, writeFile as writeFile12, rename as rename12, stat as stat9 } from "node:fs/promises";
 init_hardcoded_config();
 init_connection();
@@ -7236,7 +7469,7 @@ function endWithPunctuation(text) {
 }
 
 // src/businesses/video/workflow/real-person.ts
-import { createHash as createHash9 } from "node:crypto";
+import { createHash as createHash10 } from "node:crypto";
 
 // src/businesses/video/tools/results.ts
 import { resolve as resolve2 } from "node:path";
@@ -7598,7 +7831,7 @@ async function recoverRealPersonImages(config, body, ctx, exec, final, state = {
   try {
     for (const item of images) {
       const source = String(item.image_url.url);
-      const key = createHash9("sha256").update(source).digest("hex");
+      const key = createHash10("sha256").update(source).digest("hex");
       const entry = state.images[key] ||= {};
       if (entry.failed) throw new Error(`\u56FE\u7247\u4EFB\u52A1 ${entry.taskId || ""} \u5DF2\u660E\u786E\u5931\u8D25\uFF1A${entry.failed}\u3002\u4E0D\u81EA\u52A8\u518D\u6B21\u51FA\u56FE\u3002`);
       if (!entry.imageUrl) {
@@ -7696,7 +7929,7 @@ ${content[0].text}`;
   return { body, seconds };
 }
 async function buildGenerationBody(config, args, seconds, options = {}) {
-  const { refs } = validateImageRoles(args, resolveModel(config));
+  const { refs: refs2 } = validateImageRoles(args, resolveModel(config));
   const prompt = String(args.prompt ?? "").trim();
   const ratio = args.ratio || ref(config, "ratio", "adaptive");
   const canvas = canvasSize(ratio);
@@ -7719,7 +7952,7 @@ async function buildGenerationBody(config, args, seconds, options = {}) {
   if (firstFrame) await addImage(firstFrame, "first_frame", "\u9996\u5E27\u56FE");
   const lastFrame = String(args.lastFrameUrl ?? "").trim();
   if (lastFrame) await addImage(lastFrame, "last_frame", "\u5C3E\u5E27\u56FE");
-  for (const [index, reference] of refs.entries()) {
+  for (const [index, reference] of refs2.entries()) {
     await addImage(reference.trim(), "reference_image", `\u53C2\u8003\u56FE ${index + 1}`);
   }
   const body = { ...parseExtraParams(config) };
@@ -8444,7 +8677,7 @@ async function downloadSegmentsAndMerge(config, {
 
 // src/businesses/video/integrations/canvas-native.ts
 init_config();
-var hash3 = (value) => createHash10("sha256").update(JSON.stringify(value)).digest("hex");
+var hash3 = (value) => createHash11("sha256").update(JSON.stringify(value)).digest("hex");
 var validToken = (value) => /^[a-f0-9-]{36}$/.test(String(value || ""));
 var terminal = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled"]);
 function splitEvenly(items, count) {
@@ -8569,13 +8802,13 @@ function planCanvasNative(input, config, operation = "generate", draft = {}, car
   if (/@[^@\n]+@/.test(prompt)) throw new Error("\u8BF7\u5148\u628A@\u8BBE\u5B9A\u5F15\u7528\u5C55\u5F00\u4E3A\u660E\u786E\u63CF\u8FF0\uFF0C\u76F4\u63A5\u5236\u4F5C\u6682\u4E0D\u81EA\u52A8\u89E3\u6790\u8BBE\u5B9A\u5F15\u7528\u3002");
   const ratio = draft.ratio ?? node.ratio;
   if (!["16:9", "9:16", "1:1", "4:3", "3:4"].includes(ratio)) throw new Error("\u8BF7\u5728\u8282\u70B9\u660E\u786E\u9009\u62E9\u753B\u5E45\u540E\u518D\u5236\u4F5C\u3002");
-  const refs = incoming.filter((e) => e.toPort !== "prompt");
+  const refs2 = incoming.filter((e) => e.toPort !== "prompt");
   const order = node.refOrder || [];
-  refs.sort((a, b) => {
+  refs2.sort((a, b) => {
     const ai = order.indexOf(a.id), bi = order.indexOf(b.id);
     return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi);
   });
-  const images = refs.map((e) => {
+  const images = refs2.map((e) => {
     if (!["ref", "frame"].includes(e.toPort) || e.fromPort !== "out") throw new Error("\u5F53\u524D\u4EC5\u652F\u6301\u56FE\u7247out\u8FDE\u63A5ref/\u9996\u5E27\u53E3\uFF1B\u5C3E\u5E27\u9009\u53D6\u7B49\u8FDE\u63A5\u8BF7\u5148\u5BFC\u51FA\u4E3A\u56FE\u7247\u8282\u70B9\u3002");
     const media = input.references.find((r) => r.nodeId === e.fromNode);
     if (!media || media.kind !== "image") throw new Error("\u53C2\u8003\u7AEF\u53E3\u8FDE\u7684\u4E0A\u6E38\u8282\u70B9\u8FD8\u6CA1\u6709\u751F\u6210\u597D\u7684\u56FE\u7247\uFF1A\u5148\u5728\u5B83\u81EA\u5DF1\u7684\u300C\u5236\u4F5C\u300D\u91CC\u51FA\u4E00\u5F20\u56FE\uFF0C\u518D\u56DE\u6765\u505A\u8FD9\u4E00\u6B65\u3002");
@@ -9320,11 +9553,11 @@ async function initialCharacterReferences(config, args, saved, signal) {
   }
   const referenceImages = Array.isArray(args.referenceImages) ? args.referenceImages : args.referenceImages ? [args.referenceImages] : [];
   const source = args.characterReferenceImages ?? (referenceImages.length ? referenceImages : args.firstFrameUrl ? [args.firstFrameUrl] : []);
-  const { refs } = validateImageRoles({ referenceImages: source }, resolveModel(config));
+  const { refs: refs2 } = validateImageRoles({ referenceImages: source }, resolveModel(config));
   const canvas = canvasSize(args.ratio || ref(config, "ratio", "adaptive"));
   const fit = canvas ? { size: canvas, config, signal } : null;
   const images = [];
-  for (const value of refs) {
+  for (const value of refs2) {
     const resolved = isVolcengine(config) && /^asset:\/\//.test(value) ? { url: value } : await resolveImageInput(value, "\u6700\u521D\u89D2\u8272\u53C2\u8003\u56FE", fit);
     images.push({ type: "image_url", image_url: { url: resolved.url }, role: "reference_image" });
   }
@@ -10824,7 +11057,7 @@ function buildPromptGuidance(config) {
     "\xB7 \u5206\u955C\u5C55\u793A\u68C0\u67E5\uFF1A\u5BA1\u6838\u63D0\u95EE\u524D\u5C06\u6838\u5BF9\u72EC\u7ACBassistant\u6B63\u6587\u91CC\u7684\u56FE\u7247\u8BED\u6CD5\u4E0E\u5F53\u524D\u7248\u5206\u955C\u56FE\u6587\u4EF6\uFF1B\u4EC5reasoning\u3001\u5DE5\u5177\u770B\u56FE\u3001present\u767B\u8BB0\u6216\u7EAF\u6587\u5B57\u63CF\u8FF0\u90FD\u4F1A\u88AB\u62E6\u622A\u3002\u5148\u5B9E\u9645\u53D1\u9001\u56FE\u548C\u539F\u56FE\u94FE\u63A5\uFF0C\u518D\u5355\u72EC\u63D0\u5BA1\u6838\u95EE\u9898\u3002",
     "\xB7 \u5206\u955C\u56FE\u5FC5\u987B\u5B9E\u9645\u53EF\u89C1\uFF1A\u5148\u786E\u8BA4\u5F53\u524D\u9879\u76EE/\u7248\u672C\u7684SVG\u6216PNG\u6587\u4EF6\u771F\u5B9E\u5B58\u5728\uFF0C\u518D\u5728\u7528\u6237\u53EF\u89C1\u6B63\u6587\u8F93\u51FAMarkdown\u5185\u5D4C\u56FE\u7247\uFF08\u611F\u53F9\u53F7+\u56FE\u7247\u6807\u7B7E+\u5C16\u62EC\u53F7\u5305\u88F9\u7684\u7EDD\u5BF9\u8DEF\u5F84\uFF09\uFF0C\u540C\u65F6\u7ED9\u51FA\u6253\u5F00\u539F\u56FE\u7684\u6587\u4EF6\u94FE\u63A5\u3002present\u53EA\u767B\u8BB0\u6700\u7EC8\u6210\u7247\u3001\u4E0D\u5C5E\u4E8E\u8FC7\u7A0B\u6750\u6599\uFF0C\u4E0D\u7B49\u4E8E\u6B63\u6587\u5DF2\u7ECF\u6E32\u67D3\uFF1Bread_image\u7B49\u6A21\u578B\u770B\u56FE\u5DE5\u5177\u6210\u529F\u4E5F\u4E0D\u7B49\u4E8E\u7528\u6237\u770B\u5230\u56FE\u3002\u4E0D\u80FD\u53EA\u8BF4\u5DF2\u753B\u597D\u3001\u53EA\u7ED9\u76EE\u5F55\u6216\u5F39\u5BA1\u6838\u7A97\u3002SVG/HTML\u4E0D\u80FD\u5185\u5D4C\u65F6\u7528\u5DF2\u6709\u672C\u5730\u5DE5\u5177\u5BFC\u51FAPNG\uFF0C\u4E0D\u80FD\u4E3A\u6B64\u64C5\u81EA\u8C03\u7528\u4ED8\u8D39\u51FA\u56FE\u6216\u5B89\u88C5\u8F6F\u4EF6\uFF1B\u786E\u5B9E\u65E0\u6CD5\u5185\u5D4C\u65F6\u660E\u786E\u8BF4\u660E\u5E76\u63D0\u4F9B\u5B9E\u9645\u53EF\u6253\u5F00\u6587\u4EF6\uFF0C\u4E0D\u58F0\u79F0\u5DF2\u5C55\u793A\u6210\u529F\u3002\u5148\u53D1\u51FA\u5305\u542B\u56FE\u7247/\u6253\u5F00\u5165\u53E3\u7684\u6B63\u6587\uFF0C\u518D\u53D1\u811A\u672C\u5BA1\u6838\u63D0\u95EE\uFF0C\u7981\u6B62\u4E0E\u5C55\u793A\u5DE5\u5177\u5E76\u884C\u3002\u6B63\u6587\u4E0E\u5BA1\u6838\u63D0\u95EE\u4E4B\u95F4\u4E0D\u80FD\u7ED3\u675F\u56DE\u5408\uFF1A\u6B63\u6587\u90A3\u6761\u6D88\u606F\u5185\u5FC5\u987B\u540C\u65F6\u5E26\u4E0A video_stage \u6536\u53E3 script_present\uFF08\u5FC5\u8981\u65F6\u5E76\u5F00\u59CB script_review_wait\uFF09\uFF0C\u4E0D\u8981\u5728\u6B63\u6587\u53D1\u51FA\u4E4B\u524D\u63D0\u524D start\u3001\u66F4\u4E0D\u8981\u63D0\u524D finish script_present\uFF0C\u5426\u5219\u6B63\u6587\u4F1A\u53D8\u6210\u4E00\u6761\u7EAF\u6587\u672C\u6D88\u606F\uFF0C\u52A9\u624B\u5E38\u5728\u6B63\u6587\u540E\u76F4\u63A5\u7ED3\u675F\u56DE\u5408\uFF0C\u5BA1\u6838\u7A97\u5C31\u4E0D\u4F1A\u5F39\u51FA\u3002\u6B63\u6587\u672B\u5C3E\u7981\u6B62\u5199\u201C\u53EF\u4EE5\u6539\u7684\u65B9\u5411/\u76F4\u63A5\u56DE\u590D\u6211\u5C31\u884C\u201D\u7B49\u6536\u5C3E\u6216\u66FF\u4EE3\u95EE\u53E5\u3002\u4E0A\u4E00\u8F6E\u5C55\u793A\u540E\u6CA1\u5F39\u51FA\u5BA1\u6838\u7A97\u53E3\u65F6\uFF0C\u7528\u6237\u4E0B\u4E00\u6761\u6D88\u606F\u5230\u8FBE\u5148\u8865\u5F39\u5F53\u524D\u7248\u811A\u672C\u5BA1\u6838\u7A97\uFF0C\u518D\u6309\u8981\u6C42\u6539\u7A3F\u3002\u7528\u6237\u8BF4\u6CA1\u770B\u5230\u56FE\u65F6\u5148\u8865\u5C55\u793A\u540C\u4E00\u7248\u56FE\uFF0C\u4E0D\u76F4\u63A5\u7EE7\u7EED\u5BA1\u6838\u6216\u91CD\u65B0\u751F\u6210\u89C6\u9891\u3002",
     "\xB7 \u7EED\u62CD\u65B9\u5F0F\u7531\u672C\u7248\u5DF2\u5BA1\u6838\u811A\u672C\u51B3\u5B9A\uFF0C\u4E0D\u5728\u63D2\u4EF6\u8BBE\u7F6E\u9875\u914D\u7F6E\uFF0C\u4E5F\u4E0D\u7528video_config\u4FDD\u5B58\u5168\u5C40mode\uFF08\u8BE5\u5DE5\u5177\u53EA\u8BFB\uFF0C\u914D\u7F6E\u6539\u52A8\u4E00\u5F8B\u5728\u8BBE\u7F6E\u9875\uFF09\u3002\u6BCF\u6BB5\u660E\u786E\u8FDE\u7EED\u955C\u5934\u8FD8\u662F\u6709\u52A8\u673A\u7684\u666F\u522B\u5207\u6362\uFF0C\u5E76\u5199\u5165\u8FC7\u6E21\u63CF\u8FF0\uFF1B\u5B9E\u9645\u8C03\u7528\u4F20\u76F8\u5E94mode\u6216transitionDescription\u3002\u672A\u6307\u5B9A\u65F6\u7528\u8FDE\u7EED\u7EED\u62CD\uFF0C\u65E7\u914D\u7F6Emode\u4E0D\u5F71\u54CD\u65B0\u4EFB\u52A1\uFF1Bresume\u4FDD\u7559\u8BB0\u5F55\u91CC\u7684mode\u4E0E\u8FC7\u6E21\uFF0C\u5DF2\u63D0\u4EA4\u4EFB\u52A1\u539F\u8BF7\u6C42\u4E0D\u6539\u3002",
-    "\xB7 \u5B98\u65B9\u63D0\u793A\u8BCD\u7EC6\u5219\uFF1A\u5148\u5B9A\u4E49\u4EBA\u7269\u3001\u9053\u5177\u3001\u573A\u666F\u7B49\u4E3B\u4F53\uFF0C\u4F7F\u75282\u20133\u4E2A\u7A33\u5B9A\u53EF\u8BC6\u522B\u7279\u5F81\u4E0E\u7D20\u6750\u7F16\u53F7\u5EFA\u7ACB\u7ED1\u5B9A\uFF0C\u540E\u6587\u56FA\u5B9A\u4F7F\u7528\u540C\u4E00\u6807\u7B7E\u3002\u6BCF\u4E2A\u751F\u6210\u6BB5\u5185\u90E8\u6309\u955C\u59341/\u955C\u59342/\u955C\u59343\u7684\u4E8B\u4EF6\u987A\u5E8F\u5199\u8C01\u3001\u5728\u54EA\u3001\u505A\u4EC0\u4E48\u3001\u955C\u5934\u600E\u4E48\u52A8\u53CA\u58F0\u97F3\uFF0C\u4E0D\u5F3A\u884C\u51D1\u6EE1\u4E09\u4E2A\u955C\u5934\uFF1B\u5206\u955C\u7F16\u53F7\u4E0D\u589E\u52A0\u4ED8\u8D39\u751F\u6210\u6B21\u6570\uFF0C2.0\u4E0D\u5F3A\u5236\u9010\u955C\u79D2\u70B9\u3002\u52A8\u4F5C\u5199\u5177\u4F53\u90E8\u4F4D\u3001\u5E45\u5EA6\u3001\u901F\u5EA6\u3001\u529B\u5EA6\u548C\u60EF\u6027\u627F\u63A5\uFF0C\u7528\u53EF\u89C1\u8868\u60C5/\u59FF\u6001\u8868\u73B0\u60C5\u7EEA\uFF1B\u4E00\u822C\u4F18\u5148\u4F4E\u7F13\u8FDE\u7EED\u5C0F\u52A8\u4F5C\uFF0C\u52A8\u4F5C\u620F\u4E0E\u7528\u6237\u660E\u786E\u5267\u60C5\u4F18\u5148\uFF0C\u4E0D\u64C5\u81EA\u6539\u5199\u3002\u5C06\u666F\u522B\uFF08\u8FDC\u666F/\u5168\u666F/\u4E2D\u666F/\u8FD1\u666F/\u7279\u5199\uFF09\u3001\u89C6\u89D2\uFF08\u5E73\u89C6/\u4FEF\u62CD/\u4EF0\u62CD/\u822A\u62CD/\u8FC7\u80A9/\u7AA5\u89C6/\u5FAE\u8DDD/\u955C\u50CF\u7B49\uFF09\u3001\u8FD0\u955C\uFF08\u63A8/\u62C9/\u6447/\u79FB/\u73AF\u7ED5/\u8DDF\u968F/\u5347\u964D/\u53D8\u7126\uFF09\u5206\u522B\u5199\u6E05\uFF0C\u4E00\u4E2A\u955C\u5934\u5C3D\u91CF\u53EA\u5B89\u6392\u4E00\u79CD\u8FD0\u955C\uFF0C\u907F\u514D\u4E92\u76F8\u77DB\u76FE\uFF1B\u89C6\u89D2\u6309\u573A\u666F\u4E0E\u53D9\u4E8B\u9009\uFF0C\u5E73\u89C6\u662F\u9ED8\u8BA4\uFF0C\u8BF4\u4E0D\u6E05\u300C\u8981\u8BA9\u89C2\u4F17\u611F\u5230\u4EC0\u4E48\u300D\u6216\u573A\u666F\u6CA1\u6709\u76F8\u5E94\u6761\u4EF6\uFF08\u5BA4\u5185\u5199\u822A\u62CD\u3001\u65E0\u906E\u6321\u5199\u7AA5\u89C6\uFF09\u5C31\u4E0D\u5199\uFF0C\u4E0D\u4E3A\u53D8\u5316\u786C\u52A0\u3002\u753B\u8D28\u63CF\u8FF0\u5199\u7EB9\u7406\u3001\u8272\u5F69\u548C\u5149\u5F71\u8D28\u611F\uFF0C\u4E0D\u80FD\u4EE3\u66FF\u7528\u6237\u786E\u8BA4\u7684480P/720P\u53C2\u6570\uFF1B\u89C6\u89C9\u98CE\u683C\u4E0E\u7528\u6237\u65B9\u6848\u4E00\u81F4\uFF0C\u9010\u6BB5\u4FDD\u6301\u7EDF\u4E00\u3002\u7EA6\u675F\u8BCD\u6309\u9700\u6C42\u660E\u786E\u65E0\u5B57\u5E55\u3001\u65E0\u65B0\u589ELogo\u6216\u6C34\u5370\u3001\u4E3B\u4F53\u7A33\u5B9A\u4E0D\u53D8\u5F62\u4E0E\u65E0\u95EA\u70C1\uFF0C\u4F46\u4E0D\u5F97\u8986\u76D6\u7528\u6237\u660E\u786E\u8981\u6C42\u7684\u5B57\u5E55\u3001\u54C1\u724C\u6807\u8BC6\u6216\u6C34\u5370\u3002\u753B\u9762\u4E0D\u5355\u8C03\u7684\u4E0B\u9650\uFF08\u90FD\u5728\u540C\u4E00\u6B21\u751F\u6210\u5185\u5B8C\u6210\uFF0C\u4E0D\u989D\u5916\u589E\u52A0\u4ED8\u8D39\u8C03\u7528\uFF09\uFF1A15 \u79D2\u81F3\u5C11 2 \u6B21\u300130 \u79D2 3\u20134 \u6B21\u53EF\u89C1\u7684\u666F\u522B\u6216\u6784\u56FE\u53D8\u5316\uFF0C\u6BCF 3\u20135 \u79D2\u6709\u4E00\u4E2A\u770B\u5F97\u89C1\u7684\u53D8\u5316\uFF08\u4E3B\u4F53\u4F4D\u79FB\u3001\u9053\u5177\u4EA4\u4E92\u3001\u5149\u7EBF\u6216\u5C42\u6B21\u53D8\u5316\u3001\u660E\u786E\u7684\u60C5\u7EEA\u53CD\u5E94\uFF09\uFF0C\u81F3\u5C11\u4E00\u5904\u7279\u5199\u6216\u524D\u666F\u906E\u6321\u540E\u7684\u63ED\u793A\u627F\u62C5\u60C5\u7EEA\uFF0C\u81F3\u5C11\u4E00\u4E2A\u955C\u5934\u6709\u660E\u786E\u7684\u524D\u666F/\u4E2D\u666F/\u80CC\u666F\uFF0C\u58F0\u97F3\u81F3\u5C11\u4E24\u5C42\uFF1B\u6574\u6BB5\u53EA\u6709\u56FA\u5B9A\u4E2D\u666F\u52A0\u7F13\u6162\u63A8\u8FD1\u5373\u4E3A\u4E0D\u5408\u683C\u811A\u672C\u3002\u7528\u6237\u660E\u786E\u8981\u6C42\u4E00\u955C\u5230\u5E95\u3001\u56FA\u5B9A\u673A\u4F4D\u6216\u9759\u6001\u98CE\u5149\u65F6\uFF0C\u6539\u7528\u540C\u4E00\u4E2A\u955C\u5934\u5185\u7684\u666F\u522B\u63A8\u8FDB\u3001\u4E3B\u4F53\u4F4D\u79FB\u3001\u5149\u7EBF\u53D8\u5316\u3001\u5C42\u6B21\u4E0E\u58F0\u97F3\u6765\u907F\u514D\u5355\u8C03\uFF0C\u5E76\u5199\u660E\u8FD9\u662F\u6309\u7528\u6237\u8981\u6C42\u6216\u573A\u666F\u6761\u4EF6\u4FDD\u7559\u7684\u3002",
+    "\xB7 \u5B98\u65B9\u63D0\u793A\u8BCD\u7EC6\u5219\uFF1A\u5148\u5B9A\u4E49\u4EBA\u7269\u3001\u9053\u5177\u3001\u573A\u666F\u7B49\u4E3B\u4F53\uFF0C\u4F7F\u75282\u20133\u4E2A\u7A33\u5B9A\u53EF\u8BC6\u522B\u7279\u5F81\u4E0E\u7D20\u6750\u7F16\u53F7\u5EFA\u7ACB\u7ED1\u5B9A\uFF0C\u540E\u6587\u56FA\u5B9A\u4F7F\u7528\u540C\u4E00\u6807\u7B7E\u3002\u6BCF\u4E2A\u751F\u6210\u6BB5\u5185\u90E8\u6309\u955C\u59341/\u955C\u59342/\u955C\u59343\u7684\u4E8B\u4EF6\u987A\u5E8F\u5199\u8C01\u3001\u5728\u54EA\u3001\u505A\u4EC0\u4E48\u3001\u955C\u5934\u600E\u4E48\u52A8\u53CA\u58F0\u97F3\uFF0C\u4E0D\u5F3A\u884C\u51D1\u6EE1\u4E09\u4E2A\u955C\u5934\uFF1B\u5206\u955C\u7F16\u53F7\u4E0D\u589E\u52A0\u4ED8\u8D39\u751F\u6210\u6B21\u6570\uFF0C2.0\u4E0D\u5F3A\u5236\u9010\u955C\u79D2\u70B9\u3002\u52A8\u4F5C\u5199\u5177\u4F53\u90E8\u4F4D\u3001\u5E45\u5EA6\u3001\u901F\u5EA6\u3001\u529B\u5EA6\u548C\u60EF\u6027\u627F\u63A5\uFF0C\u7528\u53EF\u89C1\u8868\u60C5/\u59FF\u6001\u8868\u73B0\u60C5\u7EEA\uFF1B\u4E00\u822C\u4F18\u5148\u4F4E\u7F13\u8FDE\u7EED\u5C0F\u52A8\u4F5C\uFF0C\u52A8\u4F5C\u620F\u4E0E\u7528\u6237\u660E\u786E\u5267\u60C5\u4F18\u5148\uFF0C\u4E0D\u64C5\u81EA\u6539\u5199\u3002\u5C06\u666F\u522B\uFF08\u8FDC\u666F/\u5168\u666F/\u4E2D\u666F/\u8FD1\u666F/\u7279\u5199\uFF09\u3001\u89C6\u89D2\uFF08\u5E73\u89C6/\u4FEF\u62CD/\u4EF0\u62CD/\u822A\u62CD/\u8FC7\u80A9/\u7AA5\u89C6/\u5FAE\u8DDD/\u955C\u50CF\u7B49\uFF09\u3001\u8FD0\u955C\uFF08\u63A8/\u62C9/\u6447/\u79FB/\u73AF\u7ED5/\u8DDF\u968F/\u5347\u964D/\u53D8\u7126\uFF09\u5206\u522B\u5199\u6E05\uFF0C\u4E00\u4E2A\u955C\u5934\u5C3D\u91CF\u53EA\u5B89\u6392\u4E00\u79CD\u8FD0\u955C\uFF0C\u907F\u514D\u4E92\u76F8\u77DB\u76FE\uFF1B\u89C6\u89D2\u6309\u573A\u666F\u4E0E\u53D9\u4E8B\u9009\uFF0C\u5E73\u89C6\u662F\u9ED8\u8BA4\uFF0C\u8BF4\u4E0D\u6E05\u300C\u8981\u8BA9\u89C2\u4F17\u611F\u5230\u4EC0\u4E48\u300D\u6216\u573A\u666F\u6CA1\u6709\u76F8\u5E94\u6761\u4EF6\uFF08\u5BA4\u5185\u5199\u822A\u62CD\u3001\u65E0\u906E\u6321\u5199\u7AA5\u89C6\uFF09\u5C31\u4E0D\u5199\uFF0C\u4E0D\u4E3A\u53D8\u5316\u786C\u52A0\u3002\u753B\u8D28\u63CF\u8FF0\u5199\u7EB9\u7406\u3001\u8272\u5F69\u548C\u5149\u5F71\u8D28\u611F\uFF0C\u4E0D\u80FD\u4EE3\u66FF\u7528\u6237\u786E\u8BA4\u7684480P/720P\u53C2\u6570\uFF1B\u89C6\u89C9\u98CE\u683C\u4E0E\u7528\u6237\u65B9\u6848\u4E00\u81F4\uFF0C\u9010\u6BB5\u4FDD\u6301\u7EDF\u4E00\u3002\u7EA6\u675F\u8BCD\u6309\u9700\u6C42\u660E\u786E\u65E0\u5B57\u5E55\u3001\u65E0\u65B0\u589ELogo\u6216\u6C34\u5370\u3001\u4E3B\u4F53\u7A33\u5B9A\u4E0D\u53D8\u5F62\u4E0E\u65E0\u95EA\u70C1\uFF0C\u4F46\u4E0D\u5F97\u8986\u76D6\u7528\u6237\u660E\u786E\u8981\u6C42\u7684\u5B57\u5E55\u3001\u54C1\u724C\u6807\u8BC6\u6216\u6C34\u5370\u3002\u753B\u9762\u5185\u5BB9\u4E0E\u8282\u594F\u68C0\u67E5\uFF1A\u6BCF\u4E2A\u955C\u5934\u6709\u660E\u786E\u53D9\u4E8B\u76EE\u7684\uFF0C\u4EE5\u53EF\u89C1\u884C\u52A8\u3001\u6709\u6548\u4FE1\u606F\u6216\u7EC6\u8282\u53D1\u73B0\u652F\u6491\u4E3B\u9898\uFF1B\u4E0D\u673A\u68B0\u89C4\u5B9A\u5207\u955C\u6B21\u6570\u3001\u666F\u522B\u53D8\u5316\u9891\u7387\u6216\u58F0\u97F3\u5C42\u6570\u3002\u56FA\u5B9A\u673A\u4F4D\u3001\u4E00\u955C\u5230\u5E95\u548C\u5FC5\u8981\u7559\u767D\u53EF\u4EE5\u6210\u7ACB\uFF1B\u4E0D\u5F97\u7528\u7A7A\u6D1E\u753B\u9762\u6216\u91CD\u590D\u6C1B\u56F4\u586B\u65F6\u957F\uFF0C\u4E0D\u989D\u5916\u589E\u52A0\u4ED8\u8D39\u8C03\u7528\u3002",
     "\xB7 \u811A\u672C\u4E0E\u9010\u6BB5\u63D0\u793A\u8BCD\u91C7\u7528\u5B98\u65B9\u8FDB\u9636\u516C\u5F0F\uFF1A\u7CBE\u51C6\u4E3B\u4F53\u3001\u52A8\u4F5C\u7EC6\u8282\u3001\u573A\u666F\u73AF\u5883\u3001\u5149\u5F71\u8272\u8C03\u3001\u955C\u5934\u8FD0\u955C\u3001\u89C6\u89C9\u98CE\u683C\u3001\u753B\u8D28\u3001\u7EA6\u675F\u6761\u4EF6\u3002\u6BCF\u4E2A\u7EED\u62CD\u6BB5\u5728\u811A\u672C\u5206\u6BB5\u8868\u4E2D\u53E6\u5199\u660E\u786E\u7684\u8FC7\u6E21\u753B\u9762\u63CF\u8FF0\uFF1A\u4E0A\u4E00\u6BB5\u63A5\u7F1D\u72B6\u6001\u2192\u672C\u6BB5\u8D77\u59CB\u52A8\u4F5C\u4E0E\u955C\u5934\u2192\u58F0\u97F3\u4EA4\u63A5\uFF1B\u540C\u666F\u522B\u8FDE\u7EED\u6216\u5207\u4E2D\u666F/\u8FD1\u666F\u7531\u5267\u60C5\u51B3\u5B9A\uFF0C\u4E0D\u56E0\u5206\u6BB5\u81EA\u52A8\u6362\u573A\u666F\u3002\u8BE5\u63CF\u8FF0\u4E0E\u5B8C\u6574\u811A\u672C\u3001\u793A\u610F\u56FE\u4E00\u540C\u5C55\u793A\u5BA1\u6838\uFF0C\u4FEE\u6539\u540E\u91CD\u65B0\u5BA1\u6838\u3002\u6267\u884C\u65F6\u5C06\u8BE5\u6BB5\u5DF2\u5BA1\u6838\u63CF\u8FF0\u5199\u5165 segmentPrompts \u5BF9\u5E94\u6761\u76EE\u7684\u5355\u884C\u3010\u8FC7\u6E21\u753B\u9762\u3011\uFF0C\u6216 video_extend.transitionDescription\uFF1B\u76F4\u63A5\u7528\u201C\u89C6\u98911\u201D\u6307\u4EE3\u7D20\u6750\u5E76\u4F7F\u7528\u5411\u524D/\u5411\u540E\u5EF6\u957F\u89C6\u98911\uFF0C\u4E0D\u5199\u53C2\u8003\u89C6\u98911\u3002\u8F68\u9053\u8865\u5168\u591A\u4E2A\u65E2\u6709\u89C6\u9891\u7684\u5B98\u65B9\u53E5\u5F0F\u4EC5\u4F5C\u8BBE\u8BA1\u53C2\u8003\uFF0C\u4E0D\u5047\u79F0\u5F53\u524D\u5DE5\u5177\u5DF2\u652F\u6301\u591A\u89C6\u9891\u8F93\u5165\uFF0C\u4E5F\u4E0D\u4E3A\u8F6C\u573A\u64C5\u81EA\u589E\u52A0\u4ED8\u8D39\u4EFB\u52A1\u3002\u4FDD\u7559\u4EBA\u7269/\u58F0\u97F3/\u98CE\u683C\u8FDE\u7EED\u6027\uFF0C\u4E0D\u4FDD\u8BC1\u5B8C\u5168\u6D88\u9664\u63A5\u7F1D\u8DF3\u53D8\u3002",
     "\xB7 \u7EED\u62CD\u4F30\u4EF7\u53E3\u5F84\uFF1A\u4F30\u4EF7\u6309\u771F\u5B9E\u8F93\u5165\u533A\u5206\u6863\u4F4D\uFF1A\u9996\u6BB5\u751F\u6210\u65E0\u89C6\u9891\u8F93\u5165\uFF08\u53C2\u8003\u56FE/\u9996\u5C3E\u5E27\u4ECD\u4E3A\u65E0\u89C6\u9891\u8F93\u5165\uFF09\uFF0C\u6BCF\u4E2A\u7EED\u62CD\u6BB5\u6709\u89C6\u9891\u8F93\u5165\uFF0C\u7528\u4E0A\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\u65F6\u957F\u52A0\u672C\u6BB5\u8F93\u51FA\u65F6\u957F\u8BA1token\uFF0C\u5207\u6362\u5230\u542B\u89C6\u9891\u8F93\u5165\u5355\u4EF7\uFF1B\u4E0D\u628A\u7D2F\u8BA1\u6210\u7247\u65F6\u957F\u5F53\u4E0A\u4E00\u6BB5\u8F93\u5165\u3002\u811A\u672C\u8D39\u7528\u9884\u4F30\u9010\u6BB5\u5217\u6863\u4F4D\u3001\u8F93\u5165/\u8F93\u51FA\u65F6\u957F\u3001\u5355\u4EF7\u4E0E\u91D1\u989D\u518D\u5408\u8BA1\uFF1B\u5236\u4F5C\u786E\u8BA4\u548C\u6062\u590D\u9884\u68C0\u540C\u53E3\u5F84\uFF0C\u5916\u90E8\u89C6\u9891\u65F6\u957F\u4E0D\u660E\u5C31\u660E\u786E\u65E0\u6CD5\u53EF\u9760\u4F30\u4EF7\uFF0C\u4E0D\u6309\u7EAF\u751F\u6210\u8D39\u7528\u515C\u5E95\uFF0C\u4E0D\u8C03\u7528\u4ED8\u8D39\u4EFB\u52A1\u8BD5\u7B97\u3002",
     "\xB7 \u5148\u5728\u5B8C\u5584\u521B\u610F\u7684\u540C\u4E00\u8F6E\u7528ask_user_question\u5408\u5E76\u8BE2\u95EE\u6240\u6709\u7F3A\u5931\u4FE1\u606F\uFF1A\u662F\u5426\u5B8C\u5584\u6216\u521B\u610F\u65B9\u5411\u3001\u603B\u65F6\u957F\u3001\u753B\u5E45\u548C\u6E05\u6670\u5EA6\uFF1B\u653E\u5728\u540C\u4E00\u6B21\u8C03\u7528\u7684\u72EC\u7ACB\u95EE\u9898\u4E2D\uFF0C\u5DF2\u660E\u786E\u7684\u9879\u4E0D\u91CD\u590D\u95EE\u3002\u7528\u6237\u521B\u610F\u539F\u6587\u5DF2\u5199\u660E\u65F6\u957F\u3001\u6A2A\u7AD6\u5C4F\u6216\u5206\u8FA8\u7387\u65F6\uFF0C\u76F4\u63A5\u8BB0\u5F55\u5BF9\u5E94\u503C\uFF0C\u4E0D\u518D\u8BE2\u95EE\u6216\u8981\u6C42\u4E8C\u6B21\u786E\u8BA4\uFF1B\u4EC5\u8BE2\u95EE\u7F3A\u5931\u9879\u3002\u6BD4\u5982\u201C30\u79D2\u7AD6\u5C4F720P\u201D\u76F4\u63A5\u8BB0\u5F55duration=30\u3001ratio=9:16\u3001resolution=720p\uFF0C\u8FD9\u4E09\u9879\u90FD\u4E0D\u51FA\u73B0\u5728\u63D0\u95EE\u4E2D\u3002\u5DF2\u660E\u786E\u89C4\u683C\u4E0D\u4F1A\u56E0\u9009\u62E9\u5B8C\u5584\u521B\u610F\u800C\u6E05\u7A7A\uFF1B\u4EC5\u7528\u6237\u6539\u52A8\u6216\u53C2\u6570\u4E0D\u53D7\u652F\u6301\u65F6\u8BF4\u660E\u95EE\u9898\u5E76\u786E\u8BA4\u53EF\u6267\u884C\u66FF\u4EE3\u65B9\u6848\uFF0C\u4E0D\u9759\u9ED8\u66F4\u6539\u3002\u603B\u65F6\u957F\u63D0\u4F9B15\u79D2\u300130\u79D2\u300145\u79D2\u300160\u79D2\u548C\u201C\u81EA\u5B9A\u4E49\u65F6\u957F\u201D\u4E94\u4E2A\u5355\u9009\u9879\uFF0C\u5E76\u5141\u8BB8\u81EA\u7531\u8F93\u5165\uFF1B\u9009\u62E9\u81EA\u5B9A\u4E49\u800C\u672A\u8F93\u5165\u6570\u503C\u65F6\u53EA\u8865\u95EE\u79D2\u6570\u3002\u7B49\u7528\u6237\u56DE\u7B54\u540E\u624D\u8C03\u7528video_project(action:prepare)\uFF0Cduration\u4F20\u7528\u6237\u5DF2\u6307\u5B9A\u6216\u672C\u8F6E\u786E\u8BA4\u7684\u603B\u79D2\u6570\uFF1B\u7981\u6B62\u81EA\u884C\u9ED8\u8BA415\u79D2\u3002\u9057\u6F0F\u65F6\u5DE5\u5177\u8865\u95EE\u4EC5\u4F5C\u515C\u5E95\uFF0C\u4E0D\u628A\u65F6\u957F\u53E6\u6392\u5230\u5B8C\u5584\u521B\u610F\u4E4B\u540E\u3002\u56FA\u5B9A\u5916\u5F62\u4E3B\u4F53\u9009fixed_subject\uFF0C\u65E0\u56FA\u5B9A\u4E3B\u4F53\u7A7A\u955C\u9009scenery\uFF0C\u5DF2\u6709\u53C2\u8003\u56FE\u9009provided_images\uFF1B\u65B0\u521B\u4F5C\u5FC5\u987B\u521B\u5EFA\u65B0projectId\uFF0C\u540C\u9879\u76EE\u6539\u7A3F\u6CBF\u7528ID\u3002\u89D2\u8272\u56FE\u9009\u62E9\u5728prepare\u5185\u5B8C\u6210\uFF0C\u4E0D\u5728\u63D0\u4EA4\u89C6\u9891\u65F6\u4E34\u65F6\u8BE2\u95EE\uFF0C\u4E5F\u4E0D\u53E6\u5F39\u91CD\u590D\u95EE\u9898\u3002\u811A\u672C\u3001\u5206\u955C\u548C\u9010\u6BB5\u6267\u884C\u63D0\u793A\u8BCD\u5168\u90E8\u51C6\u5907\u540E\uFF0C\u5B8C\u6574\u5C55\u793A\u5F53\u524D\u7248\u811A\u672C\u6B63\u6587\u3001\u8D39\u7528\u9884\u4F30\u548C\u5185\u5D4C\u5206\u955C\u56FE\uFF0C\u518D\u8C03\u7528video_project(action:review,projectId,scriptPath,toolName,specification)\u3002specification\u987B\u4E0E\u968F\u540E\u751F\u6210\u53C2\u6570\u5B8C\u6574\u4E00\u81F4\uFF0C\u542Bprompt\u3001segmentPrompts\u3001duration\u3001ratio\u3001resolution\u53CA\u53C2\u8003\u7D20\u6750\u3002\u53EA\u6709\u5DE5\u5177\u8FD4\u56DEapproved\u624D\u53EF\u8C03\u7528\u5BF9\u5E94video_generate/video_extend\u5E76\u5E26projectId\uFF1B\u751F\u6210\u5DE5\u5177\u81EA\u5E26\u7684\u4ED8\u8D39\u5BA1\u6279\u5373\u7B2C\u4E8C\u9053\u5236\u4F5C\u786E\u8BA4\uFF0C\u4E0D\u53E6\u7528ask_user_question\u8BE2\u95EE\u5F00\u59CB\u5236\u4F5C\u3002\u672A\u7B54\u3001\u53D6\u6D88\u3001\u62D2\u7EDD\u4E0D\u7B97\u901A\u8FC7\u3002\u5BA1\u6838\u540E\u4E0D\u6539\u5199script.md\u72B6\u6001\u6216\u65F6\u95F4\u6233\uFF0C\u5BA1\u6838\u72B6\u6001\u4EE5video_project(action:status)\u4E3A\u51C6\uFF1B\u811A\u672C\u3001\u751F\u6210\u53C2\u6570\u6216\u63A5\u5165\u914D\u7F6E\u53D8\u5316\u987B\u91CD\u5BA1\u3002",
@@ -10843,7 +11076,7 @@ function buildPromptGuidance(config) {
     "\xB7 \u5BF9\u767D\u53D1\u97F3\u6821\u5BF9\uFF1A\u811A\u672C\u5BA1\u6838\u524D\u8BFB\u53D6video-director\u7684references/pronunciation.md\uFF0C\u68C0\u67E5\u591A\u97F3\u5B57\u3001\u751F\u50FB\u5B57\u3001\u4E13\u540D\u3001\u6570\u5B57\u3001\u5355\u4F4D\u548C\u7F29\u5199\u3002\u4FDD\u7559\u811A\u672C\u53CA\u5B57\u5E55\u6B63\u786E\u539F\u6587\uFF0C\u53E6\u5217\u201C\u539F\u6587\u2192\u53D1\u97F3\u6587\u672C\u201D\u7528\u4E8E\u751F\u6210\uFF1B\u4EC5\u5BF9\u8BFB\u97F3\u660E\u786E\u7684\u6613\u9519\u8BCD\u7528\u5E38\u7528\u540C\u97F3\u5B57\uFF0C\u4E0D\u5168\u6587\u66FF\u6362\u3001\u4E0D\u7528\u62FC\u97F3\u5192\u5145\u53EF\u9760\u4FEE\u97F3\u3002\u4E13\u540D\u8BFB\u97F3\u4E0D\u660E\u5148\u6F84\u6E05\uFF0C\u6D89\u53CA\u539F\u610F\u6216\u53F0\u8BCD\u5185\u5BB9\u53D8\u5316\u987B\u5728\u811A\u672C\u5BA1\u6838\u4E2D\u786E\u8BA4\u3002\u53F0\u8BCD\u7528{\u53F0\u8BCD}\uFF0C\u97F3\u6548\u7528<\u97F3\u6548>\uFF0C\u97F3\u4E50\u7528(\u97F3\u4E50)\uFF0C\u660E\u786E\u8BF4\u8BDD\u8005\u3001\u8BED\u8A00\u548C\u5148\u540E\u987A\u5E8F\uFF0C\u907F\u514D\u65E0\u5FC5\u8981\u7684\u4E2D\u82F1\u6587\u6DF7\u8BFB\u3002\u6309\u5B9E\u9645\u53D1\u58F0\u65F6\u95F4\u7EA63\u20134\u5B57/\u79D2\u521D\u4F30\u5E76\u7559\u505C\u987F\u3001\u52A8\u4F5C\u548C\u6536\u5C3E\uFF1B\u8FC7\u5BC6\u5148\u8C03\u6574\u5206\u914D\uFF0C\u4FEE\u6539\u7528\u6237\u5173\u952E\u53F0\u8BCD\u987B\u7ECF\u5BA1\u6838\u3002segmentPrompts\u4EC5\u542B\u672C\u6BB5\u5B8C\u6574\u65B0\u53F0\u8BCD\u4E0E\u9700\u8981\u7684\u53D1\u97F3\u6587\u672C\uFF0C\u4E0D\u8DE8\u6BB5\u622A\u65AD\u4E00\u53E5\u3001\u4E0D\u5939\u5E26\u5DF2\u8BF4\u53F0\u8BCD\u6216\u628A\u6620\u5C04\u8BF4\u660E\u5F53\u5BF9\u767D\u3002\u751F\u6210\u540E\u987B\u5B9E\u9645\u8BD5\u542C\u624D\u80FD\u5224\u65AD\u5410\u5B57\uFF0C\u4E0D\u5F97\u4EC5\u51ED\u6210\u529F\u72B6\u6001\u58F0\u79F0\u51C6\u786E\uFF1B\u65E0\u6CD5\u8BD5\u542C\u5219\u660E\u786E\u5F85\u7528\u6237\u6838\u542C\u3002\u8BEF\u8BFB\u53EA\u4FEE\u5BF9\u5E94\u7247\u6BB5\uFF0C\u91CD\u65B0\u751F\u6210\u524D\u8BF4\u660E\u8BA1\u8D39\u5E76\u53D6\u5F97\u540C\u610F\uFF0C\u4E0D\u81EA\u52A8\u4ED8\u8D39\u91CD\u8BD5\u3002\u9010\u5B57\u51C6\u786E\u8981\u6C42\u53EF\u5EFA\u8BAE\u6821\u5BF9\u914D\u97F3\u540E\u671F\u66FF\u6362\uFF0C\u4F46\u5F53\u524D\u63D2\u4EF6\u672A\u5B9E\u73B0\u81EA\u52A8\u914D\u97F3\u6216\u53E3\u578B\u4FEE\u590D\uFF0C\u4E0D\u627F\u8BFA\u97F3\u9891\u53C2\u8003\u4FDD\u8BC1\u9010\u5B57\u6B63\u786E\u3002",
     isVolcengine(config) ? "\u5F53\u524D\u4E3A\u706B\u5C71\u5F15\u64CE\u76F4\u8FDE\uFF0C\u4F7F\u7528 volcengineApiKey\u3002" : "\u5F53\u524D\u4E3A MetaOntic AI\uFF0C\u4F7F\u7528 metaonticApiKey\u3002\u5199\u811A\u672C\u65F6\u8C03\u7528video_estimate\u5E76\u5C06\u53CC\u65B9\u6848\u57FA\u7840\u4F30\u4EF7\u5199\u5165\u811A\u672C\u672B\u5C3E\uFF0C\u6309\u6E20\u9053\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39\u3002",
     "MetaOnticVideo\uFF08Seedance \u89C6\u9891\u751F\u6210\u63D2\u4EF6\uFF09\uFF1A\u9700\u8981\u751F\u6210\u89C6\u9891\u3001\u7ED9\u89C6\u9891\u52A0\u957F\u65F6\u4F18\u5148\u7528\u5B83\uFF1B\u7528\u6237\u53EA\u8981\u8BF4\u60F3\u8981\u591A\u957F\uFF08duration\uFF09\uFF0C\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\u7684\u90E8\u5206\u63D2\u4EF6\u81EA\u5DF1\u5206\u6BB5\u7EED\u62CD\u518D\u5408\u5E76\uFF0C\u4E0D\u7528\u7528\u6237\u81EA\u5DF1\u62C6\u4EFB\u52A1\u3002",
-    "\xB7 \u5148\u8BC4\u4F30\u7528\u6237\u65B9\u6848\u5B8C\u6574\u5EA6\uFF1A\u4E3B\u9898/\u76EE\u6807\u3001\u4E3B\u4F53\u3001\u4E3B\u8981\u5185\u5BB9\u4E0E\u53D1\u5C55\u3001\u7ED3\u5C3E\u6216\u5C55\u793A\u7ED3\u679C\u53CA\u660E\u786E\u7EA6\u675F\u662F\u5426\u8DB3\u4EE5\u5199\u811A\u672C\uFF1B\u98CE\u666F\u4E0E\u5C55\u793A\u4E0D\u5F3A\u6C42\u51B2\u7A81\uFF0C\u7F3A\u65F6\u957F\u987B\u5148\u8BE2\u95EE\u7528\u6237\uFF0C\u7F3A\u753B\u5E45\u4E0D\u56E0\u6B64\u5224\u4E3A\u9700\u8981\u5B8C\u5584\u65B9\u6848\u3001\u4F46\u5199\u811A\u672C\u524D\u5FC5\u987B\u95EE\u6E05\u3002\u65E0\u8BBA\u521B\u610F\u662F\u5426\u5B8C\u6574\uFF0C\u5F00\u59CB\u5199\u811A\u672C\u524D\u90FD\u5148\u8BE2\u95EE\u201C\u8981\u4E0D\u8981\u6211\u5728\u4FDD\u7559\u4F60\u539F\u6709\u521B\u610F\u7684\u57FA\u7840\u4E0A\u5B8C\u5584\u7EC6\u8282\uFF1F\u201D\uFF0C\u63D0\u4F9B\u201C\u5E2E\u6211\u5B8C\u5584 / \u4FDD\u7559\u539F\u65B9\u6848\u201D\uFF0C\u4E0E\u7F3A\u5931\u7684\u65F6\u957F\u3001\u753B\u5E45\u548C\u6E05\u6670\u5EA6\u653E\u5728\u540C\u4E00\u6B21ask_user_question\u4E2D\uFF1B\u672C\u6B21\u5DF2\u660E\u786E\u9009\u62E9\u6216\u6388\u6743\u5B8C\u5584\u65F6\u4E0D\u91CD\u590D\u95EE\u3002\u672A\u7B54\u6216\u53D6\u6D88\u5219\u7B49\u5F85\uFF0C\u4E0D\u81EA\u884C\u5B8C\u5584\u3002\u9009\u62E9\u5B8C\u5584\u53EA\u8865\u5145\u539F\u521B\u610F\u4E2D\u7684\u7EC6\u8282\u3001\u52A8\u4F5C\u8854\u63A5\u3001\u53EF\u62CD\u6027\u548C\u8868\u8FBE\uFF0C\u5E76\u6309\u516D\u9879\u8865\u9F50\uFF1A\u2460\u573A\u666F\u4E0E\u9053\u5177\u3001\u2461\u4E3B\u4F53\u5916\u5F62\u4E0E\u72B6\u6001\u3001\u2462\u52A8\u4F5C\u5C42\u6B21\u4E0E\u53CD\u5E94\u3001\u2463\u60C5\u7EEA\u6216\u4FE1\u606F\u63A8\u8FDB\u3001\u2464\u753B\u9762\u5C42\u6B21\uFF08\u666F\u522B/\u89C6\u89D2/\u6784\u56FE/\u8FD0\u955C\uFF0C\u540C\u4E00\u573A\u666F\u76F8\u90BB\u6BB5\u4E0D\u8FDE\u7EED\u7528\u540C\u4E00\u7EC4\uFF0C\u5E76\u6EE1\u8DB3\u4E0A\u9762\u753B\u9762\u4E0D\u5355\u8C03\u7684\u4E0B\u9650\uFF1A15 \u79D2\u81F3\u5C11 2 \u6B21\u300130 \u79D2 3\u20134 \u6B21\u53EF\u89C1\u53D8\u5316\uFF0C\u6BCF 3\u20135 \u79D2\u4E00\u4E2A\u770B\u5F97\u89C1\u7684\u53D8\u5316\uFF0C\u81F3\u5C11\u4E00\u5904\u7279\u5199\u6216\u524D\u540E\u666F\u5C42\u6B21\uFF09\u3001\u2465\u5DF2\u786E\u8BA4\u65F6\u957F\u5185\u7684\u4E8B\u4EF6\u8282\u594F\uFF1B\u4E0D\u5806\u65E0\u5173\u7EC6\u8282\u51D1\u6570\u3001\u4E0D\u4E3A\u53D8\u5316\u786C\u52A0\u89C6\u89D2\u3001\u4E0D\u501F\u5B8C\u5584\u52A0\u4EBA\u7269\u6216\u652F\u7EBF\u3001\u4E0D\u9760\u52A0\u955C\u5934\u6570\u4EE3\u66FF\u4E30\u5BCC\u5EA6\u3002\u4FDD\u7559\u4E3B\u9898\u3001\u4E3B\u4F53\u3001\u4EBA\u7269\u5173\u7CFB\u3001\u6838\u5FC3\u60C5\u8282\u53CA\u987A\u5E8F\u3001\u7ED3\u5C3E\u3001\u5173\u952E\u5BF9\u767D\u3001\u98CE\u683C\u4E0E\u660E\u786E\u9650\u5236\uFF1B\u4E0D\u5F97\u501F\u5B8C\u5584\u53E6\u8D77\u521B\u610F\u3001\u6DFB\u52A0\u53CD\u8F6C\u3001\u66FF\u6362\u7ED3\u5C3E\u6216\u6539\u53D8\u7ACB\u610F\u3002\u5FC5\u987B\u6539\u52A8\u8FD9\u4E9B\u5185\u5BB9\u6216\u538B\u7F29\u5267\u60C5\u65F6\uFF0C\u5148\u8BF4\u660E\u5177\u4F53\u6539\u52A8\u5E76\u5F81\u5F97\u540C\u610F\u3002\u65B9\u5411\u4E0D\u660E\u786E\u65F6\uFF0C\u4EC5\u56F4\u7ED5\u539F\u521B\u610F\u6F84\u6E05\uFF0C\u4E0D\u63D0\u4F9B\u504F\u79BB\u539F\u610F\u7684\u65B0\u6545\u4E8B\u3002\u7528\u6237\u9009\u62E9\u4FDD\u7559\u539F\u65B9\u6848\u65F6\u53EA\u6574\u7406\u811A\u672C\u683C\u5F0F\u548C\u5206\u955C\uFF0C\u4E0D\u6539\u5267\u60C5\uFF1B\u5B8C\u5584\u9009\u62E9\u4E0D\u66FF\u4EE3\u811A\u672C\u5BA1\u6838\u548C\u89C6\u9891\u5DE5\u5177\u4ED8\u8D39\u5BA1\u6279\u3002\u65F6\u957F\u672A\u6307\u5B9A\u65F6\u5FC5\u987B\u5148\u8BE2\u95EE\uFF0C\u4E0D\u8BBE\u9ED8\u8BA4\u503C\uFF1A\u5728\u5B8C\u5584\u521B\u610F\u7684\u540C\u4E00\u6B21ask_user_question\u4E2D\u63D0\u4F9B15\u79D2\u300130\u79D2\u300145\u79D2\u300160\u79D2\u548C\u201C\u81EA\u5B9A\u4E49\u65F6\u957F\u201D\uFF0C\u81EA\u5B9A\u4E49\u540E\u8F93\u51654\u20133600\u6574\u6570\u79D2\uFF1B\u7528\u6237\u539F\u8BDD\u6216\u672C\u8F6E\u7B54\u590D\u5DF2\u786E\u8BA4\u65F6\uFF0C\u5FC5\u987B\u5C06\u8BE5\u503C\u4F20\u7ED9video_project(action:prepare)\u7684duration\u5E76\u8BB0\u5F55\uFF0C\u7981\u6B62\u7701\u7565\u5DF2\u786E\u8BA4\u503C\u5BFC\u81F4\u5DE5\u5177\u91CD\u590D\u63D0\u95EE\u3002\u672A\u7B54\u3001\u53D6\u6D88\u6216pending\u4E0D\u5F97\u5199\u811A\u672C\u3001\u751F\u6210\u89D2\u8272\u56FE\u6216\u63D0\u4EA4\u89C6\u9891\uFF1B\u753B\u5E45\u548C\u6E05\u6670\u5EA6\u90FD\u5FC5\u987B\u7531\u7528\u6237\u660E\u786E\u9009\u62E9\u6216\u786E\u8BA4\u3002\u6E05\u6670\u5EA6\u4EC5\u652F\u6301480P\u3001720P\uFF1B\u753B\u5E45\u630916:9\u6A2A\u5C4F / 9:16\u7AD6\u5C4F\u786E\u8BA4\uFF0C\u7528\u6237\u9700\u6C42\u91CC\u6CA1\u5199\u660E\uFF08\u6216\u8BF4\u4E0D\u6E05\uFF09\u65F6\u901A\u8FC7\u63D0\u95EE\u5DE5\u5177\u63D0\u4F9B\u201C16:9 \u6A2A\u5C4F / 9:16 \u7AD6\u5C4F\u201D\u4E24\u4E2A\u5355\u9009\u9879\uFF0C\u5176\u4ED6\u753B\u5E45\u5141\u8BB8\u81EA\u7531\u8F93\u5165\uFF1B\u5199\u4E86\u201C\u7AD6\u5C4F/\u6A2A\u5C4F\u201D\u5C31\u63099:16 / 16:9\u8BB0\u5F55\uFF0C\u4E0D\u91CD\u590D\u95EE\u3002\u6240\u6709\u7F3A\u5931\u9879\u4E0E\u5B8C\u5584\u521B\u610F\u3001\u65F6\u957F\u653E\u8FDB\u540C\u4E00\u6B21\u63D0\u95EE\uFF0C\u4E0D\u8FDE\u7EED\u5F39\u7A97\uFF1B\u4E0D\u5F97\u7528\u9ED8\u8BA4\u503C\u4EE3\u66FF\u7528\u6237\u786E\u8BA4\uFF0C\u672A\u7B54\u3001\u53D6\u6D88\u6216pending\u4E0D\u5F97\u81EA\u884C\u4F7F\u7528\u9ED8\u8BA4\u503C\u8FDB\u5165\u5236\u4F5C\u3002\u7528\u6237\u5728\u672C\u6B21\u9700\u6C42\u5DF2\u660E\u786E\u6307\u5B9A\u67D0\u4E00\u9879\u65F6\u76F4\u63A5\u8BB0\u5F55\uFF0C\u8BE5\u9879\u4E0D\u91CD\u590D\u8BE2\u95EE\u3002\u628A\u786E\u8BA4\u503C\u5199\u5165script.md\u7684\u201C\u89C6\u9891\u753B\u5E45\u201D\u548C\u201C\u89C6\u9891\u6E05\u6670\u5EA6\u201D\uFF0C\u811A\u672C\u89C4\u683C\u548C\u5236\u4F5C\u786E\u8BA4\u90FD\u5C55\u793A\u8FD9\u4E24\u4E2A\u503C\uFF0C\u8C03\u7528video_generate/video_extend\u65F6\u663E\u5F0F\u4F20ratio\u4E0Eresolution=480p\u6216720p\uFF1B\u6539\u7A3F\u672A\u6D89\u53CA\u753B\u5E45\u6216\u6E05\u6670\u5EA6\u65F6\u4FDD\u7559\u5DF2\u786E\u8BA4\u9009\u62E9\uFF0C\u6539\u53D8\u5176\u4E2D\u4EFB\u4E00\u9879\u987B\u91CD\u65B0\u786E\u8BA4\u5E76\u91CD\u65B0\u8BD5\u7B97\u8D39\u7528\uFF0C\u6062\u590D\u5DF2\u63D0\u4EA4\u4EFB\u52A1\u6CBF\u7528\u539F\u503C\uFF1B\u6309\u539F\u65B9\u6848\u786E\u5B9A\u98CE\u683C\u4E0E\u58F0\u97F3\uFF0C\u65E0\u5FC5\u8981\u4E0D\u52A0\u5BF9\u767D\uFF0C\u5B57\u5E55\u672A\u6307\u5B9A\u4E0D\u52A0\u3002\u6574\u7406\u540E\u5148\u5B8C\u6574\u5C55\u793A\u6545\u4E8B\u3001\u89C4\u683C/\u98CE\u683C/\u58F0\u97F3\u3001\u4EBA\u7269\u6216\u4E3B\u4F53\u548C\u65F6\u95F4/\u753B\u9762/\u5B8C\u6574\u5BF9\u767D\u8868\uFF0C\u518D\u5BA1\u6838\uFF1B\u6BCF\u6B21\u6539\u7A3F\u4FDD\u7559\u6EE1\u610F\u90E8\u5206\uFF0C\u4E0D\u8BA9\u7528\u6237\u6539\u6A21\u578B\u63D0\u793A\u8BCD\u3002\u52A8\u7B14\u524D\u5148\u6309 video-director \u7684 references/scriptwriting.md\u300C\u5BFC\u6F14\u5DE5\u4F5C\u6CD5\u300D\u8FC7\u4E00\u904D\u89C2\u4F17\u4E0E\u8BB0\u5FC6\u70B9\u3001\u60C5\u7EEA\u66F2\u7EBF\u3001\u89C6\u89C9\u6BCD\u9898\u548C\u4E00\u6761\u4E3B\u7EBF\uFF1B\u8FD9\u5957\u63A8\u6F14\u53EA\u5728\u5185\u90E8\u7528\uFF0C\u4E0D\u5C55\u793A\u7ED9\u7528\u6237\u3002\u63A5\u5165\u65B9\u5F0F\u4EC5\u7528\u4E8E\u8FDE\u63A5\u4E0E\u8D39\u7528\u5224\u65AD\uFF0C\u4E0D\u5F53\u4F5C\u521B\u4F5C\u80FD\u529B\u5199\u8FDB\u5BA3\u4F20\u89C6\u9891\uFF0C\u9664\u975E\u7528\u6237\u660E\u786E\u8981\u63A5\u5165\u6559\u7A0B\u3002",
+    "\xB7 \u5148\u8BC4\u4F30\u7528\u6237\u65B9\u6848\u5B8C\u6574\u5EA6\uFF1A\u4E3B\u9898/\u76EE\u6807\u3001\u4E3B\u4F53\u3001\u4E3B\u8981\u5185\u5BB9\u4E0E\u53D1\u5C55\u3001\u7ED3\u5C3E\u6216\u5C55\u793A\u7ED3\u679C\u53CA\u660E\u786E\u7EA6\u675F\u662F\u5426\u8DB3\u4EE5\u5199\u811A\u672C\uFF1B\u98CE\u666F\u4E0E\u5C55\u793A\u4E0D\u5F3A\u6C42\u51B2\u7A81\uFF0C\u7F3A\u65F6\u957F\u987B\u5148\u8BE2\u95EE\u7528\u6237\uFF0C\u7F3A\u753B\u5E45\u4E0D\u56E0\u6B64\u5224\u4E3A\u9700\u8981\u5B8C\u5584\u65B9\u6848\u3001\u4F46\u5199\u811A\u672C\u524D\u5FC5\u987B\u95EE\u6E05\u3002\u65E0\u8BBA\u521B\u610F\u662F\u5426\u5B8C\u6574\uFF0C\u5F00\u59CB\u5199\u811A\u672C\u524D\u90FD\u5148\u8BE2\u95EE\u201C\u8981\u4E0D\u8981\u6211\u5728\u4FDD\u7559\u4F60\u539F\u6709\u521B\u610F\u7684\u57FA\u7840\u4E0A\u5B8C\u5584\u7EC6\u8282\uFF1F\u201D\uFF0C\u63D0\u4F9B\u201C\u5E2E\u6211\u5B8C\u5584 / \u4FDD\u7559\u539F\u65B9\u6848\u201D\uFF0C\u4E0E\u7F3A\u5931\u7684\u65F6\u957F\u3001\u753B\u5E45\u548C\u6E05\u6670\u5EA6\u653E\u5728\u540C\u4E00\u6B21ask_user_question\u4E2D\uFF1B\u672C\u6B21\u5DF2\u660E\u786E\u9009\u62E9\u6216\u6388\u6743\u5B8C\u5584\u65F6\u4E0D\u91CD\u590D\u95EE\u3002\u672A\u7B54\u6216\u53D6\u6D88\u5219\u7B49\u5F85\uFF0C\u4E0D\u81EA\u884C\u5B8C\u5584\u3002\u9009\u62E9\u5B8C\u5584\u53EA\u8865\u5145\u539F\u521B\u610F\u4E2D\u7684\u7EC6\u8282\u3001\u52A8\u4F5C\u8854\u63A5\u3001\u53EF\u62CD\u6027\u548C\u8868\u8FBE\uFF0C\u5E76\u6309\u516D\u9879\u8865\u9F50\uFF1A\u2460\u573A\u666F\u4E0E\u9053\u5177\u3001\u2461\u4E3B\u4F53\u5916\u5F62\u4E0E\u72B6\u6001\u3001\u2462\u52A8\u4F5C\u5C42\u6B21\u4E0E\u53CD\u5E94\u3001\u2463\u60C5\u7EEA\u6216\u4FE1\u606F\u63A8\u8FDB\u3001\u2464\u753B\u9762\u5C42\u6B21\uFF08\u666F\u522B/\u89C6\u89D2/\u6784\u56FE/\u8FD0\u955C\uFF0C\u540C\u4E00\u573A\u666F\u76F8\u90BB\u6BB5\u4E0D\u8FDE\u7EED\u7528\u540C\u4E00\u7EC4\uFF0C\u5E76\u6309\u53D9\u4E8B\u76EE\u7684\u68C0\u67E5\u6709\u6548\u4FE1\u606F\u4E0E\u7EC6\u8282\uFF0C\u4E0D\u673A\u68B0\u89C4\u5B9A\u5207\u955C\u6B21\u6570\uFF09\u3001\u2465\u5DF2\u786E\u8BA4\u65F6\u957F\u5185\u7684\u4E8B\u4EF6\u8282\u594F\uFF1B\u4E0D\u5806\u65E0\u5173\u7EC6\u8282\u51D1\u6570\u3001\u4E0D\u4E3A\u53D8\u5316\u786C\u52A0\u89C6\u89D2\u3001\u4E0D\u501F\u5B8C\u5584\u52A0\u4EBA\u7269\u6216\u652F\u7EBF\u3001\u4E0D\u9760\u52A0\u955C\u5934\u6570\u4EE3\u66FF\u4E30\u5BCC\u5EA6\u3002\u4FDD\u7559\u4E3B\u9898\u3001\u4E3B\u4F53\u3001\u4EBA\u7269\u5173\u7CFB\u3001\u6838\u5FC3\u60C5\u8282\u53CA\u987A\u5E8F\u3001\u7ED3\u5C3E\u3001\u5173\u952E\u5BF9\u767D\u3001\u98CE\u683C\u4E0E\u660E\u786E\u9650\u5236\uFF1B\u4E0D\u5F97\u501F\u5B8C\u5584\u53E6\u8D77\u521B\u610F\u3001\u6DFB\u52A0\u53CD\u8F6C\u3001\u66FF\u6362\u7ED3\u5C3E\u6216\u6539\u53D8\u7ACB\u610F\u3002\u5FC5\u987B\u6539\u52A8\u8FD9\u4E9B\u5185\u5BB9\u6216\u538B\u7F29\u5267\u60C5\u65F6\uFF0C\u5148\u8BF4\u660E\u5177\u4F53\u6539\u52A8\u5E76\u5F81\u5F97\u540C\u610F\u3002\u65B9\u5411\u4E0D\u660E\u786E\u65F6\uFF0C\u4EC5\u56F4\u7ED5\u539F\u521B\u610F\u6F84\u6E05\uFF0C\u4E0D\u63D0\u4F9B\u504F\u79BB\u539F\u610F\u7684\u65B0\u6545\u4E8B\u3002\u7528\u6237\u9009\u62E9\u4FDD\u7559\u539F\u65B9\u6848\u65F6\u53EA\u6574\u7406\u811A\u672C\u683C\u5F0F\u548C\u5206\u955C\uFF0C\u4E0D\u6539\u5267\u60C5\uFF1B\u5B8C\u5584\u9009\u62E9\u4E0D\u66FF\u4EE3\u811A\u672C\u5BA1\u6838\u548C\u89C6\u9891\u5DE5\u5177\u4ED8\u8D39\u5BA1\u6279\u3002\u65F6\u957F\u672A\u6307\u5B9A\u65F6\u5FC5\u987B\u5148\u8BE2\u95EE\uFF0C\u4E0D\u8BBE\u9ED8\u8BA4\u503C\uFF1A\u5728\u5B8C\u5584\u521B\u610F\u7684\u540C\u4E00\u6B21ask_user_question\u4E2D\u63D0\u4F9B15\u79D2\u300130\u79D2\u300145\u79D2\u300160\u79D2\u548C\u201C\u81EA\u5B9A\u4E49\u65F6\u957F\u201D\uFF0C\u81EA\u5B9A\u4E49\u540E\u8F93\u51654\u20133600\u6574\u6570\u79D2\uFF1B\u7528\u6237\u539F\u8BDD\u6216\u672C\u8F6E\u7B54\u590D\u5DF2\u786E\u8BA4\u65F6\uFF0C\u5FC5\u987B\u5C06\u8BE5\u503C\u4F20\u7ED9video_project(action:prepare)\u7684duration\u5E76\u8BB0\u5F55\uFF0C\u7981\u6B62\u7701\u7565\u5DF2\u786E\u8BA4\u503C\u5BFC\u81F4\u5DE5\u5177\u91CD\u590D\u63D0\u95EE\u3002\u672A\u7B54\u3001\u53D6\u6D88\u6216pending\u4E0D\u5F97\u5199\u811A\u672C\u3001\u751F\u6210\u89D2\u8272\u56FE\u6216\u63D0\u4EA4\u89C6\u9891\uFF1B\u753B\u5E45\u548C\u6E05\u6670\u5EA6\u90FD\u5FC5\u987B\u7531\u7528\u6237\u660E\u786E\u9009\u62E9\u6216\u786E\u8BA4\u3002\u6E05\u6670\u5EA6\u4EC5\u652F\u6301480P\u3001720P\uFF1B\u753B\u5E45\u630916:9\u6A2A\u5C4F / 9:16\u7AD6\u5C4F\u786E\u8BA4\uFF0C\u7528\u6237\u9700\u6C42\u91CC\u6CA1\u5199\u660E\uFF08\u6216\u8BF4\u4E0D\u6E05\uFF09\u65F6\u901A\u8FC7\u63D0\u95EE\u5DE5\u5177\u63D0\u4F9B\u201C16:9 \u6A2A\u5C4F / 9:16 \u7AD6\u5C4F\u201D\u4E24\u4E2A\u5355\u9009\u9879\uFF0C\u5176\u4ED6\u753B\u5E45\u5141\u8BB8\u81EA\u7531\u8F93\u5165\uFF1B\u5199\u4E86\u201C\u7AD6\u5C4F/\u6A2A\u5C4F\u201D\u5C31\u63099:16 / 16:9\u8BB0\u5F55\uFF0C\u4E0D\u91CD\u590D\u95EE\u3002\u6240\u6709\u7F3A\u5931\u9879\u4E0E\u5B8C\u5584\u521B\u610F\u3001\u65F6\u957F\u653E\u8FDB\u540C\u4E00\u6B21\u63D0\u95EE\uFF0C\u4E0D\u8FDE\u7EED\u5F39\u7A97\uFF1B\u4E0D\u5F97\u7528\u9ED8\u8BA4\u503C\u4EE3\u66FF\u7528\u6237\u786E\u8BA4\uFF0C\u672A\u7B54\u3001\u53D6\u6D88\u6216pending\u4E0D\u5F97\u81EA\u884C\u4F7F\u7528\u9ED8\u8BA4\u503C\u8FDB\u5165\u5236\u4F5C\u3002\u7528\u6237\u5728\u672C\u6B21\u9700\u6C42\u5DF2\u660E\u786E\u6307\u5B9A\u67D0\u4E00\u9879\u65F6\u76F4\u63A5\u8BB0\u5F55\uFF0C\u8BE5\u9879\u4E0D\u91CD\u590D\u8BE2\u95EE\u3002\u628A\u786E\u8BA4\u503C\u5199\u5165script.md\u7684\u201C\u89C6\u9891\u753B\u5E45\u201D\u548C\u201C\u89C6\u9891\u6E05\u6670\u5EA6\u201D\uFF0C\u811A\u672C\u89C4\u683C\u548C\u5236\u4F5C\u786E\u8BA4\u90FD\u5C55\u793A\u8FD9\u4E24\u4E2A\u503C\uFF0C\u8C03\u7528video_generate/video_extend\u65F6\u663E\u5F0F\u4F20ratio\u4E0Eresolution=480p\u6216720p\uFF1B\u6539\u7A3F\u672A\u6D89\u53CA\u753B\u5E45\u6216\u6E05\u6670\u5EA6\u65F6\u4FDD\u7559\u5DF2\u786E\u8BA4\u9009\u62E9\uFF0C\u6539\u53D8\u5176\u4E2D\u4EFB\u4E00\u9879\u987B\u91CD\u65B0\u786E\u8BA4\u5E76\u91CD\u65B0\u8BD5\u7B97\u8D39\u7528\uFF0C\u6062\u590D\u5DF2\u63D0\u4EA4\u4EFB\u52A1\u6CBF\u7528\u539F\u503C\uFF1B\u6309\u539F\u65B9\u6848\u786E\u5B9A\u98CE\u683C\u4E0E\u58F0\u97F3\uFF0C\u65E0\u5FC5\u8981\u4E0D\u52A0\u5BF9\u767D\uFF0C\u5B57\u5E55\u672A\u6307\u5B9A\u4E0D\u52A0\u3002\u6574\u7406\u540E\u5148\u5B8C\u6574\u5C55\u793A\u6545\u4E8B\u3001\u89C4\u683C/\u98CE\u683C/\u58F0\u97F3\u3001\u4EBA\u7269\u6216\u4E3B\u4F53\u548C\u65F6\u95F4/\u753B\u9762/\u5B8C\u6574\u5BF9\u767D\u8868\uFF0C\u518D\u5BA1\u6838\uFF1B\u6BCF\u6B21\u6539\u7A3F\u4FDD\u7559\u6EE1\u610F\u90E8\u5206\uFF0C\u4E0D\u8BA9\u7528\u6237\u6539\u6A21\u578B\u63D0\u793A\u8BCD\u3002\u52A8\u7B14\u524D\u5148\u6309 video-director \u7684 references/scriptwriting.md\u300C\u5BFC\u6F14\u5DE5\u4F5C\u6CD5\u300D\u8FC7\u4E00\u904D\u89C2\u4F17\u4E0E\u8BB0\u5FC6\u70B9\u3001\u60C5\u7EEA\u66F2\u7EBF\u3001\u89C6\u89C9\u6BCD\u9898\u548C\u4E00\u6761\u4E3B\u7EBF\uFF1B\u8FD9\u5957\u63A8\u6F14\u53EA\u5728\u5185\u90E8\u7528\uFF0C\u4E0D\u5C55\u793A\u7ED9\u7528\u6237\u3002\u63A5\u5165\u65B9\u5F0F\u4EC5\u7528\u4E8E\u8FDE\u63A5\u4E0E\u8D39\u7528\u5224\u65AD\uFF0C\u4E0D\u5F53\u4F5C\u521B\u4F5C\u80FD\u529B\u5199\u8FDB\u5BA3\u4F20\u89C6\u9891\uFF0C\u9664\u975E\u7528\u6237\u660E\u786E\u8981\u63A5\u5165\u6559\u7A0B\u3002",
     "\xB7 \u753B\u9762\u98CE\u683C\u63A8\u8350\uFF1A\u7528\u6237\u7ED9\u51FA\u521B\u610F\u4F46**\u6CA1\u6709\u6307\u5B9A\u753B\u9762\u98CE\u683C**\u65F6\uFF0C\u5148\u8BFB video-director \u7684 references/style-library.md\uFF0C\u6309\u521B\u610F\u6311 2\u20134 \u4E2A\u5408\u9002\u7684\u98CE\u683C\uFF0C\u5404\u7528\u4E00\u53E5\u8BDD\u8BF4\u660E\u753B\u9762\u7279\u5F81\u4E0E\u9002\u5408\u8FD9\u6761\u7247\u5B50\u7684\u7406\u7531\uFF0C\u7528\u63D0\u95EE\u5DE5\u5177\u8BA9\u7528\u6237\u9009\u4E00\u4E2A\uFF08\u9009\u9879\u4E92\u65A5\u3001\u5141\u8BB8\u81EA\u7531\u8F93\u5165\uFF09\uFF1B\u9009\u5B9A\u540E\u518D\u6309\u8FD9\u4E2A\u65B9\u5411\u5B8C\u5584\u521B\u610F\u4E0E\u811A\u672C\u3002\u7528\u6237\u5DF2\u7ECF\u8BF4\u6E05\u98CE\u683C\u6216\u660E\u786E\u8BF4\u8BA9\u4F60\u5B9A\uFF0C\u5C31\u76F4\u63A5\u91C7\u7528\u5E76\u5199\u8FDB\u811A\u672C\uFF0C\u4E0D\u91CD\u590D\u63A8\u8350\u3001\u4E0D\u91CD\u590D\u8BE2\u95EE\uFF1B\u521B\u610F\u65B9\u5411\u4E0E\u98CE\u683C\u90FD\u8981\u786E\u8BA4\u65F6\u653E\u8FDB\u540C\u4E00\u6B21\u63D0\u95EE\uFF0C\u4E0D\u8FDE\u7EED\u5F39\u7A97\uFF08\u6CA1\u6709\u63D0\u95EE\u5DE5\u5177\u65F6\u7528\u6B63\u6587\u5217\u5019\u9009\u5E76\u7B49\u5F85\u56DE\u590D\uFF09\u3002\u9009\u5B9A\u98CE\u683C\u5199\u5165 script.md \u7684\u89C4\u683C\uFF0C\u5206\u955C\u3001\u9010\u6BB5\u63D0\u793A\u8BCD\u4E0E\u5B9E\u9645\u751F\u6210\u4FDD\u6301\u4E00\u81F4\uFF1B\u6539\u98CE\u683C\u987B\u91CD\u65B0\u786E\u8BA4\u5E76\u91CD\u65B0\u5BA1\u6838\u3002",
     "\xB7 \u4E24\u9053\u786E\u8BA4\u7531\u63D2\u4EF6\u6267\u884C\uFF1Avideo_project(action:review)\u811A\u672C\u5BA1\u6838\uFF0C\u751F\u6210\u5DE5\u5177\u4ED8\u8D39\u5BA1\u6279\u786E\u8BA4\u5F00\u59CB\u5236\u4F5C\u3002\u5DF2\u6709\u89C6\u9891\u5EF6\u957F\u4E5F\u5148\u51C6\u5907\u7B80\u77ED\u7EED\u62CD\u811A\u672C\u548C\u5206\u955C\u3001\u5BA1\u6838\u65B9\u6848\uFF0C\u518D\u786E\u8BA4\u8D39\u7528\u3002\u4E0D\u5F97\u989D\u5916\u5F39\u5F00\u59CB\u5236\u4F5C\u95EE\u9898\u3002",
     "\xB7 \u4EC5A/B\u63A5\u5165\uFF1Avideo_generate\u3001video_extend\u53CAvideo_status\u5B8C\u6210\u540E\u82E5\u8FD4\u56DEactualCost\uFF0C\u4EA4\u4ED8\u89C6\u9891\u65F6\u4E00\u5E76\u5C55\u793A\u4E2D\u8F6C\u7AD9\u771F\u5B9E\u6D88\u8017\uFF08\u9010\u4EFB\u52A1\u548C\u5408\u8BA1\uFF09\uFF1Bpaused\u53EA\u79F0\u5DF2\u751F\u6210\u90E8\u5206\uFF0Cpartial\u53EA\u79F0\u5DF2\u7ED3\u7B97\u5C0F\u8BA1\uFF0Cpending\u8BF4\u660E\u5F85\u7ED3\u7B97/\u5F85\u67E5\u8BE2\u3002\u5B9E\u9645\u91D1\u989D\u53D6\u4E2D\u8F6C\u6700\u7EC8\u7ED3\u7B97\u800C\u975E\u4F30\u4EF7\u3001\u9884\u6263\u6216\u4F59\u989D\u5DEE\uFF1B\u6CA1\u6709\u91D1\u989D\u4E0D\u8981\u62A50\u3002\u53EF\u7528\u539FtaskId\u8C03\u7528video_status\u8865\u67E5\u8D39\u7528\uFF0C\u4E0D\u56E0\u8D39\u7528\u7F3A\u5931\u91CD\u65B0\u751F\u6210\u3001\u91CD\u8BD5\u4ED8\u8D39\u4EFB\u52A1\u6216\u5EF6\u8FDF\u4EA4\u4ED8\u3002\u53EA\u7EDF\u8BA1\u89C6\u9891\u8D39\u7528\uFF0C\u56FE\u7247\u4E0E\u989D\u5916\u91CD\u505A\u53E6\u8BA1\uFF1BC\u706B\u5C71\u76F4\u8FDE\u4E0D\u63D0\u4F9B\u6B64\u4E2D\u8F6C\u8D26\u5355\u67E5\u8BE2\u3002",
