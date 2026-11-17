@@ -114,8 +114,18 @@ test('真实工具创建、审批、改类型及重读保存一致，旧批准�
   assert.equal(invalid.valid,false);assert.equal(invalid.error_code,'INVALID_ARTIFACT_JSON');
   assert.equal((await tool.execute({action:'read',projectId:id},exec)).revision,s.revision);
   assert.equal(questions,0);
+  await assert.rejects(()=>tool.execute({action:'submit',projectId:id,stage:'creative',expectedRevision:s.revision,content:'{}x'},exec),/INVALID_ARTIFACT_JSON/);
+  const unchanged=await tool.execute({action:'read',projectId:id,responseMode:'compact'},exec);
+  assert.equal(unchanged.revision,s.revision);assert.equal(unchanged.artifacts,undefined);
+  assert.equal(unchanged.nextTask.stage,'creative');
+  const single=await tool.execute({action:'read',projectId:id,stage:'creative'},exec);assert.equal(single.artifact,null);
   const data={...creative(p),structure:[{section_id:'S1',duration_ms:15000}],must_preserve:[],assumptions:[]};
   s=await tool.execute({action:'submit',projectId:id,stage:'creative',expectedRevision:s.revision,content:JSON.stringify(data)},exec);
+  assert.equal(s.response_mode,'compact');assert.equal(s.artifacts,undefined);
+  assert.equal(s.artifact_summary.creative.revision,s.revision);
+  const full=await tool.execute({action:'read',projectId:id,responseMode:'full'},exec);assert.deepEqual(full.artifacts.creative.data,data);
+  const saved=await tool.execute({action:'read',projectId:id,stage:'creative'},exec);
+  assert.deepEqual(saved.artifact.data,data);
   s=await tool.execute({action:'approve',projectId:id,stage:'creative',expectedRevision:s.revision},exec);
   assert.equal(questions,1);assert.equal(s.approvals.creative,1);
   assert.match(approvalText,/创意方案（修订 1）/);

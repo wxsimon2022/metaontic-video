@@ -12,7 +12,7 @@ V4.0 是提示词版本，持久化 schema 仍沿用实际项目版本。版本�
 
 ## 候选提交预检
 
-`film_project validate` 只读检查候选 content 的 JSON 格式、全部必填顶层数组及现有结构/引用/时间轴规则；失败返回可定位问题，不修改项目修订与审批，不自动清空或补造道具。角色先校验再 submit，最终写入仍执行原有并发、依赖和审批校验。assets 必须同时提供 characters/scenes/locations/scene_states/props，道具确实不适用时显式为空数组。
+`film_project validate` 只读检查候选 content 的 JSON 格式、全部必填顶层数组及现有结构/引用/时间轴规则；失败返回可定位问题，不修改项目修订与审批，不自动清空或补造道具。正常稿直接 submit，失败在同次调用集中返回问题；validate 保留为可选独立检查。最终写入仍执行原有并发、依赖和审批校验。assets 必须同时提供 characters/scenes/locations/scene_states/props，道具确实不适用时显式为空数组。
 
 分镜与提示词的逐项数组要求集中在 `contracts/fields.ts`。next/route 返回 submission_contract，预检一次收集所有镜头缺失的 costume_ids/dialogue_refs 等字段，提交校验复用同一定义。没有对白才使用空 dialogue_refs；服装引用必须来自已批准角色的 costumes，不能自动填空绕过引用。
 

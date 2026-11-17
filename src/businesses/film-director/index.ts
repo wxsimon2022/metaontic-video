@@ -1,6 +1,7 @@
 import { hasContentProfile } from './profiles/dimensions.js';
 import { approvalPreview } from './runtime/approval-preview.js';
 import { checkSubmission } from './contracts/submission.js';
+import { projectResponse } from './runtime/responses.js';
 import { resolveModel } from '../video/providers/connection.js';
 import { createProjectSpec, configureProfile } from './runtime/spec.js';
 import { profileContext } from './profiles/index.js';
@@ -28,8 +29,9 @@ export const filmDirectorBusiness: BusinessModule = {
   prompt: () => ROLE_PROMPTS.director + FILM_WORKFLOW_GUIDANCE + ORCHESTRATION_GUIDANCE + INTENT_GUIDANCE,
   apply(runtime) {
     runtime.tools.register('film-director', {
-      name: 'film_project', description: '专业创作项目：create/read/validate/submit/approve/export。validate先只读校验content，返回全部缺失顶层数组与格式错误；通过不代表保存或审批。磁盘保存，创意与剧本独立人工批准，不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets必须含characters/scenes/locations/scene_states/props五个数组（无道具明确props:[]）；shots含shots；prompts含prompts；review含review_status/scores/issues/delivery_allowed；export返回可读Markdown及版本校验清单。',
+      name: 'film_project', description: '专业创作项目：create/read/validate/submit/approve/export。正常推进用responseMode:"compact"，submit已内置完整校验，失败集中返回字段问题，无需每稿先validate再submit。validate仅供单独检查，不保存或审批。磁盘保存，创意与剧本独立人工批准，不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets必须含characters/scenes/locations/scene_states/props五个数组（无道具明确props:[]）；shots含shots；prompts含prompts；review含review_status/scores/issues/delivery_allowed；export返回可读Markdown及版本校验清单。',
       parameters: { type:'object', properties: {
+        responseMode:{type:'string',enum:['compact','full'],description:'写操作默认compact：仅返回项目摘要与下一阶段完整必要材料，减少重复上下文；read默认full，完整恢复也可显式选full。read配合stage可只读单阶段产物。'},
         intent:{type:'string',enum:[...INTENTS]}, entityIds:{type:'array',items:{type:'string'}},
         projectSpec:{type:'string',description:'create可选项目规格JSON：work_type（DRAMA/COMEDY/LIFESTYLE/DOCUMENTARY/COMMERCIAL/PROMOTIONAL）、narrative_mode（FICTION/OBSERVATIONAL/EXPLANATORY/DEMONSTRATION/POETIC/MIXED）、genre/format/purpose/style_profile/tone/aspect_ratio/resolution/language/visual_style/target_audience/distribution_channel/target_model/hard_constraints/soft_preferences/references。configure_profile可增量传work_type、narrative_mode、genre、format、purpose、style_profile、tone、visual_style、target_model；target_model必须是真实模型ID（读取execution_plan.model_name），不得写占位文字；仅改模型保留创意剧本批准并重审资产、分镜、提示词和审核；四维注册选项通过read/next的resolved_profiles.available_profiles读取，genre等使用小写id；修改会失效已有产物并重新审批；类型不同于风格和生成模式，不猜测用户确认。配置修订由运行时固定。'}, issueId:{type:'string'}, taskKey:{type:'string'}, taskStatus:{type:'string',enum:['running','completed','failed']}, errorCode:{type:'string'},
         ratio:{type:'string',enum:['16:9','9:16']}, resolution:{type:'string',enum:['480p','720p']},
@@ -63,7 +65,13 @@ export const filmDirectorBusiness: BusinessModule = {
           };
           const taskFor=()=>({...nextTask(state),execution_plan:executionContext()});
 
-          if (args.action === 'read') return {...state,work_profile:profileContext(state),nextTask:taskFor()};
+          if (args.action === 'read') {
+            if(args.stage) {
+              if(!STAGES.includes(args.stage))throw Error('INVALID_STAGE');
+              return {project_id:id,revision:state.revision,status:state.status,stage:args.stage,artifact:state.artifacts[args.stage]||null,approvals:state.approvals};
+            }
+            return projectResponse(state,taskFor(),args.responseMode,{work_profile:profileContext(state)});
+          }
           if (args.action === 'validate') {
             if(!STAGES.includes(args.stage))throw Error('INVALID_STAGE');
             return checkSubmission(state,args.stage,args.content);
@@ -89,7 +97,16 @@ export const filmDirectorBusiness: BusinessModule = {
             }
           }
           if (args.action === 'export') return { project:state, markdown:renderDeliverables(state), manifest:artifactManifest(state), status:state.status };
-          if (args.action === 'submit') state=commitArtifact(state,args.stage,JSON.parse(args.content),args.expectedRevision);
+          if (args.action === 'submit') {
+            if(state.revision!==args.expectedRevision)throw Error('REVISION_CONFLICT');
+            if(!STAGES.includes(args.stage))throw Error('INVALID_STAGE');
+            try {state=commitArtifact(state,args.stage,JSON.parse(args.content),args.expectedRevision);}
+            catch(error) {
+              const check=checkSubmission(state,args.stage,args.content);
+              if(!check.valid)throw Error(`${check.error_code}: ${check.issues.map(i=>`${i.path}：${i.message}`).join('；')}`);
+              throw error;
+            }
+          }
           if (args.action === 'approve') {
             const artifact=state.artifacts[args.stage];
             if (!['creative','script'].includes(args.stage) || !artifact || artifact.stale || state.revision!==args.expectedRevision) throw Error('INVALID_APPROVAL_REVISION');
@@ -108,7 +125,7 @@ export const filmDirectorBusiness: BusinessModule = {
           await writeFile(path.join(dir,'snapshots',`${state.revision}-${randomUUID()}.json`),body,{mode:0o600,flag:'wx'});
           const temp=path.join(dir,`${randomUUID()}.tmp`);
           await writeFile(temp,body,{mode:0o600,flag:'wx'}); await rename(temp,file);
-          return {...state,nextTask:taskFor(),sha256:createHash('sha256').update(body).digest('hex')};
+          return projectResponse(state,taskFor(),args.responseMode||'compact',{sha256:createHash('sha256').update(body).digest('hex')});
         } finally {try{if(release)await release();}finally{locks.delete(id);}}
       },
     });
