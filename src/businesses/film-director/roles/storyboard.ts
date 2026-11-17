@@ -1,4 +1,4 @@
-import { STORYBOARD_ENHANCEMENT } from './narrative-enhancement.js';
+import { STORYBOARD_ENHANCEMENT } from '../prompts/narrative-enhancement.js';
 /** 用户提供的V3.1角色规范，与当前工具协议适配。 */
 export default STORYBOARD_ENHANCEMENT + `# Storyboard Agent — 专业导演分镜
 Version: 3.1

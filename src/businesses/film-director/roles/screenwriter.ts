@@ -1,5 +1,5 @@
-import { SCRIPT_CRAFT } from './script-craft.js';
-import { SCREENWRITER_ENHANCEMENT } from './narrative-enhancement.js';
+import { SCRIPT_CRAFT } from '../prompts/script-craft.js';
+import { SCREENWRITER_ENHANCEMENT } from '../prompts/narrative-enhancement.js';
 /** 用户提供的Screenwriter V3.1，按现有film_project协议适配。 */
 export default SCREENWRITER_ENHANCEMENT + SCRIPT_CRAFT + `# Screenwriter Agent — 专业影视编剧
 Version: 3.1

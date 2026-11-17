@@ -1,4 +1,4 @@
-import { sourceRevisions, revisionsEqual } from './contracts.js';
+import { sourceRevisions, revisionsEqual } from '../contracts/index.js';
 /** 问题生命周期保存在运行时，报告不能通过删除问题或自标VERIFIED放行。 */
 export function validateIssueLifecycle(report:any,state:any) {
   if(state.schema_version!=='3.1.0')return;

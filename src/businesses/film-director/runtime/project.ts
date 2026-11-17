@@ -1,9 +1,9 @@
 import { validateIssueLifecycle, updateIssueRegistry } from './issues.js';
-import { validateV31 } from './schema.js';
-import { sourceRevisions } from './contracts.js';
-import { validateReferences } from './references.js';
-import { evaluateReview } from './review.js';
-import { validateProfileArtifact } from './profiles/index.js';
+import { validateV31 } from '../contracts/schema.js';
+import { sourceRevisions } from '../contracts/index.js';
+import { validateReferences } from '../contracts/references.js';
+import { evaluateReview } from '../quality/review.js';
+import { validateProfileArtifact } from '../profiles/index.js';
 /** V2 创作数据与确定性校验。执行阶段独立于现有视频任务。 */
 export const STAGES = ['creative', 'script', 'assets', 'shots', 'prompts', 'review'] as const;
 export const ROLES = ['director', 'creative', 'screenwriter', 'character', 'scene', 'storyboard', 'prompt-engineer', 'reviewer'] as const;

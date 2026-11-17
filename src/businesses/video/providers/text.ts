@@ -1,4 +1,4 @@
-import { CREATIVE_GUIDANCE } from '../../film-director/creative.js';
+import { CREATIVE_GUIDANCE } from '../../film-director/prompts/guidance.js';
 import { writingProfileInstructions } from '../../film-director/profiles/index.js';
 /** providers/text：写脚本用的文本模型。走与视频同一个中转站的 OpenAI 兼容 /v1/chat/completions，
  *  同一把 API密钥；只负责把一段想法写成剧本与分镜表，不参与视频/图片生成，也不代替分镜解析。 */

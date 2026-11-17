@@ -1,4 +1,4 @@
-import { COMMON_CONTRACT, GENERIC_MODEL_PROFILE, sourceRevisions, STAGE_DEPS, projectContext, modelProfile } from '../contracts.js';
+import { COMMON_CONTRACT, GENERIC_MODEL_PROFILE, sourceRevisions, STAGE_DEPS, projectContext, modelProfile } from '../contracts/index.js';
 import director from './director.js';
 import creative from './creative.js';
 import screenwriter from './screenwriter.js';

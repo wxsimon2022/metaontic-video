@@ -1,4 +1,4 @@
-import { CREATIVE_ENHANCEMENT } from './narrative-enhancement.js';
+import { CREATIVE_ENHANCEMENT } from '../prompts/narrative-enhancement.js';
 /** 用户提供的CREATIVE V3.1；专职创意蓝图，不混入编剧/分镜执行任务。 */
 export default CREATIVE_ENHANCEMENT + `# CREATIVE — AI Film Director V3.1
 

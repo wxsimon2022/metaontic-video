@@ -1,8 +1,8 @@
-import { sourceRevisions, GENERIC_MODEL_PROFILE, STAGE_DEPS, projectContext, modelProfile } from './contracts.js';
-import { evaluateReview } from './review.js';
-import { roleInstructions } from './roles/index.js';
-import { profileContext } from './profiles/index.js';
-import { STAGES, validateArtifact } from './project.js';
+import { sourceRevisions, GENERIC_MODEL_PROFILE, STAGE_DEPS, projectContext, modelProfile } from '../contracts/index.js';
+import { evaluateReview } from '../quality/review.js';
+import { roleInstructions } from '../roles/index.js';
+import { profileContext } from '../profiles/index.js';
+import { STAGES, validateArtifact } from '../runtime/project.js';
 /** 程序选择下一许可动作；角色仅读取直接依赖，不重复加载全项目。 */
 export function nextTask(state: any) {
   if(state.status==='STOPPED') return {action:'stop',status:'STOPPED',expectedRevision:state.revision};

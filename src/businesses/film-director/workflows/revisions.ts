@@ -1,5 +1,5 @@
-import { sourceRevisions } from './contracts.js';
-import { validateArtifact, commitArtifact, STAGES } from './project.js';
+import { sourceRevisions } from '../contracts/index.js';
+import { validateArtifact, commitArtifact, STAGES } from '../runtime/project.js';
 /** 局部修订保留无关实体；全局时间或结构变化仍使整个相关阶段失效。 */
 export function reviseEntities(state: any, stage: string, replacements: any[], expected: number) {
   const fields={assets:['characters','scenes'],shots:['shots'],prompts:['prompts']};

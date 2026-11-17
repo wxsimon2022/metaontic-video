@@ -8,13 +8,13 @@
 | --- | --- | --- |
 | agents | src/businesses/film-director/roles | 八角色提示词，逻辑职责切换 |
 | skills | skills/video-director及promo-video | 阶段方法与按需参考文档 |
-| workflows | orchestration.ts、revisions.ts | 依赖、下一动作、局部修订及任务登记 |
-| contracts | contracts.ts、schema.ts、references.ts | 共同契约、结构与交叉引用检查 |
-| config/project | spec.ts | 项目规格、原始要求、来源标记 |
-| config/quality | review.ts、issues.ts | 加权评分、阻断规则与问题生命周期 |
+| workflows | workflows/orchestration.ts、workflows/revisions.ts | 依赖、下一动作、局部修订及任务登记 |
+| contracts | contracts/index.ts、contracts/schema.ts、contracts/references.ts | 共同契约、结构与交叉引用检查 |
+| config/project | runtime/spec.ts | 项目规格、原始要求、来源标记 |
+| config/quality | quality/review.ts、runtime/issues.ts | 加权评分、阻断规则与问题生命周期 |
 | models | contracts.ts模型档案与video/providers | 未知能力明确标记，执行能力以当前接入为准 |
-| runtime | index.ts、project.ts、storage.ts、approvals.ts | 宿主工具、状态提交、跨进程锁和真实审批 |
-| tools/build_manifest | deliverables.ts | 版本、JSON指针与SHA-256清单，可读导出 |
+| runtime | index.ts、runtime/project.ts、runtime/storage.ts、runtime/approvals.ts | 宿主工具、状态提交、跨进程锁和真实审批 |
+| tools/build_manifest | runtime/deliverables.ts | 版本、JSON指针与SHA-256清单，可读导出 |
 | projects | 宿主DATA_DIR/film-projects/会话归属/项目UUID | 项目权威状态与不可变快照，源码库不存运行数据 |
 | tests | tests/film-director.test.mjs及video测试 | 流程、版本、时长、引用、恢复与执行回归 |
 
@@ -42,3 +42,5 @@
 ## 验证范围
 
 增加原始需求恢复、统一依赖、终审范围、问题不可消失、修复产物证据、版本绑定复审、跨段拒绝、规格冲突与第二进程互斥用例。使用模拟或本地状态，不调用付费接口。Windows/macOS共用Node标准库路径和文件操作；本轮在macOS运行自动测试，未进行Windows桌面验证。技能与架构修改不更新版本号或发布说明。
+
+源码职责目录与入口见[source-layout.md](source-layout.md)。

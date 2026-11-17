@@ -85,3 +85,5 @@ Scripts clarify attention, reaction and physical feedback at key beats, and plac
 ## Work types
 
 Choose drama, comedy, lifestyle/atmosphere, documentary/educational, product advertising, or brand/place promotion. Work type is separate from visual style, narrative mode, and generation mode. Professional projects bind a versioned type profile to role guidance, creative/script extensions, and type-specific review checks. Changing type retains but invalidates existing artifacts and approvals; old projects retain their generic workflow. The canvas requirement dialog also saves an optional work type for AI script writing. Actual generation still requires existing review and cost approval.
+
+For source organization and module responsibilities, see [the source layout guide](docs/engineering/source-layout.md).

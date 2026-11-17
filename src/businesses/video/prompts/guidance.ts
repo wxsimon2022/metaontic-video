@@ -1,4 +1,4 @@
-import { CREATIVE_GUIDANCE } from '../../film-director/creative.js';
+import { CREATIVE_GUIDANCE } from '../../film-director/prompts/guidance.js';
 /** prompts/guidance：从宿主入口拆出的独立职责模块。 */
 import { resolveSingleMax, resolveSegmentSeconds } from '../workflow/planning.js';
 import { isMetaontic, isVolcengine } from '../providers/connection.js';

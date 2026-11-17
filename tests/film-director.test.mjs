@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-const result=await build({stdin:{contents:"export * from './src/businesses/film-director/project.ts'; export * from './src/businesses/film-director/orchestration.ts'; export * from './src/businesses/film-director/roles/index.ts'; export * from './src/businesses/film-director/revisions.ts'; export * from './src/businesses/film-director/deliverables.ts'; export * from './src/businesses/film-director/approvals.ts'; export * from './src/businesses/film-director/issues.ts'; export * from './src/businesses/film-director/spec.ts'; export * from './src/businesses/film-director/storage.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
+const result=await build({stdin:{contents:"export * from './src/businesses/film-director/runtime/project.ts'; export * from './src/businesses/film-director/workflows/orchestration.ts'; export * from './src/businesses/film-director/roles/index.ts'; export * from './src/businesses/film-director/workflows/revisions.ts'; export * from './src/businesses/film-director/runtime/deliverables.ts'; export * from './src/businesses/film-director/runtime/approvals.ts'; export * from './src/businesses/film-director/runtime/issues.ts'; export * from './src/businesses/film-director/runtime/spec.ts'; export * from './src/businesses/film-director/runtime/storage.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
 const api=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
 const initial=()=>({revision:0,duration_ms:15000,artifacts:{},approvals:{}});
 test('创意未批准阻止剧本，旧版本不能覆盖，改稿失效下游',()=>{

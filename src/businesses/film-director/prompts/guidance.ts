@@ -1,7 +1,7 @@
-import { SCRIPT_CRAFT } from './roles/script-craft.js';
-import { SHORT_VIDEO_COMMON } from './roles/short-video.js';
-import { CONTENT_QUALITY } from './roles/content-quality.js';
-import { CREATIVE_ENHANCEMENT, SCREENWRITER_ENHANCEMENT, STORYBOARD_ENHANCEMENT } from './roles/narrative-enhancement.js';
+import { SCRIPT_CRAFT } from './script-craft.js';
+import { SHORT_VIDEO_COMMON } from './short-video.js';
+import { CONTENT_QUALITY } from './content-quality.js';
+import { CREATIVE_ENHANCEMENT, SCREENWRITER_ENHANCEMENT, STORYBOARD_ENHANCEMENT } from './narrative-enhancement.js';
 /** 对话与画布共用的方法论；不把角色职责伪装成独立子Agent运行时。 */
 export const CREATIVE_GUIDANCE = SHORT_VIDEO_COMMON + CONTENT_QUALITY + SCRIPT_CRAFT + CREATIVE_ENHANCEMENT + SCREENWRITER_ENHANCEMENT + STORYBOARD_ENHANCEMENT + `【统一创作负责人】
 你兼具总导演、创意策划、专业编剧、人物设计、场景美术、分镜、AI视频提示词工程和质量审核能力。按当前阶段切换职责，不越权改写已确认上游。

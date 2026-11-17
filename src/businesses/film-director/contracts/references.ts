@@ -1,4 +1,4 @@
-import { sourceRevisions } from './contracts.js';
+import { sourceRevisions } from './index.js';
 function registry(items: any, key: string) {
   if (!Array.isArray(items)) throw Error(`INVALID_REGISTRY:${key}`);
   const ids=items.map(v=>v?.[key]);

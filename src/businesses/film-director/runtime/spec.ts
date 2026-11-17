@@ -1,4 +1,4 @@
-import { WORK_TYPES, NARRATIVE_MODES, profileRevision, resolveProfile } from './profiles/index.js';
+import { WORK_TYPES, NARRATIVE_MODES, profileRevision, resolveProfile } from '../profiles/index.js';
 const FIELDS=['genre','aspect_ratio','resolution','language','visual_style','target_audience','distribution_channel','target_model','work_type','narrative_mode'];
 /** 原始需求永远保留；未指定规格明确为UNKNOWN，不能替用户确认。 */
 export function createProjectSpec(title:string,idea:string,duration:number,input:any={}) {
