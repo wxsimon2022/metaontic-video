@@ -361,17 +361,17 @@ function getInner(value) {
 function extractKeys(data) {
   return filterKeys(data ?? {}, (key) => !key.startsWith("$"));
 }
-function validateVolatileSchema(schema, path25 = [], blocked2 = false, seen = /* @__PURE__ */ new Map()) {
+function validateVolatileSchema(schema, path26 = [], blocked2 = false, seen = /* @__PURE__ */ new Map()) {
   const states = seen.get(schema) ?? /* @__PURE__ */ new Set();
   if (states.has(blocked2)) return;
   states.add(blocked2);
   seen.set(schema, states);
-  if (schema.meta?.volatile && blocked2) throw new ValidationError("volatile fields require a fixed object path without an enclosing volatile field", { path: path25 });
+  if (schema.meta?.volatile && blocked2) throw new ValidationError("volatile fields require a fixed object path without an enclosing volatile field", { path: path26 });
   const nested = blocked2 || !!schema.meta?.volatile;
-  if (schema.dict) for (const [key, child] of Object.entries(schema.dict)) validateVolatileSchema(child, [...path25, key], nested, seen);
-  if (schema.sKey) validateVolatileSchema(schema.sKey, [...path25, "<key>"], true, seen);
-  if (schema.inner && (schema.type !== "lazy" || schema.inner[kSchema])) validateVolatileSchema(schema.inner, [...path25, "*"], true, seen);
-  if (schema.list) for (let index = 0; index < schema.list.length; index++) validateVolatileSchema(schema.list[index], [...path25, String(index)], true, seen);
+  if (schema.dict) for (const [key, child] of Object.entries(schema.dict)) validateVolatileSchema(child, [...path26, key], nested, seen);
+  if (schema.sKey) validateVolatileSchema(schema.sKey, [...path26, "<key>"], true, seen);
+  if (schema.inner && (schema.type !== "lazy" || schema.inner[kSchema])) validateVolatileSchema(schema.inner, [...path26, "*"], true, seen);
+  if (schema.list) for (let index = 0; index < schema.list.length; index++) validateVolatileSchema(schema.list[index], [...path26, String(index)], true, seen);
 }
 function checkWithinRange(data, meta, description, options, skipMin = false) {
   const { max = Infinity, min = -Infinity } = meta;
@@ -1179,8 +1179,8 @@ function resolveSubmitPath(config) {
 }
 function resolveQueryPath(config, taskId) {
   if (isVolcengine(config)) return VOLCENGINE.queryPath.replace("{task_id}", encodeURIComponent(taskId));
-  const path25 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
-  return path25.replace("{task_id}", encodeURIComponent(taskId));
+  const path26 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
+  return path26.replace("{task_id}", encodeURIComponent(taskId));
 }
 function resolveModel(config) {
   const preset = relayPreset();
@@ -1259,6 +1259,114 @@ var init_connection = __esm({
   }
 });
 
+// src/businesses/film-director/index.ts
+init_connection();
+
+// src/businesses/film-director/spec.ts
+var FIELDS = ["genre", "aspect_ratio", "resolution", "language", "visual_style", "target_audience", "distribution_channel", "target_model"];
+function createProjectSpec(title, idea, duration, input = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw Error("INVALID_PROJECT_SPEC");
+  if (Object.keys(input).some((k) => !FIELDS.includes(k) && !["hard_constraints", "soft_preferences", "references"].includes(k))) throw Error("UNKNOWN_PROJECT_SPEC_FIELD");
+  for (const key of FIELDS) if (input[key] !== void 0 && (typeof input[key] !== "string" || !input[key].trim())) throw Error(`INVALID_PROJECT_SPEC:${key}`);
+  if (input.aspect_ratio && !["16:9", "9:16"].includes(input.aspect_ratio)) throw Error("INVALID_PROJECT_SPEC:aspect_ratio");
+  if (input.resolution && !["480p", "720p"].includes(input.resolution)) throw Error("INVALID_PROJECT_SPEC:resolution");
+  for (const key of ["hard_constraints", "soft_preferences", "references"]) if (input[key] !== void 0 && (!Array.isArray(input[key]) || input[key].some((v) => typeof v !== "string" || !v.trim()))) throw Error(`INVALID_PROJECT_SPEC:${key}`);
+  return { title, original_idea: idea, target_duration_ms: duration, ...Object.fromEntries(FIELDS.map((k) => [k, input[k] || null])), hard_constraints: input.hard_constraints || [], soft_preferences: input.soft_preferences || [], references: input.references || [], provenance: { title: "USER_SPECIFIED", original_idea: "USER_SPECIFIED", target_duration_ms: "USER_SPECIFIED", ...Object.fromEntries(FIELDS.map((k) => [k, input[k] ? "USER_SPECIFIED" : "UNKNOWN"])) } };
+}
+
+// src/businesses/film-director/storage.ts
+import { open, unlink } from "node:fs/promises";
+import path from "node:path";
+async function acquireProjectLock(dir) {
+  const file = path.join(dir, ".write.lock");
+  let handle;
+  try {
+    handle = await open(file, "wx", 384);
+  } catch (error) {
+    if (error.code === "EEXIST") throw Error("PROJECT_LOCKED: another process or interrupted write requires inspection");
+    throw error;
+  }
+  try {
+    await handle.writeFile(JSON.stringify({ pid: process.pid, created_at: (/* @__PURE__ */ new Date()).toISOString() }));
+  } catch (error) {
+    await handle.close();
+    await unlink(file);
+    throw error;
+  }
+  return async () => {
+    try {
+      await handle.close();
+    } finally {
+      await unlink(file);
+    }
+  };
+}
+
+// src/businesses/film-director/contracts.ts
+var COMMON_CONTRACT = `
+# COMMON_CONTRACT \u2014 \u5168\u5C40\u751F\u4EA7\u5951\u7EA6
+Version: 3.1
+\u7528\u6237\u786C\u7EA6\u675F\u4E0E\u5DF2\u6279\u51C6\u7248\u672C\u4F18\u5148\u3002\u6BCF\u6B21\u4EFB\u52A1\u63A5\u6536project_id\u3001task_id\u3001stage\u3001input_refs\u3001input_revisions\u3001revision_scope\uFF1B\u5173\u952E\u4F9D\u8D56\u7F3A\u5931\u8FD4\u56DEBLOCKED\u53CA\u7F3A\u5931\u9879\uFF0C\u4E0D\u7F16\u9020\u8F93\u5165\u3002
+\u4F7F\u7528\u7A33\u5B9APROJECT/CHAPTER/SCENE/LOC/CHAR/COSTUME/PROP/SHOT/TASK/ISSUE\u6807\u8BC6\uFF1B\u533A\u5206\u7269\u7406\u5730\u70B9\u3001\u5267\u672C\u573A\u6B21\u4E0E\u73AF\u5883\u72B6\u6001\u3002\u65F6\u95F4\u91C7\u7528\u6574\u6570\u6BEB\u79D2\u548C[start_ms,end_ms)\u3002
+\u533A\u5206USER_SPECIFIED\u3001APPROVED\u3001INFERRED\u3001DEFAULT\u3001RESEARCH_REQUIRED\uFF1B\u4E0D\u5F97\u628A\u63A8\u65AD\u5F53\u7528\u6237\u8981\u6C42\u6216\u4E8B\u5B9E\u3002
+\u65B0\u589E\u4EBA\u7269\u3001\u5267\u60C5\u3001\u5173\u952E\u9053\u5177\u3001\u5730\u70B9\u548C\u5BF9\u767D\u82E5\u5F71\u54CD\u6279\u51C6\u5185\u5BB9\uFF0C\u63D0\u4EA4Director\u51B3\u7B56\u5E76\u91CD\u8D70\u5BF9\u5E94\u5BA1\u6279\u3002
+\u4EA4\u4ED8\u540C\u7248\u672CMarkdown\u4E0EJSON\uFF0C\u4FDD\u7559source_revisions\u3001changed_fields\u3001unresolved_issues\u3001next_action\uFF1B\u53EA\u6539revision_scope\uFF0C\u5220\u9664\u5B9E\u4F53\u7559\u4E0B\u53D8\u66F4\u8BB0\u5F55\u3002
+\u5DE5\u5177\u72B6\u6001\u7531\u8FD0\u884C\u65F6\u63D0\u4F9B\uFF1B\u4E0D\u5F97\u9760\u6587\u5B57\u58F0\u79F0\u8C03\u7528\u3001\u4FDD\u5B58\u3001\u5B8C\u6210\u4EFB\u52A1\u6216\u901A\u8FC7\u5BA1\u6838\u3002\u5931\u8D25\u62A5\u544Aerror_code\u3001evidence\u3001affected_artifacts\u3001suggested_owner\u3001recovery_options\u3002
+\u5404\u89D2\u8272\u53EA\u627F\u62C5\u672C\u804C\u3002\u4E24\u6B21\u521B\u4F5C\u6279\u51C6\u4E0D\u66FF\u4EE3\u4ED8\u8D39\u6388\u6743\u548C\u5B9E\u9645\u89C6\u9891\u7ED3\u679C\u5BA1\u6838\u3002COMPLETED\u5FC5\u987B\u6709\u8FD0\u884C\u65F6\u6821\u9A8C\u8FC7\u7684\u4EA7\u7269\u5F15\u7528\u3002`;
+var STAGE_DEPS = { creative: [], script: ["creative"], assets: ["script"], shots: ["script", "assets"], prompts: ["script", "assets", "shots"], review: ["creative", "script", "assets", "shots", "prompts"] };
+function sourceRevisions(state, stage) {
+  return Object.fromEntries((STAGE_DEPS[stage] || []).filter((s) => state.artifacts[s]).map((s) => [s, state.artifacts[s].revision]));
+}
+var GENERIC_MODEL_PROFILE = { model_name: "generic", profile_revision: "1", capability_status: "UNVERIFIED", generation_modes: null, supported_durations_ms: null, supported_aspect_ratios: null, native_audio_supported: null, reference_image_supported: null, reference_video_supported: null, prompt_length_limit: null, verified_at: null };
+function projectContext(state) {
+  return { project_id: state.project_id, original_idea: state.source_brief || "", target_duration_ms: state.duration_ms, project_spec: state.project_spec || { title: state.title, target_duration_ms: state.duration_ms, aspect_ratio: null, language: null, visual_style: null, target_model: null, hard_constraints: [], provenance: "LEGACY_UNKNOWN" }, approved_revisions: { ...state.approvals } };
+}
+function revisionsEqual(a, b) {
+  return !!a && !!b && typeof a === "object" && typeof b === "object" && Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => Object.hasOwn(b, k) && b[k] === v);
+}
+function modelProfile(state) {
+  return { ...GENERIC_MODEL_PROFILE, model_name: state.project_spec?.target_model || "generic" };
+}
+
+// src/businesses/film-director/issues.ts
+function validateIssueLifecycle(report, state) {
+  if (state.schema_version !== "3.1.0") return;
+  const registry2 = state.issue_registry || {};
+  const incoming = new Map((report.issues || []).map((i) => [i.issue_id, i]));
+  for (const previous of Object.values(registry2)) {
+    if (["CRITICAL", "MAJOR"].includes(previous.severity) && (previous.status !== "VERIFIED" || !revisionsEqual(previous.verification?.source_revisions, sourceRevisions(state, "review"))) && !incoming.has(previous.issue_id)) throw Error("UNRESOLVED_ISSUE_OMITTED");
+  }
+  for (const issue of report.issues || []) {
+    const previous = registry2[issue.issue_id];
+    if (!previous && ["RESOLVED", "VERIFIED"].includes(issue.status)) throw Error("ISSUE_INITIAL_STATUS_REQUIRED");
+    if (issue.status === "RESOLVED") {
+      const ownerStage = { creative: "creative", screenwriter: "script", character: "assets", scene: "assets", storyboard: "shots", "prompt-engineer": "prompts" }[issue.responsible_agent];
+      const origin = previous?.reported_source_revisions;
+      const current = sourceRevisions(state, "review");
+      if (!origin || (ownerStage ? origin[ownerStage] === current[ownerStage] : revisionsEqual(origin, current))) throw Error("ISSUE_REPAIR_ARTIFACT_REQUIRED");
+    }
+    if (issue.status === "VERIFIED" && (!previous?.verification || previous.status !== "VERIFIED" || !revisionsEqual(previous.verification.source_revisions, sourceRevisions(state, "review")))) throw Error("ISSUE_RECHECK_REQUIRED");
+    if (previous && (previous.severity === "CRITICAL" || previous.severity === "MAJOR") && !["CRITICAL", "MAJOR"].includes(issue.severity)) throw Error("ISSUE_SEVERITY_DOWNGRADE");
+  }
+}
+function updateIssueRegistry(state, report) {
+  state.issue_registry ||= {};
+  for (const issue of report.issues || []) {
+    const previous = state.issue_registry[issue.issue_id];
+    Object.defineProperty(state.issue_registry, issue.issue_id, { enumerable: true, configurable: true, writable: true, value: { ...structuredClone(issue), reported_source_revisions: previous?.reported_source_revisions || sourceRevisions(state, "review"), first_seen_revision: previous?.first_seen_revision || state.revision, last_report_revision: state.revision, ...previous?.verification ? { verification: previous.verification } : {} } });
+  }
+}
+function verifyIssue(state, id, evidence) {
+  const issue = state.issue_registry?.[id];
+  const review = state.artifacts.review;
+  if (!issue || issue.status !== "RESOLVED" || !review || review.stale) throw Error("ISSUE_NOT_RESOLVED");
+  if (!evidence || typeof evidence.evidence !== "string" || !evidence.evidence.trim() || evidence.review_revision !== review.revision || !revisionsEqual(evidence.source_revisions, sourceRevisions(state, "review"))) throw Error("INVALID_RECHECK_EVIDENCE");
+  issue.status = "VERIFIED";
+  issue.verification = { evidence: evidence.evidence, review_revision: review.revision, source_revisions: sourceRevisions(state, "review"), verified_at: (/* @__PURE__ */ new Date()).toISOString() };
+  state.revision++;
+  return issue;
+}
+
 // src/businesses/film-director/approvals.ts
 function recordApprovalDecision(state, stage, decision, expected) {
   const artifact = state.artifacts[stage];
@@ -1335,6 +1443,15 @@ function validateV31(stage, value, state) {
     array(value, "unverified_items");
     if (!value.reviewed_revisions || typeof value.reviewed_revisions !== "object") throw Error("MISSING_REVIEWED_REVISIONS");
     for (const stage2 of ["creative", "script", "assets", "shots", "prompts"]) if (value.reviewed_revisions[stage2] !== state.artifacts[stage2]?.revision) throw Error(`REVIEW_REVISION_MISMATCH:${stage2}`);
+    const final = value.review_status === "PASS" || value.review_status === "PASS_WITH_WARNINGS";
+    if (final) {
+      if (value.review_stage !== "FINAL_REVIEW") throw Error("FINAL_REVIEW_REQUIRED");
+      if (["creative", "script", "assets", "shots", "prompts"].some((s) => !value.review_scope.includes(s))) throw Error("FINAL_REVIEW_SCOPE_INCOMPLETE");
+      const required = ["requirement_fidelity", "narrative_quality", "cinematic_quality", "temporal_consistency", "prompt_executability", "structural_completeness"];
+      if (state.artifacts.assets?.data.characters?.length) required.push("character_consistency");
+      if (state.artifacts.assets?.data.scenes?.length) required.push("scene_consistency");
+      if (required.some((k) => typeof value.scores?.[k] !== "number")) throw Error("FINAL_REVIEW_SCORE_NOT_EVALUATED");
+    }
     const ids = /* @__PURE__ */ new Set();
     for (const issue of value.issues || []) {
       for (const key of ["issue_id", "description", "evidence", "location", "responsible_agent", "recheck_criteria"]) text(issue, key);
@@ -1343,23 +1460,6 @@ function validateV31(stage, value, state) {
     }
   }
 }
-
-// src/businesses/film-director/contracts.ts
-var COMMON_CONTRACT = `
-# COMMON_CONTRACT \u2014 \u5168\u5C40\u751F\u4EA7\u5951\u7EA6
-Version: 3.1
-\u7528\u6237\u786C\u7EA6\u675F\u4E0E\u5DF2\u6279\u51C6\u7248\u672C\u4F18\u5148\u3002\u6BCF\u6B21\u4EFB\u52A1\u63A5\u6536project_id\u3001task_id\u3001stage\u3001input_refs\u3001input_revisions\u3001revision_scope\uFF1B\u5173\u952E\u4F9D\u8D56\u7F3A\u5931\u8FD4\u56DEBLOCKED\u53CA\u7F3A\u5931\u9879\uFF0C\u4E0D\u7F16\u9020\u8F93\u5165\u3002
-\u4F7F\u7528\u7A33\u5B9APROJECT/CHAPTER/SCENE/LOC/CHAR/COSTUME/PROP/SHOT/TASK/ISSUE\u6807\u8BC6\uFF1B\u533A\u5206\u7269\u7406\u5730\u70B9\u3001\u5267\u672C\u573A\u6B21\u4E0E\u73AF\u5883\u72B6\u6001\u3002\u65F6\u95F4\u91C7\u7528\u6574\u6570\u6BEB\u79D2\u548C[start_ms,end_ms)\u3002
-\u533A\u5206USER_SPECIFIED\u3001APPROVED\u3001INFERRED\u3001DEFAULT\u3001RESEARCH_REQUIRED\uFF1B\u4E0D\u5F97\u628A\u63A8\u65AD\u5F53\u7528\u6237\u8981\u6C42\u6216\u4E8B\u5B9E\u3002
-\u65B0\u589E\u4EBA\u7269\u3001\u5267\u60C5\u3001\u5173\u952E\u9053\u5177\u3001\u5730\u70B9\u548C\u5BF9\u767D\u82E5\u5F71\u54CD\u6279\u51C6\u5185\u5BB9\uFF0C\u63D0\u4EA4Director\u51B3\u7B56\u5E76\u91CD\u8D70\u5BF9\u5E94\u5BA1\u6279\u3002
-\u4EA4\u4ED8\u540C\u7248\u672CMarkdown\u4E0EJSON\uFF0C\u4FDD\u7559source_revisions\u3001changed_fields\u3001unresolved_issues\u3001next_action\uFF1B\u53EA\u6539revision_scope\uFF0C\u5220\u9664\u5B9E\u4F53\u7559\u4E0B\u53D8\u66F4\u8BB0\u5F55\u3002
-\u5DE5\u5177\u72B6\u6001\u7531\u8FD0\u884C\u65F6\u63D0\u4F9B\uFF1B\u4E0D\u5F97\u9760\u6587\u5B57\u58F0\u79F0\u8C03\u7528\u3001\u4FDD\u5B58\u3001\u5B8C\u6210\u4EFB\u52A1\u6216\u901A\u8FC7\u5BA1\u6838\u3002\u5931\u8D25\u62A5\u544Aerror_code\u3001evidence\u3001affected_artifacts\u3001suggested_owner\u3001recovery_options\u3002
-\u5404\u89D2\u8272\u53EA\u627F\u62C5\u672C\u804C\u3002\u4E24\u6B21\u521B\u4F5C\u6279\u51C6\u4E0D\u66FF\u4EE3\u4ED8\u8D39\u6388\u6743\u548C\u5B9E\u9645\u89C6\u9891\u7ED3\u679C\u5BA1\u6838\u3002COMPLETED\u5FC5\u987B\u6709\u8FD0\u884C\u65F6\u6821\u9A8C\u8FC7\u7684\u4EA7\u7269\u5F15\u7528\u3002`;
-var STAGE_DEPS = { creative: [], script: ["creative"], assets: ["script"], shots: ["script", "assets"], prompts: ["script", "assets", "shots"], review: ["creative", "script", "assets", "shots", "prompts"] };
-function sourceRevisions(state, stage) {
-  return Object.fromEntries((STAGE_DEPS[stage] || []).filter((s) => state.artifacts[s]).map((s) => [s, state.artifacts[s].revision]));
-}
-var GENERIC_MODEL_PROFILE = { model_name: "generic", profile_revision: "1", capability_status: "UNVERIFIED", generation_modes: null, supported_durations_ms: null, supported_aspect_ratios: null, native_audio_supported: null, reference_image_supported: null, reference_video_supported: null, prompt_length_limit: null, verified_at: null };
 
 // src/businesses/film-director/references.ts
 function registry(items, key) {
@@ -1545,6 +1645,7 @@ function validateArtifact(stage, value, state) {
   }
   if (stage === "review" && value.review_status !== void 0) {
     evaluateReview(value);
+    validateIssueLifecycle(value, state);
     return;
   }
   if (stage === "review" && Array.isArray(value.issues) && value.issues.some((i) => !i || !["blocker", "major", "minor", "info"].includes(String(i.severity).toLowerCase()))) throw Error("INVALID_SEVERITY");
@@ -1562,6 +1663,7 @@ function commitArtifact(state, stage, value, expected) {
   validateArtifact(stage, value, state);
   const next = structuredClone(state);
   next.revision++;
+  if (stage === "review" && state.schema_version === "3.1.0") updateIssueRegistry(next, value);
   next.artifacts[stage] = { revision: next.revision, source_revisions: sourceRevisions(state, stage), data: value, stale: false };
   for (const downstream of STAGES.slice(index + 1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
   for (const approved of ["creative", "script"]) if (STAGES.indexOf(approved) >= index) delete next.approvals[approved];
@@ -1940,7 +2042,7 @@ var ROUTES = {
   produce: ["director", null],
   clarify: ["director", null]
 };
-var DEPS = { creative: [], script: ["creative"], assets: ["script"], shots: ["script", "assets"], prompts: ["assets", "shots"], review: ["creative", "script", "assets", "shots", "prompts"] };
+var DEPS = STAGE_DEPS;
 function routeIntent(state, intent, entityIds = []) {
   if (!Object.hasOwn(ROUTES, intent)) throw Error("UNKNOWN_INTENT");
   if (!Array.isArray(entityIds) || entityIds.some((id) => typeof id !== "string" || !id.trim())) throw Error("INVALID_SCOPE");
@@ -1962,9 +2064,9 @@ function routeIntent(state, intent, entityIds = []) {
     missing,
     approval_required: approvals,
     scope_required: scopeRequired,
-    project_id: state.project_id,
+    ...projectContext(state),
     input_revisions: sourceRevisions(state, stage),
-    model_profile: GENERIC_MODEL_PROFILE,
+    model_profile: modelProfile(state),
     expectedRevision: state.revision,
     instructions: ROLE_PROMPTS[role2],
     inputs,
@@ -2038,14 +2140,15 @@ function nextTask(state) {
     const artifact = state.artifacts[stage];
     if (!artifact || artifact.stale || state.status === `${stage.toUpperCase()}_REVISE`) {
       const roles = { creative: "creative", script: "screenwriter", assets: "character + scene", shots: "storyboard", prompts: "prompt-engineer", review: "reviewer" };
-      const dependencies = { creative: [], script: ["creative"], assets: ["script"], shots: ["script", "assets"], prompts: ["assets", "shots"], review: [...STAGES.slice(0, 5)] };
-      return { action: "submit", project_id: state.project_id, input_revisions: sourceRevisions(state, stage), revision_scope: artifact?.stale_entity_ids || [], model_profile: GENERIC_MODEL_PROFILE, stage, role: roles[stage], inputs: Object.fromEntries(dependencies[stage].map((s) => [s, state.artifacts[s]])), instructions: ROLE_INSTRUCTIONS[stage], expectedRevision: state.revision };
+      const dependencies = STAGE_DEPS;
+      return { action: "submit", ...projectContext(state), input_revisions: sourceRevisions(state, stage), revision_scope: artifact?.stale_entity_ids || [], model_profile: modelProfile(state), stage, role: roles[stage], inputs: Object.fromEntries(dependencies[stage].map((s) => [s, state.artifacts[s]])), instructions: ROLE_INSTRUCTIONS[stage], expectedRevision: state.revision };
     }
     if (["creative", "script"].includes(stage) && state.approvals[stage] !== artifact.revision) return { action: "approve", stage, expectedRevision: state.revision };
   }
   const report = state.artifacts.review.data;
+  if (report.review_status && !evaluateReview(report).passed && Object.values(state.issue_registry || {}).some((i) => i.status === "RESOLVED")) return { action: "recheck", role: "reviewer", stage: "review", ...projectContext(state), issues: Object.values(state.issue_registry).filter((i) => i.status === "RESOLVED"), input_revisions: sourceRevisions(state, "review"), review_revision: state.artifacts.review.revision, expectedRevision: state.revision, instructions: "\u9010\u9879\u6309recheck_criteria\u5BF9\u7167\u5F53\u524D\u7248\u672C\u5B9E\u9645\u590D\u5BA1\uFF1B\u901A\u8FC7\u540E\u8C03\u7528verify_issue\u767B\u8BB0\u8BC1\u636E\uFF0C\u4E0D\u901A\u8FC7\u8FD4\u56DE\u8D23\u4EFB\u89D2\u8272\u3002\u767B\u8BB0\u540E\u91CD\u65B0\u63D0\u4EA4\u5B8C\u6574\u6700\u7EC8\u5BA1\u6838\u62A5\u544A\uFF0C\u7981\u6B62\u4EC5\u9760\u81EA\u79F0VERIFIED\u3002" };
   if (report.review_status && !evaluateReview(report).passed) return { action: "repair", stage: "review", role: "director", issues: report.issues, expectedRevision: state.revision };
-  return { action: "compile", expectedRevision: state.revision };
+  return { action: "compile", ...projectContext(state), expectedRevision: state.revision };
 }
 function validateCurrent(state) {
   if (state.status === "STOPPED") throw Error("PROJECT_STOPPED");
@@ -2061,12 +2164,17 @@ function compileProduction(state, plan, ratio, resolution) {
   validateCurrent(state);
   if (!["16:9", "9:16"].includes(ratio) || !["480p", "720p"].includes(resolution)) throw Error("CONFIRMED_SPEC_REQUIRED");
   if (!Number.isSafeInteger(state.duration_ms) || state.duration_ms < 15e3 || state.duration_ms > 36e5) throw Error("INVALID_PROJECT_DURATION");
+  const spec = state.project_spec;
+  if (spec?.aspect_ratio && spec.aspect_ratio !== ratio) throw Error("PROJECT_SPEC_MISMATCH:aspect_ratio");
+  if (spec?.resolution && spec.resolution !== resolution) throw Error("PROJECT_SPEC_MISMATCH:resolution");
   const shots = state.artifacts.shots.data.shots;
   const prompts = state.artifacts.prompts.data.prompts;
   let start = 0;
   const segments = plan.map((part, index) => {
     const end = start + part.seconds * 1e3;
     const covered = shots.filter((s) => s.start_ms < end && s.end_ms > start);
+    if (state.schema_version === "3.1.0" && covered.some((s) => s.start_ms < start || s.end_ms > end)) throw Error("SHOT_SPLIT_REQUIRES_STORYBOARD_REVISION");
+    if (state.schema_version === "3.1.0" && new Set(covered.map((s) => s.location_id)).size > 1) throw Error("MULTI_LOCATION_SEGMENT_REQUIRES_REPLAN");
     const prompt = covered.map((s) => `[${Math.max(start, s.start_ms) - start}\u2013${Math.min(end, s.end_ms) - start}ms] ${prompts.find((p) => p.shot_id === s.shot_id).prompt}`).join("\n");
     const result = { index: index + 1, start_ms: start, end_ms: end, shot_ids: covered.map((s) => s.shot_id), prompt };
     start = end;
@@ -2201,7 +2309,7 @@ function estimatePlan(config, toolName, args) {
 }
 
 // src/businesses/video/workflow/segment-review.ts
-import path5 from "node:path";
+import path6 from "node:path";
 import { readFile as readFile2, writeFile as writeFile2, rename as rename2, rm as rm2, stat as stat2 } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 
@@ -2263,13 +2371,13 @@ function validatePauseRecord(data, file = "paused-plan.json") {
 
 // src/businesses/video/workflow/resume.ts
 init_config();
-import path4 from "node:path";
-import { readFile, open, rm, mkdir as mkdir3, writeFile, rename } from "node:fs/promises";
+import path5 from "node:path";
+import { readFile, open as open2, rm, mkdir as mkdir3, writeFile, rename } from "node:fs/promises";
 
 // src/businesses/video/utils/files.ts
 init_config();
 init_value();
-import path from "node:path";
+import path2 from "node:path";
 import { mkdir, stat } from "node:fs/promises";
 function tail(text, limit = 600) {
   const clean = String(text || "").trim();
@@ -2290,11 +2398,11 @@ function fileStamp(date2 = /* @__PURE__ */ new Date()) {
   return `${date2.getFullYear()}${pad(date2.getMonth() + 1)}${pad(date2.getDate())}-${pad(date2.getHours())}${pad(date2.getMinutes())}${pad(date2.getSeconds())}`;
 }
 async function allocateStamp(outDir, base) {
-  const parent = path.join(outDir, "segments");
+  const parent = path2.join(outDir, "segments");
   await mkdir(parent, { recursive: true });
   for (let attempt = 1; attempt <= 100; attempt += 1) {
     const stamp = attempt === 1 ? base : `${base}-${attempt}`;
-    const dir = path.join(parent, stamp);
+    const dir = path2.join(parent, stamp);
     try {
       await mkdir(dir);
       return { stamp, segmentsDir: dir };
@@ -2314,7 +2422,7 @@ async function exists(file) {
 }
 async function resolveOutputDir(config, exec, deps) {
   const configured = String(ref(config, "outputDir", "")).trim();
-  if (configured) return path.resolve(configured);
+  if (configured) return path2.resolve(configured);
   let cwd = "";
   if (deps?.workdir && exec?.agent) {
     try {
@@ -2323,7 +2431,7 @@ async function resolveOutputDir(config, exec, deps) {
       cwd = "";
     }
   }
-  return path.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
+  return path2.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
 }
 
 // src/businesses/video/workflow/resume.ts
@@ -2331,14 +2439,14 @@ import os2 from "node:os";
 
 // src/core/utils/logging.ts
 import { AsyncLocalStorage } from "node:async_hooks";
-import path3 from "node:path";
+import path4 from "node:path";
 
 // src/core/paths.ts
 import os from "node:os";
-import path2 from "node:path";
+import path3 from "node:path";
 function dshHome() {
   const fromEnv = String(typeof process !== "undefined" && process.env?.DSH_HOME || "").trim();
-  return fromEnv || path2.join(os.homedir(), ".dsh");
+  return fromEnv || path3.join(os.homedir(), ".dsh");
 }
 
 // src/core/utils/logging.ts
@@ -2349,7 +2457,7 @@ var requestLogContext = new AsyncLocalStorage();
 function requestLogPath() {
   const now = /* @__PURE__ */ new Date();
   const date2 = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-  return path3.join(dshHome(), "logs", DATA_DIR, date2, "requests.jsonl");
+  return path4.join(dshHome(), "logs", DATA_DIR, date2, "requests.jsonl");
 }
 var preparedDirs = /* @__PURE__ */ new Set();
 async function ensureLogDir(dir) {
@@ -2361,7 +2469,7 @@ async function ensureLogDir(dir) {
 async function appendRequestLog(record) {
   try {
     const file = requestLogPath();
-    await ensureLogDir(path3.dirname(file));
+    await ensureLogDir(path4.dirname(file));
     await appendFile(file, JSON.stringify({ time: (/* @__PURE__ */ new Date()).toISOString(), pluginVersion: PLUGIN_VERSION, ...requestLogContext.getStore(), ...record }) + "\n", { mode: 384 });
   } catch {
   }
@@ -2373,10 +2481,10 @@ var PAUSE_FILE = "paused-plan.json";
 function resumeDirOf(value) {
   const raw = typeof value === "string" ? value : value?.dir ?? value?.path ?? value?.resumeDir ?? value?.token ?? "";
   const dir = String(raw ?? "").trim();
-  return dir ? path4.resolve(dir) : "";
+  return dir ? path5.resolve(dir) : "";
 }
 async function readPauseFile(dir) {
-  const file = path4.join(dir, PAUSE_FILE);
+  const file = path5.join(dir, PAUSE_FILE);
   let text;
   try {
     text = await readFile(file, "utf8");
@@ -2427,7 +2535,7 @@ async function describeResumeLock(file) {
 async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
   const empty = { file: null, async release() {
   } };
-  const file = path4.join(dir, RESUME_LOCK);
+  const file = path5.join(dir, RESUME_LOCK);
   const token = uniqueSuffix("lock");
   const record = {
     tool: toolName,
@@ -2439,7 +2547,7 @@ async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
   };
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const handle = await open(file, "wx");
+      const handle = await open2(file, "wx");
       try {
         await handle.writeFile(`${JSON.stringify(record, null, 2)}
 `, "utf8");
@@ -2533,7 +2641,7 @@ function withResumeLock(tool, toolName, config) {
 }
 async function writePauseFile(dir, data) {
   await mkdir3(dir, { recursive: true, mode: 448 });
-  const file = path4.join(dir, PAUSE_FILE);
+  const file = path5.join(dir, PAUSE_FILE);
   const temp = `${file}.${uniqueSuffix("part")}`;
   try {
     await writeFile(temp, `${JSON.stringify(data, null, 2)}
@@ -2672,10 +2780,10 @@ async function segmentSnapshot(dir) {
     key: `${done}:${last.taskId}`,
     done,
     last,
-    file: path5.join(dir, `${String(last.index).padStart(2, "0")}-${last.kind}.mp4`)
+    file: path6.join(dir, `${String(last.index).padStart(2, "0")}-${last.kind}.mp4`)
   };
 }
-var reviewFile = (dir) => path5.join(dir, "segment-review.json");
+var reviewFile = (dir) => path6.join(dir, "segment-review.json");
 async function accepted(dir, key, exec) {
   try {
     const data = JSON.parse(await readFile2(reviewFile(dir), "utf8"));
@@ -2709,7 +2817,7 @@ function createSegmentReview(ctx) {
     for (const match of text.matchAll(/\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))\s*\)/g)) {
       const target = match[1] || match[2];
       try {
-        links.add(/^https?:\/\//i.test(target) ? target : path5.resolve(session.header?.cwd || process.cwd(), decodeURI(target)));
+        links.add(/^https?:\/\//i.test(target) ? target : path6.resolve(session.header?.cwd || process.cwd(), decodeURI(target)));
       } catch {
       }
     }
@@ -2754,13 +2862,13 @@ function createSegmentReview(ctx) {
 // src/businesses/video/workflow/project.ts
 import { createHash as createHash2, randomUUID as randomUUID2 } from "node:crypto";
 import { mkdir as mkdir5, readdir as readdir2, readFile as readFile4, writeFile as writeFile3, rename as rename4, rm as rm4 } from "node:fs/promises";
-import path7 from "node:path";
+import path8 from "node:path";
 
 // src/businesses/video/media/references.ts
 init_hardcoded_config();
-import path6 from "node:path";
+import path7 from "node:path";
 import os3 from "node:os";
-import { stat as stat3, mkdir as mkdir4, rename as rename3, rm as rm3, open as open2, readdir, readFile as readFile3 } from "node:fs/promises";
+import { stat as stat3, mkdir as mkdir4, rename as rename3, rm as rm3, open as open3, readdir, readFile as readFile3 } from "node:fs/promises";
 
 // src/businesses/video/media/ffmpeg.ts
 init_config();
@@ -3050,7 +3158,7 @@ function canvasSize(ratio) {
   return CANVAS_SIZES[String(ratio ?? "").trim()] || null;
 }
 function referenceCacheDir() {
-  return path6.join(os3.tmpdir(), REFERENCE_TMP_DIR);
+  return path7.join(os3.tmpdir(), REFERENCE_TMP_DIR);
 }
 async function isUsableFit(dest, width, height, config, signal) {
   const info = await stat3(dest).catch(() => null);
@@ -3070,7 +3178,7 @@ async function pruneReferenceCache(dir, { now = Date.now(), force = false } = {}
   const files = [];
   for (const entry of entries) {
     if (!entry.isFile()) continue;
-    const file = path6.join(dir, entry.name);
+    const file = path7.join(dir, entry.name);
     const info = await stat3(file).catch(() => null);
     if (!info) continue;
     const inFlight = entry.name.includes(".fit-") && now - info.mtimeMs < REFERENCE_CACHE_FRESH_MS;
@@ -3094,8 +3202,8 @@ async function fitImageToCanvas(absPath, size, config, signal) {
   const media = await probeMedia(absPath, config, signal);
   if (media?.width === width && media?.height === height) return absPath;
   const info = await stat3(absPath).catch(() => null);
-  const key = `${path6.basename(absPath, path6.extname(absPath))}-${info?.size ?? 0}-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`;
-  const dest = path6.join(referenceCacheDir(), key);
+  const key = `${path7.basename(absPath, path7.extname(absPath))}-${info?.size ?? 0}-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`;
+  const dest = path7.join(referenceCacheDir(), key);
   if (await isUsableFit(dest, width, height, config, signal)) return dest;
   const running = fitInFlight.get(dest);
   if (running) {
@@ -3144,12 +3252,12 @@ async function fitImageToCanvas(absPath, size, config, signal) {
 var UPLOAD_ALIAS_PATTERN = /^(?:latest|newest|recent|最近上传(?:的图片)?|最新上传(?:的图片)?|刚上传(?:的图片)?|最新图片|刚拖进来的图片)$/i;
 var UPLOAD_WINDOW_MS = 2 * 60 * 60 * 1e3;
 function attachmentObjectsDir() {
-  return path6.join(dshHome(), "attachments", "v1", "objects");
+  return path7.join(dshHome(), "attachments", "v1", "objects");
 }
 async function sniffFileImage(file) {
   let handle;
   try {
-    handle = await open2(file, "r");
+    handle = await open3(file, "r");
     const head = Buffer.alloc(32);
     const { bytesRead } = await handle.read(head, 0, head.length, 0);
     return sniffImageMime(head.subarray(0, bytesRead));
@@ -3167,11 +3275,11 @@ async function findRecentUploadedImages(windowMs = UPLOAD_WINDOW_MS) {
   const found = [];
   for (const shard of shards) {
     if (!shard.isDirectory()) continue;
-    const dir = path6.join(root, shard.name);
+    const dir = path7.join(root, shard.name);
     const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
       if (!entry.isFile()) continue;
-      const abs = path6.join(dir, entry.name);
+      const abs = path7.join(dir, entry.name);
       const info = await stat3(abs).catch(() => null);
       if (!info || info.mtimeMs < cutoff) continue;
       const mime = await sniffFileImage(abs);
@@ -3232,8 +3340,8 @@ async function resolveImageInput(value, label, fit = null) {
       uploadIndex: index
     };
   } else {
-    abs = path6.resolve(raw.startsWith("~/") || raw === "~" ? path6.join(os3.homedir(), raw.slice(1)) : raw);
-    const ext = path6.extname(abs).toLowerCase();
+    abs = path7.resolve(raw.startsWith("~/") || raw === "~" ? path7.join(os3.homedir(), raw.slice(1)) : raw);
+    const ext = path7.extname(abs).toLowerCase();
     if (!IMAGE_EXT_TO_MIME[ext]) {
       throw new Error(
         `${label} \u65E2\u4E0D\u662F http(s) \u94FE\u63A5\u3001base64\uFF0C\u4E5F\u4E0D\u662F\u652F\u6301\u7684\u56FE\u7247\u6587\u4EF6\uFF1A${brief(raw)}\u3002\u672C\u673A\u56FE\u7247\u8BF7\u7528 ${Object.keys(IMAGE_EXT_TO_MIME).join(" / ")} \u4E4B\u4E00\uFF0C\u7528\u6237\u521A\u5728\u5BF9\u8BDD\u91CC\u4E0A\u4F20\u7684\u56FE\u76F4\u63A5\u5199 latest\u3002`
@@ -3302,13 +3410,13 @@ function sessionOwner(exec) {
   return hash(id);
 }
 async function allProjects() {
-  const dir = path7.join(dshHome(), DATA_DIR, "projects");
+  const dir = path8.join(dshHome(), DATA_DIR, "projects");
   const names = await readdir2(dir).catch(() => []);
   const found = [];
   for (const name of names) {
     if (!name.endsWith(".json")) continue;
     try {
-      found.push(JSON.parse(await readFile4(path7.join(dir, name), "utf8")));
+      found.push(JSON.parse(await readFile4(path8.join(dir, name), "utf8")));
     } catch {
     }
   }
@@ -3325,7 +3433,7 @@ async function projectsOfSession(session) {
 }
 function projectFile(id) {
   if (!/^[a-f0-9-]{36}$/.test(String(id || ""))) throw new Error("\u7F3A\u5C11\u6709\u6548 projectId\uFF0C\u8BF7\u5148\u8C03\u7528 video_project(action:prepare)\u3002");
-  return path7.join(dshHome(), DATA_DIR, "projects", `${id}.json`);
+  return path8.join(dshHome(), DATA_DIR, "projects", `${id}.json`);
 }
 async function readProject(id, exec) {
   const data = JSON.parse(await readFile4(projectFile(id), "utf8"));
@@ -3334,7 +3442,7 @@ async function readProject(id, exec) {
 }
 async function writeProject(data) {
   const file = projectFile(data.id);
-  await mkdir5(path7.dirname(file), { recursive: true, mode: 448 });
+  await mkdir5(path8.dirname(file), { recursive: true, mode: 448 });
   const temp = `${file}.${randomUUID2()}.tmp`;
   try {
     await writeFile3(temp, JSON.stringify(data), { mode: 384, flag: "wx" });
@@ -3427,7 +3535,7 @@ function withProjectApproval(tool, config) {
 // src/businesses/film-director/index.ts
 import { randomUUID as randomUUID3, createHash as createHash3 } from "node:crypto";
 import { mkdir as mkdir6, readFile as readFile5, writeFile as writeFile4, rename as rename5 } from "node:fs/promises";
-import path8 from "node:path";
+import path9 from "node:path";
 init_hardcoded_config();
 
 // src/businesses/film-director/roles/short-video.ts
@@ -3479,7 +3587,7 @@ var CREATIVE_GUIDANCE = SHORT_VIDEO_COMMON + CONTENT_QUALITY + SCRIPT_CRAFT + `\
 \u3010\u4FEE\u8BA2\u4E0E\u4EA4\u4ED8\u3011\u53EA\u4FEE\u6539\u6307\u5B9A\u8303\u56F4\uFF0C\u4FDD\u7559\u6EE1\u610F\u5185\u5BB9\u4E0E\u7A33\u5B9AID\uFF0C\u4E0A\u6E38\u53D8\u5316\u6807\u8BB0\u4E0B\u6E38\u5931\u6548\u3002\u81EA\u52A8\u4E1A\u52A1\u4FEE\u590D\u6700\u591A2\u8F6E\uFF0C\u4ECD\u5931\u8D25\u4EA4\u7528\u6237\u5904\u7406\uFF0C\u4E0D\u5047\u79F0\u7A0B\u5E8F\u5DF2\u5B9E\u73B0\u81EA\u52A8\u5FAA\u73AF\u3002\u5DF2\u6709\u6210\u679C\u4E0D\u5220\u9664\u3001\u4E0D\u81EA\u52A8\u4ED8\u8D39\u91CD\u505A\u3002\u53EA\u62A5\u544A\u5DE5\u5177\u5B9E\u9645\u8FD4\u56DE\u7684\u4FDD\u5B58\u3001\u5BA1\u6838\u548C\u751F\u6210\u72B6\u6001\uFF1B\u672A\u89C2\u770B/\u8BD5\u542C\u7684\u5A92\u4F53\u6807\u5F85\u4EBA\u5DE5\u9A8C\u6536\u3002`;
 var FILM_WORKFLOW_GUIDANCE = `\u3010\u4E13\u4E1A\u5206\u9636\u6BB5\u521B\u4F5C\u5DE5\u5177\u5951\u7EA6\u3011
 \u5BF9\u8BDD\u4E2D\u65B0\u5199\u5B8C\u6574\u89C6\u9891\u811A\u672C\u3001\u91CD\u6784\u6545\u4E8B\u6216\u4E13\u4E1A\u5206\u9636\u6BB5\u521B\u4F5C\uFF0C\u76EE\u680715\u20133600\u79D2\u65F6\u4F18\u5148\u4F7F\u7528film_project\uFF0C\u4E0D\u7B49\u7528\u6237\u8BF4\u201C\u4E13\u4E1A\u6A21\u5F0F\u201D\u624D\u542F\u7528\u3002\u5148read/next\u7EED\u4F5C\uFF0C\u6309\u521B\u610F\u6279\u51C6\u2192\u7F16\u5267\u2192\u5267\u672C\u6279\u51C6\u2192\u8D44\u4EA7\u2192\u5206\u955C\u2192\u63D0\u793A\u8BCD\u2192\u5BA1\u6838\u63A8\u8FDB\u3002\u5DF2\u6709\u666E\u901Avideo_project\u7EE7\u7EED\u6CBF\u5176\u5DF2\u5BA1\u6838\u7248\u672C\u6539\u7A3F\uFF0C\u4E0D\u5F3A\u5236\u8FC1\u79FB\u6216\u4E22\u5931\u72B6\u6001\uFF1B4\u201314\u79D2\u53CA\u7528\u6237\u660E\u786E\u53EA\u9700\u5FEB\u901F\u8349\u6848\u65F6\u8D70\u539F\u6D41\u7A0B\uFF0C\u4ECD\u91C7\u7528\u76F8\u540C\u7F16\u5267\u65B9\u6CD5\u5E76\u6807\u8349\u6848\u3002\u5B9E\u9645\u89C6\u9891\u5236\u4F5C\u4ECD\u7528video_project\u3002\u65F6\u957F\u3001\u753B\u5E45\u3001\u6E05\u6670\u5EA6\u5DF2\u786E\u8BA4\u5219\u6CBF\u7528\uFF0C\u7F3A\u5931\u89C4\u683C\u6309\u73B0\u6709\u89C4\u5219\u5408\u5E76\u8BE2\u95EE\uFF0C\u4E0D\u628A\u5EFA\u8BAE\u5F53\u7528\u6237\u786E\u8BA4\u3002\u89C4\u5212\u4E0D\u81EA\u52A8\u8C03\u7528\u89C6\u9891\u3002
-\u5148create(title,sourceBrief\u539F\u6587,durationSeconds)\uFF0C\u7EED\u4F5C\u6216\u6539\u7A3F\u5148read(projectId)\u3002\u4EE5\u5DE5\u5177\u8FD4\u56DE\u7684\u72B6\u6001\u548Crevision\u4E3A\u51C6\uFF0C\u4E0D\u5047\u8BBE\u5B58\u5728progress/manifest\u8BFB\u53D6\u3001\u56DE\u6EDA\u3001\u7AE0\u8282\u81EA\u52A8\u8C03\u5EA6\u6216\u72EC\u7ACB\u5B50Agent\u3002
+\u5148create(title,sourceBrief\u539F\u6587,durationSeconds,projectSpec)\uFF0CprojectSpec\u4E3A\u5DF2\u77E5\u89C4\u683CJSON\uFF08aspect_ratio/resolution/language/visual_style/genre/target_audience/distribution_channel/target_model/hard_constraints/soft_preferences/references\uFF09\uFF0C\u672A\u6307\u5B9A\u5B57\u6BB5\u7559\u7A7A\uFF0C\u5DE5\u5177\u6807UNKNOWN\uFF0C\u4E0D\u5F97\u5192\u5145\u7528\u6237\u786E\u8BA4\uFF0C\u7EED\u4F5C\u6216\u6539\u7A3F\u5148read(projectId)\u3002\u4EE5\u5DE5\u5177\u8FD4\u56DE\u7684\u72B6\u6001\u548Crevision\u4E3A\u51C6\uFF0C\u4E0D\u5047\u8BBE\u5B58\u5728progress/manifest\u8BFB\u53D6\u3001\u56DE\u6EDA\u3001\u7AE0\u8282\u81EA\u52A8\u8C03\u5EA6\u6216\u72EC\u7ACB\u5B50Agent\u3002
 submit\u4F20stage\u3001content\uFF08\u5408\u6CD5JSON\u5B57\u7B26\u4E32\uFF09\u3001expectedRevision\uFF08\u6700\u8FD1\u8BFB\u53D6/\u63D0\u4EA4\u8FD4\u56DE\u7684\u9879\u76EErevision\uFF09\u3002JSON\u5B57\u7B26\u4E32\u91CC\u7684\u679A\u4E3E\u4E0E\u6587\u672C\u5FC5\u987B\u6709\u53CC\u5F15\u53F7\u3002\u6B63\u6587\u5148\u5C55\u793A\u53EF\u8BFB\u6210\u679C\uFF0C\u518D\u63D0\u4EA4\u5E76\u6838\u5BF9\u8FD4\u56DE\uFF1B\u5DE5\u5177\u6210\u529F\u624D\u79F0\u4FDD\u5B58\u3002
 \u65B0\u5EFA\u9879\u76EE\u91C7\u75283.1\u4E25\u683C\u6570\u636E\u534F\u8BAE\uFF1B\u5404\u9636\u6BB5source_revisions\u7531\u5DE5\u5177\u8BB0\u5F55\uFF0C\u63D0\u4EA4\u65F6\u82E5\u81EA\u5E26\u5FC5\u987B\u5339\u914D\u771F\u5B9E\u4E0A\u6E38\u3002\u6240\u6709JSON\u5747\u4E3A\u89C4\u8303\u5B57\u6BB5\uFF0C\u53C2\u8003\u7A3F\u522B\u540D\u987B\u5148\u6620\u5C04\uFF0C\u4E0D\u5F97\u540C\u65F6\u7EF4\u62A4\u51B2\u7A81\u7248\u672C\u3002
 \u9636\u6BB5\u53CAcontent\u5B57\u6BB5\uFF1A
@@ -3488,10 +3596,10 @@ script\uFF1Ascreenplay\u5B8C\u6574\u5267\u672C\u6B63\u6587\u3001chapters[{chapte
 assets\uFF1A\u540C\u4E00\u5BF9\u8C61\u542Bcharacters\u3001scenes\u3001locations\u3001scene_states\u3001props\u6570\u7EC4\uFF08\u65E0\u5185\u5BB9\u7528\u7A7A\u6570\u7EC4\uFF09\uFF0Cscenes\u5173\u8054location_id/scene_state_id\uFF1B\u4EBA\u7269\u9879\u5FC5\u6709character_id\uFF0C\u573A\u666F\u9879\u5FC5\u6709scene_id\u3002\u4EBA\u7269/\u573A\u666F\u5206\u522B\u6309\u4E13\u4E1A\u804C\u8D23\u6574\u7406\u540E\u5408\u5E76\u63D0\u4EA4\uFF0C\u4E0D\u6539\u53D8\u5267\u672C\u3002
 shots\uFF1A{shots:[{shot_id,scene_id,character_ids,start_ms,end_ms,duration_ms,narrative_purpose,chapter_id,location_id,scene_state_id,costume_ids,prop_ids,dialogue_refs,...\u955C\u5934\u7EC6\u8282}]}\u3002\u65F6\u95F4\u7528\u6574\u6570\u6BEB\u79D2\uFF0C\u534A\u5F00\u533A\u95F4[start_ms,end_ms)\uFF0C\u4ECE0\u8FDE\u7EED\u8986\u76D6\u5168\u7247\uFF1B\u5F15\u7528\u5FC5\u987B\u5B58\u5728\uFF0Cduration_ms=end_ms-start_ms\u3002
 prompts\uFF1A{prompts:[{shot_id,prompt,target_model,location_id,scene_state_id,duration_ms,generation_mode,dialogue_refs,capability_warnings,...}]}\uFF0C\u6BCF\u955C\u6070\u6709\u4E00\u4E2A\u975E\u7A7Aprompt\uFF1B\u4FDD\u7559\u8D44\u4EA7\u951A\u70B9\u4E0E\u6E90\u7248\u672C\uFF0C\u4E0D\u628A\u4E00\u955C\u4E00\u63D0\u793A\u8BCD\u8BEF\u5F53\u4E00\u955C\u4E00\u6B21\u4ED8\u8D39\u8C03\u7528\u3002
-review\uFF1A\u65B0\u7248Reviewer V3.1\u63D0\u4EA4review_status\u3001scores\u516B\u7EF4\uFF08\u4E0D\u9002\u7528null\uFF09\u3001issues\u3001delivery_allowed\u3001blocking_issue_count\u548C\u771F\u5B9Ereviewed_revisions\uFF08creative/script/assets/shots/prompts\u5BF9\u5E94\u5B9E\u9645\u4FEE\u8BA2\u53F7\uFF09\u3001review_id/review_stage/review_scope/unverified_items\u7B49\u5B8C\u6574\u62A5\u544A\u3002CRITICAL/MAJOR\u672AVERIFIED\u963B\u65AD\uFF1B\u52A0\u6743\u5206\u7531\u7A0B\u5E8F\u590D\u7B97\uFF0C\u5931\u8D25\u62A5\u544A\u4E5F\u53EF\u4FDD\u5B58\u4F46\u7981\u6B62\u7F16\u8BD1\u3002\u65E7\u62A5\u544Ascore/passed\u534F\u8BAE\u517C\u5BB9\u3002
+review\uFF1A\u65B0\u7248Reviewer V3.1\u63D0\u4EA4review_status\u3001scores\u516B\u7EF4\uFF08\u4E0D\u9002\u7528null\uFF09\u3001issues\u3001delivery_allowed\u3001blocking_issue_count\u548C\u771F\u5B9Ereviewed_revisions\uFF08creative/script/assets/shots/prompts\u5BF9\u5E94\u5B9E\u9645\u4FEE\u8BA2\u53F7\uFF09\u3001review_id/review_stage/review_scope/unverified_items\u7B49\u5B8C\u6574\u62A5\u544A\u3002CRITICAL/MAJOR\u672AVERIFIED\u963B\u65AD\uFF1B\u52A0\u6743\u5206\u7531\u7A0B\u5E8F\u590D\u7B97\uFF0C\u5931\u8D25\u62A5\u544A\u4E5F\u53EF\u4FDD\u5B58\u4F46\u7981\u6B62\u7F16\u8BD1\u3002\u6700\u7EC8\u901A\u8FC7\u53EA\u63A5\u53D7FINAL_REVIEW\u53CA\u5B8C\u6574review_scope\uFF0C\u9002\u7528\u7EF4\u5EA6\u4E0D\u5F97\u7528null\u8DF3\u8FC7\u3002\u91CD\u5927\u95EE\u9898\u4E0D\u5F97\u5220\u9664\u6216\u964D\u7EA7\uFF1B\u9996\u6B21\u95EE\u9898OPEN\uFF0C\u8D23\u4EFB\u4EA7\u7269\u771F\u5B9E\u6539\u7248\u540E\u624D\u6807RESOLVED\u3002Reviewer\u6309\u5F53\u524D\u7248\u672C\u590D\u5BA1\u540E\u7528verify_issue(issueId,content:{evidence,review_revision,source_revisions},expectedRevision)\u767B\u8BB0\uFF0C\u518D\u63D0\u4EA4\u542BVERIFIED\u7684\u7EC8\u5BA1\uFF1B\u95EE\u9898\u53F0\u8D26\u4E0E\u590D\u5BA1\u65F6\u95F4\u7531\u8FD0\u884C\u65F6\u7EF4\u62A4\uFF0C\u4E0D\u80FD\u81EA\u586B\u9A8C\u8BC1\u901A\u8FC7\u3002\u65E7\u62A5\u544Ascore/passed\u534F\u8BAE\u517C\u5BB9\u3002
 \u521B\u610F\u548C\u5267\u672C\u7684\u6279\u51C6\u5206\u522B\u7ED1\u5B9A\u6750\u6599\u7248\u672C\uFF0C\u6C89\u9ED8/\u53D6\u6D88/\u4FEE\u6539\u610F\u89C1\u4E0D\u7B97\u6279\u51C6\u3002\u6539\u7A3F\u540E\u6309\u5DE5\u5177stale\u72B6\u6001\u66F4\u65B0\u4E0B\u6E38\uFF0C\u4E0D\u5047\u79F0\u5DF2\u5B9E\u73B0\u5B9E\u4F53\u7EA7\u81EA\u52A8\u4FEE\u8BA2\u3002\u8D85\u8FC7180\u79D2\u6309\u7AE0\u89C4\u5212\uFF0C600\u79D2\u4EE5\u4E0A\u7EF4\u62A4\u5168\u7247\u6458\u8981\u548C\u7AE0\u95F4\u72B6\u6001\uFF0C\u5206\u6279\u521B\u4F5C\u4F46\u6309\u5F53\u524D\u5DE5\u5177\u63D0\u4EA4\u5B8C\u6574\u9636\u6BB5\u805A\u5408\u5BF9\u8C61\uFF1B\u8D85\u51FA\u4E0A\u4E0B\u6587\u80FD\u529B\u65F6\u505C\u5728\u53EF\u6062\u590D\u8349\u7A3F\uFF0C\u4E0D\u622A\u65AD\u5192\u5145\u5B8C\u6574\u3002
 export\u8FD4\u56DEJSON\u548CMarkdown\u5185\u5BB9\uFF0C\u4E0D\u662F\u5DF2\u5199\u5165\u5BFC\u51FA\u6587\u4EF6\uFF1B\u6CA1\u6709\u5B9E\u9645\u6587\u4EF6\u4E0D\u5F97\u7F16\u9020\u4E0B\u8F7D\u94FE\u63A5\u3002Markdown\u5E94\u4E3A\u540C\u7248\u672CJSON\u7684\u53EF\u8BFB\u6295\u5F71\u3002\u5B9E\u9645\u89C6\u9891\u4ECD\u987B\u8D70video_project\u811A\u672C\u5BA1\u6838\u3001\u8D39\u7528\u786E\u8BA4\u4E0E\u9010\u6BB5\u7ED3\u679C\u5BA1\u6838\uFF0C\u521B\u4F5C\u6279\u51C6\u4E0D\u66FF\u4EE3\u5236\u4F5C\u6388\u6743\u3002`;
-var ORCHESTRATION_GUIDANCE = `\u63A8\u8FDB\u4E13\u4E1A\u521B\u4F5C\u5148\u8C03\u7528film_project(action:next)\uFF0C\u53EA\u52A0\u8F7D\u8FD4\u56DE\u7684role\u3001inputs\u4E0Escope\u6240\u9700\u8D44\u6599\uFF0C\u518D\u6309\u8BB8\u53EF\u52A8\u4F5C\u63D0\u4EA4\u6216\u8BF7\u6C42\u6279\u51C6\uFF1B\u4E0D\u628A\u5B8C\u6574\u5386\u53F2\u53CD\u590D\u585E\u7ED9\u955C\u5934\u4EFB\u52A1\u3002\u5F53\u524Drole\u662F\u540C\u4E00\u52A9\u624B\u7684\u4E13\u4E1A\u804C\u8D23\uFF0C\u4E0D\u662F\u72EC\u7ACB\u8FD0\u884C\u7684\u5B50Agent\u3002\u5B8C\u6210\u5BA1\u6838\u540E\u8C03\u7528compile(expectedRevision,ratio,resolution)\u7F16\u8BD1\u5236\u4F5C\u8BA1\u5212\uFF0C\u8FD4\u56DEproduction.videoProjectId\u53CAspecification\u3002\u7528\u8BE5videoProjectId\u6267\u884Cvideo_project prepare\u5B8C\u6210\u89D2\u8272\u56FE\u8DEF\u7EBF\uFF0C\u518D\u5C55\u793A\u5236\u4F5C\u811A\u672C\u3001\u5206\u955C\u4E0E\u4F30\u4EF7\u5E76review\uFF0C\u6700\u540E\u624D\u8C03\u7528\u89C6\u9891\u751F\u6210\u3002\u4E0D\u5F97\u628A\u521B\u4F5C\u6279\u51C6\u5F53\u8D39\u7528\u6388\u6743\u3002compile\u53EA\u8BFB\u89C4\u5212\u4E0D\u4EA7\u751F\u4ED8\u8D39\u8C03\u7528\uFF1B\u91CD\u590D\u540C\u7248\u672C\u540C\u89C4\u683C\u7F16\u8BD1\u590D\u7528\u7ED1\u5B9A\u3002\u521B\u4F5C\u6539\u7A3F\u540E\u65E7\u7ED1\u5B9A\u7981\u6B62\u65B0\u589E\u751F\u6210\uFF0C\u5DF2\u63D0\u4EA4\u4EFB\u52A1\u67E5\u8BE2\u548C\u4EA4\u4ED8\u4ECD\u53EF\u6062\u590D\u3002\u5168\u7247\u6700\u957F3600\u79D2\uFF0C\u6309\u6A21\u578B\u5355\u6BB5\u80FD\u529B\u9010\u6BB5\u751F\u6210\u3001\u5BA1\u6838\u548C\u7EED\u505A\uFF0C\u4E0D\u627F\u8BFA\u4E00\u6B21\u8BF7\u6C42\u751F\u6210\u6574\u7247\u3002`;
+var ORCHESTRATION_GUIDANCE = `\u63A8\u8FDB\u4E13\u4E1A\u521B\u4F5C\u5148\u8C03\u7528film_project(action:next)\uFF0C\u53EA\u52A0\u8F7D\u8FD4\u56DE\u7684role\u3001inputs\u4E0Escope\u6240\u9700\u8D44\u6599\uFF0C\u518D\u6309\u8BB8\u53EF\u52A8\u4F5C\u63D0\u4EA4\u6216\u8BF7\u6C42\u6279\u51C6\uFF1B\u4E0D\u628A\u5B8C\u6574\u5386\u53F2\u53CD\u590D\u585E\u7ED9\u955C\u5934\u4EFB\u52A1\u3002\u5F53\u524Drole\u662F\u540C\u4E00\u52A9\u624B\u7684\u4E13\u4E1A\u804C\u8D23\uFF0C\u4E0D\u662F\u72EC\u7ACB\u8FD0\u884C\u7684\u5B50Agent\u3002\u5B8C\u6210\u5BA1\u6838\u540E\u8C03\u7528compile(expectedRevision,ratio,resolution)\u7F16\u8BD1\u5236\u4F5C\u8BA1\u5212\uFF0C\u8FD4\u56DEproduction.videoProjectId\u53CAspecification\u3002\u7528\u8BE5videoProjectId\u6267\u884Cvideo_project prepare\u5B8C\u6210\u89D2\u8272\u56FE\u8DEF\u7EBF\uFF0C\u518D\u5C55\u793A\u5236\u4F5C\u811A\u672C\u3001\u5206\u955C\u4E0E\u4F30\u4EF7\u5E76review\uFF0C\u6700\u540E\u624D\u8C03\u7528\u89C6\u9891\u751F\u6210\u3002\u4E0D\u5F97\u628A\u521B\u4F5C\u6279\u51C6\u5F53\u8D39\u7528\u6388\u6743\u3002compile\u53EA\u8BFB\u89C4\u5212\u4E0D\u4EA7\u751F\u4ED8\u8D39\u8C03\u7528\uFF1B\u91CD\u590D\u540C\u7248\u672C\u540C\u89C4\u683C\u7F16\u8BD1\u590D\u7528\u7ED1\u5B9A\u3002\u521B\u4F5C\u6539\u7A3F\u540E\u65E7\u7ED1\u5B9A\u7981\u6B62\u65B0\u589E\u751F\u6210\uFF0C\u5DF2\u63D0\u4EA4\u4EFB\u52A1\u67E5\u8BE2\u548C\u4EA4\u4ED8\u4ECD\u53EF\u6062\u590D\u3002next/route\u8FD4\u56DEexecution_plan\u5236\u4F5C\u9884\u89C4\u5212\uFF1B\u5206\u955C\u5E94\u4E0E\u771F\u5B9E\u751F\u6210\u6BB5\u8FB9\u754C\u5BF9\u9F50\u3002compile\u53D1\u73B0\u8DE8\u6BB5\u622A\u65AD\u955C\u5934\u6216\u540C\u6BB5\u591A\u5730\u70B9\u65F6\u62D2\u7EDD\u5E76\u8981\u6C42Storyboard\u91CD\u89C4\u5212\uFF0C\u4E0D\u590D\u5236\u6574\u6761\u52A8\u4F5C/\u53F0\u8BCD\u5230\u4E24\u6BB5\u3002project_spec\u9501\u5B9A\u7684\u753B\u5E45\u3001\u6E05\u6670\u5EA6\u548C\u76EE\u6807\u6A21\u578B\u4E0E\u5236\u4F5C\u4E0D\u7B26\u65F6\u5148\u4FEE\u8BA2\u5E76\u91CD\u5BA1\uFF0C\u4E0D\u9759\u9ED8\u6362\u53C2\u6570\u3002\u5168\u7247\u6700\u957F3600\u79D2\uFF0C\u6309\u6A21\u578B\u5355\u6BB5\u80FD\u529B\u9010\u6BB5\u751F\u6210\u3001\u5BA1\u6838\u548C\u7EED\u505A\uFF0C\u4E0D\u627F\u8BFA\u4E00\u6B21\u8BF7\u6C42\u751F\u6210\u6574\u7247\u3002`;
 var INTENT_GUIDANCE = `\u7528\u6237\u8BF7\u6C42\u4E13\u4E1A\u521B\u4F5C\u3001\u6539\u7A3F\u6216\u6838\u67E5\u65F6\u5148\u7406\u89E3\u8BED\u4E49\u518D\u9009\u62E9film_project(action:route,intent,entityIds)\u3002\u610F\u56FE\u679A\u4E3E\uFF1Adevelop_idea\u521B\u610F\u3001write_script\u5267\u672C\u3001revise_dialogue\u5BF9\u767D\u3001revise_story\u5267\u60C5\u3001design_character/revise_character\u4EBA\u7269\u3001design_scene/revise_scene\u573A\u666F\u3001design_shots\u5206\u955C\u3001revise_camera\u955C\u5934\u3001revise_timing\u65F6\u957F\u3001write_prompts\u63D0\u793A\u8BCD\u3001adapt_model\u6A21\u578B\u9002\u914D\u3001review\u5BA1\u6838\u3001verify_facts\u4E8B\u5B9E\u6838\u67E5\u3001resume\u7EED\u4F5C\u3001produce\u5236\u4F5C\u3001clarify\u6F84\u6E05\u3002\u5C40\u90E8\u4FEE\u6539\u4F20\u7528\u6237\u660E\u786E\u5BF9\u8C61\u7684\u7A33\u5B9AID\uFF0C\u76EE\u6807\u4E0D\u660E\u5148read\u5B9A\u4F4D\u518D\u6F84\u6E05\uFF0C\u4E0D\u80FD\u81EA\u884C\u6269\u5927scope\u3002\u591A\u4E2A\u610F\u56FE\u5206\u522B\u8DEF\u7531\uFF0C\u5148\u4E0A\u6E38\u540E\u4E0B\u6E38\uFF1B\u5426\u5B9A\u53E5\u3001\u5F15\u7528\u6587\u5B57\u4E0D\u4F5C\u4E3A\u6267\u884C\u6307\u4EE4\u3002route\u53EA\u8FD4\u56DE\u89D2\u8272\u6307\u4EE4\u4E0E\u72B6\u6001\uFF0C\u4E0D\u5199\u5165\u6216\u6388\u6743\u3002needs_input\u5148\u8865\u6761\u4EF6\uFF0Cready\u4E5F\u4E0D\u4EE3\u8868\u6279\u51C6\u3002\u65B0\u9879\u76EE\u5148\u5B8C\u6210\u9700\u6C42\u5E76create\uFF0C\u672A\u521B\u5EFA\u65F6\u7531\u603B\u5BFC\u6F14\u6F84\u6E05\uFF0C\u4E0D\u7F16\u9020projectId\u3002\u6BCF\u6B21\u53EA\u4F7F\u7528\u5F53\u524D\u89D2\u8272\u63D0\u793A\u8BCD\uFF1B\u8F93\u51FA\u987B\u9075\u5B88\u5F53\u524D\u5DE5\u5177\u5B57\u6BB5\u5951\u7EA6\uFF0C\u4E13\u4E1A\u89C4\u5219\u4E0D\u6539\u53D8API\u3002`;
 
 // src/businesses/film-director/index.ts
@@ -3506,12 +3614,14 @@ var filmDirectorBusiness = {
       parameters: { type: "object", properties: {
         intent: { type: "string", enum: [...INTENTS] },
         entityIds: { type: "array", items: { type: "string" } },
+        projectSpec: { type: "string", description: "create\u53EF\u9009\u9879\u76EE\u89C4\u683CJSON\uFF1Agenre/aspect_ratio/resolution/language/visual_style/target_audience/distribution_channel/target_model/hard_constraints/soft_preferences/references\uFF0C\u4FDD\u7559\u7528\u6237\u6307\u5B9A\u503C" },
+        issueId: { type: "string" },
         taskKey: { type: "string" },
         taskStatus: { type: "string", enum: ["running", "completed", "failed"] },
         errorCode: { type: "string" },
         ratio: { type: "string", enum: ["16:9", "9:16"] },
         resolution: { type: "string", enum: ["480p", "720p"] },
-        action: { type: "string", enum: ["create", "read", "submit", "approve", "export", "next", "compile", "revise", "schedule", "task_result", "route"] },
+        action: { type: "string", enum: ["create", "read", "submit", "approve", "export", "next", "compile", "revise", "schedule", "task_result", "route", "verify_issue"] },
         projectId: { type: "string" },
         title: { type: "string" },
         sourceBrief: { type: "string" },
@@ -3532,23 +3642,42 @@ var filmDirectorBusiness = {
         if (!/^[a-f0-9-]{36}$/.test(id || "")) throw Error("INVALID_PROJECT_ID");
         if (locks2.has(id)) throw Error("PROJECT_BUSY");
         locks2.add(id);
+        let release;
         try {
-          const dir = path8.join(dshHome(), DATA_DIR, "film-projects", owner, id);
-          const file = path8.join(dir, "project.json");
+          const dir = path9.join(dshHome(), DATA_DIR, "film-projects", owner, id);
+          const file = path9.join(dir, "project.json");
+          await mkdir6(dir, { recursive: true, mode: 448 });
+          release = await acquireProjectLock(dir);
           let state;
           if (args.action === "create") {
             if (!Number.isInteger(args.durationSeconds) || args.durationSeconds < 15 || args.durationSeconds > 3600 || !args.title?.trim() || !args.sourceBrief?.trim()) throw Error("INVALID_REQUIREMENTS");
-            state = { schema_version: "3.1.0", project_id: id, title: args.title, source_brief: args.sourceBrief, duration_ms: args.durationSeconds * 1e3, revision: 0, status: "REQUIREMENT_ANALYSIS", artifacts: {}, approvals: {}, decisions: [] };
+            state = { schema_version: "3.1.0", project_id: id, title: args.title, source_brief: args.sourceBrief, duration_ms: args.durationSeconds * 1e3, project_spec: createProjectSpec(args.title, args.sourceBrief, args.durationSeconds * 1e3, args.projectSpec ? JSON.parse(args.projectSpec) : { ...args.ratio ? { aspect_ratio: args.ratio } : {}, ...args.resolution ? { resolution: args.resolution } : {} }), revision: 0, status: "REQUIREMENT_ANALYSIS", artifacts: {}, approvals: {}, decisions: [] };
           } else state = JSON.parse(await readFile5(file, "utf8"));
-          if (args.action === "read") return { ...state, nextTask: nextTask(state) };
-          if (args.action === "next") return nextTask(state);
-          if (args.action === "route") return routeIntent(state, args.intent, args.entityIds);
-          if (["revise", "schedule", "task_result"].includes(args.action) && state.revision !== args.expectedRevision) throw Error("REVISION_CONFLICT");
+          const executionContext = () => {
+            try {
+              let cursor = 0;
+              const segments = estimatePlan(runtime.config, "video_generate", { duration: state.duration_ms / 1e3 }).map((part) => {
+                const start = cursor;
+                cursor += part.seconds * 1e3;
+                return { kind: part.kind, start_ms: start, end_ms: cursor, duration_ms: part.seconds * 1e3 };
+              });
+              return { model_name: resolveModel(runtime.config), strategy: "continuous_segments", segments, instructions: "\u5236\u4F5C\u9884\u89C4\u5212\uFF0C\u4E0D\u662F\u4ED8\u8D39\u8C03\u7528\u6216\u5DF2\u9A8C\u8BC1\u753B\u9762\u6548\u679C\u3002\u5206\u955C\u4E0D\u5F97\u8DE8\u751F\u6210\u6BB5\u622A\u65AD\u52A8\u4F5C\u4E0E\u5BF9\u767D\uFF1B\u540C\u4E00\u751F\u6210\u6BB5\u7684\u591A\u5730\u70B9\u5207\u6362\u9700\u91CD\u65B0\u89C4\u5212\u3002\u72EC\u7ACB\u955C\u5934\u6267\u884C\u5668\u5C1A\u672A\u63A5\u5165\u3002" };
+            } catch {
+              return { capability_status: "UNVERIFIED", instructions: "\u5F53\u524D\u6267\u884C\u5206\u6BB5\u65E0\u6CD5\u9884\u89C4\u5212\uFF1B\u53EF\u7EE7\u7EED\u521B\u610F\u4E0E\u5267\u672C\uFF0C\u5206\u955C\u63D0\u4EA4\u524D\u987B\u786E\u8BA4\u5B9E\u9645\u5236\u4F5C\u6A21\u578B\u548C\u5206\u6BB5\u8FB9\u754C\u3002" };
+            }
+          };
+          const taskFor = () => ({ ...nextTask(state), execution_plan: executionContext() });
+          if (args.action === "read") return { ...state, nextTask: taskFor() };
+          if (args.action === "next") return taskFor();
+          if (args.action === "route") return { ...routeIntent(state, args.intent, args.entityIds), execution_plan: executionContext() };
+          if (["revise", "schedule", "task_result", "verify_issue"].includes(args.action) && state.revision !== args.expectedRevision) throw Error("REVISION_CONFLICT");
           if (args.action === "revise") state = reviseEntities(state, args.stage, JSON.parse(args.content), args.expectedRevision);
-          if (args.action === "schedule") scheduleTask(state, nextTask(state));
+          if (args.action === "schedule") scheduleTask(state, taskFor());
+          if (args.action === "verify_issue") verifyIssue(state, args.issueId, JSON.parse(args.content));
           if (args.action === "task_result") taskResult(state, args.taskKey, args.taskStatus, args.errorCode);
           if (args.action === "compile") {
             if (state.revision !== args.expectedRevision) throw Error("REVISION_CONFLICT");
+            if (state.project_spec?.target_model && state.project_spec.target_model !== "generic" && state.project_spec.target_model !== resolveModel(runtime.config)) throw Error("PROJECT_SPEC_MISMATCH:target_model");
             const plan = compileProduction(state, estimatePlan(runtime.config, "video_generate", { duration: state.duration_ms / 1e3 }), args.ratio, args.resolution);
             if (!state.production || state.production.source_revision !== state.revision || state.production.ratio !== args.ratio || state.production.resolution !== args.resolution) {
               const project = await createProject(exec, state.artifacts.assets.data.characters.length ? "fixed_subject" : "scenery");
@@ -3572,16 +3701,20 @@ ${JSON.stringify(artifact.data)}
             if (exec.signal?.aborted || decision?.custom || decision?.selected?.length !== 1 || !["\u6279\u51C6\u672C\u7248", "\u9700\u8981\u4FEE\u6539", "\u62D2\u7EDD\u5F53\u524D\u65B9\u6848"].includes(decision.selected[0])) return { status: "needs_input", projectId: id };
             state = recordApprovalDecision(state, args.stage, { "\u6279\u51C6\u672C\u7248": "APPROVED", "\u9700\u8981\u4FEE\u6539": "REVISE", "\u62D2\u7EDD\u5F53\u524D\u65B9\u6848": "REJECTED" }[decision.selected[0]], args.expectedRevision);
           }
-          if (!["create", "submit", "approve", "compile", "revise", "schedule", "task_result"].includes(args.action)) throw Error("INVALID_ACTION");
-          await mkdir6(path8.join(dir, "snapshots"), { recursive: true, mode: 448 });
+          if (!["create", "submit", "approve", "compile", "revise", "schedule", "task_result", "verify_issue"].includes(args.action)) throw Error("INVALID_ACTION");
+          await mkdir6(path9.join(dir, "snapshots"), { recursive: true, mode: 448 });
           const body = JSON.stringify(state, null, 2);
-          await writeFile4(path8.join(dir, "snapshots", `${state.revision}-${randomUUID3()}.json`), body, { mode: 384, flag: "wx" });
-          const temp = path8.join(dir, `${randomUUID3()}.tmp`);
+          await writeFile4(path9.join(dir, "snapshots", `${state.revision}-${randomUUID3()}.json`), body, { mode: 384, flag: "wx" });
+          const temp = path9.join(dir, `${randomUUID3()}.tmp`);
           await writeFile4(temp, body, { mode: 384, flag: "wx" });
           await rename5(temp, file);
-          return { ...state, nextTask: nextTask(state), sha256: createHash3("sha256").update(body).digest("hex") };
+          return { ...state, nextTask: taskFor(), sha256: createHash3("sha256").update(body).digest("hex") };
         } finally {
-          locks2.delete(id);
+          try {
+            if (release) await release();
+          } finally {
+            locks2.delete(id);
+          }
         }
       }
     });
@@ -3636,7 +3769,7 @@ function bindAgentRegistry(ctx, registry2) {
 // src/core/telemetry/reporter.ts
 import { randomUUID as randomUUID4, createHash as createHash4 } from "node:crypto";
 import { mkdir as mkdir7, readFile as readFile6, writeFile as writeFile5 } from "node:fs/promises";
-import path9 from "node:path";
+import path10 from "node:path";
 import os4 from "node:os";
 init_version();
 init_value();
@@ -3652,8 +3785,8 @@ function processState() {
   return owner[STATE] ||= { identities: /* @__PURE__ */ new Map(), started: /* @__PURE__ */ new Set() };
 }
 function identityFiles() {
-  const dir = path9.join(dshHome(), "state", DATA_DIR);
-  return { dir, files: [path9.join(dir, "analytics-id.json"), path9.join(dir, "analytics-anchor.json")] };
+  const dir = path10.join(dshHome(), "state", DATA_DIR);
+  return { dir, files: [path10.join(dir, "analytics-id.json"), path10.join(dir, "analytics-anchor.json")] };
 }
 async function analyticsIdentity() {
   const { dir, files } = identityFiles();
@@ -3968,7 +4101,7 @@ init_hardcoded_config();
 // src/core/installation/update-lockfile.ts
 init_hardcoded_config();
 import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import path10 from "node:path";
+import path11 from "node:path";
 import { fileURLToPath } from "node:url";
 var PACKAGE_NAME = PLUGIN_PACKAGE;
 var LOCKFILE = "pnpm-lock.yaml";
@@ -4033,7 +4166,7 @@ function stripUnverifiableEntries(text) {
 }
 function locateProfileDir(moduleUrl) {
   let dir = fileURLToPath(moduleUrl);
-  for (let up = 0; up < 3; up += 1) dir = path10.dirname(dir);
+  for (let up = 0; up < 3; up += 1) dir = path11.dirname(dir);
   return dir;
 }
 function repairLockfileAt(lockfile, log = () => {
@@ -4060,13 +4193,13 @@ function repairLockfileAt(lockfile, log = () => {
     }
     return { status: "failed", message: error && error.message || String(error) };
   }
-  log("\u5DF2\u6E05\u7406 " + removed.length + " \u6761\u7F3A\u5C11 integrity \u7684\u9501\u6587\u4EF6\u8BB0\u5F55\uFF08" + removed.join("\u3001") + "\uFF09\uFF0C\u5907\u4EFD\u5728 " + path10.basename(backup) + "\uFF1B\u4E4B\u540E\u53EF\u4EE5\u5728\u7EBF\u66F4\u65B0\u3002");
+  log("\u5DF2\u6E05\u7406 " + removed.length + " \u6761\u7F3A\u5C11 integrity \u7684\u9501\u6587\u4EF6\u8BB0\u5F55\uFF08" + removed.join("\u3001") + "\uFF09\uFF0C\u5907\u4EFD\u5728 " + path11.basename(backup) + "\uFF1B\u4E4B\u540E\u53EF\u4EE5\u5728\u7EBF\u66F4\u65B0\u3002");
   return { status: "repaired", lockfile, backup, removed };
 }
 function locateLockfiles(dir, depth = 2) {
   const found = [];
   const walk = (current, level) => {
-    const candidate = path10.join(current, LOCKFILE);
+    const candidate = path11.join(current, LOCKFILE);
     try {
       if (existsSync(candidate)) found.push(candidate);
     } catch {
@@ -4080,14 +4213,14 @@ function locateLockfiles(dir, depth = 2) {
     }
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.name === "node_modules") continue;
-      walk(path10.join(current, entry.name), level - 1);
+      walk(path11.join(current, entry.name), level - 1);
     }
   };
   walk(dir, depth);
   return found;
 }
 function locateStagingLockfiles(profileDir) {
-  const parent = path10.dirname(profileDir);
+  const parent = path11.dirname(profileDir);
   let entries = [];
   try {
     entries = readdirSync(parent, { withFileTypes: true });
@@ -4097,7 +4230,7 @@ function locateStagingLockfiles(profileDir) {
   const found = [];
   for (const entry of entries) {
     if (!entry.isDirectory() || !/staging/i.test(entry.name)) continue;
-    const dir = path10.join(parent, entry.name);
+    const dir = path11.join(parent, entry.name);
     if (dir === profileDir) continue;
     found.push(...locateLockfiles(dir, 1));
   }
@@ -4113,7 +4246,7 @@ function startUpdateLockfileRepair(moduleUrl, intervalMs = 2e3, log) {
     if (stopped) return;
     try {
       const dir = locateProfileDir(moduleUrl);
-      if (!existsSync(path10.join(dir, "package.json"))) return;
+      if (!existsSync(path11.join(dir, "package.json"))) return;
       for (const lockfile of updateLockfilesToWatch(dir)) {
         let stamp = "";
         try {
@@ -4343,12 +4476,12 @@ async function ensureProjectDuration(ctx, exec, project, requested, save2) {
 
 // src/businesses/video/tools/video-project.ts
 import { mkdir as mkdir9, readFile as readFile8, readdir as readdir3, writeFile as writeFile7 } from "node:fs/promises";
-import path12 from "node:path";
+import path13 from "node:path";
 
 // src/businesses/video/workflow/character-choice.ts
 import { createHash as createHash5 } from "node:crypto";
 import { mkdir as mkdir8, readFile as readFile7, writeFile as writeFile6, rename as rename6, rm as rm5 } from "node:fs/promises";
-import path11 from "node:path";
+import path12 from "node:path";
 init_connection();
 var waiting = /* @__PURE__ */ new Map();
 var localIds = /* @__PURE__ */ new WeakMap();
@@ -4368,7 +4501,7 @@ async function characterChoiceGate(ctx, config, exec, args) {
   const stableId = typeof session.id === "string" ? session.id : typeof session.header?.id === "string" ? session.header.id : null;
   if (!localIds.has(session)) localIds.set(session, `live-${++nextId}`);
   const key = createHash5("sha256").update(JSON.stringify(project ? [project.id] : [stableId || localIds.get(session), args?.prompt || "", args?.duration, args?.resolution, args?.ratio])).digest("hex");
-  const file = path11.join(dshHome(), "metaontic-video", "character-choices", key + ".json");
+  const file = path12.join(dshHome(), "metaontic-video", "character-choices", key + ".json");
   try {
     async function choose() {
       if (project?.choice && args?.resetCharacterChoice !== true) return project.choice;
@@ -4405,7 +4538,7 @@ async function characterChoiceGate(ctx, config, exec, args) {
         project.approved = null;
         await writeProject(project);
       } else if (stableId) {
-        await mkdir8(path11.dirname(file), { recursive: true, mode: 448 });
+        await mkdir8(path12.dirname(file), { recursive: true, mode: 448 });
         const temp = file + "." + Date.now() + ".tmp";
         try {
           await writeFile6(temp, JSON.stringify({ version: 1, choice: choice2, time: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" });
@@ -5058,7 +5191,7 @@ function renderStoryboardSvg(script, options = {}) {
 async function captureScriptFile(scriptPath, text) {
   const body = captureScriptBody(text);
   if (!body) return null;
-  await mkdir9(path12.dirname(scriptPath), { recursive: true, mode: 448 });
+  await mkdir9(path13.dirname(scriptPath), { recursive: true, mode: 448 });
   await writeFile7(scriptPath, `${body}
 `, { mode: 384 });
   const closed = await closePendingStage("script_design", "script_saved");
@@ -5110,16 +5243,16 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
       }
       if (args.action === "storyboard") {
         const session = exec.agent?.session;
-        const scriptPath = path12.resolve(session?.header?.cwd || process.cwd(), String(args.scriptPath || ""));
+        const scriptPath = path13.resolve(session?.header?.cwd || process.cwd(), String(args.scriptPath || ""));
         if (!/\.md$/i.test(scriptPath)) throw new Error("storyboard\u9700\u4F20\u811A\u672C\u6587\u4EF6\u8DEF\u5F84scriptPath\uFF08.md\uFF09\u3002");
         if (args.captureScript === true && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(session) || "")) {
           throw new Error("\u6B63\u6587\u91CC\u6CA1\u6709\u627E\u5230\u5B8C\u6574\u811A\u672C\uFF1A\u5148\u628A\u672C\u7248\u811A\u672C\u6B63\u6587\u5B8C\u6574\u8D34\u8FDB\u7528\u6237\u53EF\u89C1\u6B63\u6587\uFF08\u6458\u8981\u3001\u94FE\u63A5\u3001\u793A\u610F\u56FE\u90FD\u4E0D\u7B97\uFF09\uFF0C\u518D\u8BA9\u63D2\u4EF6\u51FA\u5206\u955C\u793A\u610F\u56FE\u3002");
         }
         const script = await readFile8(scriptPath, "utf8").catch(() => "");
         if (!String(script).trim()) throw new Error("\u8FD8\u6CA1\u8BFB\u5230\u811A\u672C\u6587\u4EF6\uFF1A\u5148\u5728\u6B63\u6587\u8D34\u51FA\u5B8C\u6574\u811A\u672C\u5E76\u4F20captureScript\uFF0C\u6216\u5148\u628A\u811A\u672C\u5199\u5230scriptPath\u3002");
-        const version = nextStoryboardVersion(await readdir3(path12.dirname(scriptPath)).catch(() => []));
+        const version = nextStoryboardVersion(await readdir3(path13.dirname(scriptPath)).catch(() => []));
         const svg = renderStoryboardSvg(script, { version });
-        const target = path12.join(path12.dirname(scriptPath), storyboardFileName(version));
+        const target = path13.join(path13.dirname(scriptPath), storyboardFileName(version));
         await writeFile7(target, svg, { mode: 384 });
         return {
           path: target,
@@ -5169,7 +5302,7 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         if (name === "video_extend") validateExtensionDuration(config, spec);
         const requestedTotal = name === "video_extend" ? Number(spec.duration) * Number(spec.segments || 1) : Number(spec.duration);
         if (requestedTotal !== data.duration && !spec.resume) throw new Error("\u811A\u672C\u65F6\u957F\u4E0E\u7528\u6237\u786E\u8BA4\u7684\u603B\u65F6\u957F\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u5148\u7528prepare\u786E\u8BA4\u53D8\u66F4\uFF0C\u518D\u91CD\u65B0\u5BA1\u6838\u3002");
-        const scriptPath = path12.resolve(exec.agent.session.header?.cwd || process.cwd(), String(args.scriptPath || ""));
+        const scriptPath = path13.resolve(exec.agent.session.header?.cwd || process.cwd(), String(args.scriptPath || ""));
         if (!/\.md$/i.test(scriptPath)) throw new Error("scriptPath\u9700\u4E3AMarkdown\u811A\u672C\u6587\u4EF6\u3002");
         if (args.captureScript === true && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(exec.agent.session) || "")) {
           throw new Error("\u6B63\u6587\u91CC\u6CA1\u6709\u627E\u5230\u5B8C\u6574\u811A\u672C\uFF1A\u8BF7\u5148\u628A\u672C\u7248\u811A\u672C\u6B63\u6587\u5B8C\u6574\u8D34\u8FDB\u7528\u6237\u53EF\u89C1\u6B63\u6587\uFF08\u6458\u8981\u3001\u94FE\u63A5\u3001\u793A\u610F\u56FE\u90FD\u4E0D\u7B97\uFF09\uFF0C\u518D\u8C03\u7528review\uFF1B\u811A\u672C\u53EA\u9700\u5728\u6B63\u6587\u5199\u8FD9\u4E00\u6B21\uFF0C\u63D2\u4EF6\u4F1A\u636E\u6B64\u843D\u6210script.md\u3002");
@@ -5210,7 +5343,7 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
 }
 
 // src/businesses/video/workflow/storyboard-review.ts
-import path13 from "node:path";
+import path14 from "node:path";
 import { stat as stat4, readdir as readdir4 } from "node:fs/promises";
 var STORYBOARD_FILE = /storyboard|分镜|示意/i;
 var IMAGE_FILE = /\.(png|jpe?g|webp|svg)$/i;
@@ -5272,9 +5405,9 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
       for (const match of text.matchAll(/!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))\s*\)/g)) {
         const target = match[1] || match[2];
         try {
-          const full = path13.resolve(session.header?.cwd || process.cwd(), decodeURI(target));
+          const full = path14.resolve(session.header?.cwd || process.cwd(), decodeURI(target));
           state.shown.add(full);
-          if (STORYBOARD_FILE.test(path13.basename(full))) storyboard = true;
+          if (STORYBOARD_FILE.test(path14.basename(full))) storyboard = true;
         } catch {
         }
       }
@@ -5291,7 +5424,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
       }
     }
     const byDir = /* @__PURE__ */ new Map();
-    for (const [file, time] of fresh) byDir.set(path13.dirname(file), Math.max(byDir.get(path13.dirname(file)) || 0, time));
+    for (const [file, time] of fresh) byDir.set(path14.dirname(file), Math.max(byDir.get(path14.dirname(file)) || 0, time));
     for (const [dir, time] of byDir) {
       let entries;
       try {
@@ -5302,7 +5435,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
       let newest = "";
       for (const entry of entries) {
         if (!IMAGE_FILE.test(entry) || !STORYBOARD_FILE.test(entry)) continue;
-        const full = path13.join(dir, entry);
+        const full = path14.join(dir, entry);
         if (fresh.has(full)) continue;
         try {
           const info = await stat4(full);
@@ -5339,7 +5472,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
         return { kind: "deny", reason: `\u811A\u672C\u5BA1\u6838\u6682\u672A\u6253\u5F00\uFF1A\u672C\u7248script.md\u6B63\u6587\u53EA\u5728\u672C\u8F6E\u7528\u6237\u53EF\u89C1\u6B63\u6587\u91CC\u51FA\u73B0 ${percent2}%\u3002\u8BF7\u628Ascript.md\u6B63\u6587\u539F\u6837\u8D34\u8FDB\u672C\u8F6E\u6B63\u6587\u518D\u5355\u72EC\u8C03\u7528review\uFF1B\u6807\u9898\u3001\u52A0\u7C97\u3001\u8868\u683C\u8FD9\u7C7B\u6392\u7248\u5DEE\u5F02\u4E0D\u7B97\u95EE\u9898\uFF0C\u4F46\u4E0D\u8981\u6539\u5199\u63AA\u8F9E\u3001\u5220\u6BB5\uFF0C\u4E5F\u4E0D\u8981\u53EA\u7ED9\u6587\u4EF6\u94FE\u63A5\u6216\u6458\u8981\u3002` };
       }
     }
-    const embedded = [...state?.shown || []].filter((target2) => STORYBOARD_FILE.test(path13.basename(target2)));
+    const embedded = [...state?.shown || []].filter((target2) => STORYBOARD_FILE.test(path14.basename(target2)));
     let ready = embedded.length > 0;
     if (ready) {
       for (const file of embedded) {
@@ -5363,7 +5496,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
 }
 
 // src/businesses/video/workflow/delivery-order.ts
-import path14 from "node:path";
+import path15 from "node:path";
 import { stat as stat5 } from "node:fs/promises";
 function createDeliveryOrderGuard() {
   const sessions = /* @__PURE__ */ new WeakMap();
@@ -5379,14 +5512,14 @@ function createDeliveryOrderGuard() {
     const value = String(target ?? "").trim();
     if (!value) return "";
     try {
-      return path14.resolve(session?.header?.cwd || process.cwd(), value);
+      return path15.resolve(session?.header?.cwd || process.cwd(), value);
     } catch {
       return "";
     }
   }
   const nameOf = (target) => {
     try {
-      return path14.basename(target).toLowerCase();
+      return path15.basename(target).toLowerCase();
     } catch {
       return "";
     }
@@ -5535,8 +5668,8 @@ async function fetchActualCost(config, taskIds, signal) {
   const base = resolveBaseUrl(config).replace(/\/v1\/?$/, "");
   if (!key || !base) return pending("\u8D39\u7528\u5F85\u67E5\u8BE2\uFF1A\u539F\u8C03\u7528\u8FDE\u63A5\u4E0D\u53EF\u7528\u3002");
   const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(8e3)]) : AbortSignal.timeout(8e3);
-  async function get(path25, authenticated) {
-    const response = await fetch(`${base}${path25}`, {
+  async function get(path26, authenticated) {
+    const response = await fetch(`${base}${path26}`, {
       method: "GET",
       redirect: "error",
       signal: requestSignal,
@@ -5636,7 +5769,7 @@ function withActualCost(tool, liveConfig) {
 
 // src/businesses/video/workflow/execution.ts
 import { createRequire } from "node:module";
-import path15 from "node:path";
+import path16 from "node:path";
 import { fileURLToPath as fileURLToPath2, pathToFileURL } from "node:url";
 var progressRecordModule;
 async function appendVideoExecution(exec, phase) {
@@ -5644,7 +5777,7 @@ async function appendVideoExecution(exec, phase) {
   try {
     const resolver = createRequire(import.meta.url);
     const modulePath = resolver.resolve("@deepseek-ai/dsh-session", {
-      paths: [path15.dirname(process.argv[1] || process.execPath), path15.dirname(fileURLToPath2(import.meta.url))]
+      paths: [path16.dirname(process.argv[1] || process.execPath), path16.dirname(fileURLToPath2(import.meta.url))]
     });
     progressRecordModule ??= import(pathToFileURL(modulePath).href);
     const { appendPluginRecord } = await progressRecordModule;
@@ -5719,9 +5852,9 @@ function jsonSafeTool(tool) {
 }
 
 // src/businesses/video/providers/submissions.ts
-import path16 from "node:path";
+import path17 from "node:path";
 import { createHash as createHash6, randomUUID as randomUUID7 } from "node:crypto";
-import { mkdir as mkdir10, readFile as readFile9, writeFile as writeFile8, rename as rename7, rm as rm6, open as open3, readdir as readdir5 } from "node:fs/promises";
+import { mkdir as mkdir10, readFile as readFile9, writeFile as writeFile8, rename as rename7, rm as rm6, open as open4, readdir as readdir5 } from "node:fs/promises";
 init_hardcoded_config();
 init_connection();
 
@@ -5746,14 +5879,14 @@ function findKey(payload, keys, depth = Infinity) {
   }
   return void 0;
 }
-function collectUrls(payload, path25 = [], found = []) {
+function collectUrls(payload, path26 = [], found = []) {
   if (typeof payload === "string") {
-    if (/^https?:\/\//i.test(payload)) found.push([path25, payload]);
+    if (/^https?:\/\//i.test(payload)) found.push([path26, payload]);
   } else if (Array.isArray(payload)) {
-    for (const item of payload) collectUrls(item, path25, found);
+    for (const item of payload) collectUrls(item, path26, found);
   } else if (payload && typeof payload === "object") {
     for (const [key, value] of Object.entries(payload)) {
-      collectUrls(value, [...path25, key], found);
+      collectUrls(value, [...path26, key], found);
     }
   }
   return found;
@@ -5771,22 +5904,22 @@ function extractTaskId(payload) {
 }
 function extractVideoUrl(payload) {
   const candidates = collectUrls(payload).filter(
-    ([path25, url]) => !looksLikeImageUrl(url) && !path25.some(isImageKey)
+    ([path26, url]) => !looksLikeImageUrl(url) && !path26.some(isImageKey)
   );
   if (!candidates.length) return void 0;
   for (const wanted of VIDEO_URL_KEYS) {
-    for (const [path25, url] of candidates) {
-      if (path25.length && String(path25.at(-1)).toLowerCase() === wanted) return url;
+    for (const [path26, url] of candidates) {
+      if (path26.length && String(path26.at(-1)).toLowerCase() === wanted) return url;
     }
   }
-  for (const [path25, url] of candidates) {
-    if (path25.length && GENERIC_URL_KEYS.has(String(path25.at(-1)).toLowerCase())) return url;
+  for (const [path26, url] of candidates) {
+    if (path26.length && GENERIC_URL_KEYS.has(String(path26.at(-1)).toLowerCase())) return url;
   }
   return candidates[0][1];
 }
 function extractImageUrl(payload) {
   const found = collectUrls(payload).find(
-    ([path25, url]) => looksLikeImageUrl(url) || path25.some(isImageKey)
+    ([path26, url]) => looksLikeImageUrl(url) || path26.some(isImageKey)
   );
   return found?.[1];
 }
@@ -5843,8 +5976,8 @@ async function relayRequest(config, requestPath, options = {}) {
     throw error;
   }
 }
-async function relayRequestCore(config, path25, { method = "GET", body, signal } = {}, trace = {}) {
-  const url = `${resolveBaseUrl(config)}${path25}`;
+async function relayRequestCore(config, path26, { method = "GET", body, signal } = {}, trace = {}) {
+  const url = `${resolveBaseUrl(config)}${path26}`;
   const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   const serialized = body === void 0 ? void 0 : JSON.stringify(body);
@@ -5985,7 +6118,7 @@ function submissionIdentity(config) {
   return hash2(JSON.stringify([isVolcengine(config) ? "volcengine" : "metaontic", resolveBaseUrl(config), hash2(resolveApiKey(config))]));
 }
 function directory() {
-  return path16.join(dshHome(), "state", DATA_DIR, "submissions");
+  return path17.join(dshHome(), "state", DATA_DIR, "submissions");
 }
 async function save(file, record) {
   const temporary = `${file}.${randomUUID7()}.tmp`;
@@ -6005,10 +6138,10 @@ async function guardedSubmit(config, requestPath, body, signal, scope = "") {
   const identity = submissionIdentity(config);
   const id = hash2(JSON.stringify([identity, requestPath, body]));
   await mkdir10(directory(), { recursive: true, mode: 448 });
-  const file = path16.join(directory(), `${id}.json`);
+  const file = path17.join(directory(), `${id}.json`);
   let handle;
   try {
-    handle = await open3(file, "wx", 384);
+    handle = await open4(file, "wx", 384);
   } catch (error) {
     if (error?.code !== "EEXIST") throw error;
     const old = await readSubmission(id);
@@ -6046,7 +6179,7 @@ async function guardedSubmit(config, requestPath, body, signal, scope = "") {
 }
 async function finishSubmission(config, requestPath, body) {
   const id = hash2(JSON.stringify([submissionIdentity(config), requestPath, body]));
-  await rm6(path16.join(directory(), `${id}.json`), { force: true });
+  await rm6(path17.join(directory(), `${id}.json`), { force: true });
 }
 async function finishKnownTask(config, taskId) {
   const identity = submissionIdentity(config);
@@ -6055,7 +6188,7 @@ async function finishKnownTask(config, taskId) {
     throw error;
   })) {
     if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
-    const file = path16.join(directory(), name);
+    const file = path17.join(directory(), name);
     const raw = await readFile9(file, "utf8").catch((error) => {
       if (error.code === "ENOENT") return null;
       throw error;
@@ -6067,7 +6200,7 @@ async function finishKnownTask(config, taskId) {
 }
 async function readSubmission(id) {
   if (!/^[a-f0-9]{64}$/.test(String(id))) throw new Error("\u63D0\u4EA4\u8BB0\u5F55 ID \u683C\u5F0F\u4E0D\u6B63\u786E\u3002");
-  const record = JSON.parse(await readFile9(path16.join(directory(), `${id}.json`), "utf8"));
+  const record = JSON.parse(await readFile9(path17.join(directory(), `${id}.json`), "utf8"));
   if (record.id !== id) throw new Error("\u63D0\u4EA4\u8BB0\u5F55\u635F\u574F\uFF0C\u5DF2\u505C\u6B62\u3002");
   return record;
 }
@@ -6075,7 +6208,7 @@ async function reconcileSubmission(config, id, taskId, confirmedNotCreated) {
   const record = await readSubmission(id);
   if (/\/tasks\/doubao$/.test(record.requestPath)) config = imageConfig(config);
   if (record.identity !== submissionIdentity(config)) throw new Error("\u8BF7\u6062\u590D\u539F\u63A5\u5165\u65B9\u5F0F\u3001\u5730\u5740\u548C API\u5BC6\u94A5\u540E\u6838\u5BF9\u63D0\u4EA4\u3002");
-  const file = path16.join(directory(), `${id}.json`);
+  const file = path17.join(directory(), `${id}.json`);
   if (record.status === "submitting" && Date.now() - Date.parse(record.createdAt) < 15e4) throw new Error("\u539F\u63D0\u4EA4\u4ECD\u53EF\u80FD\u6B63\u5728\u6267\u884C\uFF0C\u8BF7\u7B49\u5F85\u5176\u8FD4\u56DE\u540E\u518D\u6838\u5BF9\u3002");
   if (taskId) {
     const image = /\/tasks\/doubao$/.test(record.requestPath);
@@ -6126,25 +6259,25 @@ function submissionTool(liveConfig) {
 
 // src/businesses/video/integrations/canvas.ts
 import { createHash as createHash8, randomUUID as randomUUID9 } from "node:crypto";
-import { mkdir as mkdir13, readFile as readFile11, writeFile as writeFile10, rename as rename10, copyFile, stat as stat7, open as open4 } from "node:fs/promises";
-import path19 from "node:path";
+import { mkdir as mkdir13, readFile as readFile11, writeFile as writeFile10, rename as rename10, copyFile, stat as stat7, open as open5 } from "node:fs/promises";
+import path20 from "node:path";
 init_hardcoded_config();
 
 // src/businesses/video/integrations/canvas-builtin.ts
 import { mkdir as mkdir11, readFile as readFile10, writeFile as writeFile9, rename as rename8, readdir as readdir6, stat as stat6 } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { createHash as createHash7, randomUUID as randomUUID8 } from "node:crypto";
-import path17 from "node:path";
+import path18 from "node:path";
 init_hardcoded_config();
 var BUILTIN_BACKEND = "builtin";
 var validId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
-var storeDir = () => path17.join(dshHome(), DATA_DIR, "canvas");
-var docsDir = () => path17.join(storeDir(), "projects");
-var dataRootOf = () => path17.join(storeDir(), "data");
-var assetsFile = () => path17.join(storeDir(), "assets.json");
+var storeDir = () => path18.join(dshHome(), DATA_DIR, "canvas");
+var docsDir = () => path18.join(storeDir(), "projects");
+var dataRootOf = () => path18.join(storeDir(), "data");
+var assetsFile = () => path18.join(storeDir(), "assets.json");
 var docFile = (id) => {
   if (!validId(id)) throw new Error("\u753B\u5E03\u9879\u76EE\u6807\u8BC6\u65E0\u6548");
-  return path17.join(docsDir(), `${id}.json`);
+  return path18.join(docsDir(), `${id}.json`);
 };
 async function readJson(file, fallback = null) {
   try {
@@ -6154,7 +6287,7 @@ async function readJson(file, fallback = null) {
   }
 }
 async function writeJson(file, value) {
-  await mkdir11(path17.dirname(file), { recursive: true, mode: 448 });
+  await mkdir11(path18.dirname(file), { recursive: true, mode: 448 });
   const temp = `${file}.${randomUUID8()}.tmp`;
   await writeFile9(temp, JSON.stringify(value), { mode: 384, flag: "wx" });
   await rename8(temp, file);
@@ -6173,7 +6306,7 @@ async function allDocs() {
   const names = await readdir6(docsDir()).catch(() => []);
   const docs = [];
   for (const name of names) if (name.endsWith(".json")) {
-    const doc = await readJson(path17.join(docsDir(), name));
+    const doc = await readJson(path18.join(docsDir(), name));
     if (doc?.id && !doc.deleted) docs.push(doc);
   }
   return docs.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
@@ -6256,7 +6389,7 @@ function builtinRpc() {
     async projectDirGet(args) {
       const id = String(args?.projectId || "");
       if (!validId(id)) return { ok: false };
-      return { ok: true, dataRoot: dataRootOf(), abs: path17.join(dataRootOf(), "projects", id) };
+      return { ok: true, dataRoot: dataRootOf(), abs: path18.join(dataRootOf(), "projects", id) };
     },
     async canvasCreateProject(args) {
       const name = String(args?.name || "").trim().slice(0, 80) || "MetaOntic \u521B\u4F5C\u753B\u5E03";
@@ -6305,7 +6438,7 @@ function createBuiltinConnect() {
 }
 function builtinCanvasAdapter() {
   const rpc = builtinRpc();
-  return { backend: BUILTIN_BACKEND, rpc, assetPath: (root, asset) => path17.resolve(root, String(asset?.rel || "")), connect: createBuiltinConnect() };
+  return { backend: BUILTIN_BACKEND, rpc, assetPath: (root, asset) => path18.resolve(root, String(asset?.rel || "")), connect: createBuiltinConnect() };
 }
 async function builtinCanvasList() {
   return (await allDocs()).map((doc) => ({ projectId: doc.id, name: doc.name, updatedAt: doc.updatedAt || 0, nodeCount: Object.keys(doc.nodes || {}).length }));
@@ -6351,8 +6484,8 @@ async function builtinCanvasImport(args) {
   const id = `mov_img_${createHash7("sha256").update(bytes).digest("hex").slice(0, 24)}`;
   const label = String(args?.name || "").trim().slice(0, 80) || `\u5BFC\u5165\u56FE\u7247${extension}`;
   const rel = `projects/${doc.id}/image/${id}${extension}`;
-  const dest = path17.join(dataRootOf(), rel);
-  await mkdir11(path17.dirname(dest), { recursive: true, mode: 448 });
+  const dest = path18.join(dataRootOf(), rel);
+  await mkdir11(path18.dirname(dest), { recursive: true, mode: 448 });
   if (!(await stat6(dest).catch(() => null))?.isFile()) {
     const temp = `${dest}.${randomUUID8()}.tmp`;
     await writeFile9(temp, bytes, { mode: 384, flag: "wx" });
@@ -6492,8 +6625,8 @@ function registerBuiltinCanvas(ctx) {
         const asset = assets[String(url.searchParams.get("assetId") || "")];
         const root = dataRootOf();
         if (!asset?.rel) throw new Error("\u7D20\u6750\u4E0D\u5B58\u5728\u3002");
-        const file = path17.resolve(root, String(asset.rel));
-        if (!file.startsWith(root + path17.sep)) throw new Error("\u7D20\u6750\u8DEF\u5F84\u65E0\u6548\u3002");
+        const file = path18.resolve(root, String(asset.rel));
+        if (!file.startsWith(root + path18.sep)) throw new Error("\u7D20\u6750\u8DEF\u5F84\u65E0\u6548\u3002");
         const info = await stat6(file);
         if (!info.isFile()) throw new Error("\u7D20\u6750\u4E0D\u5B58\u5728\u3002");
         res.setHeader("content-type", asset.mime || "application/octet-stream");
@@ -6753,13 +6886,13 @@ function preserveCanvasConfirmations(prev, next) {
 
 // src/businesses/video/media/download.ts
 import { mkdir as mkdir12, rename as rename9, rm as rm7 } from "node:fs/promises";
-import path18 from "node:path";
+import path19 from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { createWriteStream } from "node:fs";
 var DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1e3;
 async function downloadFile(url, destPath, { signal } = {}) {
-  await mkdir12(path18.dirname(destPath), { recursive: true });
+  await mkdir12(path19.dirname(destPath), { recursive: true });
   const partial = `${destPath}.${uniqueSuffix("part")}`;
   const timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -6904,11 +7037,11 @@ async function readCanvasInput(adapter, link) {
 }
 function resultFile(token) {
   if (!/^[a-f0-9-]{36}$/.test(String(token || ""))) throw new Error("\u56DE\u586B\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548");
-  return path19.join(dshHome(), DATA_DIR, "canvas-results", `${token}.json`);
+  return path20.join(dshHome(), DATA_DIR, "canvas-results", `${token}.json`);
 }
 async function saveRecord(record) {
   const file = resultFile(record.id);
-  await mkdir13(path19.dirname(file), { recursive: true, mode: 448 });
+  await mkdir13(path20.dirname(file), { recursive: true, mode: 448 });
   const temp = `${file}.${randomUUID9()}.tmp`;
   await writeFile10(temp, JSON.stringify(record), { mode: 384, flag: "wx" });
   await rename10(temp, file);
@@ -6924,7 +7057,7 @@ async function publishCanvasResult(adapter, record) {
   for (const [index, media] of record.media.entries()) {
     const id = `mov_${digest({ canvas: record.canvas, media }).slice(0, 24)}`;
     const extension = media.kind === "image" ? ".png" : ".mp4";
-    let dest = path19.join(dir.abs, media.kind, `${id}${extension}`);
+    let dest = path20.join(dir.abs, media.kind, `${id}${extension}`);
     let rel = `projects/${record.canvas.projectId}/${media.kind}/${id}${extension}`;
     if (media.kind === "image") {
       for (const suffix of [".jpg", ".webp"]) {
@@ -6937,7 +7070,7 @@ async function publishCanvasResult(adapter, record) {
       }
     }
     if (!(await stat7(dest).catch(() => null))?.isFile()) {
-      await mkdir13(path19.dirname(dest), { recursive: true });
+      await mkdir13(path20.dirname(dest), { recursive: true });
       if (media.localPath) {
         const tmp = `${dest}.${randomUUID9()}.tmp`;
         await copyFile(media.localPath, tmp);
@@ -6950,7 +7083,7 @@ async function publishCanvasResult(adapter, record) {
     }
     let mime = media.kind === "image" ? "image/png" : "video/mp4";
     if (media.kind === "image") {
-      const handle = await open4(dest, "r");
+      const handle = await open5(dest, "r");
       try {
         const head = Buffer.alloc(12);
         await handle.read(head, 0, 12, 0);
@@ -7116,7 +7249,7 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
 // src/businesses/video/integrations/canvas-project.ts
 import { createHash as createHash9 } from "node:crypto";
 import { readFile as readFile12 } from "node:fs/promises";
-import path20 from "node:path";
+import path21 from "node:path";
 init_config();
 var digest2 = (value) => createHash9("sha256").update(JSON.stringify(value)).digest("hex");
 async function adapterForNewCanvas(binding, load) {
@@ -7178,7 +7311,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
       if (!doc?.nodes || doc.deleted) throw new Error("\u81EA\u52A8\u753B\u5E03\u5DF2\u5220\u9664\u6216\u4E0D\u53EF\u7528\uFF0C\u4E0D\u4F1A\u91CD\u65B0\u521B\u5EFA\u5DF2\u5220\u9664\u7684\u9879\u76EE\u3002");
       let script = "";
       if (draft.scriptPath) {
-        const scriptPath = path20.resolve(exec.agent.session.header?.cwd || process.cwd(), draft.scriptPath);
+        const scriptPath = path21.resolve(exec.agent.session.header?.cwd || process.cwd(), draft.scriptPath);
         if (!/\.md$/i.test(scriptPath)) throw new Error("\u81EA\u52A8\u540C\u6B65\u811A\u672C\u9700\u8981Markdown\u6587\u4EF6\u3002");
         script = await readFile12(scriptPath, "utf8");
         if (script.length > 2e5) throw new Error("\u811A\u672C\u8FC7\u5927\uFF0C\u81EA\u52A8\u753B\u5E03\u672A\u8986\u76D6\u65E7\u8282\u70B9\u3002");
@@ -7409,7 +7542,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
 }
 
 // src/businesses/video/integrations/canvas-native.ts
-import path22 from "node:path";
+import path23 from "node:path";
 import { createHash as createHash11, randomUUID as randomUUID10 } from "node:crypto";
 import { mkdir as mkdir15, readFile as readFile13, writeFile as writeFile12, rename as rename12, stat as stat9 } from "node:fs/promises";
 init_hardcoded_config();
@@ -8307,7 +8440,7 @@ async function writeScript(config, brief2, options = {}) {
 init_config();
 init_connection();
 import { rm as rm8, mkdir as mkdir14, writeFile as writeFile11, rename as rename11, stat as stat8, copyFile as copyFile2 } from "node:fs/promises";
-import path21 from "node:path";
+import path22 from "node:path";
 function evenNumber(value, fallback) {
   const number2 = Number(value);
   if (!Number.isFinite(number2) || number2 <= 0) return fallback;
@@ -8370,7 +8503,7 @@ async function cleanupSegmentTemps(temps) {
 }
 async function mergeClips(config, files, outPath, { signal } = {}) {
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  await mkdir14(path21.dirname(outPath), { recursive: true });
+  await mkdir14(path22.dirname(outPath), { recursive: true });
   const work = `${outPath}.${uniqueSuffix("work")}.mp4`;
   let copyError = "";
   let audioError = "";
@@ -8551,7 +8684,7 @@ async function downloadSegmentsAndMerge(config, {
   const deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0);
   const ffmpegReady = segments.length > 1 ? await hasFfmpeg(config, signal) : true;
   let probeWarned = false;
-  const destOf = (segment) => path21.join(
+  const destOf = (segment) => path22.join(
     segmentsDir,
     `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`
   );
@@ -8630,13 +8763,13 @@ async function downloadSegmentsAndMerge(config, {
       installHint: guide.hint
     };
   }
-  const finalPath = path21.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
+  const finalPath = path22.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
   try {
     if (files.length === 1 && keepSingleFile) {
       return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "segment", videoPath: files[0] };
     }
     if (files.length === 1) {
-      await mkdir14(path21.dirname(finalPath), { recursive: true });
+      await mkdir14(path22.dirname(finalPath), { recursive: true });
       const copy = `${finalPath}.${uniqueSuffix("copy")}.mp4`;
       try {
         await copyFile2(files[0], copy);
@@ -8864,16 +8997,16 @@ function planCanvasNative(input, config, operation = "generate", draft = {}, car
 function createCanvasNativeService(liveConfig, options = {}) {
   const load = options.load || loadCanvasAdapter;
   const adapterFor = (link) => options.resolve ? options.resolve(link) : resolveCanvasAdapter(link?.projectId, load);
-  const directory2 = options.directory || path22.join(dshHome(), DATA_DIR, "canvas-native");
+  const directory2 = options.directory || path23.join(dshHome(), DATA_DIR, "canvas-native");
   const snapshots = /* @__PURE__ */ new Map(), running = /* @__PURE__ */ new Map(), locks3 = /* @__PURE__ */ new Set();
   const proposals = /* @__PURE__ */ new Map();
-  const chainDirectory = options.chainDirectory || path22.join(directory2, "chains");
+  const chainDirectory = options.chainDirectory || path23.join(directory2, "chains");
   let disposed = false;
   const file = (id) => {
     if (!validToken(id)) throw new Error("\u5236\u4F5C\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548\u3002");
-    return path22.join(directory2, `${id}.json`);
+    return path23.join(directory2, `${id}.json`);
   };
-  const pointer = (link) => path22.join(directory2, `node-${hash3([link.projectId, link.canvasId || "", link.nodeId])}.json`);
+  const pointer = (link) => path23.join(directory2, `node-${hash3([link.projectId, link.canvasId || "", link.nodeId])}.json`);
   async function save2(job) {
     await mkdir15(directory2, { recursive: true, mode: 448 });
     const dest = file(job.id), temp = `${dest}.${randomUUID10()}.tmp`;
@@ -8883,9 +9016,9 @@ function createCanvasNativeService(liveConfig, options = {}) {
   const read = async (id) => JSON.parse(await readFile13(file(id), "utf8"));
   const chainFile = (id) => {
     if (!validToken(id)) throw new Error("\u8FDE\u62CD\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548\u3002");
-    return path22.join(chainDirectory, `${id}.json`);
+    return path23.join(chainDirectory, `${id}.json`);
   };
-  const chainPointer = (link) => path22.join(chainDirectory, `canvas-${hash3([link.projectId, link.canvasId || ""])}.json`);
+  const chainPointer = (link) => path23.join(chainDirectory, `canvas-${hash3([link.projectId, link.canvasId || ""])}.json`);
   async function saveChain(chain) {
     await mkdir15(chainDirectory, { recursive: true, mode: 448 });
     const dest = chainFile(chain.id), temp = `${dest}.${randomUUID10()}.tmp`;
@@ -9165,19 +9298,19 @@ function createCanvasNativeService(liveConfig, options = {}) {
     const root = (await adapter.rpc.dataRootGet()).dataRoot;
     if (!root) throw new Error("\u753B\u5E03\u6570\u636E\u76EE\u5F55\u4E0D\u53EF\u7528\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\u6743\u9650\u3002");
     const records = (await adapter.rpc.assetsGet({ ids: segments.map((x) => x.assetId).filter(Boolean) })).items || [];
-    const work = path22.join(directory2, "film-work");
+    const work = path23.join(directory2, "film-work");
     await mkdir15(work, { recursive: true, mode: 448 });
     const files = [];
     for (const segment of segments) {
       const asset = records.find((a) => a.id === segment.assetId);
-      const local = asset?.rel ? path22.resolve(root, String(asset.rel)) : "";
+      const local = asset?.rel ? path23.resolve(root, String(asset.rel)) : "";
       if (local && (await stat9(local).catch(() => null))?.isFile()) {
         files.push(local);
         segment.bytes = (await stat9(local)).size;
         continue;
       }
       if (!segment.url) throw new Error(`\u7B2C ${segment.index + 1} \u6BB5\uFF08${segment.label}\uFF09\u7D20\u6750\u4E0D\u5728\u753B\u5E03\u6570\u636E\u76EE\u5F55\uFF0C\u4E5F\u6CA1\u6709\u53EF\u4E0B\u8F7D\u7684\u5730\u5740\u3002`);
-      const dest2 = path22.join(work, `${String(segment.index + 1).padStart(2, "0")}-segment.mp4`);
+      const dest2 = path23.join(work, `${String(segment.index + 1).padStart(2, "0")}-segment.mp4`);
       await downloadFile(segment.url, dest2, {});
       files.push(dest2);
       segment.bytes = (await stat9(dest2)).size;
@@ -9185,8 +9318,8 @@ function createCanvasNativeService(liveConfig, options = {}) {
     const stamp = hash3(segments.map((x) => [x.resultId, x.assetId, x.url, x.bytes]));
     const id = `mov_film_${stamp.slice(0, 24)}`;
     const rel = `projects/${link.projectId}/final/${id}.mp4`;
-    const dest = path22.join(root, rel);
-    await mkdir15(path22.dirname(dest), { recursive: true });
+    const dest = path23.join(root, rel);
+    await mkdir15(path23.dirname(dest), { recursive: true });
     await (options.mergeClips || mergeClips)(config, files, dest, {});
     const seconds = segments.reduce((sum, x) => sum + (x.seconds || 0), 0) || null;
     const film = {
@@ -9590,7 +9723,7 @@ function approvedCharacterReferences(images, state) {
 
 // src/businesses/video/workflow/segment-run.ts
 init_config();
-import path23 from "node:path";
+import path24 from "node:path";
 import { stat as stat10 } from "node:fs/promises";
 var SEGMENT_PAUSE_NOTE = "\u672C\u6BB5\u5DF2\u5B8C\u6210\uFF1A\u8BF7\u5148\u5C55\u793A\u672C\u6B21\u89C6\u9891\u6210\u679C\uFF0C\u8BA9\u7528\u6237\u9884\u89C8\uFF1B\u6B63\u6587\u5C55\u793A\u540E\u7ACB\u5373\u8C03\u7528video_project(action:review_segment,resume:\u539FresumeDir)\u5F39\u51FA\u5206\u6BB5\u7ED3\u679C\u786E\u8BA4\u7A97\uFF1B\u901A\u8FC7\u540E\u624D\u7528resume\u8FDB\u5165\u4E0B\u4E00\u6BB5\u8D39\u7528\u5BA1\u6279\uFF0C\u4E0D\u4EE5\u6587\u5B57\u95EE\u53E5\u66FF\u4EE3\u5F39\u7A97\u3002";
 function recordSegmentResult({ final, segments, segment, submissionId, convertedReferences }) {
@@ -9667,7 +9800,7 @@ async function runSegmentDelivery({
   const previewOnly = paused && !cumulativePreview;
   if (previewOnly) {
     for (const segment of completed.slice(0, -1)) {
-      const file = path23.join(segmentsDir, `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`);
+      const file = path24.join(segmentsDir, `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`);
       try {
         if ((await stat10(file)).isFile()) segment.localPath = file;
       } catch {
@@ -10732,7 +10865,7 @@ function setupTool(config) {
 
 // src/businesses/video/internal/hyperframes.ts
 import { spawn as spawn2 } from "node:child_process";
-import path24 from "node:path";
+import path25 from "node:path";
 import { createRequire as createRequire2 } from "node:module";
 import { stat as stat11, mkdir as mkdir16 } from "node:fs/promises";
 function runHyperframes(cli, args, cwd, config, signal) {
@@ -10749,7 +10882,7 @@ function runHyperframes(cli, args, cwd, config, signal) {
         ...Object.fromEntries([
           ["HYPERFRAMES_FFMPEG_PATH", resolveBinary(config, "ffmpegBinary", "ffmpeg")],
           ["HYPERFRAMES_FFPROBE_PATH", resolveBinary(config, "ffprobeBinary", "ffprobe")]
-        ].filter(([, binary]) => path24.isAbsolute(binary)))
+        ].filter(([, binary]) => path25.isAbsolute(binary)))
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true
@@ -10829,16 +10962,16 @@ function hyperframesTool(config, deps) {
       let cli;
       try {
         const require2 = createRequire2(import.meta.url);
-        cli = path24.join(path24.dirname(require2.resolve("hyperframes/package.json")), "bin/hyperframes.mjs");
+        cli = path25.join(path25.dirname(require2.resolve("hyperframes/package.json")), "bin/hyperframes.mjs");
       } catch {
         return { status: "dependency_missing", note: "Hyperframes \u4E3A\u5185\u90E8\u5F00\u53D1\u80FD\u529B\uFF0C\u516C\u5F00\u63D2\u4EF6\u5305\u4E0D\u5305\u542B\u8BE5\u4F9D\u8D56\uFF1B\u9700\u5728\u5F00\u53D1\u73AF\u5883\u5355\u72EC\u51C6\u5907\u3002" };
       }
       let cwd = process.cwd();
       if (deps.workdir && exec?.agent) cwd = await deps.workdir.ensure(exec.agent, exec.signal) || cwd;
-      const project = path24.resolve(cwd, args.projectDir || ".");
+      const project = path25.resolve(cwd, args.projectDir || ".");
       if (action !== "check") {
         if (!args.projectDir) throw new Error("lint/render \u5FC5\u987B\u6307\u5B9A projectDir\u3002");
-        if (!(await stat11(path24.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
+        if (!(await stat11(path25.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
       }
       let videoPath;
       let command = ["doctor", "--json"];
@@ -10846,9 +10979,9 @@ function hyperframesTool(config, deps) {
       if (action === "render") {
         if (args.fps !== void 0 && ![24, 25, 30, 50, 60].includes(args.fps)) throw new Error("\u4E0D\u652F\u6301\u7684\u5E27\u7387\u3002");
         const output = args.output || `renders/output-${Date.now()}.mp4`;
-        videoPath = path24.resolve(project, output);
-        const relative = path24.relative(project, videoPath);
-        if (!relative || relative === ".." || relative.startsWith(`..${path24.sep}`) || path24.isAbsolute(relative) || path24.extname(videoPath).toLowerCase() !== ".mp4") {
+        videoPath = path25.resolve(project, output);
+        const relative = path25.relative(project, videoPath);
+        if (!relative || relative === ".." || relative.startsWith(`..${path25.sep}`) || path25.isAbsolute(relative) || path25.extname(videoPath).toLowerCase() !== ".mp4") {
           throw new Error("\u8F93\u51FA\u5FC5\u987B\u662F\u9879\u76EE\u76EE\u5F55\u5185\u7684 .mp4 \u6587\u4EF6\u3002");
         }
         try {
@@ -10857,7 +10990,7 @@ function hyperframesTool(config, deps) {
         } catch (error) {
           if (error.code !== "ENOENT") throw error;
         }
-        await mkdir16(path24.dirname(videoPath), { recursive: true });
+        await mkdir16(path25.dirname(videoPath), { recursive: true });
         command = ["render", project, "--output", videoPath, "--fps", String(args.fps || 30), "--workers", "1", "--strict"];
       }
       const result = await runHyperframes(cli, command, action === "check" ? cwd : project, config, exec?.signal);
