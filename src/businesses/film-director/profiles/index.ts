@@ -1,3 +1,5 @@
+import { resolveDimensions, assertDimensions, hasContentProfile, dimensionInstructions, validateDimensionReview } from './dimensions.js';
+export { availableDimensions, resolveDimensions, hasContentProfile } from './dimensions.js';
 import drama from './drama.js';
 import comedy from './comedy.js';
 import lifestyle from './lifestyle.js';
@@ -29,10 +31,12 @@ export function writingProfileInstructions(workType?:string) {
 }
 export function profileContext(state:any) {
   const profile=resolveProfile(state.project_spec);
-  return {status:profile?'SELECTED':state.project_spec&&Object.hasOwn(state.project_spec,'work_type')?'UNSELECTED':'LEGACY_GENERIC',profile,available_profiles:profile?[]:availableProfiles()};
+  return {resolved_profiles:resolveDimensions(state.project_spec),status:hasContentProfile(state.project_spec)?'SELECTED':state.project_spec&&Object.hasOwn(state.project_spec,'work_type')?'UNSELECTED':'LEGACY_GENERIC',profile,available_profiles:profile?[]:availableProfiles()};
 }
-export function profileInstructions(state:any,role:string) {
+export function profileInstructions(state:any,role:string) {return legacyProfileInstructions(state,role)+dimensionInstructions(state.project_spec,role);}
+function legacyProfileInstructions(state:any,role:string) {
   const p=resolveProfile(state.project_spec);
+  if(!p&&hasContentProfile(state.project_spec))return '\n【组合类型】以已解析的四维 Profile 为创作和审核依据，不强制另选旧作品类型。';
   if(!p)return '\n【作品类型待确认】不得默认所有作品都是剧情片；根据原意推荐一个作品类型，明确后用configure_profile保存。旧项目允许沿用已有通用流程，不擅自迁移。风格、叙事方式与生成模式不是作品类型。';
   const fields=role==='creative'?p.creative_fields:role==='screenwriter'?p.script_fields:null;
   const roleRule=p.role_rules[role] || ({director:'按本类型组织角色与审批，类型变更使原创意及下游失效，需重新审批。',creative:'将策略转为可审批的内容蓝图，不提前写正式剧本。',character:'只设计已批准主体；无人像内容允许characters为空，不强加人物。',scene:'环境和道具服务本类型的内容推进，不更改已批准地点与事件。','prompt-engineer':'将本类型的已批准镜头忠实转为独立提示词，未知能力标待验证，不新添情节。',reviewer:'共同时间轴、引用、版本、对白和硬约束检查始终适用；艺术判断按本类型评估，不以缺少冲突、反转或对白判所有作品失败。'}[role] || '按当前阶段职责执行。');
@@ -43,6 +47,8 @@ export function profileInstructions(state:any,role:string) {
 }
 /** 类型检查不替代通用契约与艺术判断；只对显式选择类型的项目启用扩展。 */
 export function validateProfileArtifact(stage:string,value:any,state:any) {
+  assertDimensions(state.project_spec);
+  if(stage==='review')validateDimensionReview(value,state.project_spec);
   const p=resolveProfile(state.project_spec);if(!p)return;
   const fields=stage==='creative'?p.creative_fields:stage==='script'?p.script_fields:null;
   if(fields)for(const key of Object.keys(fields))if(typeof value.type_details?.[key]!=='string'||!value.type_details[key].trim())throw Error(`TYPE_DETAIL_REQUIRED:${key}`);

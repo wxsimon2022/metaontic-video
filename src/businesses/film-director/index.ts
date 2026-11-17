@@ -1,3 +1,4 @@
+import { hasContentProfile } from './profiles/dimensions.js';
 import { resolveModel } from '../video/providers/connection.js';
 import { createProjectSpec, configureProfile } from './runtime/spec.js';
 import { profileContext } from './profiles/index.js';
@@ -28,7 +29,7 @@ export const filmDirectorBusiness: BusinessModule = {
       name: 'film_project', description: '专业创作项目：create/read/submit/approve/export。磁盘保存，创意与剧本独立人工批准，不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets含characters/scenes；shots含shots；prompts含prompts；review含review_status/scores/issues/delivery_allowed；export返回可读Markdown及版本校验清单。',
       parameters: { type:'object', properties: {
         intent:{type:'string',enum:[...INTENTS]}, entityIds:{type:'array',items:{type:'string'}},
-        projectSpec:{type:'string',description:'create可选项目规格JSON：work_type（DRAMA/COMEDY/LIFESTYLE/DOCUMENTARY/COMMERCIAL/PROMOTIONAL）、narrative_mode（FICTION/OBSERVATIONAL/EXPLANATORY/DEMONSTRATION/POETIC/MIXED）、genre/aspect_ratio/resolution/language/visual_style/target_audience/distribution_channel/target_model/hard_constraints/soft_preferences/references。configure_profile时仅传work_type和可选narrative_mode；类型不同于风格和生成模式，不猜测用户确认。配置修订由运行时固定。'}, issueId:{type:'string'}, taskKey:{type:'string'}, taskStatus:{type:'string',enum:['running','completed','failed']}, errorCode:{type:'string'},
+        projectSpec:{type:'string',description:'create可选项目规格JSON：work_type（DRAMA/COMEDY/LIFESTYLE/DOCUMENTARY/COMMERCIAL/PROMOTIONAL）、narrative_mode（FICTION/OBSERVATIONAL/EXPLANATORY/DEMONSTRATION/POETIC/MIXED）、genre/format/purpose/style_profile/tone/aspect_ratio/resolution/language/visual_style/target_audience/distribution_channel/target_model/hard_constraints/soft_preferences/references。configure_profile可增量传work_type、narrative_mode、genre、format、purpose、style_profile、tone、visual_style；四维注册选项通过read/next的resolved_profiles.available_profiles读取，genre等使用小写id；修改会失效已有产物并重新审批；类型不同于风格和生成模式，不猜测用户确认。配置修订由运行时固定。'}, issueId:{type:'string'}, taskKey:{type:'string'}, taskStatus:{type:'string',enum:['running','completed','failed']}, errorCode:{type:'string'},
         ratio:{type:'string',enum:['16:9','9:16']}, resolution:{type:'string',enum:['480p','720p']},
         action:{type:'string',enum:['create','read','submit','approve','export','next','compile','revise','schedule','task_result','route','verify_issue','configure_profile']}, projectId:{type:'string'}, title:{type:'string'}, sourceBrief:{type:'string'}, durationSeconds:{type:'integer'}, stage:{type:'string',enum:[...STAGES]}, content:{type:'string'}, expectedRevision:{type:'integer'},
       }, required:['action'] },
@@ -86,7 +87,7 @@ export const filmDirectorBusiness: BusinessModule = {
           if (args.action === 'approve') {
             const artifact=state.artifacts[args.stage];
             if (!['creative','script'].includes(args.stage) || !artifact || artifact.stale || state.revision!==args.expectedRevision) throw Error('INVALID_APPROVAL_REVISION');
-            if(args.stage==='creative'&&state.project_spec&&Object.hasOwn(state.project_spec,'work_type')&&!state.project_spec.work_type)throw Error('WORK_TYPE_REQUIRED_BEFORE_APPROVAL');
+            if(args.stage==='creative'&&state.project_spec&&Object.hasOwn(state.project_spec,'work_type')&&!hasContentProfile(state.project_spec))throw Error('WORK_TYPE_REQUIRED_BEFORE_APPROVAL');
             const service=runtime.ctx.get?.('userQuestions') || (exec.agent as any)?.ctx?.get?.('userQuestions');
             if (!service?.ask) return {status:'needs_input',reason:'人工确认服务不可用'};
             const answer=await service.ask({agent:exec.agent,signal:exec.signal,questions:[{id:'film_approval',header:'创作审核',question:`审核${args.stage} revision ${artifact.revision}：\n${JSON.stringify(artifact.data)}\n是否批准本版进入下一阶段？`,multiSelect:false,options:[{label:'批准本版',description:'继续下一创作阶段'},{label:'需要修改',description:'保留草稿并修改'},{label:'拒绝当前方案',description:'停止当前创作流程，保留已有资料'}]}]});

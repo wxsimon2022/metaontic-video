@@ -58,7 +58,8 @@ test('类型变更保留原材料、失效全部产物及批准，使旧制作�
  assert.equal(next.artifacts.creative.stale,true);assert.notEqual(next.production.source_revision,next.revision);
  assert.equal(s.artifacts.script.stale,undefined);
  assert.throws(()=>api.configureProfile(next,{work_type:'COMEDY'},8),/REVISION_CONFLICT/);
- assert.throws(()=>api.configureProfile(next,{work_type:'COMEDY',visual_style:'x'},9),/INVALID_PROFILE/);
+ assert.equal(api.configureProfile(next,{work_type:'COMEDY',visual_style:'x'},9).project_spec.visual_style,'x');
+ assert.throws(()=>api.configureProfile(next,{work_type:'COMEDY',unknown:'x'},9),/INVALID_PROFILE/);
  assert.deepEqual(api.configureProfile(next,{work_type:'LIFESTYLE'},9),next);
  assert.throws(()=>api.recordApprovalDecision(next,'creative','APPROVED',9),/INVALID_APPROVAL/);
 });
@@ -121,5 +122,61 @@ test('真实工具创建、审批、改类型及重读保存一致，旧批准�
   assert.equal(read.approvals.creative,undefined);assert.equal(read.nextTask.work_profile.profile.id,'COMEDY');
   await assert.rejects(()=>tool.execute({action:'approve',projectId:id,stage:'creative',expectedRevision:s.revision},exec),/INVALID_APPROVAL/);
   assert.equal(questions,1);
+  const dimensionSpec={genre:'comedy',format:'skit',purpose:'entertainment',style_profile:'minidv'};
+  s=await tool.execute({action:'configure_profile',projectId:id,expectedRevision:s.revision,projectSpec:JSON.stringify(dimensionSpec)},exec);
+  const combined=await tool.execute({action:'read',projectId:id},exec);
+  assert.equal(combined.work_profile.resolved_profiles.profiles.style_profile.id,'minidv');
+  assert.equal(combined.project_spec.format,'skit');
+  assert.match(combined.nextTask.instructions,/四维 Profile/);
+  const revision=s.revision;
+  await assert.rejects(()=>tool.execute({action:'configure_profile',projectId:id,expectedRevision:revision,projectSpec:JSON.stringify({format:'missing'})},exec),/UNKNOWN_PROFILE_DIMENSION/);
+  assert.equal((await tool.execute({action:'read',projectId:id},exec)).revision,revision);
  }finally{if(prior===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=prior;await rm(home,{recursive:true,force:true});}
+});
+
+test('四维配置独立组合、按角色注入，未选项不推断且返回真实注册选项',()=>{
+ const s=state();s.project_spec=api.createProjectSpec('访谈','记录河岸生活',15000,{genre:'documentary',format:'interview',purpose:'education',style_profile:'minidv',tone:'克制',visual_style:'午后自然光'});
+ const r=api.resolveDimensions(s.project_spec);
+ assert.equal(r.status,'RESOLVED');assert.equal(r.fact_provenance_required,true);
+ assert.deepEqual(Object.keys(r.profiles),['genre','format','purpose','style_profile']);
+ assert.ok(r.available_profiles.genre.some(p=>p.id==='animation'));
+ assert.equal(api.profileContext(s).status,'SELECTED');
+ assert.equal(api.nextTask(s).resolved_profiles.profiles.format.id,'interview');
+ for(const role of Object.keys(api.ROLE_PROMPTS))assert.match(api.roleInstructions(s,role),/四维 Profile/);
+ assert.match(api.roleInstructions(s,'screenwriter'),/采访问题/);
+ assert.match(api.roleInstructions(s,'reviewer'),/dimension_review/);
+ const partial=api.resolveDimensions({genre:'romance'});assert.deepEqual(Object.keys(partial.profiles),['genre']);
+ r.profiles.genre.label='修改副本';assert.notEqual(api.resolveDimensions(s.project_spec).profiles.genre.label,'修改副本');
+ assert.equal(r.profiles.genre.rules,undefined); // 上下文不携带其他角色的写作规则。
+ const draft=api.commitArtifact(s,'creative',{theme:'观察',logline:'河岸访谈',structure:[{section_id:'sec',duration_ms:15000}],must_preserve:[],assumptions:[]},0);
+ assert.equal(api.nextTask(draft).action,'approve');
+ assert.equal(api.recordApprovalDecision(draft,'creative','APPROVED',1).approvals.creative,1);
+});
+test('四维冲突、未知配置与修订拒绝，历史自由题材保留但不冒充解析',()=>{
+ assert.throws(()=>api.createProjectSpec('x','y',15000,{genre:'documentary',narrative_mode:'FICTION'}),/PROFILE_CONFLICT/);
+ assert.throws(()=>api.createProjectSpec('x','y',15000,{format:'unknown'}),/UNKNOWN_PROFILE_DIMENSION/);
+ assert.throws(()=>api.resolveDimensions({genre:'comedy',dimension_profile_revision:'99'}),/PROFILE_REVISION/);
+ assert.throws(()=>api.createProjectSpec('x','y',15000,{purpose:'__proto__'}),/UNKNOWN_PROFILE_DIMENSION/);
+ const legacy=api.resolveDimensions({genre:'旧自由文本题材'});assert.deepEqual(legacy.profiles,{});assert.ok(legacy.warnings.includes('LEGACY_GENRE_UNRESOLVED'));
+});
+test('增量修改四维保留材料并失效批准，重复配置无操作，允许清除维度',()=>{
+ const s=state('DRAMA');s.revision=8;s.approvals={creative:1,script:2};s.artifacts={script:{revision:2,data:{screenplay:'原稿'}}};
+ const next=api.configureProfile(s,{genre:'romance',format:'short_film',purpose:'entertainment',style_profile:'cinematic_realism'},8);
+ assert.equal(next.project_spec.work_type,'DRAMA');assert.equal(next.project_spec.genre,'romance');
+ assert.equal(next.artifacts.script.data.screenplay,'原稿');assert.equal(next.artifacts.script.stale,true);assert.deepEqual(next.approvals,{});
+ assert.equal(next.revision,9);assert.deepEqual(s.approvals,{creative:1,script:2});
+ assert.equal(api.configureProfile(next,{genre:'romance'},9).revision,9);
+ const clear=api.configureProfile(next,{style_profile:null},9);assert.equal(clear.project_spec.style_profile,null);assert.equal(clear.revision,10);
+ assert.throws(()=>api.configureProfile(next,{genre:'documentary',narrative_mode:'FICTION'},9),/PROFILE_CONFLICT/);
+ assert.throws(()=>api.configureProfile(next,{purpose:'education'},8),/REVISION_CONFLICT/);
+});
+test('四维终审要求逐维证据，未检查与缺失问题引用不能放行',()=>{
+ const s=state();s.project_spec=api.createProjectSpec('x','y',15000,{genre:'animation',purpose:'education'});
+ const r={review_status:'PASS',issues:[],dimension_review:{profile_revision:'1',checks:[{dimension:'genre',profile_id:'animation',status:'PASS',evidence:'SC001 世界规则与动作一致'},{dimension:'purpose',profile_id:'education',status:'PASS',evidence:'SC001 演示有事实依据'}]}};
+ api.validateProfileArtifact('review',r,s);
+ assert.throws(()=>api.validateProfileArtifact('review',{...r,dimension_review:undefined},s),/DIMENSION_REVIEW_REQUIRED/);
+ const bad=structuredClone(r);bad.dimension_review.checks[0].status='NOT_EVALUATED';assert.throws(()=>api.validateProfileArtifact('review',bad,s),/NOT_EVALUATED/);
+ bad.dimension_review.checks[0].status='CONCERN';assert.throws(()=>api.validateProfileArtifact('review',bad,s),/ISSUE_REQUIRED/);
+ bad.dimension_review.checks[0].issue_id='i1';bad.issues=[{issue_id:'i1'}];api.validateProfileArtifact('review',bad,s);
+ bad.dimension_review.checks.push(bad.dimension_review.checks[0]);assert.throws(()=>api.validateProfileArtifact('review',bad,s),/COVERAGE/);
 });

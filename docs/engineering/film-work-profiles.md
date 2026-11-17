@@ -31,3 +31,9 @@
 tests/film-profiles.test.mjs 覆盖六类及八角色加载、未知配置拒绝、版本独立、类型变更失效、批准门槛、类型扩展字段、审核覆盖及未评估阻断，并用临时数据目录运行真实 film_project 创建/审批/修改/重读。画布交互测试验证选择保存与写作传参。测试不访问付费接口。
 
 配置文件编译入现有 Node/浏览器产物，无额外安装目录和外部依赖；持久化复用跨平台路径和原子写入。已在 macOS 自动测试，未进行 Windows 或 Harness 桌面实机验证；未运行付费视频来宣称风格差异或质量提升。
+
+## 四维组合配置
+
+专业项目支持 genre/format/purpose/style_profile，tone 与 visual_style 独立。注册表与解析器见 `src/businesses/film-director/profiles/dimensions.ts`，实际可选项由 read/next/route 的 resolved_profiles.available_profiles 返回。配置使用 create/configure_profile，不创建假想 YAML 文件。配置变更保留原材料并失效全部下游、清除批准；未选维度不从其他维度推断。只选风格不能替代内容方向确认。
+
+旧 work_type 保持原字段和类型审核；组合配置额外要求 dimension_review 逐维记录版本、证据和状态。未评估不能通过终审，艺术建议与客观阻断继续分开。审批记录与产物清单关联解析配置版本。画布快速入口仍选择原六类作品，不冒充专业项目四维配置界面。

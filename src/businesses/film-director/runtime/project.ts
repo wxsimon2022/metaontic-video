@@ -1,3 +1,4 @@
+import { resolveDimensions } from '../profiles/dimensions.js';
 import { validateIssueLifecycle, updateIssueRegistry } from './issues.js';
 import { validateV31 } from '../contracts/schema.js';
 import { sourceRevisions } from '../contracts/index.js';
@@ -87,7 +88,8 @@ export function commitArtifact(state: any, stage: string, value: any, expected: 
   const next = structuredClone(state);
   next.revision++;
   if(stage==='review' && state.schema_version==='3.1.0') updateIssueRegistry(next,value);
-  next.artifacts[stage] = { revision: next.revision, source_revisions:sourceRevisions(state,stage), ...(state.project_spec?.work_type?{profile_ref:{work_type:state.project_spec.work_type,profile_revision:state.project_spec.profile_revision}}:{}), data: value, stale: false };
+  const dimensions=resolveDimensions(state.project_spec);
+  next.artifacts[stage] = { dimension_profile_ref:{revision:dimensions.revision,profiles:Object.fromEntries(Object.entries(dimensions.profiles).map(([k,p]:[string,any])=>[k,{id:p.id,revision:p.revision}]))}, revision: next.revision, source_revisions:sourceRevisions(state,stage), ...(state.project_spec?.work_type?{profile_ref:{work_type:state.project_spec.work_type,profile_revision:state.project_spec.profile_revision}}:{}), data: value, stale: false };
   for (const downstream of STAGES.slice(index+1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
   for (const approved of ['creative','script']) if (STAGES.indexOf(approved as any) >= index) delete next.approvals[approved];
   next.status = ['creative','script'].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === 'review' ? (value.review_status && !evaluateReview(value).passed ? value.review_status : 'FINAL_DELIVERY') : `${stage.toUpperCase()}_READY`;
