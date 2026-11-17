@@ -8,7 +8,8 @@ export function validateIssueLifecycle(report:any,state:any) {
     if(['CRITICAL','MAJOR'].includes(previous.severity)&&(previous.status!=='VERIFIED'||!revisionsEqual(previous.verification?.source_revisions,sourceRevisions(state,'review')))&&!incoming.has(previous.issue_id))throw Error('UNRESOLVED_ISSUE_OMITTED');
   }
   for(const issue of report.issues || []) {
-    const previous=registry[issue.issue_id];
+    const previous=Object.hasOwn(registry,issue.issue_id)?registry[issue.issue_id]:undefined;
+    if(previous && previous.responsible_agent!==issue.responsible_agent)throw Error('ISSUE_OWNER_CHANGE_REQUIRES_DIRECTOR');
     if(!previous && ['RESOLVED','VERIFIED'].includes(issue.status))throw Error('ISSUE_INITIAL_STATUS_REQUIRED');
     if(issue.status==='RESOLVED') {
       const ownerStage={creative:'creative',screenwriter:'script',character:'assets',scene:'assets',storyboard:'shots','prompt-engineer':'prompts'}[issue.responsible_agent];

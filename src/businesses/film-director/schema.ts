@@ -40,6 +40,7 @@ export function validateV31(stage: string, value: any, state: any) {
     const ids=new Set();
     for(const issue of value.issues || []) {
       for(const key of ['issue_id','description','evidence','location','responsible_agent','recheck_criteria'])text(issue,key);
+      if(!['director','creative','screenwriter','character','scene','storyboard','prompt-engineer','reviewer'].includes(issue.responsible_agent))throw Error('INVALID_ISSUE_OWNER');
       if(ids.has(issue.issue_id))throw Error('DUPLICATE_ISSUE_ID');ids.add(issue.issue_id);
     }
   }

@@ -51,6 +51,6 @@ description: 用于视频创意、故事剧本、分镜、逐镜提示词及视�
 
 export返回JSON、可读Markdown和版本清单，包括真实存储引用与SHA-256；不代表已写出独立下载文件。schedule仅记录可恢复任务，task_result完成必须有实际合法产物和校验记录；不是后台Agent运行器。独立子Agent、回滚、自动修复未实际执行不得声称可用。
 
-审核使用Reviewer V3.1，CRITICAL/MAJOR未VERIFIED时阻断，分数不能绕过。未观看/试听真实视频不称媒体质量已通过。模型能力未知使用null和UNVERIFIED，不把示例当实测。
+审核使用Reviewer V3.1，CRITICAL/MAJOR未VERIFIED时阻断；重大问题需责任产物改版、RESOLVED报告与verify_issue复审登记，不能靠报告自标通过。最终审核必须覆盖全链路与适用维度，分数不能绕过。未观看/试听真实视频不称媒体质量已通过。模型能力未知使用null和UNVERIFIED，不把示例当实测。
 
 本技能不授权安装、发布、修改设置或付费重做；API密钥只在设置页配置，不索取、不回显。实际工具和当前用户授权优先于参考文件示例。

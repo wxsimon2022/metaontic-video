@@ -1337,7 +1337,8 @@ function validateIssueLifecycle(report, state) {
     if (["CRITICAL", "MAJOR"].includes(previous.severity) && (previous.status !== "VERIFIED" || !revisionsEqual(previous.verification?.source_revisions, sourceRevisions(state, "review"))) && !incoming.has(previous.issue_id)) throw Error("UNRESOLVED_ISSUE_OMITTED");
   }
   for (const issue of report.issues || []) {
-    const previous = registry2[issue.issue_id];
+    const previous = Object.hasOwn(registry2, issue.issue_id) ? registry2[issue.issue_id] : void 0;
+    if (previous && previous.responsible_agent !== issue.responsible_agent) throw Error("ISSUE_OWNER_CHANGE_REQUIRES_DIRECTOR");
     if (!previous && ["RESOLVED", "VERIFIED"].includes(issue.status)) throw Error("ISSUE_INITIAL_STATUS_REQUIRED");
     if (issue.status === "RESOLVED") {
       const ownerStage = { creative: "creative", screenwriter: "script", character: "assets", scene: "assets", storyboard: "shots", "prompt-engineer": "prompts" }[issue.responsible_agent];
@@ -1455,6 +1456,7 @@ function validateV31(stage, value, state) {
     const ids = /* @__PURE__ */ new Set();
     for (const issue of value.issues || []) {
       for (const key of ["issue_id", "description", "evidence", "location", "responsible_agent", "recheck_criteria"]) text(issue, key);
+      if (!["director", "creative", "screenwriter", "character", "scene", "storyboard", "prompt-engineer", "reviewer"].includes(issue.responsible_agent)) throw Error("INVALID_ISSUE_OWNER");
       if (ids.has(issue.issue_id)) throw Error("DUPLICATE_ISSUE_ID");
       ids.add(issue.issue_id);
     }
