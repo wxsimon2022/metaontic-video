@@ -1,6 +1,10 @@
 import { DIMENSION_FIELDS, assertDimensions } from '../profiles/dimensions.js';
 import { WORK_TYPES, NARRATIVE_MODES, profileRevision, resolveProfile } from '../profiles/index.js';
 const FIELDS=['genre','aspect_ratio','resolution','language','visual_style','target_audience','distribution_channel','target_model','work_type','narrative_mode','format','purpose','style_profile','tone'];
+function validateTargetModel(value:any) {
+ if(value==null)return;
+ if(typeof value!=='string'||!/^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/.test(value)||/^(placeholder|unknown|tbd|todo|example|model_id|target_model)$/i.test(value))throw Error('INVALID_TARGET_MODEL:请使用工具 execution_plan.model_name 返回的实际模型ID；未指定时省略，不能填写占位文字。');
+}
 /** 原始需求永远保留；未指定规格明确为UNKNOWN，不能替用户确认。 */
 export function createProjectSpec(title:string,idea:string,duration:number,input:any={}) {
   if(!input||typeof input!=='object'||Array.isArray(input))throw Error('INVALID_PROJECT_SPEC');
@@ -8,6 +12,7 @@ export function createProjectSpec(title:string,idea:string,duration:number,input
   for(const key of FIELDS)if(input[key]!==undefined&&(typeof input[key]!=='string'||!input[key].trim()))throw Error(`INVALID_PROJECT_SPEC:${key}`);
   if(input.aspect_ratio && !['16:9','9:16'].includes(input.aspect_ratio))throw Error('INVALID_PROJECT_SPEC:aspect_ratio');
   if(input.resolution && !['480p','720p'].includes(input.resolution))throw Error('INVALID_PROJECT_SPEC:resolution');
+  validateTargetModel(input.target_model);
   if(input.work_type && !WORK_TYPES.includes(input.work_type))throw Error('UNKNOWN_WORK_TYPE');
   if(input.narrative_mode && !NARRATIVE_MODES.includes(input.narrative_mode))throw Error('UNKNOWN_NARRATIVE_MODE');
   for(const key of ['hard_constraints','soft_preferences','references'])if(input[key]!==undefined&&(!Array.isArray(input[key])||input[key].some(v=>typeof v!=='string'||!v.trim())))throw Error(`INVALID_PROJECT_SPEC:${key}`);
@@ -20,11 +25,12 @@ export function createProjectSpec(title:string,idea:string,duration:number,input
 export function configureProfile(state:any,input:any,expected:number) {
   if(state.revision!==expected)throw Error('REVISION_CONFLICT');
   if(state.status==='STOPPED')throw Error('PROJECT_STOPPED');
-  const allowed=['work_type','narrative_mode','visual_style',...DIMENSION_FIELDS];
+  const allowed=['work_type','narrative_mode','visual_style','target_model',...DIMENSION_FIELDS];
   if(!input||typeof input!=='object'||Array.isArray(input)||!Object.keys(input).length||Object.keys(input).some(k=>!allowed.includes(k)))throw Error('INVALID_PROFILE_SELECTION');
   if(input.work_type!==undefined&&!WORK_TYPES.includes(input.work_type))throw Error('INVALID_PROFILE_SELECTION');
   if(input.narrative_mode!==undefined&&!NARRATIVE_MODES.includes(input.narrative_mode))throw Error('UNKNOWN_NARRATIVE_MODE');
-  for(const [key,value] of Object.entries(input))if(!(value===null&&[...DIMENSION_FIELDS,'visual_style'].includes(key as any))&&(typeof value!=='string'||!value.trim()))throw Error(`INVALID_PROJECT_SPEC:${key}`);
+  for(const [key,value] of Object.entries(input))if(!(value===null&&[...DIMENSION_FIELDS,'visual_style','target_model'].includes(key as any))&&(typeof value!=='string'||!value.trim()))throw Error(`INVALID_PROJECT_SPEC:${key}`);
+  validateTargetModel(input.target_model);
   const old=state.project_spec || {};
   const spec={...old,...input};
   spec.profile_revision=spec.work_type?profileRevision(spec.work_type):null;
@@ -37,6 +43,13 @@ export function configureProfile(state:any,input:any,expected:number) {
   const next=structuredClone(state);
   next.project_spec={...spec,provenance:{...old.provenance,...Object.fromEntries(Object.keys(input).map(k=>[k,'USER_SPECIFIED']))}};
   next.revision++;
+  if(changed.every(k=>k==='target_model')) {
+    const affected=['assets','shots','prompts','review'].filter(k=>next.artifacts[k]);
+    for(const stage of affected)next.artifacts[stage].stale=true;
+    next.status='ASSET_DESIGN';
+    next.last_change={stage:'project_spec',changed_fields:changed,previous_target_model:old.target_model||null,affected_artifacts:affected,approval_impact:'PRESERVE_CREATIVE_AND_SCRIPT_RECHECK_MODEL_DEPENDENT_ARTIFACTS'};
+    return next;
+  }
   for(const artifact of Object.values(next.artifacts) as any[])artifact.stale=true;
   next.approvals={};next.status='REQUIREMENT_ANALYSIS';
   next.last_change={stage:'project_spec',changed_fields:changed,previous_profile:{work_type:old.work_type || null,profile_revision:old.profile_revision || null},affected_artifacts:Object.keys(next.artifacts),approval_impact:'REAPPROVE_CREATIVE_AND_SCRIPT'};

@@ -1,3 +1,4 @@
+import { ITEM_ARRAYS, STAGE_ARRAYS } from './fields.js';
 /** 新项目使用严格协议；历史项目保持兼容，不把缺少旧字段自动认定为新稿。 */
 export function validateV31(stage: string, value: any, state: any) {
   if(state.schema_version!=='3.1.0') return;
@@ -10,18 +11,18 @@ export function validateV31(stage: string, value: any, state: any) {
     for(const line of value.dialogue){text(line,'dialogue_id');text(line,'exact_text');text(line,'speaker_id');text(line,'scene_id');}
   }
   if(stage==='assets') {
-    for(const key of ['characters','scenes','locations','scene_states','props']) array(value,key);
+    for(const key of STAGE_ARRAYS.assets) array(value,key);
     for(const scene of value.scenes){text(scene,'location_id');text(scene,'scene_state_id');}
     for(const current of value.scene_states)text(current,'location_id');
   }
   if(stage==='shots') for(const shot of value.shots || []) {
     for(const key of ['chapter_id','scene_id','location_id','scene_state_id','narrative_purpose'])text(shot,key);
     positive(shot,'duration_ms');
-    for(const key of ['character_ids','prop_ids','costume_ids','dialogue_refs'])array(shot,key);
+    for(const key of ITEM_ARRAYS.shots.shots)array(shot,key);
   }
   if(stage==='prompts') for(const prompt of value.prompts || []) {
     for(const key of ['location_id','scene_state_id','generation_mode'])text(prompt,key);
-    positive(prompt,'duration_ms');array(prompt,'dialogue_refs');
+    positive(prompt,'duration_ms');for(const key of ITEM_ARRAYS.prompts.prompts)array(prompt,key);
   }
   if(stage==='review') {
     text(value,'review_status');text(value,'review_id');text(value,'review_stage');

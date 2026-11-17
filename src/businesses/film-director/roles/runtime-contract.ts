@@ -10,5 +10,6 @@ const ADAPTERS: Record<string,string> = {
  reviewer: 'review 阶段提交平铺报告，不包 review_report。包含 review_id、review_stage、review_scope、reviewed_revisions、unverified_items、scores、issues、review_status、blocking_issue_count、delivery_allowed。终审使用 FINAL_REVIEW，scope 和 reviewed_revisions 覆盖 creative/script/assets/shots/prompts。scores 使用 requirement_fidelity/narrative_quality/character_consistency/scene_consistency/cinematic_quality/temporal_consistency/prompt_executability/structural_completeness，未评估填 null；当前权重由运行时代码复算，不虚构动态权重配置。issue 提供 description、location、evidence、responsible_agent、recheck_criteria、severity、status 等字段；expected/actual 映射 expected_behavior/actual_behavior。责任角色用注册 id，未复审不能 VERIFIED。',
 };
 export function runtimeContract(role:string) {
- return '\n\n## 当前工具数据适配\n'+ADAPTERS[role];
+ return '\n\n## 当前工具数据适配\n'+ADAPTERS[role]
+  +'\n提交前先调用 film_project(action="validate",projectId,stage,content) 校验候选，content 为合法 JSON 字符串，不带 Markdown 围栏、注释或多余字符。assets 顶层必须同时包含 characters/scenes/locations/scene_states/props 五个数组，道具属于 props，不是仅写在场景描述中；没有道具时显式 props:[]。校验失败只修复报告中的格式或字段，不重写已批准内容、不把真实道具清空、不编造道具。校验通过后使用返回的当前 expectedRevision 提交；validate 不代表保存、批准或视频成功。内部格式修复无需让用户处理 JSON，只在影响创意或已批准内容时请求决策。';
 }

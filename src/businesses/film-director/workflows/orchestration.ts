@@ -3,6 +3,7 @@ import { evaluateReview } from '../quality/review.js';
 import { roleInstructions } from '../roles/index.js';
 import { profileContext } from '../profiles/index.js';
 import { STAGES, validateArtifact } from '../runtime/project.js';
+import { submissionContract } from '../contracts/fields.js';
 /** 程序选择下一许可动作；角色仅读取直接依赖，不重复加载全项目。 */
 export function nextTask(state: any) {
   if(state.status==='STOPPED') return {action:'stop',status:'STOPPED',expectedRevision:state.revision};
@@ -12,7 +13,7 @@ export function nextTask(state: any) {
       const roles = {creative:'creative',script:'screenwriter',assets:'character + scene',shots:'storyboard',prompts:'prompt-engineer',review:'reviewer'};
       const dependencies = STAGE_DEPS;
       const roleIds={creative:['creative'],script:['screenwriter'],assets:['character','scene'],shots:['storyboard'],prompts:['prompt-engineer'],review:['reviewer']};
-      return { action:'submit', ...projectContext(state), work_profile:profileContext(state), input_revisions:sourceRevisions(state,stage), revision_scope:artifact?.stale_entity_ids || [], model_profile:modelProfile(state), stage, role:roles[stage], inputs:Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]])), instructions:roleIds[stage].map(role=>roleInstructions(state,role)).join('\n\n'),expectedRevision:state.revision };
+      return { action:'submit', submission_contract:submissionContract(stage), ...projectContext(state), work_profile:profileContext(state), input_revisions:sourceRevisions(state,stage), revision_scope:artifact?.stale_entity_ids || [], model_profile:modelProfile(state), stage, role:roles[stage], inputs:Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]])), instructions:roleIds[stage].map(role=>roleInstructions(state,role)).join('\n\n'),expectedRevision:state.revision };
     }
     if (['creative','script'].includes(stage) && state.approvals[stage] !== artifact.revision) {
       if(stage==='creative'&&profileContext(state).status==='UNSELECTED')return {action:'configure_profile',role:'director',...projectContext(state),work_profile:profileContext(state),expectedRevision:state.revision,instructions:'创意批准前确认作品类型，用configure_profile保存选择；保存会使当前草稿失效，需按类型更新后重新提交。不得把未回答当作同意。'};

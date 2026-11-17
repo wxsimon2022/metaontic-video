@@ -9,6 +9,7 @@ import promptEngineer from './prompt-engineer.js';
 import reviewer from './reviewer.js';
 import { profileInstructions, profileContext } from '../profiles/index.js';
 import { runtimeContract } from './runtime-contract.js';
+import { submissionContract } from '../contracts/fields.js';
 const ROLE_TEXTS = {director,creative,screenwriter,character,scene,storyboard,'prompt-engineer':promptEngineer,reviewer};
 export const ROLE_PROMPTS = Object.fromEntries(Object.entries(ROLE_TEXTS).map(([key,text])=>[key,text+'\n'+COMMON_CONTRACT+runtimeContract(key)])) as typeof ROLE_TEXTS;
 export function roleInstructions(state:any,role:string) {return ROLE_PROMPTS[role]+'\n'+profileInstructions(state,role);}
@@ -33,6 +34,6 @@ export function routeIntent(state: any, intent: string, entityIds: string[] = []
  const ids=stage==='assets' ? (role==='character'? state.artifacts.assets?.data.characters?.map(v=>v.character_id):state.artifacts.assets?.data.scenes?.map(v=>v.scene_id)) : stage==='shots'||stage==='prompts'?state.artifacts.shots?.data.shots?.map(v=>v.shot_id):undefined;
  if(ids && entityIds.some(id=>!ids.includes(id))) throw Error('UNKNOWN_ENTITY');
  const inputs=Object.fromEntries([...new Set([...dependencies,...(stage?[stage]:[])])].filter(s=>state.artifacts[s]).map(s=>[s,state.artifacts[s]]));
- return {intent,role,stage,scope:{entity_ids:entityIds},status:missing.length||approvals.length||scopeRequired?'needs_input':'ready',missing,approval_required:approvals,scope_required:scopeRequired,...projectContext(state),work_profile:profileContext(state),input_revisions:sourceRevisions(state,stage),model_profile:modelProfile(state),expectedRevision:state.revision,instructions:roleInstructions(state,role),inputs,
+ return {submission_contract:stage?submissionContract(stage):null,intent,role,stage,scope:{entity_ids:entityIds},status:missing.length||approvals.length||scopeRequired?'needs_input':'ready',missing,approval_required:approvals,scope_required:scopeRequired,...projectContext(state),work_profile:profileContext(state),input_revisions:sourceRevisions(state,stage),model_profile:modelProfile(state),expectedRevision:state.revision,instructions:roleInstructions(state,role),inputs,
    next_action:scopeRequired?'明确修改对象ID；不要猜测或改写全片':missing.length||approvals.length?'完成缺失上游或批准后再修改':'按职责生成候选；提交仍受现有状态机与审批约束'};
 }

@@ -103,17 +103,26 @@ test('画布需求恢复所选类型，写作采用同一类型策略并保持Ma
 test('真实工具创建、审批、改类型及重读保存一致，旧批准与产物不能继续用',async()=>{
  const home=await mkdtemp(path.join(tmpdir(),'film-type-中文 '));const prior=process.env.DSH_HOME;
  process.env.DSH_HOME=home;
- let tool,questions=0;
- const runtime={config:{},tools:{register(_business,value){tool=value;}},ctx:{get(){return {ask:async()=>{questions++;return {answers:[{id:'film_approval',selected:['批准本版']}]};}};}}};
+ let tool,questions=0,approvalText='';
+ const runtime={config:{},tools:{register(_business,value){tool=value;}},ctx:{get(){return {ask:async(request)=>{questions++;approvalText=request.questions[0].question;return {answers:[{id:'film_approval',selected:['批准本版']}]};}};}}};
  const exec={agent:{session:{id:'film-profile-test'}}};
  try{
   api.filmDirectorBusiness.apply(runtime);
   let s=await tool.execute({action:'create',title:'河岸观察',sourceBrief:'只看水波',durationSeconds:15,projectSpec:JSON.stringify({work_type:'LIFESTYLE'})},exec);
   const id=s.project_id;const p=api.resolveProfile(s.project_spec);
+  const invalid=await tool.execute({action:'validate',projectId:id,stage:'creative',content:'{}x'},exec);
+  assert.equal(invalid.valid,false);assert.equal(invalid.error_code,'INVALID_ARTIFACT_JSON');
+  assert.equal((await tool.execute({action:'read',projectId:id},exec)).revision,s.revision);
+  assert.equal(questions,0);
   const data={...creative(p),structure:[{section_id:'S1',duration_ms:15000}],must_preserve:[],assumptions:[]};
   s=await tool.execute({action:'submit',projectId:id,stage:'creative',expectedRevision:s.revision,content:JSON.stringify(data)},exec);
   s=await tool.execute({action:'approve',projectId:id,stage:'creative',expectedRevision:s.revision},exec);
   assert.equal(questions,1);assert.equal(s.approvals.creative,1);
+  assert.match(approvalText,/创意方案（修订 1）/);
+  assert.match(approvalText,/核心表达：细节发现/);
+  assert.match(approvalText,/15 秒/);
+  assert.ok(!approvalText.includes(JSON.stringify(data)));
+  assert.ok(!approvalText.includes('"duration_ms"'));
   await assert.rejects(()=>tool.execute({action:'configure_profile',projectId:id,expectedRevision:0,projectSpec:JSON.stringify({work_type:'COMEDY'})},exec),/REVISION_CONFLICT/);
   const oldRevision=s.revision;
   s=await tool.execute({action:'configure_profile',projectId:id,expectedRevision:oldRevision,projectSpec:JSON.stringify({work_type:'COMEDY'})},exec);
@@ -179,4 +188,22 @@ test('四维终审要求逐维证据，未检查与缺失问题引用不能放�
  bad.dimension_review.checks[0].status='CONCERN';assert.throws(()=>api.validateProfileArtifact('review',bad,s),/ISSUE_REQUIRED/);
  bad.dimension_review.checks[0].issue_id='i1';bad.issues=[{issue_id:'i1'}];api.validateProfileArtifact('review',bad,s);
  bad.dimension_review.checks.push(bad.dimension_review.checks[0]);assert.throws(()=>api.validateProfileArtifact('review',bad,s),/COVERAGE/);
+});
+test('分镜路由显式提供与预检相同的镜头字段契约',()=>{
+ const task=api.routeIntent(state('DRAMA'),'design_shots');
+ assert.deepEqual(task.submission_contract.required_arrays,['shots']);
+ assert.deepEqual(task.submission_contract.item_required_arrays.shots,['character_ids','prop_ids','costume_ids','dialogue_refs']);
+ assert.match(task.submission_contract.instructions,/无对白才为空/);
+});
+test('模型占位值提交前拒绝，旧模型可通过正式入口修订且保留创意剧本批准',()=>{
+ for(const target_model of ['占位文字','placeholder','MODEL_ID','unknown'])assert.throws(()=>api.createProjectSpec('x','y',15000,{target_model}),/INVALID_TARGET_MODEL/);
+ const s=state('DRAMA');s.revision=8;s.project_spec.target_model='旧占位文字';s.approvals={creative:1,script:2};
+ s.artifacts={creative:{revision:1,data:{}},script:{revision:2,data:{}},assets:{revision:3,data:{}},shots:{revision:4,data:{}},prompts:{revision:5,data:{}},review:{revision:6,data:{}}};
+ const next=api.configureProfile(s,{target_model:'real-model-2.0'},8);
+ assert.equal(next.project_spec.target_model,'real-model-2.0');assert.equal(next.revision,9);
+ assert.deepEqual(next.approvals,s.approvals);assert.equal(next.artifacts.creative.stale,undefined);assert.equal(next.artifacts.script.stale,undefined);
+ for(const stage of ['assets','shots','prompts','review'])assert.equal(next.artifacts[stage].stale,true);
+ assert.equal(s.project_spec.target_model,'旧占位文字');assert.equal(api.configureProfile(next,{target_model:'real-model-2.0'},9).revision,9);
+ assert.throws(()=>api.configureProfile(next,{target_model:'占位文字'},9),/INVALID_TARGET_MODEL/);
+ assert.throws(()=>api.configureProfile(next,{target_model:'real-model-3'},8),/REVISION_CONFLICT/);
 });
