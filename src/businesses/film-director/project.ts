@@ -16,7 +16,16 @@ export function validateTimeline(shots: any[], duration: number) {
 export function validateArtifact(stage: string, value: any, state: any) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('INVALID_ARTIFACT');
   const nonempty = (key: string) => { if (typeof value[key] !== 'string' || !value[key].trim()) throw Error(`MISSING_FIELD:${key}`); };
-  if (stage === 'creative') { nonempty('theme'); nonempty('logline'); }
+  if (stage === 'creative') {
+    nonempty('theme'); nonempty('logline');
+    if (value.structure !== undefined) {
+      if (!Array.isArray(value.structure) || !value.structure.length) throw Error('INVALID_CREATIVE_STRUCTURE');
+      const ids=value.structure.map(s=>s?.section_id);
+      if (ids.some(id=>typeof id!=='string'||!id.trim()) || new Set(ids).size!==ids.length) throw Error('INVALID_SECTION_ID');
+      if (value.structure.some(s=>!Number.isSafeInteger(s.duration_ms)||s.duration_ms<=0) || value.structure.reduce((n,s)=>n+s.duration_ms,0)!==state.duration_ms) throw Error('CREATIVE_DURATION_MISMATCH');
+    }
+    if (value.approval_questions !== undefined && (!Array.isArray(value.approval_questions)||value.approval_questions.length>3)) throw Error('TOO_MANY_CREATIVE_QUESTIONS');
+  }
   if (stage === 'script') { nonempty('screenplay'); if (!Array.isArray(value.chapters) || !value.chapters.length || value.chapters.some(c => !Number.isSafeInteger(c.duration_ms) || c.duration_ms <= 0) || value.chapters.reduce((n,c) => n+c.duration_ms,0) !== state.duration_ms) throw Error('CHAPTER_DURATION_MISMATCH'); }
   if (stage === 'assets') for (const key of ['characters','scenes']) {
     if (!Array.isArray(value[key])) throw Error(`MISSING_FIELD:${key}`);

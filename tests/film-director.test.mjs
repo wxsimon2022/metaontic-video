@@ -58,3 +58,11 @@ test('意图路由不绕过批准，局部修改缺目标需澄清，非法实�
  assert.throws(()=>api.routeIntent(state,'revise_camera',['s9']),/UNKNOWN_ENTITY/);
  assert.throws(()=>api.routeIntent(state,'approve_everything'),/UNKNOWN_INTENT/);
 });
+test('创意V3拒绝时长不守恒、重复段落和过量确认，兼容旧稿',()=>{
+ const state=initial();const draft={theme:'主题',logline:'故事',structure:[{section_id:'sec1',duration_ms:15000}],approval_questions:[]};
+ api.validateArtifact('creative',draft,state);
+ assert.throws(()=>api.validateArtifact('creative',{...draft,structure:[{section_id:'sec1',duration_ms:14000}]},state),/CREATIVE_DURATION_MISMATCH/);
+ assert.throws(()=>api.validateArtifact('creative',{...draft,structure:[{section_id:'sec1',duration_ms:7500},{section_id:'sec1',duration_ms:7500}]},state),/INVALID_SECTION_ID/);
+ assert.throws(()=>api.validateArtifact('creative',{...draft,approval_questions:['a','b','c','d']},state),/TOO_MANY/);
+ api.validateArtifact('creative',{theme:'旧主题',logline:'旧故事'},state);
+});
