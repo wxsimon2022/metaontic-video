@@ -8,8 +8,9 @@ import storyboard from './storyboard.js';
 import promptEngineer from './prompt-engineer.js';
 import reviewer from './reviewer.js';
 import { profileInstructions, profileContext } from '../profiles/index.js';
+import { runtimeContract } from './runtime-contract.js';
 const ROLE_TEXTS = {director,creative,screenwriter,character,scene,storyboard,'prompt-engineer':promptEngineer,reviewer};
-export const ROLE_PROMPTS = Object.fromEntries(Object.entries(ROLE_TEXTS).map(([key,text])=>[key,text+'\n'+COMMON_CONTRACT])) as typeof ROLE_TEXTS;
+export const ROLE_PROMPTS = Object.fromEntries(Object.entries(ROLE_TEXTS).map(([key,text])=>[key,text+'\n'+COMMON_CONTRACT+runtimeContract(key)])) as typeof ROLE_TEXTS;
 export function roleInstructions(state:any,role:string) {return ROLE_PROMPTS[role]+'\n'+profileInstructions(state,role);}
 export const INTENTS = ['new_project','develop_idea','write_script','revise_dialogue','revise_story','design_character','revise_character','design_scene','revise_scene','design_shots','revise_camera','revise_timing','write_prompts','adapt_model','review','verify_facts','resume','produce','clarify'] as const;
 const ROUTES = {

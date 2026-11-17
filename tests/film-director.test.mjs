@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 const result=await build({stdin:{contents:"export * from './src/businesses/film-director/runtime/project.ts'; export * from './src/businesses/film-director/workflows/orchestration.ts'; export * from './src/businesses/film-director/roles/index.ts'; export * from './src/businesses/film-director/workflows/revisions.ts'; export * from './src/businesses/film-director/runtime/deliverables.ts'; export * from './src/businesses/film-director/runtime/approvals.ts'; export * from './src/businesses/film-director/runtime/issues.ts'; export * from './src/businesses/film-director/runtime/spec.ts'; export * from './src/businesses/film-director/runtime/storage.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
 const api=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
@@ -83,8 +84,13 @@ test('新版审核保存失败报告但不放行，评分和阻断数不能伪�
  api.validateArtifact('review',{...report,review_status:'PASS',issues:[],blocking_issue_count:0,delivery_allowed:true},state);
 });
 test('全部角色使用已提供的完整版本且职责独立',()=>{
- assert.match(api.ROLE_PROMPTS.creative,/V3.1/);
- for(const role of ['director','screenwriter','character','scene','storyboard','prompt-engineer','reviewer'])assert.match(api.ROLE_PROMPTS[role],/Version: 3.1/);
+ const blocks=[...readFileSync('Agent_Prompts.md','utf8').matchAll(/```markdown\n([\s\S]*?)\n```/g)].map(m=>m[1]);
+ assert.equal(blocks.length,9);
+ for(const [i,role] of ['director','creative','screenwriter','character','scene','storyboard','prompt-engineer','reviewer'].entries()) {
+  assert.ok(api.ROLE_PROMPTS[role].startsWith(blocks[i+1]));
+  assert.ok(api.ROLE_PROMPTS[role].includes(blocks[0]));
+  assert.match(api.ROLE_PROMPTS[role],/当前工具数据适配/);
+ }
  assert.match(api.ROLE_PROMPTS.character,/IDENTITY_LOCK/);
  assert.match(api.ROLE_PROMPTS.scene,/location_id/);
  assert.match(api.ROLE_PROMPTS.storyboard,/action_start/);
