@@ -4368,6 +4368,116 @@ var promoVideo = {
 var agents = [videoDirector, promoVideo];
 var agentRegistry = createAgentRegistry(agents);
 
+// src/businesses/video/providers/connection-check.ts
+init_connection();
+var CONNECTION_CHECK_TIMEOUT_MS = 12e3;
+async function checkConnections(liveConfig, options = {}) {
+  const config = snapshotConfig(liveConfig);
+  const fetcher = options.fetcher || fetch;
+  const cache = /* @__PURE__ */ new Map();
+  const probe = (cfg) => {
+    const key = resolveApiKey(cfg);
+    if (!key) return Promise.resolve({ code: "key_missing", level: "error" });
+    const base = resolveBaseUrl(cfg);
+    let url;
+    try {
+      url = new URL(isVolcengine(cfg) ? base + resolveQueryPath(cfg, "00000000-0000-0000-0000-000000000000") : /\/v\d+$/.test(base) ? base + "/models" : base + "/v1/models");
+      if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw Error();
+    } catch {
+      return Promise.resolve({ code: "invalid_address", level: "error" });
+    }
+    const identity = JSON.stringify([url.href, key]);
+    if (!cache.has(identity)) cache.set(identity, (async () => {
+      const timeout = AbortSignal.timeout(options.timeoutMs || CONNECTION_CHECK_TIMEOUT_MS);
+      const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+      try {
+        const response = await fetcher(url.href, { method: "GET", redirect: "error", headers: { accept: "application/json", Authorization: `Bearer ${key}` }, signal });
+        if (response.status === 401) return { code: "auth_failed", level: "error", http_status: 401 };
+        if (response.status === 403) return { code: "forbidden", level: "error", http_status: 403 };
+        if (isVolcengine(cfg)) return { code: response.status === 404 ? "query_reachable" : "query_unverified", level: "warning", http_status: response.status };
+        if (response.status === 404 || response.status === 405) return { code: "models_unsupported", level: "warning", http_status: response.status };
+        if (response.status === 429) return { code: "rate_limited", level: "warning", http_status: 429 };
+        if (!response.ok) return { code: "server_error", level: "error", http_status: response.status };
+        let body;
+        try {
+          body = await response.json();
+        } catch {
+          return { code: "invalid_response", level: "error" };
+        }
+        if (body?.error || body?.success === false) return { code: "api_rejected", level: "error" };
+        if (!Array.isArray(body?.data) || body.data.some((row) => typeof row?.id !== "string")) return { code: "invalid_response", level: "error" };
+        return { code: "ok", level: "success", ids: new Set(body.data.map((row) => row.id)) };
+      } catch {
+        return { code: signal.aborted ? "timeout" : "network_error", level: "error" };
+      }
+    })());
+    return cache.get(identity);
+  };
+  const targets = isVolcengine(config) ? ["video"] : ["video", "image", "text"];
+  const checks = await Promise.all(targets.map(async (target) => {
+    let cfg;
+    try {
+      cfg = target === "image" ? imageConfig(config) : target === "text" ? textConfig(config) : config;
+    } catch {
+      return { target, code: "key_missing", level: "error" };
+    }
+    const model = target === "image" ? cfg.imageModel : target === "text" ? resolveTextModel(cfg) : resolveModel(cfg);
+    const result = await probe(cfg);
+    const { ids, ...safe } = result;
+    return { target, model, ...safe, ...ids && !ids.has(model) ? { code: "model_not_listed", level: "warning" } : {} };
+  }));
+  return { checks, scope: "read_only", generation_tested: false };
+}
+
+// src/businesses/video/integrations/connection-check.ts
+function registerConnectionCheck(ctx, config) {
+  return ctx.inject(["webServer"], (scope) => {
+    if (typeof scope.webServer?.register !== "function") return;
+    let running = false;
+    const remove = scope.webServer.register({ kind: "exact", path: "/metaontic-video/check-connection", async handler(req, res) {
+      res.setHeader("content-type", "application/json; charset=utf-8");
+      res.setHeader("cache-control", "no-store");
+      try {
+        if (req.method !== "POST") {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: "method_not_allowed" }));
+          return;
+        }
+        if (req.headers["sec-fetch-site"] === "cross-site" || req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) {
+          res.statusCode = 403;
+          res.end(JSON.stringify({ error: "invalid_origin" }));
+          return;
+        }
+        if (!String(req.headers["content-type"] || "").startsWith("application/json")) throw Error("invalid_request");
+        let raw = "";
+        for await (const chunk of req) {
+          raw += chunk;
+          if (raw.length > 1024) throw Error("invalid_request");
+        }
+        const body = JSON.parse(raw || "{}");
+        if (!body || Array.isArray(body) || typeof body !== "object" || Object.keys(body).length) throw Error("invalid_request");
+        if (running) {
+          res.statusCode = 409;
+          res.end(JSON.stringify({ error: "busy" }));
+          return;
+        }
+        running = true;
+        try {
+          res.end(JSON.stringify(await checkConnections(config)));
+        } finally {
+          running = false;
+        }
+      } catch {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "check_failed" }));
+      }
+    } });
+    return () => {
+      if (typeof remove === "function") remove();
+    };
+  });
+}
+
 // src/businesses/video/workflow/media-preview.ts
 var PREVIEW_TOOLS = /* @__PURE__ */ new Set(["video_generate", "video_extend", "video_status", "video_prepare_image"]);
 function mediaPreviewMeta(value, toolName) {
@@ -11259,6 +11369,7 @@ function asDisposer(value) {
 }
 function applyVideoBusiness(runtime) {
   const { ctx, config } = runtime;
+  runtime.defer(registerConnectionCheck(ctx, config));
   runtime.defer(registerCanvasNative(ctx, config));
   runtime.defer(registerBuiltinCanvas(ctx));
   const deps = {};

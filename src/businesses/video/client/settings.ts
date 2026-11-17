@@ -1,3 +1,4 @@
+import { createConnectionCheckController } from './connection-check.js';
 import { createSettingsActions } from './settings-actions.js';
 import { VOLCENGINE_MODE_AVAILABLE } from '../connection-defaults.js';
 import { createUpdateActions, renderUpdateNotice, formatReleaseTime } from '../../../client/updates.js';
@@ -30,6 +31,11 @@ function makePage({ form, t, manager }) {
         React.useEffect(() => { setVisibleKey(''); }, [selectedMode]);
         const [status, setStatus] = React.useState('idle');
         const [saveError, setSaveError] = React.useState('');
+        const [connectionCheck,setConnectionCheck]=React.useState({status:'idle',checks:[]});
+        const checkController=React.useRef(null);
+        if(!checkController.current)checkController.current=createConnectionCheckController({setState:setConnectionCheck,readSnapshot:()=>form.getSnapshot()});
+        React.useEffect(()=>{checkController.current.invalidate();return ()=>checkController.current.dispose();},[snapshot.revision]);
+
         // 「已保存」这类反馈过几秒自动收起：收起后操作条跟着消失，页面回到「没有改动」的样子
         const statusTimer = React.useRef(null);
         const connectionBusy = React.useRef(false);
@@ -102,6 +108,7 @@ function makePage({ form, t, manager }) {
         const pending = Object.entries(draft).filter(([key, next]) => !same(value[key], next));
         // 一有新的改动就把上一条「已保存」收起来，免得看着像这次的改动也存过了
         const edit = (key, next) => {
+          checkController.current.invalidate();
           clearStatusTimer();
           setStatus((current) => (current === 'idle' ? current : 'idle'));
           setDraft((current) => ({ ...current, [key]: next }));
@@ -222,9 +229,20 @@ function makePage({ form, t, manager }) {
             && (key !== 'autoCreateCanvas' || canvasOn))
             .map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean));
         };
+        const connectionBox=h('div',{key:'connection-check',className:'mov-section','data-field':'connectionCheck'},[
+          h('div',{key:'head',className:'mov-card-head'},[
+            h('span',{key:'title',className:'mov-card-title'},t('connectionCheckTitle')),
+            h('button',{key:'button',type:'button',className:'mov-btn','data-action':'check-connection',disabled:pending.length>0||status==='saving'||snapshot.status!=='ready'||connectionCheck.status==='working',onClick:()=>checkController.current.run(!pending.length&&status!=='saving'&&form.getSnapshot()?.status==='ready')},t(connectionCheck.status==='working'?'connectionChecking':'connectionCheckButton')),
+          ]),
+          h('p',{key:'hint',className:'mov-hint'},t(pending.length?'connectionCheckSaveFirst':'connectionCheckHint')),
+          h('div',{key:'result',role:'status','aria-live':'polite'},connectionCheck.status==='failed'
+            ?h('p',{style:{color:TOKENS.error}},t('connectionCheckFailed'))
+            :connectionCheck.checks.map((check:any)=>h('p',{key:check.target,style:{color:check.level==='error'?TOKENS.error:check.level==='success'?TOKENS.success:TOKENS.muted}},`${t('connectionTarget_'+check.target)}：${t('connectionResult_'+check.code)}`))),
+        ]);
         const settingsRows = () => [
           h('div', { key: 'generation', className: 'mov-section' }, [
             h('div', { key: 'title', className: 'mov-section-title' }, t('sectionGeneration')),
+            connectionBox,
             ...SECTIONS.map(section =>
               h('div', { key: section.key, className: 'mov-parameter-group' }, [
                 h('div', { key: 'heading', className: 'mov-parameter-heading' }, t(section.key)),

@@ -1,3 +1,4 @@
+import { registerConnectionCheck } from './integrations/connection-check.js';
 import type { BusinessModule, BusinessRuntime } from '../../core/runtime.js';
 import { withMediaPreview } from './workflow/media-preview.js';
 import { createSegmentReview, assertSegmentReviewed } from './workflow/segment-review.js';
@@ -43,6 +44,7 @@ function asDisposer(value: unknown): (() => void) | undefined {
 
 function applyVideoBusiness(runtime: BusinessRuntime) {
   const { ctx, config } = runtime;
+  runtime.defer(registerConnectionCheck(ctx,config));
   runtime.defer(registerCanvasNative(ctx, config));
   runtime.defer(registerBuiltinCanvas(ctx));
   // 可选服务的宿主对象（会话工作目录等），拿到就放进来

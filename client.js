@@ -780,6 +780,30 @@
   // src/businesses/video/client/locale.ts
   function createDictionaries() {
     const zh = {
+      connectionCheckTitle: "API \u8FDE\u63A5\u9A8C\u8BC1",
+      connectionCheckButton: "\u9A8C\u8BC1\u8FDE\u63A5",
+      connectionChecking: "\u6B63\u5728\u9A8C\u8BC1\u2026",
+      connectionCheckSaveFirst: "\u6709\u672A\u4FDD\u5B58\u7684\u4FEE\u6539\uFF0C\u8BF7\u5148\u4FDD\u5B58\u540E\u9A8C\u8BC1\u3002",
+      connectionCheckHint: "\u68C0\u67E5\u5DF2\u4FDD\u5B58\u7684\u63A5\u53E3\u3001\u9274\u6743\u54CD\u5E94\u548C\u6A21\u578B\u6E05\u5355\uFF0C\u4E0D\u63D0\u4EA4\u751F\u6210\u4EFB\u52A1\u3001\u4E0D\u4EA7\u751F\u6A21\u578B\u751F\u6210\u8D39\u7528\uFF1B\u901A\u8FC7\u4E0D\u4EE3\u8868\u5B9E\u9645\u751F\u6210\u6548\u679C\u5DF2\u9A8C\u8BC1\u3002",
+      connectionCheckFailed: "\u9A8C\u8BC1\u672A\u5B8C\u6210\uFF0C\u8BF7\u786E\u8BA4\u63D2\u4EF6\u670D\u52A1\u53EF\u7528\u540E\u91CD\u8BD5\u3002",
+      connectionTarget_video: "\u89C6\u9891\u6A21\u578B",
+      connectionTarget_image: "\u56FE\u7247\u6A21\u578B",
+      connectionTarget_text: "\u6587\u672C\u6A21\u578B",
+      connectionResult_ok: "\u9274\u6743\u63A5\u53E3\u54CD\u5E94\u6B63\u5E38\uFF0C\u5F53\u524D\u6A21\u578B\u5DF2\u5217\u51FA\u3002",
+      connectionResult_model_not_listed: "\u63A5\u53E3\u54CD\u5E94\u6B63\u5E38\uFF0C\u4F46\u5F53\u524D\u6A21\u578B\u672A\u5217\u51FA\uFF0C\u8BF7\u6838\u5BF9\u6A21\u578B\u540D\u79F0\u4E0E\u4F7F\u7528\u6743\u9650\u3002",
+      connectionResult_key_missing: "\u672A\u586B\u5199\u6B64\u6A21\u578B\u5B9E\u9645\u4F7F\u7528\u7684 API\u5BC6\u94A5\uFF0C\u8BF7\u586B\u5199\u5E76\u4FDD\u5B58\u3002",
+      connectionResult_invalid_address: "\u63A5\u53E3\u5730\u5740\u683C\u5F0F\u4E0D\u6B63\u786E\uFF0C\u8BF7\u68C0\u67E5\u5DF2\u4FDD\u5B58\u7684\u5730\u5740\u3002",
+      connectionResult_auth_failed: "\u9274\u6743\u672A\u901A\u8FC7\uFF08401\uFF09\uFF0C\u8BF7\u6838\u5BF9 API\u5BC6\u94A5\u53CA\u63A5\u53E3\u5730\u5740\u3002",
+      connectionResult_forbidden: "\u8BBF\u95EE\u88AB\u62D2\u7EDD\uFF08403\uFF09\uFF0C\u8BF7\u6838\u5BF9\u5BC6\u94A5\u6743\u9650\u3001\u6E20\u9053\u9650\u5236\u53CA\u5730\u5740\u3002",
+      connectionResult_models_unsupported: "\u670D\u52A1\u672A\u63D0\u4F9B\u6A21\u578B\u67E5\u8BE2\u63A5\u53E3\uFF0C\u65E0\u6CD5\u4EC5\u9760\u53EA\u8BFB\u8BF7\u6C42\u786E\u8BA4\u53EF\u7528\u6027\u3002",
+      connectionResult_rate_limited: "\u8BF7\u6C42\u53D7\u9650\uFF08429\uFF09\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u5E76\u6838\u5BF9\u6E20\u9053\u9650\u5236\u3002",
+      connectionResult_server_error: "\u4E0A\u6E38\u63A5\u53E3\u5F02\u5E38\uFF0C\u8BF7\u6838\u5BF9\u5730\u5740\u6216\u7A0D\u540E\u91CD\u8BD5\u3002",
+      connectionResult_invalid_response: "\u8FD4\u56DE\u5185\u5BB9\u4E0D\u662F\u9884\u671F\u7684\u6A21\u578B\u6E05\u5355\uFF0C\u8BF7\u68C0\u67E5\u63A5\u53E3\u5730\u5740\u3002",
+      connectionResult_api_rejected: "\u4E0A\u6E38\u62D2\u7EDD\u4E86\u9A8C\u8BC1\u8BF7\u6C42\uFF0C\u8BF7\u6838\u5BF9 API\u5BC6\u94A5\u548C\u5730\u5740\u3002",
+      connectionResult_timeout: "\u8FDE\u63A5\u8D85\u65F6\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u548C\u63A5\u53E3\u5730\u5740\u540E\u91CD\u8BD5\u3002",
+      connectionResult_network_error: "\u65E0\u6CD5\u8FDE\u63A5\u63A5\u53E3\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u3001\u8BC1\u4E66\u6216\u63A5\u53E3\u5730\u5740\u3002",
+      connectionResult_query_reachable: "\u67E5\u8BE2\u63A5\u53E3\u5DF2\u54CD\u5E94\uFF1B\u53EA\u8BFB\u63A2\u6D4B\u5C1A\u4E0D\u80FD\u786E\u8BA4\u5F53\u524D\u6A21\u578B\u7684\u751F\u6210\u6743\u9650\u3002",
+      connectionResult_query_unverified: "\u53EA\u8BFB\u67E5\u8BE2\u672A\u80FD\u786E\u8BA4\u8FDE\u63A5\uFF0C\u8BF7\u6838\u5BF9\u706B\u5C71\u63A5\u53E3\u914D\u7F6E\u53CA\u6743\u9650\u3002",
       summaryEmpty: "\u8BF7\u9009\u62E9\u63A5\u5165\u65B9\u5F0F\uFF0C\u586B\u5199 API\u5BC6\u94A5\u540E\u4FDD\u5B58\u3002",
       panelTitle: "\u89C6\u9891\u521B\u4F5C",
       panelSidebarLabel: "\u89C6\u9891\u521B\u4F5C\u52A9\u624B",
@@ -939,6 +963,30 @@
       resetFailed: "\u91CD\u7F6E\u5931\u8D25\uFF1A{message}"
     };
     const en = {
+      connectionCheckTitle: "API connection check",
+      connectionCheckButton: "Check connection",
+      connectionChecking: "Checking\u2026",
+      connectionCheckSaveFirst: "Save your changes before checking.",
+      connectionCheckHint: "Checks saved endpoints, authentication responses and model listings without submitting generation tasks or incurring model generation charges. Success does not verify generation quality.",
+      connectionCheckFailed: "Check could not finish. Confirm the plugin service is available and retry.",
+      connectionTarget_video: "Video model",
+      connectionTarget_image: "Image model",
+      connectionTarget_text: "Text model",
+      connectionResult_ok: "Authentication endpoint responded and the model is listed.",
+      connectionResult_model_not_listed: "Endpoint responded, but this model is not listed. Check its name and permissions.",
+      connectionResult_key_missing: "The API key used by this model is missing. Enter it and save.",
+      connectionResult_invalid_address: "Invalid endpoint address. Check the saved URL.",
+      connectionResult_auth_failed: "Authentication failed (401). Check the API key and endpoint.",
+      connectionResult_forbidden: "Access denied (403). Check key permissions, channel restrictions and endpoint.",
+      connectionResult_models_unsupported: "Model listing is unsupported. Read-only checks cannot confirm availability.",
+      connectionResult_rate_limited: "Rate limited (429). Retry later and check provider limits.",
+      connectionResult_server_error: "Upstream error. Check the endpoint or retry later.",
+      connectionResult_invalid_response: "Unexpected model listing response. Check the endpoint URL.",
+      connectionResult_api_rejected: "Upstream rejected the check. Check the API key and endpoint.",
+      connectionResult_timeout: "Connection timed out. Check the network and endpoint.",
+      connectionResult_network_error: "Connection failed. Check the network, certificates and endpoint.",
+      connectionResult_query_reachable: "Query endpoint responded. Generation permissions remain unverified.",
+      connectionResult_query_unverified: "Read-only query was inconclusive. Check the Volcano endpoint and permissions.",
       summaryEmpty: "Choose a connection method, then log in or enter an API key and save.",
       panelTitle: "Video",
       panelSidebarLabel: "Video Creator",
@@ -1501,6 +1549,41 @@
     return new Date(date.getTime() + 8 * 60 * 60 * 1e3).toISOString().slice(0, 16).replace("T", " ");
   }
 
+  // src/businesses/video/client/connection-check.ts
+  function createConnectionCheckController({ setState, readSnapshot, fetcher = (...args) => fetch(...args) }) {
+    let request = 0, controller = null;
+    function dispose() {
+      request++;
+      controller?.abort();
+      controller = null;
+    }
+    function invalidate() {
+      dispose();
+      setState({ status: "idle", checks: [] });
+    }
+    async function run(ready) {
+      if (!ready || controller) return;
+      const id = ++request, revision = readSnapshot()?.revision;
+      const abort = new AbortController();
+      controller = abort;
+      setState({ status: "working", checks: [] });
+      const timeout = setTimeout(() => abort.abort(), 16e3);
+      try {
+        const response = await fetcher("/metaontic-video/check-connection", { method: "POST", headers: { "content-type": "application/json" }, body: "{}", signal: abort.signal });
+        const result = await response.json();
+        if (id !== request || readSnapshot()?.revision !== revision) return;
+        if (!response.ok || !Array.isArray(result?.checks) || !result.checks.length) throw Error();
+        setState({ status: "done", checks: result.checks });
+      } catch {
+        if (id === request && readSnapshot()?.revision === revision) setState({ status: "failed", checks: [] });
+      } finally {
+        clearTimeout(timeout);
+        if (id === request) controller = null;
+      }
+    }
+    return { run, invalidate, dispose };
+  }
+
   // src/businesses/video/client/settings-actions.ts
   var HIDDEN_CONNECTION_MODES = [
     ...VOLCENGINE_MODE_AVAILABLE ? [] : ["volcengine"]
@@ -1819,6 +1902,13 @@
         }, [selectedMode]);
         const [status, setStatus] = React.useState("idle");
         const [saveError, setSaveError] = React.useState("");
+        const [connectionCheck, setConnectionCheck] = React.useState({ status: "idle", checks: [] });
+        const checkController = React.useRef(null);
+        if (!checkController.current) checkController.current = createConnectionCheckController({ setState: setConnectionCheck, readSnapshot: () => form.getSnapshot() });
+        React.useEffect(() => {
+          checkController.current.invalidate();
+          return () => checkController.current.dispose();
+        }, [snapshot.revision]);
         const statusTimer = React.useRef(null);
         const connectionBusy = React.useRef(false);
         const saveInFlight = React.useRef(false);
@@ -1931,6 +2021,7 @@
         }
         const pending = Object.entries(draft).filter(([key, next]) => !same(value[key], next));
         const edit = (key, next) => {
+          checkController.current.invalidate();
           clearStatusTimer();
           setStatus((current) => current === "idle" ? current : "idle");
           setDraft((current) => ({ ...current, [key]: next }));
@@ -2046,9 +2137,18 @@
             fields.filter((key) => (key !== "volcengineApiKey" || directMode) && (!["imageModel", "imageUseVideoKey", "imageApiKey"].includes(key) || !directMode) && (key !== "imageApiKey" || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) === false) && (key !== "metaonticApiKey" || selectedMode === "metaontic") && (key !== "autoCreateCanvas" || canvasOn)).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
           );
         };
+        const connectionBox = h("div", { key: "connection-check", className: "mov-section", "data-field": "connectionCheck" }, [
+          h("div", { key: "head", className: "mov-card-head" }, [
+            h("span", { key: "title", className: "mov-card-title" }, t("connectionCheckTitle")),
+            h("button", { key: "button", type: "button", className: "mov-btn", "data-action": "check-connection", disabled: pending.length > 0 || status === "saving" || snapshot.status !== "ready" || connectionCheck.status === "working", onClick: () => checkController.current.run(!pending.length && status !== "saving" && form.getSnapshot()?.status === "ready") }, t(connectionCheck.status === "working" ? "connectionChecking" : "connectionCheckButton"))
+          ]),
+          h("p", { key: "hint", className: "mov-hint" }, t(pending.length ? "connectionCheckSaveFirst" : "connectionCheckHint")),
+          h("div", { key: "result", role: "status", "aria-live": "polite" }, connectionCheck.status === "failed" ? h("p", { style: { color: TOKENS.error } }, t("connectionCheckFailed")) : connectionCheck.checks.map((check) => h("p", { key: check.target, style: { color: check.level === "error" ? TOKENS.error : check.level === "success" ? TOKENS.success : TOKENS.muted } }, `${t("connectionTarget_" + check.target)}\uFF1A${t("connectionResult_" + check.code)}`)))
+        ]);
         const settingsRows = () => [
           h("div", { key: "generation", className: "mov-section" }, [
             h("div", { key: "title", className: "mov-section-title" }, t("sectionGeneration")),
+            connectionBox,
             ...SECTIONS.map((section) => h("div", { key: section.key, className: "mov-parameter-group" }, [
               h("div", { key: "heading", className: "mov-parameter-heading" }, t(section.key)),
               renderGrid(section)
