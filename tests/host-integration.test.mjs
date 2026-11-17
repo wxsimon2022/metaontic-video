@@ -72,7 +72,7 @@ test('conversation stays inside video creation and configuration is read-only in
 test('refine guidance asks for a richer pass instead of rewording the same idea', async () => {
   const host = harness({ connectionMode: 'metaontic', metaonticApiKey: 'test' }, '/tmp');
   const prompt = host.prompt();
-  for (const needle of ['按六项补齐', '场景与道具', '主体外形与状态', '动作层次与反应', '同一场景相邻段不连续用同一组', '已确认时长内的事件节奏']) {
+  for (const needle of ['按六项补齐', '场景与道具', '主体外形与状态', '动作层次与反应', '同一场景按叙事需要保持或改变机位', '已确认时长内的事件节奏']) {
     assert.ok(prompt.includes(needle), needle);
   }
   assert.ok(prompt.includes('不借完善加人物或支线'), '丰富不等于加人物或支线');

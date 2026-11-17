@@ -75,3 +75,5 @@ flowchart TB
 [Module structure and adding agents or businesses](./docs/engineering/structure-refactor.md)
 
 See [LICENSE](./LICENSE).
+
+Professional script work proceeds through concept, screenplay, assets, storyboard, prompts, and review, with separate concept and screenplay approvals. Skills supply stage-specific methods; story and scenes precede camera planning. Exports include readable material and an artifact revision manifest. Completed production documents do not imply a generated video.

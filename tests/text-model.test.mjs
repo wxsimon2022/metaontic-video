@@ -30,8 +30,8 @@ test('文本模型写脚本：请求走同一中转站的 chat 接口，提示�
   assert.ok(prompt.includes('封闭室内不写航拍'), '场景里没有的条件不许写');
   assert.ok(prompt.includes('运镜列写这一段镜头怎么动'), '运镜写清方式、方向与速度');
   assert.ok(prompt.includes('画面列是这一段要拍的详情') && prompt.includes('用「先…随后…最后…」'), '画面列要求写全主体、动作、环境、光线与氛围，并能写段内的推进');
-  assert.ok(prompt.includes('整片要有变化') && prompt.includes('相邻两段的镜别与视角不要连着用同一组'), '整片要有变化，避免每个镜头都用同一组景别与视角');
-  assert.ok(prompt.includes('不为变化硬换'), '要求变化仍要符合场景，不是硬凑');
+  assert.ok(prompt.includes('每段必须推进一件事') && prompt.includes('不机械规定切镜次数'), '变化来自事件与信息，不强制轮换景别');
+  assert.ok(prompt.includes('不为求变化硬换视角'), '要求变化仍要符合场景，不是硬凑');
   assert.ok(prompt.includes('正好 2 行'), '段数写死');
   assert.equal(result.script.startsWith('# 青旅的清晨'), true, '去掉代码块围栏');
   assert.equal(result.script.includes('```'), false);
@@ -178,11 +178,11 @@ test('画布写脚本按专业导演口径：先定观众与记忆点，再交�
   };
   await api.writeScript(config, { idea: '深夜面馆的最后一碗面', totalSeconds: 15, segmentSeconds: 15, segments: 1 }, { fetcher });
   const prompt = calls[0].messages[1].content;
-  assert.ok(prompt.includes('你是这条片子的导演兼分镜师'), '画布写脚本用导演口径，不是填表口径');
+  assert.ok(prompt.includes('先讲清发生的事') && prompt.indexOf('故事与场景剧本') < prompt.indexOf('必须输出一个 Markdown 分镜表'), '先写完整场景剧本，再编排制作表格');
   for (const needle of ['导演前置', '观众与记忆点', '情绪曲线', '视觉母题', '一条主线']) {
     assert.ok(prompt.includes(needle), needle);
   }
-  for (const needle of ['至少一处特写或前景遮挡后的揭示', '每 3–5 秒一个看得见的变化', '表演与情绪',
+  for (const needle of ['不机械规定切镜次数', '固定机位、一镜到底和必要留白可以成立', '表演与情绪',
     '声音必须和画面一起设计', '开场和结尾都要具体', '不要写：抽象空词']) {
     assert.ok(prompt.includes(needle), needle);
   }
