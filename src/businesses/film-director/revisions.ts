@@ -1,4 +1,5 @@
-import { commitArtifact, STAGES } from './project.js';
+import { sourceRevisions } from './contracts.js';
+import { validateArtifact, commitArtifact, STAGES } from './project.js';
 /** 局部修订保留无关实体；全局时间或结构变化仍使整个相关阶段失效。 */
 export function reviseEntities(state: any, stage: string, replacements: any[], expected: number) {
   const fields={assets:['characters','scenes'],shots:['shots'],prompts:['prompts']};
@@ -30,14 +31,24 @@ export function scheduleTask(state: any, task: any) {
   const tasks=state.tasks || [];
   const existing=tasks.find(t=>t.key===key);
   if(existing)return existing;
-  const result={key,status:'ready',attempts:0,source_revision:state.revision,...task};
+  const result={...task,key,task_id:`TASK_${String(tasks.length+1).padStart(3,'0')}`,project_id:state.project_id,status:'ready',attempts:0,source_revision:state.revision,input_revisions:sourceRevisions(state,task.stage),revision_scope:task.scope || [],expected_outputs:task.stage?[`project.json#/artifacts/${task.stage}`]:[]};
   state.tasks=[...tasks,result];return result;
 }
 export function taskResult(state: any,key: string,status: string,errorCode?: string) {
   const task=state.tasks?.find(t=>t.key===key);
-  if(!task || task.source_revision!==state.revision)throw Error('STALE_TASK');
+  if(!task)throw Error('UNKNOWN_TASK');
+  if(task.source_revision!==state.revision && status!=='completed')throw Error('STALE_TASK');
   if(!['running','completed','failed'].includes(status))throw Error('INVALID_TASK_STATUS');
   if(task.status==='completed')return task;
+  if(status==='completed') {
+    const artifact=state.artifacts[task.stage];
+    if(task.action!=='submit'||!artifact||artifact.stale||artifact.revision<=task.source_revision) throw Error('TASK_OUTPUT_REQUIRED');
+    const inputs=sourceRevisions(state,task.stage);
+    if(JSON.stringify(inputs)!==JSON.stringify(task.input_revisions)) throw Error('STALE_TASK_INPUTS');
+    validateArtifact(task.stage,artifact.data,state);
+    task.output_refs=[{artifact_ref:`project.json#/artifacts/${task.stage}`,revision:artifact.revision}];
+    task.validation={status:'PASS',validated_at:new Date().toISOString()};
+  }
   if(status==='running') {
     if(task.attempts>=3)throw Error('RETRY_EXHAUSTED');
     task.attempts++;

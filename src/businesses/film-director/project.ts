@@ -1,3 +1,6 @@
+import { validateV31 } from './schema.js';
+import { sourceRevisions } from './contracts.js';
+import { validateReferences } from './references.js';
 import { evaluateReview } from './review.js';
 /** V2 创作数据与确定性校验。执行阶段独立于现有视频任务。 */
 export const STAGES = ['creative', 'script', 'assets', 'shots', 'prompts', 'review'] as const;
@@ -17,6 +20,8 @@ export function validateTimeline(shots: any[], duration: number) {
 export function validateArtifact(stage: string, value: any, state: any) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('INVALID_ARTIFACT');
   const nonempty = (key: string) => { if (typeof value[key] !== 'string' || !value[key].trim()) throw Error(`MISSING_FIELD:${key}`); };
+  validateV31(stage,value,state);
+  validateReferences(stage,value,state);
   if (stage === 'creative') {
     nonempty('theme'); nonempty('logline');
     if (value.structure !== undefined) {
@@ -77,7 +82,7 @@ export function commitArtifact(state: any, stage: string, value: any, expected: 
   validateArtifact(stage,value,state);
   const next = structuredClone(state);
   next.revision++;
-  next.artifacts[stage] = { revision: next.revision, data: value, stale: false };
+  next.artifacts[stage] = { revision: next.revision, source_revisions:sourceRevisions(state,stage), data: value, stale: false };
   for (const downstream of STAGES.slice(index+1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
   for (const approved of ['creative','script']) if (STAGES.indexOf(approved as any) >= index) delete next.approvals[approved];
   next.status = ['creative','script'].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === 'review' ? (value.review_status && !evaluateReview(value).passed ? value.review_status : 'FINAL_DELIVERY') : `${stage.toUpperCase()}_READY`;

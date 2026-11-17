@@ -1,3 +1,4 @@
+import { artifactManifest, renderDeliverables } from './deliverables.js';
 import { INTENTS, routeIntent, ROLE_PROMPTS } from './roles/index.js';
 import { reviseEntities, scheduleTask, taskResult } from './revisions.js';
 import { nextTask, compileProduction } from './orchestration.js';
@@ -9,7 +10,7 @@ import path from 'node:path';
 import { dshHome } from '../video/media/references.js';
 import { DATA_DIR } from '../../core/hardcoded-config.js';
 import { sessionOwner } from '../video/workflow/project.js';
-import { STAGES, commitArtifact, exportMarkdown } from './project.js';
+import { STAGES, commitArtifact } from './project.js';
 import { FILM_WORKFLOW_GUIDANCE, ORCHESTRATION_GUIDANCE, INTENT_GUIDANCE } from './creative.js';
 import type { BusinessModule } from '../../core/runtime.js';
 const locks = new Set<string>();
@@ -18,7 +19,7 @@ export const filmDirectorBusiness: BusinessModule = {
   prompt: () => ROLE_PROMPTS.director + FILM_WORKFLOW_GUIDANCE + ORCHESTRATION_GUIDANCE + INTENT_GUIDANCE,
   apply(runtime) {
     runtime.tools.register('film-director', {
-      name: 'film_project', description: '专业创作项目：create/read/submit/approve/export。磁盘保存，创意与剧本独立人工批准，不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets含characters/scenes；shots含shots；prompts含prompts；review含score/passed/issues。',
+      name: 'film_project', description: '专业创作项目：create/read/submit/approve/export。磁盘保存，创意与剧本独立人工批准，不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets含characters/scenes；shots含shots；prompts含prompts；review含review_status/scores/issues/delivery_allowed；export返回可读Markdown及版本校验清单。',
       parameters: { type:'object', properties: {
         intent:{type:'string',enum:[...INTENTS]}, entityIds:{type:'array',items:{type:'string'}},
         taskKey:{type:'string'}, taskStatus:{type:'string',enum:['running','completed','failed']}, errorCode:{type:'string'},
@@ -39,7 +40,7 @@ export const filmDirectorBusiness: BusinessModule = {
           let state;
           if (args.action === 'create') {
             if (!Number.isInteger(args.durationSeconds) || args.durationSeconds<15 || args.durationSeconds>3600 || !args.title?.trim() || !args.sourceBrief?.trim()) throw Error('INVALID_REQUIREMENTS');
-            state={schema_version:'2.0.0',project_id:id,title:args.title,source_brief:args.sourceBrief,duration_ms:args.durationSeconds*1000,revision:0,status:'REQUIREMENT_ANALYSIS',artifacts:{},approvals:{},decisions:[]};
+            state={schema_version:'3.1.0',project_id:id,title:args.title,source_brief:args.sourceBrief,duration_ms:args.durationSeconds*1000,revision:0,status:'REQUIREMENT_ANALYSIS',artifacts:{},approvals:{},decisions:[]};
           } else state=JSON.parse(await readFile(file,'utf8'));
           if (args.action === 'read') return {...state,nextTask:nextTask(state)};
           if (args.action === 'next') return nextTask(state);
@@ -59,7 +60,7 @@ export const filmDirectorBusiness: BusinessModule = {
               state.production={...plan,videoProjectId:project.id};
             }
           }
-          if (args.action === 'export') return { project:state, markdown:exportMarkdown(state), status:state.status };
+          if (args.action === 'export') return { project:state, markdown:renderDeliverables(state), manifest:artifactManifest(state), status:state.status };
           if (args.action === 'submit') state=commitArtifact(state,args.stage,JSON.parse(args.content),args.expectedRevision);
           if (args.action === 'approve') {
             const artifact=state.artifacts[args.stage];
@@ -70,7 +71,7 @@ export const filmDirectorBusiness: BusinessModule = {
             const decision=answer?.answers?.find(a=>a.id==='film_approval');
             if (exec.signal?.aborted || decision?.custom || decision?.selected?.length!==1 || decision.selected[0]!=='批准本版') return {status:'needs_input',projectId:id};
             state.approvals[args.stage]=artifact.revision;
-            state.decisions.push({stage:args.stage,revision:artifact.revision,decision:'approve',approved_at:new Date().toISOString()});
+            state.decisions.push({approval_id:`APPROVAL_${state.decisions.length+1}`,project_id:id,stage:args.stage,gate:args.stage.toUpperCase(),artifact_ref:`project.json#/artifacts/${args.stage}`,revision:artifact.revision,artifact_revision:artifact.revision,decision:'APPROVED',decided_by:'USER',approved_at:new Date().toISOString()});
             state.revision++; state.status=args.stage==='creative'?'SCRIPT_WRITING':'ASSET_DESIGN';
           }
           if (!['create','submit','approve','compile','revise','schedule','task_result'].includes(args.action)) throw Error('INVALID_ACTION');

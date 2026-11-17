@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-const result=await build({stdin:{contents:"export * from './src/businesses/film-director/project.ts'; export * from './src/businesses/film-director/orchestration.ts'; export * from './src/businesses/film-director/roles/index.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
+const result=await build({stdin:{contents:"export * from './src/businesses/film-director/project.ts'; export * from './src/businesses/film-director/orchestration.ts'; export * from './src/businesses/film-director/roles/index.ts'; export * from './src/businesses/film-director/revisions.ts'; export * from './src/businesses/film-director/deliverables.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
 const api=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
 const initial=()=>({revision:0,duration_ms:15000,artifacts:{},approvals:{}});
 test('创意未批准阻止剧本，旧版本不能覆盖，改稿失效下游',()=>{
@@ -83,7 +83,7 @@ test('新版审核保存失败报告但不放行，评分和阻断数不能伪�
  api.validateArtifact('review',{...report,review_status:'PASS',issues:[],blocking_issue_count:0,delivery_allowed:true},state);
 });
 test('全部角色使用已提供的完整版本且职责独立',()=>{
- assert.match(api.ROLE_PROMPTS.creative,/V3.0/);
+ assert.match(api.ROLE_PROMPTS.creative,/V3.1/);
  for(const role of ['director','screenwriter','character','scene','storyboard','prompt-engineer','reviewer'])assert.match(api.ROLE_PROMPTS[role],/Version: 3.1/);
  assert.match(api.ROLE_PROMPTS.character,/IDENTITY_LOCK/);
  assert.match(api.ROLE_PROMPTS.scene,/location_id/);

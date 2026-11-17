@@ -19,13 +19,14 @@ export const FILM_WORKFLOW_GUIDANCE = `【专业分阶段创作工具契约】
 用户要求专业分阶段创作或长片剧本规划时使用film_project，规划范围15–3600秒；普通视频制作仍用video_project。时长、画幅、清晰度已确认则沿用，缺失规格按现有规则合并询问，不把建议当用户确认。规划不自动调用视频。
 先create(title,sourceBrief原文,durationSeconds)，续作或改稿先read(projectId)。以工具返回的状态和revision为准，不假设存在progress/manifest读取、回滚、章节自动调度或独立子Agent。
 submit传stage、content（合法JSON字符串）、expectedRevision（最近读取/提交返回的项目revision）。JSON字符串里的枚举与文本必须有双引号。正文先展示可读成果，再提交并核对返回；工具成功才称保存。
+新建项目采用3.1严格数据协议；各阶段source_revisions由工具记录，提交时若自带必须匹配真实上游。所有JSON均为规范字段，参考稿别名须先映射，不得同时维护冲突版本。
 阶段及content字段：
-creative：新创作按CREATIVE V3.0角色返回的完整字段提交；structure使用beats与visual_evidence，段落正整数毫秒合计等于项目时长，approval_questions最多3项。旧项目保留已有字段，不把兼容读取当新稿完成标准。展示后approve(stage:creative)，只有真实批准才写剧本。
-script：screenplay完整剧本正文、chapters[{chapter_id,title,duration_ms,summary,scene_ids}]必填，章节时长总和等于项目duration_ms；按Screenwriter V3.1在scenes规范列表保留动作和场景预算，dialogue关联speaker_id/scene_id，旁白分开；approved_creative_revision绑定实际批准创意。展示后approve(stage:script)，只有真实批准才建资产。
-assets：同一对象含characters数组及scenes数组；人物项必有character_id，场景项必有scene_id。人物/场景分别按专业职责整理后合并提交，不改变剧本。
-shots：{shots:[{shot_id,scene_id,character_ids,start_ms,end_ms,duration_ms,narrative_purpose,...镜头细节}]}。时间用整数毫秒，半开区间[start_ms,end_ms)，从0连续覆盖全片；引用必须存在，duration_ms=end_ms-start_ms。
-prompts：{prompts:[{shot_id,prompt,target_model,capability_warnings,...}]}，每镜恰有一个非空prompt；保留资产锚点与源版本，不把一镜一提示词误当一镜一次付费调用。
-review：新版Reviewer V3.1提交review_status、scores八维（不适用null）、issues、delivery_allowed、blocking_issue_count和真实reviewed_revisions等完整报告。CRITICAL/MAJOR未VERIFIED阻断；加权分由程序复算，失败报告也可保存但禁止编译。旧报告score/passed协议兼容。
+creative：新创作按CREATIVE V3.1角色返回的完整字段提交；structure使用beats与visual_evidence，段落正整数毫秒合计等于项目时长，approval_questions最多3项。旧项目保留已有字段，不把兼容读取当新稿完成标准。展示后approve(stage:creative)，只有真实批准才写剧本。
+script：screenplay完整剧本正文、chapters[{chapter_id,title,duration_ms,summary,scene_ids}]必填，章节时长总和等于项目duration_ms；按Screenwriter V3.1在scenes规范列表保留动作和场景预算，characters为稳定character_id清单，dialogue每条含dialogue_id/exact_text/speaker_id/scene_id（参考稿dialogue_lines映射为dialogue），旁白分开；approved_creative_revision绑定实际批准创意。展示后approve(stage:script)，只有真实批准才建资产。
+assets：同一对象含characters、scenes、locations、scene_states、props数组（无内容用空数组），scenes关联location_id/scene_state_id；人物项必有character_id，场景项必有scene_id。人物/场景分别按专业职责整理后合并提交，不改变剧本。
+shots：{shots:[{shot_id,scene_id,character_ids,start_ms,end_ms,duration_ms,narrative_purpose,chapter_id,location_id,scene_state_id,costume_ids,prop_ids,dialogue_refs,...镜头细节}]}。时间用整数毫秒，半开区间[start_ms,end_ms)，从0连续覆盖全片；引用必须存在，duration_ms=end_ms-start_ms。
+prompts：{prompts:[{shot_id,prompt,target_model,location_id,scene_state_id,duration_ms,generation_mode,dialogue_refs,capability_warnings,...}]}，每镜恰有一个非空prompt；保留资产锚点与源版本，不把一镜一提示词误当一镜一次付费调用。
+review：新版Reviewer V3.1提交review_status、scores八维（不适用null）、issues、delivery_allowed、blocking_issue_count和真实reviewed_revisions（creative/script/assets/shots/prompts对应实际修订号）、review_id/review_stage/review_scope/unverified_items等完整报告。CRITICAL/MAJOR未VERIFIED阻断；加权分由程序复算，失败报告也可保存但禁止编译。旧报告score/passed协议兼容。
 创意和剧本的批准分别绑定材料版本，沉默/取消/修改意见不算批准。改稿后按工具stale状态更新下游，不假称已实现实体级自动修订。超过180秒按章规划，600秒以上维护全片摘要和章间状态，分批创作但按当前工具提交完整阶段聚合对象；超出上下文能力时停在可恢复草稿，不截断冒充完整。
 export返回JSON和Markdown内容，不是已写入导出文件；没有实际文件不得编造下载链接。Markdown应为同版本JSON的可读投影。实际视频仍须走video_project脚本审核、费用确认与逐段结果审核，创作批准不替代制作授权。`;
 

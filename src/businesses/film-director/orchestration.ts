@@ -1,3 +1,4 @@
+import { sourceRevisions, GENERIC_MODEL_PROFILE } from './contracts.js';
 import { evaluateReview } from './review.js';
 import { ROLE_PROMPTS } from './roles/index.js';
 import { STAGES, validateArtifact } from './project.js';
@@ -8,7 +9,7 @@ export function nextTask(state: any) {
     if (!artifact || artifact.stale) {
       const roles = {creative:'creative',script:'screenwriter',assets:'character + scene',shots:'storyboard',prompts:'prompt-engineer',review:'reviewer'};
       const dependencies = {creative:[],script:['creative'],assets:['script'],shots:['script','assets'],prompts:['assets','shots'],review:[...STAGES.slice(0,5)]};
-      return { action:'submit', stage, role:roles[stage], inputs:Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]])), instructions:ROLE_INSTRUCTIONS[stage],expectedRevision:state.revision };
+      return { action:'submit', project_id:state.project_id, input_revisions:sourceRevisions(state,stage), revision_scope:artifact?.stale_entity_ids || [], model_profile:GENERIC_MODEL_PROFILE, stage, role:roles[stage], inputs:Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]])), instructions:ROLE_INSTRUCTIONS[stage],expectedRevision:state.revision };
     }
     if (['creative','script'].includes(stage) && state.approvals[stage] !== artifact.revision) return {action:'approve',stage,expectedRevision:state.revision};
   }
