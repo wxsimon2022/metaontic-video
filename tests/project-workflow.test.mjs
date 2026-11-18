@@ -107,7 +107,7 @@ test('正文里没有完整脚本时，storyboard 与 review 都不伪造脚本'
   const p=await h.prepare();
   await h.say('本版要点：湖面、晨雾，详情见 script.md。');
   await assert.rejects(()=>h.project.execute({action:'storyboard',projectId:p.projectId,scriptPath:h.script,captureScript:true},h.exec),/正文里没有找到完整脚本/);
-  await assert.rejects(()=>h.project.execute({action:'review',projectId:p.projectId,scriptPath:h.script,specification:h.spec,captureScript:true},h.exec),/正文里没有找到完整脚本/);
+  assert.equal((await h.project.execute({action:'review',projectId:p.projectId,scriptPath:h.script,specification:h.spec,captureScript:true},h.exec)).status,'blocked');
   assert.equal(h.asks,0,'没通过审核前置就不弹窗');
 }));
 
@@ -174,4 +174,35 @@ test('extension review rejects oversize seconds and accepts an explicit equal-le
  h.spec.duration=15;h.spec.segments=3;
  assert.equal((await h.review(p.projectId,{toolName:'video_extend'})).status,'approved');
  assert.equal(h.posts,0);
+}));
+
+ test('待确认事项必须先答复并落实到新版，不能以脚本通过代替',()=>fixture(async h=>{
+  const p=await h.prepare();
+  await writeFile(h.script,'# 湖面\n## 待确认事项\n1. 是否使用真实人物姓名？\n## 费用预估\n按实际账单。');
+  const result=await h.review(p.projectId);
+  assert.equal(result.status,'blocked');
+  assert.deepEqual(result.pendingQuestions,['是否使用真实人物姓名？']);
+  assert.equal(h.asks,1);
+  assert.equal((await h.project.execute({action:'status',projectId:p.projectId},h.exec)).status,'draft');
+  assert.equal(h.posts,0);
+}));
+
+test('review复用已保存脚本，不从累计旧正文覆盖修订内容',()=>fixture(async h=>{
+  const p=await h.prepare();
+  await h.say('# 旧稿\n'+ '旧内容。'.repeat(60));
+  const revised='# 当前稿\n'+ '晨光照亮湖面。'.repeat(60);
+  await writeFile(h.script,revised);
+  await h.show();
+  await h.project.execute({action:'review',projectId:p.projectId,scriptPath:h.script,specification:h.spec,captureScript:true},h.exec);
+  assert.equal(await readFile(h.script,'utf8'),revised);
+}));
+
+test('多版正文只捕获最新完整稿，示意图消息不拼入脚本',()=>fixture(async h=>{
+  const p=await h.prepare();
+  await h.say('# 第一版\n'+'旧稿。'.repeat(80));
+  const latest='# 第二版\n'+'新稿湖面晨光。'.repeat(60);
+  await h.say(latest);
+  await h.say('正在准备分镜。');
+  await h.project.execute({action:'storyboard',projectId:p.projectId,scriptPath:h.script,captureScript:true},h.exec);
+  assert.equal((await readFile(h.script,'utf8')).trim(),latest);
 }));

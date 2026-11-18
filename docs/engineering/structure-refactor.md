@@ -90,3 +90,5 @@ Windows/macOS 沿用相同 Node 路径 API、构建入口和 `.tgz` 包。没有
 Windows/macOS共用打包入口，运行时不读取源码目录；本次本地构建和684项自动测试通过，未执行Windows桌面安装验证，也未调用付费生成接口。
 
 脚本展示与确认补充：分镜捕获仅使用最近一条完整脚本消息，审核复用磁盘稿件，防止累计正文混合多稿并覆盖修订。明确的“待确认事项/问题”章节在脚本审核前触发实际提问；答复仅用于改稿，不等于审核通过，取消或未答保持阻断。风险与建议不自动归入此检查。路径仍使用 node:path，无新增平台命令；本次仅本机自动回归，未进行 Windows 桌面验证。
+
+预设创建回归：skill-filesystem 的模块解析必须使用当前 package.json 的 name（dsh-metaontic-video），历史配置命名空间 metaontic-video 不代表 npm 包名。两预设共用同一技能目录锚点；增加测试核对 YAML 中 package.json 引用与实际可解析的包名，避免仅检查入口导出而漏掉会话挂载。此路径通过 node:path 组合，Windows/macOS 共用；本机安装验证不代表 Windows 桌面实测。

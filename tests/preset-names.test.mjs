@@ -16,3 +16,12 @@ for(const [id,title] of [['video-director','视频创作助手'],['promo-video',
   assert.equal(loaded.default.hostPreset,true);
  });
 }
+
+test('skill filesystem resolves the installed package name rather than the removed legacy name',async()=>{
+ const patch=await readFile(new URL('../cordis.patch.yml',import.meta.url),'utf8');
+ const pkg=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
+ const refs=[...patch.matchAll(/resolve\('([^']+\/package\.json)'\)/g)].map(m=>m[1]);
+ assert.deepEqual(refs,[`${pkg.name}/package.json`]);
+ const resolved=import.meta.resolve(refs[0]);
+ assert.equal(JSON.parse(await readFile(fileURLToPath(resolved),'utf8')).name,pkg.name);
+});
