@@ -17,7 +17,7 @@ var __export = (target, all) => {
 var PLUGIN_VERSION;
 var init_version = __esm({
   "src/core/version.ts"() {
-    PLUGIN_VERSION = true ? "3.31.0".trim().replace(/^v/i, "") : "";
+    PLUGIN_VERSION = true ? "3.32.0".trim().replace(/^v/i, "") : "";
   }
 });
 

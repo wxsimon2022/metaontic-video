@@ -1263,7 +1263,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "3.31.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "3.32.0".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1729,8 +1729,8 @@
   // package.json
   var package_default = {
     name: "metaontic-video",
-    version: "3.31.0",
-    description: "DeepSeek Harness video plugin: beginner-friendly guided video creation and a low-cost long-video workflow using segment continuation and local merging.",
+    version: "3.32.0",
+    description: "\u9762\u5411\u65B0\u624B\u7684 AI \u89C6\u9891\u521B\u4F5C\u52A9\u624B\uFF1A\u4ECE\u60F3\u6CD5\u3001\u811A\u672C\u5230\u89C6\u9891\u751F\u6210\uFF0C\u5168\u7A0B\u5F15\u5BFC\uFF1B\u901A\u8FC7\u5206\u6BB5\u7EED\u62CD\u4E0E\u672C\u5730\u5408\u5E76\uFF0C\u63D0\u4F9B\u4F4E\u6210\u672C\u957F\u89C6\u9891\u5236\u4F5C\u65B9\u6848\u3002",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
     keywords: [
@@ -1843,12 +1843,12 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "3.31.0",
+      version: "3.32.0",
       prerelease: false,
-      publishedAt: "2026-11-17T10:24:57.568Z",
+      publishedAt: "2026-11-18T01:20:04.701Z",
       items: [
-        "\u65B0\u589E\uFF1A\u652F\u6301\u591A\u7C7B\u578B\u4F5C\u54C1\u4E0E\u9898\u6750\u3001\u5F62\u5F0F\u3001\u76EE\u7684\u3001\u98CE\u683C\u7EC4\u5408\uFF0C\u753B\u5E03\u53EF\u9009\u4F5C\u54C1\u7C7B\u578B\u3002",
-        "\u4F18\u5316\uFF1A\u4E13\u4E1A\u89D2\u8272\u521B\u4F5C\u4E0E\u5BA1\u6838\u3001\u5BA1\u6279\u5185\u5BB9\u5C55\u793A\u3001\u5206\u955C\u56FE\u4EA4\u4ED8\u53CA\u6A21\u578B\u89C4\u683C\u4FEE\u8BA2\uFF0C\u51CF\u5C11\u811A\u672C\u6D41\u7A0B\u91CD\u590D\u7B49\u5F85\u548C\u683C\u5F0F\u91CD\u8BD5\u3002"
+        "\u65B0\u589E\uFF1A\u72EC\u7ACB\u955C\u5934\u751F\u6210\u4E0E\u9010\u955C\u7D20\u6750\u914D\u7F6E\uFF0C\u652F\u6301\u591A\u5730\u70B9\u526A\u8F91\u3002",
+        "\u4F18\u5316\uFF1A\u5F3A\u5316\u811A\u672C\u5185\u5BB9\u5BA1\u6838\u3001\u6539\u7A3F\u5BA1\u6279\u4E0E\u4EFB\u52A1\u6062\u590D\uFF0C\u4FDD\u7559\u6DF7\u5408\u97F3\u8F68\uFF0C\u63D0\u5347\u957F\u89C6\u9891\u5236\u4F5C\u7A33\u5B9A\u6027\u3002"
       ]
     }
   };

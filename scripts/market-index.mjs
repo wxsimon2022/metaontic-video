@@ -86,7 +86,7 @@ const index = {
       title: { en: 'MetaOnticVideo', zh: 'MetaOnticVideo' },
       description: {
         en: pkg.description,
-        zh: '让新手快速上手视频创作：说出想法，助手带你完善创意、写脚本并确认制作；通过分段续拍与本机合并，提供低成本长视频生成方案。',
+        zh: pkg.description,
       },
       icon: `data:image/svg+xml;base64,${readFileSync(join(root, 'icon.svg')).toString('base64')}`,
       author: 'MetaOntic',

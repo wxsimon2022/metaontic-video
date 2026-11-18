@@ -33,13 +33,13 @@ Paste an online installation URL into Harness → Plugins → Add plugin. Window
 Gitee:
 
 ```text
-https://gitee.com/hackloop/metaontic-video/releases/download/v3.31.0/metaontic-video-3.31.0.tgz
+https://gitee.com/hackloop/metaontic-video/releases/download/v3.32.0/metaontic-video-3.32.0.tgz
 ```
 
 GitHub mirror:
 
 ```text
-https://github.com/wxsimon2022/metaontic-video/releases/download/v3.31.0/metaontic-video-3.31.0.tgz
+https://github.com/wxsimon2022/metaontic-video/releases/download/v3.32.0/metaontic-video-3.32.0.tgz
 ```
 
 You can also add the plugin market index source in Harness → Plugins → Discover to browse and install:

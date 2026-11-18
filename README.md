@@ -33,13 +33,13 @@ DeepSeek Harness 视频创作插件：**新手快速上手，低成本制作长�
 Gitee：
 
 ```text
-https://gitee.com/hackloop/metaontic-video/releases/download/v3.31.0/metaontic-video-3.31.0.tgz
+https://gitee.com/hackloop/metaontic-video/releases/download/v3.32.0/metaontic-video-3.32.0.tgz
 ```
 
 GitHub 同版备用：
 
 ```text
-https://github.com/wxsimon2022/metaontic-video/releases/download/v3.31.0/metaontic-video-3.31.0.tgz
+https://github.com/wxsimon2022/metaontic-video/releases/download/v3.32.0/metaontic-video-3.32.0.tgz
 ```
 
 也可以在 Harness「插件 → 发现」中添加插件市场索引源，浏览并安装：
@@ -76,6 +76,16 @@ flowchart TB
 
 <details>
 <summary>最新更新</summary>
+
+## v3.32.0 更新内容
+
+### 新增
+
+- 独立镜头生成与逐镜素材配置，支持多地点剪辑。
+
+### 优化
+
+- 强化脚本内容审核、改稿审批与任务恢复，保留混合音轨，提升长视频制作稳定性。
 
 ## v3.31.0 更新内容
 
