@@ -9,8 +9,8 @@ export function createClientRuntime(require: any, modules: readonly { id: string
   });
   return {
     inject: [...new Set(plugins.flatMap(plugin => plugin.inject || []))],
-    apply(ctx: any) {
-      const settings = createSettingsPages(require('react').createElement);
+    apply(ctx: any, options: { decorateSettings?: (Page: any) => any } = {}) {
+      const settings = createSettingsPages(require('react').createElement, options.decorateSettings);
       for (const plugin of plugins) plugin.apply(ctx, { settings });
       settings.mount(ctx);
     },

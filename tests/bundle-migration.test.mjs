@@ -10,32 +10,32 @@ const legacy = {name:'metaontic-video',installed:true,enabled:true};
 const current = {name:'dsh-metaontic-video',installed:true,enabled:true};
 function setup({rows=[legacy,current], reject=false, restart=false, wrapper=false, unavailable=false}={}) {
   rows=rows.map(row=>({...row}));
-  let entry, action;const calls=[];const components={},dictionaries={},cleanups=[];
+  let entry, consent;const actions={};const calls=[];const components={},dictionaries={},cleanups=[];
   vm.runInNewContext(readFileSync(new URL('../client.js',import.meta.url),'utf8'),{window:{__ModuleLoader__:{load(x){entry=x;}}}});
-  const react={...React,createElement(type,props,...children){if(type==='button')action=props.onClick;return React.createElement(type,props,...children);}};
+  const react={...React,createElement(type,props,...children){if(type==='button' && props?.['data-migration-action'])actions[props['data-migration-action']]=props.onClick;if(type==='input' && props?.['data-migration-consent'])consent=props.onChange;return React.createElement(type,props,...children);}};
   const plugin=entry.factory(name=>{assert.equal(name,'react');return react;});
   const host=createPreviewHost({form:{getSnapshot:()=>({status:'ready',value:{connectionMode:'metaontic'},writable:true}),subscribe:()=>()=>{}},components,dictionaries,getLocale:()=> 'zh',onUpdate(){}});
   const manager={
     async listBundles(){if(unavailable)throw Error('unavailable');return wrapper?{ok:true,value:rows}:rows;},
     async setBundleEnabled(name,enabled){calls.push([name,enabled]);if(reject)return {ok:false,error:{message:'rejected'}};rows.find(row=>row.name===name).enabled=enabled;return {ok:true,value:{application:restart?'restart-required':'applied'}};},
-    removeBundle(){assert.fail('must not remove old package');},
+    async removeBundle(name){calls.push(['remove',name]);const row=rows.find(row=>row.name===name);assert.equal(row.enabled,false);row.installed=false;return {ok:true,value:{application:'applied'}};},
     installBundle(){assert.fail('must not reinstall');},
   };
   const get=host.get.bind(host);host.get=name=>name==='remote.pluginManager'?manager:get(name);
   const effect=host.effect;host.effect=fn=>{const off=effect(fn);if(typeof off==='function')cleanups.push(off);return off;};
-  return {host,plugin,manager,calls,components,rows,cleanups,render(){const Page=components['plugins.bundle.config:dsh-metaontic-video'];assert.equal(typeof Page,'function');return renderToStaticMarkup(React.createElement(Page));},click:()=>action()};
+  return {host,plugin,manager,calls,components,rows,cleanups,render(){const Page=components['plugins.bundle.config:dsh-metaontic-video'];assert.equal(typeof Page,'function');return renderToStaticMarkup(React.createElement(Page));},click:(kind='switch')=>actions[kind](),confirm:()=>consent({target:{checked:true}})};
 }
 
 test('both installed packages show migration settings before shared UI registration; one switch preserves the old dependency',async()=>{
  const state=setup({wrapper:true});await state.plugin.apply(state.host);
  assert.equal(state.components['sidebar.panellist:metaontic-video'],undefined,'do not collide with the running legacy sidebar');
- assert.match(state.render(),/旧版和新版同时启用/);
- assert.match(state.render(),/停用旧版并切换/);
+ assert.match(state.render(),/同时启用/g);
+ assert.match(state.render(),/仅停用旧版并切换/);
  const first=state.click(),second=state.click();assert.equal(first,second,'double click shares one operation');await first;
  assert.deepEqual(state.calls,[['metaontic-video',false]]);
  assert.equal(state.rows[0].installed,true);assert.equal(state.rows[0].enabled,false);
  assert.equal(typeof state.components['sidebar.panellist:metaontic-video'],'function');
- assert.doesNotMatch(state.render(),/旧版和新版同时启用/,'normal settings restored after verified deactivation');
+ assert.doesNotMatch(state.render(),/同时启用/g,'normal settings restored after verified deactivation');
  assert.match(state.render(),/API/);
 });
 

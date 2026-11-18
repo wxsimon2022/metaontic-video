@@ -20,3 +20,11 @@
 全量验证发现旧画布测试先看到生成完成、再异步写入发布结果的竞争，已让该用例等待所断言的同步状态，无生产行为变更。
 
 Windows/macOS 共用宿主 API 和注册机制，不引入路径、进程或包管理器平台差异。此次没有操作用户的本机启用状态，没有安装修复包、没有发布新版本，没有实际桌面迁移和真实视频调用验证；自动测试不能代替这些实测。后续发版必须使用新版本，完成双平台成品检查，并另行核对真实 Harness 的迁移入口与设置页。
+
+## 本机双包残留处理
+
+用户更新至4.0.1并重启后，desktop profile仍同时选择metaontic-video 3.32.0与dsh-metaontic-video 4.0.1。4.0.1只提供手动停用入口，不会自动停用或卸载旧包；不能把更新、退出或重启描述为已完成迁移。
+
+经授权正常退出Harness后，备份profile清单、锁文件与配置，从启用列表移除旧名称，再使用宿主自带Electron Node运行其pnpm remove，保留新版及原配置、任务和素材，成功后重新打开应用。验证旧依赖及启用项均消失，新版4.0.1保留且启用，cordis.patch.yml与备份SHA-256一致。未进行桌面视觉核验。
+
+宿主pnpm要求Node 22.13以上，系统Node20不能执行。macOS使用宿主可执行文件并设置ELECTRON_RUN_AS_NODE=1；pnpm remove使用--config.ignore-scripts=true、--config.offline=true，不能传不支持的--offline。Windows需使用相应宿主运行环境，本次未在Windows执行该修复。不要在应用运行时直接改profile，不删除配置、任务、素材或整个安装目录。

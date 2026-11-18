@@ -25,3 +25,27 @@ export async function disableLegacyBundle(manager: any) {
   return 'ready';
 }
 
+
+export function hasLegacyBundle(rows: any[]) {
+  return rows.some(row => row.name === PLUGIN_ID && row.installed === true);
+}
+
+/** Remove only the disabled legacy package through Host; never touch project/config files. */
+export async function cleanupLegacyBundle(manager: any) {
+  const rows = bundleRows(await manager.listBundles());
+  if (!hasLegacyBundle(rows)) return 'ready';
+  const current = rows.find(row => row.name === PLUGIN_PACKAGE);
+  const legacy = rows.find(row => row.name === PLUGIN_ID);
+  if (current?.installed !== true || current?.enabled !== true || legacy?.enabled !== false) return 'retained';
+  if (legacy.removable === false || typeof manager.removeBundle !== 'function') return 'manual';
+  let answer: any;
+  try { answer = await manager.removeBundle(PLUGIN_ID); } catch { return 'retained'; }
+  const value = answer?.ok === true ? answer.value : answer;
+  if (value?.error?.code === 'stop-profile') return 'stop-profile';
+  if (value?.application === 'restart-required') return 'restart-required';
+  if (answer?.ok === false || value?.error || !value) return 'retained';
+  const after = bundleRows(await manager.listBundles());
+  if (hasLegacyBundle(after)) return 'retained';
+  if (!after.some(row => row.name === PLUGIN_PACKAGE && row.installed === true && row.enabled === true)) throw new Error('Current bundle unavailable');
+  return 'ready';
+}

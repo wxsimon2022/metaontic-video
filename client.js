@@ -1,6 +1,6 @@
 (() => {
   // src/core/settings/client.ts
-  function createSettingsPages(h) {
+  function createSettingsPages(h, decorate = (Page) => Page) {
     const pages = /* @__PURE__ */ new Map();
     return {
       register(page) {
@@ -11,7 +11,8 @@
       },
       mount(ctx) {
         for (const [namespace, group] of pages) {
-          const Page = group.length === 1 ? group[0].Page : (props) => h("div", {}, ...group.map((page) => h(page.Page, { ...props, key: page.id })));
+          const Content = group.length === 1 ? group[0].Page : (props) => h("div", {}, ...group.map((page) => h(page.Page, { ...props, key: page.id })));
+          const Page = decorate(Content);
           ctx.effect(() => ctx.slots.inject("plugins.bundle.config", () => ctx.slots.register({
             name: "plugins.bundle.config",
             key: namespace,
@@ -32,8 +33,8 @@
     });
     return {
       inject: [...new Set(plugins.flatMap((plugin) => plugin.inject || []))],
-      apply(ctx) {
-        const settings = createSettingsPages(require2("react").createElement);
+      apply(ctx, options = {}) {
+        const settings = createSettingsPages(require2("react").createElement, options.decorateSettings);
         for (const plugin of plugins) plugin.apply(ctx, { settings });
         settings.mount(ctx);
       }
@@ -5472,24 +5473,56 @@
     if (rows.some((row) => row.name === PLUGIN_ID && row.enabled === true) || !rows.some((row) => row.name === PLUGIN_PACKAGE && row.enabled === true)) throw new Error("Bundle migration not applied");
     return "ready";
   }
+  function hasLegacyBundle(rows) {
+    return rows.some((row) => row.name === PLUGIN_ID && row.installed === true);
+  }
+  async function cleanupLegacyBundle(manager) {
+    const rows = bundleRows(await manager.listBundles());
+    if (!hasLegacyBundle(rows)) return "ready";
+    const current = rows.find((row) => row.name === PLUGIN_PACKAGE);
+    const legacy = rows.find((row) => row.name === PLUGIN_ID);
+    if (current?.installed !== true || current?.enabled !== true || legacy?.enabled !== false) return "retained";
+    if (legacy.removable === false || typeof manager.removeBundle !== "function") return "manual";
+    let answer;
+    try {
+      answer = await manager.removeBundle(PLUGIN_ID);
+    } catch {
+      return "retained";
+    }
+    const value = answer?.ok === true ? answer.value : answer;
+    if (value?.error?.code === "stop-profile") return "stop-profile";
+    if (value?.application === "restart-required") return "restart-required";
+    if (answer?.ok === false || value?.error || !value) return "retained";
+    const after = bundleRows(await manager.listBundles());
+    if (hasLegacyBundle(after)) return "retained";
+    if (!after.some((row) => row.name === PLUGIN_PACKAGE && row.installed === true && row.enabled === true)) throw new Error("Current bundle unavailable");
+    return "ready";
+  }
 
   // src/client/bundle-migration.ts
   function migrationManager(ctx) {
-    try {
-      return ctx.get?.("remote.pluginManager") || ctx.get?.("remote")?.pluginManager;
-    } catch {
-      return null;
+    for (const read of [() => ctx.get?.("remote.pluginManager"), () => ctx.get?.("remote")?.pluginManager, () => ctx.remote?.pluginManager]) {
+      try {
+        const manager = read();
+        if (typeof manager?.listBundles === "function") return manager;
+      } catch {
+      }
     }
+    return null;
   }
   async function mountBundleAwareClient(ctx, React, mount) {
     const manager = migrationManager(ctx);
-    if (!manager || typeof manager.listBundles !== "function") return mount();
-    let alive = true, status = "checking", running = null;
+    if (!manager) return mount();
+    let alive = true, status = "checking", confirmed = false, running = null;
     const listeners = /* @__PURE__ */ new Set();
+    const notify = () => {
+      if (alive) for (const listener of listeners) listener();
+    };
     const set = (next) => {
-      if (!alive) return;
-      status = next;
-      for (const listener of listeners) listener();
+      if (alive) {
+        status = next;
+        notify();
+      }
     };
     ctx.effect(() => () => {
       alive = false;
@@ -5497,25 +5530,51 @@
     }, "video: migration lifetime");
     const ns = "settings.metaonticVideoMigration";
     ctx.effect(() => ctx.locale.register(ns, {
-      zh: { title: "\u63D2\u4EF6\u8FC1\u79FB", checking: "\u6B63\u5728\u68C0\u67E5\u63D2\u4EF6\u5B89\u88C5\u72B6\u6001\u2026", conflict: "\u65E7\u7248\u548C\u65B0\u7248\u540C\u65F6\u542F\u7528\uFF0C\u53EF\u80FD\u5BFC\u81F4\u8BBE\u7F6E\u9875\u4E0E\u5DE5\u5177\u51B2\u7A81\u3002\u8BF7\u5148\u7B49\u5F85\u89C6\u9891\u4EFB\u52A1\u7ED3\u675F\uFF0C\u518D\u5207\u6362\u5230\u65B0\u7248\u3002", action: "\u505C\u7528\u65E7\u7248\u5E76\u5207\u6362", working: "\u6B63\u5728\u5207\u6362\u2026", loadFailed: "\u63D2\u4EF6\u754C\u9762\u52A0\u8F7D\u5931\u8D25\uFF0C\u8BF7\u5728\u63D2\u4EF6\u7BA1\u7406\u4E2D\u6838\u5BF9\u542F\u7528\u72B6\u6001\u3002\u914D\u7F6E\u548C\u4EFB\u52A1\u672A\u5220\u9664\u3002", failed: "\u5207\u6362\u672A\u5B8C\u6210\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u7BA1\u7406\u72B6\u6001\u540E\u91CD\u8BD5\u3002\u539F\u914D\u7F6E\u3001\u4EFB\u52A1\u548C\u5B89\u88C5\u6587\u4EF6\u5747\u4FDD\u7559\u3002", blocked: "\u65E0\u6CD5\u6838\u5B9E\u63D2\u4EF6\u5B89\u88C5\u72B6\u6001\uFF0C\u8BF7\u68C0\u67E5\u63D2\u4EF6\u7BA1\u7406\u670D\u52A1\u540E\u91CD\u8BD5\u3002", restart: "\u5BBF\u4E3B\u8981\u6C42\u91CD\u542F\u4EE5\u5B8C\u6210\u5207\u6362\u3002\u8BF7\u5148\u4FDD\u5B58\u5DE5\u4F5C\uFF0C\u518D\u91CD\u542F Harness\u3002", retry: "\u91CD\u65B0\u68C0\u67E5", preserved: "\u4EC5\u505C\u7528\u65E7\u63D2\u4EF6\uFF0C\u4E0D\u5378\u8F7D\u3001\u4E0D\u5220\u9664 API\u5BC6\u94A5\u3001\u4EFB\u52A1\u6216\u7D20\u6750\u3002" },
-      en: { title: "Plugin migration", checking: "Checking installed plugins\u2026", conflict: "The old and new plugins are both enabled and share component IDs. Wait for active video tasks to finish before switching.", action: "Disable old plugin and switch", working: "Switching\u2026", loadFailed: "The plugin UI could not load. Check enabled plugins; settings and tasks are preserved.", failed: "Switching was not completed. Check plugin management and retry. Settings, tasks and installed files are preserved.", blocked: "Plugin inventory could not be verified. Check plugin management and retry.", restart: "Harness requires a restart to finish switching. Save your work before restarting.", retry: "Check again", preserved: "Only disables the old plugin. No uninstall or deletion of credentials, tasks or assets." }
+      zh: {
+        title: "\u65E7\u7248\u63D2\u4EF6\u8FC1\u79FB",
+        checking: "\u6B63\u5728\u68C0\u67E5\u63D2\u4EF6\u5B89\u88C5\u72B6\u6001\u2026",
+        conflict: "\u65E7\u7248 metaontic-video \u548C\u65B0\u7248 dsh-metaontic-video \u540C\u65F6\u542F\u7528\u3002\u66F4\u65B0\u6216\u91CD\u542F\u4E0D\u4F1A\u81EA\u52A8\u79FB\u9664\u65E7\u5305\uFF0C\u8BF7\u5B8C\u6210\u8FC1\u79FB\u3002",
+        retained: "\u65B0\u7248\u5DF2\u53EF\u4F7F\u7528\uFF0C\u4F46\u65E7\u5305\u4ECD\u5728\u5DF2\u5B89\u88C5\u5217\u8868\u4E2D\u3002\u53EF\u6E05\u7406\u65E7\u5305\uFF0C\u907F\u514D\u518D\u6B21\u8BEF\u542F\u7528\u3002",
+        ready: "\u8FC1\u79FB\u5B8C\u6210\uFF1A\u5DF2\u79FB\u9664\u65E7\u5305\uFF0C\u4FDD\u7559\u65B0\u7248\u3002",
+        action: "\u5207\u6362\u5E76\u6E05\u7406\u65E7\u7248",
+        cleanup: "\u6E05\u7406\u65E7\u7248\u5B89\u88C5\u5305",
+        switchOnly: "\u4EC5\u505C\u7528\u65E7\u7248\u5E76\u5207\u6362",
+        working: "\u6B63\u5728\u5904\u7406\uFF0C\u8BF7\u52FF\u91CD\u590D\u64CD\u4F5C\u2026",
+        consent: "\u6211\u5DF2\u7ED3\u675F\u6240\u6709\u89C6\u9891\u4EFB\u52A1\uFF0C\u540C\u610F\u505C\u7528\u5E76\u5378\u8F7D\u65E7\u5305 metaontic-video\u3002",
+        preserved: "\u914D\u7F6E\u3001API\u5BC6\u94A5\u3001\u5386\u53F2\u4EFB\u52A1\u548C\u7D20\u6750\u7EE7\u7EED\u4FDD\u7559\uFF1B\u4EC5\u5904\u7406\u65E7\u5B89\u88C5\u5305\u3002",
+        failed: "\u8FC1\u79FB\u672A\u5B8C\u6210\uFF0C\u8BF7\u91CD\u65B0\u68C0\u67E5\u3002\u4E0D\u4F1A\u81EA\u52A8\u5220\u9664\u914D\u7F6E\u6216\u91CD\u88C5\u63D2\u4EF6\u3002",
+        blocked: "\u65E0\u6CD5\u6838\u5B9E\u5B89\u88C5\u72B6\u6001\uFF0C\u8BF7\u91CD\u65B0\u68C0\u67E5\uFF1B\u6682\u4E0D\u6E05\u7406\u65E7\u5305\u3002",
+        restart: "\u5BBF\u4E3B\u8981\u6C42\u91CD\u542F\u4EE5\u5B8C\u6210\u5207\u6362\u3002\u8BF7\u5148\u4FDD\u5B58\u5DE5\u4F5C\uFF0C\u91CD\u542F\u540E\u56DE\u5230\u6B64\u5904\u68C0\u67E5\u5E76\u7EE7\u7EED\u6E05\u7406\u3002",
+        stop: "\u65B0\u7248\u5DF2\u53EF\u4F7F\u7528\uFF0C\u65E7\u5305\u5DF2\u505C\u7528\uFF1B\u5BBF\u4E3B\u8981\u6C42\u5148\u9000\u51FA\u5F53\u524D\u8FD0\u884C\u73AF\u5883\u624D\u80FD\u5378\u8F7D\u3002\u8BF7\u5728\u63D2\u4EF6\u7BA1\u7406\u4E2D\u5B8C\u6210\u65E7\u5305\u5378\u8F7D\uFF0C\u4E0D\u8981\u5220\u9664\u914D\u7F6E\u6216\u4EFB\u52A1\u76EE\u5F55\u3002",
+        manual: "\u65B0\u7248\u5DF2\u53EF\u4F7F\u7528\uFF1B\u5F53\u524D\u5BBF\u4E3B\u4E0D\u652F\u6301\u5728\u8FD9\u91CC\u5378\u8F7D\u65E7\u5305\uFF0C\u8BF7\u5230\u63D2\u4EF6\u7BA1\u7406\u4E2D\u5378\u8F7D metaontic-video\u3002",
+        cleanupFailed: "\u65B0\u7248\u5DF2\u53EF\u4F7F\u7528\uFF0C\u65E7\u5305\u6E05\u7406\u5C1A\u672A\u5B8C\u6210\u3002\u8BF7\u91CD\u65B0\u68C0\u67E5\u540E\u91CD\u8BD5\uFF0C\u52FF\u518D\u6B21\u542F\u7528\u65E7\u7248\u3002",
+        loadFailed: "\u63D2\u4EF6\u754C\u9762\u52A0\u8F7D\u5931\u8D25\uFF0C\u8BF7\u5728\u63D2\u4EF6\u7BA1\u7406\u4E2D\u6838\u5BF9\u542F\u7528\u72B6\u6001\u3002\u914D\u7F6E\u548C\u4EFB\u52A1\u672A\u5220\u9664\u3002",
+        retry: "\u91CD\u65B0\u68C0\u67E5"
+      },
+      en: {
+        title: "Legacy plugin migration",
+        checking: "Checking installed plugins\u2026",
+        conflict: "metaontic-video and dsh-metaontic-video are both enabled. Updating or restarting does not remove the old package.",
+        retained: "The new plugin is ready. Remove the disabled old package to avoid enabling it again.",
+        ready: "Migration complete. The old package was removed; the new plugin is retained.",
+        action: "Switch and remove old package",
+        cleanup: "Remove old package",
+        switchOnly: "Disable old plugin and switch only",
+        working: "Working\u2026",
+        consent: "All video tasks have finished. I agree to disable and uninstall metaontic-video.",
+        preserved: "Settings, API credentials, task history and assets are retained. Only the old installation package is removed.",
+        failed: "Migration was not completed. Check again. Settings will not be deleted and no reinstall is attempted.",
+        blocked: "Installation state could not be verified. Check again before cleanup.",
+        restart: "Harness requires a restart. Save your work, restart and return here to finish cleanup.",
+        stop: "The new plugin is ready and the old plugin is disabled. Harness requires the running profile to stop before uninstalling. Finish removal in plugin management; keep settings and task directories.",
+        manual: "The new plugin is ready. Use plugin management to uninstall metaontic-video; this Host cannot remove it here.",
+        cleanupFailed: "The new plugin is ready, but cleanup is incomplete. Check and retry; do not enable the old package again.",
+        loadFailed: "The plugin UI could not load. Check enabled plugins; settings and tasks are preserved.",
+        retry: "Check again"
+      }
     }), "video: migration messages");
     const t = ctx.locale.bind(ns), h = React.createElement;
-    const start = () => {
-      if (running) return running;
-      set("working");
-      running = disableLegacyBundle(manager).then((result) => {
-        if (!alive) return;
-        if (result === "restart-required") {
-          set("restart");
-          return;
-        }
-        return activate();
-      }).catch(() => set("failed")).finally(() => {
-        running = null;
-      });
-      return running;
-    };
+    let activated = false;
     const check = async () => {
       set("checking");
       try {
@@ -5525,36 +5584,82 @@
           set("conflict");
           return;
         }
+        set(hasLegacyBundle(rows) ? "retained" : "ready");
         return activate();
       } catch {
         set("blocked");
       }
     };
-    function Page() {
-      const state = React.useSyncExternalStore((listener) => {
+    const start = (cleanup) => {
+      if (!alive || cleanup && !confirmed) return Promise.resolve();
+      if (running) return running;
+      set("working");
+      running = (async () => {
+        try {
+          const result = await disableLegacyBundle(manager);
+          if (!alive) return;
+          if (result === "restart-required") {
+            set("restart");
+            return;
+          }
+          if (cleanup) {
+            const outcome = await cleanupLegacyBundle(manager);
+            if (!alive) return;
+            set(outcome === "ready" ? "ready" : outcome === "stop-profile" ? "stop" : outcome === "restart-required" ? "restart" : outcome === "manual" ? "manual" : "cleanupFailed");
+          } else {
+            const rows = bundleRows(await manager.listBundles());
+            set(hasLegacyBundle(rows) ? "retained" : "ready");
+          }
+          return activate();
+        } catch {
+          try {
+            const rows = bundleRows(await manager.listBundles());
+            if (!hasLegacyBundleConflict(rows)) {
+              set("cleanupFailed");
+              return activate();
+            }
+          } catch {
+          }
+          set("failed");
+        }
+      })().finally(() => {
+        running = null;
+      });
+      return running;
+    };
+    function Notice() {
+      const snapshot = React.useSyncExternalStore((listener) => {
         listeners.add(listener);
         return () => listeners.delete(listener);
-      }, () => status, () => status);
+      }, () => `${status}:${confirmed}`, () => `${status}:${confirmed}`);
+      const state = snapshot.split(":")[0];
+      if (state === "ready") return null;
+      const cleanupAllowed = ["conflict", "retained", "failed", "cleanupFailed"].includes(state);
       return h(
         "section",
-        { style: { padding: 20, maxWidth: 640 }, "data-metaontic-migration": state },
+        { style: { padding: 20, maxWidth: 680 }, "data-metaontic-migration": state },
         h("h3", null, t("title")),
-        h("p", { role: state === "failed" || state === "blocked" ? "alert" : "status" }, t(state)),
+        h("p", { role: ["failed", "blocked", "cleanupFailed"].includes(state) ? "alert" : "status" }, t(state)),
         h("p", null, t("preserved")),
-        state === "conflict" || state === "failed" ? h("button", { type: "button", onClick: start }, t("action")) : null,
-        state === "blocked" ? h("button", { type: "button", onClick: check }, t("retry")) : null
+        cleanupAllowed ? h("label", null, h("input", { type: "checkbox", checked: confirmed, "data-migration-consent": true, onChange: (event) => {
+          confirmed = event.target.checked === true;
+          notify();
+        } }), t("consent")) : null,
+        cleanupAllowed ? h("button", { type: "button", disabled: !confirmed, "data-migration-action": "cleanup", onClick: () => start(true) }, t(state === "conflict" ? "action" : "cleanup")) : null,
+        state === "conflict" || state === "failed" ? h("button", { type: "button", "data-migration-action": "switch", onClick: () => start(false) }, t("switchOnly")) : null,
+        state !== "working" && state !== "checking" ? h("button", { type: "button", "data-migration-action": "check", onClick: () => running || check() }, t("retry")) : null
       );
     }
-    const registerPage = () => ctx.effect(() => ctx.slots.inject("plugins.bundle.config", () => ctx.slots.register({ name: "plugins.bundle.config", key: PLUGIN_PACKAGE, locale: ns }, Page)), "video: migration settings");
+    const registerPage = () => ctx.effect(() => ctx.slots.inject("plugins.bundle.config", () => ctx.slots.register({ name: "plugins.bundle.config", key: PLUGIN_PACKAGE, locale: ns }, Notice)), "video: migration settings");
     let off = registerPage();
-    let activated = false;
     function activate() {
       if (!alive || activated) return;
       activated = true;
       if (typeof off === "function") off();
       try {
-        return mount();
+        return mount((Page) => (props) => h("div", null, h(Notice), h(Page, props)));
       } catch {
+        activated = false;
         off = registerPage();
         set("loadFailed");
       }
@@ -5567,7 +5672,7 @@
     id: PLUGIN_PACKAGE,
     factory: (require2) => {
       const runtime = createClientRuntime(require2, [{ id: "video", create: createVideoClient }]);
-      return { ...runtime, apply: (ctx) => mountBundleAwareClient(ctx, require2("react"), () => runtime.apply(ctx)) };
+      return { ...runtime, apply: (ctx) => mountBundleAwareClient(ctx, require2("react"), (decorateSettings) => runtime.apply(ctx, { decorateSettings })) };
     }
   });
 })();

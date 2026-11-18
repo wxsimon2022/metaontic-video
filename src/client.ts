@@ -7,6 +7,6 @@ window.__ModuleLoader__.load({
   id: PLUGIN_PACKAGE,
   factory: require => {
     const runtime = createClientRuntime(require, [{ id: 'video', create: createVideoClient }]);
-    return { ...runtime, apply: ctx => mountBundleAwareClient(ctx, require('react'), () => runtime.apply(ctx)) };
+    return { ...runtime, apply: ctx => mountBundleAwareClient(ctx, require('react'), decorateSettings => runtime.apply(ctx, { decorateSettings })) };
   },
 });
