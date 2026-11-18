@@ -49,7 +49,7 @@ test('old installed but disabled is not a conflict; fresh installs mount normal 
 
 test('rejected migration keeps a visible settings page, preserves conflict and permits retry',async()=>{
  const state=setup({reject:true});await state.plugin.apply(state.host);state.render();await state.click();
- assert.match(state.render(),/切换未完成/);assert.equal(state.rows[0].enabled,true);
+ assert.match(state.render(),/迁移未完成/);assert.equal(state.rows[0].enabled,true);
  assert.equal(state.components['sidebar.panellist:metaontic-video'],undefined);
 });
 
@@ -60,7 +60,7 @@ test('only an explicit host restart-required result requests restart and does no
 
 test('unavailable inventory remains visible and cannot silently mount duplicate UI',async()=>{
  const state=setup({unavailable:true});await state.plugin.apply(state.host);
- assert.match(state.render(),/无法核实插件安装状态/);assert.deepEqual(state.calls,[]);
+ assert.match(state.render(),/无法核实安装状态/);assert.deepEqual(state.calls,[]);
  assert.equal(state.components['sidebar.panellist:metaontic-video'],undefined);
 });
 
@@ -68,7 +68,7 @@ test('unavailable inventory remains visible and cannot silently mount duplicate 
 test('a success response alone cannot pass migration while the old bundle is still enabled',async()=>{
  const state=setup();state.manager.setBundleEnabled=async()=>({ok:true,value:{application:'applied'}});
  await state.plugin.apply(state.host);state.render();await state.click();
- assert.match(state.render(),/切换未完成/);assert.equal(state.components['sidebar.panellist:metaontic-video'],undefined);
+ assert.match(state.render(),/迁移未完成/);assert.equal(state.components['sidebar.panellist:metaontic-video'],undefined);
 });
 
 test('disposing while inventory is pending never registers late settings or shared components',async()=>{
@@ -93,4 +93,61 @@ test('Host disposal during inventory loading prevents a late tool registration',
  const {api}=await import('./module-test-api.mjs');let complete;
  const dispose=api.mountBundleAwareHost({get:()=>({listBundles:()=>new Promise(resolve=>{complete=resolve;})})},()=>assert.fail('late mount'));
  dispose();complete([current]);await new Promise(resolve=>setTimeout(resolve,0));
+});
+
+
+test('cleanup requires task-finished consent and removes only the disabled old package',async()=>{
+ const state=setup();await state.plugin.apply(state.host);state.render();
+ await state.click('cleanup');assert.deepEqual(state.calls,[]);
+ state.confirm();state.render();const first=state.click('cleanup'),second=state.click('cleanup');assert.equal(first,second);await first;
+ assert.deepEqual(state.calls,[['metaontic-video',false],['remove','metaontic-video']]);
+ assert.equal(state.rows[0].installed,false);assert.equal(state.rows[1].installed,true);assert.equal(state.rows[1].enabled,true);
+ assert.match(state.render(),/API/);assert.doesNotMatch(state.render(),/data-metaontic-migration/);
+});
+
+test('an already disabled old package remains discoverable for cleanup alongside normal settings',async()=>{
+ const state=setup({rows:[{...legacy,enabled:false},current]});await state.plugin.apply(state.host);
+ assert.match(state.render(),/旧包仍在已安装列表/);assert.match(state.render(),/API/);
+ state.confirm();await state.click('cleanup');assert.deepEqual(state.calls,[['remove','metaontic-video']]);assert.equal(state.rows[0].installed,false);
+});
+
+test('uninstall failure retains normal settings and provides cleanup retry',async()=>{
+ const state=setup();state.manager.removeBundle=async()=>({ok:false,error:{code:'failure'}});
+ await state.plugin.apply(state.host);state.render();state.confirm();await state.click('cleanup');
+ assert.match(state.render(),/旧包清理尚未完成/);assert.match(state.render(),/API/);assert.equal(state.rows[0].enabled,false);assert.equal(state.rows[0].installed,true);
+ state.manager.removeBundle=async()=>{state.rows[0].installed=false;return {ok:true,value:{application:'applied'}};};
+ await state.click('cleanup');assert.doesNotMatch(state.render(),/data-metaontic-migration/);
+});
+
+test('Host stop-profile refusal explains manual removal while keeping new settings usable',async()=>{
+ const state=setup();state.manager.removeBundle=async()=>({ok:true,value:{error:{code:'stop-profile'}}});
+ await state.plugin.apply(state.host);state.render();state.confirm();await state.click('cleanup');
+ assert.match(state.render(),/先退出当前运行环境才能卸载/);assert.match(state.render(),/API/);assert.equal(state.rows[0].enabled,false);
+});
+
+test('missing uninstall capability does not block use of the new plugin or claim removal',async()=>{
+ const state=setup();delete state.manager.removeBundle;
+ await state.plugin.apply(state.host);state.render();state.confirm();await state.click('cleanup');
+ assert.match(state.render(),/当前宿主不支持/);assert.match(state.render(),/API/);assert.equal(state.rows[0].installed,true);
+});
+
+test('successful uninstall response is verified against actual inventory',async()=>{
+ const state=setup();state.manager.removeBundle=async()=>({ok:true,value:{application:'applied'}});
+ await state.plugin.apply(state.host);state.render();state.confirm();await state.click('cleanup');
+ assert.match(state.render(),/旧包清理尚未完成/);assert.match(state.render(),/API/);
+});
+
+test('disposing during old bundle deactivation never starts uninstall',async()=>{
+ const state=setup();let finish;
+ state.manager.setBundleEnabled=()=>new Promise(resolve=>{finish=resolve;});
+ await state.plugin.apply(state.host);state.render();state.confirm();const pending=state.click('cleanup');
+ await new Promise(resolve=>setTimeout(resolve,0));for(const off of state.cleanups.toReversed())off();
+ state.rows[0].enabled=false;finish({ok:true,value:{application:'applied'}});await pending;
+ assert.equal(state.rows[0].installed,true);assert.equal(state.components['sidebar.panellist:metaontic-video'],undefined);
+});
+
+test('remote property fallback is used even if full-name lookup throws',async()=>{
+ const state=setup({rows:[current]});const get=state.host.get.bind(state.host);
+ state.host.remote={pluginManager:state.manager};state.host.get=name=>{if(name==='remote.pluginManager')throw Error('unsupported');return get(name);};
+ await state.plugin.apply(state.host);assert.match(state.render(),/API/);
 });

@@ -1265,7 +1265,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "4.0.1".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "4.0.2".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1731,7 +1731,7 @@
   // package.json
   var package_default = {
     name: "dsh-metaontic-video",
-    version: "4.0.1",
+    version: "4.0.2",
     description: "\u9762\u5411\u65B0\u624B\u7684 AI \u89C6\u9891\u521B\u4F5C\u52A9\u624B\uFF1A\u4ECE\u60F3\u6CD5\u3001\u811A\u672C\u5230\u89C6\u9891\u751F\u6210\uFF0C\u5168\u7A0B\u5F15\u5BFC\uFF1B\u901A\u8FC7\u5206\u6BB5\u7EED\u62CD\u4E0E\u672C\u5730\u5408\u5E76\uFF0C\u63D0\u4F9B\u4F4E\u6210\u672C\u957F\u89C6\u9891\u5236\u4F5C\u65B9\u6848\u3002",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1845,11 +1845,11 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "4.0.1",
+      version: "4.0.2",
       prerelease: false,
-      publishedAt: "2026-11-18T04:07:59.397Z",
+      publishedAt: "2026-11-18T05:40:29.749Z",
       items: [
-        "\u4F18\u5316\uFF1A\u6682\u9690\u85CF\u6D41\u7A0B\u753B\u5E03\uFF0C\u7EDF\u4E00\u7531\u89C6\u9891\u52A9\u624B\u521B\u4F5C\uFF1B\u5B89\u88C5\u540D\u6539\u4E3A dsh-metaontic-video\uFF0C\u63D0\u4F9B\u4FDD\u7559\u8D44\u6599\u7684\u8FC1\u79FB\u5165\u53E3\uFF0C\u89E3\u51B3\u65B0\u65E7\u63D2\u4EF6\u51B2\u7A81\u4E0E\u8BBE\u7F6E\u9875\u7F3A\u5931\u3002"
+        "\u4F18\u5316\uFF1A\u5B8C\u5584\u65E7\u7248\u8FC1\u79FB\uFF0C\u652F\u6301\u5207\u6362\u5E76\u6E05\u7406\u65E7\u5305\uFF1B\u4FDD\u7559\u914D\u7F6E\u4E0E\u4EFB\u52A1\uFF0C\u6E05\u7406\u5931\u8D25\u53EF\u91CD\u8BD5\uFF0C\u65B0\u7248\u8BBE\u7F6E\u6301\u7EED\u53EF\u7528\u3002"
       ]
     }
   };

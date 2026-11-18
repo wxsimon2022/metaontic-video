@@ -28,3 +28,9 @@ Windows/macOS 共用宿主 API 和注册机制，不引入路径、进程或包�
 经授权正常退出Harness后，备份profile清单、锁文件与配置，从启用列表移除旧名称，再使用宿主自带Electron Node运行其pnpm remove，保留新版及原配置、任务和素材，成功后重新打开应用。验证旧依赖及启用项均消失，新版4.0.1保留且启用，cordis.patch.yml与备份SHA-256一致。未进行桌面视觉核验。
 
 宿主pnpm要求Node 22.13以上，系统Node20不能执行。macOS使用宿主可执行文件并设置ELECTRON_RUN_AS_NODE=1；pnpm remove使用--config.ignore-scripts=true、--config.offline=true，不能传不支持的--offline。Windows需使用相应宿主运行环境，本次未在Windows执行该修复。不要在应用运行时直接改profile，不删除配置、任务、素材或整个安装目录。
+
+## 后续迁移流程完善
+
+迁移页新增经用户确认的“切换并清理旧版”，保留仅停用路径。旧包已停用但仍安装时，正常设置页顶部持续显示清理入口；新版设置不会被清理失败遮挡。操作只使用宿主setBundleEnabled/removeBundle，卸载前确认旧包已停用、新包已安装启用；清理后重新核实旧包已移除。清单异常、卸载拒绝、成功但未生效均不能标记完成。stop-profile明确说明在插件管理中结束运行环境后卸载；仅真实restart-required要求重启。按钮防重复，卸载需要确认所有视频任务结束并同意；插件不会自动卸载。上下文销毁后不继续发起卸载。
+
+新流程共17项迁移回归，全量673项测试通过。Windows/macOS共用宿主API，无直接文件删除或外部包管理器调用。此轮未安装到本地、未发布、未完成真实桌面与Windows实测；此前本机离线清理结果不代表新版交互已实测。
