@@ -18,7 +18,7 @@ import { dirname, join, resolve } from 'node:path';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // 索引里的安装来源：Git 来源固定到提交，所以直接指向 Gitee 主仓库。
-// 本仓库的 GitHub 镜像已停在 v3.26.0，不能作为安装来源；`repository` 与 `homepage` 同样按此口径。
+// 市场安装来源固定为 Gitee 发布提交；GitHub 提供同版本正式包镜像。
 const REPOSITORY = 'https://gitee.com/hackloop/metaontic-video.git';
 const HOMEPAGE = 'https://ai.mybfs.cn';
 const MAX_VERSIONS = 5;
@@ -83,7 +83,7 @@ const index = {
   plugins: [
     {
       name: pkg.name,
-      title: { en: 'MetaOnticVideo', zh: 'MetaOnticVideo' },
+      title: { en: 'dsh-metaontic-video', zh: 'dsh-metaontic-video' },
       description: {
         en: pkg.description,
         zh: pkg.description,

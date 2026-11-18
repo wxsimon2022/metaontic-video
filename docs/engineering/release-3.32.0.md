@@ -12,8 +12,12 @@ MetaOnticVideo v3.32.0
 
 验证
 - 本地构建及测试通过。
-- 本条按仅 Gitee 发布处理：未运行 GitHub 双平台 CI，也没做 Windows 桌面实测，Windows 兼容性只有构建与打包层面的保证。
+- 先本机发布 Gitee，按用户追加指令同步同一版本到 GitHub；GitHub Actions 44215102128 的 Windows/macOS 成品安装及升级检查均成功，发布任务成功。桌面GUI与真实付费生成未实测。
+- GitHub 复用 Gitee 原始 tgz，未重新打包；本机成品 SHA-256：dd36812644b97db58dc2596bbebf9875784c15c3034ea0895f669b426c816a55。
+- GitHub master 存在独有旧提交 a96c1a7（历史仓库地址迁移），没有强推或覆盖；正式版由相同 v3.32.0 标签发布。
 - 宣传页安装地址已同步为 v3.32.0（/Users/simon/Documents/my_python/MetaOnticVideoService/frontend/public/promo/index.html，属服务端仓库，需在那里提交并部署）。
 - 桌面GUI与付费调用未由发布脚本自动验证。
 
 指南核对：对照上一正式版核对全部变化：新增独立镜头方案的逐镜时长、费用、首尾帧、逐镜素材和分段结果确认；同步连续续拍默认行为、编译改稿重新审核、视觉调整保留故事批准及叙事变化重审、混合音轨补静音与合并失败保留原片。安装配置与常见问题已复核；MD与PDF同步，配图无流程冲突。指南不含版本、发布或核对记录，指南与配图继续仅本地保留并随成品入包；未纳入价格参考资料。
+
+补充核对：GitHub 下载附件与本机发布 Gitee 原包 SHA-256 完全一致；两站均为正式版，GitHub Release 正文与发布计划一致。市场显示名后续调整为 dsh-metaontic-video，索引生成校验通过，不变更安装包标识，不改已公开标签。
