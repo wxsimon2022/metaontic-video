@@ -13,17 +13,6 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// src/core/settings/value.ts
-function ref(config, key, fallback) {
-  const raw = config?.[key];
-  const value = raw && typeof raw.get === "function" ? raw.get() : raw;
-  return value === void 0 || value === null || value === "" ? fallback : value;
-}
-var init_value = __esm({
-  "src/core/settings/value.ts"() {
-  }
-});
-
 // src/core/version.ts
 var PLUGIN_VERSION;
 var init_version = __esm({
@@ -94,6 +83,17 @@ var init_hardcoded_config = __esm({
       linux: { label: "Linux\uFF08Debian / Ubuntu\uFF09", command: "sudo apt update && sudo apt install -y ffmpeg" },
       linuxDnf: { label: "Linux\uFF08Fedora / RHEL / CentOS\uFF09", command: "sudo dnf install -y ffmpeg" }
     };
+  }
+});
+
+// src/core/settings/value.ts
+function ref(config, key, fallback) {
+  const raw = config?.[key];
+  const value = raw && typeof raw.get === "function" ? raw.get() : raw;
+  return value === void 0 || value === null || value === "" ? fallback : value;
+}
+var init_value = __esm({
+  "src/core/settings/value.ts"() {
   }
 });
 
@@ -1259,6 +1259,107 @@ var init_connection = __esm({
   }
 });
 
+// src/businesses/video/providers/capabilities.ts
+function videoCapabilities(model) {
+  const known = /^(?:doubao-)?seedance-2[-.](0|5)(?:-|$)/i.test(model);
+  const omni = /seedance-2[-.]5(?:-|$)/i.test(model);
+  return {
+    model_name: model,
+    profile_revision: "adapter-1",
+    capability_status: known ? "ADAPTER_DEFINED" : "UNVERIFIED",
+    generation_modes: known ? ["TEXT_TO_VIDEO", "IMAGE_TO_VIDEO"] : null,
+    supported_durations_ms: known ? { min: 4e3, max: omni ? 3e4 : 15e3, step: 1e3 } : null,
+    supported_aspect_ratios: known ? ["16:9", "9:16", "4:3", "3:4", "1:1"] : null,
+    native_audio_supported: known ? true : null,
+    reference_image_supported: known ? true : null,
+    reference_video_supported: known ? true : null,
+    reference_image_limit: known ? omni ? 30 : 9 : null,
+    prompt_length_limit: null,
+    verified_at: null,
+    source: "local_adapter_contract",
+    caveat: "\u6E20\u9053\u53EF\u7528\u6027\u53CA\u5B9E\u9645\u753B\u9762\u6548\u679C\u4ECD\u9700\u9A8C\u8BC1\uFF1B\u672A\u77E5\u6A21\u578B\u4E0D\u63A8\u65AD\u80FD\u529B\u3002"
+  };
+}
+
+// src/businesses/film-director/runtime/diagnostics.ts
+import { performance } from "node:perf_hooks";
+
+// src/core/utils/logging.ts
+import { AsyncLocalStorage } from "node:async_hooks";
+import path2 from "node:path";
+
+// src/core/paths.ts
+import os from "node:os";
+import path from "node:path";
+function dshHome() {
+  const fromEnv = String(typeof process !== "undefined" && process.env?.DSH_HOME || "").trim();
+  return fromEnv || path.join(os.homedir(), ".dsh");
+}
+
+// src/core/utils/logging.ts
+init_version();
+init_hardcoded_config();
+import { mkdir, appendFile } from "node:fs/promises";
+var requestLogContext = new AsyncLocalStorage();
+function requestLogPath() {
+  const now = /* @__PURE__ */ new Date();
+  const date2 = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  return path2.join(dshHome(), "logs", DATA_DIR, date2, "requests.jsonl");
+}
+var preparedDirs = /* @__PURE__ */ new Set();
+async function ensureLogDir(dir) {
+  if (preparedDirs.has(dir)) return;
+  await mkdir(dir, { recursive: true, mode: 448 });
+  if (preparedDirs.size > 32) preparedDirs.clear();
+  preparedDirs.add(dir);
+}
+async function appendRequestLog(record) {
+  try {
+    const file = requestLogPath();
+    await ensureLogDir(path2.dirname(file));
+    await appendFile(file, JSON.stringify({ time: (/* @__PURE__ */ new Date()).toISOString(), pluginVersion: PLUGIN_VERSION, ...requestLogContext.getStore(), ...record }) + "\n", { mode: 384 });
+  } catch {
+  }
+}
+
+// src/businesses/film-director/runtime/diagnostics.ts
+var ACTIONS = ["create", "read", "validate", "submit", "approve", "export", "next", "compile", "revise", "schedule", "task_result", "route", "verify_issue", "configure_profile", "diagnose", "recover_lock"];
+var STAGES = ["creative", "script", "assets", "shots", "prompts", "review"];
+function withFilmDiagnostics(tool) {
+  return { ...tool, async execute(args, exec) {
+    const started = performance.now();
+    let result;
+    let outcome = "failed";
+    let category = "INTERNAL_ERROR";
+    try {
+      result = await tool.execute(args, exec);
+      outcome = "success";
+      return result;
+    } catch (e) {
+      const code = String(e?.message || "").split(":")[0];
+      category = /^[A-Z_]{1,70}$/.test(code) ? code : "INTERNAL_ERROR";
+      throw e;
+    } finally {
+      await appendRequestLog({ event: "film_stage_finished", action: ACTIONS.includes(args.action) ? args.action : "unknown", stage: STAGES.includes(args.stage) ? args.stage : null, elapsedMs: Math.round(performance.now() - started), outcome, errorCode: outcome === "failed" ? category : void 0, responseBytes: result ? Buffer.byteLength(JSON.stringify(result)) : 0 });
+    }
+  } };
+}
+
+// src/businesses/film-director/runtime/production-binding.ts
+import { createHash } from "node:crypto";
+var KEYS = ["prompt", "segmentPrompts", "duration", "ratio", "resolution", "productionStrategy", "shotDurations", "mode", "transitionDescription"];
+function productionDigest(spec) {
+  return createHash("sha256").update(JSON.stringify(KEYS.map((k) => [k, spec?.[k] ?? (k === "productionStrategy" ? "continuous_segments" : k === "mode" ? "continuous" : null)]))).digest("hex");
+}
+function assertCompiledProduction(project, source, spec, actualModel) {
+  if (!project.filmSource) return;
+  if (actualModel && project.filmSource.model_name && project.filmSource.model_name !== actualModel) throw Error("COMPILED_MODEL_MISMATCH:\u5236\u4F5C\u6A21\u578B\u5DF2\u6539\u53D8\uFF0C\u8BF7\u4FEE\u8BA2\u9879\u76EE\u6A21\u578B\u5E76\u91CD\u65B0\u7F16\u8BD1\u5BA1\u6838\u3002");
+  if (source.revision !== project.filmSource.revision) throw Error("\u521B\u4F5C\u9879\u76EE\u5DF2\u6539\u7A3F\uFF0C\u8BF7\u91CD\u65B0\u7F16\u8BD1\u5236\u4F5C\u8BA1\u5212\u5E76\u5BA1\u6838\u3002");
+  const expected = source.production;
+  if (!expected || expected.videoProjectId !== project.id || expected.source_revision !== source.revision || !project.filmSource.plan_digest || productionDigest(expected.specification) !== project.filmSource.plan_digest) throw Error("COMPILED_PLAN_REQUIRED:\u8BF7\u91CD\u65B0\u7F16\u8BD1\u4E13\u4E1A\u5236\u4F5C\u65B9\u6848\u3002");
+  if (productionDigest(spec) !== project.filmSource.plan_digest) throw Error("COMPILED_PLAN_MISMATCH:\u63D0\u793A\u8BCD\u3001\u5206\u6BB5\u6216\u89C4\u683C\u4E0E\u6279\u51C6\u7684\u7F16\u8BD1\u65B9\u6848\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u56DE\u5230\u4E13\u4E1A\u9879\u76EE\u4FEE\u8BA2\u5E76\u91CD\u5BA1\u3002");
+}
+
 // src/businesses/film-director/profiles/dimensions.ts
 var entry = (label, creative, screenwriter, storyboard, criterion) => ({ label, rules: { creative, screenwriter, storyboard, reviewer: criterion }, criterion });
 var REGISTRY = {
@@ -1481,6 +1582,33 @@ ${content}
 \u662F\u5426\u6279\u51C6\u672C\u7248\u8FDB\u5165\u4E0B\u4E00\u9636\u6BB5\uFF1F`;
 }
 
+// src/businesses/film-director/quality/content.ts
+function narrativeDiagnostics(script) {
+  return (script?.scenes || []).flatMap((scene) => {
+    const lines = (script.dialogue || []).filter((d) => d.scene_id === scene.scene_id);
+    const chars = lines.reduce((n, d) => n + Array.from(String(d.exact_text || "").replace(/[\s，。！？、；：,.!?]/g, "")).length, 0);
+    const estimate = Math.ceil(chars / 4 * 1e3);
+    return estimate > scene.duration_ms ? [{ category: "SPEECH_BUDGET_RISK", scene_id: scene.scene_id, speech_estimate_ms: estimate, duration_ms: scene.duration_ms, kind: "WARNING", reason: "\u6309\u6BCF\u79D2\u7EA64\u5B57\u521D\u4F30\u5DF2\u8D85\u8FC7\u573A\u6B21\u9884\u7B97\uFF0C\u9700\u7ED3\u5408\u8BED\u901F\u3001\u52A8\u4F5C\u4E0E\u505C\u987F\u4EBA\u5DE5\u590D\u6838\u3002" }] : [];
+  });
+}
+function validateContentEvidence(stage, value, state) {
+  if (state.quality_policy !== "evidence_v1") return;
+  const text = (v) => typeof v === "string" && !!v.trim();
+  if (stage === "creative") for (const section of value.structure || []) {
+    if (!text(section.purpose) || !(text(section.visual_evidence) || Array.isArray(section.visual_evidence) && section.visual_evidence.some(text))) throw Error("CREATIVE_VISIBLE_EVIDENCE_REQUIRED");
+  }
+  if (stage === "script") for (const scene of value.scenes || []) {
+    if (!["scene_goal", "entry_state", "exit_state"].every((k) => text(scene[k])) || !Array.isArray(scene.key_actions) || !scene.key_actions.length || !scene.key_actions.every(text)) throw Error("SCENE_ACTION_EVIDENCE_REQUIRED");
+  }
+  if (stage === "review" && ["PASS", "PASS_WITH_WARNINGS"].includes(value.review_status)) {
+    for (const [key, score] of Object.entries(value.scores || {})) if (score !== null && !text(value.score_evidence?.[key])) throw Error("REVIEW_SCORE_EVIDENCE_REQUIRED:" + key);
+    const scenes = state.artifacts.script.data.scenes;
+    if (!Array.isArray(value.theme_evidence) || !value.theme_evidence.length || value.theme_evidence.some((e) => !scenes.some((s) => s.scene_id === e.scene_id) || !text(e.evidence))) throw Error("THEME_EVIDENCE_REQUIRED");
+    const warnings = narrativeDiagnostics(state.artifacts.script.data);
+    for (const warning of warnings) if (!value.budget_checks?.some((c) => c.scene_id === warning.scene_id && ["ACCEPTED_WITH_REASON", "REVISED"].includes(c.status) && text(c.evidence))) throw Error("SPEECH_BUDGET_REVIEW_REQUIRED:" + warning.scene_id);
+  }
+}
+
 // src/businesses/film-director/contracts/index.ts
 var COMMON_CONTRACT = `# COMMON_CONTRACT V4.0
 \u4F60\u662F AI Film Director V4.0 \u5F71\u89C6\u751F\u4EA7\u7CFB\u7EDF\u4E2D\u7684\u4E00\u4E2A\u4E13\u4E1A Agent\u3002\u59CB\u7EC8\u9075\u5B88\uFF1A
@@ -1519,15 +1647,14 @@ var STAGE_DEPS = { creative: [], script: ["creative"], assets: ["script"], shots
 function sourceRevisions(state, stage) {
   return Object.fromEntries((STAGE_DEPS[stage] || []).filter((s) => state.artifacts[s]).map((s) => [s, state.artifacts[s].revision]));
 }
-var GENERIC_MODEL_PROFILE = { model_name: "generic", profile_revision: "1", capability_status: "UNVERIFIED", generation_modes: null, supported_durations_ms: null, supported_aspect_ratios: null, native_audio_supported: null, reference_image_supported: null, reference_video_supported: null, prompt_length_limit: null, verified_at: null };
 function projectContext(state) {
-  return { resolved_profiles: resolveDimensions(state.project_spec), project_id: state.project_id, original_idea: state.source_brief || "", target_duration_ms: state.duration_ms, project_spec: state.project_spec || { title: state.title, target_duration_ms: state.duration_ms, aspect_ratio: null, language: null, visual_style: null, target_model: null, hard_constraints: [], provenance: "LEGACY_UNKNOWN" }, approved_revisions: { ...state.approvals } };
+  return { resolved_profiles: resolveDimensions(state.project_spec), project_id: state.project_id, original_idea: state.source_brief || "", target_duration_ms: state.duration_ms, project_spec: state.project_spec || { title: state.title, target_duration_ms: state.duration_ms, aspect_ratio: null, language: null, visual_style: null, target_model: null, hard_constraints: [], provenance: "LEGACY_UNKNOWN" }, quality_policy: state.quality_policy || "legacy", approved_revisions: { ...state.approvals } };
 }
 function revisionsEqual(a, b) {
   return !!a && !!b && typeof a === "object" && typeof b === "object" && Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => Object.hasOwn(b, k) && b[k] === v);
 }
 function modelProfile(state) {
-  return { ...GENERIC_MODEL_PROFILE, model_name: state.project_spec?.target_model || "generic" };
+  return videoCapabilities(state.project_spec?.target_model || "generic");
 }
 
 // src/businesses/film-director/runtime/issues.ts
@@ -1584,7 +1711,7 @@ var ITEM_ARRAYS = {
   prompts: { prompts: ["dialogue_refs"] }
 };
 function submissionContract(stage) {
-  return { stage, required_arrays: structuredClone(STAGE_ARRAYS[stage] || []), item_required_arrays: structuredClone(ITEM_ARRAYS[stage] || {}), instructions: "\u6240\u6709\u5217\u51FA\u7684\u6570\u7EC4\u5FC5\u987B\u663E\u5F0F\u63D0\u4F9B\u3002\u65E0\u5BF9\u5E94\u5185\u5BB9\u65F6\u7528 []\uFF1B\u5DF2\u6709\u89D2\u8272\u3001\u9053\u5177\u3001\u670D\u88C5\u4E0E\u5BF9\u767D\u5FC5\u987B\u4ECE\u6279\u51C6\u767B\u8BB0\u8868\u5F15\u7528\uFF0C\u4E0D\u80FD\u4E3A\u901A\u8FC7\u6821\u9A8C\u6E05\u7A7A\u3002\u5206\u955C costume_ids \u5F15\u7528\u672C\u955C\u4EBA\u7269\u7A7F\u7740\u7684\u670D\u88C5\uFF0Cdialogue_refs \u5F15\u7528\u672C\u955C\u4F7F\u7528\u7684\u5267\u672C dialogue_id\uFF1B\u65E0\u5BF9\u767D\u624D\u4E3A\u7A7A\u3002\u76F4\u63A5 submit \u5373\u4F1A\u6821\u9A8C\u5E76\u5728\u5931\u8D25\u65F6\u96C6\u4E2D\u8FD4\u56DE\u95EE\u9898\uFF0C\u65E0\u9700\u56FA\u5B9A\u589E\u52A0\u4E00\u6B21 validate\uFF1Bvalidate \u4EC5\u4F9B\u5355\u72EC\u68C0\u67E5\uFF0C\u4E0D\u4EE3\u8868\u4FDD\u5B58\u6216\u6279\u51C6\u3002" };
+  return { stage, quality_evidence: { creative: ["structure[].purpose", "structure[].visual_evidence"], script: ["scenes[].scene_goal", "scenes[].key_actions", "scenes[].entry_state", "scenes[].exit_state"], review: ["score_evidence", "theme_evidence\uFF08scene_id/evidence\uFF09", "budget_checks\uFF08\u6709\u8D85\u65F6\u98CE\u9669\u65F6\uFF09"] }[stage] || [], required_arrays: structuredClone(STAGE_ARRAYS[stage] || []), item_required_arrays: structuredClone(ITEM_ARRAYS[stage] || {}), instructions: "\u6240\u6709\u5217\u51FA\u7684\u6570\u7EC4\u5FC5\u987B\u663E\u5F0F\u63D0\u4F9B\u3002\u65E0\u5BF9\u5E94\u5185\u5BB9\u65F6\u7528 []\uFF1B\u5DF2\u6709\u89D2\u8272\u3001\u9053\u5177\u3001\u670D\u88C5\u4E0E\u5BF9\u767D\u5FC5\u987B\u4ECE\u6279\u51C6\u767B\u8BB0\u8868\u5F15\u7528\uFF0C\u4E0D\u80FD\u4E3A\u901A\u8FC7\u6821\u9A8C\u6E05\u7A7A\u3002\u5206\u955C costume_ids \u5F15\u7528\u672C\u955C\u4EBA\u7269\u7A7F\u7740\u7684\u670D\u88C5\uFF0Cdialogue_refs \u5F15\u7528\u672C\u955C\u4F7F\u7528\u7684\u5267\u672C dialogue_id\uFF1B\u65E0\u5BF9\u767D\u624D\u4E3A\u7A7A\u3002\u76F4\u63A5 submit \u5373\u4F1A\u6821\u9A8C\u5E76\u5728\u5931\u8D25\u65F6\u96C6\u4E2D\u8FD4\u56DE\u95EE\u9898\uFF0C\u65E0\u9700\u56FA\u5B9A\u589E\u52A0\u4E00\u6B21 validate\uFF1Bvalidate \u4EC5\u4F9B\u5355\u72EC\u68C0\u67E5\uFF0C\u4E0D\u4EE3\u8868\u4FDD\u5B58\u6216\u6279\u51C6\u3002" };
 }
 
 // src/businesses/film-director/contracts/schema.ts
@@ -2028,7 +2155,7 @@ function validateProfileArtifact(stage, value, state) {
 }
 
 // src/businesses/film-director/runtime/project.ts
-var STAGES = ["creative", "script", "assets", "shots", "prompts", "review"];
+var STAGES2 = ["creative", "script", "assets", "shots", "prompts", "review"];
 function validateTimeline(shots, duration) {
   let end = 0;
   const ids = /* @__PURE__ */ new Set();
@@ -2049,6 +2176,7 @@ function validateArtifact(stage, value, state) {
   validateV31(stage, value, state);
   validateReferences(stage, value, state);
   validateProfileArtifact(stage, value, state);
+  validateContentEvidence(stage, value, state);
   if (stage === "creative") {
     nonempty("theme");
     nonempty("logline");
@@ -2109,9 +2237,9 @@ function validateArtifact(stage, value, state) {
 function commitArtifact(state, stage, value, expected) {
   if (state.revision !== expected) throw Error("REVISION_CONFLICT");
   if (state.status === "STOPPED") throw Error("PROJECT_STOPPED");
-  const index = STAGES.indexOf(stage);
+  const index = STAGES2.indexOf(stage);
   if (index < 0) throw Error("INVALID_STAGE");
-  for (const upstream of STAGES.slice(0, index)) {
+  for (const upstream of STAGES2.slice(0, index)) {
     if (!state.artifacts[upstream] || state.artifacts[upstream].stale) throw Error("UPSTREAM_REQUIRED");
     if (["creative", "script"].includes(upstream) && state.approvals[upstream] !== state.artifacts[upstream].revision) throw Error("APPROVAL_REQUIRED");
   }
@@ -2121,8 +2249,8 @@ function commitArtifact(state, stage, value, expected) {
   if (stage === "review" && state.schema_version === "3.1.0") updateIssueRegistry(next, value);
   const dimensions = resolveDimensions(state.project_spec);
   next.artifacts[stage] = { dimension_profile_ref: { revision: dimensions.revision, profiles: Object.fromEntries(Object.entries(dimensions.profiles).map(([k, p]) => [k, { id: p.id, revision: p.revision }])) }, revision: next.revision, source_revisions: sourceRevisions(state, stage), ...state.project_spec?.work_type ? { profile_ref: { work_type: state.project_spec.work_type, profile_revision: state.project_spec.profile_revision } } : {}, data: value, stale: false };
-  for (const downstream of STAGES.slice(index + 1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
-  for (const approved of ["creative", "script"]) if (STAGES.indexOf(approved) >= index) delete next.approvals[approved];
+  for (const downstream of STAGES2.slice(index + 1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
+  for (const approved of ["creative", "script"]) if (STAGES2.indexOf(approved) >= index) delete next.approvals[approved];
   next.status = ["creative", "script"].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === "review" ? value.review_status && !evaluateReview(value).passed ? value.review_status : "FINAL_DELIVERY" : `${stage.toUpperCase()}_READY`;
   return next;
 }
@@ -2189,7 +2317,7 @@ function projectResponse(state, nextTask2, mode = "full", extra2 = {}) {
 init_connection();
 
 // src/businesses/film-director/runtime/spec.ts
-var FIELDS = ["genre", "aspect_ratio", "resolution", "language", "visual_style", "target_audience", "distribution_channel", "target_model", "work_type", "narrative_mode", "format", "purpose", "style_profile", "tone"];
+var FIELDS = ["production_strategy", "genre", "aspect_ratio", "resolution", "language", "visual_style", "target_audience", "distribution_channel", "target_model", "work_type", "narrative_mode", "format", "purpose", "style_profile", "tone"];
 function validateTargetModel(value) {
   if (value == null) return;
   if (typeof value !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/.test(value) || /^(placeholder|unknown|tbd|todo|example|model_id|target_model)$/i.test(value)) throw Error("INVALID_TARGET_MODEL:\u8BF7\u4F7F\u7528\u5DE5\u5177 execution_plan.model_name \u8FD4\u56DE\u7684\u5B9E\u9645\u6A21\u578BID\uFF1B\u672A\u6307\u5B9A\u65F6\u7701\u7565\uFF0C\u4E0D\u80FD\u586B\u5199\u5360\u4F4D\u6587\u5B57\u3002");
@@ -2200,6 +2328,7 @@ function createProjectSpec(title, idea, duration, input = {}) {
   for (const key of FIELDS) if (input[key] !== void 0 && (typeof input[key] !== "string" || !input[key].trim())) throw Error(`INVALID_PROJECT_SPEC:${key}`);
   if (input.aspect_ratio && !["16:9", "9:16"].includes(input.aspect_ratio)) throw Error("INVALID_PROJECT_SPEC:aspect_ratio");
   if (input.resolution && !["480p", "720p"].includes(input.resolution)) throw Error("INVALID_PROJECT_SPEC:resolution");
+  if (input.production_strategy && !["continuous_segments", "independent_shots"].includes(input.production_strategy)) throw Error("INVALID_PRODUCTION_STRATEGY");
   validateTargetModel(input.target_model);
   if (input.work_type && !WORK_TYPES.includes(input.work_type)) throw Error("UNKNOWN_WORK_TYPE");
   if (input.narrative_mode && !NARRATIVE_MODES.includes(input.narrative_mode)) throw Error("UNKNOWN_NARRATIVE_MODE");
@@ -2211,11 +2340,19 @@ function createProjectSpec(title, idea, duration, input = {}) {
 function configureProfile(state, input, expected) {
   if (state.revision !== expected) throw Error("REVISION_CONFLICT");
   if (state.status === "STOPPED") throw Error("PROJECT_STOPPED");
-  const allowed = ["work_type", "narrative_mode", "visual_style", "target_model", ...DIMENSION_FIELDS];
+  const scope = input?.change_scope;
+  if (scope !== void 0 && !["visual_only", "story"].includes(scope)) throw Error("INVALID_CHANGE_SCOPE");
+  if (input && typeof input === "object" && !Array.isArray(input)) {
+    input = { ...input };
+    delete input.change_scope;
+  }
+  if (scope === "visual_only" && Object.keys(input || {}).some((k) => !["visual_style", "style_profile", "tone"].includes(k))) throw Error("VISUAL_SCOPE_CONFLICT");
+  const allowed = ["production_strategy", "work_type", "narrative_mode", "visual_style", "target_model", ...DIMENSION_FIELDS];
   if (!input || typeof input !== "object" || Array.isArray(input) || !Object.keys(input).length || Object.keys(input).some((k) => !allowed.includes(k))) throw Error("INVALID_PROFILE_SELECTION");
   if (input.work_type !== void 0 && !WORK_TYPES.includes(input.work_type)) throw Error("INVALID_PROFILE_SELECTION");
   if (input.narrative_mode !== void 0 && !NARRATIVE_MODES.includes(input.narrative_mode)) throw Error("UNKNOWN_NARRATIVE_MODE");
   for (const [key, value] of Object.entries(input)) if (!(value === null && [...DIMENSION_FIELDS, "visual_style", "target_model"].includes(key)) && (typeof value !== "string" || !value.trim())) throw Error(`INVALID_PROJECT_SPEC:${key}`);
+  if (input.production_strategy && !["continuous_segments", "independent_shots"].includes(input.production_strategy)) throw Error("INVALID_PRODUCTION_STRATEGY");
   validateTargetModel(input.target_model);
   const old = state.project_spec || {};
   const spec = { ...old, ...input };
@@ -2224,17 +2361,17 @@ function configureProfile(state, input, expected) {
   resolveProfile(spec);
   assertDimensions(spec);
   const changed = Object.keys(input).filter((k) => old[k] !== spec[k]);
-  if (old.profile_revision !== spec.profile_revision) changed.push("profile_revision");
-  if (old.dimension_profile_revision !== spec.dimension_profile_revision) changed.push("dimension_profile_revision");
+  if ((old.profile_revision ?? null) !== spec.profile_revision) changed.push("profile_revision");
+  if ((old.dimension_profile_revision ?? null) !== (spec.dimension_profile_revision ?? null)) changed.push("dimension_profile_revision");
   if (!changed.length) return structuredClone(state);
   const next = structuredClone(state);
   next.project_spec = { ...spec, provenance: { ...old.provenance, ...Object.fromEntries(Object.keys(input).map((k) => [k, "USER_SPECIFIED"])) } };
   next.revision++;
-  if (changed.every((k) => k === "target_model")) {
+  if (scope !== "story" && changed.every((k) => ["target_model", "production_strategy", "visual_style", "style_profile", "dimension_profile_revision", ...scope === "visual_only" ? ["tone"] : []].includes(k))) {
     const affected = ["assets", "shots", "prompts", "review"].filter((k) => next.artifacts[k]);
     for (const stage of affected) next.artifacts[stage].stale = true;
     next.status = "ASSET_DESIGN";
-    next.last_change = { stage: "project_spec", changed_fields: changed, previous_target_model: old.target_model || null, affected_artifacts: affected, approval_impact: "PRESERVE_CREATIVE_AND_SCRIPT_RECHECK_MODEL_DEPENDENT_ARTIFACTS" };
+    next.last_change = { stage: "project_spec", changed_fields: changed, previous_target_model: old.target_model || null, affected_artifacts: affected, approval_impact: changed.some((k) => ["visual_style", "style_profile", "tone"].includes(k)) ? "PRESERVE_STORY_RECHECK_VISUAL_ARTIFACTS" : changed.includes("production_strategy") ? "PRESERVE_STORY_RECHECK_PRODUCTION_PLAN" : "PRESERVE_CREATIVE_AND_SCRIPT_RECHECK_MODEL_DEPENDENT_ARTIFACTS" };
     return next;
   }
   for (const artifact of Object.values(next.artifacts)) artifact.stale = true;
@@ -2245,31 +2382,145 @@ function configureProfile(state, input, expected) {
 }
 
 // src/businesses/film-director/runtime/storage.ts
-import { open, unlink } from "node:fs/promises";
-import path from "node:path";
-async function acquireProjectLock(dir) {
-  const file = path.join(dir, ".write.lock");
-  let handle;
+import { open, unlink, readFile, readdir, stat, link } from "node:fs/promises";
+import path3 from "node:path";
+import os2 from "node:os";
+import { randomUUID } from "node:crypto";
+async function inspectLock(file) {
+  let raw;
   try {
-    handle = await open(file, "wx", 384);
-  } catch (error) {
-    if (error.code === "EEXIST") throw Error("PROJECT_LOCKED: another process or interrupted write requires inspection");
-    throw error;
+    raw = await readFile(file, "utf8");
+  } catch (e) {
+    if (e.code === "ENOENT") return { status: "unlocked", recoverable: false };
+    throw e;
+  }
+  let record;
+  try {
+    record = JSON.parse(raw);
+  } catch {
+    return { status: "unknown", recoverable: false };
+  }
+  if (record?.host && record.host !== os2.hostname()) return { status: "foreign_host", recoverable: false };
+  if (!Number.isSafeInteger(record?.pid) || record.pid <= 0) return { status: "unknown", recoverable: false };
+  try {
+    process.kill(record.pid, 0);
+    return { status: "active", recoverable: false };
+  } catch (e) {
+    return { status: e.code === "ESRCH" ? "interrupted" : "unknown", recoverable: e.code === "ESRCH", record };
+  }
+}
+async function inspectProjectLock(dir) {
+  return { ...await inspectLock(path3.join(dir, ".write.lock")), recovery: await inspectLock(path3.join(dir, ".recovery.lock")) };
+}
+function lockRecord(token) {
+  return { pid: process.pid, host: os2.hostname(), token, created_at: (/* @__PURE__ */ new Date()).toISOString() };
+}
+async function removeOwned(file, token) {
+  let record;
+  try {
+    record = JSON.parse(await readFile(file, "utf8"));
+  } catch (e) {
+    if (e.code === "ENOENT") return;
+    throw e;
+  }
+  if (record.token === token) await unlink(file);
+}
+async function publishLock(file, token) {
+  const prepared = `${file}.${token}.tmp`;
+  const handle = await open(prepared, "wx", 384);
+  try {
+    await handle.writeFile(JSON.stringify(lockRecord(token)));
+    await handle.close();
+    await link(prepared, file);
+  } finally {
+    await handle.close().catch(() => {
+    });
+    await unlink(prepared).catch(() => {
+    });
+  }
+}
+async function reclaimDeadLock(file, depth = 0) {
+  const check = await inspectLock(file);
+  if (check.status === "unlocked") return;
+  if (depth > 32 || !check.recoverable || !/^[a-f0-9-]{36}$/.test(check.record?.token || "")) throw Error("RECOVERY_LOCK_UNSAFE:\u6062\u590D\u9501\u6D3B\u8DC3\u6216\u65E0\u6CD5\u786E\u5B9A\u6240\u5C5E\u8FDB\u7A0B\uFF0C\u4FDD\u7559\u539F\u9501\u3002");
+  const claim = `${file}.reclaim-${check.record.token}`;
+  const token = randomUUID();
+  try {
+    await publishLock(claim, token);
+  } catch (e) {
+    if (e.code !== "EEXIST") throw e;
+    await reclaimDeadLock(claim, depth + 1);
+    await publishLock(claim, token);
   }
   try {
-    await handle.writeFile(JSON.stringify({ pid: process.pid, created_at: (/* @__PURE__ */ new Date()).toISOString() }));
-  } catch (error) {
-    await handle.close();
+    let current;
+    try {
+      current = JSON.parse(await readFile(file, "utf8"));
+    } catch (e) {
+      if (e.code === "ENOENT") return;
+      throw e;
+    }
+    if (current.token === check.record.token) await unlink(file);
+  } finally {
+    await removeOwned(claim, token);
+  }
+}
+async function recoverProjectLock(dir) {
+  const file = path3.join(dir, ".write.lock");
+  const guardFile = path3.join(dir, ".recovery.lock");
+  const token = randomUUID();
+  try {
+    await publishLock(guardFile, token);
+  } catch (e) {
+    if (e.code !== "EEXIST") throw e;
+    await reclaimDeadLock(guardFile);
+    await publishLock(guardFile, token);
+  }
+  try {
+    const check = await inspectLock(file);
+    if (check.status === "unlocked") return { status: "unlocked", recoverable: false };
+    if (!check.recoverable) throw Error("LOCK_RECOVERY_UNSAFE:\u9501\u4ECD\u6D3B\u8DC3\u6216\u65E0\u6CD5\u786E\u8BA4\u6240\u5C5E\u8FDB\u7A0B\uFF0C\u4FDD\u7559\u539F\u9501\u3002");
     await unlink(file);
-    throw error;
+    return { status: "recovered", recoverable: false };
+  } finally {
+    await removeOwned(guardFile, token);
+  }
+}
+async function acquireProjectLock(dir) {
+  const file = path3.join(dir, ".write.lock");
+  const token = randomUUID();
+  try {
+    await publishLock(file, token);
+  } catch (e) {
+    if (e.code === "EEXIST") throw Error("PROJECT_LOCKED:\u4F7F\u7528diagnose\u68C0\u67E5\uFF0C\u660E\u786E\u4E2D\u65AD\u540Erecover_lock\u6062\u590D\u3002");
+    throw e;
   }
   return async () => {
-    try {
-      await handle.close();
-    } finally {
-      await unlink(file);
-    }
+    await removeOwned(file, token);
   };
+}
+async function pruneProjectSnapshots(dir, state, keep = 30) {
+  const folder = path3.join(dir, "snapshots");
+  const protectedRevisions = /* @__PURE__ */ new Set([state.revision, ...Object.values(state.approvals || {}), ...(state.decisions || []).map((d) => d.artifact_revision), ...Object.values(state.artifacts || {}).flatMap((a) => [a.revision, ...Object.values(a.source_revisions || {})])]);
+  const files = [];
+  for (const name of await readdir(folder)) {
+    if (!/^\d+-[a-f0-9-]+\.json$/.test(name)) continue;
+    const revision = Number(name.split("-")[0]);
+    if (revision > state.revision) continue;
+    files.push({ name, revision, mtime: (await stat(path3.join(folder, name))).mtimeMs });
+  }
+  files.sort((a, b) => b.mtime - a.mtime);
+  for (const item of files.slice(keep)) {
+    if (protectedRevisions.has(item.revision)) continue;
+    const file = path3.join(folder, item.name);
+    let saved;
+    try {
+      saved = JSON.parse(await readFile(file, "utf8"));
+    } catch {
+      continue;
+    }
+    if (saved.revision === item.revision) await unlink(file);
+  }
 }
 
 // src/businesses/film-director/runtime/approvals.ts
@@ -2294,11 +2545,11 @@ function recordApprovalDecision(state, stage, decision, expected) {
 }
 
 // src/businesses/film-director/runtime/deliverables.ts
-import { createHash } from "node:crypto";
+import { createHash as createHash2 } from "node:crypto";
 function artifactManifest(state) {
-  return STAGES.filter((s) => state.artifacts[s]).map((stage) => {
+  return STAGES2.filter((s) => state.artifacts[s]).map((stage) => {
     const artifact = state.artifacts[stage];
-    return { stage, artifact_ref: `project.json#/artifacts/${stage}`, revision: artifact.revision, source_revisions: artifact.source_revisions || {}, ...artifact.profile_ref ? { profile_ref: artifact.profile_ref } : {}, ...artifact.dimension_profile_ref ? { dimension_profile_ref: artifact.dimension_profile_ref } : {}, stale: artifact.stale, sha256: createHash("sha256").update(JSON.stringify(artifact.data)).digest("hex") };
+    return { stage, artifact_ref: `project.json#/artifacts/${stage}`, revision: artifact.revision, source_revisions: artifact.source_revisions || {}, ...artifact.profile_ref ? { profile_ref: artifact.profile_ref } : {}, ...artifact.dimension_profile_ref ? { dimension_profile_ref: artifact.dimension_profile_ref } : {}, stale: artifact.stale, sha256: createHash2("sha256").update(JSON.stringify(artifact.data)).digest("hex") };
   });
 }
 function printable(value) {
@@ -2315,7 +2566,7 @@ function renderDeliverables(state) {
 
 \u9879\u76EE\uFF1A${state.project_id} \xB7 \u4FEE\u8BA2\uFF1A${state.revision}
 
-` + STAGES.filter((s) => state.artifacts[s]).map((stage) => {
+` + STAGES2.filter((s) => state.artifacts[s]).map((stage) => {
     const a = state.artifacts[stage];
     const data = { ...a.data };
     const screenplay = stage === "script" && typeof data.screenplay === "string" ? data.screenplay : "";
@@ -2664,7 +2915,7 @@ var ADAPTERS = {
   reviewer: "review \u9636\u6BB5\u63D0\u4EA4\u5E73\u94FA\u62A5\u544A\uFF0C\u4E0D\u5305 review_report\u3002\u5305\u542B review_id\u3001review_stage\u3001review_scope\u3001reviewed_revisions\u3001unverified_items\u3001scores\u3001issues\u3001review_status\u3001blocking_issue_count\u3001delivery_allowed\u3002\u7EC8\u5BA1\u4F7F\u7528 FINAL_REVIEW\uFF0Cscope \u548C reviewed_revisions \u8986\u76D6 creative/script/assets/shots/prompts\u3002scores \u4F7F\u7528 requirement_fidelity/narrative_quality/character_consistency/scene_consistency/cinematic_quality/temporal_consistency/prompt_executability/structural_completeness\uFF0C\u672A\u8BC4\u4F30\u586B null\uFF1B\u5F53\u524D\u6743\u91CD\u7531\u8FD0\u884C\u65F6\u4EE3\u7801\u590D\u7B97\uFF0C\u4E0D\u865A\u6784\u52A8\u6001\u6743\u91CD\u914D\u7F6E\u3002issue \u63D0\u4F9B description\u3001location\u3001evidence\u3001responsible_agent\u3001recheck_criteria\u3001severity\u3001status \u7B49\u5B57\u6BB5\uFF1Bexpected/actual \u6620\u5C04 expected_behavior/actual_behavior\u3002\u8D23\u4EFB\u89D2\u8272\u7528\u6CE8\u518C id\uFF0C\u672A\u590D\u5BA1\u4E0D\u80FD VERIFIED\u3002"
 };
 function runtimeContract(role2) {
-  return "\n\n## \u5F53\u524D\u5DE5\u5177\u6570\u636E\u9002\u914D\n" + ADAPTERS[role2] + (role2 === "storyboard" || role2 === "director" ? "\n\u3010\u5206\u955C\u811A\u672C\u4E0E\u5206\u955C\u793A\u610F\u56FE\u533A\u5206\u3011shots JSON\u3001\u955C\u5934\u5217\u8868\u3001\u65F6\u95F4\u8F74\u6216 Markdown \u8868\u683C\u90FD\u662F\u6587\u5B57\u5206\u955C\uFF0C\u4E0D\u80FD\u79F0\u4E3A\u5DF2\u7ECF\u4EA4\u4ED8\u5206\u955C\u793A\u610F\u56FE\u3002\u7528\u6237\u8981\u6C42\u770B\u56FE\uFF0C\u6216\u8FDB\u5165 video_project \u5B9E\u9645\u5236\u4F5C\u811A\u672C\u5BA1\u6838\u524D\uFF0C\u5FC5\u987B\u4F9D\u636E\u5F53\u524D\u5DF2\u6279\u51C6\u955C\u5934\u7ED8\u5236\u5E76\u4FDD\u5B58\u771F\u5B9E\u7684\u672C\u5730 SVG/PNG \u6784\u56FE\u8349\u56FE\uFF1B\u8BFB\u53D6 video-director/references/segment-storyboard.md\u3002\u56FE\u4E2D\u5E94\u6709\u5BF9\u5E94\u753B\u5E45\u7684\u753B\u6846\u3001\u4E3B\u4F53\u8F6E\u5ED3\u4E0E\u7AD9\u4F4D\u3001\u5173\u952E\u9053\u5177\u3001\u52A8\u4F5C/\u89C6\u7EBF/\u8FD0\u955C\u7BAD\u5934\u548C\u573A\u666F\u7A7A\u95F4\uFF0C\u4E0D\u80FD\u53EA\u662F\u7A7A\u767D\u5361\u7247\u52A0\u955C\u5934\u6587\u5B57\u3002\u5355\u955C\u81F3\u5C11\u4E00\u683C\uFF0C\u591A\u6BB5\u6BCF\u6BB5\u81F3\u5C11\u4E00\u683C\u5173\u952E\u6784\u56FE\uFF1B\u6807\u6CE8\u4EC5\u4E3A\u6784\u56FE\u793A\u610F\uFF0C\u4E0D\u5192\u5145\u5B9E\u9645\u751F\u6210\u753B\u9762\u3002\u5148\u786E\u8BA4\u6587\u4EF6\u771F\u5B9E\u5B58\u5728\uFF0C\u518D\u5728\u7528\u6237\u53EF\u89C1\u6B63\u6587\u5185\u5D4C\u56FE\u7247\u5E76\u9644\u539F\u56FE\u94FE\u63A5\uFF1BSVG\u65E0\u6CD5\u5185\u5D4C\u65F6\u7528\u5DF2\u6709\u672C\u5730\u5DE5\u5177\u8F6CPNG\uFF0C\u4E0D\u80FD\u76F4\u63A5\u6362\u6210\u955C\u5934\u5217\u8868\u3002\u6CA1\u6709\u7ED8\u56FE\u80FD\u529B\u65F6\u8BF4\u660E\u5C1A\u672A\u51FA\u56FE\uFF0C\u4E0D\u80FD\u58F0\u79F0\u5DF2\u5B8C\u6210\u3002\u793A\u610F\u56FE\u9ED8\u8BA4\u514D\u8D39\u672C\u5730\u7ED8\u5236\uFF0C\u4E0D\u64C5\u81EA\u8C03\u7528\u4ED8\u8D39\u51FA\u56FE\u3001\u5B89\u88C5\u8F6F\u4EF6\u6216\u628A\u8349\u56FE\u4E0A\u4F20\u4F5C\u53C2\u8003\u56FE\uFF1B\u4E0D\u8C03\u7528present\u767B\u8BB0\u8FC7\u7A0B\u56FE\u3002\u4E13\u4E1A\u521B\u610F\u3001\u5267\u672C\u9636\u6BB5\u4E0D\u63D0\u524D\u8981\u6C42\u6700\u7EC8\u793A\u610F\u56FE\uFF0C\u4E0D\u589E\u52A0\u989D\u5916\u5BA1\u6279\u8282\u70B9\u3002" : "") + '\n\u6B63\u5E38\u63A8\u8FDB\u4F7F\u7528 responseMode="compact"\uFF0C\u76F4\u63A5 submit \u4E00\u6B21\u5373\u53EF\uFF1Bsubmit \u5185\u7F6E\u6821\u9A8C\uFF0C\u5931\u8D25\u65F6\u4E00\u6B21\u8FD4\u56DE\u5168\u90E8\u7F3A\u5931\u6570\u7EC4\u3002validate \u4EC5\u7528\u4E8E\u9700\u8981\u5355\u72EC\u68C0\u67E5\u7684\u8349\u7A3F\uFF0C\u4E0D\u5F3A\u5236\u6BCF\u7A3F\u8C03\u7528\u3001\u4E0D\u5728\u6821\u9A8C\u6210\u529F\u540E\u91CD\u65B0\u751F\u6210\u6574\u7A3F\u3002content \u4E3A\u5408\u6CD5 JSON \u5B57\u7B26\u4E32\uFF0C\u4E0D\u5E26 Markdown \u56F4\u680F\u3001\u6CE8\u91CA\u6216\u591A\u4F59\u5B57\u7B26\u3002assets \u9876\u5C42\u5FC5\u987B\u540C\u65F6\u5305\u542B characters/scenes/locations/scene_states/props \u4E94\u4E2A\u6570\u7EC4\uFF0C\u9053\u5177\u5C5E\u4E8E props\uFF0C\u4E0D\u662F\u4EC5\u5199\u5728\u573A\u666F\u63CF\u8FF0\u4E2D\uFF1B\u6CA1\u6709\u9053\u5177\u65F6\u663E\u5F0F props:[]\u3002\u6821\u9A8C\u5931\u8D25\u53EA\u4FEE\u590D\u62A5\u544A\u4E2D\u7684\u683C\u5F0F\u6216\u5B57\u6BB5\uFF0C\u4E0D\u91CD\u5199\u5DF2\u6279\u51C6\u5185\u5BB9\u3001\u4E0D\u628A\u771F\u5B9E\u9053\u5177\u6E05\u7A7A\u3001\u4E0D\u7F16\u9020\u9053\u5177\u3002submit \u4F7F\u7528\u6700\u8FD1\u5DE5\u5177\u8FD4\u56DE\u7684\u5F53\u524D revision\uFF1B\u8FD4\u56DE nextTask \u5DF2\u542B\u4E0B\u4E00\u9636\u6BB5\u5B8C\u6574\u8F93\u5165\uFF0C\u76F4\u63A5\u7EE7\u7EED\uFF0C\u4E0D\u518D\u4E3A\u76F8\u540C\u7248\u672C\u91CD\u590D next/read\u3002\u9700\u8981\u8865\u67E5\u5355\u9636\u6BB5\u7528 read(stage)\uFF0C\u5168\u90E8\u5386\u53F2\u624D\u7528 responseMode="full"\u3002validate \u4E0D\u4EE3\u8868\u4FDD\u5B58\u3001\u6279\u51C6\u6216\u89C6\u9891\u6210\u529F\u3002\u5185\u90E8\u683C\u5F0F\u4FEE\u590D\u65E0\u9700\u8BA9\u7528\u6237\u5904\u7406 JSON\uFF0C\u53EA\u5728\u5F71\u54CD\u521B\u610F\u6216\u5DF2\u6279\u51C6\u5185\u5BB9\u65F6\u8BF7\u6C42\u51B3\u7B56\u3002';
+  return "\n\n## \u5F53\u524D\u5DE5\u5177\u6570\u636E\u9002\u914D\n" + ADAPTERS[role2] + (role2 === "storyboard" || role2 === "director" ? '\n\u3010\u5206\u955C\u811A\u672C\u4E0E\u5206\u955C\u793A\u610F\u56FE\u533A\u5206\u3011shots JSON\u3001\u955C\u5934\u5217\u8868\u3001\u65F6\u95F4\u8F74\u6216 Markdown \u8868\u683C\u90FD\u662F\u6587\u5B57\u5206\u955C\uFF0C\u4E0D\u80FD\u79F0\u4E3A\u5DF2\u7ECF\u4EA4\u4ED8\u5206\u955C\u793A\u610F\u56FE\u3002\u7528\u6237\u8981\u6C42\u770B\u56FE\uFF0C\u6216\u8FDB\u5165 video_project \u5B9E\u9645\u5236\u4F5C\u811A\u672C\u5BA1\u6838\u524D\uFF0C\u8C03\u7528 video_project(action:"storyboard",captureScript:true,scriptPath)\uFF0C\u7531\u63D2\u4EF6\u6839\u636E\u5F53\u524D\u5236\u4F5C\u811A\u672C\u5206\u955C\u8868\u514D\u8D39\u6E32\u67D3\u672C\u5730\u6784\u56FE\u793A\u610F\u56FE\uFF1B\u811A\u672C\u6B63\u6587\u53EA\u751F\u6210\u4E00\u6B21\uFF0C\u4F7F\u7528\u8FD4\u56DEmarkdown\u5185\u5D4C\u56FE\u7247\u5E76\u9644\u539F\u56FE\u94FE\u63A5\uFF0C\u518Dreview\u3002\u4E0D\u5F97\u624B\u5199SVG\u6216\u7ED8\u56FE\u7A0B\u5E8F\uFF0C\u4E5F\u4E0D\u8C03\u7528\u4ED8\u8D39\u51FA\u56FE\u6A21\u578B\u3002\u6587\u5B57\u6E05\u5355\u4E0D\u80FD\u66FF\u4EE3\u56FE\u7247\uFF0C\u4E0D\u8C03\u7528present\u767B\u8BB0\u8FC7\u7A0B\u56FE\u3002\u521B\u610F\u548C\u5267\u672C\u9636\u6BB5\u4E0D\u63D0\u524D\u8981\u6C42\u6700\u7EC8\u56FE\uFF0C\u4E0D\u589E\u52A0\u5BA1\u6279\u8282\u70B9\u3002' : "") + '\n\u65B0\u9879\u76EEquality_policy=evidence_v1\uFF1A\u6B63\u5F0F\u5267\u672C\u6BCF\u573A\u542Bscene_goal\u3001key_actions\u3001entry_state\u3001exit_state\uFF08\u53EF\u89C2\u5BDF\u72B6\u6001\uFF09\uFF1BCreative structure\u6BCF\u6BB5\u542Bpurpose\u548Cvisual_evidence\u3002\u7EC8\u5BA1scores\u6BCF\u4E2A\u9002\u7528\u7EF4\u5EA6\u987B\u5728score_evidence\u4E2D\u63D0\u4F9B\u975E\u7A7A\u4F9D\u636E\uFF0C\u5E76\u63D0\u4F9Btheme_evidence\u6570\u7EC4\uFF0C\u6BCF\u9879scene_id\u53CA\u53EF\u89C1\u884C\u52A8\u6216\u58F0\u97F3evidence\uFF1Bnarrative_diagnostics\u53EA\u4F5C\u4E3A\u98CE\u9669\u63D0\u793A\uFF0C\u827A\u672F\u5224\u65AD\u4E0D\u4F2A\u88C5\u4E3A\u786C\u9519\u8BEF\u3002\n\u6B63\u5E38\u63A8\u8FDB\u4F7F\u7528 responseMode="compact"\uFF0C\u76F4\u63A5 submit \u4E00\u6B21\u5373\u53EF\uFF1Bsubmit \u5185\u7F6E\u6821\u9A8C\uFF0C\u5931\u8D25\u65F6\u4E00\u6B21\u8FD4\u56DE\u5168\u90E8\u7F3A\u5931\u6570\u7EC4\u3002validate \u4EC5\u7528\u4E8E\u9700\u8981\u5355\u72EC\u68C0\u67E5\u7684\u8349\u7A3F\uFF0C\u4E0D\u5F3A\u5236\u6BCF\u7A3F\u8C03\u7528\u3001\u4E0D\u5728\u6821\u9A8C\u6210\u529F\u540E\u91CD\u65B0\u751F\u6210\u6574\u7A3F\u3002content \u4E3A\u5408\u6CD5 JSON \u5B57\u7B26\u4E32\uFF0C\u4E0D\u5E26 Markdown \u56F4\u680F\u3001\u6CE8\u91CA\u6216\u591A\u4F59\u5B57\u7B26\u3002assets \u9876\u5C42\u5FC5\u987B\u540C\u65F6\u5305\u542B characters/scenes/locations/scene_states/props \u4E94\u4E2A\u6570\u7EC4\uFF0C\u9053\u5177\u5C5E\u4E8E props\uFF0C\u4E0D\u662F\u4EC5\u5199\u5728\u573A\u666F\u63CF\u8FF0\u4E2D\uFF1B\u6CA1\u6709\u9053\u5177\u65F6\u663E\u5F0F props:[]\u3002\u6821\u9A8C\u5931\u8D25\u53EA\u4FEE\u590D\u62A5\u544A\u4E2D\u7684\u683C\u5F0F\u6216\u5B57\u6BB5\uFF0C\u4E0D\u91CD\u5199\u5DF2\u6279\u51C6\u5185\u5BB9\u3001\u4E0D\u628A\u771F\u5B9E\u9053\u5177\u6E05\u7A7A\u3001\u4E0D\u7F16\u9020\u9053\u5177\u3002submit \u4F7F\u7528\u6700\u8FD1\u5DE5\u5177\u8FD4\u56DE\u7684\u5F53\u524D revision\uFF1B\u8FD4\u56DE nextTask \u5DF2\u542B\u4E0B\u4E00\u9636\u6BB5\u5B8C\u6574\u8F93\u5165\uFF0C\u76F4\u63A5\u7EE7\u7EED\uFF0C\u4E0D\u518D\u4E3A\u76F8\u540C\u7248\u672C\u91CD\u590D next/read\u3002\u9700\u8981\u8865\u67E5\u5355\u9636\u6BB5\u7528 read(stage)\uFF0C\u5168\u90E8\u5386\u53F2\u624D\u7528 responseMode="full"\u3002validate \u4E0D\u4EE3\u8868\u4FDD\u5B58\u3001\u6279\u51C6\u6216\u89C6\u9891\u6210\u529F\u3002\u5185\u90E8\u683C\u5F0F\u4FEE\u590D\u65E0\u9700\u8BA9\u7528\u6237\u5904\u7406 JSON\uFF0C\u53EA\u5728\u5F71\u54CD\u521B\u610F\u6216\u5DF2\u6279\u51C6\u5185\u5BB9\u65F6\u8BF7\u6C42\u51B3\u7B56\u3002';
 }
 
 // src/businesses/film-director/roles/index.ts
@@ -2705,7 +2956,7 @@ function routeIntent(state, intent, entityIds = []) {
   const approvals = dependencies.filter((s) => ["creative", "script"].includes(s) && state.approvals[s] !== state.artifacts[s]?.revision);
   const local = ["revise_dialogue", "revise_character", "revise_scene", "revise_camera", "revise_timing"].includes(intent);
   const scopeRequired = local && !entityIds.length;
-  const ids = stage === "assets" ? role2 === "character" ? state.artifacts.assets?.data.characters?.map((v) => v.character_id) : state.artifacts.assets?.data.scenes?.map((v) => v.scene_id) : stage === "shots" || stage === "prompts" ? state.artifacts.shots?.data.shots?.map((v) => v.shot_id) : void 0;
+  const ids = stage === "assets" ? role2 === "character" ? state.artifacts.assets?.data.characters?.map((v) => v.character_id) : ["scenes", "locations", "scene_states", "props"].flatMap((k) => (state.artifacts.assets?.data[k] || []).map((v) => v[{ scenes: "scene_id", locations: "location_id", scene_states: "scene_state_id", props: "prop_id" }[k]])) : stage === "shots" || stage === "prompts" ? state.artifacts.shots?.data.shots?.map((v) => v.shot_id) : void 0;
   if (ids && entityIds.some((id) => !ids.includes(id))) throw Error("UNKNOWN_ENTITY");
   const inputs = Object.fromEntries([.../* @__PURE__ */ new Set([...dependencies, ...stage ? [stage] : []])].filter((s) => state.artifacts[s]).map((s) => [s, state.artifacts[s]]));
   return {
@@ -2731,8 +2982,8 @@ function routeIntent(state, intent, entityIds = []) {
 
 // src/businesses/film-director/workflows/revisions.ts
 function reviseEntities(state, stage, replacements, expected) {
-  const fields = { assets: ["characters", "scenes"], shots: ["shots"], prompts: ["prompts"] };
-  const keys = { characters: "character_id", scenes: "scene_id", shots: "shot_id", prompts: "shot_id" };
+  const fields = { assets: ["characters", "scenes", "locations", "scene_states", "props"], shots: ["shots"], prompts: ["prompts"] };
+  const keys = { characters: "character_id", scenes: "scene_id", locations: "location_id", scene_states: "scene_state_id", props: "prop_id", shots: "shot_id", prompts: "shot_id" };
   if (!fields[stage] || !Array.isArray(replacements) || !replacements.length) throw Error("INVALID_REVISION_SCOPE");
   const artifact = state.artifacts[stage];
   if (!artifact || artifact.stale) throw Error("UPSTREAM_REQUIRED");
@@ -2743,16 +2994,16 @@ function reviseEntities(state, stage, replacements, expected) {
     const key = keys[replacement.collection];
     const id = replacement.entity?.[key];
     const index = data[replacement.collection].findIndex((v) => v[key] === id);
-    if (index < 0 || changed.has(id)) throw Error("UNKNOWN_OR_DUPLICATE_ENTITY");
+    if (index < 0 || changed.has(`${replacement.collection}:${id}`)) throw Error("UNKNOWN_OR_DUPLICATE_ENTITY");
     data[replacement.collection][index] = replacement.entity;
-    changed.add(id);
+    changed.add(`${replacement.collection}:${id}`);
   }
   const next = commitArtifact(state, stage, data, expected);
-  const affected = stage === "assets" ? state.artifacts.shots?.data.shots.filter((s) => changed.has(s.scene_id) || s.character_ids.some((id) => changed.has(id))).map((s) => s.shot_id) || [] : [...changed];
-  for (const downstream of STAGES.slice(STAGES.indexOf(stage) + 1)) {
+  const affected = stage === "assets" ? state.artifacts.shots?.data.shots.filter((s) => changed.has(`scenes:${s.scene_id}`) || changed.has(`locations:${s.location_id}`) || changed.has(`scene_states:${s.scene_state_id}`) || s.character_ids.some((id) => changed.has(`characters:${id}`)) || (s.prop_ids || []).some((id) => changed.has(`props:${id}`))).map((s) => s.shot_id) || [] : replacements.map((r) => r.entity[keys[r.collection]]);
+  for (const downstream of STAGES2.slice(STAGES2.indexOf(stage) + 1)) {
     if (next.artifacts[downstream]) next.artifacts[downstream].stale_entity_ids = affected;
   }
-  next.last_change = { stage, entity_ids: [...changed], affected_shot_ids: affected };
+  next.last_change = { stage, entity_ids: replacements.map((r) => r.entity[keys[r.collection]]), changed_entities: [...changed], affected_shot_ids: affected };
   return next;
 }
 function scheduleTask(state, task) {
@@ -2789,15 +3040,16 @@ function taskResult(state, key, status, errorCode) {
 }
 
 // src/businesses/film-director/workflows/orchestration.ts
+init_config();
 function nextTask(state) {
   if (state.status === "STOPPED") return { action: "stop", status: "STOPPED", expectedRevision: state.revision };
-  for (const stage of STAGES) {
+  for (const stage of STAGES2) {
     const artifact = state.artifacts[stage];
     if (!artifact || artifact.stale || state.status === `${stage.toUpperCase()}_REVISE`) {
       const roles = { creative: "creative", script: "screenwriter", assets: "character + scene", shots: "storyboard", prompts: "prompt-engineer", review: "reviewer" };
       const dependencies = STAGE_DEPS;
       const roleIds = { creative: ["creative"], script: ["screenwriter"], assets: ["character", "scene"], shots: ["storyboard"], prompts: ["prompt-engineer"], review: ["reviewer"] };
-      return { action: "submit", submission_contract: submissionContract(stage), ...projectContext(state), work_profile: profileContext(state), input_revisions: sourceRevisions(state, stage), revision_scope: artifact?.stale_entity_ids || [], model_profile: modelProfile(state), stage, role: roles[stage], inputs: Object.fromEntries(dependencies[stage].map((s) => [s, state.artifacts[s]])), instructions: roleIds[stage].map((role2) => roleInstructions(state, role2)).join("\n\n"), expectedRevision: state.revision };
+      return { action: "submit", narrative_diagnostics: narrativeDiagnostics(state.artifacts.script?.data), submission_contract: submissionContract(stage), ...projectContext(state), work_profile: profileContext(state), input_revisions: sourceRevisions(state, stage), revision_scope: artifact?.stale_entity_ids || [], model_profile: modelProfile(state), stage, role: roles[stage], inputs: Object.fromEntries(dependencies[stage].map((s) => [s, state.artifacts[s]])), instructions: roleIds[stage].map((role2) => roleInstructions(state, role2)).join("\n\n"), expectedRevision: state.revision };
     }
     if (["creative", "script"].includes(stage) && state.approvals[stage] !== artifact.revision) {
       if (stage === "creative" && profileContext(state).status === "UNSELECTED") return { action: "configure_profile", role: "director", ...projectContext(state), work_profile: profileContext(state), expectedRevision: state.revision, instructions: "\u521B\u610F\u6279\u51C6\u524D\u786E\u8BA4\u4F5C\u54C1\u7C7B\u578B\uFF0C\u7528configure_profile\u4FDD\u5B58\u9009\u62E9\uFF1B\u4FDD\u5B58\u4F1A\u4F7F\u5F53\u524D\u8349\u7A3F\u5931\u6548\uFF0C\u9700\u6309\u7C7B\u578B\u66F4\u65B0\u540E\u91CD\u65B0\u63D0\u4EA4\u3002\u4E0D\u5F97\u628A\u672A\u56DE\u7B54\u5F53\u4F5C\u540C\u610F\u3002" };
@@ -2811,7 +3063,7 @@ function nextTask(state) {
 }
 function validateCurrent(state) {
   if (state.status === "STOPPED") throw Error("PROJECT_STOPPED");
-  for (const stage of STAGES) {
+  for (const stage of STAGES2) {
     const artifact = state.artifacts[stage];
     if (!artifact || artifact.stale) throw Error(`STALE_OR_MISSING:${stage}`);
     if (["creative", "script"].includes(stage) && state.approvals[stage] !== artifact.revision) throw Error("APPROVAL_REQUIRED");
@@ -2819,7 +3071,7 @@ function validateCurrent(state) {
     if (stage === "review" && artifact.data.review_status && !evaluateReview(artifact.data).passed) throw Error("REVIEW_BLOCKED");
   }
 }
-function compileProduction(state, plan, ratio, resolution) {
+function compileProduction(state, plan, ratio, resolution, capabilities = modelProfile(state)) {
   validateCurrent(state);
   if (!["16:9", "9:16"].includes(ratio) || !["480p", "720p"].includes(resolution)) throw Error("CONFIRMED_SPEC_REQUIRED");
   if (!Number.isSafeInteger(state.duration_ms) || state.duration_ms < 15e3 || state.duration_ms > 36e5) throw Error("INVALID_PROJECT_DURATION");
@@ -2828,19 +3080,40 @@ function compileProduction(state, plan, ratio, resolution) {
   if (spec?.resolution && spec.resolution !== resolution) throw Error("PROJECT_SPEC_MISMATCH:resolution");
   const shots = state.artifacts.shots.data.shots;
   const prompts = state.artifacts.prompts.data.prompts;
+  const independent = spec?.production_strategy === "independent_shots";
+  if (independent) {
+    const capability = capabilities.supported_durations_ms;
+    if (!capability) throw Error("MODEL_CAPABILITY_UNVERIFIED");
+    if (shots.some((s) => s.duration_ms % 1e3 || s.duration_ms < capability.min || s.duration_ms > capability.max)) throw Error("INDEPENDENT_SHOT_DURATION_REQUIRES_REVISION");
+    plan = shots.map((s) => ({ kind: "generate", seconds: s.duration_ms / 1e3 }));
+    if (plan.length > MAX_SEGMENTS) throw Error("TOO_MANY_INDEPENDENT_SHOTS");
+  }
   let start = 0;
   const segments = plan.map((part, index) => {
     const end = start + part.seconds * 1e3;
     const covered = shots.filter((s) => s.start_ms < end && s.end_ms > start);
     if (state.schema_version === "3.1.0" && covered.some((s) => s.start_ms < start || s.end_ms > end)) throw Error("SHOT_SPLIT_REQUIRES_STORYBOARD_REVISION");
-    if (state.schema_version === "3.1.0" && new Set(covered.map((s) => s.location_id)).size > 1) throw Error("MULTI_LOCATION_SEGMENT_REQUIRES_REPLAN");
+    if (!independent && state.schema_version === "3.1.0" && new Set(covered.map((s) => s.location_id)).size > 1) throw Error("MULTI_LOCATION_SEGMENT_REQUIRES_REPLAN");
     const prompt = covered.map((s) => `[${Math.max(start, s.start_ms) - start}\u2013${Math.min(end, s.end_ms) - start}ms] ${prompts.find((p) => p.shot_id === s.shot_id).prompt}`).join("\n");
     const result = { index: index + 1, start_ms: start, end_ms: end, shot_ids: covered.map((s) => s.shot_id), prompt };
     start = end;
     return result;
   });
   if (start !== state.duration_ms || segments.some((s) => !s.prompt)) throw Error("PRODUCTION_DURATION_MISMATCH");
-  return { source_project_id: state.project_id, source_revision: state.revision, ratio, resolution, segments, specification: { prompt: segments[0].prompt, segmentPrompts: segments.map((s) => s.prompt), duration: state.duration_ms / 1e3, ratio, resolution } };
+  return { source_project_id: state.project_id, source_revision: state.revision, ratio, resolution, segments, specification: { prompt: segments[0].prompt, segmentPrompts: segments.map((s) => s.prompt), duration: state.duration_ms / 1e3, ratio, resolution, ...independent ? { productionStrategy: "independent_shots", shotDurations: plan.map((p) => p.seconds) } : {} }, strategy: independent ? "independent_shots" : "continuous_segments" };
+}
+
+// src/businesses/video/workflow/shot-materials.ts
+function validateShotFrames(args, count) {
+  if (args.shotFrames === void 0) return;
+  if (args.productionStrategy !== "independent_shots" || !Array.isArray(args.shotFrames) || args.shotFrames.length !== count) throw Error("INVALID_SHOT_FRAMES");
+  for (const frame of args.shotFrames) if (!frame || typeof frame !== "object" || Array.isArray(frame) || Object.keys(frame).some((k) => !["firstFrameUrl", "lastFrameUrl"].includes(k)) || Object.values(frame).some((v) => typeof v !== "string" || !v.trim())) throw Error("INVALID_SHOT_FRAMES");
+}
+function shotMaterials(args, index, count) {
+  if (args.productionStrategy !== "independent_shots") return { ...args };
+  validateShotFrames(args, count);
+  const selected = args.shotFrames?.[index] || {};
+  return { ...args, firstFrameUrl: selected.firstFrameUrl ?? (index === 0 ? args.firstFrameUrl : void 0), lastFrameUrl: selected.lastFrameUrl ?? (index === count - 1 ? args.lastFrameUrl : void 0) };
 }
 
 // src/businesses/video/workflow/planning.ts
@@ -2860,7 +3133,7 @@ function finiteNumber(value) {
 // src/businesses/video/workflow/planning.ts
 init_config();
 function modelMaxSeconds(config) {
-  return isOmniExtendModel(resolveModel(config)) ? 30 : 15;
+  return videoCapabilities(resolveModel(config)).supported_durations_ms?.max / 1e3 || 15;
 }
 function resolveSingleMax(config) {
   return modelMaxSeconds(config);
@@ -2909,6 +3182,14 @@ function resolveSegmentPrompts(prompts, planLength) {
 }
 function resolveTargetPlan(config, args) {
   const singleMax = resolveSingleMax(config);
+  if (args?.productionStrategy && !["continuous_segments", "independent_shots"].includes(args.productionStrategy)) throw Error("INVALID_PRODUCTION_STRATEGY");
+  if (args?.productionStrategy === "independent_shots") {
+    const durations = args.shotDurations;
+    if (!Array.isArray(durations) || !durations.length || durations.length > MAX_SEGMENTS || durations.some((s) => !Number.isInteger(s) || s < MIN_SECONDS || s > singleMax) || durations.reduce((a, b) => a + b, 0) !== args.duration || args.duration > MAX_TOTAL_SECONDS) throw Error("INVALID_INDEPENDENT_SHOT_PLAN");
+    validateShotFrames(args, durations.length);
+    return { plan: durations.map((seconds) => ({ kind: "generate", seconds })), singleMax, segmentSeconds: singleMax, cap: MAX_TOTAL_SECONDS, asked: args.duration, total: args.duration };
+  }
+  if (args?.shotFrames !== void 0) validateShotFrames(args, 0);
   const segmentSeconds = resolveSegmentSeconds(config, args?.segmentSeconds);
   const cap = maxTargetSeconds(singleMax, segmentSeconds);
   const asked = clampInteger(
@@ -2961,8 +3242,8 @@ function estimatePlan(config, toolName, args) {
 
 // src/businesses/video/workflow/segment-review.ts
 import path6 from "node:path";
-import { readFile as readFile2, writeFile as writeFile2, rename as rename2, rm as rm2, stat as stat2 } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { readFile as readFile3, writeFile as writeFile2, rename as rename2, rm as rm2, stat as stat3 } from "node:fs/promises";
+import { randomUUID as randomUUID2 } from "node:crypto";
 
 // src/businesses/video/workflow/result-state.ts
 function videoResultState(value = {}) {
@@ -3023,13 +3304,13 @@ function validatePauseRecord(data, file = "paused-plan.json") {
 // src/businesses/video/workflow/resume.ts
 init_config();
 import path5 from "node:path";
-import { readFile, open as open2, rm, mkdir as mkdir3, writeFile, rename } from "node:fs/promises";
+import { readFile as readFile2, open as open2, rm, mkdir as mkdir3, writeFile, rename } from "node:fs/promises";
 
 // src/businesses/video/utils/files.ts
 init_config();
 init_value();
-import path2 from "node:path";
-import { mkdir, stat } from "node:fs/promises";
+import path4 from "node:path";
+import { mkdir as mkdir2, stat as stat2 } from "node:fs/promises";
 function tail(text, limit = 600) {
   const clean = String(text || "").trim();
   return clean.length > limit ? `\u2026${clean.slice(-limit)}` : clean;
@@ -3049,13 +3330,13 @@ function fileStamp(date2 = /* @__PURE__ */ new Date()) {
   return `${date2.getFullYear()}${pad(date2.getMonth() + 1)}${pad(date2.getDate())}-${pad(date2.getHours())}${pad(date2.getMinutes())}${pad(date2.getSeconds())}`;
 }
 async function allocateStamp(outDir, base) {
-  const parent = path2.join(outDir, "segments");
-  await mkdir(parent, { recursive: true });
+  const parent = path4.join(outDir, "segments");
+  await mkdir2(parent, { recursive: true });
   for (let attempt = 1; attempt <= 100; attempt += 1) {
     const stamp = attempt === 1 ? base : `${base}-${attempt}`;
-    const dir = path2.join(parent, stamp);
+    const dir = path4.join(parent, stamp);
     try {
-      await mkdir(dir);
+      await mkdir2(dir);
       return { stamp, segmentsDir: dir };
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
@@ -3065,7 +3346,7 @@ async function allocateStamp(outDir, base) {
 }
 async function exists(file) {
   try {
-    await stat(file);
+    await stat2(file);
     return true;
   } catch {
     return false;
@@ -3073,7 +3354,7 @@ async function exists(file) {
 }
 async function resolveOutputDir(config, exec, deps) {
   const configured = String(ref(config, "outputDir", "")).trim();
-  if (configured) return path2.resolve(configured);
+  if (configured) return path4.resolve(configured);
   let cwd = "";
   if (deps?.workdir && exec?.agent) {
     try {
@@ -3082,51 +3363,11 @@ async function resolveOutputDir(config, exec, deps) {
       cwd = "";
     }
   }
-  return path2.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
+  return path4.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
 }
 
 // src/businesses/video/workflow/resume.ts
-import os2 from "node:os";
-
-// src/core/utils/logging.ts
-import { AsyncLocalStorage } from "node:async_hooks";
-import path4 from "node:path";
-
-// src/core/paths.ts
-import os from "node:os";
-import path3 from "node:path";
-function dshHome() {
-  const fromEnv = String(typeof process !== "undefined" && process.env?.DSH_HOME || "").trim();
-  return fromEnv || path3.join(os.homedir(), ".dsh");
-}
-
-// src/core/utils/logging.ts
-init_version();
-init_hardcoded_config();
-import { mkdir as mkdir2, appendFile } from "node:fs/promises";
-var requestLogContext = new AsyncLocalStorage();
-function requestLogPath() {
-  const now = /* @__PURE__ */ new Date();
-  const date2 = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-  return path4.join(dshHome(), "logs", DATA_DIR, date2, "requests.jsonl");
-}
-var preparedDirs = /* @__PURE__ */ new Set();
-async function ensureLogDir(dir) {
-  if (preparedDirs.has(dir)) return;
-  await mkdir2(dir, { recursive: true, mode: 448 });
-  if (preparedDirs.size > 32) preparedDirs.clear();
-  preparedDirs.add(dir);
-}
-async function appendRequestLog(record) {
-  try {
-    const file = requestLogPath();
-    await ensureLogDir(path4.dirname(file));
-    await appendFile(file, JSON.stringify({ time: (/* @__PURE__ */ new Date()).toISOString(), pluginVersion: PLUGIN_VERSION, ...requestLogContext.getStore(), ...record }) + "\n", { mode: 384 });
-  } catch {
-  }
-}
-
-// src/businesses/video/workflow/resume.ts
+import os3 from "node:os";
 init_connection();
 var PAUSE_FILE = "paused-plan.json";
 function resumeDirOf(value) {
@@ -3138,7 +3379,7 @@ async function readPauseFile(dir) {
   const file = path5.join(dir, PAUSE_FILE);
   let text;
   try {
-    text = await readFile(file, "utf8");
+    text = await readFile2(file, "utf8");
   } catch {
     throw new Error(
       `\u6CA1\u6709\u627E\u5230\u6682\u505C\u8BB0\u5F55\uFF1A${file}\u3002resume \u8981\u4F20\u4E0A\u4E00\u6B21\u7ED3\u679C\u91CC\u7684 resumeDir\uFF08\u7528\u6237\u9009\u62E9\u5148\u4E0D\u7EE7\u7EED\u65F6\uFF0C\u7ED3\u679C\u91CC\u7ED9\u7684\u90A3\u4E2A\u5206\u6BB5\u76EE\u5F55\uFF09\uFF0C\u4E0D\u8981\u81EA\u5DF1\u62FC\u8DEF\u5F84\u3002`
@@ -3159,7 +3400,7 @@ function resumeLockStaleMs(config) {
   return minutes * 60 * 1e3;
 }
 async function resumeLockExpired(file, staleMs) {
-  const raw = await readFile(file, "utf8").catch(() => null);
+  const raw = await readFile2(file, "utf8").catch(() => null);
   if (raw === null) return true;
   let data;
   try {
@@ -3173,7 +3414,7 @@ async function resumeLockExpired(file, staleMs) {
   return Date.now() - started > staleMs;
 }
 async function describeResumeLock(file) {
-  const raw = await readFile(file, "utf8").catch(() => null);
+  const raw = await readFile2(file, "utf8").catch(() => null);
   if (!raw) return "";
   try {
     const data = JSON.parse(raw);
@@ -3192,7 +3433,7 @@ async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
     tool: toolName,
     callId: callId || null,
     pid: process.pid,
-    host: os2.hostname(),
+    host: os3.hostname(),
     startedAt: (/* @__PURE__ */ new Date()).toISOString(),
     token
   };
@@ -3208,7 +3449,7 @@ async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
       return {
         file,
         async release() {
-          const raw = await readFile(file, "utf8").catch(() => null);
+          const raw = await readFile2(file, "utf8").catch(() => null);
           if (raw) {
             try {
               if (JSON.parse(raw)?.token !== token) return;
@@ -3305,6 +3546,7 @@ async function writePauseFile(dir, data) {
   }
 }
 function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
+  if (data.options?.productionStrategy === "independent_shots" && askedTotal != null && askedTotal !== sumStepSeconds(data.plan || [])) throw Error("INDEPENDENT_PLAN_CHANGE_REQUIRES_NEW_REVIEW");
   const done = Number(data.done) || 0;
   const cursor = Number(data.cursor) || 0;
   const fullPlan = (data.plan || []).map((step) => ({ ...step }));
@@ -3323,6 +3565,9 @@ function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
 function pickResumeOptions(args) {
   const keys = [
     "projectId",
+    "productionStrategy",
+    "shotDurations",
+    "shotFrames",
     "mode",
     "ratio",
     "generateAudio",
@@ -3437,7 +3682,7 @@ async function segmentSnapshot(dir) {
 var reviewFile = (dir) => path6.join(dir, "segment-review.json");
 async function accepted(dir, key, exec) {
   try {
-    const data = JSON.parse(await readFile2(reviewFile(dir), "utf8"));
+    const data = JSON.parse(await readFile3(reviewFile(dir), "utf8"));
     return data.version === 1 && data.owner === sessionOwner(exec) && data.key === key && data.approved === true;
   } catch {
     return false;
@@ -3483,7 +3728,7 @@ function createSegmentReview(ctx) {
       const links = shown.get(exec?.agent?.session);
       let localReady = false;
       try {
-        localReady = (await stat2(snap.file)).isFile();
+        localReady = (await stat3(snap.file)).isFile();
       } catch {
       }
       if (!(localReady && links?.has(snap.file)) && !links?.has(snap.last.videoUrl)) return { status: "blocked", resumeDir: dir, reason: "\u8BF7\u5148\u5728\u7528\u6237\u53EF\u89C1\u6B63\u6587\u7528\u53EF\u70B9\u51FB\u94FE\u63A5\u5C55\u793A\u521A\u5B8C\u6210\u7684\u5206\u6BB5\uFF0C\u518D\u8C03\u7528review_segment\uFF1B\u6587\u4EF6\u767B\u8BB0\u3001\u5DE5\u5177\u770B\u89C6\u9891\u6216\u7EAF\u6587\u5B57\u8DEF\u5F84\u4E0D\u7B97\u5C55\u793A\u3002", videoPath: localReady ? snap.file : void 0, videoUrl: snap.last.videoUrl };
@@ -3495,7 +3740,7 @@ function createSegmentReview(ctx) {
       const approved = !exec.signal?.aborted && !answer?.custom && answer?.selected?.length === 1 && answer.selected[0] === "\u6548\u679C\u53EF\u4EE5\uFF0C\u7EE7\u7EED\u4E0B\u4E00\u6BB5";
       if (!approved) return { status: "paused", resumeDir: dir, reason: "\u672A\u901A\u8FC7\u672C\u6BB5\u7ED3\u679C\u5BA1\u6838\uFF0C\u4E0D\u63D0\u4EA4\u4E0B\u4E00\u6BB5\uFF0C\u4E0D\u81EA\u52A8\u91CD\u505A\u5DF2\u5B8C\u6210\u89C6\u9891\u3002" };
       if ((await segmentSnapshot(dir)).key !== snap.key) throw new Error("\u7B49\u5F85\u5BA1\u6838\u671F\u95F4\u5206\u6BB5\u8FDB\u5EA6\u5DF2\u6539\u53D8\uFF0C\u8BF7\u5C55\u793A\u6700\u65B0\u4E00\u6BB5\u5E76\u91CD\u65B0\u786E\u8BA4\u3002");
-      const temp = `${reviewFile(dir)}.${randomUUID()}.tmp`;
+      const temp = `${reviewFile(dir)}.${randomUUID2()}.tmp`;
       try {
         await writeFile2(temp, JSON.stringify({ version: 1, owner, key: snap.key, approved: true, reviewedAt: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" });
         await rename2(temp, reviewFile(dir));
@@ -3511,15 +3756,15 @@ function createSegmentReview(ctx) {
 }
 
 // src/businesses/video/workflow/project.ts
-import { createHash as createHash2, randomUUID as randomUUID2 } from "node:crypto";
-import { mkdir as mkdir5, readdir as readdir2, readFile as readFile4, writeFile as writeFile3, rename as rename4, rm as rm4 } from "node:fs/promises";
+import { createHash as createHash3, randomUUID as randomUUID3 } from "node:crypto";
+import { mkdir as mkdir5, readdir as readdir3, readFile as readFile5, writeFile as writeFile3, rename as rename4, rm as rm4 } from "node:fs/promises";
 import path8 from "node:path";
 
 // src/businesses/video/media/references.ts
 init_hardcoded_config();
 import path7 from "node:path";
-import os3 from "node:os";
-import { stat as stat3, mkdir as mkdir4, rename as rename3, rm as rm3, open as open3, readdir, readFile as readFile3 } from "node:fs/promises";
+import os4 from "node:os";
+import { stat as stat4, mkdir as mkdir4, rename as rename3, rm as rm3, open as open3, readdir as readdir2, readFile as readFile4 } from "node:fs/promises";
 
 // src/businesses/video/media/ffmpeg.ts
 init_config();
@@ -3731,16 +3976,16 @@ async function findInstalledFfmpeg(signal) {
 }
 function ffmpegInstallHint(config) {
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  const { os: os5, installs } = ffmpegInstallOptions();
+  const { os: os6, installs } = ffmpegInstallOptions();
   const lines = [
     `\u672C\u673A\u6CA1\u6709\u627E\u5230\u53EF\u7528\u7684 ffmpeg\uFF08${binary}\uFF09\uFF0C\u6240\u4EE5\u300C\u628A\u591A\u6BB5\u5408\u5E76\u6210\u4E00\u6761\u300D\u8FD9\u6B65\u6682\u65F6\u6CA1\u505A\uFF0C\u5DF2\u751F\u6210\u7ED3\u679C\u4EE5\u8FD4\u56DE\u7684\u5206\u6BB5\u5217\u8868\u4E3A\u51C6\uFF1B\u672C\u5730\u6587\u4EF6\u662F\u5426\u9F50\u5168\u8BF7\u6838\u5BF9\u5404\u6BB5\u8DEF\u5F84\u3002`,
-    `\u88C5\u4E00\u4E0B ffmpeg \u5C31\u80FD\u5408\u5E76\uFF08\u4F60\u5F53\u524D\u662F ${os5}\uFF09\uFF1A`,
+    `\u88C5\u4E00\u4E0B ffmpeg \u5C31\u80FD\u5408\u5E76\uFF08\u4F60\u5F53\u524D\u662F ${os6}\uFF09\uFF1A`,
     ...installs.map((item) => `  \xB7 ${item.label}\uFF1A${item.command}`),
     "\u88C5\u597D\u540E\u4F7F\u7528\u539Fresume\u6062\u590D\u5DF2\u6709\u4EFB\u52A1\u7684\u4E0B\u8F7D\u6216\u5408\u5E76\uFF0C\u4E0D\u91CD\u65B0\u63D0\u4EA4\u751F\u6210\u4EFB\u52A1\uFF1B\u5982\u679C ffmpeg \u5DF2\u7ECF\u88C5\u4E86\u4F46\u4E0D\u5728\u9ED8\u8BA4\u4F4D\u7F6E\uFF0C\u628A\u5B83\u7684\u7EDD\u5BF9\u8DEF\u5F84\u586B\u5230\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\u4E5F\u4E00\u6837\u7BA1\u7528\u3002",
     "ffmpeg \u7684\u5B89\u88C5\u5305\u91CC\u81EA\u5E26 ffprobe\uFF0C\u88C5\u5B8C\u5206\u6BB5\u63A2\u6D4B\u4E5F\u4E00\u8D77\u597D\u4E86\u3002",
     "\u60F3\u8BA9\u6211\u6765\u88C5\u5C31\u8BF4\u4E00\u58F0 \u2014\u2014 \u6211\u4F1A\u7528 video_setup \u6267\u884C\u5B89\u88C5\uFF08\u6267\u884C\u524D\u5BBF\u4E3B\u4F1A\u5148\u8BA9\u4F60\u786E\u8BA4\u547D\u4EE4\uFF09\u3002"
   ];
-  return { binary, os: os5, installs, hint: lines.join("\n") };
+  return { binary, os: os6, installs, hint: lines.join("\n") };
 }
 async function probeMedia(file, config, signal) {
   try {
@@ -3809,10 +4054,10 @@ function canvasSize(ratio) {
   return CANVAS_SIZES[String(ratio ?? "").trim()] || null;
 }
 function referenceCacheDir() {
-  return path7.join(os3.tmpdir(), REFERENCE_TMP_DIR);
+  return path7.join(os4.tmpdir(), REFERENCE_TMP_DIR);
 }
 async function isUsableFit(dest, width, height, config, signal) {
-  const info = await stat3(dest).catch(() => null);
+  const info = await stat4(dest).catch(() => null);
   if (!info?.isFile() || info.size <= 0) return false;
   const media = await probeMedia(dest, config, signal);
   if (!media?.width || !media?.height) return true;
@@ -3825,12 +4070,12 @@ var lastCachePruneAt = 0;
 async function pruneReferenceCache(dir, { now = Date.now(), force = false } = {}) {
   if (!force && now - lastCachePruneAt < 60 * 60 * 1e3) return;
   lastCachePruneAt = now;
-  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+  const entries = await readdir2(dir, { withFileTypes: true }).catch(() => []);
   const files = [];
   for (const entry2 of entries) {
     if (!entry2.isFile()) continue;
     const file = path7.join(dir, entry2.name);
-    const info = await stat3(file).catch(() => null);
+    const info = await stat4(file).catch(() => null);
     if (!info) continue;
     const inFlight = entry2.name.includes(".fit-") && now - info.mtimeMs < REFERENCE_CACHE_FRESH_MS;
     if (inFlight) continue;
@@ -3852,7 +4097,7 @@ async function fitImageToCanvas(absPath, size, config, signal) {
   const [width, height] = size;
   const media = await probeMedia(absPath, config, signal);
   if (media?.width === width && media?.height === height) return absPath;
-  const info = await stat3(absPath).catch(() => null);
+  const info = await stat4(absPath).catch(() => null);
   const key = `${path7.basename(absPath, path7.extname(absPath))}-${info?.size ?? 0}-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`;
   const dest = path7.join(referenceCacheDir(), key);
   if (await isUsableFit(dest, width, height, config, signal)) return dest;
@@ -3921,17 +4166,17 @@ async function sniffFileImage(file) {
 }
 async function findRecentUploadedImages(windowMs = UPLOAD_WINDOW_MS) {
   const root = attachmentObjectsDir();
-  const shards = await readdir(root, { withFileTypes: true }).catch(() => []);
+  const shards = await readdir2(root, { withFileTypes: true }).catch(() => []);
   const cutoff = Date.now() - windowMs;
   const found = [];
   for (const shard of shards) {
     if (!shard.isDirectory()) continue;
     const dir = path7.join(root, shard.name);
-    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+    const entries = await readdir2(dir, { withFileTypes: true }).catch(() => []);
     for (const entry2 of entries) {
       if (!entry2.isFile()) continue;
       const abs = path7.join(dir, entry2.name);
-      const info = await stat3(abs).catch(() => null);
+      const info = await stat4(abs).catch(() => null);
       if (!info || info.mtimeMs < cutoff) continue;
       const mime = await sniffFileImage(abs);
       if (mime) found.push({ abs, mime, bytes: info.size, mtimeMs: info.mtimeMs });
@@ -3991,14 +4236,14 @@ async function resolveImageInput(value, label, fit = null) {
       uploadIndex: index
     };
   } else {
-    abs = path7.resolve(raw.startsWith("~/") || raw === "~" ? path7.join(os3.homedir(), raw.slice(1)) : raw);
+    abs = path7.resolve(raw.startsWith("~/") || raw === "~" ? path7.join(os4.homedir(), raw.slice(1)) : raw);
     const ext = path7.extname(abs).toLowerCase();
     if (!IMAGE_EXT_TO_MIME[ext]) {
       throw new Error(
         `${label} \u65E2\u4E0D\u662F http(s) \u94FE\u63A5\u3001base64\uFF0C\u4E5F\u4E0D\u662F\u652F\u6301\u7684\u56FE\u7247\u6587\u4EF6\uFF1A${brief(raw)}\u3002\u672C\u673A\u56FE\u7247\u8BF7\u7528 ${Object.keys(IMAGE_EXT_TO_MIME).join(" / ")} \u4E4B\u4E00\uFF0C\u7528\u6237\u521A\u5728\u5BF9\u8BDD\u91CC\u4E0A\u4F20\u7684\u56FE\u76F4\u63A5\u5199 latest\u3002`
       );
     }
-    info = await stat3(abs).catch(() => null);
+    info = await stat4(abs).catch(() => null);
     if (!info?.isFile()) {
       throw new Error(`${label} \u627E\u4E0D\u5230\u6587\u4EF6\uFF1A${abs}\uFF08\u7528\u6237\u521A\u5728\u5BF9\u8BDD\u91CC\u4E0A\u4F20\u7684\u56FE\u53EF\u4EE5\u76F4\u63A5\u5199 latest\uFF09`);
     }
@@ -4006,7 +4251,7 @@ async function resolveImageInput(value, label, fit = null) {
   const submitPath = fit?.size ? await fitImageToCanvas(abs, fit.size, fit.config, fit.signal) : abs;
   let size = info.size;
   if (submitPath !== abs) {
-    const fittedInfo = await stat3(submitPath).catch(() => null);
+    const fittedInfo = await stat4(submitPath).catch(() => null);
     if (!fittedInfo?.isFile()) throw new Error(`${label} \u8BFB\u4E0D\u51FA\u6765\uFF1A${abs}`);
     size = fittedInfo.size;
   }
@@ -4015,7 +4260,7 @@ async function resolveImageInput(value, label, fit = null) {
       `${label} \u592A\u5927\uFF08${(size / 1048576).toFixed(1)} MB\uFF09\uFF0C\u8BF7\u538B\u5230 ${MAX_IMAGE_BYTES / 1048576} MB \u4EE5\u5185\u518D\u4F20\uFF1A${abs}`
     );
   }
-  const buffer = await readFile3(submitPath);
+  const buffer = await readFile4(submitPath);
   const mime = sniffImageMime(buffer);
   if (!mime) throw new Error(`${label} \u4E0D\u662F\u6709\u6548\u7684\u56FE\u7247\u6587\u4EF6\uFF08\u8BFB\u5230\u7684\u5185\u5BB9\u4E0D\u662F jpg/png/webp/bmp/gif/tiff\uFF09\uFF1A${abs}`);
   const resolved = {
@@ -4048,7 +4293,7 @@ init_hardcoded_config();
 init_config();
 init_connection();
 var locks = /* @__PURE__ */ new Set();
-var hash = (value) => createHash2("sha256").update(value).digest("hex");
+var hash = (value) => createHash3("sha256").update(value).digest("hex");
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().filter((k) => value[k] !== void 0).map((k) => [k, stable(value[k])]));
@@ -4062,12 +4307,12 @@ function sessionOwner(exec) {
 }
 async function allProjects() {
   const dir = path8.join(dshHome(), DATA_DIR, "projects");
-  const names = await readdir2(dir).catch(() => []);
+  const names = await readdir3(dir).catch(() => []);
   const found = [];
   for (const name of names) {
     if (!name.endsWith(".json")) continue;
     try {
-      found.push(JSON.parse(await readFile4(path8.join(dir, name), "utf8")));
+      found.push(JSON.parse(await readFile5(path8.join(dir, name), "utf8")));
     } catch {
     }
   }
@@ -4087,14 +4332,14 @@ function projectFile(id) {
   return path8.join(dshHome(), DATA_DIR, "projects", `${id}.json`);
 }
 async function readProject(id, exec) {
-  const data = JSON.parse(await readFile4(projectFile(id), "utf8"));
+  const data = JSON.parse(await readFile5(projectFile(id), "utf8"));
   if (data.version !== 1 || data.owner !== sessionOwner(exec)) throw new Error("\u6B64\u9879\u76EE\u4E0D\u5C5E\u4E8E\u5F53\u524D\u4F1A\u8BDD\u3002");
   return data;
 }
 async function writeProject(data) {
   const file = projectFile(data.id);
   await mkdir5(path8.dirname(file), { recursive: true, mode: 448 });
-  const temp = `${file}.${randomUUID2()}.tmp`;
+  const temp = `${file}.${randomUUID3()}.tmp`;
   try {
     await writeFile3(temp, JSON.stringify(data), { mode: 384, flag: "wx" });
     await rename4(temp, file);
@@ -4113,12 +4358,12 @@ async function lockProject(id, fn) {
   }
 }
 async function createProject(exec, subjectType) {
-  const data = { version: 1, id: randomUUID2(), owner: sessionOwner(exec), subjectType, choice: "", approved: null };
+  const data = { version: 1, id: randomUUID3(), owner: sessionOwner(exec), subjectType, choice: "", approved: null };
   await writeProject(data);
   return data;
 }
 function hasProjectImages(args) {
-  return [args?.firstFrameUrl, ...Array.isArray(args?.referenceImages) ? args.referenceImages : [args?.referenceImages], ...args?.characterReferenceImages || []].some((v) => typeof v === "string" && v.trim());
+  return [args?.firstFrameUrl, args?.lastFrameUrl, ...args?.productionStrategy === "independent_shots" && Array.isArray(args.shotFrames) ? args.shotFrames.flatMap((frame) => [frame?.firstFrameUrl, frame?.lastFrameUrl]) : [], ...Array.isArray(args?.referenceImages) ? args.referenceImages : [args?.referenceImages], ...args?.characterReferenceImages || []].some((v) => typeof v === "string" && v.trim());
 }
 function productionFingerprint(config, name, args) {
   const ignore = /* @__PURE__ */ new Set(["projectId", "resume", "merge", "cumulativePreview", "outputDir", "keepSegments", "resetCharacterChoice", "resumeWithCurrentConfig", "referenceImagesReviewed", "inputVideoSeconds"]);
@@ -4138,7 +4383,7 @@ function productionFingerprint(config, name, args) {
   })));
 }
 async function scriptDigest(file) {
-  return hash(await readFile4(file));
+  return hash(await readFile5(file));
 }
 async function assertProjectApproved(config, exec, args) {
   let candidate = args;
@@ -4160,8 +4405,9 @@ async function assertProjectApproved(config, exec, args) {
   if (!resumeDirOf(args?.resume) && args.duration == null) throw new Error("\u751F\u6210\u524D\u5FC5\u987B\u4F20\u5165\u7528\u6237\u5DF2\u786E\u8BA4\u7684\u89C6\u9891\u65F6\u957Fduration\uFF0C\u4E0D\u5F97\u4F7F\u7528\u9ED8\u8BA415\u79D2\u3002");
   if (data.approved?.resumeDir && resumeDirOf(args.resume) !== data.approved.resumeDir) throw new Error("\u6B64\u6B21\u5BA1\u6838\u7ED1\u5B9A\u4E86\u539F\u7EED\u505A\u76EE\u5F55\uFF0C\u8BF7\u4F7F\u7528\u539Fresume\u3002");
   if (data.filmSource) {
-    const source = JSON.parse(await readFile4(data.filmSource.path, "utf8"));
-    if (source.revision !== data.filmSource.revision) throw new Error("\u521B\u4F5C\u9879\u76EE\u5DF2\u6539\u7A3F\uFF0C\u8BF7\u91CD\u65B0\u7F16\u8BD1\u5236\u4F5C\u8BA1\u5212\u5E76\u5BA1\u6838\u3002");
+    if (exec.name !== "video_generate") throw Error("COMPILED_TOOL_MISMATCH:\u4E13\u4E1A\u7F16\u8BD1\u65B9\u6848\u5FC5\u987B\u4F7F\u7528video_generate\u3002");
+    const source = JSON.parse(await readFile5(data.filmSource.path, "utf8"));
+    assertCompiledProduction(data, source, args.resume ? { ...data.approved?.specification, ...candidate } : candidate, resolveModel(config));
   }
   if (!data.approved) throw new Error("\u672C\u9879\u76EE\u811A\u672C\u5C1A\u672A\u5BA1\u6838\u901A\u8FC7\uFF0C\u8BF7\u5148\u5C55\u793A\u811A\u672C\u548C\u5206\u955C\uFF0C\u518D\u8C03\u7528 video_project(action:review)\u3002");
   if (await scriptDigest(data.approved.scriptPath) !== data.approved.scriptHash) throw new Error("\u811A\u672C\u5DF2\u4FEE\u6539\uFF0C\u8BF7\u91CD\u65B0\u5BA1\u6838\u5F53\u524D\u7248\u672C\u3002");
@@ -4184,8 +4430,8 @@ function withProjectApproval(tool, config) {
 }
 
 // src/businesses/film-director/index.ts
-import { randomUUID as randomUUID3, createHash as createHash3 } from "node:crypto";
-import { mkdir as mkdir6, readFile as readFile5, writeFile as writeFile4, rename as rename5 } from "node:fs/promises";
+import { randomUUID as randomUUID4, createHash as createHash4 } from "node:crypto";
+import { mkdir as mkdir6, readFile as readFile6, writeFile as writeFile4, rename as rename5, rm as rm5 } from "node:fs/promises";
 import path9 from "node:path";
 init_hardcoded_config();
 
@@ -4283,7 +4529,7 @@ var CREATIVE_GUIDANCE = SHORT_VIDEO_COMMON + CONTENT_QUALITY + SCRIPT_CRAFT + CR
 \u3010\u8D28\u91CF\u5BA1\u6838\u3011\u5148\u6838\u5BF9\u7A0B\u5E8F\u6821\u9A8C\u7ED3\u679C\uFF0C\u518D\u8BC4\u4E3B\u9898\u3001\u56E0\u679C\u3001\u52A8\u673A\u3001\u5BF9\u767D\u3001\u8FDE\u7EED\u6027\u3001\u97F3\u753B\u548C\u53EF\u751F\u6210\u6027\u3002\u4E13\u4E1A\u9879\u76EE\u6309Reviewer V3.1\u516B\u7EF4\u6743\u91CD\u8BC4\u5206\uFF0C\u4E0D\u9002\u7528\u9879\u5F52\u4E00\u5316\uFF1B\u603B\u5206\u226580\u4E14\u65E0\u672AVERIFIED\u7684CRITICAL/MAJOR\u624D\u5EFA\u8BAE\u4EA4\u4ED8\uFF0C\u5206\u6570\u4E0D\u80FD\u63A9\u76D6\u963B\u65AD\u9879\u3002\u95EE\u9898\u8BB0\u5F55entity_id\u3001rule_id\u3001evidence\u3001owner\u3001minimal_fix\u3001downstream_impact\uFF1B\u4E0D\u5F97\u53EA\u8BF4\u201C\u66F4\u6709\u7535\u5F71\u611F\u201D\u3002\u672A\u6267\u884C\u7684\u7A0B\u5E8F\u68C0\u67E5\u5217unverified_checks\uFF0C\u4E0D\u80FD\u81EA\u79F0\u673A\u5668\u6821\u9A8C\u901A\u8FC7\u3002
 \u3010\u4FEE\u8BA2\u4E0E\u4EA4\u4ED8\u3011\u53EA\u4FEE\u6539\u6307\u5B9A\u8303\u56F4\uFF0C\u4FDD\u7559\u6EE1\u610F\u5185\u5BB9\u4E0E\u7A33\u5B9AID\uFF0C\u4E0A\u6E38\u53D8\u5316\u6807\u8BB0\u4E0B\u6E38\u5931\u6548\u3002\u81EA\u52A8\u4E1A\u52A1\u4FEE\u590D\u6700\u591A2\u8F6E\uFF0C\u4ECD\u5931\u8D25\u4EA4\u7528\u6237\u5904\u7406\uFF0C\u4E0D\u5047\u79F0\u7A0B\u5E8F\u5DF2\u5B9E\u73B0\u81EA\u52A8\u5FAA\u73AF\u3002\u5DF2\u6709\u6210\u679C\u4E0D\u5220\u9664\u3001\u4E0D\u81EA\u52A8\u4ED8\u8D39\u91CD\u505A\u3002\u53EA\u62A5\u544A\u5DE5\u5177\u5B9E\u9645\u8FD4\u56DE\u7684\u4FDD\u5B58\u3001\u5BA1\u6838\u548C\u751F\u6210\u72B6\u6001\uFF1B\u672A\u89C2\u770B/\u8BD5\u542C\u7684\u5A92\u4F53\u6807\u5F85\u4EBA\u5DE5\u9A8C\u6536\u3002`;
 var FILM_WORKFLOW_GUIDANCE = `\u3010\u4E13\u4E1A\u5206\u9636\u6BB5\u521B\u4F5C\u5DE5\u5177\u5951\u7EA6\u3011
-\u3010\u56DB\u7EF4\u521B\u4F5C\u914D\u7F6E\u3011\u652F\u6301\u72EC\u7ACB genre\uFF08\u9898\u6750\uFF09\u3001format\uFF08\u4F5C\u54C1\u5F62\u5F0F\uFF09\u3001purpose\uFF08\u76EE\u7684\uFF09\u3001style_profile\uFF08\u6CE8\u518C\u89C6\u89C9\u7B56\u7565\uFF09\uFF0Ctone \u4E0E visual_style\uFF08\u81EA\u7531\u6587\u672C\uFF09\u72EC\u7ACB\u3002create/configure_profile \u7528 projectSpec JSON \u8BBE\u7F6E\uFF1Bread/next/route \u8FD4\u56DE resolved_profiles \u53CA available_profiles\uFF0C\u53EA\u7528\u771F\u5B9E\u6CE8\u518C id\uFF0C\u4E0D\u5047\u8BBE\u914D\u7F6E\u6587\u4EF6\u5B58\u5728\u3002\u53EF\u53EA\u9009\u5185\u5BB9\u7EF4\u5EA6\u800C\u4E0D\u989D\u5916\u9009\u65E7 work_type\uFF1B\u4EC5\u9009\u98CE\u683C\u4E0D\u4EE3\u8868\u9009\u5B9A\u5185\u5BB9\u65B9\u5411\u3002\u4FEE\u6539\u4EFB\u4E00\u7EF4\u5EA6\u4F1A\u5931\u6548\u6750\u6599\u4E0E\u6279\u51C6\uFF0C\u5FC5\u987B\u91CD\u65B0\u5BA1\u6279\uFF1BPROFILE_CONFLICT \u5148\u89E3\u51B3\uFF0C\u4E0D\u9759\u9ED8\u8986\u76D6\u3002\u7EC8\u5BA1 dimension_review \u9010\u4E00\u8986\u76D6\u5DF2\u9009\u7EF4\u5EA6\uFF0C\u63D0\u4F9B\u8BC1\u636E\uFF0CNOT_EVALUATED \u4E0D\u80FD\u901A\u8FC7\u3002\u4FDD\u7559\u65E7\u4F5C\u54C1\u7C7B\u578B\u517C\u5BB9\uFF1A\u5148\u533A\u5206\u4F5C\u54C1\u7C7B\u578Bwork_type\u3001\u89C6\u89C9\u98CE\u683Cvisual_style\u3001\u53D9\u4E8B\u65B9\u5F0Fnarrative_mode\u548C\u751F\u6210\u6A21\u5F0F\u3002work_type\u652F\u6301DRAMA\u5267\u60C5\u3001COMEDY\u559C\u5267\u3001LIFESTYLE\u751F\u6D3BVlog/\u6C1B\u56F4\u3001DOCUMENTARY\u7EAA\u5F55/\u77E5\u8BC6\u3001COMMERCIAL\u4EA7\u54C1\u5E7F\u544A\u3001PROMOTIONAL\u54C1\u724C/\u5730\u57DF\u5BA3\u4F20\u3002\u7528\u6237\u5DF2\u660E\u786E\u7C7B\u578B\u76F4\u63A5\u91C7\u7528\uFF1B\u4E0D\u660E\u786E\u65F6\u63A8\u8350\u4E00\u4E2A\u65B9\u5411\uFF0C\u4E0E\u73B0\u6709\u7F3A\u5931\u521B\u610F\u95EE\u9898\u5408\u5E76\u786E\u8BA4\uFF0C\u4E0D\u628A\u63A8\u65AD\u5192\u5145\u7528\u6237\u786E\u8BA4\u3002create\u7684projectSpec\u53EF\u4FDD\u5B58\u7C7B\u578B\u4E0E\u53D9\u4E8B\u65B9\u5F0F\uFF1Bnext/route\u52A8\u6001\u52A0\u8F7D\u914D\u7F6E\u53CA\u5404\u89D2\u8272\u89C4\u5219\u3002\u7C7B\u578B\u672A\u9009\u7684\u65B0\u9879\u76EE\u987B\u5728\u521B\u610F\u6279\u51C6\u524Dconfigure_profile(projectSpec\u4E3Awork_type/narrative_mode\u6216\u56DB\u7EF4\u5B57\u6BB5\u7684JSON\u5B57\u7B26\u4E32,expectedRevision)\u3002\u4FEE\u6539\u5DF2\u6279\u51C6\u9879\u76EE\u7C7B\u578B\u4F1A\u4FDD\u7559\u5168\u90E8\u6750\u6599\u4F46\u6807\u5931\u6548\u5E76\u6E05\u9664\u539F\u6279\u51C6\uFF0C\u91CD\u65B0\u8D70\u521B\u610F/\u5267\u672C\u5BA1\u6279\uFF1B\u4E0D\u81EA\u52A8\u4ED8\u8D39\u91CD\u505A\u3002\u65E7\u9879\u76EE\u6CA1\u6709\u7C7B\u578B\u5B57\u6BB5\u65F6\u6CBF\u539F\u6D41\u7A0B\uFF0C\u4E0D\u5F3A\u5236\u8FC1\u79FB\u3002profile_revision\u7531\u7CFB\u7EDF\u7ED1\u5B9A\uFF0C\u672A\u77E5\u7248\u672C\u505C\u6B62\u800C\u975E\u9759\u9ED8\u6362\u7B56\u7565\u3002creative/script\u589E\u52A0\u914D\u7F6E\u8981\u6C42\u7684type_details\uFF0C\u7EC8\u5BA1\u589E\u52A0type_review\u5E76\u9010\u9879\u7ED9\u8BC1\u636E\uFF1B\u4E0D\u5F97\u628A\u672A\u68C0\u67E5\u5199\u6210\u901A\u8FC7\u3002
+\u3010\u56DB\u7EF4\u521B\u4F5C\u914D\u7F6E\u3011\u652F\u6301\u72EC\u7ACB genre\uFF08\u9898\u6750\uFF09\u3001format\uFF08\u4F5C\u54C1\u5F62\u5F0F\uFF09\u3001purpose\uFF08\u76EE\u7684\uFF09\u3001style_profile\uFF08\u6CE8\u518C\u89C6\u89C9\u7B56\u7565\uFF09\uFF0Ctone \u4E0E visual_style\uFF08\u81EA\u7531\u6587\u672C\uFF09\u72EC\u7ACB\u3002create/configure_profile \u7528 projectSpec JSON \u8BBE\u7F6E\uFF1Bread/next/route \u8FD4\u56DE resolved_profiles \u53CA available_profiles\uFF0C\u53EA\u7528\u771F\u5B9E\u6CE8\u518C id\uFF0C\u4E0D\u5047\u8BBE\u914D\u7F6E\u6587\u4EF6\u5B58\u5728\u3002\u53EF\u53EA\u9009\u5185\u5BB9\u7EF4\u5EA6\u800C\u4E0D\u989D\u5916\u9009\u65E7 work_type\uFF1B\u4EC5\u9009\u98CE\u683C\u4E0D\u4EE3\u8868\u9009\u5B9A\u5185\u5BB9\u65B9\u5411\u3002\u4FEE\u6539\u5185\u5BB9\u7EF4\u5EA6\u6216\u53D9\u4E8Btone\u4F1A\u5931\u6548\u6750\u6599\u4E0E\u6279\u51C6\uFF0C\u5FC5\u987B\u91CD\u65B0\u5BA1\u6279\uFF1B\u4EC5visual_style/style_profile\u8C03\u6574\u4FDD\u7559\u521B\u610F\u548C\u5267\u672C\u6279\u51C6\uFF0C\u91CD\u68C0\u8D44\u4EA7\u53CA\u4E0B\u6E38\uFF1B\u4EC5\u6539\u53D8\u89C6\u89C9\u5149\u8272\u6216\u6F14\u7ECE\u57FA\u8C03\u7684tone\uFF0Cconfigure_profile\u663E\u5F0F\u4F20change_scope:"visual_only"\uFF0C\u4E0D\u5F97\u7528\u4E8E\u6539\u53D8\u6545\u4E8B\u60C5\u7EEA\u6216\u7ED3\u5C40\uFF1B\u4E0D\u660E\u786E\u65F6\u9ED8\u8BA4\u91CD\u5BA1\u3002PROFILE_CONFLICT \u5148\u89E3\u51B3\uFF0C\u4E0D\u9759\u9ED8\u8986\u76D6\u3002\u7EC8\u5BA1 dimension_review \u9010\u4E00\u8986\u76D6\u5DF2\u9009\u7EF4\u5EA6\uFF0C\u63D0\u4F9B\u8BC1\u636E\uFF0CNOT_EVALUATED \u4E0D\u80FD\u901A\u8FC7\u3002\u4FDD\u7559\u65E7\u4F5C\u54C1\u7C7B\u578B\u517C\u5BB9\uFF1A\u5148\u533A\u5206\u4F5C\u54C1\u7C7B\u578Bwork_type\u3001\u89C6\u89C9\u98CE\u683Cvisual_style\u3001\u53D9\u4E8B\u65B9\u5F0Fnarrative_mode\u548C\u751F\u6210\u6A21\u5F0F\u3002work_type\u652F\u6301DRAMA\u5267\u60C5\u3001COMEDY\u559C\u5267\u3001LIFESTYLE\u751F\u6D3BVlog/\u6C1B\u56F4\u3001DOCUMENTARY\u7EAA\u5F55/\u77E5\u8BC6\u3001COMMERCIAL\u4EA7\u54C1\u5E7F\u544A\u3001PROMOTIONAL\u54C1\u724C/\u5730\u57DF\u5BA3\u4F20\u3002\u7528\u6237\u5DF2\u660E\u786E\u7C7B\u578B\u76F4\u63A5\u91C7\u7528\uFF1B\u4E0D\u660E\u786E\u65F6\u63A8\u8350\u4E00\u4E2A\u65B9\u5411\uFF0C\u4E0E\u73B0\u6709\u7F3A\u5931\u521B\u610F\u95EE\u9898\u5408\u5E76\u786E\u8BA4\uFF0C\u4E0D\u628A\u63A8\u65AD\u5192\u5145\u7528\u6237\u786E\u8BA4\u3002create\u7684projectSpec\u53EF\u4FDD\u5B58\u7C7B\u578B\u4E0E\u53D9\u4E8B\u65B9\u5F0F\uFF1Bnext/route\u52A8\u6001\u52A0\u8F7D\u914D\u7F6E\u53CA\u5404\u89D2\u8272\u89C4\u5219\u3002\u7C7B\u578B\u672A\u9009\u7684\u65B0\u9879\u76EE\u987B\u5728\u521B\u610F\u6279\u51C6\u524Dconfigure_profile(projectSpec\u4E3Awork_type/narrative_mode\u6216\u56DB\u7EF4\u5B57\u6BB5\u7684JSON\u5B57\u7B26\u4E32,expectedRevision)\u3002\u4FEE\u6539\u5DF2\u6279\u51C6\u9879\u76EE\u7C7B\u578B\u4F1A\u4FDD\u7559\u5168\u90E8\u6750\u6599\u4F46\u6807\u5931\u6548\u5E76\u6E05\u9664\u539F\u6279\u51C6\uFF0C\u91CD\u65B0\u8D70\u521B\u610F/\u5267\u672C\u5BA1\u6279\uFF1B\u4E0D\u81EA\u52A8\u4ED8\u8D39\u91CD\u505A\u3002\u65E7\u9879\u76EE\u6CA1\u6709\u7C7B\u578B\u5B57\u6BB5\u65F6\u6CBF\u539F\u6D41\u7A0B\uFF0C\u4E0D\u5F3A\u5236\u8FC1\u79FB\u3002profile_revision\u7531\u7CFB\u7EDF\u7ED1\u5B9A\uFF0C\u672A\u77E5\u7248\u672C\u505C\u6B62\u800C\u975E\u9759\u9ED8\u6362\u7B56\u7565\u3002creative/script\u589E\u52A0\u914D\u7F6E\u8981\u6C42\u7684type_details\uFF0C\u7EC8\u5BA1\u589E\u52A0type_review\u5E76\u9010\u9879\u7ED9\u8BC1\u636E\uFF1B\u4E0D\u5F97\u628A\u672A\u68C0\u67E5\u5199\u6210\u901A\u8FC7\u3002
 \u5BF9\u8BDD\u4E2D\u65B0\u5199\u5B8C\u6574\u89C6\u9891\u811A\u672C\u3001\u91CD\u6784\u6545\u4E8B\u6216\u4E13\u4E1A\u5206\u9636\u6BB5\u521B\u4F5C\uFF0C\u76EE\u680715\u20133600\u79D2\u65F6\u4F18\u5148\u4F7F\u7528film_project\uFF0C\u4E0D\u7B49\u7528\u6237\u8BF4\u201C\u4E13\u4E1A\u6A21\u5F0F\u201D\u624D\u542F\u7528\u3002\u5148read/next\u7EED\u4F5C\uFF0C\u6309\u521B\u610F\u6279\u51C6\u2192\u7F16\u5267\u2192\u5267\u672C\u6279\u51C6\u2192\u8D44\u4EA7\u2192\u5206\u955C\u2192\u63D0\u793A\u8BCD\u2192\u5BA1\u6838\u63A8\u8FDB\u3002\u5DF2\u6709\u666E\u901Avideo_project\u7EE7\u7EED\u6CBF\u5176\u5DF2\u5BA1\u6838\u7248\u672C\u6539\u7A3F\uFF0C\u4E0D\u5F3A\u5236\u8FC1\u79FB\u6216\u4E22\u5931\u72B6\u6001\uFF1B4\u201314\u79D2\u53CA\u7528\u6237\u660E\u786E\u53EA\u9700\u5FEB\u901F\u8349\u6848\u65F6\u8D70\u539F\u6D41\u7A0B\uFF0C\u4ECD\u91C7\u7528\u76F8\u540C\u7F16\u5267\u65B9\u6CD5\u5E76\u6807\u8349\u6848\u3002\u5B9E\u9645\u89C6\u9891\u5236\u4F5C\u4ECD\u7528video_project\u3002\u65F6\u957F\u3001\u753B\u5E45\u3001\u6E05\u6670\u5EA6\u5DF2\u786E\u8BA4\u5219\u6CBF\u7528\uFF0C\u7F3A\u5931\u89C4\u683C\u6309\u73B0\u6709\u89C4\u5219\u5408\u5E76\u8BE2\u95EE\uFF0C\u4E0D\u628A\u5EFA\u8BAE\u5F53\u7528\u6237\u786E\u8BA4\u3002\u89C4\u5212\u4E0D\u81EA\u52A8\u8C03\u7528\u89C6\u9891\u3002
 \u5148create(title,sourceBrief\u539F\u6587,durationSeconds,projectSpec)\uFF0CprojectSpec\u4E3A\u5DF2\u77E5\u89C4\u683CJSON\uFF08aspect_ratio/resolution/language/visual_style/genre/target_audience/distribution_channel/target_model/hard_constraints/soft_preferences/references\uFF09\uFF0Ctarget_model\u53EA\u7528execution_plan.model_name\u6216\u7528\u6237\u660E\u786E\u63D0\u4F9B\u7684\u771F\u5B9E\u6A21\u578BID\uFF0C\u672A\u6307\u5B9A\u65F6\u7701\u7565\uFF0C\u4E0D\u5199\u5F85\u5B9A\u6216\u5360\u4F4D\u6587\u5B57\u3002\u65E7\u9879\u76EE\u5360\u4F4D\u503C\u901A\u8FC7configure_profile\u4FEE\u6539target_model\uFF1B\u4EC5\u6A21\u578B\u53D8\u5316\u4FDD\u7559\u521B\u610F\u5267\u672C\u6279\u51C6\uFF0C\u91CD\u68C0\u8D44\u4EA7\u4E0E\u4E0B\u6E38\u3002\u672A\u6307\u5B9A\u5B57\u6BB5\u7559\u7A7A\uFF0C\u5DE5\u5177\u6807UNKNOWN\uFF0C\u4E0D\u5F97\u5192\u5145\u7528\u6237\u786E\u8BA4\uFF0C\u7EED\u4F5C\u6216\u6539\u7A3F\u5148read(projectId)\u3002\u4EE5\u5DE5\u5177\u8FD4\u56DE\u7684\u72B6\u6001\u548Crevision\u4E3A\u51C6\uFF0C\u4E0D\u5047\u8BBE\u5B58\u5728progress/manifest\u8BFB\u53D6\u3001\u56DE\u6EDA\u3001\u7AE0\u8282\u81EA\u52A8\u8C03\u5EA6\u6216\u72EC\u7ACB\u5B50Agent\u3002
 \u6B63\u5E38create/read/submit/approve/configure_profile\u7B49\u63A8\u8FDB\u8C03\u7528\u90FD\u4F20responseMode:"compact"\uFF0C\u4FDD\u7559\u5B8C\u6574\u4E0B\u4E00\u9636\u6BB5\u8F93\u5165\u4F46\u4E0D\u91CD\u590D\u56DE\u663E\u5168\u9879\u76EE\u3002\u4EC5\u5B8C\u6574\u6062\u590D\u65F6read(responseMode:"full")\uFF0C\u8865\u67E5\u5355\u4E2A\u4EA7\u7269\u7528read(stage)\u3002\u8FD4\u56DE\u5DF2\u6709nextTask\u5C31\u76F4\u63A5\u6309\u5B83\u7EE7\u7EED\uFF0C\u4E0D\u91CD\u590Dnext/read\u3002submit\u81EA\u5E26\u6821\u9A8C\uFF0C\u4E0D\u56FA\u5B9A\u5148validate\u518Dsubmit\uFF1B\u5931\u8D25\u6309\u96C6\u4E2D\u95EE\u9898\u6E05\u5355\u4FEE\u6B63\uFF0C\u4FDD\u62A4\u539F\u5267\u60C5\u4E0E\u5DF2\u6279\u51C6\u5185\u5BB9\u3002
@@ -4298,35 +4544,36 @@ prompts\uFF1A{prompts:[{shot_id,prompt,target_model,location_id,scene_state_id,d
 review\uFF1A\u65B0\u7248Reviewer V3.1\u63D0\u4EA4review_status\u3001scores\u516B\u7EF4\uFF08\u4E0D\u9002\u7528null\uFF09\u3001issues\u3001delivery_allowed\u3001blocking_issue_count\u548C\u771F\u5B9Ereviewed_revisions\uFF08creative/script/assets/shots/prompts\u5BF9\u5E94\u5B9E\u9645\u4FEE\u8BA2\u53F7\uFF09\u3001review_id/review_stage/review_scope/unverified_items\u7B49\u5B8C\u6574\u62A5\u544A\u3002CRITICAL/MAJOR\u672AVERIFIED\u963B\u65AD\uFF1B\u52A0\u6743\u5206\u7531\u7A0B\u5E8F\u590D\u7B97\uFF0C\u5931\u8D25\u62A5\u544A\u4E5F\u53EF\u4FDD\u5B58\u4F46\u7981\u6B62\u7F16\u8BD1\u3002\u6700\u7EC8\u901A\u8FC7\u53EA\u63A5\u53D7FINAL_REVIEW\u53CA\u5B8C\u6574review_scope\uFF0C\u9002\u7528\u7EF4\u5EA6\u4E0D\u5F97\u7528null\u8DF3\u8FC7\u3002\u91CD\u5927\u95EE\u9898\u4E0D\u5F97\u5220\u9664\u6216\u964D\u7EA7\uFF1B\u9996\u6B21\u95EE\u9898OPEN\uFF0C\u8D23\u4EFB\u4EA7\u7269\u771F\u5B9E\u6539\u7248\u540E\u624D\u6807RESOLVED\u3002Reviewer\u6309\u5F53\u524D\u7248\u672C\u590D\u5BA1\u540E\u7528verify_issue(issueId,content:{evidence,review_revision,source_revisions},expectedRevision)\u767B\u8BB0\uFF0C\u518D\u63D0\u4EA4\u542BVERIFIED\u7684\u7EC8\u5BA1\uFF1B\u95EE\u9898\u53F0\u8D26\u4E0E\u590D\u5BA1\u65F6\u95F4\u7531\u8FD0\u884C\u65F6\u7EF4\u62A4\uFF0C\u4E0D\u80FD\u81EA\u586B\u9A8C\u8BC1\u901A\u8FC7\u3002\u65E7\u62A5\u544Ascore/passed\u534F\u8BAE\u517C\u5BB9\u3002
 \u521B\u610F\u548C\u5267\u672C\u7684\u6279\u51C6\u5206\u522B\u7ED1\u5B9A\u6750\u6599\u7248\u672C\uFF0C\u6C89\u9ED8/\u53D6\u6D88/\u4FEE\u6539\u610F\u89C1\u4E0D\u7B97\u6279\u51C6\u3002\u6539\u7A3F\u540E\u6309\u5DE5\u5177stale\u72B6\u6001\u66F4\u65B0\u4E0B\u6E38\uFF0C\u4E0D\u5047\u79F0\u5DF2\u5B9E\u73B0\u5B9E\u4F53\u7EA7\u81EA\u52A8\u4FEE\u8BA2\u3002\u8D85\u8FC7180\u79D2\u6309\u7AE0\u89C4\u5212\uFF0C600\u79D2\u4EE5\u4E0A\u7EF4\u62A4\u5168\u7247\u6458\u8981\u548C\u7AE0\u95F4\u72B6\u6001\uFF0C\u5206\u6279\u521B\u4F5C\u4F46\u6309\u5F53\u524D\u5DE5\u5177\u63D0\u4EA4\u5B8C\u6574\u9636\u6BB5\u805A\u5408\u5BF9\u8C61\uFF1B\u8D85\u51FA\u4E0A\u4E0B\u6587\u80FD\u529B\u65F6\u505C\u5728\u53EF\u6062\u590D\u8349\u7A3F\uFF0C\u4E0D\u622A\u65AD\u5192\u5145\u5B8C\u6574\u3002
 export\u8FD4\u56DEJSON\u548CMarkdown\u5185\u5BB9\uFF0C\u4E0D\u662F\u5DF2\u5199\u5165\u5BFC\u51FA\u6587\u4EF6\uFF1B\u6CA1\u6709\u5B9E\u9645\u6587\u4EF6\u4E0D\u5F97\u7F16\u9020\u4E0B\u8F7D\u94FE\u63A5\u3002Markdown\u5E94\u4E3A\u540C\u7248\u672CJSON\u7684\u53EF\u8BFB\u6295\u5F71\u3002\u5B9E\u9645\u89C6\u9891\u4ECD\u987B\u8D70video_project\u811A\u672C\u5BA1\u6838\u3001\u8D39\u7528\u786E\u8BA4\u4E0E\u9010\u6BB5\u7ED3\u679C\u5BA1\u6838\uFF0C\u521B\u4F5C\u6279\u51C6\u4E0D\u66FF\u4EE3\u5236\u4F5C\u6388\u6743\u3002`;
-var ORCHESTRATION_GUIDANCE = `\u63A8\u8FDB\u4E13\u4E1A\u521B\u4F5C\u5148\u8C03\u7528film_project(action:next)\uFF0C\u53EA\u52A0\u8F7D\u8FD4\u56DE\u7684role\u3001inputs\u4E0Escope\u6240\u9700\u8D44\u6599\uFF0C\u518D\u6309\u8BB8\u53EF\u52A8\u4F5C\u63D0\u4EA4\u6216\u8BF7\u6C42\u6279\u51C6\uFF1B\u4E0D\u628A\u5B8C\u6574\u5386\u53F2\u53CD\u590D\u585E\u7ED9\u955C\u5934\u4EFB\u52A1\u3002\u5F53\u524Drole\u662F\u540C\u4E00\u52A9\u624B\u7684\u4E13\u4E1A\u804C\u8D23\uFF0C\u4E0D\u662F\u72EC\u7ACB\u8FD0\u884C\u7684\u5B50Agent\u3002\u5B8C\u6210\u5BA1\u6838\u540E\u8C03\u7528compile(expectedRevision,ratio,resolution)\u7F16\u8BD1\u5236\u4F5C\u8BA1\u5212\uFF0C\u8FD4\u56DEproduction.videoProjectId\u53CAspecification\u3002\u7528\u8BE5videoProjectId\u6267\u884Cvideo_project prepare\u5B8C\u6210\u89D2\u8272\u56FE\u8DEF\u7EBF\uFF0C\u518D\u5C55\u793A\u5236\u4F5C\u811A\u672C\u3001\u771F\u5B9E\u5206\u955C\u6784\u56FE\u793A\u610F\u56FE\u4E0E\u4F30\u4EF7\u5E76review\u3002\u5206\u955CJSON/\u955C\u5934\u5217\u8868\u6587\u4EF6\u4E0D\u7B49\u4E8E\u56FE\uFF1A\u8BFB\u53D6video-director/references/segment-storyboard.md\uFF0C\u514D\u8D39\u672C\u5730\u7ED8\u5236\u5F53\u524D\u7248SVG/PNG\uFF08\u4E3B\u4F53\u3001\u573A\u666F\u3001\u9053\u5177\u4E0E\u52A8\u4F5C\u7BAD\u5934\uFF0C\u4E0D\u662F\u6587\u5B57\u5361\u7247\uFF09\uFF0C\u786E\u8BA4\u6587\u4EF6\u5B58\u5728\u540E\u5728\u6B63\u6587\u5185\u5D4C\u5E76\u9644\u539F\u56FE\u94FE\u63A5\uFF1B\u65E0\u6CD5\u663E\u793ASVG\u65F6\u7528\u5DF2\u6709\u5DE5\u5177\u8F6CPNG\uFF0C\u4E0D\u4EE5\u955C\u5934\u6E05\u5355\u66FF\u4EE3\uFF0C\u4E0D\u64C5\u81EA\u4ED8\u8D39\u51FA\u56FE\uFF0C\u6700\u540E\u624D\u8C03\u7528\u89C6\u9891\u751F\u6210\u3002\u4E0D\u5F97\u628A\u521B\u4F5C\u6279\u51C6\u5F53\u8D39\u7528\u6388\u6743\u3002compile\u53EA\u8BFB\u89C4\u5212\u4E0D\u4EA7\u751F\u4ED8\u8D39\u8C03\u7528\uFF1B\u91CD\u590D\u540C\u7248\u672C\u540C\u89C4\u683C\u7F16\u8BD1\u590D\u7528\u7ED1\u5B9A\u3002\u521B\u4F5C\u6539\u7A3F\u540E\u65E7\u7ED1\u5B9A\u7981\u6B62\u65B0\u589E\u751F\u6210\uFF0C\u5DF2\u63D0\u4EA4\u4EFB\u52A1\u67E5\u8BE2\u548C\u4EA4\u4ED8\u4ECD\u53EF\u6062\u590D\u3002next/route\u8FD4\u56DEexecution_plan\u5236\u4F5C\u9884\u89C4\u5212\uFF1B\u5206\u955C\u5E94\u4E0E\u771F\u5B9E\u751F\u6210\u6BB5\u8FB9\u754C\u5BF9\u9F50\u3002compile\u53D1\u73B0\u8DE8\u6BB5\u622A\u65AD\u955C\u5934\u6216\u540C\u6BB5\u591A\u5730\u70B9\u65F6\u62D2\u7EDD\u5E76\u8981\u6C42Storyboard\u91CD\u89C4\u5212\uFF0C\u4E0D\u590D\u5236\u6574\u6761\u52A8\u4F5C/\u53F0\u8BCD\u5230\u4E24\u6BB5\u3002project_spec\u9501\u5B9A\u7684\u753B\u5E45\u3001\u6E05\u6670\u5EA6\u548C\u76EE\u6807\u6A21\u578B\u4E0E\u5236\u4F5C\u4E0D\u7B26\u65F6\u5148\u4FEE\u8BA2\u5E76\u91CD\u5BA1\uFF0C\u4E0D\u9759\u9ED8\u6362\u53C2\u6570\u3002\u5168\u7247\u6700\u957F3600\u79D2\uFF0C\u6309\u6A21\u578B\u5355\u6BB5\u80FD\u529B\u9010\u6BB5\u751F\u6210\u3001\u5BA1\u6838\u548C\u7EED\u505A\uFF0C\u4E0D\u627F\u8BFA\u4E00\u6B21\u8BF7\u6C42\u751F\u6210\u6574\u7247\u3002`;
+var ORCHESTRATION_GUIDANCE = `\u63A8\u8FDB\u4E13\u4E1A\u521B\u4F5C\u5148\u8C03\u7528film_project(action:next)\uFF0C\u53EA\u52A0\u8F7D\u8FD4\u56DE\u7684role\u3001inputs\u4E0Escope\u6240\u9700\u8D44\u6599\uFF0C\u518D\u6309\u8BB8\u53EF\u52A8\u4F5C\u63D0\u4EA4\u6216\u8BF7\u6C42\u6279\u51C6\uFF1B\u4E0D\u628A\u5B8C\u6574\u5386\u53F2\u53CD\u590D\u585E\u7ED9\u955C\u5934\u4EFB\u52A1\u3002\u5F53\u524Drole\u662F\u540C\u4E00\u52A9\u624B\u7684\u4E13\u4E1A\u804C\u8D23\uFF0C\u4E0D\u662F\u72EC\u7ACB\u8FD0\u884C\u7684\u5B50Agent\u3002\u5B8C\u6210\u5BA1\u6838\u540E\u8C03\u7528compile(expectedRevision,ratio,resolution)\u7F16\u8BD1\u5236\u4F5C\u8BA1\u5212\uFF0C\u8FD4\u56DEproduction.videoProjectId\u53CAspecification\u3002\u7528\u8BE5videoProjectId\u6267\u884Cvideo_project prepare\u5B8C\u6210\u89D2\u8272\u56FE\u8DEF\u7EBF\uFF0C\u518D\u5C55\u793A\u5236\u4F5C\u811A\u672C\u3001\u771F\u5B9E\u5206\u955C\u6784\u56FE\u793A\u610F\u56FE\u4E0E\u4F30\u4EF7\u5E76review\u3002\u5206\u955CJSON/\u955C\u5934\u5217\u8868\u4E0D\u7B49\u4E8E\u56FE\uFF1A\u5B8C\u6574\u5236\u4F5C\u811A\u672C\u5728\u6B63\u6587\u5C55\u793A\u4E00\u6B21\u540E\uFF0C\u8C03\u7528 video_project(action:"storyboard",captureScript:true,scriptPath)\u7531\u63D2\u4EF6\u514D\u8D39\u672C\u5730\u7ED8\u56FE\uFF0C\u4F7F\u7528\u8FD4\u56DEmarkdown\u5185\u5D4C\u56FE\u7247\u5E76\u9644\u539F\u56FE\u94FE\u63A5\uFF0C\u518Dreview\uFF1B\u4E0D\u8981\u624B\u5199\u7ED8\u56FE\u4EE3\u7801\u6216SVG\uFF0C\u4E0D\u64C5\u81EA\u4ED8\u8D39\u51FA\u56FE\u3002\u4E0D\u5F97\u628A\u521B\u4F5C\u6279\u51C6\u5F53\u8D39\u7528\u6388\u6743\u3002compile\u53EA\u8BFB\u89C4\u5212\u4E0D\u4EA7\u751F\u4ED8\u8D39\u8C03\u7528\uFF1B\u91CD\u590D\u540C\u7248\u672C\u540C\u89C4\u683C\u7F16\u8BD1\u590D\u7528\u7ED1\u5B9A\u3002\u521B\u4F5C\u6539\u7A3F\u540E\u65E7\u7ED1\u5B9A\u7981\u6B62\u65B0\u589E\u751F\u6210\uFF0C\u5DF2\u63D0\u4EA4\u4EFB\u52A1\u67E5\u8BE2\u548C\u4EA4\u4ED8\u4ECD\u53EF\u6062\u590D\u3002next/route\u8FD4\u56DEexecution_plan\u5236\u4F5C\u9884\u89C4\u5212\uFF1B\u5206\u955C\u5E94\u4E0E\u771F\u5B9E\u751F\u6210\u6BB5\u8FB9\u754C\u5BF9\u9F50\u3002compile\u53D1\u73B0\u8DE8\u6BB5\u622A\u65AD\u955C\u5934\u6216\u540C\u6BB5\u591A\u5730\u70B9\u65F6\u62D2\u7EDD\u5E76\u8981\u6C42Storyboard\u91CD\u89C4\u5212\uFF0C\u4E0D\u590D\u5236\u6574\u6761\u52A8\u4F5C/\u53F0\u8BCD\u5230\u4E24\u6BB5\u3002project_spec\u9501\u5B9A\u7684\u753B\u5E45\u3001\u6E05\u6670\u5EA6\u548C\u76EE\u6807\u6A21\u578B\u4E0E\u5236\u4F5C\u4E0D\u7B26\u65F6\u5148\u4FEE\u8BA2\u5E76\u91CD\u5BA1\uFF0C\u4E0D\u9759\u9ED8\u6362\u53C2\u6570\u3002\u5168\u7247\u6700\u957F3600\u79D2\uFF0C\u6309\u6A21\u578B\u5355\u6BB5\u80FD\u529B\u9010\u6BB5\u751F\u6210\u3001\u5BA1\u6838\u548C\u7EED\u505A\uFF0C\u4E0D\u627F\u8BFA\u4E00\u6B21\u8BF7\u6C42\u751F\u6210\u6574\u7247\u3002`;
 var INTENT_GUIDANCE = `\u7528\u6237\u8BF7\u6C42\u4E13\u4E1A\u521B\u4F5C\u3001\u6539\u7A3F\u6216\u6838\u67E5\u65F6\u5148\u7406\u89E3\u8BED\u4E49\u518D\u9009\u62E9film_project(action:route,intent,entityIds)\u3002\u610F\u56FE\u679A\u4E3E\uFF1Adevelop_idea\u521B\u610F\u3001write_script\u5267\u672C\u3001revise_dialogue\u5BF9\u767D\u3001revise_story\u5267\u60C5\u3001design_character/revise_character\u4EBA\u7269\u3001design_scene/revise_scene\u573A\u666F\u3001design_shots\u5206\u955C\u3001revise_camera\u955C\u5934\u3001revise_timing\u65F6\u957F\u3001write_prompts\u63D0\u793A\u8BCD\u3001adapt_model\u6A21\u578B\u9002\u914D\u3001review\u5BA1\u6838\u3001verify_facts\u4E8B\u5B9E\u6838\u67E5\u3001resume\u7EED\u4F5C\u3001produce\u5236\u4F5C\u3001clarify\u6F84\u6E05\u3002\u5C40\u90E8\u4FEE\u6539\u4F20\u7528\u6237\u660E\u786E\u5BF9\u8C61\u7684\u7A33\u5B9AID\uFF0C\u76EE\u6807\u4E0D\u660E\u5148read\u5B9A\u4F4D\u518D\u6F84\u6E05\uFF0C\u4E0D\u80FD\u81EA\u884C\u6269\u5927scope\u3002\u591A\u4E2A\u610F\u56FE\u5206\u522B\u8DEF\u7531\uFF0C\u5148\u4E0A\u6E38\u540E\u4E0B\u6E38\uFF1B\u5426\u5B9A\u53E5\u3001\u5F15\u7528\u6587\u5B57\u4E0D\u4F5C\u4E3A\u6267\u884C\u6307\u4EE4\u3002route\u53EA\u8FD4\u56DE\u89D2\u8272\u6307\u4EE4\u4E0E\u72B6\u6001\uFF0C\u4E0D\u5199\u5165\u6216\u6388\u6743\u3002needs_input\u5148\u8865\u6761\u4EF6\uFF0Cready\u4E5F\u4E0D\u4EE3\u8868\u6279\u51C6\u3002\u65B0\u9879\u76EE\u5148\u5B8C\u6210\u9700\u6C42\u5E76create\uFF0C\u672A\u521B\u5EFA\u65F6\u7531\u603B\u5BFC\u6F14\u6F84\u6E05\uFF0C\u4E0D\u7F16\u9020projectId\u3002\u6BCF\u6B21\u53EA\u4F7F\u7528\u5F53\u524D\u89D2\u8272\u63D0\u793A\u8BCD\uFF1B\u8F93\u51FA\u987B\u9075\u5B88\u5F53\u524D\u5DE5\u5177\u5B57\u6BB5\u5951\u7EA6\uFF0C\u4E13\u4E1A\u89C4\u5219\u4E0D\u6539\u53D8API\u3002`;
+var PRODUCTION_STRATEGY_GUIDANCE = `production_strategy \u9ED8\u8BA4 continuous_segments\uFF1A\u6309\u6A21\u578B\u4E0A\u9650\u6700\u5C11\u6BB5\u6570\u7EED\u62CD\u3002\u7528\u6237\u660E\u786E\u9700\u8981\u591A\u5730\u70B9\u72EC\u7ACB\u955C\u5934\u65F6\uFF0C\u53EF\u5C55\u793A independent_shots \u65B9\u6848\u5E76\u7ECF\u521B\u610F/\u5267\u672C\u5BA1\u6838\u786E\u8BA4\uFF0C\u518D configure_profile \u4FDD\u5B58\uFF1B\u6BCF\u955C4\u79D2\u81F3\u6A21\u578B\u4E0A\u9650\u6574\u79D2\uFF0C\u72EC\u7ACB\u751F\u6210\u3001\u5355\u72EC\u8BA1\u8D39\uFF0C\u65E0\u4E0A\u4E00\u6BB5\u89C6\u9891\u8F93\u5165\uFF0C\u53C2\u8003\u56FE\u63A7\u5236\u4EBA\u7269\u4E00\u81F4\u6027\uFF0C\u9ED8\u8BA4\u76F4\u63A5\u526A\u8F91\u4E0D\u88C1\u63A5\u7F1D\u3002\u5168\u5C40firstFrameUrl\u53EA\u7528\u4E8E\u9996\u955C\uFF0ClastFrameUrl\u53EA\u7528\u4E8E\u672B\u955C\uFF1B\u9010\u955C\u9996\u5C3E\u5E27\u7528\u4E0EshotDurations\u7B49\u957F\u7684shotFrames\uFF0C\u7A7A\u955C\u7D20\u6750\u586B{}\uFF1B\u4E0D\u80FD\u628A\u9996\u955C\u6784\u56FE\u5F53\u5404\u955C\u5171\u540C\u4EBA\u7269\u53C2\u8003\u3002\u8865\u5145\u7D20\u6750\u4ECD\u9700video_project\u5BA1\u6838\u3002\u4E0D\u5F97\u81EA\u52A8\u5207\u6362\u4EE5\u7ED5\u8FC7\u8FDE\u7EED\u8DEF\u7EBF\u6821\u9A8C\u3002\u7EC8\u5BA1\u540Ecompile\u751F\u6210shotDurations\u548CsegmentPrompts\uFF0C\u5B9E\u9645video_project\u5BA1\u6838\u4E0E\u751F\u6210\u5FC5\u987B\u4F7F\u7528\u539F\u7F16\u8BD1\u5185\u5BB9\u3002`;
 
 // src/businesses/film-director/index.ts
 var locks2 = /* @__PURE__ */ new Set();
 var filmDirectorBusiness = {
   id: "film-director",
-  prompt: () => ROLE_PROMPTS.director + FILM_WORKFLOW_GUIDANCE + ORCHESTRATION_GUIDANCE + INTENT_GUIDANCE,
+  prompt: () => ROLE_PROMPTS.director + FILM_WORKFLOW_GUIDANCE + ORCHESTRATION_GUIDANCE + INTENT_GUIDANCE + PRODUCTION_STRATEGY_GUIDANCE,
   apply(runtime) {
-    runtime.tools.register("film-director", {
+    runtime.tools.register("film-director", withFilmDiagnostics({
       name: "film_project",
       description: '\u4E13\u4E1A\u521B\u4F5C\u9879\u76EE\uFF1Acreate/read/validate/submit/approve/export\u3002\u6B63\u5E38\u63A8\u8FDB\u7528responseMode:"compact"\uFF0Csubmit\u5DF2\u5185\u7F6E\u5B8C\u6574\u6821\u9A8C\uFF0C\u5931\u8D25\u96C6\u4E2D\u8FD4\u56DE\u5B57\u6BB5\u95EE\u9898\uFF0C\u65E0\u9700\u6BCF\u7A3F\u5148validate\u518Dsubmit\u3002validate\u4EC5\u4F9B\u5355\u72EC\u68C0\u67E5\uFF0C\u4E0D\u4FDD\u5B58\u6216\u5BA1\u6279\u3002\u78C1\u76D8\u4FDD\u5B58\uFF0C\u521B\u610F\u4E0E\u5267\u672C\u72EC\u7ACB\u4EBA\u5DE5\u6279\u51C6\uFF0C\u4E0D\u63D0\u4EA4\u4ED8\u8D39\u89C6\u9891\u3002submit\u7684content\u4E3AJSON\u5B57\u7B26\u4E32\uFF1Acreative\u542Btheme/logline\uFF1Bscript\u542Bscreenplay/chapters\uFF08duration_ms\uFF09\uFF1Bassets\u5FC5\u987B\u542Bcharacters/scenes/locations/scene_states/props\u4E94\u4E2A\u6570\u7EC4\uFF08\u65E0\u9053\u5177\u660E\u786Eprops:[]\uFF09\uFF1Bshots\u542Bshots\uFF1Bprompts\u542Bprompts\uFF1Breview\u542Breview_status/scores/issues/delivery_allowed\uFF1Bexport\u8FD4\u56DE\u53EF\u8BFBMarkdown\u53CA\u7248\u672C\u6821\u9A8C\u6E05\u5355\u3002',
       parameters: { type: "object", properties: {
         responseMode: { type: "string", enum: ["compact", "full"], description: "\u5199\u64CD\u4F5C\u9ED8\u8BA4compact\uFF1A\u4EC5\u8FD4\u56DE\u9879\u76EE\u6458\u8981\u4E0E\u4E0B\u4E00\u9636\u6BB5\u5B8C\u6574\u5FC5\u8981\u6750\u6599\uFF0C\u51CF\u5C11\u91CD\u590D\u4E0A\u4E0B\u6587\uFF1Bread\u9ED8\u8BA4full\uFF0C\u5B8C\u6574\u6062\u590D\u4E5F\u53EF\u663E\u5F0F\u9009full\u3002read\u914D\u5408stage\u53EF\u53EA\u8BFB\u5355\u9636\u6BB5\u4EA7\u7269\u3002" },
         intent: { type: "string", enum: [...INTENTS] },
         entityIds: { type: "array", items: { type: "string" } },
-        projectSpec: { type: "string", description: "create\u53EF\u9009\u9879\u76EE\u89C4\u683CJSON\uFF1Awork_type\uFF08DRAMA/COMEDY/LIFESTYLE/DOCUMENTARY/COMMERCIAL/PROMOTIONAL\uFF09\u3001narrative_mode\uFF08FICTION/OBSERVATIONAL/EXPLANATORY/DEMONSTRATION/POETIC/MIXED\uFF09\u3001genre/format/purpose/style_profile/tone/aspect_ratio/resolution/language/visual_style/target_audience/distribution_channel/target_model/hard_constraints/soft_preferences/references\u3002configure_profile\u53EF\u589E\u91CF\u4F20work_type\u3001narrative_mode\u3001genre\u3001format\u3001purpose\u3001style_profile\u3001tone\u3001visual_style\u3001target_model\uFF1Btarget_model\u5FC5\u987B\u662F\u771F\u5B9E\u6A21\u578BID\uFF08\u8BFB\u53D6execution_plan.model_name\uFF09\uFF0C\u4E0D\u5F97\u5199\u5360\u4F4D\u6587\u5B57\uFF1B\u4EC5\u6539\u6A21\u578B\u4FDD\u7559\u521B\u610F\u5267\u672C\u6279\u51C6\u5E76\u91CD\u5BA1\u8D44\u4EA7\u3001\u5206\u955C\u3001\u63D0\u793A\u8BCD\u548C\u5BA1\u6838\uFF1B\u56DB\u7EF4\u6CE8\u518C\u9009\u9879\u901A\u8FC7read/next\u7684resolved_profiles.available_profiles\u8BFB\u53D6\uFF0Cgenre\u7B49\u4F7F\u7528\u5C0F\u5199id\uFF1B\u4FEE\u6539\u4F1A\u5931\u6548\u5DF2\u6709\u4EA7\u7269\u5E76\u91CD\u65B0\u5BA1\u6279\uFF1B\u7C7B\u578B\u4E0D\u540C\u4E8E\u98CE\u683C\u548C\u751F\u6210\u6A21\u5F0F\uFF0C\u4E0D\u731C\u6D4B\u7528\u6237\u786E\u8BA4\u3002\u914D\u7F6E\u4FEE\u8BA2\u7531\u8FD0\u884C\u65F6\u56FA\u5B9A\u3002" },
+        projectSpec: { type: "string", description: "create\u53EF\u9009\u9879\u76EE\u89C4\u683CJSON\uFF1Awork_type\uFF08DRAMA/COMEDY/LIFESTYLE/DOCUMENTARY/COMMERCIAL/PROMOTIONAL\uFF09\u3001narrative_mode\uFF08FICTION/OBSERVATIONAL/EXPLANATORY/DEMONSTRATION/POETIC/MIXED\uFF09\u3001genre/format/purpose/style_profile/tone/aspect_ratio/resolution/language/visual_style/target_audience/distribution_channel/target_model/hard_constraints/soft_preferences/references\u3002production_strategy\u53EF\u9009continuous_segments/independent_shots\uFF08\u5FC5\u987B\u5148\u8BF4\u660E\u8D39\u7528\u4E0E\u8FDE\u7EED\u6027\u5DEE\u5F02\u5E76\u83B7\u7528\u6237\u9009\u62E9\uFF09\u3002configure_profile\u53EF\u589E\u91CF\u4F20change_scope\uFF08visual_only\u4EC5\u89C6\u89C9/\u5149\u8272/\u6F14\u7ECE\u57FA\u8C03\u4E14\u4E0D\u6539\u6545\u4E8B\uFF0Cstory\u9700\u8981\u91CD\u5BA1\u521B\u610F\u5267\u672C\uFF1Btone\u672A\u660E\u786E\u8303\u56F4\u9ED8\u8BA4\u91CD\u5BA1\uFF09\u3001production_strategy\u3001work_type\u3001narrative_mode\u3001genre\u3001format\u3001purpose\u3001style_profile\u3001tone\u3001visual_style\u3001target_model\uFF1Btarget_model\u5FC5\u987B\u662F\u771F\u5B9E\u6A21\u578BID\uFF08\u8BFB\u53D6execution_plan.model_name\uFF09\uFF0C\u4E0D\u5F97\u5199\u5360\u4F4D\u6587\u5B57\uFF1B\u4EC5\u6539\u6A21\u578B\u4FDD\u7559\u521B\u610F\u5267\u672C\u6279\u51C6\u5E76\u91CD\u5BA1\u8D44\u4EA7\u3001\u5206\u955C\u3001\u63D0\u793A\u8BCD\u548C\u5BA1\u6838\uFF1B\u56DB\u7EF4\u6CE8\u518C\u9009\u9879\u901A\u8FC7read/next\u7684resolved_profiles.available_profiles\u8BFB\u53D6\uFF0Cgenre\u7B49\u4F7F\u7528\u5C0F\u5199id\uFF1B\u4FEE\u6539\u4F1A\u5931\u6548\u5DF2\u6709\u4EA7\u7269\u5E76\u91CD\u65B0\u5BA1\u6279\uFF1B\u7C7B\u578B\u4E0D\u540C\u4E8E\u98CE\u683C\u548C\u751F\u6210\u6A21\u5F0F\uFF0C\u4E0D\u731C\u6D4B\u7528\u6237\u786E\u8BA4\u3002\u914D\u7F6E\u4FEE\u8BA2\u7531\u8FD0\u884C\u65F6\u56FA\u5B9A\u3002" },
         issueId: { type: "string" },
         taskKey: { type: "string" },
         taskStatus: { type: "string", enum: ["running", "completed", "failed"] },
         errorCode: { type: "string" },
         ratio: { type: "string", enum: ["16:9", "9:16"] },
         resolution: { type: "string", enum: ["480p", "720p"] },
-        action: { type: "string", enum: ["create", "read", "validate", "submit", "approve", "export", "next", "compile", "revise", "schedule", "task_result", "route", "verify_issue", "configure_profile"] },
+        action: { type: "string", enum: ["create", "read", "validate", "submit", "approve", "export", "next", "compile", "revise", "schedule", "task_result", "route", "verify_issue", "configure_profile", "diagnose", "recover_lock"] },
         projectId: { type: "string" },
         title: { type: "string" },
         sourceBrief: { type: "string" },
         durationSeconds: { type: "integer" },
-        stage: { type: "string", enum: [...STAGES] },
+        stage: { type: "string", enum: [...STAGES2] },
         content: { type: "string" },
         expectedRevision: { type: "integer" }
       }, required: ["action"] },
@@ -4338,48 +4585,56 @@ var filmDirectorBusiness = {
       },
       async execute(args, exec) {
         const owner = sessionOwner(exec);
-        const id = args.action === "create" ? randomUUID3() : args.projectId;
+        const id = args.action === "create" ? randomUUID4() : args.projectId;
         if (!/^[a-f0-9-]{36}$/.test(id || "")) throw Error("INVALID_PROJECT_ID");
-        if (locks2.has(id)) throw Error("PROJECT_BUSY");
-        locks2.add(id);
+        const readonly = ["read", "next", "route", "validate", "export", "diagnose"].includes(args.action);
+        if (!readonly && locks2.has(id)) throw Error("PROJECT_BUSY");
+        if (!readonly) locks2.add(id);
         let release;
         try {
           const dir = path9.join(dshHome(), DATA_DIR, "film-projects", owner, id);
           const file = path9.join(dir, "project.json");
           await mkdir6(dir, { recursive: true, mode: 448 });
-          release = await acquireProjectLock(dir);
+          if (args.action === "diagnose") return { lock: await inspectProjectLock(dir), instructions: "\u6D3B\u8DC3\u9501\u4E0D\u6062\u590D\uFF1B\u4EC5\u660E\u786E\u6B7B\u4EA1\u7684\u540C\u673A\u8FDB\u7A0B\u53EFrecover_lock\u3002read\u4E0D\u53D6\u5199\u9501\uFF0C\u53EF\u8BFB\u53D6\u6700\u540E\u5B8C\u6574\u63D0\u4EA4\u3002" };
+          if (args.action === "recover_lock") return recoverProjectLock(dir);
+          if (!["read", "next", "route", "validate", "export"].includes(args.action)) release = await acquireProjectLock(dir);
           let state;
           if (args.action === "create") {
             if (!Number.isInteger(args.durationSeconds) || args.durationSeconds < 15 || args.durationSeconds > 3600 || !args.title?.trim() || !args.sourceBrief?.trim()) throw Error("INVALID_REQUIREMENTS");
-            state = { schema_version: "3.1.0", project_id: id, title: args.title, source_brief: args.sourceBrief, duration_ms: args.durationSeconds * 1e3, project_spec: createProjectSpec(args.title, args.sourceBrief, args.durationSeconds * 1e3, args.projectSpec ? JSON.parse(args.projectSpec) : { ...args.ratio ? { aspect_ratio: args.ratio } : {}, ...args.resolution ? { resolution: args.resolution } : {} }), revision: 0, status: "REQUIREMENT_ANALYSIS", artifacts: {}, approvals: {}, decisions: [] };
-          } else state = JSON.parse(await readFile5(file, "utf8"));
+            state = { quality_policy: "evidence_v1", schema_version: "3.1.0", project_id: id, title: args.title, source_brief: args.sourceBrief, duration_ms: args.durationSeconds * 1e3, project_spec: createProjectSpec(args.title, args.sourceBrief, args.durationSeconds * 1e3, args.projectSpec ? JSON.parse(args.projectSpec) : { ...args.ratio ? { aspect_ratio: args.ratio } : {}, ...args.resolution ? { resolution: args.resolution } : {} }), revision: 0, status: "REQUIREMENT_ANALYSIS", artifacts: {}, approvals: {}, decisions: [] };
+          } else state = JSON.parse(await readFile6(file, "utf8"));
+          const originalState = JSON.stringify(state);
           const executionContext = () => {
             try {
               let cursor = 0;
-              const segments = estimatePlan(runtime.config, "video_generate", { duration: state.duration_ms / 1e3 }).map((part) => {
+              const independent = state.project_spec?.production_strategy === "independent_shots";
+              const segments = independent ? (state.artifacts.shots?.data.shots || []).map((s) => ({ kind: "generate", start_ms: s.start_ms, end_ms: s.end_ms, duration_ms: s.duration_ms })) : estimatePlan(runtime.config, "video_generate", { duration: state.duration_ms / 1e3 }).map((part) => {
                 const start = cursor;
                 cursor += part.seconds * 1e3;
                 return { kind: part.kind, start_ms: start, end_ms: cursor, duration_ms: part.seconds * 1e3 };
               });
-              return { model_name: resolveModel(runtime.config), strategy: "continuous_segments", segments, instructions: "\u5236\u4F5C\u9884\u89C4\u5212\uFF0C\u4E0D\u662F\u4ED8\u8D39\u8C03\u7528\u6216\u5DF2\u9A8C\u8BC1\u753B\u9762\u6548\u679C\u3002\u5206\u955C\u4E0D\u5F97\u8DE8\u751F\u6210\u6BB5\u622A\u65AD\u52A8\u4F5C\u4E0E\u5BF9\u767D\uFF1B\u540C\u4E00\u751F\u6210\u6BB5\u7684\u591A\u5730\u70B9\u5207\u6362\u9700\u91CD\u65B0\u89C4\u5212\u3002\u72EC\u7ACB\u955C\u5934\u6267\u884C\u5668\u5C1A\u672A\u63A5\u5165\u3002" };
+              return { model_name: resolveModel(runtime.config), strategy: state.project_spec?.production_strategy || "continuous_segments", segments, instructions: independent ? "\u72EC\u7ACB\u955C\u5934\uFF1A\u6BCF\u955C\u72EC\u7ACB\u751F\u6210\u4E0E\u8BA1\u8D39\uFF0C\u6BCF\u955C4\u79D2\u81F3\u6A21\u578B\u4E0A\u9650\u7684\u6574\u79D2\uFF1B\u53EF\u8DE8\u5730\u70B9\u526A\u8F91\uFF0C\u4E0D\u8981\u6C42\u8FDE\u7EED\u5206\u6BB5\u8FB9\u754C\u3002\u4EBA\u7269\u4E00\u81F4\u6027\u4F9D\u8D56\u53C2\u8003\u56FE\uFF0C\u672A\u63D0\u4EA4\u5206\u955C\u65F6segments\u4E3A\u7A7A\u3002" : "\u8FDE\u7EED\u7EED\u62CD\u9884\u89C4\u5212\uFF1A\u5206\u955C\u4E0D\u5F97\u8DE8\u751F\u6210\u6BB5\u622A\u65AD\u52A8\u4F5C\u4E0E\u5BF9\u767D\uFF0C\u540C\u4E00\u751F\u6210\u6BB5\u591A\u5730\u70B9\u9700\u91CD\u65B0\u89C4\u5212\uFF1B\u8FD9\u4E0D\u662F\u4ED8\u8D39\u8C03\u7528\u6216\u753B\u9762\u6548\u679C\u9A8C\u8BC1\u3002" };
             } catch {
               return { capability_status: "UNVERIFIED", instructions: "\u5F53\u524D\u6267\u884C\u5206\u6BB5\u65E0\u6CD5\u9884\u89C4\u5212\uFF1B\u53EF\u7EE7\u7EED\u521B\u610F\u4E0E\u5267\u672C\uFF0C\u5206\u955C\u63D0\u4EA4\u524D\u987B\u786E\u8BA4\u5B9E\u9645\u5236\u4F5C\u6A21\u578B\u548C\u5206\u6BB5\u8FB9\u754C\u3002" };
             }
           };
-          const taskFor = () => ({ ...nextTask(state), execution_plan: executionContext() });
+          const taskFor = () => {
+            const task = nextTask(state);
+            return { ...task, ...task.model_profile ? { model_profile: videoCapabilities(state.project_spec?.target_model || resolveModel(runtime.config)) } : {}, execution_plan: executionContext() };
+          };
           if (args.action === "read") {
             if (args.stage) {
-              if (!STAGES.includes(args.stage)) throw Error("INVALID_STAGE");
+              if (!STAGES2.includes(args.stage)) throw Error("INVALID_STAGE");
               return { project_id: id, revision: state.revision, status: state.status, stage: args.stage, artifact: state.artifacts[args.stage] || null, approvals: state.approvals };
             }
             return projectResponse(state, taskFor(), args.responseMode, { work_profile: profileContext(state) });
           }
           if (args.action === "validate") {
-            if (!STAGES.includes(args.stage)) throw Error("INVALID_STAGE");
+            if (!STAGES2.includes(args.stage)) throw Error("INVALID_STAGE");
             return checkSubmission(state, args.stage, args.content);
           }
           if (args.action === "next") return taskFor();
-          if (args.action === "route") return { ...routeIntent(state, args.intent, args.entityIds), execution_plan: executionContext() };
+          if (args.action === "route") return { ...routeIntent(state, args.intent, args.entityIds), model_profile: videoCapabilities(state.project_spec?.target_model || resolveModel(runtime.config)), execution_plan: executionContext() };
           if (["revise", "schedule", "task_result", "verify_issue", "configure_profile"].includes(args.action) && state.revision !== args.expectedRevision) throw Error("REVISION_CONFLICT");
           if (args.action === "configure_profile") state = configureProfile(state, JSON.parse(args.projectSpec), args.expectedRevision);
           if (args.action === "revise") state = reviseEntities(state, args.stage, JSON.parse(args.content), args.expectedRevision);
@@ -4389,19 +4644,20 @@ var filmDirectorBusiness = {
           if (args.action === "compile") {
             if (state.revision !== args.expectedRevision) throw Error("REVISION_CONFLICT");
             if (state.project_spec?.target_model && state.project_spec.target_model !== "generic" && state.project_spec.target_model !== resolveModel(runtime.config)) throw Error("PROJECT_SPEC_MISMATCH:target_model\u3002\u9879\u76EE\u6A21\u578B\u4E0E\u5F53\u524D\u5236\u4F5C\u914D\u7F6E\u4E0D\u540C\uFF1B\u5148 read \u67E5\u770B execution_plan.model_name\uFF0C\u518D\u7528 configure_profile \u7684 projectSpec.target_model \u66F4\u65B0\u9879\u76EE\u5E76\u91CD\u5BA1\u6A21\u578B\u76F8\u5173\u6750\u6599\uFF1B\u82E5\u8981\u6539\u5B9E\u9645\u8C03\u7528\u6A21\u578B\uFF0C\u8BF7\u5230\u63D2\u4EF6\u8BBE\u7F6E\u3002\u4E0D\u8981\u586B\u5199\u5360\u4F4D\u6587\u5B57\u6216\u76F4\u63A5\u4FEE\u6539\u9879\u76EE\u6587\u4EF6\u3002");
-            const plan = compileProduction(state, estimatePlan(runtime.config, "video_generate", { duration: state.duration_ms / 1e3 }), args.ratio, args.resolution);
-            if (!state.production || state.production.source_revision !== state.revision || state.production.ratio !== args.ratio || state.production.resolution !== args.resolution) {
+            const plan = compileProduction(state, estimatePlan(runtime.config, "video_generate", { duration: state.duration_ms / 1e3 }), args.ratio, args.resolution, videoCapabilities(resolveModel(runtime.config)));
+            if (state.production?.source_revision === state.revision && state.production.model_name && state.production.model_name !== resolveModel(runtime.config)) throw Error("MODEL_CHANGED_RECOMPILE:\u8BF7configure_profile\u660E\u786E\u5F53\u524Dtarget_model\u5E76\u91CD\u5BA1\u6A21\u578B\u76F8\u5173\u6750\u6599\u3002");
+            if (!state.production || state.production.source_revision !== state.revision || state.production.ratio !== args.ratio || state.production.resolution !== args.resolution || !state.production.plan_digest) {
               const project = await createProject(exec, state.artifacts.assets.data.characters.length ? "fixed_subject" : "scenery");
               project.duration = state.duration_ms / 1e3;
-              project.filmSource = { path: file, revision: state.revision };
+              project.filmSource = { path: file, revision: state.revision, plan_digest: productionDigest(plan.specification), model_name: resolveModel(runtime.config) };
               await writeProject(project);
-              state.production = { ...plan, videoProjectId: project.id };
+              state.production = { ...plan, model_name: resolveModel(runtime.config), plan_digest: productionDigest(plan.specification), videoProjectId: project.id };
             }
           }
           if (args.action === "export") return { project: state, markdown: renderDeliverables(state), manifest: artifactManifest(state), status: state.status };
           if (args.action === "submit") {
             if (state.revision !== args.expectedRevision) throw Error("REVISION_CONFLICT");
-            if (!STAGES.includes(args.stage)) throw Error("INVALID_STAGE");
+            if (!STAGES2.includes(args.stage)) throw Error("INVALID_STAGE");
             try {
               state = commitArtifact(state, args.stage, JSON.parse(args.content), args.expectedRevision);
             } catch (error) {
@@ -4422,22 +4678,30 @@ var filmDirectorBusiness = {
             state = recordApprovalDecision(state, args.stage, { "\u6279\u51C6\u672C\u7248": "APPROVED", "\u9700\u8981\u4FEE\u6539": "REVISE", "\u62D2\u7EDD\u5F53\u524D\u65B9\u6848": "REJECTED" }[decision.selected[0]], args.expectedRevision);
           }
           if (!["create", "submit", "approve", "compile", "revise", "schedule", "task_result", "verify_issue", "configure_profile"].includes(args.action)) throw Error("INVALID_ACTION");
+          if (args.action !== "create" && originalState === JSON.stringify(state)) return projectResponse(state, taskFor(), args.responseMode || "compact");
           await mkdir6(path9.join(dir, "snapshots"), { recursive: true, mode: 448 });
           const body = JSON.stringify(state, null, 2);
-          await writeFile4(path9.join(dir, "snapshots", `${state.revision}-${randomUUID3()}.json`), body, { mode: 384, flag: "wx" });
-          const temp = path9.join(dir, `${randomUUID3()}.tmp`);
-          await writeFile4(temp, body, { mode: 384, flag: "wx" });
-          await rename5(temp, file);
-          return projectResponse(state, taskFor(), args.responseMode || "compact", { sha256: createHash3("sha256").update(body).digest("hex") });
+          await writeFile4(path9.join(dir, "snapshots", `${state.revision}-${randomUUID4()}.json`), body, { mode: 384, flag: "wx" });
+          const temp = path9.join(dir, `${randomUUID4()}.tmp`);
+          try {
+            await writeFile4(temp, body, { mode: 384, flag: "wx" });
+            await rename5(temp, file);
+          } finally {
+            await rm5(temp, { force: true }).catch(() => {
+            });
+          }
+          await pruneProjectSnapshots(dir, state).catch(() => {
+          });
+          return projectResponse(state, taskFor(), args.responseMode || "compact", { sha256: createHash4("sha256").update(body).digest("hex") });
         } finally {
           try {
             if (release) await release();
           } finally {
-            locks2.delete(id);
+            if (!readonly) locks2.delete(id);
           }
         }
       }
-    });
+    }));
   }
 };
 
@@ -4487,10 +4751,10 @@ function bindAgentRegistry(ctx, registry2) {
 }
 
 // src/core/telemetry/reporter.ts
-import { randomUUID as randomUUID4, createHash as createHash4 } from "node:crypto";
-import { mkdir as mkdir7, readFile as readFile6, writeFile as writeFile5 } from "node:fs/promises";
+import { randomUUID as randomUUID5, createHash as createHash5 } from "node:crypto";
+import { mkdir as mkdir7, readFile as readFile7, writeFile as writeFile5 } from "node:fs/promises";
 import path10 from "node:path";
-import os4 from "node:os";
+import os5 from "node:os";
 init_version();
 init_value();
 init_hardcoded_config();
@@ -4523,7 +4787,7 @@ async function analyticsIdentity() {
     const present = [];
     for (const file of files) {
       try {
-        present.push(parse(await readFile6(file, "utf8")));
+        present.push(parse(await readFile7(file, "utf8")));
       } catch {
         present.push(null);
       }
@@ -4531,13 +4795,13 @@ async function analyticsIdentity() {
     let id = present[0] || present[1];
     await mkdir7(dir, { recursive: true, mode: 448 });
     if (!id) {
-      const created = randomUUID4();
+      const created = randomUUID5();
       try {
         await writeFile5(files[0], JSON.stringify({ installationId: created }), { mode: 384, flag: "wx" });
         id = created;
       } catch (error) {
         if (error.code !== "EEXIST") throw error;
-        id = parse(await readFile6(files[0], "utf8").catch(() => ""));
+        id = parse(await readFile7(files[0], "utf8").catch(() => ""));
         if (!id) {
           id = created;
           await writeFile5(files[0], JSON.stringify({ installationId: id }), { mode: 384 });
@@ -4581,9 +4845,9 @@ function createAnalyticsReporter(config, options = {}) {
   const request = options.request || ((...args) => globalThis.fetch(...args));
   const identity = options.identity || analyticsIdentity;
   const device = options.device || (() => ({
-    arch: ["arm64", "x64", "ia32", "arm"].includes(os4.arch()) ? os4.arch() : "other",
-    osRelease: deviceText(os4.release(), true),
-    memoryGb: Math.max(1, Math.min(4096, Math.round(os4.totalmem() / 1024 ** 3))),
+    arch: ["arm64", "x64", "ia32", "arm"].includes(os5.arch()) ? os5.arch() : "other",
+    osRelease: deviceText(os5.release(), true),
+    memoryGb: Math.max(1, Math.min(4096, Math.round(os5.totalmem() / 1024 ** 3))),
     harnessVersion: deviceText(process.env.DSH_CLIENT_VERSION || process.env.DSH_APP_VERSION, false)
   }));
   const delay = options.delayMs ?? 1e3;
@@ -4662,7 +4926,7 @@ function createAnalyticsReporter(config, options = {}) {
       const fields = analyticsFields(input);
       if (name !== "plugin_started" && !fields.tool) return;
       const event = {
-        eventId: randomUUID4(),
+        eventId: randomUUID5(),
         name,
         occurredAt: (/* @__PURE__ */ new Date()).toISOString(),
         version: PLUGIN_VERSION,
@@ -4673,7 +4937,7 @@ function createAnalyticsReporter(config, options = {}) {
       if (dedupeKey) {
         void Promise.resolve().then(() => identity()).then((id) => {
           if (!id || !allowed()) return;
-          event.eventId = createHash4("sha256").update(`${id}:${name}:${dedupeKey}`).digest("hex");
+          event.eventId = createHash5("sha256").update(`${id}:${name}:${dedupeKey}`).digest("hex");
           queue.push(event);
           queue = queue.slice(-maxQueue);
           schedule();
@@ -4742,12 +5006,12 @@ function withUsageAnalytics(tool, reporter, mode = (_exec) => "standard") {
 }
 
 // src/core/utils/timing.ts
-import { randomUUID as randomUUID5 } from "node:crypto";
-import { performance } from "node:perf_hooks";
+import { randomUUID as randomUUID6 } from "node:crypto";
+import { performance as performance2 } from "node:perf_hooks";
 async function timedStage(stage, operation) {
-  const spanId = randomUUID5();
+  const spanId = randomUUID6();
   const startedAt = (/* @__PURE__ */ new Date()).toISOString();
-  const start = performance.now();
+  const start = performance2.now();
   await appendRequestLog({ event: "stage_started", stage, spanId, startedAt });
   let outcome = "error";
   try {
@@ -4764,14 +5028,14 @@ async function timedStage(stage, operation) {
       spanId,
       startedAt,
       finishedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      elapsedMs: Math.round((performance.now() - start) * 1e3) / 1e3,
+      elapsedMs: Math.round((performance2.now() - start) * 1e3) / 1e3,
       outcome
     });
   }
 }
 function withStageTiming(tool) {
   return { ...tool, async execute(args, exec) {
-    const context = { ...requestLogContext.getStore(), callId: exec?.callId || randomUUID5(), tool: tool.name };
+    const context = { ...requestLogContext.getStore(), callId: exec?.callId || randomUUID6(), tool: tool.name };
     return requestLogContext.run(context, () => timedStage(`tool:${tool.name}`, () => tool.execute(args, exec)));
   } };
 }
@@ -5239,6 +5503,9 @@ function isVideoDirector(context, ctx) {
   return registryForContext(ctx, agentRegistry).hasBusiness(context, ctx, "video");
 }
 
+// src/businesses/video/tools/video-project.ts
+init_connection();
+
 // src/businesses/video/workflow/duration-choice.ts
 init_config();
 var DURATION_OPTIONS = [15, 30, 45, 60];
@@ -5305,12 +5572,12 @@ async function ensureProjectDuration(ctx, exec, project, requested, save2) {
 }
 
 // src/businesses/video/tools/video-project.ts
-import { mkdir as mkdir9, readFile as readFile8, readdir as readdir3, writeFile as writeFile7 } from "node:fs/promises";
+import { mkdir as mkdir9, readFile as readFile9, readdir as readdir4, writeFile as writeFile7 } from "node:fs/promises";
 import path13 from "node:path";
 
 // src/businesses/video/workflow/character-choice.ts
-import { createHash as createHash5 } from "node:crypto";
-import { mkdir as mkdir8, readFile as readFile7, writeFile as writeFile6, rename as rename6, rm as rm5 } from "node:fs/promises";
+import { createHash as createHash6 } from "node:crypto";
+import { mkdir as mkdir8, readFile as readFile8, writeFile as writeFile6, rename as rename6, rm as rm6 } from "node:fs/promises";
 import path12 from "node:path";
 init_connection();
 var waiting = /* @__PURE__ */ new Map();
@@ -5318,11 +5585,8 @@ var localIds = /* @__PURE__ */ new WeakMap();
 var nextId = 0;
 var IMAGE = "\u5148\u751F\u6210\u89D2\u8272\u56FE\uFF08\u5355\u72EC\u8BA1\u8D39\uFF09";
 var TEXT = "\u76F4\u63A5\u6587\u751F\u89C6\u9891";
-function hasImages(args) {
-  return [args?.firstFrameUrl, ...Array.isArray(args?.referenceImages) ? args.referenceImages : [args?.referenceImages], ...Array.isArray(args?.characterReferenceImages) ? args.characterReferenceImages : []].some((value) => typeof value === "string" && Boolean(value.trim()));
-}
 async function characterChoiceGate(ctx, config, exec, args) {
-  if (exec.name !== "video_generate" || String(args?.resume || "").trim() || hasImages(args)) return null;
+  if (exec.name !== "video_generate" || String(args?.resume || "").trim() || hasProjectImages(args)) return null;
   if (args?.projectId && !args.preparation) return projectCharacterGate(config, exec, args);
   const project = args?.projectId ? await readProject(args.projectId, exec) : null;
   const session = exec.agent?.session;
@@ -5330,14 +5594,14 @@ async function characterChoiceGate(ctx, config, exec, args) {
   if (!session || typeof session !== "object") return deny("\u63D0\u4EA4\u5DF2\u505C\u6B62\uFF1A\u7EAF\u6587\u751F\u89C6\u9891\u987B\u5148\u8BE2\u95EE\u662F\u5426\u751F\u6210\u89D2\u8272\u53C2\u8003\u56FE\uFF0C\u5F53\u524D\u7F3A\u5C11\u53EF\u4EA4\u4E92\u4F1A\u8BDD\u3002");
   const stableId = typeof session.id === "string" ? session.id : typeof session.header?.id === "string" ? session.header.id : null;
   if (!localIds.has(session)) localIds.set(session, `live-${++nextId}`);
-  const key = createHash5("sha256").update(JSON.stringify(project ? [project.id] : [stableId || localIds.get(session), args?.prompt || "", args?.duration, args?.resolution, args?.ratio])).digest("hex");
+  const key = createHash6("sha256").update(JSON.stringify(project ? [project.id] : [stableId || localIds.get(session), args?.prompt || "", args?.duration, args?.resolution, args?.ratio])).digest("hex");
   const file = path12.join(dshHome(), "metaontic-video", "character-choices", key + ".json");
   try {
     async function choose() {
       if (project?.choice && args?.resetCharacterChoice !== true) return project.choice;
       if (!project && stableId && args?.resetCharacterChoice !== true) {
         try {
-          const saved = JSON.parse(await readFile7(file, "utf8"));
+          const saved = JSON.parse(await readFile8(file, "utf8"));
           if (saved.version === 1 && ["text_only", "generate_first"].includes(saved.choice)) return saved.choice;
         } catch (error) {
           if (error?.code !== "ENOENT") return null;
@@ -5374,7 +5638,7 @@ async function characterChoiceGate(ctx, config, exec, args) {
           await writeFile6(temp, JSON.stringify({ version: 1, choice: choice2, time: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" });
           await rename6(temp, file);
         } finally {
-          await rm5(temp, { force: true }).catch(() => {
+          await rm6(temp, { force: true }).catch(() => {
           });
         }
       }
@@ -5426,12 +5690,12 @@ function compareVideoCosts(config, args) {
   if (isVolcengine(config) && groupRatio !== 1) throw new Error("\u706B\u5C71\u76F4\u8FDE\u4E0D\u9002\u7528\u4E2D\u8F6C\u5206\u7EC4\u6298\u6263\u3002");
   const officialModel = "doubao-seedance-2-5";
   const officialRates = RATES.find(([prefix]) => officialModel.startsWith(prefix))[1];
-  const officialPlan = planVideoSegments(duration, 30, 30);
+  const officialPlan = args.productionStrategy === "independent_shots" ? planned.plan : planVideoSegments(duration, 30, 30);
   function calculate(id, plan, price, multiplier) {
     const pixels = resolution === "720p" ? [1280, 720] : id.startsWith("doubao-seedance-2-5") ? [854, 480] : [864, 496];
     const dimensions = ratio === "9:16" ? [...pixels].reverse() : pixels;
     const segments = plan.map((step, index) => {
-      const inputSeconds = index ? plan[index - 1].seconds : 0;
+      const inputSeconds = step.kind === "extend" && index ? plan[index - 1].seconds : 0;
       const tokens = (inputSeconds + step.seconds) * pixels[0] * pixels[1] * 24 / 1024;
       const rateCnyPerMillion = price[inputSeconds ? 1 : 0] * multiplier;
       return { index: index + 1, kind: step.kind, seconds: step.seconds, inputSeconds, billingMode: inputSeconds ? "with_video_input" : "without_video_input", tokens, rateCnyPerMillion, cny: tokens * rateCnyPerMillion / 1e6 };
@@ -5442,6 +5706,7 @@ function compareVideoCosts(config, args) {
     duration,
     resolution,
     ratio,
+    productionStrategy: args.productionStrategy || "continuous_segments",
     fps: 24,
     priceDate: PRICE_DATE,
     currency: "CNY",
@@ -5450,14 +5715,16 @@ function compareVideoCosts(config, args) {
     plugin: calculate(model, planned.plan, rates[1], groupRatio),
     pluginChannel: isVolcengine(config) ? "\u706B\u5C71\u76F4\u8FDE\uFF08\u65E0\u4E2D\u8F6C\u6298\u6263\uFF09" : "MetaOnticVideo\u4E2D\u8F6C\u5236\u4F5C\u65B9\u6848",
     sources: ["https://docs.volcengine.com/docs/ark/model-pricing?lang=zh", "https://ai.bileego.com/pricing"],
-    notes: ["\u8FD9\u662F\u89C6\u9891API\u57FA\u7840\u516C\u5F0F\u4F30\u4EF7\uFF0C\u975E\u56FA\u5B9A\u62A5\u4EF7\uFF1B\u542B\u89C6\u9891\u8F93\u5165\u7684\u6700\u4F4E\u7528\u91CF\u8865\u8DB3\u5C1A\u672A\u8BA1\u5165\uFF0C\u5B9E\u9645\u4EE5\u6E20\u9053\u8D26\u5355\u4E3A\u51C6\u3002", "\u7EED\u62CD\u8F93\u5165\u6309\u4E0A\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\u65F6\u957F\u8BA1\u5165\uFF0C\u4E0D\u6309\u7D2F\u8BA1\u6210\u7247\u8F93\u5165\uFF1B\u53C2\u8003\u56FE\u7247\u4E0D\u7B49\u540C\u53C2\u8003\u89C6\u9891\uFF0C\u4E0D\u4F7F\u7528\u542B\u89C6\u9891\u5355\u4EF7\u3002", "\u4E0D\u542B\u56FE\u7247\u751F\u6210\u6216\u8F6C\u6362\u3001\u91CD\u8BD5\u3001\u72EC\u7ACB\u914D\u97F3\u53CA\u5176\u4ED6\u989D\u5916\u8C03\u7528\uFF1B\u672C\u5730\u5408\u5E76\u4E0D\u4EA7\u751F\u89C6\u9891\u6A21\u578B\u8C03\u7528\u8D39\uFF0C\u63A5\u7F1D\u88C1\u526A\u4F1A\u7F29\u77ED\u4EA4\u4ED8\u65F6\u957F\u3002", "\u4E0D\u540C\u6A21\u578B\u7684\u8D28\u91CF\u4E0E\u80FD\u529B\u6709\u5DEE\u5F02\uFF1B\u706B\u5C71\u5B98\u65B9\u4E3AAPI\u520A\u4F8B\u4EF7\uFF0C\u4E0D\u662F\u7F51\u9875\u79EF\u5206\u6216\u5957\u9910\u4EF7\u683C\u3002", "\u706B\u5C71\u5B98\u65B9\u65B9\u6848\u6309 Seedance 2.5 \u7684\u5B9E\u9645\u79D2\u6570\u6392\u6BB5\uFF1A\u5355\u6BB5\u4E0A\u9650 30 \u79D2\uFF0C\u4E0D\u8DB3 30 \u79D2\u4E0D\u51D1\u6574\uFF1B\u8D85\u8FC7 30 \u79D2\u6309 30 \u79D2\u76F4\u51FA\u52A0\u9010\u6BB5\u7EED\u62CD\u5217\u51FA\uFF0C\u7EED\u62CD\u8BA1\u5165\u4E0A\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\u8F93\u5165\u3002", "\u4E2D\u8F6C\u500D\u7387\u4EC5\u5728 API\u5BC6\u94A5\u786E\u6709\u5BF9\u5E94\u5206\u7EC4\u6743\u9650\u4E14\u5B9E\u9645\u4F7F\u7528\u8BE5\u5206\u7EC4\u65F6\u6210\u7ACB\uFF1B\u4EF7\u683C\u65E5\u671F\u540E\u53EF\u80FD\u8C03\u6574\uFF0C\u5236\u4F5C\u524D\u9700\u590D\u6838\u3002"]
+    notes: ["\u8FD9\u662F\u89C6\u9891API\u57FA\u7840\u516C\u5F0F\u4F30\u4EF7\uFF0C\u975E\u56FA\u5B9A\u62A5\u4EF7\uFF1B\u542B\u89C6\u9891\u8F93\u5165\u7684\u6700\u4F4E\u7528\u91CF\u8865\u8DB3\u5C1A\u672A\u8BA1\u5165\uFF0C\u5B9E\u9645\u4EE5\u6E20\u9053\u8D26\u5355\u4E3A\u51C6\u3002", "\u7EED\u62CD\u8F93\u5165\u6309\u4E0A\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\u65F6\u957F\u8BA1\u5165\uFF0C\u4E0D\u6309\u7D2F\u8BA1\u6210\u7247\u8F93\u5165\uFF1B\u53C2\u8003\u56FE\u7247\u4E0D\u7B49\u540C\u53C2\u8003\u89C6\u9891\uFF0C\u4E0D\u4F7F\u7528\u542B\u89C6\u9891\u5355\u4EF7\u3002", "\u4E0D\u542B\u56FE\u7247\u751F\u6210\u6216\u8F6C\u6362\u3001\u91CD\u8BD5\u3001\u72EC\u7ACB\u914D\u97F3\u53CA\u5176\u4ED6\u989D\u5916\u8C03\u7528\uFF1B\u672C\u5730\u5408\u5E76\u4E0D\u4EA7\u751F\u89C6\u9891\u6A21\u578B\u8C03\u7528\u8D39\uFF0C\u63A5\u7F1D\u88C1\u526A\u4F1A\u7F29\u77ED\u4EA4\u4ED8\u65F6\u957F\u3002", "\u4E0D\u540C\u6A21\u578B\u7684\u8D28\u91CF\u4E0E\u80FD\u529B\u6709\u5DEE\u5F02\uFF1B\u706B\u5C71\u5B98\u65B9\u4E3AAPI\u520A\u4F8B\u4EF7\uFF0C\u4E0D\u662F\u7F51\u9875\u79EF\u5206\u6216\u5957\u9910\u4EF7\u683C\u3002", args.productionStrategy === "independent_shots" ? "\u4E24\u9879\u65B9\u6848\u5747\u6309\u6279\u51C6\u7684\u72EC\u7ACB\u955C\u5934\u9010\u955C\u751F\u6210\u4F30\u4EF7\uFF0C\u5404\u955C\u4E0D\u8F93\u5165\u4E0A\u4E00\u6BB5\u89C6\u9891\uFF0C\u9ED8\u8BA4\u76F4\u63A5\u526A\u8F91\u4E0D\u88C1\u7EED\u62CD\u63A5\u7F1D\uFF1B\u4EBA\u7269\u4E00\u81F4\u6027\u9700\u53C2\u8003\u56FE\u548C\u7ED3\u679C\u5BA1\u6838\u3002" : "\u706B\u5C71\u5B98\u65B9\u65B9\u6848\u6309 Seedance 2.5 \u7684\u5B9E\u9645\u79D2\u6570\u6392\u6BB5\uFF1A\u5355\u6BB5\u4E0A\u9650 30 \u79D2\uFF0C\u4E0D\u8DB3 30 \u79D2\u4E0D\u51D1\u6574\uFF1B\u8D85\u8FC7 30 \u79D2\u6309 30 \u79D2\u76F4\u51FA\u52A0\u9010\u6BB5\u7EED\u62CD\u5217\u51FA\uFF0C\u7EED\u62CD\u8BA1\u5165\u4E0A\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\u8F93\u5165\u3002", "\u4E2D\u8F6C\u500D\u7387\u4EC5\u5728 API\u5BC6\u94A5\u786E\u6709\u5BF9\u5E94\u5206\u7EC4\u6743\u9650\u4E14\u5B9E\u9645\u4F7F\u7528\u8BE5\u5206\u7EC4\u65F6\u6210\u7ACB\uFF1B\u4EF7\u683C\u65E5\u671F\u540E\u53EF\u80FD\u8C03\u6574\uFF0C\u5236\u4F5C\u524D\u9700\u590D\u6838\u3002"]
   };
 }
 function estimateTool(config) {
   return {
     name: "video_estimate",
-    description: "\u811A\u672C\u5BA1\u6838\u524D\u5FC5\u987B\u8C03\u7528\u7684\u53EA\u8BFB\u53CC\u65B9\u6848\u8D39\u7528\u8BD5\u7B97\uFF1A\u706B\u5C71\u5B98\u65B9\u65B9\u6848\u4E0E\u5F53\u524DMetaOnticVideo\u63D2\u4EF6\u65B9\u6848\u3002duration\u4E3A\u5B8C\u6574\u76EE\u6807\u65F6\u957F\uFF0Cresolution\u987B\u7528\u6237\u5DF2\u786E\u8BA4\uFF1B\u9996\u6BB5\u6309\u65E0\u89C6\u9891\u8F93\u5165\uFF0C\u540E\u7EED\u7EED\u62CD\u6309\u6709\u89C6\u9891\u8F93\u5165\u8BA1\u4EF7\u5E76\u8BA1\u5165\u4E0A\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\u65F6\u957F\uFF1B\u53C2\u8003\u56FE\u4E0D\u7B97\u89C6\u9891\u8F93\u5165\u3002\u5FC5\u987B\u5728\u811A\u672C\u672B\u5C3E\u5C55\u793A\u9010\u6BB5\u6863\u4F4D\u3001\u8F93\u5165/\u8F93\u51FA\u79D2\u6570\u3001\u5355\u4EF7\u53CA\u91D1\u989D\uFF0C\u4E0D\u80FD\u53EA\u7ED9\u5408\u8BA1\u3002\u4E0D\u4F1A\u751F\u6210\u89C6\u9891\u3001\u6263\u8D39\u3001\u67E5\u4F59\u989D\u6216\u4FEE\u6539\u914D\u7F6E\u3002\u672A\u77E5\u6A21\u578B/\u753B\u5E45\u62D2\u7EDD\u731C\u4EF7\u3002\u6BCF\u6B21\u6539\u7A3F\u6D89\u53CA\u65F6\u957F\u3001\u6E05\u6670\u5EA6\u3001\u6A21\u578B\u6216\u5206\u6BB5\u987B\u91CD\u7B97\u3002",
+    description: "\u811A\u672C\u5BA1\u6838\u524D\u5FC5\u987B\u8C03\u7528\u7684\u53EA\u8BFB\u53CC\u65B9\u6848\u8D39\u7528\u8BD5\u7B97\uFF1A\u706B\u5C71\u5B98\u65B9\u65B9\u6848\u4E0E\u5F53\u524DMetaOnticVideo\u63D2\u4EF6\u65B9\u6848\u3002duration\u4E3A\u5B8C\u6574\u76EE\u6807\u65F6\u957F\uFF0Cresolution\u987B\u7528\u6237\u5DF2\u786E\u8BA4\uFF1B\u9996\u6BB5\u6309\u65E0\u89C6\u9891\u8F93\u5165\uFF0C\u540E\u7EED\u7EED\u62CD\u6309\u6709\u89C6\u9891\u8F93\u5165\u8BA1\u4EF7\u5E76\u8BA1\u5165\u4E0A\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\u65F6\u957F\uFF1B\u53C2\u8003\u56FE\u4E0D\u7B97\u89C6\u9891\u8F93\u5165\u3002\u663E\u5F0Findependent_shots\u6309shotDurations\u9010\u955C\u65E0\u89C6\u9891\u8F93\u5165\u8BA1\u8D39\u3002\u5FC5\u987B\u5728\u811A\u672C\u672B\u5C3E\u5C55\u793A\u9010\u6BB5\u6863\u4F4D\u3001\u8F93\u5165/\u8F93\u51FA\u79D2\u6570\u3001\u5355\u4EF7\u53CA\u91D1\u989D\uFF0C\u4E0D\u80FD\u53EA\u7ED9\u5408\u8BA1\u3002\u4E0D\u4F1A\u751F\u6210\u89C6\u9891\u3001\u6263\u8D39\u3001\u67E5\u4F59\u989D\u6216\u4FEE\u6539\u914D\u7F6E\u3002\u672A\u77E5\u6A21\u578B/\u753B\u5E45\u62D2\u7EDD\u731C\u4EF7\u3002\u6BCF\u6B21\u6539\u7A3F\u6D89\u53CA\u65F6\u957F\u3001\u6E05\u6670\u5EA6\u3001\u6A21\u578B\u6216\u5206\u6BB5\u987B\u91CD\u7B97\u3002",
     parameters: { type: "object", properties: {
+      productionStrategy: { type: "string", enum: ["continuous_segments", "independent_shots"] },
+      shotDurations: { type: "array", items: { type: "integer", minimum: 4 }, description: "\u72EC\u7ACB\u955C\u5934\u5404\u79D2\u6570\uFF1B\u4E0E\u5BA1\u6838\u53CA\u751F\u6210\u4E00\u81F4" },
       duration: { type: "integer", minimum: 4, maximum: 3600, description: "\u5F53\u524D\u5B8C\u6574\u811A\u672C\u7684\u76EE\u6807\u603B\u65F6\u957F" },
       resolution: { type: "string", enum: ["480p", "720p"], description: '\u7528\u6237\u5DF2\u786E\u8BA4\u7684\u89C6\u9891\u6E05\u6670\u5EA6\u3002\u5FC5\u987B\u5199\u6210\u5E26\u5F15\u53F7\u7684\u5B57\u7B26\u4E32\uFF0C\u4F8B\u5982 "480p"\uFF1B\u5199\u6210\u88F8\u503C 480p \u4F1A\u8BA9\u8FD9\u6B21\u8C03\u7528\u76F4\u63A5\u5931\u8D25\u3002' },
       ratio: { type: "string", enum: ["16:9", "9:16"], description: '\u811A\u672C\u753B\u5E45\uFF0C\u5176\u4ED6\u753B\u5E45\u6682\u4E0D\u53EF\u9760\u8BD5\u7B97\u3002\u540C\u6837\u8981\u5199\u6210\u5E26\u5F15\u53F7\u7684\u5B57\u7B26\u4E32\uFF0C\u4F8B\u5982 "16:9"\u3002' },
@@ -5467,7 +5734,7 @@ function estimateTool(config) {
     output: { schema: { type: "object" }, render(_args, value) {
       const detail = (name, item) => item.segments.map((s) => `${name}\u7B2C${s.index}\u6BB5\uFF1A${s.inputSeconds ? "\u6709\u89C6\u9891\u8F93\u5165" : "\u65E0\u89C6\u9891\u8F93\u5165"}\uFF1B\u8F93\u5165${s.inputSeconds}\u79D2 + \u8F93\u51FA${s.seconds}\u79D2\uFF1B\u5355\u4EF7\xA5${s.rateCnyPerMillion}/\u767E\u4E07token\uFF1B\u7EA6\xA5${s.cny.toFixed(4)}`);
       const line = (name, item) => `${name}\uFF1A\u7EA6\xA5${item.cny.toFixed(2)}\uFF1B${item.model}\uFF1B${item.segments.map((s) => s.seconds).join("+")}\u79D2\uFF1B\u500D\u7387${item.groupRatio}`;
-      return [{ type: "text", text: [`${value.duration}\u79D2 / ${value.resolution.toUpperCase()} / ${value.ratio}\uFF08${value.estimateType}\uFF09`, line("\u706B\u5C71\u5B98\u65B9\u65B9\u6848", value.official), line("MetaOnticVideo\u63D2\u4EF6\u65B9\u6848", value.plugin), ...detail("\u706B\u5C71\u5B98\u65B9", value.official), ...detail("\u63D2\u4EF6", value.plugin), `\u4EF7\u683C\u6838\u5BF9\u65E5\u671F\uFF1A${value.priceDate}`, ...value.notes].join("\n") }];
+      return [{ type: "text", text: [`${value.duration}\u79D2 / ${value.resolution.toUpperCase()} / ${value.ratio}\uFF08${value.estimateType}\uFF1B${value.productionStrategy === "independent_shots" ? "\u72EC\u7ACB\u955C\u5934\u9010\u955C\u8BA1\u8D39" : "\u8FDE\u7EED\u7EED\u62CD"}\uFF09`, line("\u706B\u5C71\u5B98\u65B9\u65B9\u6848", value.official), line("MetaOnticVideo\u63D2\u4EF6\u65B9\u6848", value.plugin), ...detail("\u706B\u5C71\u5B98\u65B9", value.official), ...detail("\u63D2\u4EF6", value.plugin), `\u4EF7\u683C\u6838\u5BF9\u65E5\u671F\uFF1A${value.priceDate}`, ...value.notes].join("\n") }];
     } },
     isConcurrencySafe() {
       return true;
@@ -5528,20 +5795,20 @@ function approvalPolicy(ctx, exec) {
 function setupGate(ctx, exec) {
   const args = exec.arguments && typeof exec.arguments === "object" ? exec.arguments : {};
   if (args?.install !== true) return { kind: "allow" };
-  const { os: os5, installs, bootstrap } = ffmpegInstallOptions();
+  const { os: os6, installs, bootstrap } = ffmpegInstallOptions();
   const command = String(args?.target || "ffmpeg") === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
   if (approvalPolicy(ctx, exec) === "never") {
     return {
       kind: "deny",
-      reason: `\u5F53\u524D\u6743\u9650\u6A21\u5F0F\u5173\u95ED\u4E86\u5BA1\u6279\u63D0\u793A\uFF08\u5B8C\u5168\u8BBF\u95EE\uFF09\uFF0C\u88C5\u73AF\u5883\u8FD9\u79CD\u4F1A\u5728\u672C\u673A\u8DD1\u547D\u4EE4\u7684\u64CD\u4F5C\u6CA1\u6CD5\u786E\u8BA4\uFF0C\u5DF2\u505C\u6B62\u3002\u628A\u6743\u9650\u5207\u5230\u300C\u5DE5\u4F5C\u533A\u5199\u5165\u300D\u6216\u300C\u53EA\u8BFB\u300D\u540E\u518D\u8BA9\u6211\u88C5\uFF1B\u4E5F\u53EF\u4EE5\u7167\u7740\u8FD9\u6761\u547D\u4EE4\u81EA\u5DF1\u5728\u7EC8\u7AEF\u6267\u884C\uFF1A${command}\uFF08${os5}\uFF09\u3002`
+      reason: `\u5F53\u524D\u6743\u9650\u6A21\u5F0F\u5173\u95ED\u4E86\u5BA1\u6279\u63D0\u793A\uFF08\u5B8C\u5168\u8BBF\u95EE\uFF09\uFF0C\u88C5\u73AF\u5883\u8FD9\u79CD\u4F1A\u5728\u672C\u673A\u8DD1\u547D\u4EE4\u7684\u64CD\u4F5C\u6CA1\u6CD5\u786E\u8BA4\uFF0C\u5DF2\u505C\u6B62\u3002\u628A\u6743\u9650\u5207\u5230\u300C\u5DE5\u4F5C\u533A\u5199\u5165\u300D\u6216\u300C\u53EA\u8BFB\u300D\u540E\u518D\u8BA9\u6211\u88C5\uFF1B\u4E5F\u53EF\u4EE5\u7167\u7740\u8FD9\u6761\u547D\u4EE4\u81EA\u5DF1\u5728\u7EC8\u7AEF\u6267\u884C\uFF1A${command}\uFF08${os6}\uFF09\u3002`
     };
   }
   return {
     kind: "ask",
-    reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u5728 ${os5} \u4E0A\u6267\u884C\u5B89\u88C5\u547D\u4EE4\u300C${command}\u300D\u3002`,
+    reason: `\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u5728 ${os6} \u4E0A\u6267\u884C\u5B89\u88C5\u547D\u4EE4\u300C${command}\u300D\u3002`,
     displayReason: {
-      zh: `\u51C6\u5907\u5728\u8FD9\u53F0\u7535\u8111\u4E0A\u88C5 ffmpeg\uFF1A${command}\uFF08${os5}\uFF09\u3002\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u6267\u884C\uFF0C\u5B89\u88C5\u5B8C\u6210\u53EA\u9A8C\u8BC1\u5DE5\u5177\uFF1B\u65B0\u751F\u6210\u4ECD\u9700\u5355\u72EC\u786E\u8BA4\u8D39\u7528\uFF0C\u5DF2\u6709\u4EFB\u52A1\u6309\u539F\u8FDB\u5EA6\u6062\u590D\u3002`,
-      en: `About to install ffmpeg on this machine: ${command} (${os5}). It runs only after you allow it; installation only verifies the tool; new video generation requires separate cost confirmation, while existing tasks should resume their saved progress.`
+      zh: `\u51C6\u5907\u5728\u8FD9\u53F0\u7535\u8111\u4E0A\u88C5 ffmpeg\uFF1A${command}\uFF08${os6}\uFF09\u3002\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u6267\u884C\uFF0C\u5B89\u88C5\u5B8C\u6210\u53EA\u9A8C\u8BC1\u5DE5\u5177\uFF1B\u65B0\u751F\u6210\u4ECD\u9700\u5355\u72EC\u786E\u8BA4\u8D39\u7528\uFF0C\u5DF2\u6709\u4EFB\u52A1\u6309\u539F\u8FDB\u5EA6\u6062\u590D\u3002`,
+      en: `About to install ffmpeg on this machine: ${command} (${os6}). It runs only after you allow it; installation only verifies the tool; new video generation requires separate cost confirmation, while existing tasks should resume their saved progress.`
     }
   };
 }
@@ -5565,14 +5832,14 @@ async function ffmpegConsentGate(config, exec, args) {
   const allSteps = [...doneSteps, ...plan || []];
   if (!plan || allSteps.length < 2) return null;
   if (await hasFfmpeg(config, exec.signal)) return null;
-  const { os: os5, installs } = ffmpegInstallOptions();
+  const { os: os6, installs } = ffmpegInstallOptions();
   const command = installs[0].command;
   const sizes = allSteps.map((step) => `${step.seconds}s`).join(" + ");
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
   const lines = [
     `\u672C\u673A\u6CA1\u6709 ${binary}\uFF0C\u672C\u6B21\u8BA1\u5212\u603B\u65F6\u957F\u662F ${allSteps.reduce((sum, step) => sum + step.seconds, 0)} \u79D2\uFF08\u4F1A\u62C6\u6210 ${allSteps.length} \u6BB5\uFF1A${sizes}\uFF09\uFF0C\u6CA1\u6709 ffmpeg \u5C31\u6CA1\u6CD5\u5408\u5E76\u6210\u4E00\u6761\uFF0C\u6240\u4EE5\u5148\u505C\u4E0B\u6765\u4E86\uFF0C\u8FD8\u6CA1\u6709\u8C03\u7528\u6A21\u578B\u3001\u6CA1\u6709\u4EA7\u751F\u8D39\u7528\u3002`,
     "\u8BF7\u5728\u5BF9\u8BDD\u6846\u91CC\u5148\u548C\u7528\u6237\u786E\u8BA4\uFF0C\u4E0D\u8981\u81EA\u5DF1\u7ED5\u8FC7\u8FD9\u4E00\u6B65\uFF1A",
-    `1) \u95EE\u7528\u6237\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg \u2014\u2014 \u8BF4\u6E05\u4ED6\u7684\u7CFB\u7EDF\uFF08${os5}\uFF09\u548C\u547D\u4EE4\uFF1A${command}`,
+    `1) \u95EE\u7528\u6237\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg \u2014\u2014 \u8BF4\u6E05\u4ED6\u7684\u7CFB\u7EDF\uFF08${os6}\uFF09\u548C\u547D\u4EE4\uFF1A${command}`,
     "   \uFF08\u88C5\u597D\u540E\uFF0C\u5DF2\u6709\u4EFB\u52A1\u7528\u539Fresume\u91CD\u8BD5\u4E0B\u8F7D\u6216\u5408\u5E76\uFF1B\u5C1A\u672A\u63D0\u4EA4\u7684\u65B0\u4EFB\u52A1\u518D\u786E\u8BA4\u751F\u6210\u8D39\u7528\uFF09\u3002",
     '2) \u7528\u6237\u540C\u610F\u5B89\u88C5\uFF1A\u8C03\u7528 video_setup\uFF08install:true\uFF09\u2014\u2014\u63D2\u4EF6\u4F1A\u6267\u884C\u4E0A\u9762\u7684\u547D\u4EE4\uFF0C\u5BBF\u4E3B\u4F1A\u5148\u628A\u8FD9\u6761\u547D\u4EE4\u62FF\u7ED9\u7528\u6237\u786E\u8BA4\uFF1B\u88C5\u5B8C\u5B83\u4F1A\u81EA\u5DF1\u9A8C\u8BC1\uFF0C\u6210\u529F\u540E\u4F60\u6309\u539F duration \u91CD\u65B0\u8C03\u7528 video_generate \u7EE7\u7EED\u751F\u6210\u5373\u53EF\uFF08\u4E00\u822C\u662F\u5148\u88C5\u5305\u7BA1\u7406\u5668\uFF1A\u672C\u673A\u8FDE brew \u90FD\u6CA1\u6709\u65F6\uFF0Cvideo_setup \u4F1A\u8FD4\u56DE nextStep\uFF0C\u7528 target:"package-manager" \u518D\u88C5\u4E00\u6B21\uFF09\u3002',
     "3) \u7528\u6237\u4E0D\u60F3\u88C5\u3001\u6216\u8005\u88C5\u4E0D\u4E86\uFF1A\u5E26 `merge:false` \u91CD\u65B0\u8C03\u7528 video_generate\uFF0C\u63D2\u4EF6\u5C31\u53EA\u751F\u6210\u5E76\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u4E0A\u6E38\u94FE\u63A5\uFF0C\u4E0D\u4E0B\u8F7D\u672C\u5730\u6587\u4EF6\uFF09\uFF0C\u8FD9\u6B21\u4E0D\u4F1A\u518D\u62E6\u3002",
@@ -5581,7 +5848,7 @@ async function ffmpegConsentGate(config, exec, args) {
   return {
     kind: "deny",
     reason: lines.join("\n"),
-    info: { ffmpegMissing: true, os: os5, command, segments: allSteps.length }
+    info: { ffmpegMissing: true, os: os6, command, segments: allSteps.length }
   };
 }
 async function estimateArgsFor(config, toolName, args) {
@@ -5700,7 +5967,7 @@ async function preflightGate(ctx, config, exec) {
       costZh = `\u65E0\u6CD5\u53EF\u9760\u4F30\u4EF7\uFF08${error?.message || error}\uFF09`;
       costEn = "A reliable cost estimate is unavailable";
     }
-    const summary = `${resolveModel(config)} \xB7 ${ratio} \xB7 ${resolution} \xB7 ${audio ? "\u6709\u97F3\u9891" : "\u65E0\u97F3\u9891"} \xB7 \u672C\u6BB5${plan[0]?.seconds ?? "\u672A\u77E5"}\u79D2 \xB7 \u5269\u4F59${plan.map((s) => s.seconds).join("+")}\u79D2`;
+    const summary = `${effectiveArgs.productionStrategy === "independent_shots" ? "\u72EC\u7ACB\u955C\u5934\u751F\u6210\uFF0C\u6BCF\u955C\u8BA1\u8D39\u3001\u4EBA\u7269\u4E00\u81F4\u6027\u9700\u53C2\u8003\u56FE\uFF1B" : "\u8FDE\u7EED\u7EED\u62CD\uFF1B"}${resolveModel(config)} \xB7 ${ratio} \xB7 ${resolution} \xB7 ${audio ? "\u6709\u97F3\u9891" : "\u65E0\u97F3\u9891"} \xB7 \u672C\u6BB5${plan[0]?.seconds ?? "\u672A\u77E5"}\u79D2 \xB7 \u5269\u4F59${plan.map((s) => s.seconds).join("+")}\u79D2`;
     return {
       kind: "ask",
       reason: `${resumeLead?.zh || ""}\u5236\u4F5C\u786E\u8BA4\uFF1A${connectionLabel(config)} ${summary}\uFF1B${costZh}\u3002\u6309\u5F53\u524D API\u5BC6\u94A5\u5728\u6E20\u9053\u7684\u5B9E\u9645\u7528\u91CF\u8BA1\u8D39\u3002`,
@@ -5735,9 +6002,9 @@ function captureScriptBody(text) {
 }
 
 // src/businesses/video/tools/video-stage.ts
-import { randomUUID as randomUUID6 } from "node:crypto";
-import { performance as performance2 } from "node:perf_hooks";
-var STAGES2 = ["script_design", "storyboard_design", "script_present", "script_review_wait", "production_confirm_wait", "reference_review_wait", "segment_review_wait", "result_present"];
+import { randomUUID as randomUUID7 } from "node:crypto";
+import { performance as performance3 } from "node:perf_hooks";
+var STAGES3 = ["script_design", "storyboard_design", "script_present", "script_review_wait", "production_confirm_wait", "reference_review_wait", "segment_review_wait", "result_present"];
 var pendingStages = /* @__PURE__ */ new Map();
 async function closePendingStage(stage, source) {
   let target;
@@ -5745,7 +6012,7 @@ async function closePendingStage(stage, source) {
   if (!target) return null;
   const entry2 = pendingStages.get(target);
   pendingStages.delete(target);
-  const elapsedMs = Math.round((performance2.now() - entry2.start) * 1e3) / 1e3;
+  const elapsedMs = Math.round((performance3.now() - entry2.start) * 1e3) / 1e3;
   await appendRequestLog({
     event: "stage_finished",
     stage: entry2.stage,
@@ -5762,7 +6029,7 @@ function stageTool() {
   return {
     name: "video_stage",
     description: "\u4EC5\u8BB0\u5F55\u9636\u6BB5\u8BA1\u65F6\uFF0C\u4E0D\u8C03\u7528\u751F\u6210\u63A5\u53E3\u3001\u4E0D\u4EA7\u751F\u6A21\u578B\u8D39\u7528\u3001\u4E0D\u6539\u914D\u7F6E\u3002\u811A\u672C\u8BBE\u8BA1/\u793A\u610F\u56FE/\u5C55\u793A/\u7B49\u5F85\u5BA1\u6838\u7B49\u9636\u6BB5\u5F00\u59CB\u65F6action=start\uFF0C\u7ED3\u675F\u65F6action=finish\u5E76\u4F20\u539FspanId\u3002\u811A\u672C\u8BBE\u8BA1\u4E00\u6BB5\u5728\u811A\u672C\u4FDD\u5B58\u5230script.md\u540E\u7531\u63D2\u4EF6\u81EA\u52A8\u7ED3\u675F\uFF0C\u6B64\u65F6\u4E0D\u5FC5\u518D\u8C03finish\uFF1B\u811A\u672C\u4E0D\u662F\u7528\u5199\u6587\u4EF6\u5DE5\u5177\u4FDD\u5B58\u65F6\u518D\u8865finish\u3002\u8017\u65F6\u662F\u6807\u8BB0\u8FB9\u754C\u95F4\u5899\u949F\u65F6\u95F4\uFF08\u5305\u542B\u5DE5\u5177\u8C03\u5EA6\uFF09\uFF0C\u4E0D\u662F\u6A21\u578B\u7EAF\u63A8\u7406\u8017\u65F6\uFF1B\u7B49\u5F85\u7528\u6237\u5355\u72EC\u8BB0\u9636\u6BB5\u3002\u7F3A\u5931\u5F00\u59CB\u6216\u70ED\u91CD\u8F7D\u4E22\u5931\u6807\u8BB0\u65F6\u8FD4\u56DEunavailable\uFF0C\u4E0D\u731C\u8017\u65F6\u3002",
-    parameters: { type: "object", properties: { action: { type: "string", enum: ["start", "finish"] }, stage: { type: "string", enum: STAGES2 }, spanId: { type: "string" }, outcome: { type: "string", enum: ["success", "cancelled", "error"] } }, required: ["action", "stage"] },
+    parameters: { type: "object", properties: { action: { type: "string", enum: ["start", "finish"] }, stage: { type: "string", enum: STAGES3 }, spanId: { type: "string" }, outcome: { type: "string", enum: ["success", "cancelled", "error"] } }, required: ["action", "stage"] },
     output: { schema: { type: "object", properties: { status: { type: "string" }, spanId: { type: "string" }, elapsedMs: { type: "number" } } }, render(_args, value) {
       return [{ type: "text", text: JSON.stringify(value) }];
     } },
@@ -5771,11 +6038,11 @@ function stageTool() {
       return true;
     },
     async execute(args) {
-      if (!STAGES2.includes(args?.stage)) throw new Error("\u672A\u77E5\u8BA1\u65F6\u9636\u6BB5");
+      if (!STAGES3.includes(args?.stage)) throw new Error("\u672A\u77E5\u8BA1\u65F6\u9636\u6BB5");
       if (args.action === "start") {
         if (pendingStages.size >= 512) return { status: "unavailable" };
-        const spanId = randomUUID6(), startedAt = (/* @__PURE__ */ new Date()).toISOString();
-        pendingStages.set(spanId, { stage: args.stage, startedAt, start: performance2.now() });
+        const spanId = randomUUID7(), startedAt = (/* @__PURE__ */ new Date()).toISOString();
+        pendingStages.set(spanId, { stage: args.stage, startedAt, start: performance3.now() });
         await appendRequestLog({ event: "stage_started", stage: args.stage, spanId, startedAt, source: "assistant_marker" });
         return { status: "started", spanId };
       }
@@ -5783,7 +6050,7 @@ function stageTool() {
       const entry2 = pendingStages.get(args.spanId);
       if (!entry2 || entry2.stage !== args.stage) return { status: "unavailable" };
       pendingStages.delete(args.spanId);
-      const elapsedMs = Math.round((performance2.now() - entry2.start) * 1e3) / 1e3;
+      const elapsedMs = Math.round((performance3.now() - entry2.start) * 1e3) / 1e3;
       const outcome = ["success", "cancelled", "error"].includes(args.outcome) ? args.outcome : "success";
       await appendRequestLog({ event: "stage_finished", stage: entry2.stage, spanId: args.spanId, startedAt: entry2.startedAt, finishedAt: (/* @__PURE__ */ new Date()).toISOString(), elapsedMs, outcome, source: "assistant_marker" });
       return { status: "finished", spanId: args.spanId, elapsedMs };
@@ -6068,8 +6335,18 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
       }
       if (args.action === "status") {
         const data2 = await readProject(args.projectId, exec);
-        const current = data2.approved && await scriptDigest(data2.approved.scriptPath).catch(() => "") === data2.approved.scriptHash && productionFingerprint(config, data2.approved.name, data2.approved.specification) === data2.approved.fingerprint;
-        return { projectId: data2.id, subjectType: data2.subjectType, choice: data2.choice, duration: data2.duration, status: current ? "approved" : "draft" };
+        let sourceCurrent = true;
+        let staleReason;
+        if (data2.approved && data2.filmSource) {
+          try {
+            assertCompiledProduction(data2, JSON.parse(await readFile9(data2.filmSource.path, "utf8")), data2.approved.specification, resolveModel(config));
+          } catch {
+            sourceCurrent = false;
+            staleReason = "\u4E13\u4E1A\u6E90\u9879\u76EE\u3001\u6A21\u578B\u6216\u7F16\u8BD1\u65B9\u6848\u5DF2\u6539\u53D8\u6216\u65E0\u6CD5\u8BFB\u53D6\uFF0C\u8BF7\u91CD\u65B0\u7F16\u8BD1\u5E76\u5BA1\u6838\u3002";
+          }
+        }
+        const current = sourceCurrent && data2.approved && await scriptDigest(data2.approved.scriptPath).catch(() => "") === data2.approved.scriptHash && productionFingerprint(config, data2.approved.name, data2.approved.specification) === data2.approved.fingerprint;
+        return { projectId: data2.id, subjectType: data2.subjectType, choice: data2.choice, duration: data2.duration, status: current ? "approved" : "draft", ...staleReason ? { approval_stale: true, reason: staleReason } : {} };
       }
       if (args.action === "storyboard") {
         const session = exec.agent?.session;
@@ -6078,9 +6355,9 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         if (args.captureScript === true && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(session) || "")) {
           throw new Error("\u6B63\u6587\u91CC\u6CA1\u6709\u627E\u5230\u5B8C\u6574\u811A\u672C\uFF1A\u5148\u628A\u672C\u7248\u811A\u672C\u6B63\u6587\u5B8C\u6574\u8D34\u8FDB\u7528\u6237\u53EF\u89C1\u6B63\u6587\uFF08\u6458\u8981\u3001\u94FE\u63A5\u3001\u793A\u610F\u56FE\u90FD\u4E0D\u7B97\uFF09\uFF0C\u518D\u8BA9\u63D2\u4EF6\u51FA\u5206\u955C\u793A\u610F\u56FE\u3002");
         }
-        const script = await readFile8(scriptPath, "utf8").catch(() => "");
+        const script = await readFile9(scriptPath, "utf8").catch(() => "");
         if (!String(script).trim()) throw new Error("\u8FD8\u6CA1\u8BFB\u5230\u811A\u672C\u6587\u4EF6\uFF1A\u5148\u5728\u6B63\u6587\u8D34\u51FA\u5B8C\u6574\u811A\u672C\u5E76\u4F20captureScript\uFF0C\u6216\u5148\u628A\u811A\u672C\u5199\u5230scriptPath\u3002");
-        const version = nextStoryboardVersion(await readdir3(path13.dirname(scriptPath)).catch(() => []));
+        const version = nextStoryboardVersion(await readdir4(path13.dirname(scriptPath)).catch(() => []));
         const svg = renderStoryboardSvg(script, { version });
         const target = path13.join(path13.dirname(scriptPath), storyboardFileName(version));
         await writeFile7(target, svg, { mode: 384 });
@@ -6121,6 +6398,11 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
           return { projectId: data.id, duration: data.duration, choice: saved.choice, status: saved.choice ? "prepared" : "pending", nextAction: gate2?.reason || "\u7F16\u5199\u811A\u672C\u4E0E\u5206\u955C\uFF0C\u5B8C\u6210\u540Ereview\u3002" };
         }
         const spec = args.specification;
+        if (data.filmSource) {
+          if (args.toolName && args.toolName !== "video_generate") throw Error("COMPILED_TOOL_MISMATCH");
+          const source = JSON.parse(await readFile9(data.filmSource.path, "utf8"));
+          assertCompiledProduction(data, source, spec, resolveModel(config));
+        }
         const allowed = new Set(Object.keys(args.toolName === "video_extend" ? extensionProperties : generationProperties));
         if (spec && Object.keys(spec).some((k) => !allowed.has(k))) throw new Error("specification\u53EA\u80FD\u5305\u542B\u5BF9\u5E94\u751F\u6210\u5DE5\u5177\u7684\u516C\u5F00\u53C2\u6570\uFF0C\u7981\u6B62\u51ED\u636E\u6216\u672A\u77E5\u5B57\u6BB5\u3002");
         if (!spec || !spec.prompt || !spec.duration || !spec.ratio || !spec.resolution || spec.projectId) throw new Error("review\u9700\u5B8C\u6574specification\uFF1Aprompt\u3001duration\u3001ratio\u3001resolution\uFF0C\u4E0D\u80FD\u5305\u542BprojectId\u3002");
@@ -6138,7 +6420,7 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
           throw new Error("\u6B63\u6587\u91CC\u6CA1\u6709\u627E\u5230\u5B8C\u6574\u811A\u672C\uFF1A\u8BF7\u5148\u628A\u672C\u7248\u811A\u672C\u6B63\u6587\u5B8C\u6574\u8D34\u8FDB\u7528\u6237\u53EF\u89C1\u6B63\u6587\uFF08\u6458\u8981\u3001\u94FE\u63A5\u3001\u793A\u610F\u56FE\u90FD\u4E0D\u7B97\uFF09\uFF0C\u518D\u8C03\u7528review\uFF1B\u811A\u672C\u53EA\u9700\u5728\u6B63\u6587\u5199\u8FD9\u4E00\u6B21\uFF0C\u63D2\u4EF6\u4F1A\u636E\u6B64\u843D\u6210script.md\u3002");
         }
         const scriptHash = await scriptDigest(scriptPath);
-        const scriptBody = (await readFile8(scriptPath, "utf8")).replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
+        const scriptBody = (await readFile9(scriptPath, "utf8")).replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
         if (!scriptBody) throw new Error("\u811A\u672C\u6B63\u6587\u4E0D\u80FD\u4E3A\u7A7A\u3002");
         if (name === "video_generate" && !spec.resume) resolveSegmentPrompts(spec.segmentPrompts, estimatePlan(config, name, spec).length);
         const fingerprint = productionFingerprint(config, name, spec);
@@ -6164,6 +6446,7 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         const answer = result?.answers?.find((a) => a.id === "script_review");
         if (exec.signal?.aborted || answer?.custom || answer?.selected?.length !== 1 || answer.selected[0] !== "\u811A\u672C\u901A\u8FC7") return { projectId: data.id, status: "draft", ...canvasOutput, reason: "\u672A\u53D6\u5F97\u5BA1\u6838\u901A\u8FC7\uFF0C\u672A\u751F\u6210\u3002" };
         if (await scriptDigest(scriptPath) !== scriptHash || productionFingerprint(config, name, spec) !== fingerprint) throw new Error("\u7B49\u5F85\u5BA1\u6838\u671F\u95F4\u6750\u6599\u6216\u914D\u7F6E\u6539\u53D8\uFF0C\u8BF7\u91CD\u65B0\u5C55\u793A\u5BA1\u6838\u3002");
+        if (data.filmSource) assertCompiledProduction(data, JSON.parse(await readFile9(data.filmSource.path, "utf8")), spec, resolveModel(config));
         data.approved = { scriptPath, scriptHash, fingerprint, specification: spec, name, resumeDir: resumeDirOf(spec.resume), reviewedAt: (/* @__PURE__ */ new Date()).toISOString() };
         await writeProject(data);
         return { projectId: data.id, status: "approved", ...canvasOutput, nextAction: `\u76F4\u63A5\u8C03\u7528${name}\u5E76\u5E26projectId\u548C\u672C\u6B21specification\uFF1B\u5DE5\u5177\u4ED8\u8D39\u5BA1\u6279\u627F\u62C5\u5236\u4F5C\u786E\u8BA4\uFF0C\u4E0D\u518D\u53E6\u95EE\u4E00\u6B21\u3002` };
@@ -6174,7 +6457,7 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
 
 // src/businesses/video/workflow/storyboard-review.ts
 import path14 from "node:path";
-import { stat as stat4, readdir as readdir4 } from "node:fs/promises";
+import { stat as stat5, readdir as readdir5 } from "node:fs/promises";
 var STORYBOARD_FILE = /storyboard|分镜|示意/i;
 var IMAGE_FILE = /\.(png|jpe?g|webp|svg)$/i;
 function readableText(value) {
@@ -6248,7 +6531,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     const fresh = /* @__PURE__ */ new Map();
     for (const file of embedded) {
       try {
-        const info = await stat4(file);
+        const info = await stat5(file);
         if (info.isFile()) fresh.set(file, info.mtimeMs);
       } catch {
       }
@@ -6258,7 +6541,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     for (const [dir, time] of byDir) {
       let entries;
       try {
-        entries = await readdir4(dir);
+        entries = await readdir5(dir);
       } catch {
         continue;
       }
@@ -6268,9 +6551,9 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
         const full = path14.join(dir, entry2);
         if (fresh.has(full)) continue;
         try {
-          const info = await stat4(full);
+          const info = await stat5(full);
           if (!info.isFile()) continue;
-          if (info.mtimeMs > time && info.mtimeMs > (newest ? (await stat4(newest)).mtimeMs : 0)) newest = full;
+          if (info.mtimeMs > time && info.mtimeMs > (newest ? (await stat5(newest)).mtimeMs : 0)) newest = full;
         } catch {
         }
       }
@@ -6307,7 +6590,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     if (ready) {
       for (const file of embedded) {
         try {
-          if (!(await stat4(file)).isFile()) ready = false;
+          if (!(await stat5(file)).isFile()) ready = false;
         } catch {
           ready = false;
         }
@@ -6327,7 +6610,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
 
 // src/businesses/video/workflow/delivery-order.ts
 import path15 from "node:path";
-import { stat as stat5 } from "node:fs/promises";
+import { stat as stat6 } from "node:fs/promises";
 function createDeliveryOrderGuard() {
   const sessions = /* @__PURE__ */ new WeakMap();
   function stateFor(session) {
@@ -6356,7 +6639,7 @@ function createDeliveryOrderGuard() {
   };
   async function sizeOf(target) {
     try {
-      const info = await stat5(target);
+      const info = await stat6(target);
       return info.isFile() ? info.size : 0;
     } catch {
       return 0;
@@ -6683,8 +6966,8 @@ function jsonSafeTool(tool) {
 
 // src/businesses/video/providers/submissions.ts
 import path17 from "node:path";
-import { createHash as createHash6, randomUUID as randomUUID7 } from "node:crypto";
-import { mkdir as mkdir10, readFile as readFile9, writeFile as writeFile8, rename as rename7, rm as rm6, open as open4, readdir as readdir5 } from "node:fs/promises";
+import { createHash as createHash7, randomUUID as randomUUID8 } from "node:crypto";
+import { mkdir as mkdir10, readFile as readFile10, writeFile as writeFile8, rename as rename7, rm as rm7, open as open4, readdir as readdir6 } from "node:fs/promises";
 init_hardcoded_config();
 init_connection();
 
@@ -6943,7 +7226,7 @@ async function waitForCompletion(config, taskId, signal) {
 }
 
 // src/businesses/video/providers/submissions.ts
-var hash2 = (value) => createHash6("sha256").update(value).digest("hex");
+var hash2 = (value) => createHash7("sha256").update(value).digest("hex");
 function submissionIdentity(config) {
   return hash2(JSON.stringify([isVolcengine(config) ? "volcengine" : "metaontic", resolveBaseUrl(config), hash2(resolveApiKey(config))]));
 }
@@ -6951,12 +7234,12 @@ function directory() {
   return path17.join(dshHome(), "state", DATA_DIR, "submissions");
 }
 async function save(file, record) {
-  const temporary = `${file}.${randomUUID7()}.tmp`;
+  const temporary = `${file}.${randomUUID8()}.tmp`;
   try {
     await writeFile8(temporary, JSON.stringify(record), { mode: 384 });
     await rename7(temporary, file);
   } finally {
-    await rm6(temporary, { force: true }).catch(() => {
+    await rm7(temporary, { force: true }).catch(() => {
     });
   }
 }
@@ -6994,11 +7277,11 @@ async function guardedSubmit(config, requestPath, body, signal, scope = "") {
     return result;
   } catch (error) {
     if (error?.code === "request_too_large") {
-      await rm6(file, { force: true });
+      await rm7(file, { force: true });
       throw error;
     }
     if (error?.status >= 400 && error.status < 500 && error.status !== 408) {
-      await rm6(file, { force: true });
+      await rm7(file, { force: true });
       throw error;
     }
     record.status = "uncertain";
@@ -7009,28 +7292,28 @@ async function guardedSubmit(config, requestPath, body, signal, scope = "") {
 }
 async function finishSubmission(config, requestPath, body) {
   const id = hash2(JSON.stringify([submissionIdentity(config), requestPath, body]));
-  await rm6(path17.join(directory(), `${id}.json`), { force: true });
+  await rm7(path17.join(directory(), `${id}.json`), { force: true });
 }
 async function finishKnownTask(config, taskId) {
   const identity = submissionIdentity(config);
-  for (const name of await readdir5(directory()).catch((error) => {
+  for (const name of await readdir6(directory()).catch((error) => {
     if (error.code === "ENOENT") return [];
     throw error;
   })) {
     if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
     const file = path17.join(directory(), name);
-    const raw = await readFile9(file, "utf8").catch((error) => {
+    const raw = await readFile10(file, "utf8").catch((error) => {
       if (error.code === "ENOENT") return null;
       throw error;
     });
     if (raw === null) continue;
     const record = JSON.parse(raw);
-    if (record.identity === identity && record.taskId === taskId && record.status === "created") await rm6(file, { force: true });
+    if (record.identity === identity && record.taskId === taskId && record.status === "created") await rm7(file, { force: true });
   }
 }
 async function readSubmission(id) {
   if (!/^[a-f0-9]{64}$/.test(String(id))) throw new Error("\u63D0\u4EA4\u8BB0\u5F55 ID \u683C\u5F0F\u4E0D\u6B63\u786E\u3002");
-  const record = JSON.parse(await readFile9(path17.join(directory(), `${id}.json`), "utf8"));
+  const record = JSON.parse(await readFile10(path17.join(directory(), `${id}.json`), "utf8"));
   if (record.id !== id) throw new Error("\u63D0\u4EA4\u8BB0\u5F55\u635F\u574F\uFF0C\u5DF2\u505C\u6B62\u3002");
   return record;
 }
@@ -7051,7 +7334,7 @@ async function reconcileSubmission(config, id, taskId, confirmedNotCreated) {
   }
   if (record.taskId) throw new Error("\u6B64\u8BB0\u5F55\u5DF2\u6709\u660E\u786E\u4EFB\u52A1 ID\uFF0C\u8BF7\u5148\u67E5\u8BE2\u539F\u4EFB\u52A1\uFF0C\u4E0D\u80FD\u6309\u672A\u521B\u5EFA\u89E3\u9501\u3002");
   if (confirmedNotCreated !== true) throw new Error("\u5FC5\u987B\u63D0\u4F9B\u539F\u4EFB\u52A1 ID\uFF0C\u6216\u7531\u7528\u6237\u5728\u6E20\u9053\u4FA7\u6838\u5BF9\u5E76\u660E\u786E\u786E\u8BA4\u672A\u521B\u5EFA\u3002");
-  await rm6(file);
+  await rm7(file);
   return { submissionId: id, status: "unlocked", note: "\u4EC5\u89E3\u9664\u672C\u673A\u9632\u91CD\uFF0C\u672A\u63D0\u4EA4\u65B0\u4EFB\u52A1\uFF1B\u4E0B\u4E00\u6B21\u751F\u6210\u4ECD\u9700\u8D39\u7528\u786E\u8BA4\u3002" };
 }
 
@@ -7088,15 +7371,15 @@ function submissionTool(liveConfig) {
 }
 
 // src/businesses/video/integrations/canvas.ts
-import { createHash as createHash8, randomUUID as randomUUID9 } from "node:crypto";
-import { mkdir as mkdir13, readFile as readFile11, writeFile as writeFile10, rename as rename10, copyFile, stat as stat7, open as open5 } from "node:fs/promises";
+import { createHash as createHash9, randomUUID as randomUUID10 } from "node:crypto";
+import { mkdir as mkdir13, readFile as readFile12, writeFile as writeFile10, rename as rename10, copyFile, stat as stat8, open as open5 } from "node:fs/promises";
 import path20 from "node:path";
 init_hardcoded_config();
 
 // src/businesses/video/integrations/canvas-builtin.ts
-import { mkdir as mkdir11, readFile as readFile10, writeFile as writeFile9, rename as rename8, readdir as readdir6, stat as stat6 } from "node:fs/promises";
+import { mkdir as mkdir11, readFile as readFile11, writeFile as writeFile9, rename as rename8, readdir as readdir7, stat as stat7 } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { createHash as createHash7, randomUUID as randomUUID8 } from "node:crypto";
+import { createHash as createHash8, randomUUID as randomUUID9 } from "node:crypto";
 import path18 from "node:path";
 init_hardcoded_config();
 var BUILTIN_BACKEND = "builtin";
@@ -7111,14 +7394,14 @@ var docFile = (id) => {
 };
 async function readJson(file, fallback = null) {
   try {
-    return JSON.parse(await readFile10(file, "utf8"));
+    return JSON.parse(await readFile11(file, "utf8"));
   } catch {
     return fallback;
   }
 }
 async function writeJson(file, value) {
   await mkdir11(path18.dirname(file), { recursive: true, mode: 448 });
-  const temp = `${file}.${randomUUID8()}.tmp`;
+  const temp = `${file}.${randomUUID9()}.tmp`;
   await writeFile9(temp, JSON.stringify(value), { mode: 384, flag: "wx" });
   await rename8(temp, file);
 }
@@ -7133,7 +7416,7 @@ async function writeDoc(id, doc) {
   await writeJson(docFile(id), doc);
 }
 async function allDocs() {
-  const names = await readdir6(docsDir()).catch(() => []);
+  const names = await readdir7(docsDir()).catch(() => []);
   const docs = [];
   for (const name of names) if (name.endsWith(".json")) {
     const doc = await readJson(path18.join(docsDir(), name));
@@ -7253,7 +7536,7 @@ function createBuiltinConnect() {
     if (!doc.nodes[from2] || !doc.nodes[to]) return { ok: false };
     if ((doc.edges || []).some((edge2) => edge2.fromNode === from2 && edge2.toNode === to)) return { ok: true, already: true };
     const edge = {
-      id: `mov_conn_${randomUUID8().replaceAll("-", "").slice(0, 16)}`,
+      id: `mov_conn_${randomUUID9().replaceAll("-", "").slice(0, 16)}`,
       fromNode: from2,
       toNode: to,
       ...args?.fromPort ? { fromPort: args.fromPort } : {},
@@ -7311,13 +7594,13 @@ async function builtinCanvasImport(args) {
   if (bytes.length > IMPORT_LIMIT_BYTES) throw new Error("\u5355\u5F20\u56FE\u7247\u4E0D\u80FD\u8D85\u8FC7 32MB\u3002");
   const extension = imageExtension(args?.mime, bytes);
   if (!extension) throw new Error("\u53EA\u652F\u6301 PNG\u3001JPEG\u3001WebP \u56FE\u7247\u3002");
-  const id = `mov_img_${createHash7("sha256").update(bytes).digest("hex").slice(0, 24)}`;
+  const id = `mov_img_${createHash8("sha256").update(bytes).digest("hex").slice(0, 24)}`;
   const label = String(args?.name || "").trim().slice(0, 80) || `\u5BFC\u5165\u56FE\u7247${extension}`;
   const rel = `projects/${doc.id}/image/${id}${extension}`;
   const dest = path18.join(dataRootOf(), rel);
   await mkdir11(path18.dirname(dest), { recursive: true, mode: 448 });
-  if (!(await stat6(dest).catch(() => null))?.isFile()) {
-    const temp = `${dest}.${randomUUID8()}.tmp`;
+  if (!(await stat7(dest).catch(() => null))?.isFile()) {
+    const temp = `${dest}.${randomUUID9()}.tmp`;
     await writeFile9(temp, bytes, { mode: 384, flag: "wx" });
     await rename8(temp, dest);
   }
@@ -7416,7 +7699,7 @@ async function builtinCanvasHandle(args) {
     const existing = (doc.edges || []).find((edge2) => edge2.fromNode === from2 && edge2.toNode === to);
     if (existing) return { canvas: { projectId: doc.id, edge: existing, already: true } };
     const edge = {
-      id: `mov_connect_${randomUUID8().replaceAll("-", "").slice(0, 16)}`,
+      id: `mov_connect_${randomUUID9().replaceAll("-", "").slice(0, 16)}`,
       fromNode: from2,
       toNode: to,
       fromPort: String(params.fromPort || "out").slice(0, 24),
@@ -7457,7 +7740,7 @@ function registerBuiltinCanvas(ctx) {
         if (!asset?.rel) throw new Error("\u7D20\u6750\u4E0D\u5B58\u5728\u3002");
         const file = path18.resolve(root, String(asset.rel));
         if (!file.startsWith(root + path18.sep)) throw new Error("\u7D20\u6750\u8DEF\u5F84\u65E0\u6548\u3002");
-        const info = await stat6(file);
+        const info = await stat7(file);
         if (!info.isFile()) throw new Error("\u7D20\u6750\u4E0D\u5B58\u5728\u3002");
         res.setHeader("content-type", asset.mime || "application/octet-stream");
         res.setHeader("cache-control", "private, max-age=300");
@@ -7622,8 +7905,8 @@ function canvasSegmentStats(doc) {
     produced,
     shots,
     assets: links.length,
-    assetsBound: links.filter((link) => link.segments.length).length,
-    assetsOrphan: links.filter((link) => !link.segments.length).length,
+    assetsBound: links.filter((link2) => link2.segments.length).length,
+    assetsOrphan: links.filter((link2) => !link2.segments.length).length,
     filmReady: Boolean(doc?.film?.assetId),
     filmCount: Number(doc?.film?.count || 0)
   };
@@ -7715,7 +7998,7 @@ function preserveCanvasConfirmations(prev, next) {
 }
 
 // src/businesses/video/media/download.ts
-import { mkdir as mkdir12, rename as rename9, rm as rm7 } from "node:fs/promises";
+import { mkdir as mkdir12, rename as rename9, rm as rm8 } from "node:fs/promises";
 import path19 from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
@@ -7742,7 +8025,7 @@ async function downloadFile(url, destPath, { signal } = {}) {
     await rename9(partial, destPath);
     return destPath;
   } catch (error) {
-    await rm7(partial, { force: true }).catch(() => {
+    await rm8(partial, { force: true }).catch(() => {
     });
     if (error?.code === "download_failed") throw error;
     if (signal?.aborted) throw abortError();
@@ -7779,11 +8062,11 @@ var canvasLinkSchema = { type: "object", properties: {
   nodeId: { type: "string" },
   fingerprint: { type: "string" }
 }, required: ["projectId", "nodeId", "fingerprint"], description: "video_canvas(action:read)\u8FD4\u56DE\u7684\u6D41\u7A0B\u753B\u5E03\u5B9A\u4F4D\u4E0E\u5185\u5BB9\u6458\u8981\uFF1B\u539F\u6837\u4F20\u5165\uFF0C\u4E0D\u731C\u6D4B\u3002" };
-var digest = (value) => createHash8("sha256").update(JSON.stringify(value)).digest("hex");
+var digest = (value) => createHash9("sha256").update(JSON.stringify(value)).digest("hex");
 var validId2 = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
-function location(link) {
-  if (!validId2(link?.projectId) || !validId2(link?.nodeId) || link.canvasId && !validId2(link.canvasId)) throw new Error("\u753B\u5E03\u9879\u76EE\u6216\u8282\u70B9\u6807\u8BC6\u65E0\u6548");
-  return { id: link.projectId, ...link.canvasId ? { canvasId: link.canvasId } : {} };
+function location(link2) {
+  if (!validId2(link2?.projectId) || !validId2(link2?.nodeId) || link2.canvasId && !validId2(link2.canvasId)) throw new Error("\u753B\u5E03\u9879\u76EE\u6216\u8282\u70B9\u6807\u8BC6\u65E0\u6548");
+  return { id: link2.projectId, ...link2.canvasId ? { canvasId: link2.canvasId } : {} };
 }
 async function loadCanvasAdapter() {
   return builtinCanvasAdapter();
@@ -7792,16 +8075,16 @@ async function resolveCanvasAdapter(projectId, load = loadCanvasAdapter) {
   if (projectId && await builtinCanvasExists(projectId)) return builtinCanvasAdapter();
   return load();
 }
-async function readCanvasInput(adapter, link) {
-  const doc = await adapter.rpc.projectsGet(location(link));
-  if (!doc?.nodes?.[link.nodeId]) throw new Error("\u753B\u5E03\u8282\u70B9\u4E0D\u5B58\u5728\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u3002");
+async function readCanvasInput(adapter, link2) {
+  const doc = await adapter.rpc.projectsGet(location(link2));
+  if (!doc?.nodes?.[link2.nodeId]) throw new Error("\u753B\u5E03\u8282\u70B9\u4E0D\u5B58\u5728\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u3002");
   const ids = /* @__PURE__ */ new Set(), visit = (id) => {
     if (ids.has(id)) return;
     ids.add(id);
     if (ids.size > 100) throw new Error("\u8282\u70B9\u4E0A\u6E38\u8D85\u8FC7100\u9879\uFF0C\u8BF7\u7F29\u5C0F\u5236\u4F5C\u8303\u56F4\u3002");
     for (const e of doc.edges || []) if (e.toNode === id && doc.nodes[e.fromNode]) visit(e.fromNode);
   };
-  visit(link.nodeId);
+  visit(link2.nodeId);
   const latest = /* @__PURE__ */ new Map();
   for (const item of Object.values(doc.nodes || {})) {
     const owner = String(item?.metaonticSourceNode || ""), assetId = String(item?.data?.assetId || "");
@@ -7811,7 +8094,7 @@ async function readCanvasInput(adapter, link) {
   }
   const nodes = [...ids].map((id) => {
     const n = doc.nodes[id], d = n.data || {};
-    const upstreamResult = id === link.nodeId ? "" : latest.get(id)?.assetId || "";
+    const upstreamResult = id === link2.nodeId ? "" : latest.get(id)?.assetId || "";
     return {
       id,
       type: n.type,
@@ -7849,15 +8132,15 @@ async function readCanvasInput(adapter, link) {
     const a = records.find((a2) => a2.id === node.assetId);
     if (!a || !["image", "video"].includes(a.kind) || !a.rel && !a.sha) throw new Error("\u4E0A\u6E38\u5A92\u4F53\u8D44\u4EA7\u672A\u843D\u76D8\uFF0C\u8BF7\u5148\u5728\u753B\u5E03\u4E2D\u4FDD\u5B58\u7D20\u6750\u3002");
     const file = adapter.assetPath(root, a);
-    if (!(await stat7(file)).isFile()) throw new Error("\u753B\u5E03\u53C2\u8003\u7D20\u6750\u6587\u4EF6\u4E0D\u5B58\u5728\u3002");
-    const info = await stat7(file);
+    if (!(await stat8(file)).isFile()) throw new Error("\u753B\u5E03\u53C2\u8003\u7D20\u6750\u6587\u4EF6\u4E0D\u5B58\u5728\u3002");
+    const info = await stat8(file);
     references.push({ nodeId: node.id, assetId: a.id, kind: a.kind, path: file, size: info.size, modified: info.mtimeMs });
   }
   const b = doc.bible || {};
   const bible = { world: b.world || "", style: b.style || "", characters: b.characters || [], scenes: b.scenes || [], props: b.props || [] };
   const fingerprint = digest({ nodes, edges, references, bible });
   return {
-    canvas: { projectId: link.projectId, ...link.canvasId ? { canvasId: link.canvasId } : {}, nodeId: link.nodeId, fingerprint },
+    canvas: { projectId: link2.projectId, ...link2.canvasId ? { canvasId: link2.canvasId } : {}, nodeId: link2.nodeId, fingerprint },
     nodes,
     edges,
     references,
@@ -7872,7 +8155,7 @@ function resultFile(token) {
 async function saveRecord(record) {
   const file = resultFile(record.id);
   await mkdir13(path20.dirname(file), { recursive: true, mode: 448 });
-  const temp = `${file}.${randomUUID9()}.tmp`;
+  const temp = `${file}.${randomUUID10()}.tmp`;
   await writeFile10(temp, JSON.stringify(record), { mode: 384, flag: "wx" });
   await rename10(temp, file);
 }
@@ -7892,17 +8175,17 @@ async function publishCanvasResult(adapter, record) {
     if (media.kind === "image") {
       for (const suffix of [".jpg", ".webp"]) {
         const existing = dest.replace(/\.png$/, suffix);
-        if ((await stat7(existing).catch(() => null))?.isFile()) {
+        if ((await stat8(existing).catch(() => null))?.isFile()) {
           dest = existing;
           rel = rel.replace(/\.png$/, suffix);
           break;
         }
       }
     }
-    if (!(await stat7(dest).catch(() => null))?.isFile()) {
+    if (!(await stat8(dest).catch(() => null))?.isFile()) {
       await mkdir13(path20.dirname(dest), { recursive: true });
       if (media.localPath) {
-        const tmp = `${dest}.${randomUUID9()}.tmp`;
+        const tmp = `${dest}.${randomUUID10()}.tmp`;
         await copyFile(media.localPath, tmp);
         await rename10(tmp, dest);
       } else {
@@ -7931,7 +8214,7 @@ async function publishCanvasResult(adapter, record) {
       dest = corrected;
       rel = rel.replace(/\.png$/, suffix);
     }
-    const created = await adapter.rpc.assetCreate({ projectName: doc.name || "", asset: { id, projectId: record.canvas.projectId, kind: media.kind, mime, name: media.label, rel, size: (await stat7(dest)).size, createdAt: record.createdAt, stored: "disk", source: PLUGIN_ID } });
+    const created = await adapter.rpc.assetCreate({ projectName: doc.name || "", asset: { id, projectId: record.canvas.projectId, kind: media.kind, mime, name: media.label, rel, size: (await stat8(dest)).size, createdAt: record.createdAt, stored: "disk", source: PLUGIN_ID } });
     if (created?.ok === false) throw new Error("\u753B\u5E03\u8D44\u4EA7\u767B\u8BB0\u5931\u8D25");
     publications.push({ id, media, index });
   }
@@ -7989,7 +8272,7 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
     if (busy.has(token)) throw new Error("\u6B64\u6210\u679C\u6B63\u5728\u56DE\u586B\uFF0C\u8BF7\u7A0D\u540E\u67E5\u8BE2\u3002");
     busy.add(token);
     try {
-      const record = JSON.parse(await readFile11(resultFile(token), "utf8"));
+      const record = JSON.parse(await readFile12(resultFile(token), "utf8"));
       if (record.owner !== sessionOwner(exec)) throw new Error("\u6B64\u6210\u679C\u4E0D\u5C5E\u4E8E\u5F53\u524D\u4F1A\u8BDD");
       return await publishCanvasResult(await resolveCanvasAdapter(record?.canvas?.projectId, load), record);
     } finally {
@@ -8042,7 +8325,7 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
       if (!canvas || !result || typeof result !== "object") return result;
       const media = mediaPreviewMeta(result, tool2.name).media;
       if (!media.length) return { ...result, canvasSync: { status: "no_media", reason: "\u5C1A\u65E0\u6210\u529F\u7D20\u6750\uFF0C\u672A\u56DE\u586B\u865A\u6784\u6210\u679C\u3002" } };
-      const record = { id: randomUUID9(), owner: sessionOwner(exec), canvas, media, ratio: args.ratio, phase: tool2.name === "video_prepare_image" ? "reference_review" : videoResultState(result).phase, createdAt: Date.now() };
+      const record = { id: randomUUID10(), owner: sessionOwner(exec), canvas, media, ratio: args.ratio, phase: tool2.name === "video_prepare_image" ? "reference_review" : videoResultState(result).phase, createdAt: Date.now() };
       try {
         await saveRecord(record);
       } catch {
@@ -8077,11 +8360,11 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
 }
 
 // src/businesses/video/integrations/canvas-project.ts
-import { createHash as createHash9 } from "node:crypto";
-import { readFile as readFile12 } from "node:fs/promises";
+import { createHash as createHash10 } from "node:crypto";
+import { readFile as readFile13 } from "node:fs/promises";
 import path21 from "node:path";
 init_config();
-var digest2 = (value) => createHash9("sha256").update(JSON.stringify(value)).digest("hex");
+var digest2 = (value) => createHash10("sha256").update(JSON.stringify(value)).digest("hex");
 async function adapterForNewCanvas(binding, load) {
   if (binding?.projectId) return resolveCanvasAdapter(binding.projectId, load);
   if (load !== loadCanvasAdapter) return load();
@@ -8143,7 +8426,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
       if (draft.scriptPath) {
         const scriptPath = path21.resolve(exec.agent.session.header?.cwd || process.cwd(), draft.scriptPath);
         if (!/\.md$/i.test(scriptPath)) throw new Error("\u81EA\u52A8\u540C\u6B65\u811A\u672C\u9700\u8981Markdown\u6587\u4EF6\u3002");
-        script = await readFile12(scriptPath, "utf8");
+        script = await readFile13(scriptPath, "utf8");
         if (script.length > 2e5) throw new Error("\u811A\u672C\u8FC7\u5927\uFF0C\u81EA\u52A8\u753B\u5E03\u672A\u8986\u76D6\u65E7\u8282\u70B9\u3002");
       }
       const specification = draft.specification || null;
@@ -8373,8 +8656,8 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
 
 // src/businesses/video/integrations/canvas-native.ts
 import path23 from "node:path";
-import { createHash as createHash11, randomUUID as randomUUID10 } from "node:crypto";
-import { mkdir as mkdir15, readFile as readFile13, writeFile as writeFile12, rename as rename12, stat as stat9 } from "node:fs/promises";
+import { createHash as createHash12, randomUUID as randomUUID11 } from "node:crypto";
+import { mkdir as mkdir15, readFile as readFile14, writeFile as writeFile12, rename as rename12, stat as stat10 } from "node:fs/promises";
 init_hardcoded_config();
 init_connection();
 
@@ -8448,7 +8731,7 @@ function endWithPunctuation(text) {
 }
 
 // src/businesses/video/workflow/real-person.ts
-import { createHash as createHash10 } from "node:crypto";
+import { createHash as createHash11 } from "node:crypto";
 
 // src/businesses/video/tools/results.ts
 import { resolve as resolve2 } from "node:path";
@@ -8810,7 +9093,7 @@ async function recoverRealPersonImages(config, body, ctx, exec, final, state = {
   try {
     for (const item of images) {
       const source = String(item.image_url.url);
-      const key = createHash10("sha256").update(source).digest("hex");
+      const key = createHash11("sha256").update(source).digest("hex");
       const entry2 = state.images[key] ||= {};
       if (entry2.failed) throw new Error(`\u56FE\u7247\u4EFB\u52A1 ${entry2.taskId || ""} \u5DF2\u660E\u786E\u5931\u8D25\uFF1A${entry2.failed}\u3002\u4E0D\u81EA\u52A8\u518D\u6B21\u51FA\u56FE\u3002`);
       if (!entry2.imageUrl) {
@@ -9272,7 +9555,7 @@ async function writeScript(config, brief2, options = {}) {
 // src/businesses/video/media/merge.ts
 init_config();
 init_connection();
-import { rm as rm8, mkdir as mkdir14, writeFile as writeFile11, rename as rename11, stat as stat8, copyFile as copyFile2 } from "node:fs/promises";
+import { rm as rm9, mkdir as mkdir14, writeFile as writeFile11, rename as rename11, stat as stat9, copyFile as copyFile2 } from "node:fs/promises";
 import path22 from "node:path";
 function evenNumber(value, fallback) {
   const number2 = Number(value);
@@ -9325,21 +9608,20 @@ async function alignSegmentAudio(config, files, probed, outPath, { signal, binar
       trimmed.push({ index: index + 1, paddingSeconds: Number(padding.toFixed(3)) });
       aligned.push(temp);
     } else {
-      await rm8(temp, { force: true });
+      await rm9(temp, { force: true });
       aligned.push(file);
     }
   }
   return { files: aligned, temps, trimmed };
 }
 async function cleanupSegmentTemps(temps) {
-  for (const temp of temps || []) await rm8(temp, { force: true });
+  for (const temp of temps || []) await rm9(temp, { force: true });
 }
 async function mergeClips(config, files, outPath, { signal } = {}) {
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
   await mkdir14(path22.dirname(outPath), { recursive: true });
   const work = `${outPath}.${uniqueSuffix("work")}.mp4`;
   let copyError = "";
-  let audioError = "";
   const probed = [];
   for (const file of files) probed.push(await probeMedia(file, config, signal));
   const videos = probed.filter((media) => media && media.width && media.height);
@@ -9354,7 +9636,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
   files = aligned;
   try {
     const mergeMode = ref(config, "mergeMode", "copy");
-    if (mergeMode !== "reencode" && paramsMatch) {
+    if (mergeMode !== "reencode" && paramsMatch && probed.every((m) => typeof m?.hasAudio === "boolean" && m.hasAudio === probed[0]?.hasAudio)) {
       const listPath = `${work}.concat.txt`;
       const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
       await writeFile11(listPath, `${lines}
@@ -9380,7 +9662,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
         }
         copyError = stderr2.trim().slice(-400);
       } finally {
-        await rm8(listPath, { force: true });
+        await rm9(listPath, { force: true });
       }
     } else if (!paramsMatch) {
       copyError = "\u5206\u6BB5\u5206\u8FA8\u7387\u4E0D\u4E00\u81F4\uFF0C\u8DF3\u8FC7\u65E0\u635F\u62FC\u63A5\u3002";
@@ -9389,11 +9671,12 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
     const width = evenNumber(first.width, 1280);
     const height = evenNumber(first.height, 720);
     const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
-    const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
-    const videoParts = files.map((_, index) => `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${index}]`);
+    if (probed.some((m) => typeof m?.hasAudio !== "boolean")) throw Object.assign(new Error("\u65E0\u6CD5\u786E\u8BA4\u5404\u6BB5\u97F3\u8F68\uFF0C\u5DF2\u4FDD\u7559\u539F\u5206\u6BB5\uFF1B\u8BF7\u6062\u590Dffprobe\u540E\u91CD\u8BD5\u5408\u5E76\uFF0C\u4E0D\u91CD\u65B0\u751F\u6210\u3002"), { code: "audio_probe_required" });
+    const withAudio = probed.some((media) => media.hasAudio);
+    const videoParts = files.map((_, index) => `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},setpts=PTS-STARTPTS[v${index}]`);
     const videoInputs = files.map((_, index) => `[v${index}]`).join("");
     async function encode(filter2, maps, withAudioTrack) {
-      await rm8(work, { force: true });
+      await rm9(work, { force: true });
       const args = ["-y"];
       for (const file of files) args.push("-i", file);
       args.push("-filter_complex", filter2, ...maps, "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p");
@@ -9402,7 +9685,12 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
       return runProcess(binary, args, { signal });
     }
     if (withAudio) {
-      const audioParts = files.map((_, index) => `[${index}:a]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a${index}]`);
+      const audioParts = files.map((_, index) => {
+        const duration = Number(probed[index]?.videoDurationSeconds || probed[index]?.durationSeconds);
+        if (!Number.isFinite(duration) || duration <= 0) throw Object.assign(new Error("\u7F3A\u5C11\u53EF\u9760\u7684\u5206\u6BB5\u65F6\u957F\uFF0C\u65E0\u6CD5\u5B89\u5168\u5BF9\u9F50\u97F3\u9891\uFF1B\u4FDD\u7559\u5206\u6BB5\uFF0C\u8BF7\u4FEE\u590D\u63A2\u6D4B\u540E\u91CD\u8BD5\u5408\u5E76\u3002"), { code: "audio_duration_required" });
+        const source = probed[index].hasAudio ? `[${index}:a]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,apad` : "anullsrc=r=48000:cl=stereo";
+        return `${source},atrim=duration=${duration},asetpts=PTS-STARTPTS[a${index}]`;
+      });
       const pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join("");
       const filter2 = [
         ...videoParts,
@@ -9414,15 +9702,15 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
         await rename11(work, outPath);
         return { path: outPath, mode: "reencode", trimmed };
       }
-      audioError = stderr2.trim().slice(-400);
+      throw Object.assign(new Error("\u97F3\u9891\u5408\u5E76\u5931\u8D25\uFF0C\u5DF2\u4FDD\u7559\u539F\u5206\u6BB5\u53CA\u5DF2\u6709\u6210\u7247\uFF1B\u8BF7\u91CD\u8BD5\u5408\u5E76\uFF0C\u4E0D\u4F1A\u81EA\u52A8\u8F93\u51FA\u65E0\u58F0\u6210\u7247\u3002"), { code: "audio_merge_failed" });
     }
     const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(";");
     const { code, stderr } = await encode(filter, ["-map", "[v]"], false);
     if (code === 0 && await exists(work)) {
       await rename11(work, outPath);
-      return { path: outPath, mode: withAudio ? "reencode-video-only" : "reencode", trimmed };
+      return { path: outPath, mode: "reencode", trimmed };
     }
-    const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
+    const detail = [copyError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
     throw Object.assign(new Error(`ffmpeg \u5408\u5E76\u5931\u8D25\uFF1A${detail || "\u672A\u77E5\u9519\u8BEF"}`), { code: "ffmpeg_failed" });
   } finally {
     await cleanupSegmentTemps([...temps, work]);
@@ -9558,7 +9846,7 @@ async function downloadSegmentsAndMerge(config, {
       index: segment.index,
       taskId: segment.taskId,
       path: dest,
-      bytes: (await stat8(dest)).size
+      bytes: (await stat9(dest)).size
     });
     const media = probed[index];
     if (media?.durationSeconds) {
@@ -9568,7 +9856,7 @@ async function downloadSegmentsAndMerge(config, {
         CUMULATIVE_TOLERANCE_MIN_SECONDS,
         cumulative * CUMULATIVE_TOLERANCE_RATIO
       );
-      const looksCumulative = files.length > 0 && Math.abs(media.durationSeconds - cumulative) <= tolerance && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
+      const looksCumulative = segment.kind === "extend" && files.length > 0 && Math.abs(media.durationSeconds - cumulative) <= tolerance && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
       if (looksCumulative) {
         await appendRequestLog({ event: "cumulative_output_detected", index: segment.index, duration: media.durationSeconds, plannedCumulative: cumulative });
         files.length = 0;
@@ -9608,7 +9896,7 @@ async function downloadSegmentsAndMerge(config, {
         await copyFile2(files[0], copy);
         await rename11(copy, finalPath);
       } finally {
-        await rm8(copy, { force: true }).catch(() => {
+        await rm9(copy, { force: true }).catch(() => {
         });
       }
       await appendRequestLog({ event: "delivery_copied", sourcePath: files[0], videoPath: finalPath });
@@ -9657,7 +9945,7 @@ async function downloadSegmentsAndMerge(config, {
 
 // src/businesses/video/integrations/canvas-native.ts
 init_config();
-var hash3 = (value) => createHash11("sha256").update(JSON.stringify(value)).digest("hex");
+var hash3 = (value) => createHash12("sha256").update(JSON.stringify(value)).digest("hex");
 var validToken = (value) => /^[a-f0-9-]{36}$/.test(String(value || ""));
 var terminal = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled"]);
 function splitEvenly(items, count) {
@@ -9829,7 +10117,7 @@ function planCanvasNative(input, config, operation = "generate", draft = {}, car
 }
 function createCanvasNativeService(liveConfig, options = {}) {
   const load = options.load || loadCanvasAdapter;
-  const adapterFor = (link) => options.resolve ? options.resolve(link) : resolveCanvasAdapter(link?.projectId, load);
+  const adapterFor = (link2) => options.resolve ? options.resolve(link2) : resolveCanvasAdapter(link2?.projectId, load);
   const directory2 = options.directory || path23.join(dshHome(), DATA_DIR, "canvas-native");
   const snapshots = /* @__PURE__ */ new Map(), running = /* @__PURE__ */ new Map(), locks3 = /* @__PURE__ */ new Set();
   const proposals = /* @__PURE__ */ new Map();
@@ -9839,40 +10127,40 @@ function createCanvasNativeService(liveConfig, options = {}) {
     if (!validToken(id)) throw new Error("\u5236\u4F5C\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548\u3002");
     return path23.join(directory2, `${id}.json`);
   };
-  const pointer = (link) => path23.join(directory2, `node-${hash3([link.projectId, link.canvasId || "", link.nodeId])}.json`);
+  const pointer = (link2) => path23.join(directory2, `node-${hash3([link2.projectId, link2.canvasId || "", link2.nodeId])}.json`);
   async function save2(job) {
     await mkdir15(directory2, { recursive: true, mode: 448 });
-    const dest = file(job.id), temp = `${dest}.${randomUUID10()}.tmp`;
+    const dest = file(job.id), temp = `${dest}.${randomUUID11()}.tmp`;
     await writeFile12(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
     await rename12(temp, dest);
   }
-  const read = async (id) => JSON.parse(await readFile13(file(id), "utf8"));
+  const read = async (id) => JSON.parse(await readFile14(file(id), "utf8"));
   const chainFile = (id) => {
     if (!validToken(id)) throw new Error("\u8FDE\u62CD\u8BB0\u5F55\u6807\u8BC6\u65E0\u6548\u3002");
     return path23.join(chainDirectory, `${id}.json`);
   };
-  const chainPointer = (link) => path23.join(chainDirectory, `canvas-${hash3([link.projectId, link.canvasId || ""])}.json`);
+  const chainPointer = (link2) => path23.join(chainDirectory, `canvas-${hash3([link2.projectId, link2.canvasId || ""])}.json`);
   async function saveChain(chain) {
     await mkdir15(chainDirectory, { recursive: true, mode: 448 });
-    const dest = chainFile(chain.id), temp = `${dest}.${randomUUID10()}.tmp`;
+    const dest = chainFile(chain.id), temp = `${dest}.${randomUUID11()}.tmp`;
     await writeFile12(temp, JSON.stringify(chain), { mode: 384, flag: "wx" });
     await rename12(temp, dest);
   }
-  const readChain = async (id) => JSON.parse(await readFile13(chainFile(id), "utf8"));
-  async function previousChain(link) {
+  const readChain = async (id) => JSON.parse(await readFile14(chainFile(id), "utf8"));
+  async function previousChain(link2) {
     let id;
     try {
-      id = JSON.parse(await readFile13(chainPointer(link), "utf8")).id;
+      id = JSON.parse(await readFile14(chainPointer(link2), "utf8")).id;
     } catch (e) {
       if (e.code === "ENOENT") return null;
       throw e;
     }
     return readChain(id);
   }
-  async function previous(link) {
+  async function previous(link2) {
     let id;
     try {
-      id = JSON.parse(await readFile13(pointer(link), "utf8")).id;
+      id = JSON.parse(await readFile14(pointer(link2), "utf8")).id;
     } catch (e) {
       if (e.code === "ENOENT") return null;
       throw e;
@@ -9938,8 +10226,8 @@ function createCanvasNativeService(liveConfig, options = {}) {
         continue;
       }
       if (carry && !carry.videoUrl) throw new Error(`\u4E0A\u4E00\u6BB5\u300C${carryLabel}\u300D\u7684\u6210\u679C\u6CA1\u6709\u53EF\u7528\u7684\u89C6\u9891\u5730\u5740\uFF0C\u6CA1\u6CD5\u4F5C\u4E3A\u672C\u6BB5\u7684\u7EED\u62CD\u8F93\u5165\uFF1A\u8BF7\u5728\u753B\u5E03\u4E0A\u6838\u5BF9\u8FD9\u6761\u6210\u679C\uFF0C\u6216\u5220\u6389\u5B83\u518D\u91CD\u65B0\u9884\u89C8\u8FDE\u62CD\u65B9\u6848\u3002`);
-      const link = { projectId, nodeId: node.id };
-      const input = await readCanvasInput(adapter, link);
+      const link2 = { projectId, nodeId: node.id };
+      const input = await readCanvasInput(adapter, link2);
       const draft = { prompt: node.prompt, duration: node.duration, resolution: node.resolution, ratio: node.ratio, generateAudio: node.generateAudio };
       if (operation === "extend") draft.transitionDescription = node.transition || node.prompt;
       const plan = planCanvasNative(input, config, operation, draft, carry);
@@ -9985,9 +10273,9 @@ function createCanvasNativeService(liveConfig, options = {}) {
     try {
       const old = await previous(canvas);
       if (old && (!terminal.has(old.state) || old.media?.length && !old.reviewed || old.sync?.status === "pending")) return old;
-      const job = { version: 1, id: randomUUID10(), canvas, plan, identity: chain.identity, createdAt: Date.now(), state: "running", reviewed: false, chain: chain.id };
+      const job = { version: 1, id: randomUUID11(), canvas, plan, identity: chain.identity, createdAt: Date.now(), state: "running", reviewed: false, chain: chain.id };
       await save2(job);
-      const temp = `${key}.${randomUUID10()}.tmp`;
+      const temp = `${key}.${randomUUID11()}.tmp`;
       await writeFile12(temp, JSON.stringify({ id: job.id }), { mode: 384, flag: "wx" });
       await rename12(temp, key);
       snapshots.set(job.id, config);
@@ -10118,9 +10406,9 @@ function createCanvasNativeService(liveConfig, options = {}) {
       running.delete(job.id);
     }
   }
-  async function mergeFilm(link, config) {
-    const adapter = await adapterFor(link);
-    const loc = { id: link.projectId, ...link.canvasId ? { canvasId: link.canvasId } : {} };
+  async function mergeFilm(link2, config) {
+    const adapter = await adapterFor(link2);
+    const loc = { id: link2.projectId, ...link2.canvasId ? { canvasId: link2.canvasId } : {} };
     const doc = await adapter.rpc.projectsGet(loc);
     if (!doc?.nodes) throw new Error("\u753B\u5E03\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664\u3002");
     const { segments, missing } = filmSegments(doc);
@@ -10137,20 +10425,20 @@ function createCanvasNativeService(liveConfig, options = {}) {
     for (const segment of segments) {
       const asset = records.find((a) => a.id === segment.assetId);
       const local = asset?.rel ? path23.resolve(root, String(asset.rel)) : "";
-      if (local && (await stat9(local).catch(() => null))?.isFile()) {
+      if (local && (await stat10(local).catch(() => null))?.isFile()) {
         files.push(local);
-        segment.bytes = (await stat9(local)).size;
+        segment.bytes = (await stat10(local)).size;
         continue;
       }
       if (!segment.url) throw new Error(`\u7B2C ${segment.index + 1} \u6BB5\uFF08${segment.label}\uFF09\u7D20\u6750\u4E0D\u5728\u753B\u5E03\u6570\u636E\u76EE\u5F55\uFF0C\u4E5F\u6CA1\u6709\u53EF\u4E0B\u8F7D\u7684\u5730\u5740\u3002`);
       const dest2 = path23.join(work, `${String(segment.index + 1).padStart(2, "0")}-segment.mp4`);
       await downloadFile(segment.url, dest2, {});
       files.push(dest2);
-      segment.bytes = (await stat9(dest2)).size;
+      segment.bytes = (await stat10(dest2)).size;
     }
     const stamp = hash3(segments.map((x) => [x.resultId, x.assetId, x.url, x.bytes]));
     const id = `mov_film_${stamp.slice(0, 24)}`;
-    const rel = `projects/${link.projectId}/final/${id}.mp4`;
+    const rel = `projects/${link2.projectId}/final/${id}.mp4`;
     const dest = path23.join(root, rel);
     await mkdir15(path23.dirname(dest), { recursive: true });
     await (options.mergeClips || mergeClips)(config, files, dest, {});
@@ -10164,12 +10452,12 @@ function createCanvasNativeService(liveConfig, options = {}) {
     };
     await adapter.rpc.assetCreate({ projectName: doc.name || "", asset: {
       id,
-      projectId: link.projectId,
+      projectId: link2.projectId,
       kind: "video",
       mime: "video/mp4",
       name: "\u6210\u7247",
       rel,
-      size: (await stat9(dest)).size,
+      size: (await stat10(dest)).size,
       createdAt: film.updatedAt,
       stored: "disk",
       source: "metaontic-video"
@@ -10217,16 +10505,16 @@ function createCanvasNativeService(liveConfig, options = {}) {
       const config = snapshotConfig(liveConfig);
       if (args.confirmPlan !== true || args.confirmCost !== true) throw new Error("\u8BF7\u5148\u5206\u522B\u786E\u8BA4\u6574\u6761\u8FDE\u62CD\u7684\u5236\u4F5C\u65B9\u6848\u4E0E\u8D39\u7528\u3002");
       if (args.identity && args.identity !== hash3(config)) throw new Error("\u63D2\u4EF6\u914D\u7F6E\u5DF2\u53D8\uFF0C\u8BF7\u91CD\u65B0\u9884\u89C8\u8FDE\u62CD\u65B9\u6848\u3002");
-      const link = { projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} };
-      const adapter = await adapterFor(link);
-      const existing = await previousChain(link);
+      const link2 = { projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} };
+      const adapter = await adapterFor(link2);
+      const existing = await previousChain(link2);
       if (existing && ["running", "review"].includes(chainStateOf(existing, await currentJob(existing)))) return { chain: chainView(existing, await currentJob(existing)) };
       const segments = await chainPlan(adapter, args.projectId, config);
       if (!segments.some((segment) => !segment.skip)) throw new Error("\u753B\u5E03\u4E0A\u7684\u89C6\u9891\u6BB5\u90FD\u5DF2\u6709\u6210\u679C\uFF0C\u4E0D\u9700\u8981\u518D\u8FDE\u62CD\uFF1B\u8981\u91CD\u505A\u67D0\u4E00\u6BB5\uFF0C\u70B9\u90A3\u4E2A\u8282\u70B9\u81EA\u5DF1\u7684\u300C\u5236\u4F5C\u300D\u3002");
       if (existing && chainSignature(existing.segments) === chainSignature(segments)) return { chain: chainView(existing, await currentJob(existing)) };
       const chain = {
         version: 1,
-        id: randomUUID10(),
+        id: randomUUID11(),
         projectId: args.projectId,
         ...args.canvasId ? { canvasId: args.canvasId } : {},
         identity: hash3(config),
@@ -10240,9 +10528,9 @@ function createCanvasNativeService(liveConfig, options = {}) {
       };
       await saveChain(chain);
       await mkdir15(chainDirectory, { recursive: true, mode: 448 });
-      const temp = `${chainPointer(link)}.${randomUUID10()}.tmp`;
+      const temp = `${chainPointer(link2)}.${randomUUID11()}.tmp`;
       await writeFile12(temp, JSON.stringify({ id: chain.id }), { mode: 384, flag: "wx" });
-      await rename12(temp, chainPointer(link));
+      await rename12(temp, chainPointer(link2));
       try {
         await runChainSegment(chain, config);
       } catch (error) {
@@ -10405,7 +10693,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       const config = snapshotConfig(liveConfig), plan = planCanvasNative(input, config, args.operation || "generate", args.draft || {});
       if (plan.kind === "image" && plan.args.ratio !== "1:1") throw new Error("\u672C\u7248\u56FE\u7247\u76F4\u63A5\u5236\u4F5C\u4EC5\u652F\u63011:1\uFF0C\u8BF7\u5148\u4FEE\u6539\u8282\u70B9\u753B\u5E45\u3002");
       assertConfigured(plan.kind === "image" ? imageConfig(config) : config, resolveApiKey(plan.kind === "image" ? imageConfig(config) : config));
-      const id = randomUUID10(), proposal = { id, canvas: input.canvas, plan, config, identity: hash3(config), expires: Date.now() + 10 * 6e4 };
+      const id = randomUUID11(), proposal = { id, canvas: input.canvas, plan, config, identity: hash3(config), expires: Date.now() + 10 * 6e4 };
       for (const [key, p] of proposals) if (p.expires < Date.now()) proposals.delete(key);
       if (proposals.size >= 100) throw new Error("\u5F85\u786E\u8BA4\u65B9\u6848\u8FC7\u591A\uFF0C\u8BF7\u5148\u5904\u7406\u5DF2\u6709\u65B9\u6848\u3002");
       proposals.set(id, proposal);
@@ -10449,7 +10737,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
         if (old && (!terminal.has(old.state) || old.media?.length && !old.reviewed || old.sync?.status === "pending")) return { job: view(old) };
         const job2 = { version: 1, id: p.id, canvas: p.canvas, plan: p.plan, identity: p.identity, createdAt: Date.now(), state: "running", reviewed: false };
         await save2(job2);
-        const temp = `${key}.${randomUUID10()}.tmp`;
+        const temp = `${key}.${randomUUID11()}.tmp`;
         await writeFile12(temp, JSON.stringify({ id: job2.id }), { mode: 384, flag: "wx" });
         await rename12(temp, key);
         proposals.delete(p.id);
@@ -10533,7 +10821,7 @@ async function initialCharacterReferences(config, args, saved, signal) {
     return saved.characterReferences.map((item) => ({ ...item, image_url: { ...item.image_url } }));
   }
   const referenceImages = Array.isArray(args.referenceImages) ? args.referenceImages : args.referenceImages ? [args.referenceImages] : [];
-  const source = args.characterReferenceImages ?? (referenceImages.length ? referenceImages : args.firstFrameUrl ? [args.firstFrameUrl] : []);
+  const source = args.characterReferenceImages ?? (referenceImages.length ? referenceImages : args.productionStrategy !== "independent_shots" && args.firstFrameUrl ? [args.firstFrameUrl] : []);
   const { refs: refs2 } = validateImageRoles({ referenceImages: source }, resolveModel(config));
   const canvas = canvasSize(args.ratio || ref(config, "ratio", "adaptive"));
   const fit = canvas ? { size: canvas, config, signal } : null;
@@ -10558,7 +10846,7 @@ function approvedCharacterReferences(images, state) {
 // src/businesses/video/workflow/segment-run.ts
 init_config();
 import path24 from "node:path";
-import { stat as stat10 } from "node:fs/promises";
+import { stat as stat11 } from "node:fs/promises";
 var SEGMENT_PAUSE_NOTE = "\u672C\u6BB5\u5DF2\u5B8C\u6210\uFF1A\u8BF7\u5148\u5C55\u793A\u672C\u6B21\u89C6\u9891\u6210\u679C\uFF0C\u8BA9\u7528\u6237\u9884\u89C8\uFF1B\u6B63\u6587\u5C55\u793A\u540E\u7ACB\u5373\u8C03\u7528video_project(action:review_segment,resume:\u539FresumeDir)\u5F39\u51FA\u5206\u6BB5\u7ED3\u679C\u786E\u8BA4\u7A97\uFF1B\u901A\u8FC7\u540E\u624D\u7528resume\u8FDB\u5165\u4E0B\u4E00\u6BB5\u8D39\u7528\u5BA1\u6279\uFF0C\u4E0D\u4EE5\u6587\u5B57\u95EE\u53E5\u66FF\u4EE3\u5F39\u7A97\u3002";
 function recordSegmentResult({ final, segments, segment, submissionId, convertedReferences }) {
   const detail = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}\u4E0A\u6E38\u8BE6\u60C5\uFF1A${final.error || ""}` : final.error;
@@ -10636,7 +10924,7 @@ async function runSegmentDelivery({
     for (const segment of completed.slice(0, -1)) {
       const file = path24.join(segmentsDir, `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`);
       try {
-        if ((await stat10(file)).isFile()) segment.localPath = file;
+        if ((await stat11(file)).isFile()) segment.localPath = file;
       } catch {
       }
     }
@@ -10785,10 +11073,13 @@ function videoTool(liveConfig, deps, ctx) {
   const TOOL_NAME = "video_generate";
   return {
     name: "video_generate",
-    description: `\u751F\u6210\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\uFF08\u89C6\u9891\u751F\u6210\u7684\u9996\u9009\u5DE5\u5177\uFF09\uFF0Cduration \u662F\u76EE\u6807\u603B\u79D2\u6570\uFF1A\u4E0D\u8D85\u8FC7\u6A21\u578B\u5355\u6BB5\u4E0A\u9650\uFF082.0 \u4E3A 15 \u79D2\u30012.5 \u4E3A 30 \u79D2\uFF09\u65F6\u4E00\u6B21\u76F4\u51FA\uFF1B**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 \u5355\u6BB5\u4E0A\u9650\u7684\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u62C6\u6210\u591A\u6BB5 / \u591A\u955C / \u591A\u6B21\u8C03\u7528\u518D\u62FC\u63A5**\uFF08\u4F8B\u5982\u300C15 \u79D2\u300D\u4E0D\u8BB8\u62C6\u6210 8+7\uFF09\uFF1B\u6309\u6545\u4E8B\u9009\u62E9\u4E00\u955C\u5230\u5E95\u6216\u5C11\u91CF\u6709\u52A8\u673A\u7684\u5207\u955C\uFF0C\u5E76\u5199\u5165\u5F85\u5BA1\u6838\u811A\u672C\uFF1B\u53D9\u4E8B\u5207\u955C\u4E0D\u7B49\u4E8E\u62C6\u5206\u751F\u6210\u4EFB\u52A1\u3002\u66F4\u957F\u65F6\u5148\u76F4\u51FA\u9996\u6BB5\uFF0C\u518D\u628A\u5269\u4F59\u65F6\u957F\u6309 4 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09 \u79D2\u5747\u5206\u9010\u6BB5\u7EED\u62CD\uFF08\u9ED8\u8BA4\u5403\u6EE1\u4E0A\u9650\u3001\u6BB5\u6570\u6700\u5C11\uFF0C\u6700\u957F ${MAX_TOTAL_SECONDS} \u79D2\uFF09\u2014\u2014\u8FD9\u662F\u8FDE\u7EED\u5267\u60C5\u7684\u7EED\u62CD\u5EF6\u957F\uFF0C\u751F\u6210\u5206\u6BB5\u672C\u8EAB\u4E0D\u4EE3\u8868\u53D9\u4E8B\u5207\u955C\uFF0C\u6700\u540E\u7528 ffmpeg \u5408\u5E76\u6210\u4E00\u4E2A\u672C\u5730\u6210\u7247\u6587\u4EF6\uFF0C\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\uFF0C\u6587\u4EF6\u540D\u5F62\u5982 20261027-201530-25s.mp4\u300220 \u79D2\u300125 \u79D2\u8FD9\u7C7B\u76EE\u6807\u4E0D\u7528\u624B\u52A8\u62C6\u6210\u591A\u4E2A\u72EC\u7ACB\u751F\u6210\u8C03\u7528\uFF1A\u76F4\u63A5\u4F20 duration=20 \u5373\u53EF\uFF0820 \u79D2 \u2192 15+5\uFF0C25 \u79D2 \u2192 15+10\uFF09\u3002**\u6BCF\u6BB5\u751F\u6210\u5B8C\u5148\u8FD4\u56DE\u89C6\u9891\u4F9B\u9884\u89C8**\uFF1A\u5148\u5C55\u793A\u6210\u679C\uFF0C\u518D\u8BE2\u95EE\u662F\u5426\u7EE7\u7EED\uFF1B\u672A\u786E\u8BA4\u5C31\u505C\u4E0B\uFF0C\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\uFF0C\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir \u548C remainingSeconds\uFF1B\u4E4B\u540E\u901A\u8FC7\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838\u5E76\u786E\u8BA4\u4E0B\u4E00\u6BB5\u8D39\u7528\u65F6\uFF0C\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_generate \u7684 resume \u53C2\u6570\u63A5\u7740\u505A\uFF08\u524D\u9762\u51E0\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\uFF1B\u65B0\u589E\u5269\u4F59\u5206\u6BB5\u4ECD\u9700\u786E\u8BA4\u8D39\u7528\u5E76\u8BA1\u8D39\uFF09\uFF0C\u4E0D\u8981\u4ECE\u5934\u518D\u751F\u6210\u4E00\u904D\u3001\u4E5F\u4E0D\u8981\u6539\u7528 video_extend \u62FC\u3002\u6BCF\u6B21\u8C03\u7528\u6700\u591A\u5B8C\u6210\u5F53\u524D\u4E00\u6BB5\uFF1B\u540E\u7EED\u5FC5\u987B\u4F7F\u7528resume\uFF0C\u4E0D\u91CD\u65B0\u521B\u5EFA\u9996\u6BB5\u4EFB\u52A1\u3002\u8FD4\u56DE\u6BCF\u6BB5\u4EFB\u52A1 ID\u3001\u4E0A\u6E38\u94FE\u63A5\u548C\u6210\u7247\u8DEF\u5F84\u3002\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF08\u6BCF\u6BB5\u5355\u72EC\u751F\u6210\uFF09\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout\u3001\u6216\u67D0\u6BB5\u8FD4\u56DE unknown\uFF08\u67E5\u8BE2\u5931\u8D25\u3001\u4EFB\u52A1\u5176\u5B9E\u5DF2\u63D0\u4EA4\uFF09\u65F6\uFF0C\u90FD\u7528\u8FD4\u56DE\u7684\u4EFB\u52A1 ID \u8D70 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u65B0\u4EFB\u52A1\u2014\u2014\u91CD\u590D\u63D0\u4EA4\u4F1A\u91CD\u590D\u6263\u8D39\uFF0C\u67E5\u8BE2\u5931\u8D25\u4E0D\u4EE3\u8868\u6CA1\u6709\u751F\u6210\u3002**\u8C03\u7528\u524D\u5FC5\u987B\u5148\u5B8C\u6574\u5C55\u793A\u5F53\u524D\u7248\u811A\u672C\u3001\u518D\u8BA9\u7528\u6237\u5BA1\u6838\u901A\u8FC7\uFF0C\u5E76\u786E\u8BA4\u5F00\u59CB\u5236\u4F5C**\uFF08\u4E24\u9053\u786E\u8BA4\u7F3A\u4E00\u4E0D\u53EF\uFF09\uFF0C\u4E0D\u8981\u8DF3\u8FC7\u811A\u672C\u76F4\u63A5\u751F\u6210\u3002\u5408\u5E76\u9700\u8981\u672C\u673A\u6709 ffmpeg\u3002\u672C\u673A\u6CA1\u88C5 ffmpeg \u65F6\uFF0C\u63D2\u4EF6\u4F1A**\u5148\u628A\u8FD9\u6B21\u8C03\u7528\u62E6\u56DE\u6765\uFF08\u4E0D\u4F1A\u8C03\u7528\u6A21\u578B\u3001\u4E0D\u4EA7\u751F\u8D39\u7528\uFF09**\uFF0C\u8FD4\u56DE\u7684\u8BF4\u660E\u91CC\u5E26\u7740\u6309\u7CFB\u7EDF\u7ED9\u7684\u5B89\u88C5\u547D\u4EE4 \u2014\u2014\u8FD9\u65F6\u8981\u5728\u5BF9\u8BDD\u6846\u91CC\u548C\u7528\u6237\u786E\u8BA4\uFF1A\u95EE\u4ED6\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg\uFF08\u7ED9\u51FA\u4ED6\u7CFB\u7EDF\u7684\u547D\u4EE4\uFF0C\u8BF4\u660E\u88C5\u597D\u540E\u9996\u6B21\u751F\u6210\u53EF\u6309\u539F\u53C2\u6570\u63D0\u4EA4\uFF1B\u5DF2\u6709\u8FDB\u5EA6\u5219\u7528\u539Fresume\u91CD\u8BD5\u4E0B\u8F7D\u6216\u5408\u5E76\uFF09\uFF0C\u540C\u610F\u5C31\u8C03\u7528 video_setup\uFF08install:true\uFF09\uFF0C\u5BBF\u4E3B\u786E\u8BA4\u540E\u5B89\u88C5\u5E76\u81EA\u52A8\u9A8C\u8BC1\uFF0C\u7136\u540E\u9996\u6B21\u751F\u6210\u6309\u539F\u53C2\u6570\u63D0\u4EA4\uFF1B\u5DF2\u6709\u8FDB\u5EA6\u5219\u4F7F\u7528\u539Fresume\uFF1B\u7528\u6237\u4E0D\u60F3\u88C5\u5C31\u5E26 merge:false \u91CD\u53D1\uFF0C\u63D2\u4EF6\u53EA\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u4E0A\u6E38\u94FE\u63A5\uFF0C\u4E0D\u4E0B\u8F7D\u672C\u5730\u6587\u4EF6\uFF09\u3002\u62FF\u5230 ffmpegMissing=true \u7684\u7ED3\u679C\u65F6\u4E5F\u8981\u7167 installHint \u5F15\u5BFC\u5B89\u88C5\uFF0C\u522B\u53EA\u4E22\u4E00\u53E5\u300C\u5DF2\u8DF3\u8FC7\u5408\u5E76\u300D\u3002**\u4EBA\u7269\u5F62\u8C61 / \u53C2\u8003\u56FE**\uFF1A\u516C\u7F51\u56FE\u7247 URL\u3001base64\uFF08data URI \u6216\u7EAF base64\uFF09\u3001\u672C\u673A\u56FE\u7247\u8DEF\u5F84\uFF0C\u6216\u7B80\u5199 \`latest\` \u90FD\u652F\u6301\u2014\u2014\u8981\u56FA\u5B9A\u4EBA\u7269\u957F\u76F8\u3001\u670D\u88C5\u3001\u573A\u666F\u65F6\u4F20 referenceImages\uFF0C\u6309\u6570\u7EC4\u987A\u5E8F\u9010\u5F20\u63D0\u4EA4\u5E76\u4EE5\u56FE\u72471\u3001\u56FE\u72472\u7B49\u6307\u4EE3\uFF1B\u9996\u5E27 / \u5C3E\u5E27\u7528 firstFrameUrl / lastFrameUrl \u4F20\u3002\u516C\u7F51 URL \u76F4\u63A5\u4EA4\u7ED9\u4E2D\u8F6C\u7AD9\u53D6\u56FE\uFF1B\u672C\u5730\u56FE\u7247\u7531\u63D2\u4EF6\u8BFB\u8FDB\u6765\uFF08\u6309 ratio \u5148\u9002\u914D\u753B\u5E45\uFF09\u5185\u8054\u6210 image_url \u53D1\u7ED9\u4E2D\u8F6C\u7AD9\uFF0C\u7528\u6237\u4E0D\u9700\u8981\u81EA\u5DF1\u627E\u56FE\u5E8A\u3002**\u7528\u6237\u8BF4\u300C\u5C31\u7528\u6211\u521A\u4E0A\u4F20/\u521A\u62D6\u8FDB\u6765\u7684\u90A3\u5F20\u56FE\u300D\u65F6\u76F4\u63A5\u4F20 \`latest\`**\uFF08\`latest:2\` \u53D6\u7B2C 2 \u65B0\u7684\uFF09\uFF1A\u63D2\u4EF6\u4F1A\u53BB Harness \u9644\u4EF6\u5E93\u91CC\u627E\u6700\u8FD1 2 \u5C0F\u65F6\u4E0A\u4F20\u7684\u56FE\u7247\u2014\u2014\u54EA\u6015\u5F53\u524D\u804A\u5929\u6A21\u578B\u4E0D\u652F\u6301\u56FE\u7247\u3001\u9644\u4EF6\u88AB \`MODEL_DOES_NOT_SUPPORT_IMAGES\` \u62E6\u4E0B\uFF0C\u56FE\u7247\u672C\u8EAB\u4E5F\u5DF2\u7ECF\u843D\u76D8\uFF0C\u7167\u6837\u80FD\u7528\u3002\u522B\u5728\u8FD9\u65F6\u8BF4\u300C\u6211\u770B\u4E0D\u5230\u56FE\u7247\u300D\uFF0C\u4E5F\u522B\u8BA9\u7528\u6237\u81EA\u5DF1\u53BB\u627E\u8DEF\u5F84\u3002`,
+    description: `\u751F\u6210\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\uFF08\u89C6\u9891\u751F\u6210\u7684\u9996\u9009\u5DE5\u5177\uFF09\uFF0Cduration \u662F\u76EE\u6807\u603B\u79D2\u6570\uFF1A\u4E0D\u8D85\u8FC7\u6A21\u578B\u5355\u6BB5\u4E0A\u9650\uFF082.0 \u4E3A 15 \u79D2\u30012.5 \u4E3A 30 \u79D2\uFF09\u65F6\u4E00\u6B21\u76F4\u51FA\uFF1B\u663E\u5F0F\u9009\u62E9productionStrategy=independent_shots\u5E76\u5B8C\u6210\u6574\u6761\u65B9\u6848\u5BA1\u6838\u65F6\uFF0C\u53EF\u6309shotDurations\u72EC\u7ACB\u751F\u6210\u518D\u526A\u8F91\uFF1B\u6B64\u8DEF\u7EBF\u6BCF\u955C\u5355\u72EC\u8BA1\u8D39\u3001\u9010\u955C\u5BA1\u6838\uFF0C\u4EBA\u7269\u4E00\u81F4\u6027\u4F9D\u8D56\u53C2\u8003\u56FE\uFF0C\u4E0D\u4FDD\u8BC1\u65E0\u6F02\u79FB\u3002\u4EE5\u4E0B\u5355\u6B21\u76F4\u51FA\u7EA6\u675F\u9002\u7528\u4E8E\u9ED8\u8BA4\u8FDE\u7EED\u8DEF\u7EBF\u3002**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 \u5355\u6BB5\u4E0A\u9650\u7684\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u62C6\u6210\u591A\u6BB5 / \u591A\u955C / \u591A\u6B21\u8C03\u7528\u518D\u62FC\u63A5**\uFF08\u4F8B\u5982\u300C15 \u79D2\u300D\u4E0D\u8BB8\u62C6\u6210 8+7\uFF09\uFF1B\u6309\u6545\u4E8B\u9009\u62E9\u4E00\u955C\u5230\u5E95\u6216\u5C11\u91CF\u6709\u52A8\u673A\u7684\u5207\u955C\uFF0C\u5E76\u5199\u5165\u5F85\u5BA1\u6838\u811A\u672C\uFF1B\u53D9\u4E8B\u5207\u955C\u4E0D\u7B49\u4E8E\u62C6\u5206\u751F\u6210\u4EFB\u52A1\u3002\u66F4\u957F\u65F6\u5148\u76F4\u51FA\u9996\u6BB5\uFF0C\u518D\u628A\u5269\u4F59\u65F6\u957F\u6309 4 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09 \u79D2\u5747\u5206\u9010\u6BB5\u7EED\u62CD\uFF08\u9ED8\u8BA4\u5403\u6EE1\u4E0A\u9650\u3001\u6BB5\u6570\u6700\u5C11\uFF0C\u6700\u957F ${MAX_TOTAL_SECONDS} \u79D2\uFF09\u2014\u2014\u8FD9\u662F\u8FDE\u7EED\u5267\u60C5\u7684\u7EED\u62CD\u5EF6\u957F\uFF0C\u751F\u6210\u5206\u6BB5\u672C\u8EAB\u4E0D\u4EE3\u8868\u53D9\u4E8B\u5207\u955C\uFF0C\u6700\u540E\u7528 ffmpeg \u5408\u5E76\u6210\u4E00\u4E2A\u672C\u5730\u6210\u7247\u6587\u4EF6\uFF0C\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\uFF0C\u6587\u4EF6\u540D\u5F62\u5982 20261027-201530-25s.mp4\u300220 \u79D2\u300125 \u79D2\u8FD9\u7C7B\u76EE\u6807\u4E0D\u7528\u624B\u52A8\u62C6\u6210\u591A\u4E2A\u72EC\u7ACB\u751F\u6210\u8C03\u7528\uFF1A\u76F4\u63A5\u4F20 duration=20 \u5373\u53EF\uFF0820 \u79D2 \u2192 15+5\uFF0C25 \u79D2 \u2192 15+10\uFF09\u3002**\u6BCF\u6BB5\u751F\u6210\u5B8C\u5148\u8FD4\u56DE\u89C6\u9891\u4F9B\u9884\u89C8**\uFF1A\u5148\u5C55\u793A\u6210\u679C\uFF0C\u518D\u8BE2\u95EE\u662F\u5426\u7EE7\u7EED\uFF1B\u672A\u786E\u8BA4\u5C31\u505C\u4E0B\uFF0C\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\uFF0C\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir \u548C remainingSeconds\uFF1B\u4E4B\u540E\u901A\u8FC7\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838\u5E76\u786E\u8BA4\u4E0B\u4E00\u6BB5\u8D39\u7528\u65F6\uFF0C\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_generate \u7684 resume \u53C2\u6570\u63A5\u7740\u505A\uFF08\u524D\u9762\u51E0\u6BB5\u4E0D\u91CD\u65B0\u751F\u6210\uFF1B\u65B0\u589E\u5269\u4F59\u5206\u6BB5\u4ECD\u9700\u786E\u8BA4\u8D39\u7528\u5E76\u8BA1\u8D39\uFF09\uFF0C\u4E0D\u8981\u4ECE\u5934\u518D\u751F\u6210\u4E00\u904D\u3001\u4E5F\u4E0D\u8981\u6539\u7528 video_extend \u62FC\u3002\u6BCF\u6B21\u8C03\u7528\u6700\u591A\u5B8C\u6210\u5F53\u524D\u4E00\u6BB5\uFF1B\u540E\u7EED\u5FC5\u987B\u4F7F\u7528resume\uFF0C\u4E0D\u91CD\u65B0\u521B\u5EFA\u9996\u6BB5\u4EFB\u52A1\u3002\u8FD4\u56DE\u6BCF\u6BB5\u4EFB\u52A1 ID\u3001\u4E0A\u6E38\u94FE\u63A5\u548C\u6210\u7247\u8DEF\u5F84\u3002\u751F\u6210\u901A\u5E38\u9700\u8981\u51E0\u5206\u949F\uFF08\u6BCF\u6BB5\u5355\u72EC\u751F\u6210\uFF09\uFF0C\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout\u3001\u6216\u67D0\u6BB5\u8FD4\u56DE unknown\uFF08\u67E5\u8BE2\u5931\u8D25\u3001\u4EFB\u52A1\u5176\u5B9E\u5DF2\u63D0\u4EA4\uFF09\u65F6\uFF0C\u90FD\u7528\u8FD4\u56DE\u7684\u4EFB\u52A1 ID \u8D70 video_status \u7EE7\u7EED\u7B49\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u65B0\u4EFB\u52A1\u2014\u2014\u91CD\u590D\u63D0\u4EA4\u4F1A\u91CD\u590D\u6263\u8D39\uFF0C\u67E5\u8BE2\u5931\u8D25\u4E0D\u4EE3\u8868\u6CA1\u6709\u751F\u6210\u3002**\u8C03\u7528\u524D\u5FC5\u987B\u5148\u5B8C\u6574\u5C55\u793A\u5F53\u524D\u7248\u811A\u672C\u3001\u518D\u8BA9\u7528\u6237\u5BA1\u6838\u901A\u8FC7\uFF0C\u5E76\u786E\u8BA4\u5F00\u59CB\u5236\u4F5C**\uFF08\u4E24\u9053\u786E\u8BA4\u7F3A\u4E00\u4E0D\u53EF\uFF09\uFF0C\u4E0D\u8981\u8DF3\u8FC7\u811A\u672C\u76F4\u63A5\u751F\u6210\u3002\u5408\u5E76\u9700\u8981\u672C\u673A\u6709 ffmpeg\u3002\u672C\u673A\u6CA1\u88C5 ffmpeg \u65F6\uFF0C\u63D2\u4EF6\u4F1A**\u5148\u628A\u8FD9\u6B21\u8C03\u7528\u62E6\u56DE\u6765\uFF08\u4E0D\u4F1A\u8C03\u7528\u6A21\u578B\u3001\u4E0D\u4EA7\u751F\u8D39\u7528\uFF09**\uFF0C\u8FD4\u56DE\u7684\u8BF4\u660E\u91CC\u5E26\u7740\u6309\u7CFB\u7EDF\u7ED9\u7684\u5B89\u88C5\u547D\u4EE4 \u2014\u2014\u8FD9\u65F6\u8981\u5728\u5BF9\u8BDD\u6846\u91CC\u548C\u7528\u6237\u786E\u8BA4\uFF1A\u95EE\u4ED6\u8981\u4E0D\u8981\u73B0\u5728\u88C5 ffmpeg\uFF08\u7ED9\u51FA\u4ED6\u7CFB\u7EDF\u7684\u547D\u4EE4\uFF0C\u8BF4\u660E\u88C5\u597D\u540E\u9996\u6B21\u751F\u6210\u53EF\u6309\u539F\u53C2\u6570\u63D0\u4EA4\uFF1B\u5DF2\u6709\u8FDB\u5EA6\u5219\u7528\u539Fresume\u91CD\u8BD5\u4E0B\u8F7D\u6216\u5408\u5E76\uFF09\uFF0C\u540C\u610F\u5C31\u8C03\u7528 video_setup\uFF08install:true\uFF09\uFF0C\u5BBF\u4E3B\u786E\u8BA4\u540E\u5B89\u88C5\u5E76\u81EA\u52A8\u9A8C\u8BC1\uFF0C\u7136\u540E\u9996\u6B21\u751F\u6210\u6309\u539F\u53C2\u6570\u63D0\u4EA4\uFF1B\u5DF2\u6709\u8FDB\u5EA6\u5219\u4F7F\u7528\u539Fresume\uFF1B\u7528\u6237\u4E0D\u60F3\u88C5\u5C31\u5E26 merge:false \u91CD\u53D1\uFF0C\u63D2\u4EF6\u53EA\u8FD4\u56DE\u5206\u6BB5\u5217\u8868\uFF08\u6BCF\u6BB5\u4E0A\u6E38\u94FE\u63A5\uFF0C\u4E0D\u4E0B\u8F7D\u672C\u5730\u6587\u4EF6\uFF09\u3002\u62FF\u5230 ffmpegMissing=true \u7684\u7ED3\u679C\u65F6\u4E5F\u8981\u7167 installHint \u5F15\u5BFC\u5B89\u88C5\uFF0C\u522B\u53EA\u4E22\u4E00\u53E5\u300C\u5DF2\u8DF3\u8FC7\u5408\u5E76\u300D\u3002**\u4EBA\u7269\u5F62\u8C61 / \u53C2\u8003\u56FE**\uFF1A\u516C\u7F51\u56FE\u7247 URL\u3001base64\uFF08data URI \u6216\u7EAF base64\uFF09\u3001\u672C\u673A\u56FE\u7247\u8DEF\u5F84\uFF0C\u6216\u7B80\u5199 \`latest\` \u90FD\u652F\u6301\u2014\u2014\u8981\u56FA\u5B9A\u4EBA\u7269\u957F\u76F8\u3001\u670D\u88C5\u3001\u573A\u666F\u65F6\u4F20 referenceImages\uFF0C\u6309\u6570\u7EC4\u987A\u5E8F\u9010\u5F20\u63D0\u4EA4\u5E76\u4EE5\u56FE\u72471\u3001\u56FE\u72472\u7B49\u6307\u4EE3\uFF1B\u9996\u5E27 / \u5C3E\u5E27\u7528 firstFrameUrl / lastFrameUrl \u4F20\u3002\u516C\u7F51 URL \u76F4\u63A5\u4EA4\u7ED9\u4E2D\u8F6C\u7AD9\u53D6\u56FE\uFF1B\u672C\u5730\u56FE\u7247\u7531\u63D2\u4EF6\u8BFB\u8FDB\u6765\uFF08\u6309 ratio \u5148\u9002\u914D\u753B\u5E45\uFF09\u5185\u8054\u6210 image_url \u53D1\u7ED9\u4E2D\u8F6C\u7AD9\uFF0C\u7528\u6237\u4E0D\u9700\u8981\u81EA\u5DF1\u627E\u56FE\u5E8A\u3002**\u7528\u6237\u8BF4\u300C\u5C31\u7528\u6211\u521A\u4E0A\u4F20/\u521A\u62D6\u8FDB\u6765\u7684\u90A3\u5F20\u56FE\u300D\u65F6\u76F4\u63A5\u4F20 \`latest\`**\uFF08\`latest:2\` \u53D6\u7B2C 2 \u65B0\u7684\uFF09\uFF1A\u63D2\u4EF6\u4F1A\u53BB Harness \u9644\u4EF6\u5E93\u91CC\u627E\u6700\u8FD1 2 \u5C0F\u65F6\u4E0A\u4F20\u7684\u56FE\u7247\u2014\u2014\u54EA\u6015\u5F53\u524D\u804A\u5929\u6A21\u578B\u4E0D\u652F\u6301\u56FE\u7247\u3001\u9644\u4EF6\u88AB \`MODEL_DOES_NOT_SUPPORT_IMAGES\` \u62E6\u4E0B\uFF0C\u56FE\u7247\u672C\u8EAB\u4E5F\u5DF2\u7ECF\u843D\u76D8\uFF0C\u7167\u6837\u80FD\u7528\u3002\u522B\u5728\u8FD9\u65F6\u8BF4\u300C\u6211\u770B\u4E0D\u5230\u56FE\u7247\u300D\uFF0C\u4E5F\u522B\u8BA9\u7528\u6237\u81EA\u5DF1\u53BB\u627E\u8DEF\u5F84\u3002`,
     parameters: {
       type: "object",
       properties: {
+        productionStrategy: { type: "string", enum: ["continuous_segments", "independent_shots"], description: "\u9ED8\u8BA4\u8FDE\u7EED\u7EED\u62CD\u3002\u4EC5\u7528\u6237\u660E\u786E\u9009\u62E9\u5E76\u5BA1\u6838\u72EC\u7ACB\u955C\u5934\u65B9\u6848\u65F6\u7528independent_shots\uFF0C\u6BCF\u955C\u72EC\u7ACB\u8BA1\u8D39\uFF0C\u590D\u7528\u5DF2\u5BA1\u53C2\u8003\u56FE\uFF0C\u4E0D\u8F93\u5165\u4E0A\u4E00\u6BB5\u89C6\u9891\uFF1B\u6BCF\u955C\u5B8C\u6210\u4ECD\u987B\u5BA1\u6838\u540Eresume\u3002" },
+        shotFrames: { type: "array", items: { type: "object", properties: { firstFrameUrl: { type: "string" }, lastFrameUrl: { type: "string" } } }, description: "\u72EC\u7ACB\u955C\u5934\u9010\u955C\u9996\u5C3E\u5E27\uFF0C\u4E0EshotDurations\u7B49\u957F\uFF1B\u65E0\u7D20\u6750\u7684\u955C\u5934\u586B{}\u3002\u5168\u5C40firstFrameUrl\u4EC5\u7528\u4E8E\u9996\u955C\uFF0ClastFrameUrl\u4EC5\u7528\u4E8E\u672B\u955C\uFF1B\u4EBA\u7269\u53C2\u8003\u56FE\u53EF\u5171\u4EAB\u3002\u6539\u7D20\u6750\u987B\u91CD\u5BA1\u3002" },
+        shotDurations: { type: "array", items: { type: "integer", minimum: 4 }, description: "\u72EC\u7ACB\u955C\u5934\u5404\u79D2\u6570\uFF0C\u4E4B\u548C\u5FC5\u987B\u7B49\u4E8Eduration\uFF0C\u6BCF\u955C\u4E0D\u8D85\u6A21\u578B\u4E0A\u9650\uFF1B\u4E0EsegmentPrompts\u9010\u9879\u5BF9\u5E94\u3002" },
         projectId: { type: "string", description: "video_project\u8FD4\u56DE\u7684\u9879\u76EEID\u3002\u65B0\u5EFA\u751F\u6210/\u5EF6\u957F\u524D\u987Bprepare\u5E76review\u901A\u8FC7\uFF1B\u7EED\u505A\u9ED8\u8BA4\u6CBF\u7528\u3002" },
         cumulativePreview: { type: "boolean", description: "\u9ED8\u8BA4\u6682\u505C\u53EA\u4E0B\u8F7D\u5C55\u793A\u65B0\u6BB5\uFF0C\u6700\u7EC8\u518D\u5408\u5E76\uFF1B\u660E\u786E\u9700\u8981\u7D2F\u8BA1\u9884\u89C8\u65F6\u4F20true\uFF0C\u4E0D\u65B0\u589E\u751F\u6210\u8D39\u7528\u3002" },
         resetCharacterChoice: { type: "boolean", description: "\u4EC5\u5728\u7528\u6237\u660E\u786E\u6539\u53D8\u5DF2\u786E\u8BA4\u7684\u89D2\u8272\u56FE\u65B9\u6848\u65F6\u8BBEtrue\uFF0C\u91CD\u65B0\u5F39\u51FA\u9009\u62E9\uFF1B\u4E0D\u4F1A\u76F4\u63A5\u6539\u4E3A\u7EAF\u6587\u751F\uFF0C\u4E5F\u4E0D\u80FD\u7ED5\u8FC7\u786E\u8BA4\u3002" },
@@ -10929,6 +11220,10 @@ function videoTool(liveConfig, deps, ctx) {
       if (!prompt) {
         throw new Error(resumeDir ? "\u8FD9\u6B21\u662F\u63A5\u7740\u4E0A\u4E00\u6B21\u6682\u505C\u7684\u89C6\u9891\u7EE7\u7EED\uFF0C\u4F46\u6682\u505C\u8BB0\u5F55\u91CC\u6CA1\u6709\u63D0\u793A\u8BCD\uFF1A\u8BF7\u628A prompt \u8865\u4E0A\u3002" : "\u63D0\u793A\u8BCD prompt \u4E0D\u80FD\u4E3A\u7A7A\u3002");
       }
+      if (resume?.options?.productionStrategy === "independent_shots") {
+        if (args.productionStrategy !== resume.options.productionStrategy || JSON.stringify(args.shotDurations) !== JSON.stringify(resume.options.shotDurations)) throw Error("INDEPENDENT_PLAN_CHANGE_REQUIRES_NEW_REVIEW");
+        args.duration = args.duration ?? resume.plan.reduce((n, s) => n + s.seconds, 0);
+      }
       const target = resolveTargetPlan(config2, args);
       const { singleMax, segmentSeconds, cap, asked } = target;
       const restarted = resume ? resumePlanFrom(resume, {
@@ -11002,7 +11297,8 @@ function videoTool(liveConfig, deps, ctx) {
           characterReferences: state.characterReferences
         }),
         buildStep: async ({ step, position, state }) => {
-          const focusedPrompt = suppliedPrompts ? buildSegmentExecutionPrompt({ prompt: suppliedPrompts[position], kind: step.kind, index: position, count: fullPlan.length }) : prompt;
+          const focusedPrompt = suppliedPrompts ? args.productionStrategy === "independent_shots" ? `\u3010\u72EC\u7ACB\u955C\u5934 ${position + 1}/${fullPlan.length}\u3011\u53EA\u6267\u884C\u672C\u955C\u52A8\u4F5C\u4E0E\u5BF9\u767D\uFF0C\u4E0D\u5F15\u7528\u6216\u91CD\u6F14\u5176\u4ED6\u955C\u5934\uFF0C\u4E0D\u5047\u8BBE\u5B58\u5728\u89C6\u98911\u3002\u955C\u5934\u4E4B\u95F4\u4EE5\u526A\u8F91\u8854\u63A5\u3002
+${suppliedPrompts[position]}` : buildSegmentExecutionPrompt({ prompt: suppliedPrompts[position], kind: step.kind, index: position, count: fullPlan.length }) : prompt;
           const stepArgs = {
             ...resumeOptions,
             ...args,
@@ -11016,11 +11312,11 @@ function videoTool(liveConfig, deps, ctx) {
           let body;
           let seconds;
           if (step.kind === "generate") {
-            const initialArgs = { ...stepArgs };
+            const initialArgs = shotMaterials(stepArgs, position, fullPlan.length);
             if (state.characterReferences.length) {
-              if (!stepArgs.firstFrameUrl && (!stepArgs.referenceImages || args.characterReferenceImages === void 0))
+              if (!initialArgs.firstFrameUrl && !initialArgs.lastFrameUrl && (!initialArgs.referenceImages || args.characterReferenceImages === void 0))
                 initialArgs.referenceImages = state.characterReferences.map((item) => item.image_url.url);
-              else if (stepArgs.firstFrameUrl && args.characterReferenceImages === void 0)
+              else if (args.productionStrategy !== "independent_shots" && stepArgs.firstFrameUrl && args.characterReferenceImages === void 0)
                 initialArgs.firstFrameUrl = state.characterReferences[0].image_url.url;
             }
             const generated = await buildGenerationBody(config2, initialArgs, step.seconds, {
@@ -11045,7 +11341,7 @@ function videoTool(liveConfig, deps, ctx) {
       const deliveredSeconds = completed.reduce((sum, segment) => sum + (segment.seconds || 0), 0);
       const result = {
         status,
-        mode: fullPlan.length > 1 ? "extended" : "direct",
+        mode: args.productionStrategy === "independent_shots" ? "independent_shots" : fullPlan.length > 1 ? "extended" : "direct",
         plannedSeconds: restarted ? total : plannedTotal,
         totalSeconds: deliveredSeconds,
         segments,
@@ -11090,7 +11386,7 @@ function videoTool(liveConfig, deps, ctx) {
         return skipMergeDelivery({ result, paused, remainingSeconds, notes, segmentsDir, toolName: TOOL_NAME });
       }
       return runSegmentDelivery({
-        config: config2,
+        config: args.productionStrategy === "independent_shots" ? { ...config2, seamTrimSeconds: "0" } : config2,
         exec,
         interrupted,
         completed,
@@ -11581,7 +11877,7 @@ function setupTool(config) {
       render(_args, value) {
         const {
           status,
-          os: os5,
+          os: os6,
           ffmpegVersion,
           ffmpegPath,
           ffprobeVersion,
@@ -11596,7 +11892,7 @@ function setupTool(config) {
           lines.push("ffmpeg \u88C5\u597D\u4E86\uFF0C\u957F\u89C6\u9891\u73B0\u5728\u53EF\u4EE5\u5408\u5E76\u6210\u4E00\u6761\u3002");
         } else if (status === "missing") {
           lines.push("\u672C\u673A\u8FD8\u6CA1\u6709 ffmpeg\uFF1A\u751F\u6210\u8D85\u8FC7\u6A21\u578B\u5355\u6B21\u4E0A\u9650\u7684\u89C6\u9891\u65F6\u53EA\u80FD\u7ED9\u5206\u6BB5\uFF0C\u6CA1\u6CD5\u5408\u5E76\u6210\u4E00\u6761\u3002");
-          lines.push(`\u88C5\u4E00\u4E0B\u5C31\u597D\uFF08${os5 || "\u5F53\u524D\u7CFB\u7EDF"}\uFF09\uFF1A${installCommand || ""}`);
+          lines.push(`\u88C5\u4E00\u4E0B\u5C31\u597D\uFF08${os6 || "\u5F53\u524D\u7CFB\u7EDF"}\uFF09\uFF1A${installCommand || ""}`);
           lines.push("\u7528\u6237\u540C\u610F\u7684\u8BDD\uFF0C\u6211\u53EF\u4EE5\u7528 video_setup\uFF08install=true\uFF09\u76F4\u63A5\u5E2E\u4ED6\u88C5\u3002");
         } else if (status === "failed") {
           lines.push("ffmpeg \u6CA1\u88C5\u6210\u529F\uFF0C\u5F97\u624B\u52A8\u88C5\u4E00\u4E0B\u3002");
@@ -11624,14 +11920,14 @@ function setupTool(config) {
       const signal = exec?.signal;
       const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
       const probeBinary = resolveBinary(config, "ffprobeBinary", "ffprobe");
-      const { os: os5, installs, bootstrap } = ffmpegInstallOptions();
+      const { os: os6, installs, bootstrap } = ffmpegInstallOptions();
       const wantsInstall = args?.install === true;
       const target = String(args?.target || "ffmpeg");
       const manualSteps = installs.map((item) => `${item.label}\uFF1A${item.command}`);
       const installCommand = target === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
       const ffmpegVersion = await probeBinaryVersion(binary, signal);
       const ffprobeVersion = await probeBinaryVersion(probeBinary, signal);
-      const base = { os: os5, installCommand, manualSteps, ffmpegVersion, ffprobeVersion };
+      const base = { os: os6, installCommand, manualSteps, ffmpegVersion, ffprobeVersion };
       if (ffmpegVersion) {
         const note = ffprobeVersion ? "ffmpeg \u4E0E ffprobe \u90FD\u53EF\u7528\uFF0C\u957F\u89C6\u9891\u4F1A\u6B63\u5E38\u5408\u5E76\u6210\u4E00\u6761\u3002" : "ffmpeg \u53EF\u7528\uFF1B\u6CA1\u6709 ffprobe\uFF0C\u5206\u6BB5\u65F6\u957F\u63A2\u6D4B\u4F1A\u88AB\u8DF3\u8FC7\uFF08\u4E0D\u5F71\u54CD\u5408\u5E76\uFF09\u3002";
         return { status: "ready", ...base, ffmpegPath: binary, note };
@@ -11650,7 +11946,7 @@ function setupTool(config) {
           return {
             status: "failed",
             ...base,
-            note: `${os5} \u4E0D\u9700\u8981\u53E6\u5916\u88C5\u5305\u7BA1\u7406\u5668\uFF0C\u76F4\u63A5\u7528\u7CFB\u7EDF\u81EA\u5E26\u7684\u5305\u7BA1\u7406\u5668\u88C5 ffmpeg \u5C31\u884C\u3002`
+            note: `${os6} \u4E0D\u9700\u8981\u53E6\u5916\u88C5\u5305\u7BA1\u7406\u5668\uFF0C\u76F4\u63A5\u7528\u7CFB\u7EDF\u81EA\u5E26\u7684\u5305\u7BA1\u7406\u5668\u88C5 ffmpeg \u5C31\u884C\u3002`
           };
         }
         const result = await runProcess(shellCommand, [], {
@@ -11691,7 +11987,7 @@ function setupTool(config) {
         installCommand: needsBootstrap ? bootstrap.command : installs[0].command,
         manualSteps: needsBootstrap ? [`\u5148\u88C5\u5305\u7BA1\u7406\u5668\uFF1A${bootstrap.command}`, ...manualSteps] : manualSteps,
         output,
-        note: needsBootstrap ? `\u672C\u673A\u6CA1\u6709 ${os5} \u7684\u5305\u7BA1\u7406\u5668\uFF0C\u5F97\u5148\u88C5\u5B83\uFF1A${bootstrap.command}\uFF1B\u88C5\u597D\u4E4B\u540E\u518D\u88C5 ffmpeg\u3002\u8FD9\u4E24\u6B65\u90FD\u53EF\u4EE5\u8BA9\u6211\u6765\u505A \u2014\u2014 \u8BF4\u4E00\u58F0\u5C31\u884C\u3002` : "\u5B89\u88C5\u547D\u4EE4\u6CA1\u6210\u529F\uFF08\u53EF\u80FD\u662F\u6CA1\u6743\u9650\u3001\u6CA1\u8054\u7F51\u6216\u88AB\u5B89\u5168\u7B56\u7565\u62E6\u4E0B\uFF09\u3002\u4E0A\u9762\u662F\u624B\u52A8\u6B65\u9AA4\uFF0C\u7167\u7740\u5728\u7EC8\u7AEF\u91CC\u8DD1\u4E00\u904D\u5373\u53EF\u3002"
+        note: needsBootstrap ? `\u672C\u673A\u6CA1\u6709 ${os6} \u7684\u5305\u7BA1\u7406\u5668\uFF0C\u5F97\u5148\u88C5\u5B83\uFF1A${bootstrap.command}\uFF1B\u88C5\u597D\u4E4B\u540E\u518D\u88C5 ffmpeg\u3002\u8FD9\u4E24\u6B65\u90FD\u53EF\u4EE5\u8BA9\u6211\u6765\u505A \u2014\u2014 \u8BF4\u4E00\u58F0\u5C31\u884C\u3002` : "\u5B89\u88C5\u547D\u4EE4\u6CA1\u6210\u529F\uFF08\u53EF\u80FD\u662F\u6CA1\u6743\u9650\u3001\u6CA1\u8054\u7F51\u6216\u88AB\u5B89\u5168\u7B56\u7565\u62E6\u4E0B\uFF09\u3002\u4E0A\u9762\u662F\u624B\u52A8\u6B65\u9AA4\uFF0C\u7167\u7740\u5728\u7EC8\u7AEF\u91CC\u8DD1\u4E00\u904D\u5373\u53EF\u3002"
       };
     }
   };
@@ -11701,7 +11997,7 @@ function setupTool(config) {
 import { spawn as spawn2 } from "node:child_process";
 import path25 from "node:path";
 import { createRequire as createRequire2 } from "node:module";
-import { stat as stat11, mkdir as mkdir16 } from "node:fs/promises";
+import { stat as stat12, mkdir as mkdir16 } from "node:fs/promises";
 function runHyperframes(cli, args, cwd, config, signal) {
   return new Promise((resolve3, reject) => {
     if (signal?.aborted) return reject(new Error("Hyperframes \u5DF2\u53D6\u6D88\u3002"));
@@ -11805,7 +12101,7 @@ function hyperframesTool(config, deps) {
       const project = path25.resolve(cwd, args.projectDir || ".");
       if (action !== "check") {
         if (!args.projectDir) throw new Error("lint/render \u5FC5\u987B\u6307\u5B9A projectDir\u3002");
-        if (!(await stat11(path25.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
+        if (!(await stat12(path25.join(project, "index.html"))).isFile()) throw new Error("\u9879\u76EE\u7F3A\u5C11 index.html\u3002");
       }
       let videoPath;
       let command = ["doctor", "--json"];
@@ -11819,7 +12115,7 @@ function hyperframesTool(config, deps) {
           throw new Error("\u8F93\u51FA\u5FC5\u987B\u662F\u9879\u76EE\u76EE\u5F55\u5185\u7684 .mp4 \u6587\u4EF6\u3002");
         }
         try {
-          await stat11(videoPath);
+          await stat12(videoPath);
           throw new Error("\u8F93\u51FA\u6587\u4EF6\u5DF2\u5B58\u5728\uFF0C\u8BF7\u6362\u4E00\u4E2A\u6587\u4EF6\u540D\u3002");
         } catch (error) {
           if (error.code !== "ENOENT") throw error;
@@ -11829,7 +12125,7 @@ function hyperframesTool(config, deps) {
       }
       const result = await runHyperframes(cli, command, action === "check" ? cwd : project, config, exec?.signal);
       if (result.code !== 0) return { status: "failed", action, output: result.output, note: "\u68C0\u67E5\u8F93\u51FA\u4E2D\u7684\u73AF\u5883\u6216\u9879\u76EE\u9519\u8BEF\u540E\u91CD\u8BD5\uFF1B\u4E0D\u4F1A\u91CD\u590D\u63D0\u4EA4 Seedance \u4EFB\u52A1\u3002" };
-      if (videoPath && !(await stat11(videoPath)).size) throw new Error("Hyperframes \u672A\u751F\u6210\u6709\u6548\u7684 MP4 \u6587\u4EF6\u3002");
+      if (videoPath && !(await stat12(videoPath)).size) throw new Error("Hyperframes \u672A\u751F\u6210\u6709\u6548\u7684 MP4 \u6587\u4EF6\u3002");
       return { status: action === "render" ? "succeeded" : "checked", action, output: result.output, ...videoPath ? { videoPath } : {} };
     }
   };
@@ -12063,7 +12359,7 @@ function buildPromptGuidance(config) {
     "\xB7 \u4E24\u9053\u786E\u8BA4\u7531\u63D2\u4EF6\u6267\u884C\uFF1Avideo_project(action:review)\u811A\u672C\u5BA1\u6838\uFF0C\u751F\u6210\u5DE5\u5177\u4ED8\u8D39\u5BA1\u6279\u786E\u8BA4\u5F00\u59CB\u5236\u4F5C\u3002\u5DF2\u6709\u89C6\u9891\u5EF6\u957F\u4E5F\u5148\u51C6\u5907\u7B80\u77ED\u7EED\u62CD\u811A\u672C\u548C\u5206\u955C\u3001\u5BA1\u6838\u65B9\u6848\uFF0C\u518D\u786E\u8BA4\u8D39\u7528\u3002\u4E0D\u5F97\u989D\u5916\u5F39\u5F00\u59CB\u5236\u4F5C\u95EE\u9898\u3002",
     "\xB7 \u4EC5A/B\u63A5\u5165\uFF1Avideo_generate\u3001video_extend\u53CAvideo_status\u5B8C\u6210\u540E\u82E5\u8FD4\u56DEactualCost\uFF0C\u4EA4\u4ED8\u89C6\u9891\u65F6\u4E00\u5E76\u5C55\u793A\u4E2D\u8F6C\u7AD9\u771F\u5B9E\u6D88\u8017\uFF08\u9010\u4EFB\u52A1\u548C\u5408\u8BA1\uFF09\uFF1Bpaused\u53EA\u79F0\u5DF2\u751F\u6210\u90E8\u5206\uFF0Cpartial\u53EA\u79F0\u5DF2\u7ED3\u7B97\u5C0F\u8BA1\uFF0Cpending\u8BF4\u660E\u5F85\u7ED3\u7B97/\u5F85\u67E5\u8BE2\u3002\u5B9E\u9645\u91D1\u989D\u53D6\u4E2D\u8F6C\u6700\u7EC8\u7ED3\u7B97\u800C\u975E\u4F30\u4EF7\u3001\u9884\u6263\u6216\u4F59\u989D\u5DEE\uFF1B\u6CA1\u6709\u91D1\u989D\u4E0D\u8981\u62A50\u3002\u53EF\u7528\u539FtaskId\u8C03\u7528video_status\u8865\u67E5\u8D39\u7528\uFF0C\u4E0D\u56E0\u8D39\u7528\u7F3A\u5931\u91CD\u65B0\u751F\u6210\u3001\u91CD\u8BD5\u4ED8\u8D39\u4EFB\u52A1\u6216\u5EF6\u8FDF\u4EA4\u4ED8\u3002\u53EA\u7EDF\u8BA1\u89C6\u9891\u8D39\u7528\uFF0C\u56FE\u7247\u4E0E\u989D\u5916\u91CD\u505A\u53E6\u8BA1\uFF1BC\u706B\u5C71\u76F4\u8FDE\u4E0D\u63D0\u4F9B\u6B64\u4E2D\u8F6C\u8D26\u5355\u67E5\u8BE2\u3002",
     "\xB7 \u6BCF\u6B21\u65B0\u811A\u672C\u53CA\u6539\u7A3F\u5BA1\u6838\u524D\uFF0C\u65E0\u8BBA\u5355\u6BB5\u8FD8\u662F\u591A\u6BB5\uFF0C\u90FD\u5148\u8BFB\u53D6video-director\u7684references/segment-storyboard.md\u5E76\u5B9E\u9645\u5C55\u793A\u5F53\u524D\u7248\u955C\u5934\u53C2\u8003\u793A\u610F\u56FE\uFF1B\u4E00\u955C\u5230\u5E95\u4E5F\u5C55\u793A\u5173\u952E\u6784\u56FE\u4E0E\u52A8\u4F5C\u3002\u9700\u8981\u62C6\u5206\u751F\u6210\u65F6\u53E6\u5C55\u793A\u5206\u6BB5\u8868\uFF08\u6BB5\u53F7\u3001\u5168\u7247\u65F6\u95F4\u3001\u751F\u6210\u65F6\u957F\u3001\u751F\u6210/\u7EED\u62CD\u3001\u4E3B\u8981\u753B\u9762\u4E0E\u65B0\u5BF9\u767D\u3001\u8D77\u6B62\u72B6\u6001\u53CA\u4EA4\u63A5\uFF09\u3002\u6309\u5F53\u524D\u6A21\u578B\u548C\u5B9E\u9645\u5206\u6BB5\u89C4\u5219\u6838\u5BF9\uFF0C\u4E0D\u8C03\u7528\u751F\u6210\u5DE5\u5177\u8BD5\u7B97\uFF0C\u4E0D\u6309\u5206\u955C\u6570\u589E\u52A0\u4ED8\u8D39\u8C03\u7528\u3002\u7528video_project(action:storyboard,projectId,scriptPath,captureScript:true)\u8BA9\u63D2\u4EF6\u6309\u5206\u955C\u8868\u5373\u65F6\u6E32\u67D3\u672C\u7248\u5206\u955C\u793A\u610F\u56FE\uFF08\u79D2\u7EA7\u3001\u786E\u5B9A\u6027\uFF0C\u8FD4\u56DEmarkdown\u4E0E\u6253\u5F00\u539F\u56FE\u94FE\u63A5\uFF09\uFF1B\u628A\u8FD4\u56DE\u7684markdown\u5185\u5D4C\u8FDB\u6B63\u6587\u3001\u94FE\u63A5\u4E00\u5E76\u7ED9\u51FA\uFF08\u4E0D\u8C03\u7528 present\uFF09\uFF0C\u5148\u53D1\u56FE\u7247\u6B63\u6587\u518D\u5F39\u811A\u672C\u5BA1\u6838\u7A97\u3002\u4E0D\u8981\u81EA\u5DF1\u5199\u7ED8\u56FE\u4EE3\u7801\u3001Python\u6216SVG\uFF0C\u4E5F\u4E0D\u8981\u4E3A\u6B64\u8C03\u7528\u4ED8\u8D39\u51FA\u56FE\u6A21\u578B\uFF1A\u624B\u5199\u7ED8\u56FE\u65E2\u6162\uFF08\u5B9E\u6D4B30\u201345\u79D2\uFF09\u53C8\u5BB9\u6613\u753B\u574F\u3002\u6539\u7A3F\u540C\u6B65\u66F4\u65B0\u56FE\u8868\uFF0C\u4E0D\u589E\u52A0\u7B2C\u4E09\u9053\u786E\u8BA4\uFF1B\u793A\u610F\u56FE\u4E0D\u80FD\u4EE3\u66FF\u771F\u5B9E\u9010\u6BB5\u9884\u89C8\u3002\u9ED8\u8BA4\u4E0D\u8C03\u7528\u4ED8\u8D39\u51FA\u56FE\u6A21\u578B\uFF0C\u89D2\u8272\u53C2\u8003\u56FE\u53EF\u5728\u53D6\u5F97\u540C\u610F\u540E\u7528video_prepare_image\u7684create_character\u751F\u6210\uFF0C\u56FE\u7247\u5355\u72EC\u8BA1\u8D39\uFF1B\u5206\u955C\u793A\u610F\u56FE\u4ECD\u4F7F\u7528\u672C\u5730\u7ED8\u5236\uFF0C\u4E0D\u80FD\u6DF7\u4E3A\u540C\u4E00\u6D41\u7A0B\u3002",
-    "\xB7 \u4E0D\u8BBA\u63A5\u5165\u65B9\u5F0F\u662FMetaOntic AI\u8FD8\u662F\u706B\u5C71\u76F4\u8FDE\uFF0C\u5747\u5FC5\u987B\u9884\u4F30\u8D39\u7528\uFF0C\u4E0D\u5F97\u8DF3\u8FC7\u3002\u8D39\u7528\u8BA1\u7B97\u5C5E\u4E8E\u5199\u811A\u672C\u8FD9\u4E00\u6B65\uFF0C\u4E0D\u662F\u811A\u672C\u4E4B\u524D\u7684\u524D\u7F6E\u6B65\u9AA4\uFF1A\u5199\u811A\u672C\u65F6\u5C31\u4E00\u5E76\u8C03\u7528\u53EA\u8BFBvideo_estimate\uFF08\u76EE\u6807\u603B\u65F6\u957F\u3001\u7528\u6237\u5DF2\u786E\u8BA4resolution\u3001\u753B\u5E45\u548C\u771F\u5B9EsegmentSeconds\uFF09\uFF0C\u5C06\u8FD4\u56DE\u7684\u706B\u5C71\u5B98\u65B9\u65B9\u6848\u4E0EMetaOnticVideo\u63D2\u4EF6\u65B9\u6848\u4E24\u9879\u4EBA\u6C11\u5E01\u57FA\u7840\u4F30\u4EF7\u3001\u5404\u81EA\u6A21\u578B/\u5206\u6BB5/\u500D\u7387/\u65E5\u671F\u5199\u5165script.md\u6700\u540E\u7684\u201C\u8D39\u7528\u9884\u4F30\u201D\u4E00\u8282\uFF0C\u653E\u5728\u5B8C\u6574\u5267\u60C5\u3001\u5206\u955C\u3001\u5BF9\u767D\u3001\u7ED3\u5C3E\u53CA\u5206\u6BB5\u65B9\u6848\u4E4B\u540E\uFF1B\u6B63\u6587\u5C55\u793A\u811A\u672C\u65F6\u4E5F\u6309\u76F8\u540C\u987A\u5E8F\u5728\u672B\u5C3E\u5B8C\u6574\u5C55\u793A\u8FD9\u4E24\u9879\u91D1\u989D\u4E0E\u8BA1\u8D39\u524D\u63D0\uFF0C\u968F\u811A\u672C\u4E00\u8D77\u4EA4\u4ED8\u540E\u518D\u5F39\u5BA1\u6838\u7A97\u53E3\uFF1B\u4E0D\u8981\u628A\u5B83\u62C6\u6210\u811A\u672C\u4E4B\u524D\u7684\u5355\u72EC\u4E00\u6B65\u6216\u5355\u72EC\u4E00\u8F6E\uFF0C\u4E5F\u4E0D\u8981\u53EA\u5199\u5728\u5DE5\u5177\u7ED3\u679C\u3001\u6587\u4EF6\u5916\u7684\u8865\u5145\u6D88\u606F\u6216\u5236\u4F5C\u786E\u8BA4\u91CC\u3002\u706B\u5C71\u5B98\u65B9\u53C2\u7167\u4E00\u5F8B\u91C7\u7528 Seedance 2.5\uFF0C\u5355\u6BB5\u4E0A\u9650 30 \u79D2\uFF1A\u4E0D\u8DB3 30 \u79D2\u6309\u5B9E\u9645\u79D2\u6570\u8BA1\uFF0C\u4E0D\u51D1\u6574\uFF1B\u8D85\u8FC7 30 \u79D2\u6309 30 \u79D2\u76F4\u51FA\u52A0\u9010\u6BB5\u7EED\u62CD\u5982\u5B9E\u5217\u51FA\uFF0C\u7EED\u62CD\u8BA1\u5165\u4E0A\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\u8F93\u5165\uFF0C\u4E0D\u79F0\u4E00\u6B21\u76F4\u51FA\uFF1B\u63D2\u4EF6\u6309\u5F53\u524D\u5B9E\u9645\u6A21\u578B\u4E0E\u5206\u6BB5\u65B9\u6848\uFF0C\u7EED\u62CD\u5305\u542B\u4E0A\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\u8F93\u5165\u3002\u624B\u586B API\u5BC6\u94A5\u672A\u6838\u5B9E\u5206\u7EC4\u4E0D\u5F97\u5047\u8BBE0.8\u6298\u6263\uFF1B\u4E0D\u628A\u53C2\u8003\u56FE\u7247\u5F53\u53C2\u8003\u89C6\u9891\u8BA1\u4EF7\u3002\u5FC5\u987B\u6807\u660E\u6700\u4F4E\u7528\u91CF\u8865\u8DB3\u672A\u8BA1\u5165\u3001\u56FE\u7247\u8F6C\u6362/\u91CD\u505A/\u72EC\u7ACB\u914D\u97F3\u53E6\u8BA1\u3001\u5B9E\u9645\u4EE5\u8D26\u5355\u4E3A\u51C6\u53CA\u6A21\u578B\u6548\u679C\u4E0D\u540C\u3002\u53C2\u6570\u6539\u53D8\u91CD\u7B97\uFF0C\u8BD5\u7B97\u4E0D\u8C03\u7528\u751F\u6210\u5DE5\u5177\u3001\u4E0D\u8981\u6C42\u767B\u5F55\u6216\u989D\u5916\u5BA1\u6279\u3001\u4E0D\u66FF\u4EE3\u4E24\u9053\u786E\u8BA4\uFF1B\u5DE5\u5177\u62D2\u7EDD\u6216\u7F3A\u5C11\u53EF\u9760\u4EF7\u76EE\u65F6\u8BF4\u660E\u65E0\u6CD5\u53EF\u9760\u4F30\u7B97\u5E76\u6838\u5BF9\u4F9D\u636E\uFF0C\u7981\u6B62\u731C\u4EF7\u6216\u663E\u793A0\u5143\u3002\u5F53\u524D\u6BCF\u6B21\u751F\u6210\u5BA1\u6279\u53EF\u80FD\u53EA\u4F30\u672C\u6B21\u4E00\u6BB5\uFF0C\u4E0D\u80FD\u5192\u5145\u5168\u7247\u9884\u7B97\u3002",
+    "\xB7 \u4E0D\u8BBA\u63A5\u5165\u65B9\u5F0F\u662FMetaOntic AI\u8FD8\u662F\u706B\u5C71\u76F4\u8FDE\uFF0C\u5747\u5FC5\u987B\u9884\u4F30\u8D39\u7528\uFF0C\u4E0D\u5F97\u8DF3\u8FC7\u3002\u8D39\u7528\u8BA1\u7B97\u5C5E\u4E8E\u5199\u811A\u672C\u8FD9\u4E00\u6B65\uFF0C\u4E0D\u662F\u811A\u672C\u4E4B\u524D\u7684\u524D\u7F6E\u6B65\u9AA4\uFF1A\u5199\u811A\u672C\u65F6\u5C31\u4E00\u5E76\u8C03\u7528\u53EA\u8BFBvideo_estimate\uFF08\u76EE\u6807\u603B\u65F6\u957F\u3001\u7528\u6237\u5DF2\u786E\u8BA4resolution\u3001\u753B\u5E45\u548C\u771F\u5B9EsegmentSeconds\uFF09\uFF0C\u5C06\u8FD4\u56DE\u7684\u706B\u5C71\u5B98\u65B9\u65B9\u6848\u4E0EMetaOnticVideo\u63D2\u4EF6\u65B9\u6848\u4E24\u9879\u4EBA\u6C11\u5E01\u57FA\u7840\u4F30\u4EF7\u3001\u5404\u81EA\u6A21\u578B/\u5206\u6BB5/\u500D\u7387/\u65E5\u671F\u5199\u5165script.md\u6700\u540E\u7684\u201C\u8D39\u7528\u9884\u4F30\u201D\u4E00\u8282\uFF0C\u653E\u5728\u5B8C\u6574\u5267\u60C5\u3001\u5206\u955C\u3001\u5BF9\u767D\u3001\u7ED3\u5C3E\u53CA\u5206\u6BB5\u65B9\u6848\u4E4B\u540E\uFF1B\u6B63\u6587\u5C55\u793A\u811A\u672C\u65F6\u4E5F\u6309\u76F8\u540C\u987A\u5E8F\u5728\u672B\u5C3E\u5B8C\u6574\u5C55\u793A\u8FD9\u4E24\u9879\u91D1\u989D\u4E0E\u8BA1\u8D39\u524D\u63D0\uFF0C\u968F\u811A\u672C\u4E00\u8D77\u4EA4\u4ED8\u540E\u518D\u5F39\u5BA1\u6838\u7A97\u53E3\uFF1B\u4E0D\u8981\u628A\u5B83\u62C6\u6210\u811A\u672C\u4E4B\u524D\u7684\u5355\u72EC\u4E00\u6B65\u6216\u5355\u72EC\u4E00\u8F6E\uFF0C\u4E5F\u4E0D\u8981\u53EA\u5199\u5728\u5DE5\u5177\u7ED3\u679C\u3001\u6587\u4EF6\u5916\u7684\u8865\u5145\u6D88\u606F\u6216\u5236\u4F5C\u786E\u8BA4\u91CC\u3002\u706B\u5C71\u5B98\u65B9\u53C2\u7167\u4E00\u5F8B\u91C7\u7528 Seedance 2.5\uFF0C\u5355\u6BB5\u4E0A\u9650 30 \u79D2\uFF1A\u4E0D\u8DB3 30 \u79D2\u6309\u5B9E\u9645\u79D2\u6570\u8BA1\uFF0C\u4E0D\u51D1\u6574\uFF1B\u8D85\u8FC7 30 \u79D2\u6309 30 \u79D2\u76F4\u51FA\u52A0\u9010\u6BB5\u7EED\u62CD\u5982\u5B9E\u5217\u51FA\uFF0C\u7EED\u62CD\u8BA1\u5165\u4E0A\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\u8F93\u5165\uFF0C\u4E0D\u79F0\u4E00\u6B21\u76F4\u51FA\uFF1B\u63D2\u4EF6\u6309\u5F53\u524D\u5B9E\u9645\u6A21\u578B\u4E0E\u5206\u6BB5\u65B9\u6848\uFF0C\u7EED\u62CD\u5305\u542B\u4E0A\u4E00\u6BB5\u5B8C\u6574\u89C6\u9891\u8F93\u5165\uFF1B\u72EC\u7ACB\u955C\u5934\u987B\u5411video_estimate\u540C\u6B65productionStrategy\u548CshotDurations\uFF0C\u5404\u955C\u65E0\u89C6\u9891\u8F93\u5165\uFF0C\u4E0D\u80FD\u5957\u7EED\u62CD\u8BA1\u8D39\u3002\u624B\u586B API\u5BC6\u94A5\u672A\u6838\u5B9E\u5206\u7EC4\u4E0D\u5F97\u5047\u8BBE0.8\u6298\u6263\uFF1B\u4E0D\u628A\u53C2\u8003\u56FE\u7247\u5F53\u53C2\u8003\u89C6\u9891\u8BA1\u4EF7\u3002\u5FC5\u987B\u6807\u660E\u6700\u4F4E\u7528\u91CF\u8865\u8DB3\u672A\u8BA1\u5165\u3001\u56FE\u7247\u8F6C\u6362/\u91CD\u505A/\u72EC\u7ACB\u914D\u97F3\u53E6\u8BA1\u3001\u5B9E\u9645\u4EE5\u8D26\u5355\u4E3A\u51C6\u53CA\u6A21\u578B\u6548\u679C\u4E0D\u540C\u3002\u53C2\u6570\u6539\u53D8\u91CD\u7B97\uFF0C\u8BD5\u7B97\u4E0D\u8C03\u7528\u751F\u6210\u5DE5\u5177\u3001\u4E0D\u8981\u6C42\u767B\u5F55\u6216\u989D\u5916\u5BA1\u6279\u3001\u4E0D\u66FF\u4EE3\u4E24\u9053\u786E\u8BA4\uFF1B\u5DE5\u5177\u62D2\u7EDD\u6216\u7F3A\u5C11\u53EF\u9760\u4EF7\u76EE\u65F6\u8BF4\u660E\u65E0\u6CD5\u53EF\u9760\u4F30\u7B97\u5E76\u6838\u5BF9\u4F9D\u636E\uFF0C\u7981\u6B62\u731C\u4EF7\u6216\u663E\u793A0\u5143\u3002\u5F53\u524D\u6BCF\u6B21\u751F\u6210\u5BA1\u6279\u53EF\u80FD\u53EA\u4F30\u672C\u6B21\u4E00\u6BB5\uFF0C\u4E0D\u80FD\u5192\u5145\u5168\u7247\u9884\u7B97\u3002",
     "\xB7 \u811A\u672C\u5C55\u793A\u662F\u5BA1\u6838\u7684\u5F3A\u5236\u524D\u7F6E\uFF1A\u811A\u672C\u53EA\u5728\u7528\u6237\u53EF\u89C1\u6B63\u6587\u91CC\u5199\u4E00\u6B21\u2014\u2014\u9996\u6B21\u548C\u6BCF\u6B21\u6539\u7A3F\u90FD\u628A\u5B8C\u6574\u811A\u672C\u76F4\u63A5\u5199\u5728\u6B63\u6587\uFF08\u6545\u4E8B\u3001\u89C4\u683C/\u98CE\u683C\u3001\u4EBA\u7269\u6216\u4E3B\u4F53\u3001\u5206\u955C\u65F6\u95F4\u8868\u3001\u5B8C\u6574\u5BF9\u767D/\u58F0\u97F3\u3001\u7ED3\u5C3E\u3001\u8D39\u7528\u9884\u4F30\uFF09\uFF0C\u4E0D\u8981\u518D\u5148\u7528\u5199\u6587\u4EF6\u5DE5\u5177\u628A\u540C\u4E00\u6BB5\u811A\u672C\u5199\u8FDBscript.md\uFF1A\u63D2\u4EF6\u6309\u6B63\u6587\u843D\u76D8\uFF0C\u91CD\u590D\u8F93\u51FA\u4E00\u904D\u5B9E\u6D4B\u591A\u82B110\u201325\u79D2\u548C\u7B49\u91CFtoken\u3002\u53EA\u7ED9\u8DEF\u5F84\u3001\u6458\u8981\u3001\u4FEE\u6539\u70B9\u6216\u793A\u610F\u56FE\u4E0D\u7B97\u5C55\u793A\u3002\u672C\u7248script.md \u5728\u6B63\u6587\u5B8C\u6574\u5C55\u793A\u5E76\u9644\u53EF\u70B9\u51FB\u94FE\u63A5\u5373\u53EF\uFF0C\u4E0D\u8C03\u7528 present\uFF08\u4EA4\u4ED8\u5361\u7247\u53EA\u767B\u8BB0\u6700\u7EC8\u6210\u7247\uFF09\uFF1B\u968F\u540E\u518D\u5355\u72EC\u8C03\u7528\u5BA1\u6838\u63D0\u95EE\u5DE5\u5177\uFF0C\u7981\u6B62\u5E76\u884C\u6216\u540C\u4E00\u5DE5\u5177\u6279\u6B21\u540C\u65F6\u53D1\u51FA\u3002\u5C55\u793A\u5931\u8D25\u3001\u4E0D\u652F\u6301Markdown\u6216\u5DE5\u5177\u7F3A\u5931\u65F6\uFF0C\u5148\u5728\u6B63\u6587\u5B8C\u6574\u8D34\u51FA\u811A\u672C\uFF0C\u518D\u63D0\u95EE\u3002\u5BA1\u6838\u7A97\u53E3\u53EA\u7528\u4E8E\u7B80\u77ED\u786E\u8BA4\uFF0C\u7981\u6B62\u628A\u5B8C\u6574\u811A\u672C\u653E\u5165question\u3001header\u3001\u9009\u9879\u6216\u9009\u9879\u63CF\u8FF0\uFF1B\u811A\u672C\u4E0E\u793A\u610F\u56FE\u5148\u5728\u7A97\u53E3\u5916\u5B8C\u6574\u5C55\u793A\uFF0C\u7B49\u5F85\u5B8C\u6210\u518D\u63D0\u95EE\u3002\u5DF2\u5F39\u7A97\u5374\u6F0F\u5C55\u793A\u65F6\uFF0C\u5148\u8865\u5B8C\u6574\u811A\u672C\u5E76\u91CD\u65B0\u5BA1\u6838\uFF0C\u4E0D\u6CBF\u7528\u8BE5\u6B21\u7B54\u590D\uFF0C\u4E0D\u8FDB\u5165\u5236\u4F5C\u786E\u8BA4\u6216\u751F\u6210\u3002",
     "\xB7 \u811A\u672C\u5143\u4FE1\u606F\u53EA\u8BB0\u5F55\u4E2D\u6587\u7248\u672C\u548C\u9879\u76EEID\uFF1B\u5BA1\u6838\u901A\u8FC7\u540E\u4E0D\u6539\u5199\u811A\u672C\u6587\u4EF6\uFF0C\u771F\u5B9E\u5BA1\u6838\u72B6\u6001\u7531video_project\u4FDD\u5B58\u3002\u6539\u7A3F\u540E\u5C55\u793A\u5B8C\u6574\u5F53\u524D\u7248\u5E76\u91CD\u65B0review\u3002",
     "\xB7 \u51CF\u5C11\u5F80\u8FD4\u4E0E\u7A7A\u8F6C\uFF1A\u540C\u4E00\u6279\u80FD\u5E76\u884C\u7684\u8C03\u7528\u653E\u8FDB\u540C\u4E00\u6761\u6D88\u606F\uFF08\u6BD4\u5982video_stage\u5F00\u59CB\u8BA1\u65F6\uFF0Bvideo_estimate\u4F30\u4EF7\uFF0Bvideo_project(action:prepare)\uFF09\uFF0C\u4E0D\u8981\u4E3A\u6BCF\u4E2A\u5C0F\u52A8\u4F5C\u5355\u72EC\u8D77\u4E00\u8F6E\uFF1B\u6B63\u6587\u4E0E\u5DE5\u5177\u8C03\u7528\u540C\u6279\u53D1\u51FA\u3002\u76F4\u63A5\u4EA7\u51FA\u7ED3\u679C\uFF0C\u4E0D\u8981\u590D\u8FF0\u7528\u6237\u9700\u6C42\u3001\u4E0D\u8981\u53CD\u590D\u81EA\u68C0\u6216\u628A\u811A\u672C\u5185\u5BB9\u5728\u601D\u8003\u91CC\u518D\u5199\u4E00\u904D\u2014\u2014\u601D\u8003\u4E0E\u6B63\u6587\u4E00\u6837\u8981\u7B97\u65F6\u95F4\u3002",
@@ -12071,7 +12367,7 @@ function buildPromptGuidance(config) {
     "\xB7 \u811A\u672C\u5BA1\u6838\u53EA\u8C03\u7528video_project(action:review)\uFF0C\u7531\u63D2\u4EF6\u521B\u5EFA\u7B80\u77ED\u5BA1\u6838\u7A97\u53E3\u3002\u5B8C\u6574\u6750\u6599\u5148\u5728\u6B63\u6587\u5C55\u793A\uFF0C\u4E0D\u628A\u811A\u672C\u585E\u8FDB\u95EE\u9898\u6216\u9009\u9879\u3002",
     "\xB7 \u4FEE\u6539\u65B9\u5411\u786E\u8BA4\uFF1A\u7528\u6237\u5DF2\u660E\u786E\u8BF4\u51FA\u4FEE\u6539\u8981\u6C42\u65F6\u76F4\u63A5\u6309\u8981\u6C42\u6539\u7A3F\uFF0C\u4E0D\u518D\u5F39\u65B9\u5411\u9009\u62E9\u3002\u4EC5\u201C\u4FEE\u6539\u4E00\u4E0B\u201D\u7B49\u65B9\u5411\u4E0D\u660E\u786E\u65F6\uFF0C\u624D\u95EE\u4E00\u4E2A\u7B80\u77ED\u95EE\u9898\uFF0C\u9ED8\u8BA4\u63D0\u4F9B2\u20133\u4E2A\u4E92\u65A5\u7684\u5355\u9009\u65B9\u5411\uFF08multi_select\u4E3Afalse\u6216\u7701\u7565\uFF09\uFF0C\u9009\u9879\u6807\u7B7E\u4E0D\u8D85\u8FC712\u4E2A\u6C49\u5B57\u3001\u63CF\u8FF0\u4E0D\u8D85\u8FC7\u4E00\u884C\uFF1B\u4E0D\u9ED8\u8BA4\u7ED9\u51FA5\u9879\u591A\u9009\uFF0C\u4E0D\u6DFB\u52A0\u201C\u6211\u81EA\u5DF1\u8BF4\u201D\u7B49\u7A7A\u64CD\u4F5C\u9009\u9879\uFF0C\u81EA\u7531\u8F93\u5165\u7531\u5BBF\u4E3B\u63D0\u4F9B\u3002\u63D0\u95EE\u4E2D\u7B80\u77ED\u63D0\u793A\u201C\u9009\u597D\u540E\u70B9\u51FB\u63D0\u4EA4\uFF0C\u4E5F\u53EF\u76F4\u63A5\u8F93\u5165\u4FEE\u6539\u8981\u6C42\u201D\u3002\u53EA\u6709\u7528\u6237\u660E\u786E\u8981\u7EC4\u5408\u591A\u4E2A\u65B9\u5411\u65F6\u624D\u4F7F\u7528\u591A\u9009\uFF0C\u5E76\u8BF4\u660E\u201C\u53EF\u591A\u9009\uFF0C\u9009\u5B8C\u70B9\u51FB\u63D0\u4EA4\u201D\uFF1B\u65B9\u5411\u7B54\u590D\u53EA\u662F\u6539\u7A3F\u8981\u6C42\uFF0C\u4E0D\u7B49\u4E8E\u811A\u672C\u5BA1\u6838\u6216\u5236\u4F5C\u6388\u6743\u3002",
     "\xB7 \u811A\u672C\u5BA1\u6838\u4F7F\u7528video_project\uFF0C\u4E0D\u4F7F\u7528ask_user_question\u5192\u5145\u5BA1\u6838\u72B6\u6001\uFF1B\u5236\u4F5C\u786E\u8BA4\u4F7F\u7528\u751F\u6210\u5DE5\u5177\u81EA\u5E26\u5BA1\u6279\uFF0C\u4E0D\u91CD\u590D\u8BE2\u95EE\u3002",
-    `\xB7 \u65B0\u89C6\u9891\u7528 video_generate\uFF0Cduration \u4F20\u76EE\u6807\u603B\u79D2\u6570\u3002**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 ${singleMax} \u79D2\uFF08\u5355\u6BB5\u4E0A\u9650\uFF09\u7684\u6574\u6761\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u6309\u53D9\u4E8B\u955C\u5934\u62C6\u6210\u591A\u6B21 video_generate \u518D\u62FC\u63A5**\u2014\u2014\u4F8B\u5982\u300C15 \u79D2\u300D\u5C31\u662F\u4E00\u6B21 15 \u79D2\uFF0C\u4E0D\u8BB8\u62C6\u6210 8+7\uFF1B\u6309\u6545\u4E8B\u9009\u62E9\u4E00\u955C\u5230\u5E95\u6216\u5C11\u91CF\u6709\u52A8\u673A\u7684\u5207\u955C\uFF0C\u955C\u5934\u65B9\u6848\u5148\u5199\u8FDB\u5F85\u5BA1\u6838\u811A\u672C\uFF0C\u5DF2\u5BA1\u6838\u7684\u5207\u955C\u5728\u540C\u4E00\u6B21\u751F\u6210\u63D0\u793A\u8BCD\u4E2D\u5B89\u6392\uFF1B\u7528\u6237\u6307\u5B9A\u7684\u955C\u5934\u5F62\u5F0F\u4F18\u5148\u3002\u8D85\u8FC7\u4E0A\u9650\u65F6\uFF08\u5982 20 \u79D2\uFF09\u4F1A\u81EA\u52A8\u62C6\u6210\u9996\u6BB5 + \u82E5\u5E72\u7EED\u62CD\u6BB5\u518D\u5408\u5E76\u2014\u2014\u90A3\u662F\u540C\u4E00\u6761\u89C6\u9891\u5F80\u4E0B\u7EED\u62CD\uFF0C\u4E0D\u662F\u591A\u955C\u62FC\u63A5\u3002\u6240\u4EE5\u300C20 \u79D2\u89C6\u9891\u300D\u76F4\u63A5\u4F20 duration=20\uFF0C\u4E0D\u7528\u624B\u52A8\u62C6\u6210\u591A\u4E2A\u72EC\u7ACB\u8C03\u7528\uFF0C\u4E5F\u4E0D\u7528\u8DDF\u7528\u6237\u89E3\u91CA\u300C\u6A21\u578B\u4E00\u6B21\u53EA\u80FD\u51FA 15 \u79D2\u300D\uFF1B**\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\u7684\u6210\u7247\u662F\u300C\u5FAA\u73AF\u8FED\u4EE3\u300D\u7684\uFF1A\u6BCF\u6BB5\u751F\u6210\u5B8C\u5148\u8FD4\u56DE\u89C6\u9891\u6210\u679C\u4F9B\u5C55\u793A\uFF0C\u7528\u6237\u9884\u89C8\u5E76\u786E\u8BA4\u540E\u518D\u7528 resume \u7EE7\u7EED\uFF0C\u4E0D\u8981\u7ED5\u8FC7\u5B83\u3001\u4E5F\u4E0D\u8981\u81EA\u5DF1\u62C6\u6210\u591A\u6B21\u751F\u6210**\uFF1B\u5206\u6BB5\u4EA4\u4ED8\u65F6\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir\u3001remainingSeconds\u2014\u2014\u8FD9\u65F6\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\u7ED9\u4ED6\uFF0C\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838\u901A\u8FC7\u5E76\u786E\u8BA4\u4E0B\u4E00\u6BB5\u8D39\u7528\u540E\uFF0C\u518D\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_generate \u7684 resume \u53C2\u6570\uFF08\u63D2\u4EF6\u63A5\u7740\u5DF2\u6709\u7684\u5206\u6BB5\u5F80\u4E0B\u505A\uFF0C\u5DF2\u5B8C\u6210\u5206\u6BB5\u4E0D\u91CD\u751F\u6210\uFF0C\u65B0\u589E\u5206\u6BB5\u4ECD\u8BA1\u8D39\uFF09\uFF0C\u4E0D\u8981\u4ECE\u5934\u518D\u6765\u4E00\u904D\uFF1B\u540C\u4E00\u4EFD\u6682\u505C\u8FDB\u5EA6\uFF08resumeDir\uFF09\u540C\u4E00\u65F6\u95F4\u53EA\u5141\u8BB8\u4E00\u6B21 resume \u5728\u8DD1\uFF1A\u5982\u679C\u7ED3\u679C\u8BF4\u300C\u5DF2\u7ECF\u6709\u4E00\u6B21\u300E\u7EE7\u7EED\u300F\u5728\u8DD1\u300D\uFF0C\u5C31\u8BA9\u7528\u6237\u7B49\u90A3\u4E00\u6B21\u8DD1\u5B8C\uFF08\u6216\u786E\u8BA4\u5B83\u5DF2\u4E2D\u65AD\u3001\u9501\u8FC7\u671F\uFF09\u518D\u7EE7\u7EED\uFF0C\u4E0D\u8981\u91CD\u590D\u53D1 resume\u2014\u2014\u5E76\u53D1\u7EED\u505A\u4F1A\u88AB\u62E6\u622A\uFF1B\u8BF7\u52FF\u7ED5\u8FC7\u9501\u91CD\u590D\u63D0\u4EA4\uFF1B\u7528\u6237\u4E2D\u9014\u70B9\u4E86\u300C\u505C\u6B62\u300D\u6216\u8FD9\u4E00\u8F6E\u7B49\u8D85\u65F6\u4E5F\u4E00\u6837\uFF1A\u5DF2\u7ECF\u751F\u6210\u597D\u7684\u6BB5\u4F1A\u5C1D\u8BD5\u4E0B\u8F7D\u5E76\u63D0\u4F9B\u9884\u89C8\uFF1B\u662F\u5426\u5408\u5E76\u4EE5\u8FD4\u56DE\u7ED3\u679C\u4E3A\u51C6\uFF08\u7ED3\u679C\u91CC\u540C\u6837\u662F paused=true + \u5DF2\u5B8C\u6210\u5206\u6BB5 + resumeDir\uFF09\uFF0C\u4E0D\u8981\u628A\u90A3\u51E0\u6BB5\u4E22\u6389\u91CD\u6765\uFF1B\u5355\u6761\u6210\u7247\u6700\u957F ${MAX_TOTAL_SECONDS} \u79D2\uFF08\u6700\u591A ${MAX_SEGMENTS} \u6BB5\uFF09\uFF0C\u7528\u6237\u8981\u66F4\u957F\u7684\u5C31\u6309 ${MAX_TOTAL_SECONDS} \u79D2\u751F\u6210\u5E76\u8BF4\u660E\u8FD9\u662F\u63D2\u4EF6\u5F53\u524D\u7684\u4E0A\u9650\uFF0C\u4E0D\u8981\u53CD\u590D\u52A0\u5927 duration\uFF1B\u6210\u7247\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\u3002`,
+    `\xB7 \u9ED8\u8BA4 continuous_segments \u65B0\u89C6\u9891\u7528 video_generate\uFF0Cduration \u4F20\u76EE\u6807\u603B\u79D2\u6570\u3002\u7528\u6237\u660E\u786E\u9009\u62E9\u5E76\u5BA1\u6838 independent_shots \u65F6\u8D70 shotDurations \u72EC\u7ACB\u751F\u6210\u3001\u5355\u72EC\u8BA1\u8D39\uFF0C\u6BCF\u955C\u5BA1\u6838\u540Eresume\uFF0C\u4E0D\u8F93\u5165\u4E0A\u4E00\u6BB5\u89C6\u9891\uFF1B\u4E0B\u5217\u6700\u5C11\u5206\u6BB5\u7EA6\u675F\u4EC5\u9002\u7528\u4E8E\u8FDE\u7EED\u8DEF\u7EBF\u3002**\u786C\u89C4\u5219\uFF1A\u603B\u65F6\u957F \u2264 ${singleMax} \u79D2\uFF08\u5355\u6BB5\u4E0A\u9650\uFF09\u7684\u6574\u6761\u89C6\u9891\u5FC5\u987B\u4E00\u6B21\u76F4\u51FA\uFF0C\u7981\u6B62\u6309\u53D9\u4E8B\u955C\u5934\u62C6\u6210\u591A\u6B21 video_generate \u518D\u62FC\u63A5**\u2014\u2014\u4F8B\u5982\u300C15 \u79D2\u300D\u5C31\u662F\u4E00\u6B21 15 \u79D2\uFF0C\u4E0D\u8BB8\u62C6\u6210 8+7\uFF1B\u6309\u6545\u4E8B\u9009\u62E9\u4E00\u955C\u5230\u5E95\u6216\u5C11\u91CF\u6709\u52A8\u673A\u7684\u5207\u955C\uFF0C\u955C\u5934\u65B9\u6848\u5148\u5199\u8FDB\u5F85\u5BA1\u6838\u811A\u672C\uFF0C\u5DF2\u5BA1\u6838\u7684\u5207\u955C\u5728\u540C\u4E00\u6B21\u751F\u6210\u63D0\u793A\u8BCD\u4E2D\u5B89\u6392\uFF1B\u7528\u6237\u6307\u5B9A\u7684\u955C\u5934\u5F62\u5F0F\u4F18\u5148\u3002\u8D85\u8FC7\u4E0A\u9650\u65F6\uFF08\u5982 20 \u79D2\uFF09\u4F1A\u81EA\u52A8\u62C6\u6210\u9996\u6BB5 + \u82E5\u5E72\u7EED\u62CD\u6BB5\u518D\u5408\u5E76\u2014\u2014\u90A3\u662F\u540C\u4E00\u6761\u89C6\u9891\u5F80\u4E0B\u7EED\u62CD\uFF0C\u4E0D\u662F\u591A\u955C\u62FC\u63A5\u3002\u6240\u4EE5\u300C20 \u79D2\u89C6\u9891\u300D\u76F4\u63A5\u4F20 duration=20\uFF0C\u4E0D\u7528\u624B\u52A8\u62C6\u6210\u591A\u4E2A\u72EC\u7ACB\u8C03\u7528\uFF0C\u4E5F\u4E0D\u7528\u8DDF\u7528\u6237\u89E3\u91CA\u300C\u6A21\u578B\u4E00\u6B21\u53EA\u80FD\u51FA 15 \u79D2\u300D\uFF1B**\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\u7684\u6210\u7247\u662F\u300C\u5FAA\u73AF\u8FED\u4EE3\u300D\u7684\uFF1A\u6BCF\u6BB5\u751F\u6210\u5B8C\u5148\u8FD4\u56DE\u89C6\u9891\u6210\u679C\u4F9B\u5C55\u793A\uFF0C\u7528\u6237\u9884\u89C8\u5E76\u786E\u8BA4\u540E\u518D\u7528 resume \u7EE7\u7EED\uFF0C\u4E0D\u8981\u7ED5\u8FC7\u5B83\u3001\u4E5F\u4E0D\u8981\u81EA\u5DF1\u62C6\u6210\u591A\u6B21\u751F\u6210**\uFF1B\u5206\u6BB5\u4EA4\u4ED8\u65F6\u7ED3\u679C\u91CC\u5E26 paused=true\u3001resumeDir\u3001remainingSeconds\u2014\u2014\u8FD9\u65F6\u5148\u628A\u5DF2\u7ECF\u751F\u6210\u7684\u90E8\u5206\u4EA4\u4ED8\u7ED9\u4ED6\uFF0C\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838\u901A\u8FC7\u5E76\u786E\u8BA4\u4E0B\u4E00\u6BB5\u8D39\u7528\u540E\uFF0C\u518D\u628A resumeDir \u539F\u6837\u4F20\u7ED9 video_generate \u7684 resume \u53C2\u6570\uFF08\u63D2\u4EF6\u63A5\u7740\u5DF2\u6709\u7684\u5206\u6BB5\u5F80\u4E0B\u505A\uFF0C\u5DF2\u5B8C\u6210\u5206\u6BB5\u4E0D\u91CD\u751F\u6210\uFF0C\u65B0\u589E\u5206\u6BB5\u4ECD\u8BA1\u8D39\uFF09\uFF0C\u4E0D\u8981\u4ECE\u5934\u518D\u6765\u4E00\u904D\uFF1B\u540C\u4E00\u4EFD\u6682\u505C\u8FDB\u5EA6\uFF08resumeDir\uFF09\u540C\u4E00\u65F6\u95F4\u53EA\u5141\u8BB8\u4E00\u6B21 resume \u5728\u8DD1\uFF1A\u5982\u679C\u7ED3\u679C\u8BF4\u300C\u5DF2\u7ECF\u6709\u4E00\u6B21\u300E\u7EE7\u7EED\u300F\u5728\u8DD1\u300D\uFF0C\u5C31\u8BA9\u7528\u6237\u7B49\u90A3\u4E00\u6B21\u8DD1\u5B8C\uFF08\u6216\u786E\u8BA4\u5B83\u5DF2\u4E2D\u65AD\u3001\u9501\u8FC7\u671F\uFF09\u518D\u7EE7\u7EED\uFF0C\u4E0D\u8981\u91CD\u590D\u53D1 resume\u2014\u2014\u5E76\u53D1\u7EED\u505A\u4F1A\u88AB\u62E6\u622A\uFF1B\u8BF7\u52FF\u7ED5\u8FC7\u9501\u91CD\u590D\u63D0\u4EA4\uFF1B\u7528\u6237\u4E2D\u9014\u70B9\u4E86\u300C\u505C\u6B62\u300D\u6216\u8FD9\u4E00\u8F6E\u7B49\u8D85\u65F6\u4E5F\u4E00\u6837\uFF1A\u5DF2\u7ECF\u751F\u6210\u597D\u7684\u6BB5\u4F1A\u5C1D\u8BD5\u4E0B\u8F7D\u5E76\u63D0\u4F9B\u9884\u89C8\uFF1B\u662F\u5426\u5408\u5E76\u4EE5\u8FD4\u56DE\u7ED3\u679C\u4E3A\u51C6\uFF08\u7ED3\u679C\u91CC\u540C\u6837\u662F paused=true + \u5DF2\u5B8C\u6210\u5206\u6BB5 + resumeDir\uFF09\uFF0C\u4E0D\u8981\u628A\u90A3\u51E0\u6BB5\u4E22\u6389\u91CD\u6765\uFF1B\u5355\u6761\u6210\u7247\u6700\u957F ${MAX_TOTAL_SECONDS} \u79D2\uFF08\u6700\u591A ${MAX_SEGMENTS} \u6BB5\uFF09\uFF0C\u7528\u6237\u8981\u66F4\u957F\u7684\u5C31\u6309 ${MAX_TOTAL_SECONDS} \u79D2\u751F\u6210\u5E76\u8BF4\u660E\u8FD9\u662F\u63D2\u4EF6\u5F53\u524D\u7684\u4E0A\u9650\uFF0C\u4E0D\u8981\u53CD\u590D\u52A0\u5927 duration\uFF1B\u6210\u7247\u9ED8\u8BA4\u843D\u5728\u4F1A\u8BDD\u5DE5\u4F5C\u76EE\u5F55\u4E0B\u7684 metaontic-video/\u3002`,
     "\xB7 \u7ED9\u5DF2\u6709\u89C6\u9891\u63A5\u957F\u7528 video_extend\uFF0C\u8F93\u5165\u5FC5\u987B\u662F\u516C\u7F51 URL\uFF1B\u63D0\u793A\u8BCD\u4EE5\u300C\u5411\u540E\u5EF6\u957F\u89C6\u98911\u300D\u6216\u300C\u5411\u524D\u5EF6\u957F\u89C6\u98911\u300D\u5F00\u5934\uFF0C\u5168\u7A0B\u7528\u300C\u89C6\u98911\u300D\u6307\u4EE3\u7D20\u6750\uFF0C\u4E0D\u8981\u5199\u300C\u53C2\u8003\u89C6\u98911\u300D\uFF1B\u5199\u6E05\u5EF6\u957F\u65B9\u5411\u3001\u5267\u60C5\u53D1\u5C55\u3001\u4E3B\u4F53\u72B6\u6001\u3001\u955C\u5934\u8FD0\u52A8\u3001\u58F0\u97F3\u5EF6\u7EED\uFF08\u80CC\u666F\u97F3\u4E50\u63A5\u5728\u89C6\u98911\u7ED3\u5C3E\u5904\u3001\u4E0D\u8981\u4ECE\u5934\u64AD\u653E\uFF0C\u73AF\u5883\u58F0\u548C\u5BF9\u767D\u4E5F\u8981\u8FDE\u7EED\uFF09\uFF1B\u6BCF\u6BB5 4 \u81F3\u6A21\u578B\u4E0A\u9650\uFF082.0 \u4E3A 15\u30012.5 \u4E3A 30\uFF09 \u79D2\uFF0C\u9ED8\u8BA4\u6309\u4E0A\u9650\u62C6\u3001\u6BB5\u6570\u6700\u5C11\uFF1B\u8FDE\u7740\u5EF6\u957F\u591A\u6BB5\u65F6\u6BCF\u6BB5\u5B8C\u6210\u5148\u4EA4\u4ED8\u9884\u89C8\uFF0C\u7528\u6237\u786E\u8BA4\u540E\u7528 resume \u7EE7\u7EED\uFF0C\u5E76\u9ED8\u8BA4\u4E0B\u8F7D\u5206\u6BB5\u5728\u672C\u673A\u5408\u5E76\u6210\u4E00\u6761\u6210\u7247\uFF08\u7F3A ffmpeg \u4F1A\u5148\u62E6\u4E0B\u6765\u95EE\uFF09\uFF1B\u7528\u6237\u70B9\u300C\u62D2\u7EDD\u300D\u6216\u4E2D\u9014\u88AB\u505C\u6B62\u65F6\uFF0C\u5DF2\u7ECF\u5EF6\u957F\u597D\u7684\u90E8\u5206\u7167\u6837\u5148\u4EA4\u4ED8\uFF08paused=true + resumeDir\uFF09\uFF0C\u4E4B\u540E\u628A resumeDir \u4F20\u7ED9 video_extend \u7684 resume \u53C2\u6570\u63A5\u7740\u505A\u5373\u53EF\uFF0C\u5DF2\u5B8C\u6210\u5206\u6BB5\u4E0D\u91CD\u751F\u6210\uFF1B\u65B0\u589E\u5206\u6BB5\u4ECD\u9700\u786E\u8BA4\u8D39\u7528\u5E76\u8BA1\u8D39\u3002",
     "\xB7 \u300C\u751F\u6210\u89C6\u9891\u300D\u4E00\u5F8B\u5148\u5F39\u4EBA\u5DE5\u786E\u8BA4\uFF1A\u63D2\u4EF6\u4F1A\u5199\u660E\u672C\u6B21\u8981\u8C03\u7528\u7684\u6A21\u578B\u3001\u6E05\u6670\u5EA6\u3001\u5206\u6BB5\u4E0E\u9884\u4F30\u8D39\u7528\uFF0C\u70B9\u4E86\u300C\u5141\u8BB8\u300D\u624D\u4F1A\u771F\u6B63\u8C03\u7528\u6A21\u578B\u3002\u4EFB\u4F55\u63A5\u5165\u65B9\u5F0F\u90FD\u4E0D\u8981\u8DF3\u8FC7\u8FD9\u4E00\u6B65\uFF1BMetaOntic AI \u4E0E\u706B\u5C71\u5F15\u64CE\u4E0D\u5224\u65AD\u4F59\u989D\uFF0C\u6309\u5F53\u524D API\u5BC6\u94A5\u5728\u6E20\u9053\u7684\u5B9E\u9645\u7528\u91CF\u8BA1\u8D39\u3002\u4E0D\u8981\u66FF\u7528\u6237\u786E\u8BA4\uFF0C\u4E5F\u4E0D\u8981\u7528\u4ED8\u6B3E\u6216\u5176\u4ED6\u65B9\u5F0F\u7ED5\u8FC7\u8FD9\u9053\u786E\u8BA4\u3002",
     "\xB7 \u751F\u6210\u901A\u5E38\u8981\u51E0\u5206\u949F\uFF1A\u5355\u6B21\u8C03\u7528\u8FD4\u56DE timeout \u4E0D\u7B49\u4E8E\u5931\u8D25\uFF0C\u4F18\u5148\u7528\u539F\u5DE5\u5177\u52A0 resume \u67E5\u8BE2\u5E76\u63A5\u56DE\u8FDB\u5EA6\uFF0C\u4E5F\u53EF\u7528 video_status \u52A0 taskId \u7EE7\u7EED\u67E5\uFF08\u4E0A\u6E38\u94FE\u63A5\u6709\u6548\u671F\u7531\u6E20\u9053\u51B3\u5B9A\uFF0C\u8BF7\u53CA\u65F6\u4FDD\u5B58\uFF09\uFF0C\u4E0D\u8981\u91CD\u590D\u63D0\u4EA4\u540C\u4E00\u6BB5\u3002\u4E0B\u8F7D\u6216\u5408\u5E76\u5931\u8D25\u65F6\u4F7F\u7528\u539Fresume\u91CD\u8BD5\u4EA4\u4ED8\uFF0C\u4E0D\u65B0\u5EFA\u751F\u6210\u4EFB\u52A1\u3002\u6A21\u578B\u6216\u63A5\u5165\u6E20\u9053\u53D8\u5316\u65F6\u5148\u8BF4\u660E\u5E76\u53D6\u5F97\u7528\u6237\u660E\u786E\u786E\u8BA4\uFF0C\u624D\u4F20resumeWithCurrentConfig:true\uFF1B\u8FD8\u6709\u5F85\u67E5\u8BE2\u4EFB\u52A1\u65F6\u5FC5\u987B\u6062\u590D\u539F\u914D\u7F6E\u3002",

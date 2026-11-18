@@ -6,13 +6,13 @@ import os from 'node:os';
 import vm from 'node:vm';
 import { sourceOf } from './source.mjs';
 
-for (const cumulative of [false, true]) for (const cuts of [false, true]) {
-  test(`delivery retains both source segments (${cumulative ? 'cumulative output' : 'incremental output'}, cuts=${cuts})`, async () => {
+for (const cumulative of [false, true]) for (const cuts of [false, true]) for(const independent of cumulative?[false,true]:[false]) {
+  test(`delivery retains both source segments (${cumulative ? 'cumulative output' : 'incremental output'}, cuts=${cuts}, independent=${independent})`, async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mv-preserve-'));
     try {
       const segmentsDir = path.join(dir, 'segments');
       await fs.mkdir(segmentsDir);
-      const originals = ['01-generate.mp4', '02-extend.mp4'].map(name => path.join(segmentsDir, name));
+      const originals = ['01-generate.mp4', independent?'02-generate.mp4':'02-extend.mp4'].map(name => path.join(segmentsDir, name));
       await fs.writeFile(originals[0], 'first-source');
       await fs.writeFile(originals[1], 'second-source');
       const source = sourceOf('businesses/video/media/merge');
@@ -36,7 +36,7 @@ for (const cumulative of [false, true]) for (const cuts of [false, true]) {
       vm.runInContext(sourceOf('businesses/video/media/merge'), context);
       Object.assign(context,mocks);
       const result = await context.downloadSegmentsAndMerge({ mergeMode: 'reencode', keepSegments: false, seamTrimSeconds: cuts ? '0.5' : '0' }, {
-        segments: [{index:1,kind:'generate',seconds:15},{index:2,kind:'extend',seconds:15}],
+        segments: [{index:1,kind:'generate',seconds:15},{index:2,kind:independent?'generate':'extend',seconds:15}],
         segmentsDir, outDir:dir, stamp:'test',
       });
       assert.equal(result.merged, true);
@@ -44,6 +44,7 @@ for (const cumulative of [false, true]) for (const cuts of [false, true]) {
       assert.equal(await fs.readFile(originals[1], 'utf8'), 'second-source');
       assert.ok((await fs.stat(result.videoPath)).size > 0);
       assert.notEqual(result.videoPath, originals[1]);
+      if(independent)assert.equal(await fs.readFile(result.videoPath,'utf8'),'first-source|second-source');
     } finally { await fs.rm(dir, {recursive:true,force:true}); }
   });
 }

@@ -1,5 +1,7 @@
 /** workflow/planning：从宿主入口拆出的独立职责模块。 */
-import { isOmniExtendModel, resolveModel } from '../providers/connection.js';
+import { validateShotFrames } from './shot-materials.js';
+import { videoCapabilities } from '../providers/capabilities.js';
+import { resolveModel } from '../providers/connection.js';
 import { clampInteger } from '../../../core/utils/validation.js';
 import { MIN_SEGMENT_SECONDS, MAX_TOTAL_SECONDS, MAX_SEGMENTS, MIN_SECONDS } from '../config.js';
 
@@ -7,7 +9,7 @@ import { MIN_SEGMENT_SECONDS, MAX_TOTAL_SECONDS, MAX_SEGMENTS, MIN_SECONDS } fro
 
 /** 模型能力决定单次生成上限，避免旧配置的 15 秒限制影响 2.5。 */
 export function modelMaxSeconds(config) {
-  return isOmniExtendModel(resolveModel(config)) ? 30 : 15;
+  return videoCapabilities(resolveModel(config)).supported_durations_ms?.max / 1000 || 15;
 }
 
 export function resolveSingleMax(config) {
@@ -88,6 +90,14 @@ export function resolveSegmentPrompts(prompts, planLength) {
  */
 export function resolveTargetPlan(config, args) {
   const singleMax = resolveSingleMax(config);
+  if(args?.productionStrategy && !['continuous_segments','independent_shots'].includes(args.productionStrategy))throw Error('INVALID_PRODUCTION_STRATEGY');
+  if(args?.productionStrategy==='independent_shots') {
+    const durations=args.shotDurations;
+    if(!Array.isArray(durations)||!durations.length||durations.length>MAX_SEGMENTS||durations.some(s=>!Number.isInteger(s)||s<MIN_SECONDS||s>singleMax)||durations.reduce((a,b)=>a+b,0)!==args.duration||args.duration>MAX_TOTAL_SECONDS)throw Error('INVALID_INDEPENDENT_SHOT_PLAN');
+    validateShotFrames(args,durations.length);
+    return {plan:durations.map(seconds=>({kind:'generate',seconds})),singleMax,segmentSeconds:singleMax,cap:MAX_TOTAL_SECONDS,asked:args.duration,total:args.duration};
+  }
+  if(args?.shotFrames!==undefined)validateShotFrames(args,0);
   const segmentSeconds = resolveSegmentSeconds(config, args?.segmentSeconds);
   const cap = maxTargetSeconds(singleMax, segmentSeconds);
   const asked = clampInteger(

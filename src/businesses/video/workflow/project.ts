@@ -1,3 +1,4 @@
+import { assertCompiledProduction } from '../../film-director/runtime/production-binding.js';
 import { assertSegmentReviewed } from './segment-review.js';
 /** 项目身份、真实审核答复与制作参数的持久化。无密钥、无付费调用。 */
 import { createHash, randomUUID } from 'node:crypto';
@@ -66,7 +67,7 @@ export async function createProject(exec, subjectType) {
   return data;
 }
 export function hasProjectImages(args) {
-  return [args?.firstFrameUrl, ...(Array.isArray(args?.referenceImages) ? args.referenceImages : [args?.referenceImages]), ...(args?.characterReferenceImages || [])].some(v => typeof v === 'string' && v.trim());
+  return [args?.firstFrameUrl, args?.lastFrameUrl, ...(args?.productionStrategy==='independent_shots' && Array.isArray(args.shotFrames)?args.shotFrames.flatMap(frame=>[frame?.firstFrameUrl,frame?.lastFrameUrl]):[]), ...(Array.isArray(args?.referenceImages) ? args.referenceImages : [args?.referenceImages]), ...(args?.characterReferenceImages || [])].some(v => typeof v === 'string' && v.trim());
 }
 /** 绑定全部生成字段与实际非敏感配置；审批、交付控制参数不影响内容审核。 */
 export function productionFingerprint(config, name, args) {
@@ -98,8 +99,9 @@ export async function assertProjectApproved(config, exec, args) {
   if (!resumeDirOf(args?.resume) && args.duration == null) throw new Error('生成前必须传入用户已确认的视频时长duration，不得使用默认15秒。');
   if (data.approved?.resumeDir && resumeDirOf(args.resume) !== data.approved.resumeDir) throw new Error('此次审核绑定了原续做目录，请使用原resume。');
   if (data.filmSource) {
+    if(exec.name!=='video_generate')throw Error('COMPILED_TOOL_MISMATCH:专业编译方案必须使用video_generate。');
     const source = JSON.parse(await readFile(data.filmSource.path,'utf8'));
-    if (source.revision !== data.filmSource.revision) throw new Error('创作项目已改稿，请重新编译制作计划并审核。');
+    assertCompiledProduction(data,source,args.resume?{...data.approved?.specification,...candidate}:candidate,resolveModel(config));
   }
   if (!data.approved) throw new Error('本项目脚本尚未审核通过，请先展示脚本和分镜，再调用 video_project(action:review)。');
   if (await scriptDigest(data.approved.scriptPath) !== data.approved.scriptHash) throw new Error('脚本已修改，请重新审核当前版本。');

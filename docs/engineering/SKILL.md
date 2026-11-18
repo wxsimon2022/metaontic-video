@@ -188,3 +188,8 @@ Agent组件图标使用<完整预设模块>/icon导出，SVG在presets/icons，�
 说明书源码仓库政策：用户要求MD/PDF及其docs/guide配图仅留本地。git rm --cached保留本地，.gitignore阻止误提交；README统一链接https://ai.mybfs.cn，不重写历史。成品包是否附带属于独立范围，未明确要求时不擅自移除包内说明书。
 
 插件对外亮点固定两点：新手快速上手视频创作、低成本长视频生成方案。README、插件描述、仓库简介、宣传页和社区介绍均围绕这两点，不把其他能力扩成独立卖点；操作说明保留必要事实，不承诺所有模型下固定低价。
+
+
+专业链路维护：分镜示意统一video_project storyboard本地渲染，不注入手写SVG指令。compile保存plan_digest，video_project审核和assertProjectApproved均核对compiled提示词/分段/规格；参考图等补充仍需制作审核。旧绑定缺摘要必须重新编译。production_strategy默认continuous_segments，显式independent_shots按4秒至模型上限逐镜生成，估价/执行共享resolveTargetPlan，断点保存策略和时长，续做不得改计划；各镜无video输入，直接剪辑不裁接缝、不作累计成片识别。付费确认及逐段审核不变。能力来自providers/capabilities本地适配器，ADAPTER_DEFINED不是渠道实测，未知保持null。新quality_policy=evidence_v1检查场次可观察证据、评分依据和主题场次引用，口速估时仅提示并要求复核。锁恢复只认同机死亡进程，不按超时夺锁；read不持锁。快照保留最近30份和批准/依赖版本；未变化写操作不留重复快照。film_stage_finished只记录固定类别、耗时和响应字节，无正文或密钥。相关测试film-global-improvements.test.mjs；Windows实机未验证时不得宣称已覆盖。
+
+边界补充：独立镜头shotFrames按完整shotDurations保存和恢复，全局首尾帧仅首镜/末镜，首帧不提升为共享人物参考。hasProjectImages与角色选择共用素材判断。video_project status和审核答复后均核对filmSource版本/摘要/模型。视觉visual_style/style_profile仅失效资产与下游，tone默认叙事变化，显式change_scope=visual_only才保留故事批准且不能混改内容字段。合并混合音轨须补静音、统一时间戳及长度，音频编码失败不能退无声。写锁/恢复锁元数据完整后硬链接独占发布；恢复者中断时递归清理同机死亡token，未知/空/异机/活跃锁不得自动删除。跨平台硬链接不支持时明确失败，不降级为不安全抢锁。

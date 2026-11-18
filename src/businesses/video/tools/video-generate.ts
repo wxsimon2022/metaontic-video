@@ -1,3 +1,4 @@
+import { shotMaterials } from '../workflow/shot-materials.js';
 import { executeSegmentPlan } from '../workflow/segment-executor.js';
 import { initialCharacterReferences } from '../workflow/character-references.js';
 /** tools/video-generate：从宿主入口拆出的独立职责模块。 */
@@ -19,6 +20,7 @@ export function videoTool(liveConfig, deps, ctx) {
     description:
       '生成一段完整视频（视频生成的首选工具），duration 是目标总秒数：'
       + '不超过模型单段上限（2.0 为 15 秒、2.5 为 30 秒）时一次直出；'
+      + '显式选择productionStrategy=independent_shots并完成整条方案审核时，可按shotDurations独立生成再剪辑；此路线每镜单独计费、逐镜审核，人物一致性依赖参考图，不保证无漂移。以下单次直出约束适用于默认连续路线。'
       + '**硬规则：总时长 ≤ 单段上限的视频必须一次直出，禁止拆成多段 / 多镜 / 多次调用再拼接**'
       + '（例如「15 秒」不许拆成 8+7）；按故事选择一镜到底或少量有动机的切镜，并写入待审核脚本；叙事切镜不等于拆分生成任务。'
       + `更长时先直出首段，再把剩余时长按 4 至模型上限（2.0 为 15、2.5 为 30） 秒均分逐段续拍（默认吃满上限、段数最少，最长 `
@@ -54,6 +56,9 @@ export function videoTool(liveConfig, deps, ctx) {
     parameters: {
       type: 'object',
       properties: {
+        productionStrategy: {type:'string',enum:['continuous_segments','independent_shots'],description:'默认连续续拍。仅用户明确选择并审核独立镜头方案时用independent_shots，每镜独立计费，复用已审参考图，不输入上一段视频；每镜完成仍须审核后resume。'},
+        shotFrames:{type:'array',items:{type:'object',properties:{firstFrameUrl:{type:'string'},lastFrameUrl:{type:'string'}}},description:'独立镜头逐镜首尾帧，与shotDurations等长；无素材的镜头填{}。全局firstFrameUrl仅用于首镜，lastFrameUrl仅用于末镜；人物参考图可共享。改素材须重审。'},
+        shotDurations: {type:'array',items:{type:'integer',minimum:4},description:'独立镜头各秒数，之和必须等于duration，每镜不超模型上限；与segmentPrompts逐项对应。'},
         projectId: { type: 'string', description: 'video_project返回的项目ID。新建生成/延长前须prepare并review通过；续做默认沿用。' },
         cumulativePreview: { type: 'boolean', description: '默认暂停只下载展示新段，最终再合并；明确需要累计预览时传true，不新增生成费用。' },
         resetCharacterChoice: { type: 'boolean', description: '仅在用户明确改变已确认的角色图方案时设true，重新弹出选择；不会直接改为纯文生，也不能绕过确认。' },
@@ -215,6 +220,10 @@ export function videoTool(liveConfig, deps, ctx) {
           ? '这次是接着上一次暂停的视频继续，但暂停记录里没有提示词：请把 prompt 补上。'
           : '提示词 prompt 不能为空。');
       }
+      if(resume?.options?.productionStrategy==='independent_shots') {
+        if(args.productionStrategy!==resume.options.productionStrategy||JSON.stringify(args.shotDurations)!==JSON.stringify(resume.options.shotDurations))throw Error('INDEPENDENT_PLAN_CHANGE_REQUIRES_NEW_REVIEW');
+        args.duration=args.duration??resume.plan.reduce((n,s)=>n+s.seconds,0);
+      }
       const target = resolveTargetPlan(config, args);
       const { singleMax, segmentSeconds, cap, asked } = target;
       const restarted = resume
@@ -286,7 +295,9 @@ export function videoTool(liveConfig, deps, ctx) {
         }),
         buildStep: async ({ step, position, state }) => {
           const focusedPrompt = suppliedPrompts
-            ? buildSegmentExecutionPrompt({ prompt: suppliedPrompts[position], kind: step.kind, index: position, count: fullPlan.length })
+            ? args.productionStrategy==='independent_shots'
+              ? `【独立镜头 ${position+1}/${fullPlan.length}】只执行本镜动作与对白，不引用或重演其他镜头，不假设存在视频1。镜头之间以剪辑衔接。\n${suppliedPrompts[position]}`
+              : buildSegmentExecutionPrompt({ prompt: suppliedPrompts[position], kind: step.kind, index: position, count: fullPlan.length })
             : prompt;
           const stepArgs = {
             ...resumeOptions,
@@ -301,11 +312,11 @@ export function videoTool(liveConfig, deps, ctx) {
           let body;
           let seconds;
           if (step.kind === 'generate') {
-            const initialArgs = { ...stepArgs };
+            const initialArgs = shotMaterials(stepArgs,position,fullPlan.length);
             if (state.characterReferences.length) {
-              if (!stepArgs.firstFrameUrl && (!stepArgs.referenceImages || args.characterReferenceImages === undefined))
+              if (!initialArgs.firstFrameUrl && !initialArgs.lastFrameUrl && (!initialArgs.referenceImages || args.characterReferenceImages === undefined))
                 initialArgs.referenceImages = state.characterReferences.map(item => item.image_url.url);
-              else if (stepArgs.firstFrameUrl && args.characterReferenceImages === undefined)
+              else if (args.productionStrategy!=='independent_shots' && stepArgs.firstFrameUrl && args.characterReferenceImages === undefined)
                 initialArgs.firstFrameUrl = state.characterReferences[0].image_url.url;
             }
             const generated = await buildGenerationBody(config, initialArgs, step.seconds, {
@@ -332,7 +343,7 @@ export function videoTool(liveConfig, deps, ctx) {
       // 结果字段随流程追加（合并信息、备注等），显式声明成可扩展对象
       const result: Record<string, any> = {
         status,
-        mode: fullPlan.length > 1 ? 'extended' : 'direct',
+        mode: args.productionStrategy==='independent_shots'?'independent_shots':fullPlan.length > 1 ? 'extended' : 'direct',
         plannedSeconds: restarted ? total : plannedTotal,
         totalSeconds: deliveredSeconds,
         segments,
@@ -380,7 +391,7 @@ export function videoTool(liveConfig, deps, ctx) {
         return skipMergeDelivery({ result, paused, remainingSeconds, notes, segmentsDir, toolName: TOOL_NAME });
       }
       return runSegmentDelivery({
-        config, exec, interrupted, completed, segments, segmentsDir, outDir, stamp, notes, result, cumulativePreview: args.cumulativePreview === true,
+        config:args.productionStrategy==='independent_shots'?{...config,seamTrimSeconds:'0'}:config, exec, interrupted, completed, segments, segmentsDir, outDir, stamp, notes, result, cumulativePreview: args.cumulativePreview === true,
         paused,
         remainingSeconds,
         pauseNote: `已完成从头到第 ${segments.length} 段，分段仍保留在 ${segmentsDir}。`,

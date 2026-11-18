@@ -32,12 +32,12 @@ function compareVideoCosts(config, args) {
   // 续拍计入上一段完整视频时长，既不把尾段凑成 30 秒，也不把 45 秒算成两段 30 秒。
   const officialModel = 'doubao-seedance-2-5';
   const officialRates = RATES.find(([prefix]) => officialModel.startsWith(prefix))![1];
-  const officialPlan = planVideoSegments(duration, 30, 30);
+  const officialPlan = args.productionStrategy==='independent_shots'?planned.plan:planVideoSegments(duration, 30, 30);
   function calculate(id, plan, price, multiplier) {
     const pixels = resolution === '720p' ? [1280, 720] : id.startsWith('doubao-seedance-2-5') ? [854, 480] : [864, 496];
     const dimensions = ratio === '9:16' ? [...pixels].reverse() : pixels;
     const segments = plan.map((step, index) => {
-      const inputSeconds = index ? plan[index - 1].seconds : 0;
+      const inputSeconds = step.kind==='extend' && index ? plan[index - 1].seconds : 0;
       const tokens = (inputSeconds + step.seconds) * pixels[0] * pixels[1] * 24 / 1024;
       const rateCnyPerMillion = price[inputSeconds ? 1 : 0] * multiplier;
       return { index: index + 1, kind: step.kind, seconds: step.seconds, inputSeconds, billingMode: inputSeconds ? 'with_video_input' : 'without_video_input', tokens, rateCnyPerMillion, cny: tokens * rateCnyPerMillion / 1e6 };
@@ -45,20 +45,22 @@ function compareVideoCosts(config, args) {
     return { model: id, dimensions, groupRatio: multiplier, segments, cny: Math.round(segments.reduce((sum, s) => sum + s.cny, 0) * 10000) / 10000 };
   }
   return {
-    duration, resolution, ratio, fps: 24, priceDate: PRICE_DATE, currency: 'CNY', estimateType: '基础公式估价',
+    duration, resolution, ratio, productionStrategy:args.productionStrategy||'continuous_segments', fps: 24, priceDate: PRICE_DATE, currency: 'CNY', estimateType: '基础公式估价',
     official: calculate(officialModel, officialPlan, officialRates, 1),
     plugin: calculate(model, planned.plan, rates[1], groupRatio),
     pluginChannel: isVolcengine(config) ? '火山直连（无中转折扣）' : 'MetaOnticVideo中转制作方案',
     sources: ['https://docs.volcengine.com/docs/ark/model-pricing?lang=zh', 'https://ai.bileego.com/pricing'],
-    notes: ['这是视频API基础公式估价，非固定报价；含视频输入的最低用量补足尚未计入，实际以渠道账单为准。', '续拍输入按上一段完整视频时长计入，不按累计成片输入；参考图片不等同参考视频，不使用含视频单价。', '不含图片生成或转换、重试、独立配音及其他额外调用；本地合并不产生视频模型调用费，接缝裁剪会缩短交付时长。', '不同模型的质量与能力有差异；火山官方为API刊例价，不是网页积分或套餐价格。', '火山官方方案按 Seedance 2.5 的实际秒数排段：单段上限 30 秒，不足 30 秒不凑整；超过 30 秒按 30 秒直出加逐段续拍列出，续拍计入上一段完整视频输入。', '中转倍率仅在 API密钥确有对应分组权限且实际使用该分组时成立；价格日期后可能调整，制作前需复核。'],
+    notes: ['这是视频API基础公式估价，非固定报价；含视频输入的最低用量补足尚未计入，实际以渠道账单为准。', '续拍输入按上一段完整视频时长计入，不按累计成片输入；参考图片不等同参考视频，不使用含视频单价。', '不含图片生成或转换、重试、独立配音及其他额外调用；本地合并不产生视频模型调用费，接缝裁剪会缩短交付时长。', '不同模型的质量与能力有差异；火山官方为API刊例价，不是网页积分或套餐价格。', args.productionStrategy==='independent_shots'?'两项方案均按批准的独立镜头逐镜生成估价，各镜不输入上一段视频，默认直接剪辑不裁续拍接缝；人物一致性需参考图和结果审核。':'火山官方方案按 Seedance 2.5 的实际秒数排段：单段上限 30 秒，不足 30 秒不凑整；超过 30 秒按 30 秒直出加逐段续拍列出，续拍计入上一段完整视频输入。', '中转倍率仅在 API密钥确有对应分组权限且实际使用该分组时成立；价格日期后可能调整，制作前需复核。'],
   };
 }
 
 export function estimateTool(config) {
   return {
     name: 'video_estimate',
-    description: '脚本审核前必须调用的只读双方案费用试算：火山官方方案与当前MetaOnticVideo插件方案。duration为完整目标时长，resolution须用户已确认；首段按无视频输入，后续续拍按有视频输入计价并计入上一段完整视频时长；参考图不算视频输入。必须在脚本末尾展示逐段档位、输入/输出秒数、单价及金额，不能只给合计。不会生成视频、扣费、查余额或修改配置。未知模型/画幅拒绝猜价。每次改稿涉及时长、清晰度、模型或分段须重算。',
+    description: '脚本审核前必须调用的只读双方案费用试算：火山官方方案与当前MetaOnticVideo插件方案。duration为完整目标时长，resolution须用户已确认；首段按无视频输入，后续续拍按有视频输入计价并计入上一段完整视频时长；参考图不算视频输入。显式independent_shots按shotDurations逐镜无视频输入计费。必须在脚本末尾展示逐段档位、输入/输出秒数、单价及金额，不能只给合计。不会生成视频、扣费、查余额或修改配置。未知模型/画幅拒绝猜价。每次改稿涉及时长、清晰度、模型或分段须重算。',
     parameters: { type: 'object', properties: {
+      productionStrategy:{type:'string',enum:['continuous_segments','independent_shots']},
+      shotDurations:{type:'array',items:{type:'integer',minimum:4},description:'独立镜头各秒数；与审核及生成一致'},
       duration: { type: 'integer', minimum: 4, maximum: 3600, description: '当前完整脚本的目标总时长' },
       resolution: { type: 'string', enum: ['480p', '720p'], description: '用户已确认的视频清晰度。必须写成带引号的字符串，例如 "480p"；写成裸值 480p 会让这次调用直接失败。' },
       ratio: { type: 'string', enum: ['16:9', '9:16'], description: '脚本画幅，其他画幅暂不可靠试算。同样要写成带引号的字符串，例如 "16:9"。' },
@@ -68,7 +70,7 @@ export function estimateTool(config) {
     output: { schema: { type: 'object' }, render(_args, value) {
       const detail = (name, item) => item.segments.map(s => `${name}第${s.index}段：${s.inputSeconds ? '有视频输入' : '无视频输入'}；输入${s.inputSeconds}秒 + 输出${s.seconds}秒；单价¥${s.rateCnyPerMillion}/百万token；约¥${s.cny.toFixed(4)}`);
       const line = (name, item) => `${name}：约¥${item.cny.toFixed(2)}；${item.model}；${item.segments.map(s => s.seconds).join('+')}秒；倍率${item.groupRatio}`;
-      return [{ type: 'text', text: [`${value.duration}秒 / ${value.resolution.toUpperCase()} / ${value.ratio}（${value.estimateType}）`, line('火山官方方案', value.official), line('MetaOnticVideo插件方案', value.plugin), ...detail('火山官方', value.official), ...detail('插件', value.plugin), `价格核对日期：${value.priceDate}`, ...value.notes].join('\n') }];
+      return [{ type: 'text', text: [`${value.duration}秒 / ${value.resolution.toUpperCase()} / ${value.ratio}（${value.estimateType}；${value.productionStrategy==='independent_shots'?'独立镜头逐镜计费':'连续续拍'}）`, line('火山官方方案', value.official), line('MetaOnticVideo插件方案', value.plugin), ...detail('火山官方', value.official), ...detail('插件', value.plugin), `价格核对日期：${value.priceDate}`, ...value.notes].join('\n') }];
     } },
     isConcurrencySafe() { return true; },
     async execute(args) { return compareVideoCosts(config, args); },

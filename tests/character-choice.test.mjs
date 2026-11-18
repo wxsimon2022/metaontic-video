@@ -11,7 +11,7 @@ let next=0;
 function setup(label='直接文生视频'){
  let asks=0;const id='session-'+(++next);
  const c=vm.createContext({createHash,path,mkdir,readFile,writeFile,rename,rm,dshHome:()=>home,isVolcengine:config=>config.connectionMode==='volcengine',timedStage:async(_stage,op)=>op()});
- vm.runInContext(sourceOf('businesses/video/workflow/character-choice'),c);
+ vm.runInContext(sourceOf('businesses/video/workflow/project','businesses/video/workflow/character-choice'),c);
  const ctx={get:()=>({ask:async request=>{asks++;return {answers:[{id:request.questions[0].id,selected:label?[label]:[]}]};}})};
  const exec={name:'video_generate',callId:'call-'+id,agent:{session:{id}},arguments:{}};
  return {c,ctx,exec,get asks(){return asks;},args:{prompt:'人物介绍',duration:30,resolution:'480p',ratio:'16:9'}};
@@ -54,4 +54,10 @@ test('a changed plan can reopen the choice without silently overriding previous 
  h.ctx.get=()=>({ask:async request=>({answers:[{id:request.questions[0].id,selected:['直接文生视频']}]})});
  assert.equal(await h.c.characterChoiceGate(h.ctx,{},h.exec,{...h.args,resetCharacterChoice:true}),null);
  assert.equal(await h.c.characterChoiceGate(h.ctx,{},h.exec,h.args),null);
+});
+
+test('per-shot frame references satisfy the image choice without another prompt',async()=>{
+ const h=setup();
+ assert.equal(await h.c.characterChoiceGate(h.ctx,{},h.exec,{...h.args,productionStrategy:'independent_shots',shotFrames:[{}, {firstFrameUrl:'https://example.invalid/shot.png'}]}),null);
+ assert.equal(h.asks,0);
 });

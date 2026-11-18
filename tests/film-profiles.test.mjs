@@ -119,7 +119,7 @@ test('真实工具创建、审批、改类型及重读保存一致，旧批准�
   assert.equal(unchanged.revision,s.revision);assert.equal(unchanged.artifacts,undefined);
   assert.equal(unchanged.nextTask.stage,'creative');
   const single=await tool.execute({action:'read',projectId:id,stage:'creative'},exec);assert.equal(single.artifact,null);
-  const data={...creative(p),structure:[{section_id:'S1',duration_ms:15000}],must_preserve:[],assumptions:[]};
+  const data={...creative(p),structure:[{section_id:'S1',purpose:'观察水面变化',visual_evidence:'风吹动水纹',duration_ms:15000}],must_preserve:[],assumptions:[]};
   s=await tool.execute({action:'submit',projectId:id,stage:'creative',expectedRevision:s.revision,content:JSON.stringify(data)},exec);
   assert.equal(s.response_mode,'compact');assert.equal(s.artifacts,undefined);
   assert.equal(s.artifact_summary.creative.revision,s.revision);

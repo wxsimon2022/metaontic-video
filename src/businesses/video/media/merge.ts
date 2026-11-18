@@ -20,7 +20,7 @@ function evenNumber(value, fallback) {
 }
 
 /**
- * 把分段合并成一个文件：先试无损拼接，需要时统一重编码（带音频，失败再退回只并视频）。
+ * 把分段合并成一个文件：先试无损拼接，需要时统一重编码；有音轨时保留，缺音轨补静音，失败保留原片。
  */
 /** 分段的音频比视频长出这么多帧时，认为封装补白会在接缝处留下空洞。 */
 const AUDIO_PADDING_TOLERANCE_FRAMES = 1;
@@ -89,7 +89,6 @@ export async function mergeClips(config, files: string[], outPath: string, { sig
   // 并发合并同一个目标路径时，读者要么看到旧文件、要么看到完整的新文件，不会拿到半截 mp4。
   const work = `${outPath}.${uniqueSuffix('work')}.mp4`;
   let copyError = '';
-  let audioError = '';
 
   const probed = [];
   for (const file of files) probed.push(await probeMedia(file, config, signal));
@@ -108,7 +107,7 @@ export async function mergeClips(config, files: string[], outPath: string, { sig
     // 旧seamless配置兼容为直接拼接，避免xfade叠加人物造成双影。
     const mergeMode = ref(config, 'mergeMode', 'copy');
 
-    if (mergeMode !== 'reencode' && paramsMatch) {
+    if (mergeMode !== 'reencode' && paramsMatch && probed.every(m=>typeof m?.hasAudio==='boolean' && m.hasAudio===probed[0]?.hasAudio)) {
       const listPath = `${work}.concat.txt`;
       const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join('\n');
       await writeFile(listPath, `${lines}\n`, 'utf8');
@@ -133,11 +132,12 @@ export async function mergeClips(config, files: string[], outPath: string, { sig
     const width = evenNumber(first.width, 1280);
     const height = evenNumber(first.height, 720);
     const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
-    const withAudio = probed.length > 0 && probed.every((media) => media?.hasAudio);
+    if(probed.some(m=>typeof m?.hasAudio!=='boolean'))throw Object.assign(new Error('无法确认各段音轨，已保留原分段；请恢复ffprobe后重试合并，不重新生成。'),{code:'audio_probe_required'});
+    const withAudio = probed.some(media=>media.hasAudio);
 
     const videoParts = files.map((_, index) => (
       `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,`
-      + `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${index}]`
+      + `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},setpts=PTS-STARTPTS[v${index}]`
     ));
     const videoInputs = files.map((_, index) => `[v${index}]`).join('');
 
@@ -153,11 +153,12 @@ export async function mergeClips(config, files: string[], outPath: string, { sig
 
     if (withAudio) {
       // concat 的输入按 (视频, 音频) 成对排列：v0,a0,v1,a1…
-      const audioParts = files.map((_, index) => (
-        `[${index}:a]aresample=48000,`
-        + 'aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo'
-        + `[a${index}]`
-      ));
+      const audioParts = files.map((_, index) => {
+        const duration=Number(probed[index]?.videoDurationSeconds || probed[index]?.durationSeconds);
+        if(!Number.isFinite(duration)||duration<=0)throw Object.assign(new Error('缺少可靠的分段时长，无法安全对齐音频；保留分段，请修复探测后重试合并。'),{code:'audio_duration_required'});
+        const source=probed[index].hasAudio?`[${index}:a]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,apad`:'anullsrc=r=48000:cl=stereo';
+        return `${source},atrim=duration=${duration},asetpts=PTS-STARTPTS[a${index}]`;
+      });
       const pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join('');
       const filter = [
         ...videoParts,
@@ -169,16 +170,16 @@ export async function mergeClips(config, files: string[], outPath: string, { sig
         await rename(work, outPath);
         return { path: outPath, mode: 'reencode', trimmed };
       }
-      audioError = stderr.trim().slice(-400);
+      throw Object.assign(new Error('音频合并失败，已保留原分段及已有成片；请重试合并，不会自动输出无声成片。'),{code:'audio_merge_failed'});
     }
 
     const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(';');
     const { code, stderr } = await encode(filter, ['-map', '[v]'], false);
     if (code === 0 && await exists(work)) {
       await rename(work, outPath);
-      return { path: outPath, mode: withAudio ? 'reencode-video-only' : 'reencode', trimmed };
+      return { path: outPath, mode: 'reencode', trimmed };
     }
-    const detail = [copyError, audioError, stderr.trim().slice(-400)].filter(Boolean).join(' | ');
+    const detail = [copyError, stderr.trim().slice(-400)].filter(Boolean).join(' | ');
     throw Object.assign(new Error(`ffmpeg 合并失败：${detail || '未知错误'}`), { code: 'ffmpeg_failed' });
   } finally {
     await cleanupSegmentTemps([...temps, work]);
@@ -322,7 +323,7 @@ export async function downloadSegmentsAndMerge(config, {
         CUMULATIVE_TOLERANCE_MIN_SECONDS,
         cumulative * CUMULATIVE_TOLERANCE_RATIO,
       );
-      const looksCumulative = files.length > 0
+      const looksCumulative = segment.kind === 'extend' && files.length > 0
         && Math.abs(media.durationSeconds - cumulative) <= tolerance
         && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
       if (looksCumulative) {

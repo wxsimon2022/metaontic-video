@@ -31,7 +31,7 @@ export function routeIntent(state: any, intent: string, entityIds: string[] = []
  const approvals=dependencies.filter(s=>['creative','script'].includes(s) && state.approvals[s]!==state.artifacts[s]?.revision);
  const local=['revise_dialogue','revise_character','revise_scene','revise_camera','revise_timing'].includes(intent);
  const scopeRequired=local && !entityIds.length;
- const ids=stage==='assets' ? (role==='character'? state.artifacts.assets?.data.characters?.map(v=>v.character_id):state.artifacts.assets?.data.scenes?.map(v=>v.scene_id)) : stage==='shots'||stage==='prompts'?state.artifacts.shots?.data.shots?.map(v=>v.shot_id):undefined;
+ const ids=stage==='assets' ? (role==='character'? state.artifacts.assets?.data.characters?.map(v=>v.character_id):['scenes','locations','scene_states','props'].flatMap(k=>(state.artifacts.assets?.data[k]||[]).map(v=>v[{scenes:'scene_id',locations:'location_id',scene_states:'scene_state_id',props:'prop_id'}[k]]))) : stage==='shots'||stage==='prompts'?state.artifacts.shots?.data.shots?.map(v=>v.shot_id):undefined;
  if(ids && entityIds.some(id=>!ids.includes(id))) throw Error('UNKNOWN_ENTITY');
  const inputs=Object.fromEntries([...new Set([...dependencies,...(stage?[stage]:[])])].filter(s=>state.artifacts[s]).map(s=>[s,state.artifacts[s]]));
  return {submission_contract:stage?submissionContract(stage):null,intent,role,stage,scope:{entity_ids:entityIds},status:missing.length||approvals.length||scopeRequired?'needs_input':'ready',missing,approval_required:approvals,scope_required:scopeRequired,...projectContext(state),work_profile:profileContext(state),input_revisions:sourceRevisions(state,stage),model_profile:modelProfile(state),expectedRevision:state.revision,instructions:roleInstructions(state,role),inputs,

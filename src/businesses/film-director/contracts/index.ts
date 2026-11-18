@@ -1,3 +1,4 @@
+import { videoCapabilities } from '../../video/providers/capabilities.js';
 import { resolveDimensions } from '../profiles/dimensions.js';
 /** 所有角色的共同契约；由构建注入，不依赖宿主识别外部目录。 */
 export const COMMON_CONTRACT = `# COMMON_CONTRACT V4.0
@@ -41,11 +42,11 @@ export function sourceRevisions(state: any, stage: string) {
 export const GENERIC_MODEL_PROFILE = {model_name:'generic',profile_revision:'1',capability_status:'UNVERIFIED',generation_modes:null,supported_durations_ms:null,supported_aspect_ratios:null,native_audio_supported:null,reference_image_supported:null,reference_video_supported:null,prompt_length_limit:null,verified_at:null};
 /** 每个任务都携带原始要求与规格，不依赖上一轮聊天记忆。 */
 export function projectContext(state:any) {
-  return {resolved_profiles:resolveDimensions(state.project_spec),project_id:state.project_id,original_idea:state.source_brief || '',target_duration_ms:state.duration_ms,project_spec:state.project_spec || {title:state.title,target_duration_ms:state.duration_ms,aspect_ratio:null,language:null,visual_style:null,target_model:null,hard_constraints:[],provenance:'LEGACY_UNKNOWN'},approved_revisions:{...state.approvals}};
+  return {resolved_profiles:resolveDimensions(state.project_spec),project_id:state.project_id,original_idea:state.source_brief || '',target_duration_ms:state.duration_ms,project_spec:state.project_spec || {title:state.title,target_duration_ms:state.duration_ms,aspect_ratio:null,language:null,visual_style:null,target_model:null,hard_constraints:[],provenance:'LEGACY_UNKNOWN'},quality_policy:state.quality_policy || 'legacy',approved_revisions:{...state.approvals}};
 }
 export function revisionsEqual(a:any,b:any) {
   return !!a&&!!b&&typeof a==='object'&&typeof b==='object'&&Object.keys(a).length===Object.keys(b).length&&Object.entries(a).every(([k,v])=>Object.hasOwn(b,k)&&b[k]===v);
 }
 export function modelProfile(state:any) {
-  return {...GENERIC_MODEL_PROFILE,model_name:state.project_spec?.target_model || 'generic'};
+  return videoCapabilities(state.project_spec?.target_model || 'generic');
 }

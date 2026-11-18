@@ -1,3 +1,5 @@
+import { resolveModel } from '../providers/connection.js';
+import { assertCompiledProduction } from '../../film-director/runtime/production-binding.js';
 import { validateExtensionDuration } from '../workflow/planning.js';
 import { ensureProjectDuration } from '../workflow/duration-choice.js';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -55,9 +57,14 @@ export function projectTool(config, ctx, reviewGuard, generationProperties, exte
       }
       if (args.action === 'status') {
         const data = await readProject(args.projectId, exec);
-        const current = data.approved && await scriptDigest(data.approved.scriptPath).catch(() => '') === data.approved.scriptHash
+        let sourceCurrent=true;let staleReason;
+        if(data.approved && data.filmSource) {
+          try {assertCompiledProduction(data,JSON.parse(await readFile(data.filmSource.path,'utf8')),data.approved.specification,resolveModel(config));}
+          catch {sourceCurrent=false;staleReason='专业源项目、模型或编译方案已改变或无法读取，请重新编译并审核。';}
+        }
+        const current = sourceCurrent && data.approved && await scriptDigest(data.approved.scriptPath).catch(() => '') === data.approved.scriptHash
           && productionFingerprint(config, data.approved.name, data.approved.specification) === data.approved.fingerprint;
-        return { projectId: data.id, subjectType: data.subjectType, choice: data.choice, duration: data.duration, status: current ? 'approved' : 'draft' };
+        return { projectId: data.id, subjectType: data.subjectType, choice: data.choice, duration: data.duration, status: current ? 'approved' : 'draft',...(staleReason?{approval_stale:true,reason:staleReason}:{}) };
       }
       if (args.action === 'storyboard') {
         // 分镜示意图改由插件按脚本分镜表本地渲染：秒级、确定性，不再让模型手写绘图程序或 SVG。
@@ -99,6 +106,11 @@ export function projectTool(config, ctx, reviewGuard, generationProperties, exte
           return { projectId: data.id, duration: data.duration, choice: saved.choice, status: saved.choice ? 'prepared' : 'pending', nextAction: gate?.reason || '编写脚本与分镜，完成后review。' };
         }
         const spec = args.specification;
+        if(data.filmSource) {
+          if(args.toolName && args.toolName!=='video_generate')throw Error('COMPILED_TOOL_MISMATCH');
+          const source=JSON.parse(await readFile(data.filmSource.path,'utf8'));
+          assertCompiledProduction(data,source,spec,resolveModel(config));
+        }
         const allowed = new Set(Object.keys(args.toolName === 'video_extend' ? extensionProperties : generationProperties));
         if (spec && Object.keys(spec).some(k => !allowed.has(k))) throw new Error('specification只能包含对应生成工具的公开参数，禁止凭据或未知字段。');
         if (!spec || !spec.prompt || !spec.duration || !spec.ratio || !spec.resolution || spec.projectId) throw new Error('review需完整specification：prompt、duration、ratio、resolution，不能包含projectId。');
@@ -140,6 +152,7 @@ export function projectTool(config, ctx, reviewGuard, generationProperties, exte
         const answer = result?.answers?.find(a => a.id === 'script_review');
         if (exec.signal?.aborted || answer?.custom || answer?.selected?.length !== 1 || answer.selected[0] !== '脚本通过') return { projectId: data.id, status: 'draft', ...canvasOutput, reason: '未取得审核通过，未生成。' };
         if (await scriptDigest(scriptPath) !== scriptHash || productionFingerprint(config, name, spec) !== fingerprint) throw new Error('等待审核期间材料或配置改变，请重新展示审核。');
+        if(data.filmSource)assertCompiledProduction(data,JSON.parse(await readFile(data.filmSource.path,'utf8')),spec,resolveModel(config));
         data.approved = { scriptPath, scriptHash, fingerprint, specification: spec, name, resumeDir: resumeDirOf(spec.resume), reviewedAt: new Date().toISOString() };
         await writeProject(data);
         return { projectId: data.id, status: 'approved', ...canvasOutput, nextAction: `直接调用${name}并带projectId和本次specification；工具付费审批承担制作确认，不再另问一次。` };

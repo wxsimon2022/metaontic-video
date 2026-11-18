@@ -1,3 +1,5 @@
+import { narrativeDiagnostics } from '../quality/content.js';
+import { MAX_SEGMENTS } from '../../video/config.js';
 import { sourceRevisions, GENERIC_MODEL_PROFILE, STAGE_DEPS, projectContext, modelProfile } from '../contracts/index.js';
 import { evaluateReview } from '../quality/review.js';
 import { roleInstructions } from '../roles/index.js';
@@ -13,7 +15,7 @@ export function nextTask(state: any) {
       const roles = {creative:'creative',script:'screenwriter',assets:'character + scene',shots:'storyboard',prompts:'prompt-engineer',review:'reviewer'};
       const dependencies = STAGE_DEPS;
       const roleIds={creative:['creative'],script:['screenwriter'],assets:['character','scene'],shots:['storyboard'],prompts:['prompt-engineer'],review:['reviewer']};
-      return { action:'submit', submission_contract:submissionContract(stage), ...projectContext(state), work_profile:profileContext(state), input_revisions:sourceRevisions(state,stage), revision_scope:artifact?.stale_entity_ids || [], model_profile:modelProfile(state), stage, role:roles[stage], inputs:Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]])), instructions:roleIds[stage].map(role=>roleInstructions(state,role)).join('\n\n'),expectedRevision:state.revision };
+      return { action:'submit', narrative_diagnostics:narrativeDiagnostics(state.artifacts.script?.data), submission_contract:submissionContract(stage), ...projectContext(state), work_profile:profileContext(state), input_revisions:sourceRevisions(state,stage), revision_scope:artifact?.stale_entity_ids || [], model_profile:modelProfile(state), stage, role:roles[stage], inputs:Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]])), instructions:roleIds[stage].map(role=>roleInstructions(state,role)).join('\n\n'),expectedRevision:state.revision };
     }
     if (['creative','script'].includes(stage) && state.approvals[stage] !== artifact.revision) {
       if(stage==='creative'&&profileContext(state).status==='UNSELECTED')return {action:'configure_profile',role:'director',...projectContext(state),work_profile:profileContext(state),expectedRevision:state.revision,instructions:'创意批准前确认作品类型，用configure_profile保存选择；保存会使当前草稿失效，需按类型更新后重新提交。不得把未回答当作同意。'};
@@ -35,8 +37,8 @@ export function validateCurrent(state: any) {
     if(stage==='review' && artifact.data.review_status && !evaluateReview(artifact.data).passed) throw Error('REVIEW_BLOCKED');
   }
 }
-/** 编译不付费；显式使用现有视频分段算法，镜头边界不改变调用次数。 */
-export function compileProduction(state: any, plan: any[], ratio: string, resolution: string) {
+/** 编译不付费；默认连续续拍，显式独立路线按批准镜头规划调用。 */
+export function compileProduction(state: any, plan: any[], ratio: string, resolution: string, capabilities:any=modelProfile(state)) {
   validateCurrent(state);
   if (!['16:9','9:16'].includes(ratio) || !['480p','720p'].includes(resolution)) throw Error('CONFIRMED_SPEC_REQUIRED');
   if (!Number.isSafeInteger(state.duration_ms) || state.duration_ms < 15000 || state.duration_ms > 3600000) throw Error('INVALID_PROJECT_DURATION');
@@ -45,15 +47,23 @@ export function compileProduction(state: any, plan: any[], ratio: string, resolu
   if(spec?.resolution && spec.resolution!==resolution) throw Error('PROJECT_SPEC_MISMATCH:resolution');
   const shots=state.artifacts.shots.data.shots;
   const prompts=state.artifacts.prompts.data.prompts;
+  const independent=spec?.production_strategy==='independent_shots';
+  if(independent) {
+    const capability=capabilities.supported_durations_ms;
+    if(!capability)throw Error('MODEL_CAPABILITY_UNVERIFIED');
+    if(shots.some(s=>s.duration_ms%1000||s.duration_ms<capability.min||s.duration_ms>capability.max))throw Error('INDEPENDENT_SHOT_DURATION_REQUIRES_REVISION');
+    plan=shots.map(s=>({kind:'generate',seconds:s.duration_ms/1000}));
+    if(plan.length>MAX_SEGMENTS)throw Error('TOO_MANY_INDEPENDENT_SHOTS');
+  }
   let start=0;
   const segments=plan.map((part,index)=>{
     const end=start+part.seconds*1000;
     const covered=shots.filter(s=>s.start_ms<end && s.end_ms>start);
     if(state.schema_version==='3.1.0' && covered.some(s=>s.start_ms<start||s.end_ms>end)) throw Error('SHOT_SPLIT_REQUIRES_STORYBOARD_REVISION');
-    if(state.schema_version==='3.1.0' && new Set(covered.map(s=>s.location_id)).size>1) throw Error('MULTI_LOCATION_SEGMENT_REQUIRES_REPLAN');
+    if(!independent && state.schema_version==='3.1.0' && new Set(covered.map(s=>s.location_id)).size>1) throw Error('MULTI_LOCATION_SEGMENT_REQUIRES_REPLAN');
     const prompt=covered.map(s=>`[${Math.max(start,s.start_ms)-start}–${Math.min(end,s.end_ms)-start}ms] ${prompts.find(p=>p.shot_id===s.shot_id).prompt}`).join('\n');
     const result={index:index+1,start_ms:start,end_ms:end,shot_ids:covered.map(s=>s.shot_id),prompt};start=end;return result;
   });
   if (start!==state.duration_ms || segments.some(s=>!s.prompt)) throw Error('PRODUCTION_DURATION_MISMATCH');
-  return {source_project_id:state.project_id,source_revision:state.revision,ratio,resolution,segments,specification:{prompt:segments[0].prompt,segmentPrompts:segments.map(s=>s.prompt),duration:state.duration_ms/1000,ratio,resolution}};
+  return {source_project_id:state.project_id,source_revision:state.revision,ratio,resolution,segments,specification:{prompt:segments[0].prompt,segmentPrompts:segments.map(s=>s.prompt),duration:state.duration_ms/1000,ratio,resolution,...(independent?{productionStrategy:'independent_shots',shotDurations:plan.map(p=>p.seconds)}:{})},strategy:independent?'independent_shots':'continuous_segments'};
 }

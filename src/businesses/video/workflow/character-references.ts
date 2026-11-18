@@ -12,7 +12,7 @@ export async function initialCharacterReferences(config, args, saved, signal) {
     return saved.characterReferences.map(item => ({ ...item, image_url: { ...item.image_url } }));
   }
   const referenceImages = Array.isArray(args.referenceImages) ? args.referenceImages : args.referenceImages ? [args.referenceImages] : [];
-  const source = args.characterReferenceImages ?? (referenceImages.length ? referenceImages : args.firstFrameUrl ? [args.firstFrameUrl] : []);
+  const source = args.characterReferenceImages ?? (referenceImages.length ? referenceImages : args.productionStrategy!=='independent_shots' && args.firstFrameUrl ? [args.firstFrameUrl] : []);
   const { refs } = validateImageRoles({ referenceImages: source }, resolveModel(config));
   const canvas = canvasSize(args.ratio || ref(config, 'ratio', 'adaptive'));
   const fit = canvas ? { size: canvas, config, signal } : null;

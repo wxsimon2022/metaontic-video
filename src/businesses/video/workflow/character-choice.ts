@@ -1,4 +1,4 @@
-import { readProject, writeProject, projectCharacterGate } from './project.js';
+import { readProject, writeProject, projectCharacterGate, hasProjectImages } from './project.js';
 /** 文生视频提交前强制取得角色图选择；不依赖模型是否遵守提示词。 */
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
@@ -12,12 +12,8 @@ const localIds = new WeakMap<object, string>();
 let nextId = 0;
 const IMAGE = '先生成角色图（单独计费）';
 const TEXT = '直接文生视频';
-function hasImages(args) {
-  return [args?.firstFrameUrl, ...(Array.isArray(args?.referenceImages) ? args.referenceImages : [args?.referenceImages]), ...(Array.isArray(args?.characterReferenceImages) ? args.characterReferenceImages : [])]
-    .some(value => typeof value === 'string' && Boolean(value.trim()));
-}
 export async function characterChoiceGate(ctx, config, exec, args) {
-  if (exec.name !== 'video_generate' || String(args?.resume || '').trim() || hasImages(args)) return null;
+  if (exec.name !== 'video_generate' || String(args?.resume || '').trim() || hasProjectImages(args)) return null;
   if (args?.projectId && !args.preparation) return projectCharacterGate(config, exec, args);
   const project = args?.projectId ? await readProject(args.projectId, exec) : null;
   const session = exec.agent?.session;

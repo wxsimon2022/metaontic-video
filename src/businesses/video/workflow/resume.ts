@@ -207,6 +207,7 @@ async function writePauseFile(dir, data) {
  *   cursor 已经生成好的秒数、total 整条的总秒数。
  */
 export function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
+  if(data.options?.productionStrategy==='independent_shots' && askedTotal!=null && askedTotal!==sumStepSeconds(data.plan || []))throw Error('INDEPENDENT_PLAN_CHANGE_REQUIRES_NEW_REVIEW');
   const done = Number(data.done) || 0;
   const cursor = Number(data.cursor) || 0;
   const fullPlan = (data.plan || []).map((step) => ({ ...step }));
@@ -225,7 +226,7 @@ export function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
 
 /** 续做时要沿用的参数：调用方只传 resume 时，靠这份记录还原上次的口径。 */
 export function pickResumeOptions(args) {
-  const keys = ['projectId',
+  const keys = ['projectId', 'productionStrategy','shotDurations','shotFrames',
     'mode', 'ratio', 'generateAudio', 'watermark', 'segmentPrompts', 'transitionDescription', 'merge',
     // 这几个是 video_extend 的口径（延长方向、提示词写法、整片时间轴位置）
     'direction', 'wording', 'startAt', 'inputVideoSeconds',

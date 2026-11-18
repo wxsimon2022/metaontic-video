@@ -1,3 +1,4 @@
+import { validateContentEvidence } from '../quality/content.js';
 import { resolveDimensions } from '../profiles/dimensions.js';
 import { validateIssueLifecycle, updateIssueRegistry } from './issues.js';
 import { validateV31 } from '../contracts/schema.js';
@@ -26,6 +27,7 @@ export function validateArtifact(stage: string, value: any, state: any) {
   validateV31(stage,value,state);
   validateReferences(stage,value,state);
   validateProfileArtifact(stage,value,state);
+  validateContentEvidence(stage,value,state);
   if (stage === 'creative') {
     nonempty('theme'); nonempty('logline');
     if (value.structure !== undefined) {

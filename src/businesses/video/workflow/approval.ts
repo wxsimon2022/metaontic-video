@@ -265,7 +265,7 @@ export async function preflightGate(ctx, config, exec) {
       costZh = `本段基础估价约¥${measured.segments[0].cny.toFixed(4)}，剩余计划${plan.length}段合计约¥${measured.cny.toFixed(4)}（价目日期${measured.priceDate}，倍率1，最低用量补足未计入）`;
       costEn = `This segment ~CNY ${measured.segments[0].cny.toFixed(4)}; remaining ${plan.length} segments ~CNY ${measured.cny.toFixed(4)} (base estimate, multiplier 1; minimum billing excluded)`;
     } catch (error) { costZh = `无法可靠估价（${error?.message || error}）`; costEn = 'A reliable cost estimate is unavailable'; }
-    const summary = `${resolveModel(config)} · ${ratio} · ${resolution} · ${audio ? '有音频' : '无音频'} · 本段${plan[0]?.seconds ?? '未知'}秒 · 剩余${plan.map(s => s.seconds).join('+')}秒`;
+    const summary = `${effectiveArgs.productionStrategy==='independent_shots'?'独立镜头生成，每镜计费、人物一致性需参考图；':'连续续拍；'}${resolveModel(config)} · ${ratio} · ${resolution} · ${audio ? '有音频' : '无音频'} · 本段${plan[0]?.seconds ?? '未知'}秒 · 剩余${plan.map(s => s.seconds).join('+')}秒`;
     return {
       kind: 'ask',
       reason: `${resumeLead?.zh || ''}制作确认：${connectionLabel(config)} ${summary}；${costZh}。按当前 API密钥在渠道的实际用量计费。`,

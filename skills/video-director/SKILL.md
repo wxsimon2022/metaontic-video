@@ -58,3 +58,15 @@ export返回JSON、可读Markdown和版本清单，包括真实存储引用与SH
 审核使用Reviewer V3.1，CRITICAL/MAJOR未VERIFIED时阻断；重大问题需责任产物改版、RESOLVED报告与verify_issue复审登记，不能靠报告自标通过。最终审核必须覆盖全链路与适用维度，分数不能绕过。未观看/试听真实视频不称媒体质量已通过。模型能力未知使用null和UNVERIFIED，不把示例当实测。
 
 本技能不授权安装、发布、修改设置或付费重做；API密钥只在设置页配置，不索取、不回显。实际工具和当前用户授权优先于参考文件示例。
+
+
+## 制作与诊断补充
+
+- 分镜示意图统一用video_project(action:"storyboard",captureScript:true,scriptPath)免费本地渲染；正文只写一次脚本，不手写绘图程序，展示返回图片再review。
+- 编译后的专业提示词、分段及规格已绑定制作项目；不改写后绕过专业审查，冲突返回film_project修订、重审和compile。
+- 默认连续续拍；用户明确选择独立镜头才保存production_strategy="independent_shots"。每镜独立计费、无上一段视频输入，估价传相同productionStrategy/shotDurations；逐镜审核、resume和费用确认不省略。独立镜头不保证人物一致，优先使用获批参考图。全局firstFrameUrl/lastFrameUrl只绑定全片首镜/末镜；逐镜首尾帧通过与shotDurations等长的shotFrames设置，无素材填{}，不能将首镜画面提升为全镜人物参考；改素材重新制作审核。
+- 新项目quality_policy="evidence_v1"：创意提供purpose/visual_evidence，场次提供scene_goal/key_actions/entry_state/exit_state；终审score_evidence逐维提供依据，theme_evidence关联scene_id和可见行动/声音。超时风险由budget_checks记录处理依据，不把估算当绝对口速或艺术判定。
+- 地点、场景状态、道具可通过revise的locations/scene_states/props定向替换；保留稳定ID，按受影响镜头更新下游，不能直接改磁盘文件。
+- 仅visual_style/style_profile调整保留创意和剧本批准，资产与下游重检；tone默认按叙事变化重审，明确只改光色/演绎基调时configure_profile传change_scope="visual_only"，不能借此改剧情。
+- PROJECT_LOCKED先diagnose；活跃或无法确定的锁不删除，仅运行时证实同机进程已退出才recover_lock。read不取写锁，可读取最后完整提交；不把读取到的版本当审批中稿件。
+- 快照保留最近30份及审批/依赖版本，不随意删除用户材料。film_stage_finished仅记录动作、阶段、耗时、失败类别和响应字节，不包含创意、台词或密钥。
