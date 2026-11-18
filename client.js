@@ -1326,7 +1326,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "4.0.3".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "4.0.4".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1793,7 +1793,7 @@
   // package.json
   var package_default = {
     name: "dsh-metaontic-video",
-    version: "4.0.3",
+    version: "4.0.4",
     description: "面向新手的 AI 视频创作助手：从想法、脚本到视频生成，全程引导；通过分段续拍与本地合并，提供低成本长视频制作方案。",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1908,11 +1908,11 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "4.0.3",
+      version: "4.0.4",
       prerelease: false,
-      publishedAt: "2026-11-18T09:42:44.891Z",
+      publishedAt: "2026-11-18T13:11:27.128Z",
       items: [
-        "优化：完善迁移中断保护与安装状态超时处理，失败可重新检查，避免旧包误清理和长时间等待。"
+        "优化：收紧插件设置布局，客服移至卸载左侧；API验证仅在共用密钥时显示，避免将模型清单403误判为生成权限异常；隐藏详情页README。"
       ]
     }
   };
