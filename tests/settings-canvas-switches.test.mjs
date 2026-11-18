@@ -34,7 +34,7 @@ function bootSettings(initial) {
   const components = {}, dictionaries = {};
   const host = createPreviewHost({ form, components, dictionaries, getLocale: () => 'zh', onUpdate() {} });
   plugin.apply(host);
-  const Page = components['plugins.bundle.config:metaontic-video'];
+  const Page = components['plugins.bundle.config:dsh-metaontic-video'];
   assert.equal(typeof Page, 'function', '设置页组件已注册');
   const render = () => renderToStaticMarkup(React.createElement(Page, { view: 'full' }));
   return { render, form };
@@ -44,15 +44,15 @@ function bootSettings(initial) {
 const hasAutoCreateSwitch = (html) => html.includes('流程画布打开后有效');
 const hasCanvasSwitch = (html) => html.includes('关闭时左侧栏不出现');
 
-test('设置页：总开关关着不显示自动创建，打开后出现，再关掉又隐藏', () => {
+test('设置页隐藏全部画布开关，旧的开启配置也不重新显示', () => {
   const { render, form } = bootSettings({ canvasEnabled: false });
   const off = render();
-  assert.ok(hasCanvasSwitch(off), '总开关一直都在');
+  assert.ok(!hasCanvasSwitch(off), '总开关隐藏');
   assert.ok(!hasAutoCreateSwitch(off), '总开关关着时不该出现自动创建画布');
   form.set('canvasEnabled', true);
   const on = render();
-  assert.ok(hasCanvasSwitch(on));
-  assert.ok(hasAutoCreateSwitch(on), '打开总开关后自动创建画布出现');
+  assert.ok(!hasCanvasSwitch(on));
+  assert.ok(!hasAutoCreateSwitch(on), '旧的开启配置也不显示自动创建');
   form.set('canvasEnabled', false);
   assert.ok(!hasAutoCreateSwitch(render()), '再关掉总开关又隐藏');
 });

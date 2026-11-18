@@ -27,7 +27,7 @@ description: 用于视频创意、故事剧本、分镜、逐镜提示词及视�
 | 导演分镜 | [分镜与制作映射](references/segment-storyboard.md) | 覆盖剧情，明确动作、轴线、声画和毫秒时间轴；不生成最终模型提示词 |
 | 视频提示词 | [提示词写法](references/prompt-playbook.md)；有对白读发音规范 | 每镜独立完整，锚点展开，不自行拆镜、添人物或改原话 |
 | 审核与局部修订 | [专业数据与修订协议](references/professional-workflow.md)，指定版本产物和当前Reviewer规则 | 问题有来源、位置、责任与复审条件；Reviewer只审不改 |
-| 实际视频生成、续拍、恢复、角色图、画布 | [执行工作流](references/execution-workflow.md) | 必须在执行前读取，沿用脚本审核、费用确认、逐段结果审核与防重记录 |
+| 实际视频生成、续拍、恢复、角色图 | [执行工作流](references/execution-workflow.md) | 必须在执行前读取，沿用脚本审核、费用确认、逐段结果审核与防重记录 |
 | 合成或媒体交付 | [FFmpeg操作](references/ffmpeg.md)，执行工作流 | 只处理真实已有文件，实际检查后报告；配置与外部工具权限不扩大 |
 | 准备普通制作脚本文档 | [项目模板](references/project-template.md) | 模板是可读材料，不是审批状态的事实源 |
 
@@ -70,3 +70,5 @@ export返回JSON、可读Markdown和版本清单，包括真实存储引用与SH
 - 仅visual_style/style_profile调整保留创意和剧本批准，资产与下游重检；tone默认按叙事变化重审，明确只改光色/演绎基调时configure_profile传change_scope="visual_only"，不能借此改剧情。
 - PROJECT_LOCKED先diagnose；活跃或无法确定的锁不删除，仅运行时证实同机进程已退出才recover_lock。read不取写锁，可读取最后完整提交；不把读取到的版本当审批中稿件。
 - 快照保留最近30份及审批/依赖版本，不随意删除用户材料。film_stage_finished仅记录动作、阶段、耗时、失败类别和响应字节，不包含创意、台词或密钥。
+
+流程画布暂隐藏，不引导设置开关、画布入口或video_canvas；当前全部创作通过视频创作助手完成，历史数据保留。

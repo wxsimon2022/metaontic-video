@@ -13,9 +13,9 @@
 import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GITEE, GITHUB, PLUGIN_PACKAGE } from '../hardcoded-config.js';
+import { GITEE, GITHUB, PLUGIN_ID, PLUGIN_PACKAGE } from '../hardcoded-config.js';
 
-const PACKAGE_NAME = PLUGIN_PACKAGE;
+const PACKAGE_NAMES = new Set([PLUGIN_PACKAGE, PLUGIN_ID]);
 const LOCKFILE = 'pnpm-lock.yaml';
 /** 本插件成品包的发布地址；这类记录必须能验签，否则 pnpm 会拒绝整次安装。 */
 const RELEASE_HOSTS = [GITEE, GITHUB].map(({ web }) => web.replace(/^https?:\/\//, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
@@ -63,31 +63,32 @@ export function stripUnverifiableEntries(text) {
   const verified = new Set();
   for (let index = 0; index < lines.length; index += 1) {
     const entry = remoteEntry(lines[index]);
-    if (!entry || entry.name !== PACKAGE_NAME) continue;
+    if (!entry || !PACKAGE_NAMES.has(entry.name)) continue;
     const end = blockEnd(lines, index, 2);
     const block = lines.slice(index, end).join('\n');
     // 只处理远程 tgz 记录：键本身是发布地址，或块里带了 tarball 地址；本机 link:/file: 记录不动。
     if (!RELEASE_URL.test(entry.url) && !/tarball:\s*https?:\/\//.test(block)) continue;
-    ours.add(entry.url);
-    if (SHA.test(integrityOf(block))) verified.add(entry.url);
+    ours.add(entry.name + '@' + entry.url);
+    if (SHA.test(integrityOf(block))) verified.add(entry.name + '@' + entry.url);
   }
   const poisoned = new Set([...ours].filter((url) => !verified.has(url)));
   if (!poisoned.size) return { text, removed: [] };
   const removed = new Set();
   for (let index = 0; index < lines.length; index += 1) {
     const entry = remoteEntry(lines[index]);
-    if (!entry || entry.name !== PACKAGE_NAME || !poisoned.has(entry.url)) continue;
+    if (!entry || !PACKAGE_NAMES.has(entry.name) || !poisoned.has(entry.name + '@' + entry.url)) continue;
     const end = blockEnd(lines, index, 2);
     removed.add(entry.name + '@' + entry.url);
     lines.splice(index, end - index);
     index -= 1;
   }
   for (let index = 0; index < lines.length; index += 1) {
-    if (!/^ {6}metaontic-video:\s*$/.test(lines[index])) continue;
+    if (!/^ {6}(?:dsh-)?metaontic-video:\s*$/.test(lines[index])) continue;
     const specifier = (/^\s+specifier:\s*(\S+)\s*$/.exec(lines[index + 1] || '') || [])[1]
       || (/^\s+version:\s*(\S+)\s*$/.exec(lines[index + 2] || '') || [])[1]
       || '';
-    if (!poisoned.has(specifier)) continue;
+    const dependencyName = lines[index].trim().slice(0, -1);
+    if (!poisoned.has(dependencyName + '@' + specifier)) continue;
     lines.splice(index, blockEnd(lines, index, 6) - index);
     index -= 1;
   }

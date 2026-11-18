@@ -583,9 +583,10 @@
 
   // src/core/hardcoded-config.ts
   var PLUGIN_ID = "metaontic-video";
-  var PLUGIN_PACKAGE = PLUGIN_ID;
+  var PLUGIN_PACKAGE = "dsh-metaontic-video";
   var PLUGIN_NAMESPACE = PLUGIN_ID;
   var PANEL_ID = PLUGIN_ID;
+  var FLOW_CANVAS_AVAILABLE = false;
   var CANVAS_PANEL_ID = `${PLUGIN_ID}-canvas`;
   var GUIDE_URL = "https://ai.mybfs.cn";
   var SUPPORT_URL = "https://work.weixin.qq.com/kfid/kfcd6fc4ca793eeac18";
@@ -685,7 +686,7 @@
       { key: "sectionConnection", fields: ["connectionMode"] },
       { key: "sectionModels", fields: ["imageUseVideoKey", "model", "metaonticApiKey", "volcengineApiKey", "imageModel", "imageApiKey", "textModel", "textApiKey"] },
       { key: "sectionVideo", fields: ["ratio", "generateAudio"] },
-      { key: "sectionCanvas", fields: ["canvasEnabled", "autoCreateCanvas"] }
+      ...FLOW_CANVAS_AVAILABLE ? [{ key: "sectionCanvas", fields: ["canvasEnabled", "autoCreateCanvas"] }] : []
     ];
     const FIELDS = [
       { key: "connectionMode", kind: "select", wide: true },
@@ -858,7 +859,7 @@
       textApiKey: "\u6587\u672C\u6A21\u578B API\u5BC6\u94A5",
       resolution: "\u89C6\u9891\u6E05\u6670\u5EA6",
       imageModelHint: "Seedream\u53EF\u751F\u6210\u89D2\u8272\u56FE\uFF1B\u9047\u771F\u4EBA\u9650\u5236\u65F6\uFF0C\u7ECF\u540C\u610F\u53EF\u8F6C\u6362\u53C2\u8003\u56FE\u3002\u56FE\u7247\u8C03\u7528\u5355\u72EC\u8BA1\u8D39\uFF0C\u7ED3\u679C\u9700\u5BA1\u6838\u3002",
-      textModelHint: "\u753B\u5E03\u300C\u521B\u4F5C\u6D41\u7A0B\u300D\u91CC\u7528\u8FD9\u4E2A\u578B\u53F7\u628A\u4E00\u6BB5\u60F3\u6CD5\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF1B\u8D70\u540C\u4E00\u4E2D\u8F6C\u7AD9\u7684 /v1/chat/completions\uFF0C\u5355\u72EC\u6309\u6587\u672C\u8BA1\u8D39\u3002\u5019\u9009\u4E0E\u4E2D\u8F6C\u7AD9\u5728\u552E\u7684\u6587\u672C\u6A21\u578B\u4E00\u81F4\uFF0C\u65E7\u7684\u9ED8\u8BA4\u578B\u53F7\u5DF2\u4E0B\u7EBF\uFF0C\u8BFB\u5230\u4F1A\u81EA\u52A8\u6362\u6210\u9ED8\u8BA4\u9879\u3002",
+      textModelHint: "\u4FDD\u7559\u914D\u7F6E\uFF1A\u6D41\u7A0B\u753B\u5E03\u6682\u9690\u85CF\uFF0C\u5BF9\u8BDD\u5199\u811A\u672C\u4F7F\u7528Harness\u4F1A\u8BDD\u6A21\u578B\u3002\u539F\u753B\u5E03\u300C\u521B\u4F5C\u6D41\u7A0B\u300D\u91CC\u7528\u8FD9\u4E2A\u578B\u53F7\u628A\u4E00\u6BB5\u60F3\u6CD5\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF1B\u8D70\u540C\u4E00\u4E2D\u8F6C\u7AD9\u7684 /v1/chat/completions\uFF0C\u5355\u72EC\u6309\u6587\u672C\u8BA1\u8D39\u3002\u5019\u9009\u4E0E\u4E2D\u8F6C\u7AD9\u5728\u552E\u7684\u6587\u672C\u6A21\u578B\u4E00\u81F4\uFF0C\u65E7\u7684\u9ED8\u8BA4\u578B\u53F7\u5DF2\u4E0B\u7EBF\uFF0C\u8BFB\u5230\u4F1A\u81EA\u52A8\u6362\u6210\u9ED8\u8BA4\u9879\u3002",
       modelHint: "mini \u4FA7\u91CD\u6210\u672C\uFF0Cfast \u4FA7\u91CD\u751F\u6210\u901F\u5EA6\u3002\u5B9E\u9645\u4EF7\u683C\u4EE5\u6240\u9009\u6E20\u9053\u4E3A\u51C6\u3002",
       mergeMode: "\u5408\u5E76\u65B9\u5F0F",
       mergeModeSeamless: "\u76F4\u63A5\u62FC\u63A5\uFF08\u65E7\u914D\u7F6E\u517C\u5BB9\uFF09",
@@ -1041,7 +1042,7 @@
       textApiKey: "Text model key",
       resolution: "Video resolution",
       imageModelHint: "Seedream creates character images or, with consent after a real-person restriction, stylizes references. Image calls are billed separately and results require review.",
-      textModelHint: "Used inside the canvas flow panel to turn a brief into a script and storyboard table through the same relay (/v1/chat/completions); text calls are billed separately. Options match the text models on sale at the relay; the retired default is replaced with the current default.",
+      textModelHint: "Retained configuration: the workflow canvas is temporarily hidden; chat scripting uses the Harness session model. Previously used inside the canvas flow panel to turn a brief into a script and storyboard table through the same relay (/v1/chat/completions); text calls are billed separately. Options match the text models on sale at the relay; the retired default is replaced with the current default.",
       modelHint: "mini focuses on cost; fast focuses on generation speed. Actual prices depend on your provider.",
       mergeMode: "Merge mode",
       mergeModeSeamless: "Direct concat (legacy setting)",
@@ -1728,7 +1729,7 @@
 
   // package.json
   var package_default = {
-    name: "metaontic-video",
+    name: "dsh-metaontic-video",
     version: "3.32.0",
     description: "\u9762\u5411\u65B0\u624B\u7684 AI \u89C6\u9891\u521B\u4F5C\u52A9\u624B\uFF1A\u4ECE\u60F3\u6CD5\u3001\u811A\u672C\u5230\u89C6\u9891\u751F\u6210\uFF0C\u5168\u7A0B\u5F15\u5BFC\uFF1B\u901A\u8FC7\u5206\u6BB5\u7EED\u62CD\u4E0E\u672C\u5730\u5408\u5E76\uFF0C\u63D0\u4F9B\u4F4E\u6210\u672C\u957F\u89C6\u9891\u5236\u4F5C\u65B9\u6848\u3002",
     license: "SEE LICENSE IN LICENSE",
@@ -1875,7 +1876,7 @@
       FIELD_BY_KEY,
       SECTIONS,
       formatMoney,
-      PLUGIN_PACKAGE: PLUGIN_PACKAGE2,
+      PLUGIN_PACKAGE: PLUGIN_PACKAGE3,
       UPDATE_SPEC: UPDATE_SPEC2,
       UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2,
       isNewerVersion,
@@ -1970,7 +1971,7 @@
             return manager;
           },
           get PLUGIN_PACKAGE() {
-            return PLUGIN_PACKAGE2;
+            return PLUGIN_PACKAGE3;
           },
           get updateLatest() {
             return updateLatest;
@@ -5303,8 +5304,8 @@
     const { PLUGIN_OWNED_KEYS, SELECTS, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, NS, NAMESPACE } = createClientConfig();
     const { zh, en } = createDictionaries();
     const { useSnapshot, same, validateSettings, persistConnection, persistBatch } = createSettingsState({ React });
-    const { PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, fetchRecentVersions, PLUGIN_PACKAGE: PLUGIN_PACKAGE2, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell } = createUpdates({ h });
-    const { makePage } = createSettingsPage({ useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS, persistBatch, PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, SELECTS, inputStyle, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE: PLUGIN_PACKAGE2, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell, PAGE_CSS });
+    const { PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, fetchRecentVersions, PLUGIN_PACKAGE: PLUGIN_PACKAGE3, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell } = createUpdates({ h });
+    const { makePage } = createSettingsPage({ useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS, persistBatch, PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, SELECTS, inputStyle, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE: PLUGIN_PACKAGE3, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell, PAGE_CSS });
     return {
       inject: ["slots", "locale", "configForms", "uiSession"],
       apply(ctx, { settings }) {
@@ -5347,8 +5348,8 @@
           return { manager: null, tried };
         };
         const Page = makePage({ form, t, manager: pluginManager });
-        settings.register({ id: "video", namespace: NAMESPACE, locale: NS, Page });
-        const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS, PAGE_CSS });
+        settings.register({ id: "video", namespace: PLUGIN_PACKAGE3, locale: NS, Page });
+        const FlowCanvasPage = FLOW_CANVAS_AVAILABLE ? createCanvasView({ React, h, TOKENS, PAGE_CSS }).FlowCanvas : null;
         const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: icon_default });
         ensureUpdateHintStyles();
         const updateHint = createUpdateHint({ version: PLUGIN_VERSION, isNewerVersion, fetchRecentVersions, cacheKey: UPDATE_CACHE_KEY2, maxAge: UPDATE_MAX_AGE_MS2 });
@@ -5360,7 +5361,7 @@
           version: PLUGIN_VERSION,
           isNewerVersion,
           manager: pluginManager,
-          pluginPackage: PLUGIN_PACKAGE2,
+          pluginPackage: PLUGIN_PACKAGE3,
           updateSpec: UPDATE_SPEC2,
           updateAttempts: UPDATE_ATTEMPTS2,
           cacheKey: UPDATE_CACHE_KEY2,
@@ -5390,7 +5391,7 @@
           // 面板要的两个动作都按需取服务：老宿主没有这些服务时按钮自然失效，不报错。
           inject: () => ({
             startSession: () => ctx.get("uiWorkspace")?.startSession(void 0, { agentPreset: "video-director" }),
-            openSettings: () => ctx.get("pluginNavigation")?.openBundle(NAMESPACE),
+            openSettings: () => ctx.get("pluginNavigation")?.openBundle(PLUGIN_PACKAGE3),
             manager: pluginManager,
             // 面板顶部的更新入口：与设置页同一套两步确认，点左侧栏的「有更新」进来就能更新。
             updateBanner: () => h(UpdateHintBanner, { key: "update-hint" })
@@ -5398,7 +5399,7 @@
         }, VideoPanel)), "metaontic-video: sidebar panel");
         const canvasSwitchOn = () => {
           try {
-            return form?.getSnapshot?.()?.value?.canvasEnabled === true;
+            return FLOW_CANVAS_AVAILABLE && form?.getSnapshot?.()?.value?.canvasEnabled === true;
           } catch {
             return false;
           }
@@ -5454,7 +5455,7 @@
 
   // src/client.ts
   window.__ModuleLoader__.load({
-    id: PLUGIN_ID,
+    id: PLUGIN_PACKAGE,
     factory: (require2) => createClientRuntime(require2, [{ id: "video", create: createVideoClient }])
   });
 })();

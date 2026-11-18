@@ -14,7 +14,7 @@ import { createSidebarPanel } from './client/panel.js';
 import { createCanvasView } from './client/canvas-view.js';
 import iconMark from '../../../icon.svg';
 
-import { CANVAS_PANEL_ID, GUIDE_URL, PANEL_ID } from '../../core/hardcoded-config.js';
+import { PLUGIN_PACKAGE, FLOW_CANVAS_AVAILABLE, CANVAS_PANEL_ID, GUIDE_URL, PANEL_ID } from '../../core/hardcoded-config.js';
 
 export function createVideoClient(require) {
     const React = require('react');
@@ -78,10 +78,10 @@ export function createVideoClient(require) {
         const Page = makePage({ form, t, manager: pluginManager });
         // 第三方 bundle 的配置页注册到 plugins.bundle.config，以 npm 包名为 key；
         // 打开「已安装插件」里的 metaontic-video 详情页时显示在描述与组件行之间。
-        settings.register({ id: 'video', namespace: NAMESPACE, locale: NS, Page });
+        settings.register({ id: 'video', namespace: PLUGIN_PACKAGE, locale: NS, Page });
         // 面板组件要用当前配置快照与界面字典（form/t 在 apply 里才有），所以在这里构造。
         // 流程画布只做独立页面：左侧栏有单独入口，视频创作面板里不再内嵌画布。
-        const { FlowCanvas: FlowCanvasPage } = createCanvasView({ React, h, TOKENS, PAGE_CSS });
+        const FlowCanvasPage = FLOW_CANVAS_AVAILABLE ? createCanvasView({ React, h, TOKENS, PAGE_CSS }).FlowCanvas : null;
         const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: iconMark });
         // 有更新时只在入口那一行点一个红点：展开时贴在这行右端（原来写「有更新」的位置），收起时落在图标角上，
         // 入口名字本身不带文字。状态放在 update-hint 的轻量 store 里：宿主渲染那一行，拿不到设置页的 state。
@@ -117,7 +117,7 @@ export function createVideoClient(require) {
           // 面板要的两个动作都按需取服务：老宿主没有这些服务时按钮自然失效，不报错。
           inject: () => ({
             startSession: () => ctx.get('uiWorkspace')?.startSession(undefined, { agentPreset: 'video-director' }),
-            openSettings: () => ctx.get('pluginNavigation')?.openBundle(NAMESPACE),
+            openSettings: () => ctx.get('pluginNavigation')?.openBundle(PLUGIN_PACKAGE),
             manager: pluginManager,
             // 面板顶部的更新入口：与设置页同一套两步确认，点左侧栏的「有更新」进来就能更新。
             updateBanner: () => h(UpdateHintBanner, { key: 'update-hint' }),
@@ -126,7 +126,7 @@ export function createVideoClient(require) {
         // 流程画布是可开关的组件：设置页「流程画布」总开关打开时才注册左侧栏入口与画布页。
         // 关闭后左侧栏不再出现画布入口，已有画布与成果仍留在插件数据目录；开关改动实时生效，不必重开 Harness。
         const canvasSwitchOn = () => {
-          try { return form?.getSnapshot?.()?.value?.canvasEnabled === true; } catch { return false; }
+          try { return FLOW_CANVAS_AVAILABLE && form?.getSnapshot?.()?.value?.canvasEnabled === true; } catch { return false; }
         };
         const canvasSlots = [
           () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({

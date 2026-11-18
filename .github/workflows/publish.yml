@@ -59,6 +59,7 @@ jobs:
         run: |
           mkdir -p dist
           npm pack --pack-destination dist
+          node scripts/normalize-package-name.mjs dist
           VERSION=$(node -p "require('./package.json').version")
           python3 scripts/strip-package-readme.py "dist/metaontic-video-$VERSION.tgz"
       - name: Reuse the published Gitee artifact

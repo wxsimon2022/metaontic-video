@@ -1,3 +1,4 @@
+import { FLOW_CANVAS_AVAILABLE } from '../../../core/hardcoded-config.js';
 /** 浏览器端 config：由入口注入宿主 React 与共享依赖。 */
 import { VOLCENGINE_MODE_AVAILABLE, IMAGE_MODEL, TEXT_MODELS } from '../connection-defaults.js';
 import { PLUGIN_NAMESPACE, VIDEO_MODEL_OPTIONS } from '../../../core/hardcoded-config.js';
@@ -37,7 +38,7 @@ export function createClientConfig() {
       { key: 'sectionConnection', fields: ['connectionMode'] },
       { key: 'sectionModels', fields: ['imageUseVideoKey', 'model', 'metaonticApiKey', 'volcengineApiKey', 'imageModel', 'imageApiKey', 'textModel', 'textApiKey'] },
       { key: 'sectionVideo', fields: ['ratio', 'generateAudio'] },
-      { key: 'sectionCanvas', fields: ['canvasEnabled', 'autoCreateCanvas'] },
+      ...(FLOW_CANVAS_AVAILABLE ? [{ key: 'sectionCanvas', fields: ['canvasEnabled', 'autoCreateCanvas'] }] : []),
     ];
     const FIELDS = [
       { key: 'connectionMode', kind: 'select', wide: true },

@@ -28,7 +28,7 @@ function boot(form) {
   return { host, components, dictionaries };
 }
 
-test('流程画布开关关掉后左侧栏不再注册画布入口，打开立刻回来', () => {
+test('流程画布暂隐藏，旧配置及开关变化都不能重新注册入口', () => {
   const form = switchForm({ canvasEnabled: false });
   const off = boot(form);
   assert.equal(off.components['sidebar.panellist:metaontic-video-canvas'], undefined, '关闭时不该有画布图标');
@@ -36,8 +36,8 @@ test('流程画布开关关掉后左侧栏不再注册画布入口，打开立�
   // 视频创作入口不受影响。
   assert.equal(typeof off.components['sidebar.panellist:metaontic-video'], 'function', '视频创作入口照旧');
   form.set('canvasEnabled', true);
-  assert.equal(typeof off.components['sidebar.panellist:metaontic-video-canvas'], 'function', '打开后画布图标回来');
-  assert.equal(typeof off.components['main:metaontic-video-canvas'], 'function', '打开后画布页回来');
+  assert.equal(off.components['sidebar.panellist:metaontic-video-canvas'], undefined, '旧开关不能恢复隐藏入口');
+  assert.equal(off.components['main:metaontic-video-canvas'], undefined, '旧开关不能恢复隐藏页面');
   form.set('canvasEnabled', false);
   assert.equal(off.components['sidebar.panellist:metaontic-video-canvas'], undefined, '再关掉又消失');
 });
@@ -56,16 +56,16 @@ test('standalone preview host mounts the real client and registers settings and 
   }
   assert.equal(host.locale.bind('settings.metaonticVideo')('save'), '保存');
   assert.equal(host.locale.bind('settings.metaonticVideo')('panelTitle'), '视频创作');
-  assert.equal(typeof components['plugins.bundle.config:metaontic-video'], 'function', '设置页');
+  assert.equal(typeof components['plugins.bundle.config:dsh-metaontic-video'], 'function', '设置页');
   assert.equal(typeof components['tool.call.toolview:video_generate'], 'function', '工具卡片');
   assert.equal(typeof components['conversation.input.dock:metaontic-video-progress'], 'function', '输入框进度');
   assert.equal(typeof components['sidebar.panellist:metaontic-video'], 'function', '左侧栏图标');
   assert.equal(typeof components['main:metaontic-video'], 'function', '左侧栏面板本体');
   // 流程画布是插件自己的独立页面：单独的左侧栏入口与 main 键位槽。
-  assert.equal(typeof components['sidebar.panellist:metaontic-video-canvas'], 'function', '画布页图标');
+  assert.equal(components['sidebar.panellist:metaontic-video-canvas'], undefined, '画布页隐藏');
   // 左侧栏那一行的名字：带上产品名，方便在图标列表里认出来。
   assert.equal(host.locale.bind('settings.metaonticVideo')('canvasPanelLabel'), 'MetaOnticVideo流程画布');
-  assert.equal(typeof components['main:metaontic-video-canvas'], 'function', '流程画布页面');
+  assert.equal(components['main:metaontic-video-canvas'], undefined, '流程画布页面隐藏');
   const panel = components['main:metaontic-video:props']();
   panel.startSession();
   const started = host.calls.at(-1);
@@ -75,7 +75,7 @@ test('standalone preview host mounts the real client and registers settings and 
   panel.openSettings();
   const opened = host.calls.at(-1);
   assert.equal(opened.action, 'openBundle');
-  assert.equal(opened.bundle, 'metaontic-video');
+  assert.equal(opened.bundle, 'dsh-metaontic-video');
   // 流程画布只在独立页面：视频创作面板不再内嵌，也不再有跳转入口。
   assert.equal(panel.openCanvasPage, undefined, '面板不再提供 openCanvasPage');
   assert.equal(components['main:metaontic-video-canvas:props'], undefined, '画布页不需要宿主注入动作');

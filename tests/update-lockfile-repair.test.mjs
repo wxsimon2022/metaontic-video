@@ -252,3 +252,14 @@ test('同级 staging 目录（宿主换 profile 时的临时副本）里的锁�
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('renamed package repairs its lock entries while preserving verified legacy entries at the same URL', () => {
+  const legacy = lockfile(url => `{integrity: sha512-YWJj, tarball: ${url}}`);
+  const renamed = lockfile(url => `{tarball: ${url}}`).replaceAll('metaontic-video@', 'dsh-metaontic-video@').replace('      metaontic-video:', '      dsh-metaontic-video:');
+  const {text, removed} = stripUnverifiableEntries(legacy + '\n' + renamed);
+  assert.equal(removed.length, 1);
+  assert.ok(removed[0].startsWith('dsh-metaontic-video@'));
+  assert.ok(text.includes(`  metaontic-video@${URL_OLD}:`));
+  assert.ok(text.includes('      metaontic-video:'));
+  assert.ok(!text.includes('      dsh-metaontic-video:'));
+});

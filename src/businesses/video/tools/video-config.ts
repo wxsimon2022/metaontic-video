@@ -1,3 +1,4 @@
+import { FLOW_CANVAS_AVAILABLE } from '../../../core/hardcoded-config.js';
 import { VOLCENGINE_MODE_AVAILABLE, IMAGE_MODEL, resolveImageModel } from '../connection-defaults.js';
 /** tools/video-config：从宿主入口拆出的独立职责模块。 */
 import { ref } from '../config.js';
@@ -36,8 +37,8 @@ export function configView(config) {
   return {
     stored: maskSecrets(stored),
     effective: {
-      canvasEnabled: ref(config, 'canvasEnabled', false) === true,
-      autoCreateCanvas: ref(config, 'canvasEnabled', false) === true && ref(config, 'autoCreateCanvas', true) === true,
+      canvasEnabled: FLOW_CANVAS_AVAILABLE && ref(config, 'canvasEnabled', false) === true,
+      autoCreateCanvas: FLOW_CANVAS_AVAILABLE && ref(config, 'canvasEnabled', false) === true && ref(config, 'autoCreateCanvas', true) === true,
       connectionMode: isVolcengine(config) ? 'volcengine' : 'metaontic',
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),

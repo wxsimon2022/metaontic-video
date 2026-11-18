@@ -41,7 +41,7 @@ test('published host preserves schema, tool registration, live configuration and
   assert.ok(plugin.Config);
   const config = { connectionMode: 'metaontic', metaonticApiKey: 'test', model: 'seedance-2-0' };
   const host = harness(config, '/tmp');
-  assert.deepEqual([...host.tools.keys()].sort(), ['film_project', 'media_submission', 'video_canvas', 'video_config', 'video_estimate', 'video_extend', 'video_generate', 'video_prepare_image', 'video_project', 'video_setup', 'video_stage', 'video_status']);
+  assert.deepEqual([...host.tools.keys()].sort(), ['film_project', 'media_submission', 'video_config', 'video_estimate', 'video_extend', 'video_generate', 'video_prepare_image', 'video_project', 'video_setup', 'video_stage', 'video_status']);
   assert.match(host.prompt(), /直出上限 15 秒/);
   config.model = 'seedance-2-5';
   assert.match(host.prompt(), /直出上限 30 秒/);
@@ -49,7 +49,7 @@ test('published host preserves schema, tool registration, live configuration and
   assert.equal(decision.kind, 'deny');
   assert.match(decision.reason, /projectId/);
   host.dispose();
-  assert.equal(host.disposed(), 12);
+  assert.equal(host.disposed(), 11);
 });
 
 test('conversation stays inside video creation and configuration is read-only in chat', async () => {
@@ -266,4 +266,20 @@ test('script writing starts from a director pass instead of a checklist', async 
     assert.ok(reference.includes(needle), needle);
   }
   host.dispose();
+});
+
+test('hidden canvas ignores legacy enabled flags without changing the saved config or ordinary project flow',async()=>{
+ const previous=process.env.DSH_HOME;const home=await mkdtemp(path.join(os.tmpdir(),'hidden-canvas-'));process.env.DSH_HOME=home;
+ const config={canvasEnabled:true,autoCreateCanvas:true,connectionMode:'metaontic'};
+ const host=harness(config,home);
+ try {
+  assert.equal(host.tools.has('video_canvas'),false);
+  const view=await host.tools.get('video_config').execute({action:'get'});
+  assert.equal(view.stored.canvasEnabled,true);assert.equal(view.effective.canvasEnabled,false);assert.equal(view.effective.autoCreateCanvas,false);
+  const result=await host.tools.get('video_project').execute({action:'prepare',subjectType:'scenery',duration:15},{agent:{session:{id:'hidden-canvas',header:{cwd:home}}}});
+  assert.equal(result.status,'prepared');assert.equal(result.canvasProject,undefined);
+  assert.equal(host.tools.get('video_generate').parameters.properties.canvas,undefined);
+  assert.equal(config.canvasEnabled,true);assert.equal(config.autoCreateCanvas,true);
+  assert.doesNotMatch(host.prompt(),/先在插件设置页打开「流程画布」|工具会自动建流程画布项目/);
+ }finally{host.dispose();if(previous===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=previous;await rm(home,{recursive:true,force:true});}
 });

@@ -1,3 +1,4 @@
+import { FLOW_CANVAS_AVAILABLE } from '../../core/hardcoded-config.js';
 import { registerConnectionCheck } from './integrations/connection-check.js';
 import type { BusinessModule, BusinessRuntime } from '../../core/runtime.js';
 import { withMediaPreview } from './workflow/media-preview.js';
@@ -70,18 +71,20 @@ function applyVideoBusiness(runtime: BusinessRuntime) {
     } };
     return runtime.tools.register('video', withMediaPreview(guarded));
   };
-  const canvasBridge = createCanvasBridge(undefined, config);
-  const canvasProjects = createCanvasProjectSync(undefined, config, { get: session => (ctx.get?.('sessionTitle'))?.get(session) });
+  const canvasBridge = FLOW_CANVAS_AVAILABLE ? createCanvasBridge(undefined, config) : null;
+  const wrapCanvas = tool => canvasBridge ? canvasBridge.wrap(tool) : tool;
+  const canvasProjects = FLOW_CANVAS_AVAILABLE ? createCanvasProjectSync(undefined, config, { get: session => (ctx.get?.('sessionTitle'))?.get(session) }) : null;
   // 会话标题通常首轮之后才生成：标题落定或被改写时，把自动画布的项目名对齐成同一个名字。
-  runtime.defer((ctx as any).on('session/event', canvasProjects.followTitle));
-  const generation = canvasBridge.wrap(videoTool(config, deps, ctx));
-  const extension = canvasBridge.wrap(extendTool(config, deps, ctx));
-  register(jsonSafeTool(canvasBridge.tool));
+  if (canvasProjects) runtime.defer((ctx as any).on('session/event', canvasProjects.followTitle));
+  const generation = wrapCanvas(videoTool(config, deps, ctx));
+  const extension = wrapCanvas(extendTool(config, deps, ctx));
+  if (canvasBridge) register(jsonSafeTool(canvasBridge.tool));
   register(jsonSafeTool(stageTool()));
-  register(jsonSafeTool(canvasProjects.wrapProject(projectTool(config, ctx, storyboardReview, generation.parameters.properties, extension.parameters.properties, segmentReview, canvasProjects.sync))));
+  const project = projectTool(config, ctx, storyboardReview, generation.parameters.properties, extension.parameters.properties, segmentReview, canvasProjects?.sync);
+  register(jsonSafeTool(canvasProjects ? canvasProjects.wrapProject(project) : project));
   register(jsonSafeTool(estimateTool(config)));
   register(jsonSafeTool(submissionTool(config)));
-  register(jsonSafeTool(canvasBridge.wrap(prepareImageTool(config))));
+  register(jsonSafeTool(wrapCanvas(prepareImageTool(config))));
   register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(generation, config), config)), 'video_generate', config), deliveryOrder.remember));
   register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(extension, config), config)), 'video_extend', config), deliveryOrder.remember));
   register(withVideoExecution(jsonSafeTool(withActualCost(taskTool(config), config))));

@@ -385,19 +385,11 @@ test('流程画布打开但关掉自动创建画布时同样不建图，并说�
 });
 
 test('默认关闭不谎报：助手口径不承诺自动建图、摘要卡不印 disabled、内置画布不报已打开', async () => {
-  const off = api.buildPromptGuidance({});
-  assert.match(off, /左侧栏「MetaOnticVideo流程画布」/, '提示词按现在的侧边栏名字指路');
-  assert.match(off, /当前流程画布：关闭/);
-  assert.doesNotMatch(off, /工具会自动建流程画布项目/, '默认关闭时不能还说工具会自动建图');
-  assert.match(off, /先在插件设置页打开「流程画布」/, '画布关着要先引导去设置页打开');
-  assert.match(off, /无法代开/, '内置画布开不了要说清楚');
-  const noAuto = api.buildPromptGuidance({ canvasEnabled: true, autoCreateCanvas: false });
-  assert.match(noAuto, /当前流程画布：开启；自动创建画布：关闭/);
-  assert.doesNotMatch(noAuto, /工具会自动建流程画布项目/, '关掉自动创建后不能再承诺自动建图');
-  const on = api.buildPromptGuidance({ canvasEnabled: true, autoCreateCanvas: true });
-  assert.match(on, /当前流程画布：开启；自动创建画布：开启/);
-  assert.match(on, /工具会自动建流程画布项目/);
-  assert.doesNotMatch(on, /当前流程画布：关闭/);
+  for(const config of [{},{canvasEnabled:true,autoCreateCanvas:false},{canvasEnabled:true,autoCreateCanvas:true}]) {
+    const prompt=api.buildPromptGuidance(config);
+    assert.match(prompt,/流程画布暂隐藏/);
+    assert.doesNotMatch(prompt,/工具会自动建流程画布项目|先在插件设置页打开「流程画布」|左侧栏「MetaOnticVideo流程画布」/);
+  }
 
   // 摘要卡：未开启自动投影是常态，不占一行，也不把内部状态码印给用户。
   const rows = (canvasStatus) => api.toolSummary('video_project', {

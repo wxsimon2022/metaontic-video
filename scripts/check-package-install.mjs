@@ -21,7 +21,7 @@ try {
   // Build an older package fixture from the same archive, changing only manifest
   // version. Exercise an actual managed-package upgrade, not just a fresh add.
   const raw = gunzipSync(await readFile(downloaded));
-  const chunks = []; let changed = false;
+  const chunks = []; let changed = false; let packageName;
   for (let offset = 0; offset + 512 <= raw.length;) {
     const header = Buffer.from(raw.subarray(offset, offset + 512));
     if (header.every(byte => byte === 0)) break;
@@ -30,7 +30,7 @@ try {
     let body = Buffer.from(raw.subarray(offset + 512, offset + 512 + size));
     offset += 512 + Math.ceil(size / 512) * 512;
     if (name === 'package/package.json') {
-      const previous = JSON.parse(body.toString()); previous.version = '0.0.0';
+      const previous = JSON.parse(body.toString()); packageName = previous.name; assert.match(packageName, /^(?:@[a-z0-9-]+\/)?[a-z0-9-]+$/); previous.version = '0.0.0';
       body = Buffer.from(JSON.stringify(previous)); changed = true;
       header.write(body.length.toString(8).padStart(11, '0') + '\0', 124, 12, 'ascii');
       header.fill(32, 148, 156);
@@ -51,12 +51,12 @@ try {
   const taskFile = path.join(profile, 'saved-task.json');
   await writeFile(settingsFile, '# preserve existing settings sentinel\n');
   await writeFile(taskFile, '{"task_id":"existing-task-do-not-resubmit"}');
-  assert.equal(JSON.parse(await readFile(path.join(profile, 'node_modules/metaontic-video/package.json'), 'utf8')).version, '0.0.0');
+  assert.equal(JSON.parse(await readFile(path.join(profile, 'node_modules', packageName, 'package.json'), 'utf8')).version, '0.0.0');
   console.log(runInstall(downloaded));
   assert.deepEqual(await readFile(previousArchive), previousBytes, 'Update must preserve the original installation file');
   assert.equal(await readFile(settingsFile, 'utf8'), '# preserve existing settings sentinel\n');
   assert.equal(await readFile(taskFile, 'utf8'), '{"task_id":"existing-task-do-not-resubmit"}');
-  const installed = path.join(profile, 'node_modules/metaontic-video');
+  const installed = path.join(profile, 'node_modules', packageName);
   const relative = path.relative(await realpath(profile), await realpath(installed));
   assert.ok(relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative), 'Installed files must be managed inside the profile');
   // Once installed, moving the source must not break metadata or loading.

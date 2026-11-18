@@ -148,8 +148,8 @@ export function main(argv = process.argv.slice(2), env = process.env) {
     console.log('DRY RUN 结束，未上传。');
     return;
   }
-  console.log(`\n已发布 metaontic-video@${version} 到 npmjs。`);
-  console.log('国内镜像同步状态：https://npmmirror.com/package/metaontic-video');
+  console.log(`\n已将成品包 v${version} 发布到 npmjs。`);
+  console.log('国内镜像会按成品包 package.json 中的实际包名同步。');
   console.log('同步完成后，DSH 里 npm 来源的市场条目在大陆会经 registry.npmmirror.com 安装。');
   console.log('记得重跑 npm run market:index，把该版本切换为 npm 来源。');
 }

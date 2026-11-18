@@ -69,6 +69,7 @@ stages:
           - 'node scripts/validate-release.mjs'
           - 'mkdir -p dist'
           - 'npm pack --pack-destination dist'
+          - 'node scripts/normalize-package-name.mjs dist'
           - 'TGZ=$(ls dist/metaontic-video-*.tgz | head -1)'
           - 'VERSION=${TGZ##*/metaontic-video-}; VERSION=${VERSION%.tgz}'
           - 'echo "成品版本 $VERSION"'

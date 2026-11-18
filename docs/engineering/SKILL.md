@@ -38,7 +38,7 @@ description: 用于本仓库视频与图片接入、断点恢复、费用确认�
 
 ## 发布经验
 
-- 先比较最近发布到当前工作区的全部逻辑变化，展示完整说明，再按 README 发布；操作指南必须复核且纳入包；用户要求指南只面向使用，只讲选择 MetaOntic AI 的配置路线，不列其他接入方式，不写 A/B 标记、版本号、更新记录或发布信息；配图优先真实插件组件预览。核对结论及适用版本只写入 docs/engineering/release-<版本>.md，不写进指南或配图；发布时检查指南正文和配图，不得添加“适用版本”“本次更新”“发布核对”等章节。更新内容统一留在 CHANGELOG、README 更新区和 releaseNotes。
+- 先比较最近发布到当前工作区的全部逻辑变化，展示完整说明，再按 AGENTS.md 及发布工程文档执行；操作指南必须复核且纳入包；用户要求指南只面向使用，只讲选择 MetaOntic AI 的配置路线，不列其他接入方式，不写 A/B 标记、版本号、更新记录或发布信息；配图优先真实插件组件预览。核对结论及适用版本只写入 docs/engineering/release-<版本>.md，不写进指南或配图；发布时检查指南正文和配图，不得添加“适用版本”“本次更新”“发布核对”等章节。更新内容统一留在 CHANGELOG 和 releaseNotes。
 - CI checkout 后显式取回注解标签，再读取完整发布说明，避免 checkout 将标签覆盖为提交引用而只读出提交标题。
 - Gitee 更新已有 Release 使用 PATCH，携带 tag_name；发布后核对 GitHub/Gitee 的说明与附件，不只看工作流绿色。
 - 发布慢的主因是等 GitHub Actions（GitHub SSH 443 还常整段超时）；改成本地成品直传 Gitee 后，一次发版只剩本地构建测试打包约 3 分钟加三个附件上传，双仓并行推送也避免一仓超时拖累另一仓。GitHub Actions 只在--both时使用，作为双平台安装校验证据；仅 Gitee 发布的 Windows 缺口写进 release 文档。
@@ -193,3 +193,9 @@ Agent组件图标使用<完整预设模块>/icon导出，SVG在presets/icons，�
 专业链路维护：分镜示意统一video_project storyboard本地渲染，不注入手写SVG指令。compile保存plan_digest，video_project审核和assertProjectApproved均核对compiled提示词/分段/规格；参考图等补充仍需制作审核。旧绑定缺摘要必须重新编译。production_strategy默认continuous_segments，显式independent_shots按4秒至模型上限逐镜生成，估价/执行共享resolveTargetPlan，断点保存策略和时长，续做不得改计划；各镜无video输入，直接剪辑不裁接缝、不作累计成片识别。付费确认及逐段审核不变。能力来自providers/capabilities本地适配器，ADAPTER_DEFINED不是渠道实测，未知保持null。新quality_policy=evidence_v1检查场次可观察证据、评分依据和主题场次引用，口速估时仅提示并要求复核。锁恢复只认同机死亡进程，不按超时夺锁；read不持锁。快照保留最近30份和批准/依赖版本；未变化写操作不留重复快照。film_stage_finished只记录固定类别、耗时和响应字节，无正文或密钥。相关测试film-global-improvements.test.mjs；Windows实机未验证时不得宣称已覆盖。
 
 边界补充：独立镜头shotFrames按完整shotDurations保存和恢复，全局首尾帧仅首镜/末镜，首帧不提升为共享人物参考。hasProjectImages与角色选择共用素材判断。video_project status和审核答复后均核对filmSource版本/摘要/模型。视觉visual_style/style_profile仅失效资产与下游，tone默认叙事变化，显式change_scope=visual_only才保留故事批准且不能混改内容字段。合并混合音轨须补静音、统一时间戳及长度，音频编码失败不能退无声。写锁/恢复锁元数据完整后硬链接独占发布；恢复者中断时递归清理同机死亡token，未知/空/异机/活跃锁不得自动删除。跨平台硬链接不支持时明确失败，不降级为不安全抢锁。
+
+流程画布暂隐藏：FLOW_CANVAS_AVAILABLE统一控制左侧栏、main页面、设置画布节、video_canvas注册及动态引导；旧canvasEnabled/autoCreateCanvas不触发自动建图或标题同步，保留原配置与历史数据。内部存储、媒体和原任务恢复实现保留，普通对话的专业创作/审批/估价/生成/结果审核/合并不依赖画布；恢复入口开放前需重新验收。
+
+README 不展示各版本更新条目；发布脚本只同步其在线安装链接，更新内容写入 CHANGELOG、包内 releaseNotes 与 Release。包名为 dsh-metaontic-video，配置命名空间与历史数据目录仍为 metaontic-video；发布附件文件名保持 metaontic-video-X.Y.Z.tgz。市场索引只收录清单包名匹配的标签，不能将旧包名版本伪装成新包名版本。
+
+README 编辑先遵守 docs/engineering/readme-guidelines.md，功能变化不逐条追加到首页。纯文档修改只检查文档结构和链接，无需构建或重复业务测试。

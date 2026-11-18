@@ -190,12 +190,13 @@ export async function main(argv) {
     writeFileSync('package.json',JSON.stringify(pkg,null,2)+'\n');
     const lock=JSON.parse(readFileSync('package-lock.json','utf8'));lock.version=version;lock.packages[''].version=version;
     writeFileSync('package-lock.json',JSON.stringify(lock,null,2)+'\n');
-    const englishReadme=readFileSync('README.en.md','utf8');
-    writeFileSync('README.en.md',englishReadme.replace(/(releases\/download\/)v\d+\.\d+\.\d+\/(metaontic-video-)\d+\.\d+\.\d+(\.tgz)/g,`$1v${version}/$2${version}$3`));
+    for (const file of ['README.md', 'README.en.md']) {
+      const readme=readFileSync(file,'utf8');
+      writeFileSync(file,readme.replace(/(releases\/download\/)v\d+\.\d+\.\d+\/(metaontic-video-)\d+\.\d+\.\d+(\.tgz)/g,`$1v${version}/$2${version}$3`));
+    }
     const markdown=sections.map(s=>'### '+s.category+'\n\n'+s.items.map(i=>'- '+i).join('\n')).join('\n\n');
-    for(const [file,header] of [['README.md',`## ${tag} 更新内容`],['CHANGELOG.md',`## ${tag}`]]) {
+    for(const [file,header] of [['CHANGELOG.md',`## ${tag}`]]) {
       let text=readFileSync(file,'utf8');
-      if(file==='README.md')text=text.replace(/(releases\/download\/)v\d+\.\d+\.\d+\/(metaontic-video-)\d+\.\d+\.\d+(\.tgz)/g,`$1v${version}/$2${version}$3`);
       if(text.includes(header)) { const start=text.indexOf(header);const rest=text.slice(start+header.length);const next=rest.search(/^## v\d+\.\d+\.\d+/m);text=text.slice(0,start)+(next<0?'':rest.slice(next)); }
       const at=text.search(/^## v\d+\.\d+\.\d+/m);if(at<0)throw Error(`${file}缺少更新区插入位置`);
       writeFileSync(file,text.slice(0,at)+header+'\n\n'+markdown+'\n\n'+text.slice(at));
@@ -229,6 +230,7 @@ export async function main(argv) {
     if(pipeline) console.log(`本机不打包：成品由 Gitee Go 流水线按标签 ${tag} 产出（scripts/ci-release.mjs 负责发布与核对，并归档到制品库）。`);
     else {
       run(process.execPath,[npmCli,'pack','--pack-destination',out]);
+      run(process.execPath, ['scripts/normalize-package-name.mjs', out]);
       // Python is a packaging tool only; Windows py launcher is accepted.
       const python=process.platform==='win32'?'py':'python3';
       // 包内 README 会被宿主插件页当成「详细介绍」渲染，成品包统一裁掉。

@@ -1,34 +1,21 @@
-<img src="./logo.svg" width="240" alt="MetaOnticVideo" />
+<img src="./logo.svg" width="160" alt="MetaOnticVideo" />
 
-# MetaOnticVideo
+# dsh-metaontic-video
 
 [简体中文](./README.md)
 
 A DeepSeek Harness plugin for **beginner-friendly video creation and a low-cost long-video workflow**.
 
-## Start creating videos quickly
+## What it does
 
-Describe what you want to make and follow the assistant through your first video, without first learning prompting or editing workflows.
+- **Create videos quickly**: describe an idea, review the script, then generate and preview your video.
+- **Build longer videos**: generate and continue segments, save progress, and merge them locally.
 
-1. **Share your idea**: start with a brief thought or a complete concept. Refinement keeps your original idea and adds richer detail and more varied shots.
-2. **Review the script**: read what will be filmed, ask for changes in plain language, then confirm production.
-3. **Watch the result**: preview the generated video and keep the finished file locally.
-
-For example: “Make a 30-second vertical 720P video showing a peaceful lake at dawn.” Duration, orientation and resolution already supplied are reused; only missing details are requested.
-
-## A low-cost long-video workflow
-
-Use **segment generation → continuation → local merging** to make videos beyond the model’s single-call duration limit.
-
-- Review each result before continuing to the next segment.
-- Keep and reuse completed segments, pause and resume saved progress, and avoid starting over.
-- Merge completed segments locally with FFmpeg while retaining the original clips.
-
-Bring your own API key. Image and video calls are billed by the chosen provider, with cost confirmation before each new segment.
+Image and video generation is billed by your provider, with cost confirmation before generation.
 
 ## Online installation
 
-Paste an online installation URL into Harness → Plugins → Add plugin. Windows and macOS use the same package.
+Paste a link into Harness → Plugins → Add plugin. Windows and macOS use the same package.
 
 Gitee:
 
@@ -42,55 +29,14 @@ GitHub mirror:
 https://github.com/wxsimon2022/metaontic-video/releases/download/v3.32.0/metaontic-video-3.32.0.tgz
 ```
 
-You can also add the plugin market index source in Harness → Plugins → Discover to browse and install:
+## Get started
 
-```text
-https://gitee.com/hackloop/metaontic-video/raw/master/market/index.json
-```
+1. Open plugin settings, choose **MetaOntic AI**, enter your API key and save.
+2. Select **视频创作助手** in a conversation, or **宣传视频助手** for promotional content.
+3. Describe your video, review the script and confirm costs, then preview each generated segment.
 
-Open plugin settings, choose **MetaOntic AI**, enter your API key and save. Select **视频创作助手** in a conversation to begin; **宣传视频助手** is also available for product, brand or event content. Both assistants share the production workflow. Standard mode remains general-purpose.
+Example: “Make a 30-second vertical 720P video showing a peaceful lake at dawn.”
 
-[Online user guide](https://ai.mybfs.cn) · [Report an issue](https://github.com/wxsimon2022/metaontic-video/issues) · [Changelog](./CHANGELOG.md) · [Development](./docs/engineering/development.md)
+## Links
 
-## Plugin architecture
-
-Agents declare their business dependencies; the shared framework assembles them. Both existing assistants use the video module. New business modules can be added independently.
-
-```mermaid
-flowchart TB
-    Harness[DeepSeek Harness]
-    Harness --> Host["Host entry: src/index.ts"]
-    Harness --> Client["Browser entry: src/client.ts"]
-    Director[Video creation assistant] --> Agents["Agent definitions: src/agents"]
-    Promo[Promotional video assistant] --> Agents
-    Agents --> Core["Shared framework: src/core<br/>Agent and tool registration · Scope · Lifecycle"]
-    Host --> Core
-    Core --> Video["Video module: src/businesses/video<br/>Review · Generation · Continuation · Recovery · Delivery"]
-    Video --> Providers[Image and video providers]
-    Video --> Media[Local download and FFmpeg merging]
-    Client --> UI["Shared UI: src/client<br/>Module assembly · Settings composition · Updates"]
-    UI --> VideoUI["Video UI<br/>Settings · Progress · Media preview"]
-```
-
-[Module structure and adding agents or businesses](./docs/engineering/structure-refactor.md)
-
-See [LICENSE](./LICENSE).
-
-Professional script work proceeds through concept, screenplay, assets, storyboard, prompts, and review, with separate concept and screenplay approvals. Skills supply stage-specific methods; story and scenes precede camera planning. Exports include readable material and an artifact revision manifest. Completed production documents do not imply a generated video.
-
-API connection validation is available below version updates in plugin settings. Save first, then check authentication responses and model listings for video, image and text. This read-only check does not submit generation tasks or verify actual generation results.
-
-Scripts clarify attention, reaction and physical feedback at key beats, and place complete lines and readable action endpoints at generation boundaries. Continuation uses the actual previous result; single and final segments retain their intended ending. Preview review is still needed for performance, audio and seam quality.
-
-## Work types
-
-Professional conversations can combine genre, format, purpose, and a registered visual style independently. Creative and script approvals display readable content. Storyboard diagrams remain visual sketches rather than shot-list files; model changes recheck dependent assets and prompts. Routine progression returns only the next stage’s required materials to reduce repeated context.
-
-Choose drama, comedy, lifestyle/atmosphere, documentary/educational, product advertising, or brand/place promotion. Work type is separate from visual style, narrative mode, and generation mode. Professional projects bind a versioned type profile to role guidance, creative/script extensions, and type-specific review checks. Changing type retains but invalidates existing artifacts and approvals; old projects retain their generic workflow. The canvas requirement dialog also saves an optional work type for AI script writing. Actual generation still requires existing review and cost approval.
-
-For source organization and module responsibilities, see [the source layout guide](docs/engineering/source-layout.md).
-
-
-Professional production defaults to continuous segments. An explicitly selected independent-shot plan generates and bills each shot separately, without previous-video input, and keeps per-shot review, resumable execution and cost consent. Approved references help identity continuity; they do not guarantee it. Estimates use the same shot durations as execution. Compiled prompts and specifications are checked before review and generation. Storyboard sketches use the existing local renderer. New professional projects require visible story evidence and justified review scores. Lock diagnostics recover only positively identified exited local processes; active approvals still allow reading the last committed project.
-
-Global first/last frames apply to the first/last independent shot only; per-shot frames can be supplied separately. Visual-only style changes preserve story approvals and require downstream review; narrative tone changes require renewed approval. Merge inserts silence for clips without audio and preserves available audio. Audio merge failure retains source clips and the existing final video for a merge-only retry.
+[User guide](https://ai.mybfs.cn) · [Issues](https://github.com/wxsimon2022/metaontic-video/issues) · [Changelog](./CHANGELOG.md) · [Development](./docs/engineering/development.md) · [License](./LICENSE)
