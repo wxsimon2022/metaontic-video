@@ -134,7 +134,7 @@ dsh plugin --profile desktop add "/你的绝对路径/metaontic-video-plugin/pac
 
 ### 定期清理历史标签与发行版（维护者）
 
-历史版本会不断累积标签、Release 和发行版附件，插件只对外提供最新正式版，因此可以定期回收旧版本。清理脚本同时处理 GitHub 与 Gitee，先演练、后删除：
+历史版本会不断累积标签、Release 和发行版附件，插件只对外提供最新正式版，因此可以定期回收旧版本。删除发行版必须同步删除同一仓库对应的远端 tag，并在完成后重新核对；不得只删 Release 留下孤立版本标签。两个仓库分别按保留范围处理，本地 tag 仅在两个仓库均不再保留对应版本时删除。清理脚本同时处理 GitHub 与 Gitee，先演练、后删除：
 
 ```text
 npm run clean:releases
