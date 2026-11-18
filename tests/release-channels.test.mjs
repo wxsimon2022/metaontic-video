@@ -9,7 +9,7 @@ function setup(releases) {
     window:{setTimeout, clearTimeout},
     fetch:async()=>({ok:true,json:async()=>releases}),
   });
-  vm.runInContext(sourceOf('client/updates')+'\nObject.assign(globalThis,createUpdates({h}));',ctx);
+  vm.runInContext(sourceOf('ui/updates/update.service')+'\nObject.assign(globalThis,createUpdates({h}));',ctx);
   return ctx;
 }
 test('release channels filter draft and flagged prereleases; numeric beta ordering and stable promotion', async()=>{

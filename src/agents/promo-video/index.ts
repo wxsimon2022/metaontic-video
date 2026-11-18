@@ -1,4 +1,4 @@
-import type { AgentDefinition } from '../../core/agent-registry.js';
+import type { AgentDefinition } from '../contracts/agent-definition.js';
 import { promoVideoGuidance } from './instructions.js';
 export const promoVideo: AgentDefinition = {
   id: 'promo-video', name: '宣传视频助手', businesses: ['video', 'film-director'],

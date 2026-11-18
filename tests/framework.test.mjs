@@ -14,11 +14,11 @@ after(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 await build({ stdin: { contents: `
-export * from './src/core/runtime.ts';
-export * from './src/core/agent-registry.ts';
-export * from './src/client/runtime.ts';
-export * from './src/businesses/video/index.ts';
-export {isVideoDirector} from './src/businesses/video/prompts/scope.ts';
+export * from './src/app/bootstrap.ts';
+export * from './src/app/registry/agent.registry.ts';
+export * from './src/app/composition/client.composer.ts';
+export * from './src/businesses/video-generation/index.ts';
+export {isVideoDirector} from './src/businesses/video-generation/prompts/scope.ts';
 export {agents} from './src/agents/index.ts';
 `, resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', outfile: path.join(directory, 'api.mjs') });
 const api = await import(pathToFileURL(path.join(directory, 'api.mjs')));
@@ -120,7 +120,7 @@ test('built-in agent declarations agree with shipped preset, icon, locale and sk
   }
 });
 test('the shared host framework builds without importing any business or built-in agent', async () => {
-  const result = await build({ entryPoints: ['src/core/runtime.ts'], bundle: true, platform: 'node', format: 'esm', write: false, metafile: true });
+  const result = await build({ entryPoints: ['src/app/bootstrap.ts'], bundle: true, platform: 'node', format: 'esm', write: false, metafile: true });
   for (const input of Object.keys(result.metafile.inputs)) assert.doesNotMatch(input, /src\/(businesses|agents)\//);
 });
 test('overlapping hot reloads cannot restore a registry whose runtime was already disposed', () => {

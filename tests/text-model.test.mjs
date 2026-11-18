@@ -113,7 +113,7 @@ test('文本模型默认值：设置页选的型号优先，其次环境变量�
 
 test('文本模型候选与中转站在售一致：设置页下拉可选，已下线的旧默认值读到就归一到默认项', () => {
   const ctx = vm.createContext({});
-  vm.runInContext(sourceOf('businesses/video/connection-defaults', 'businesses/video/client/config') + '\nObject.assign(globalThis, createClientConfig());\nObject.assign(globalThis, { TEXT_MODELS, TEXT_MODEL, normalizeTextModel, connectionDefaults });', ctx);
+  vm.runInContext(sourceOf('businesses/video-generation/connection-defaults', 'businesses/video-generation/client/config') + '\nObject.assign(globalThis, createClientConfig());\nObject.assign(globalThis, { TEXT_MODELS, TEXT_MODEL, normalizeTextModel, connectionDefaults });', ctx);
   assert.deepEqual(Array.from(ctx.TEXT_MODELS), ['deepseek v4.1 flash', 'deepseekv4pro'], '候选就是中转站在售的文本模型');
   assert.deepEqual(Array.from(ctx.SELECTS.textModel), Array.from(ctx.TEXT_MODELS), '设置页按同一份候选做下拉');
   assert.equal(ctx.FIELD_BY_KEY.textModel.kind, 'select', '文本模型和视频/图片模型一样用下拉选择');
@@ -128,7 +128,7 @@ test('文本模型候选与中转站在售一致：设置页下拉可选，已�
 
 test('设置页文本模型是下拉：候选就是视频/图片模型那种在售列表，旧默认值显示成默认项', () => {
   const scope = vm.createContext({});
-  vm.runInContext(sourceOf('businesses/video/connection-defaults', 'businesses/video/client/config', 'businesses/video/client/settings-actions')
+  vm.runInContext(sourceOf('businesses/video-generation/connection-defaults', 'businesses/video-generation/client/config', 'businesses/video-generation/client/settings-actions')
     + '\nObject.assign(globalThis, createClientConfig());\nObject.assign(globalThis, { createSettingsActions });', scope);
   const h = (type, props, children) => ({ type, props: props || {}, children: Array.isArray(children) ? children.filter(Boolean) : children === undefined ? [] : [children] });
   const context = {

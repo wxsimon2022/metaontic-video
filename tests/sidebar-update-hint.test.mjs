@@ -6,7 +6,7 @@ import { sourceOf } from './source.mjs';
 
 const CACHE = 'test.update-check-v3';
 /** 左侧栏提示与设置页共用一份缓存，这里照 optional-update 的做法跑真实模块，只桩掉网络与宿主 React。 */
-const SOURCE = sourceOf('client/updates', 'client/update-hint');
+const SOURCE = sourceOf('ui/updates/update.service', 'ui/updates/update-notice');
 
 /** 极简 React 桩：hook 槽位按调用顺序保留，够验证「第一下确认、第二下更新」的两步状态。 */
 function makeReact() {
@@ -159,7 +159,7 @@ test('面板顶部的「稍后再说」不再提示这一版，也不会触发�
 });
 
 test('左侧栏入口只画红点：名字不带「有更新」，也不再为重读文字重注册', () => {
-  const source = readFileSync(new URL('../src/businesses/video/client.ts', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/businesses/video-generation/client.ts', import.meta.url), 'utf8');
   assert.match(source, /updateBanner: \(\) => h\(UpdateHintBanner/, '点入口进来就有更新入口');
   assert.match(source, /const railIcon = \(props: any\)/);
   assert.match(source, /className: 'mov-rail-hint'/, '圆点挂在入口图标外面那层壳上');

@@ -4,7 +4,7 @@
 
 - `src/index.ts`：宿主入口，注册配置、业务模块与预设。
 - `src/client.ts`：浏览器入口，组合设置、工具结果和画布。
-- `src/config.ts`：汇总宿主配置。
+- `src/app/config/config-composer.ts`：汇总宿主配置。
 - `src/agents/`：Harness 会话预设与入口身份，不等同影视八角色。
 - `src/core/`：跨业务的工具注册、设置、安装、路径、日志和匿名统计。
 - `src/client/`：跨业务的客户端组件与主题、更新和错误提示。
@@ -13,7 +13,7 @@
 ## 专业创作业务
 
 ```text
-src/businesses/film-director/
+src/businesses/film-production/
 ├── index.ts                  # film_project 工具注册与宿主适配
 ├── roles/                    # 八角色提示词和意图路由
 │   ├── index.ts
@@ -54,7 +54,7 @@ src/businesses/film-director/
 
 ## 视频执行业务
 
-保留现有已分层的 `src/businesses/video/`：
+保留现有已分层的 `src/businesses/video-generation/`：
 
 | 目录 | 职责 |
 | --- | --- |

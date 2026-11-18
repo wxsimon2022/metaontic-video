@@ -9,7 +9,7 @@ import { sourceOf } from './source.mjs';
 function setup(manager) {
   const state={calls:0,status:'',message:''};
   const sandbox=vm.createContext({window:{localStorage:{removeItem(){}}}});
-  vm.runInContext(sourceOf('client/updates'),sandbox);
+  vm.runInContext(sourceOf('ui/updates/update.service'),sandbox);
   const api={...manager,installBundle:async()=>{state.calls++;return {ok:true,value:{application:'applied',version:'3.13.2'}};}};
   const context={updateConfirm:true,PLUGIN_VERSION:'3.13.1',updateLatest:'3.13.2',availableVersions:['3.13.2'],
     PLUGIN_PACKAGE:'metaontic-video',UPDATE_ATTEMPTS:1,UPDATE_CACHE_KEY:'test',
@@ -54,7 +54,7 @@ test('lockfile integrity failure waits for the background cleanup and retries, n
   const state={calls:0,status:'',message:'',waits:0};
   // 插件的后台清理每 2 秒扫一次锁文件：客户端命中该错误时应当等清理完成再试，而不是让用户自己数秒重按。
   const sandbox=vm.createContext({window:{localStorage:{removeItem(){}},setTimeout:(fn)=>{state.waits+=1;fn();return 0;}}});
-  vm.runInContext(sourceOf('client/updates'),sandbox);
+  vm.runInContext(sourceOf('ui/updates/update.service'),sandbox);
   const diagnostic='ERR_PNPM_MISSING_TARBALL_INTEGRITY Cannot install package "metaontic-video@https://gitee.com/x.tgz": its lockfile entry has no "integrity" field';
   const api={listBundles:async()=>[{name:'metaontic-video',installed:true,source:'https://gitee.com/hackloop/metaontic-video/releases/download/v3.13.10/metaontic-video-3.13.10.tgz'}],
     installBundle:async()=>{state.calls+=1;return {ok:true,value:{application:'failed',error:{code:'operation-error',diagnostic}}};}};

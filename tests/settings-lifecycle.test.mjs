@@ -167,7 +167,7 @@ test('save retains edits made while the write is in flight', async () => {
 
 test('流程画布与自动创建画布是两个开关：总开关默认关，自动创建默认开', () => {
   const scope = vm.createContext({});
-  vm.runInContext(sourceOf('businesses/video/connection-defaults', 'businesses/video/client/config', 'businesses/video/client/settings-actions')
+  vm.runInContext(sourceOf('businesses/video-generation/connection-defaults', 'businesses/video-generation/client/config', 'businesses/video-generation/client/settings-actions')
     + '\nObject.assign(globalThis, createClientConfig());\nObject.assign(globalThis, { createSettingsActions });', scope);
   const h = (type, props, children) => ({ type, props: props || {}, children: Array.isArray(children) ? children.filter(Boolean) : children === undefined ? [] : [children] });
   const build = (key, value) => scope.createSettingsActions({

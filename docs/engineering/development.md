@@ -52,7 +52,7 @@ npm pack --dry-run
 
 仅发布正式版，使用 `X.Y.Z` 并设置 `releaseNotes.prerelease: false`。两仓 Release、附注标签、说明及插件包须保持一致，不再提供预发布渠道。正式发布须汇总从最近正式版以来的全部变化，包括此前已验证的改动，不覆盖历史标签。
 
-插件版本卡片只保留“检查更新”和更新到最新正式版。左侧栏入口在发现新版本时只点一个红点，不改入口文字：展开侧栏时红点做成上标角标落在入口名字最后一个字的右上角（原来写「有更新」的位置，由名字那个 span 的伪元素画），收起侧栏时落在图标角上（`src/client/update-hint.ts` 的轻量 store，读写设置页同一份缓存；红点由自己的订阅重渲染，不需要重注册 `sidebar.panellist`，样式用 `ensureUpdateHintStyles` 注入一次，按 `button:has(.mov-rail-hint)` 定位）。过滤草稿与预发布，仅远端版本严格高于本机时显示更新入口，二次确认后安装对应 Release 成品包；Gitee 不可用时仅尝试同版 GitHub 附件。不提供历史版本选择、同版本重装或降级，不回退默认分支，也不先卸载现有插件。
+插件版本卡片只保留“检查更新”和更新到最新正式版。左侧栏入口在发现新版本时只点一个红点，不改入口文字：展开侧栏时红点做成上标角标落在入口名字最后一个字的右上角（原来写「有更新」的位置，由名字那个 span 的伪元素画），收起侧栏时落在图标角上（`src/ui/updates/update-notice.ts` 的轻量 store，读写设置页同一份缓存；红点由自己的订阅重渲染，不需要重注册 `sidebar.panellist`，样式用 `ensureUpdateHintStyles` 注入一次，按 `button:has(.mov-rail-hint)` 定位）。过滤草稿与预发布，仅远端版本严格高于本机时显示更新入口，二次确认后安装对应 Release 成品包；Gitee 不可用时仅尝试同版 GitHub 附件。不提供历史版本选择、同版本重装或降级，不回退默认分支，也不先卸载现有插件。
 
 版本采用语义化版本号，并按改动量把版本号升到最低那位：修复、样式/文案/交互微调、没有新增能力的调整只升 patch（第三位，如 `3.28.1`）；只有成规模的新增兼容能力或行为变化才升 minor（第二位），不兼容变更才升 major（第一位）。小改不要习惯性升第二位。
 
@@ -241,3 +241,7 @@ npm run pack:test -- 3.13.9-test.1
 正式版和测试版仅提供 Windows/macOS 通用 `.tgz` 成品，不再生成或上传 Windows ZIP 及 `.zip.sha256`；Windows 与 macOS 仍须验证同一 `.tgz` 的安装与升级。历史已发布 ZIP 保留，避免旧链接失效。README 与宣传页仅展示在线安装，不推荐下载解压或目录安装。
 
 双仓发布使用本机同一成品暂存到 GitHub 草稿，Windows/macOS 自动安装检查通过后公开，再将同一成品发布到 Gitee。GitHub 仅推送版本标签，不强推具有独立历史的默认分支；等待 CI 按标签指向的提交匹配，不用标签后的市场索引提交匹配。包名迁移须先停用旧名称插件再添加新包，不通过卸载删除资料；CI 使用真实旧版成品核对保留资料的包安装迁移，桌面迁移仍需人工核对。
+
+## 源码与发布目录
+
+业务实现、Agent提示词、预设入口和类型声明统一在`src/`维护：`src/businesses/`、`src/agents/`、`src/app/`、`src/platform/`、`src/shared/`、`src/ui/`、`src/types/`。预设源码在`src/agents/presets/`，由构建生成`presets/*.js`；根目录`index.js`、`client.js`与`locale/*.json`也是安装产物，不能直接编辑或移走。根目录包清单、Cordis配置、静态资源与技能保留发布路径；`scripts/`、`tests/`、`preview/`、`docs/`分别承载工程工具、测试、开发预览与文档，不混入业务源码。

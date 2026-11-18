@@ -138,11 +138,11 @@ SHA-256：409c6fa0d50812efd6dcfd64f6cddef465344bcb3e11c587aacf5956b4ced7cf，1,3
 
 ## 内置流程画布 3.20.1-test.17
 
-不再依赖原版：新增 `src/businesses/video/integrations/canvas-builtin.ts`，在插件自己的目录里实现与原版同形的 `projectsGet/projectsPut/projectsList/assetsGet/assetCreate/dataRootGet/projectDirGet/canvasCreateProject/canvasRename/canvasOpen` 与 `connect`（幂等连线）。因为接口同形，`readCanvasInput`、`publishCanvasResult`、`markCanvasChanged`、`canvas-project` 的建图与补名全部原样复用，没有第二套映射逻辑。
+不再依赖原版：新增 `src/businesses/video-generation/integrations/canvas-builtin.ts`，在插件自己的目录里实现与原版同形的 `projectsGet/projectsPut/projectsList/assetsGet/assetCreate/dataRootGet/projectDirGet/canvasCreateProject/canvasRename/canvasOpen` 与 `connect`（幂等连线）。因为接口同形，`readCanvasInput`、`publishCanvasResult`、`markCanvasChanged`、`canvas-project` 的建图与补名全部原样复用，没有第二套映射逻辑。
 
 后端选择规则（`resolveCanvasAdapter` / `adapterForNewCanvas`）：内置存储里有这份文档就走内置；老绑定（已有原版 projectId）继续留在原版；新建画布默认写内置，设置项 `canvasBackend: 'original'` 可强制回原版；显式注入的加载器（自动化检查、备用实现）优先。存储位置 `~/.dsh/metaontic-video/canvas/projects/<id>.json`，素材与成果在 `~/.dsh/metaontic-video/canvas/data/`，不再需要用户去原版画布设置数据根。
 
-界面：`src/businesses/video/client/canvas-view.ts` 在插件面板新增「流程画布」区，按画布列出（名字即会话标题）并渲染节点与连线（平移、缩放、重置），图片/视频成果用 `/metaontic-video/canvas-media` 回看；画布文档读取走 `/metaontic-video/canvas`，两个路由都与原版一样限定同源 POST／同源 GET。
+界面：`src/businesses/video-generation/client/canvas-view.ts` 在插件面板新增「流程画布」区，按画布列出（名字即会话标题）并渲染节点与连线（平移、缩放、重置），图片/视频成果用 `/metaontic-video/canvas-media` 回看；画布文档读取走 `/metaontic-video/canvas`，两个路由都与原版一样限定同源 POST／同源 GET。
 
 验证：类型检查、构建、464 项自动测试、diff 检查通过。新增 `tests/canvas-builtin.test.mjs` 在「原版画布完全不存在」的前提下（`loadCanvasAdapter` 断言必须失败）完成：建图（script/storyboard/两段制作计划/production + 2 条连线）、画布名与默认画布名等于会话标题且不含创作项目 id、重复同步幂等、标题事件补名、用户改名不被覆盖、`readCanvasInput` 读回、成果回填落到插件自己的数据根并登记资产。
 

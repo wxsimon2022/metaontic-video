@@ -15,7 +15,7 @@ const context = vm.createContext({
   isOmniExtendModel: () => false,
 });
 vm.runInContext(
-  `${sourceOf('businesses/video/media/references')}\nObject.assign(globalThis,{pruneReferenceCache,referenceCacheDir});`,
+  `${sourceOf('businesses/video-generation/media/references')}\nObject.assign(globalThis,{pruneReferenceCache,referenceCacheDir});`,
   context,
 );
 

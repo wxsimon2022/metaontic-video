@@ -1,5 +1,5 @@
 (() => {
-  // src/core/settings/client.ts
+  // src/platform/settings/client.ts
   function createSettingsPages(h, decorate = (Page) => Page) {
     const pages = /* @__PURE__ */ new Map();
     return {
@@ -23,7 +23,7 @@
     };
   }
 
-  // src/client/runtime.ts
+  // src/app/composition/client.composer.ts
   function createClientRuntime(require2, modules) {
     const ids = /* @__PURE__ */ new Set();
     const plugins = modules.map((module) => {
@@ -41,7 +41,7 @@
     };
   }
 
-  // src/core/hardcoded-config.ts
+  // src/shared/constants/plugin.ts
   var PLUGIN_ID = "metaontic-video";
   var PLUGIN_PACKAGE = "dsh-metaontic-video";
   var PLUGIN_NAMESPACE = PLUGIN_ID;
@@ -99,7 +99,7 @@
   var RETIRED_TEXT_MODELS = ["doubao-seed-1-6-250615"];
   var REFERENCE_TMP_DIR = `${PLUGIN_ID}-reference`;
 
-  // src/client/support-action.ts
+  // src/ui/components/support-action.ts
   function createSupportAction({ React, t, PAGE_CSS }) {
     const h = React.createElement;
     return function SupportAction({ subject }) {
@@ -155,7 +155,7 @@
     };
   }
 
-  // src/client/auth-notice.ts
+  // src/ui/components/auth-notice.ts
   var TOOL_ARGS_JSON = /Tool call[^\n]*JSON|Expected ',' or '\}' after property value|Unexpected (?:token|end of JSON input)/i;
   function createAuthNotice({ h, Original, hostT, t }) {
     return function AuthNotice(props) {
@@ -191,7 +191,7 @@
     return ctx.slots.register({ name: "conversation.chat.node", key: "turn-error", priority: (original.options.priority || 0) + 1, locale: "chat" }, Notice);
   }
 
-  // src/businesses/video/client/tool-result.ts
+  // src/businesses/video-generation/client/tool-result.ts
   var SUMMARY_TOOLS = { video_project: "脚本审核", video_estimate: "费用试算" };
   var ACTION_LABELS = { prepare: "准备项目", review: "脚本审核", review_segment: "分段结果审核", status: "读取项目状态" };
   var STATUS_LABELS = { approved: "已通过", draft: "待修改", pending: "待确认", blocked: "未通过校验", running: "进行中" };
@@ -284,7 +284,7 @@
     return { ToolResultView };
   }
 
-  // src/businesses/video/client/media-preview.ts
+  // src/businesses/video-generation/client/media-preview.ts
   function localMediaUrl(file, base) {
     if (typeof file !== "string" || /[\u0000-\u001f\u007f]/.test(file) || !/^(?:\/(?!\/)|[a-z]:[/\\])/i.test(file)) return "";
     if (typeof base !== "string" || !/^https?:/i.test(base) && !base.startsWith("dsh-app://app/")) return "";
@@ -401,7 +401,7 @@
     return { MediaPreview };
   }
 
-  // src/client/theme.ts
+  // src/ui/components/theme.ts
   function createTheme() {
     const TOKENS = {
       text: "var(--dsw-alias-label-primary, inherit)",
@@ -553,7 +553,7 @@
     return { TOKENS, inputStyle, PAGE_CSS };
   }
 
-  // src/businesses/video/client/progress.ts
+  // src/businesses/video-generation/client/progress.ts
   function estimatedVideoWait(duration) {
     const seconds = Number(duration);
     return Number.isFinite(seconds) && seconds > 0 ? 105 + seconds * 3 : 180;
@@ -699,7 +699,7 @@
     return { videoExecutionSource, VideoTaskProgress, VideoProgressDock };
   }
 
-  // src/businesses/video/connection-defaults.ts
+  // src/businesses/video-generation/connection-defaults.ts
   var METAONTIC_BASE_URL = RELAY.baseUrl;
   var VOLCENGINE_MODE_AVAILABLE = VOLCENGINE.modeAvailable;
   function resolveImageModel(value) {
@@ -726,7 +726,7 @@
     };
   }
 
-  // src/businesses/video/client/config.ts
+  // src/businesses/video-generation/client/config.ts
   function createClientConfig() {
     const NAMESPACE = PLUGIN_NAMESPACE;
     const NS = "settings.metaonticVideo";
@@ -838,7 +838,7 @@
     return { PLUGIN_OWNED_KEYS, SELECTS, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, NS, NAMESPACE };
   }
 
-  // src/businesses/video/client/locale.ts
+  // src/businesses/video-generation/client/locale.ts
   function createDictionaries() {
     const zh = {
       connectionCheckTitle: "API 连接验证",
@@ -1211,7 +1211,7 @@
     return { zh, en };
   }
 
-  // src/core/settings/state.ts
+  // src/platform/settings/state.ts
   function createFormState({ React }) {
     function useSnapshot(form) {
       const subscribe = React.useCallback((listener) => form.subscribe(listener), [form]);
@@ -1286,7 +1286,7 @@
     return { useSnapshot, same, persistBatch };
   }
 
-  // src/businesses/video/client/state.ts
+  // src/businesses/video-generation/client/state.ts
   function createSettingsState({ React }) {
     const { useSnapshot, same, persistBatch } = createFormState({ React });
     function validateSettings(values) {
@@ -1324,7 +1324,7 @@
     return { useSnapshot, same, validateSettings, persistConnection, persistBatch };
   }
 
-  // src/client/updates.ts
+  // src/ui/updates/update.service.ts
   function createUpdates({ h, fetchSource }) {
     const PLUGIN_VERSION = true ? "4.0.4".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
@@ -1612,7 +1612,7 @@
     return new Date(date.getTime() + 8 * 60 * 60 * 1e3).toISOString().slice(0, 16).replace("T", " ");
   }
 
-  // src/businesses/video/client/connection-check.ts
+  // src/businesses/video-generation/client/connection-check.ts
   function createConnectionCheckController({ setState, readSnapshot, fetcher = (...args) => fetch(...args) }) {
     let request = 0, controller = null;
     function dispose() {
@@ -1647,7 +1647,7 @@
     return { run, invalidate, dispose };
   }
 
-  // src/businesses/video/client/settings-actions.ts
+  // src/businesses/video-generation/client/settings-actions.ts
   var HIDDEN_CONNECTION_MODES = [
     ...VOLCENGINE_MODE_AVAILABLE ? [] : ["volcengine"]
   ];
@@ -1917,7 +1917,7 @@
     }
   };
 
-  // src/businesses/video/client/settings.ts
+  // src/businesses/video-generation/client/settings.ts
   function createSettingsPage(deps) {
     const {
       useSnapshot,
@@ -2378,7 +2378,7 @@
     return { makePage };
   }
 
-  // src/client/update-hint.ts
+  // src/ui/updates/update-notice.ts
   var UPDATE_HINT_CSS = `
   .mov-rail-hint { position: relative; display: inline-flex; align-items: center; }
   /* 收起侧栏：红点落在图标右上角 */
@@ -2637,7 +2637,7 @@
     return { useUpdateHint, UpdateHintDot, UpdateHintBanner };
   }
 
-  // src/businesses/video/client/panel.ts
+  // src/businesses/video-generation/client/panel.ts
   function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID: PANEL_ID2, GUIDE_URL: GUIDE_URL2, LOGO_SVG }) {
     const LOGO_SRC = LOGO_SVG ? `data:image/svg+xml,${encodeURIComponent(LOGO_SVG)}` : "";
     const PANEL_CSS = `
@@ -2863,7 +2863,7 @@
     return { PANEL_ID: PANEL_ID2, PanelIcon, VideoPanel };
   }
 
-  // src/businesses/video/integrations/canvas-stages.ts
+  // src/businesses/video-generation/integrations/canvas-stages.ts
   var STAGE_REV = 2;
   var STAGE_KEYS = ["requirement", "script", "storyboard", "assets", "cost", "segments", "film"];
   var STAGE_LABELS = {
@@ -3155,43 +3155,77 @@
     return { nodes, changed };
   }
 
-  // src/businesses/film-director/profiles/dimensions.ts
+  // src/businesses/film-production/profiles/profile.definition.ts
   var entry = (label, creative, screenwriter, storyboard, criterion) => ({ label, rules: { creative, screenwriter, storyboard, reviewer: criterion }, criterion });
-  var REGISTRY = {
-    genre: {
-      comedy: entry("喜剧", "寻找人物欲望与情境反差，不强制反转。", "以铺垫、升级、行为笑点与回应推进。", "为笑点兑现和反应留时间，不靠密集切镜。", "笑点有铺垫且符合人物逻辑。"),
-      drama: entry("剧情", "建立目标、阻碍、选择与后果。", "事件因果推动人物或关系变化。", "呈现决定与后果，不用空镜代替行动。", "人物选择与可见后果成立。"),
-      documentary: entry("纪录", "建立真实问题、观察对象与素材来源。", "使用真实材料、采访问题或明确标注的戏剧化重现，不编造受访者原话。", "区分拟拍摄方案、真实素材和重现镜头。", "陈述有来源，VERIFIED_FACT/USER_PROVIDED/UNVERIFIED/DRAMATIZATION 分离。"),
-      animation: entry("动画", "明确世界规则、角色辨识与目标受众。", "动作有视觉因果，遵守世界规则。", "动作路径清楚，角色比例与空间规则稳定。", "世界规则、角色和动作可读性一致。"),
-      romance: entry("爱情", "围绕具体关系变化与情感障碍提炼体验。", "用互动、试探、回应推进关系，不靠告白口号。", "通过距离、视线与回应呈现关系变化。", "情感变化有具体互动与回应支撑。"),
-      thriller: entry("悬疑惊悚", "规划观众已知和未知信息及线索。", "悬念有因果铺垫与回收，不依赖无原因反转。", "控制视点与信息揭示，不能藏掉理解所需证据。", "线索公平、因果成立且关键悬念得到处理。")
-    },
-    format: {
-      skit: entry("情景小品", "集中在单一情境与核心互动。", "减少支线，动作、对白和反应可在预算内完成。", "少量必要机位保持互动可读。", "单一情境完整，关键反应有时长。"),
-      short_film: entry("短片", "构建适合时长的完整体验。", "每场有功能与状态变化。", "镜头覆盖关键事件并控制节奏。", "结构完整，场景推进有必要性。"),
-      micro_drama: entry("微短剧", "设计单集核心事件与连续人物关系。", "记录关系变化和未解决线索，不重置角色。", "关键冲突与回应清楚，不能用快切掩盖因果。", "单集成立并与连续人物线一致。"),
-      series: entry("连续作品", "建立全片主线、单集功能与跨集状态。", "维护伏笔、前情与人物状态，按章交付。", "分章场镜分层规划，复查跨章边界。", "单集进度和全片完成状态准确，线索可追踪。"),
-      interview: entry("访谈", "明确问题、对象与真实素材需求。", "提供采访问题；未取得的回答不得当成真实原话。", "安排采访、反应与相关证据画面，不虚构已拍素材。", "采访来源真实，拟问与已回答内容区分。"),
-      commercial: entry("广告片", "围绕需求、可信利益与行动目标设计。", "只使用有依据的产品主张与演示。", "展示产品使用过程和证据，避免暗示未证实功效。", "产品主张有依据，使用与行动目标清楚。"),
-      vlog: entry("生活记录", "寻找日常观察、细节与体验变化。", "保留自然行动和环境反馈，不强加戏剧冲突。", "观察性构图与自然节奏，避免无意义运镜。", "日常细节有观察价值，节奏自然。"),
-      music_video: entry("音乐影像", "建立音乐与视觉母题的关联。", "用动作和意象递进，不强塞对白或剧情。", "按音乐段落规划节奏与视觉变化。", "声画关联和意象递进明确。")
-    },
-    purpose: {
-      entertainment: entry("娱乐", "明确观众的情绪收益。", "保持人物与事件吸引力，避免空洞刺激。", "保证看点可见且节奏可读。", "观众体验有事件或画面支撑。"),
-      promotion: entry("宣传", "提炼地域或品牌辨识与记忆点。", "用具体可核实细节代替口号。", "展示可辨识地点、人物和生活细节。", "辨识度与传播信息具体且可信。"),
-      education: entry("科普教育", "确定观众要理解的问题与边界。", "按问题、证据、解释推进，事实不确定处标待核实。", "用演示或对比解释信息，不只堆字幕。", "知识准确，解释清楚，有证据与适用边界。"),
-      sales: entry("销售转化", "定义需求、证据与行动目标。", "不编造性能、数据、认证或承诺。", "让使用过程与利益证据可见。", "卖点可信，行动清楚，无夸大主张。")
-    },
-    style_profile: {
-      rural_documentary: entry("乡村观察", "从具体生活观察寻找细节，不刻板化农村。", "语言自然，地域事实需来源。", "自然光、现场声与可辨空间，不自动添加破败贫困。", "生活细节可信，地域事实与观察边界清楚。"),
-      minidv: entry("千禧 MiniDV", "以生活片段与自然观察组织视觉母题。", "对白小声自然，动作与停顿有生活感。", "按需轻微手持、对焦搜索、低饱和原生色彩和颗粒，不掩盖关键动作。", "DV 表现克制，人物动作与关键信息保持清楚。"),
-      cinematic_realism: entry("写实电影", "以具体事件承载表达。", "行为和对白自然，不用抽象形容词代替剧情。", "以光源、材质、空间和动作描述风格，不堆参数。", "视觉细节真实并服务叙事。"),
-      stylized_animation: entry("风格化动画", "明确统一的造型和世界规则。", "表演与动作符合设定。", "统一比例、材质、色彩和动作物理规则。", "造型风格与世界物理规则跨镜一致。")
-    }
-  };
 
-  // src/businesses/film-director/profiles/drama.ts
-  var drama_default = {
+  // src/businesses/film-production/profiles/genres/comedy.ts
+  var comedy_default = entry("喜剧", "寻找人物欲望与情境反差，不强制反转。", "以铺垫、升级、行为笑点与回应推进。", "为笑点兑现和反应留时间，不靠密集切镜。", "笑点有铺垫且符合人物逻辑。");
+
+  // src/businesses/film-production/profiles/genres/drama.ts
+  var drama_default = entry("剧情", "建立目标、阻碍、选择与后果。", "事件因果推动人物或关系变化。", "呈现决定与后果，不用空镜代替行动。", "人物选择与可见后果成立。");
+
+  // src/businesses/film-production/profiles/genres/documentary.ts
+  var documentary_default = entry("纪录", "建立真实问题、观察对象与素材来源。", "使用真实材料、采访问题或明确标注的戏剧化重现，不编造受访者原话。", "区分拟拍摄方案、真实素材和重现镜头。", "陈述有来源，VERIFIED_FACT/USER_PROVIDED/UNVERIFIED/DRAMATIZATION 分离。");
+
+  // src/businesses/film-production/profiles/genres/animation.ts
+  var animation_default = entry("动画", "明确世界规则、角色辨识与目标受众。", "动作有视觉因果，遵守世界规则。", "动作路径清楚，角色比例与空间规则稳定。", "世界规则、角色和动作可读性一致。");
+
+  // src/businesses/film-production/profiles/genres/romance.ts
+  var romance_default = entry("爱情", "围绕具体关系变化与情感障碍提炼体验。", "用互动、试探、回应推进关系，不靠告白口号。", "通过距离、视线与回应呈现关系变化。", "情感变化有具体互动与回应支撑。");
+
+  // src/businesses/film-production/profiles/genres/thriller.ts
+  var thriller_default = entry("悬疑惊悚", "规划观众已知和未知信息及线索。", "悬念有因果铺垫与回收，不依赖无原因反转。", "控制视点与信息揭示，不能藏掉理解所需证据。", "线索公平、因果成立且关键悬念得到处理。");
+
+  // src/businesses/film-production/profiles/formats/skit.ts
+  var skit_default = entry("情景小品", "集中在单一情境与核心互动。", "减少支线，动作、对白和反应可在预算内完成。", "少量必要机位保持互动可读。", "单一情境完整，关键反应有时长。");
+
+  // src/businesses/film-production/profiles/formats/short-film.ts
+  var short_film_default = entry("短片", "构建适合时长的完整体验。", "每场有功能与状态变化。", "镜头覆盖关键事件并控制节奏。", "结构完整，场景推进有必要性。");
+
+  // src/businesses/film-production/profiles/formats/micro-drama.ts
+  var micro_drama_default = entry("微短剧", "设计单集核心事件与连续人物关系。", "记录关系变化和未解决线索，不重置角色。", "关键冲突与回应清楚，不能用快切掩盖因果。", "单集成立并与连续人物线一致。");
+
+  // src/businesses/film-production/profiles/formats/series.ts
+  var series_default = entry("连续作品", "建立全片主线、单集功能与跨集状态。", "维护伏笔、前情与人物状态，按章交付。", "分章场镜分层规划，复查跨章边界。", "单集进度和全片完成状态准确，线索可追踪。");
+
+  // src/businesses/film-production/profiles/formats/interview.ts
+  var interview_default = entry("访谈", "明确问题、对象与真实素材需求。", "提供采访问题；未取得的回答不得当成真实原话。", "安排采访、反应与相关证据画面，不虚构已拍素材。", "采访来源真实，拟问与已回答内容区分。");
+
+  // src/businesses/film-production/profiles/formats/commercial.ts
+  var commercial_default = entry("广告片", "围绕需求、可信利益与行动目标设计。", "只使用有依据的产品主张与演示。", "展示产品使用过程和证据，避免暗示未证实功效。", "产品主张有依据，使用与行动目标清楚。");
+
+  // src/businesses/film-production/profiles/formats/vlog.ts
+  var vlog_default = entry("生活记录", "寻找日常观察、细节与体验变化。", "保留自然行动和环境反馈，不强加戏剧冲突。", "观察性构图与自然节奏，避免无意义运镜。", "日常细节有观察价值，节奏自然。");
+
+  // src/businesses/film-production/profiles/formats/music-video.ts
+  var music_video_default = entry("音乐影像", "建立音乐与视觉母题的关联。", "用动作和意象递进，不强塞对白或剧情。", "按音乐段落规划节奏与视觉变化。", "声画关联和意象递进明确。");
+
+  // src/businesses/film-production/profiles/purposes/entertainment.ts
+  var entertainment_default = entry("娱乐", "明确观众的情绪收益。", "保持人物与事件吸引力，避免空洞刺激。", "保证看点可见且节奏可读。", "观众体验有事件或画面支撑。");
+
+  // src/businesses/film-production/profiles/purposes/promotion.ts
+  var promotion_default = entry("宣传", "提炼地域或品牌辨识与记忆点。", "用具体可核实细节代替口号。", "展示可辨识地点、人物和生活细节。", "辨识度与传播信息具体且可信。");
+
+  // src/businesses/film-production/profiles/purposes/education.ts
+  var education_default = entry("科普教育", "确定观众要理解的问题与边界。", "按问题、证据、解释推进，事实不确定处标待核实。", "用演示或对比解释信息，不只堆字幕。", "知识准确，解释清楚，有证据与适用边界。");
+
+  // src/businesses/film-production/profiles/purposes/sales.ts
+  var sales_default = entry("销售转化", "定义需求、证据与行动目标。", "不编造性能、数据、认证或承诺。", "让使用过程与利益证据可见。", "卖点可信，行动清楚，无夸大主张。");
+
+  // src/businesses/film-production/profiles/styles/rural-documentary.ts
+  var rural_documentary_default = entry("乡村观察", "从具体生活观察寻找细节，不刻板化农村。", "语言自然，地域事实需来源。", "自然光、现场声与可辨空间，不自动添加破败贫困。", "生活细节可信，地域事实与观察边界清楚。");
+
+  // src/businesses/film-production/profiles/styles/minidv.ts
+  var minidv_default = entry("千禧 MiniDV", "以生活片段与自然观察组织视觉母题。", "对白小声自然，动作与停顿有生活感。", "按需轻微手持、对焦搜索、低饱和原生色彩和颗粒，不掩盖关键动作。", "DV 表现克制，人物动作与关键信息保持清楚。");
+
+  // src/businesses/film-production/profiles/styles/cinematic-realism.ts
+  var cinematic_realism_default = entry("写实电影", "以具体事件承载表达。", "行为和对白自然，不用抽象形容词代替剧情。", "以光源、材质、空间和动作描述风格，不堆参数。", "视觉细节真实并服务叙事。");
+
+  // src/businesses/film-production/profiles/styles/stylized-animation.ts
+  var stylized_animation_default = entry("风格化动画", "明确统一的造型和世界规则。", "表演与动作符合设定。", "统一比例、材质、色彩和动作物理规则。", "造型风格与世界物理规则跨镜一致。");
+
+  // src/businesses/film-production/profiles/legacy/drama.ts
+  var drama_default2 = {
     "id": "DRAMA",
     "revision": "1",
     "label": "剧情短片",
@@ -3221,8 +3255,8 @@
     }
   };
 
-  // src/businesses/film-director/profiles/comedy.ts
-  var comedy_default = {
+  // src/businesses/film-production/profiles/legacy/comedy.ts
+  var comedy_default2 = {
     "id": "COMEDY",
     "revision": "1",
     "label": "情景喜剧",
@@ -3252,7 +3286,7 @@
     }
   };
 
-  // src/businesses/film-director/profiles/lifestyle.ts
+  // src/businesses/film-production/profiles/legacy/lifestyle.ts
   var lifestyle_default = {
     "id": "LIFESTYLE",
     "revision": "1",
@@ -3283,8 +3317,8 @@
     }
   };
 
-  // src/businesses/film-director/profiles/documentary.ts
-  var documentary_default = {
+  // src/businesses/film-production/profiles/legacy/documentary.ts
+  var documentary_default2 = {
     "id": "DOCUMENTARY",
     "revision": "1",
     "label": "纪录／知识片",
@@ -3314,8 +3348,8 @@
     }
   };
 
-  // src/businesses/film-director/profiles/commercial.ts
-  var commercial_default = {
+  // src/businesses/film-production/profiles/legacy/commercial.ts
+  var commercial_default2 = {
     "id": "COMMERCIAL",
     "revision": "1",
     "label": "产品广告",
@@ -3345,7 +3379,7 @@
     }
   };
 
-  // src/businesses/film-director/profiles/promotional.ts
+  // src/businesses/film-production/profiles/legacy/promotional.ts
   var promotional_default = {
     "id": "PROMOTIONAL",
     "revision": "1",
@@ -3376,14 +3410,14 @@
     }
   };
 
-  // src/businesses/film-director/profiles/index.ts
-  var REGISTRY2 = Object.fromEntries([drama_default, comedy_default, lifestyle_default, documentary_default, commercial_default, promotional_default].map((p) => [p.id, p]));
-  var WORK_TYPES = Object.keys(REGISTRY2);
+  // src/businesses/film-production/profiles/index.ts
+  var REGISTRY = Object.fromEntries([drama_default2, comedy_default2, lifestyle_default, documentary_default2, commercial_default2, promotional_default].map((p) => [p.id, p]));
+  var WORK_TYPES = Object.keys(REGISTRY);
   function availableProfiles() {
-    return Object.values(REGISTRY2).map((p) => ({ work_type: p.id, label: p.label, profile_revision: p.revision, strategy: p.strategy }));
+    return Object.values(REGISTRY).map((p) => ({ work_type: p.id, label: p.label, profile_revision: p.revision, strategy: p.strategy }));
   }
 
-  // src/businesses/video/client/canvas-view.ts
+  // src/businesses/video-generation/client/canvas-view.ts
   var TEXT_WRITE_TIMEOUT_MS = 18e4;
   async function canvasNativeRpc(args, fetcher = fetch, timeoutMs = 2e4) {
     const response = await fetcher("/metaontic-video/canvas-native", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(args), signal: AbortSignal.timeout(timeoutMs) });
@@ -5328,7 +5362,7 @@
   // icon.svg
   var icon_default = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="MetaOnticVideo"><defs>\n<linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#36e8ee"/><stop offset=".5" stop-color="#1688ff"/><stop offset="1" stop-color="#1742e8"/></linearGradient>\n<linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#341ad5"/><stop offset=".5" stop-color="#7635ff"/><stop offset="1" stop-color="#176bff"/></linearGradient>\n<linearGradient id="c" x1="1" y1="0" x2="0" y2="1"><stop stop-color="#2ce7ef"/><stop offset=".5" stop-color="#087bff"/><stop offset="1" stop-color="#2026ba"/></linearGradient>\n<linearGradient id="d" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#24e5ec"/><stop offset=".45" stop-color="#1168ff"/><stop offset="1" stop-color="#2539d7"/></linearGradient>\n</defs>\n<path d="M9 25Q9 11 21 13L43 29 32 43 20 33V79Q20 85 14 85Q9 85 9 79Z" fill="url(#b)"/>\n<path d="M91 25Q91 11 79 13L43 39 57 53 80 35V78Q80 85 86 85Q91 85 91 79Z" fill="url(#c)"/>\n<path d="M10 23Q14 9 27 17L75 49Q79 52 75 56L43 77Q37 81 33 74L19 39Q15 27 10 23ZM40 40Q38 39 38 42V65Q38 68 41 66L59 54Q62 52 59 50Z" fill="url(#a)" fill-rule="evenodd"/>\n<path d="M75 49Q80 52 81 64L91 80Q89 88 82 84L62 70 43 77Q38 80 34 75Z" fill="url(#d)"/>\n<path d="M40 40Q38 39 38 42V65Q38 68 41 66L59 54Q62 52 59 50Z" fill="none"/>\n</svg>\n';
 
-  // src/businesses/video/client.ts
+  // src/businesses/video-generation/client.ts
   function createVideoClient(require2) {
     const React = require2("react");
     const h = React.createElement;
@@ -5494,7 +5528,7 @@
     };
   }
 
-  // src/core/installation/bundle-inventory.ts
+  // src/platform/migration/bundle-inventory.ts
   var BundleInventoryError = class extends Error {
     constructor(code) {
       super(`Bundle inventory ${code}`);
@@ -5535,7 +5569,7 @@
     });
   }
 
-  // src/core/installation/bundle-identity.ts
+  // src/platform/migration/bundle-identity.ts
   function hasLegacyBundleConflict(rows) {
     return rows.some((row) => row.name === PLUGIN_ID && row.installed === true && row.enabled === true) && rows.some((row) => row.name === PLUGIN_PACKAGE && row.installed === true && row.enabled === true);
   }
@@ -5580,7 +5614,7 @@
     return "ready";
   }
 
-  // src/client/bundle-migration.ts
+  // src/ui/installation/bundle-migration.ts
   function migrationManager(ctx) {
     for (const read of [() => ctx.get?.("remote.pluginManager"), () => ctx.get?.("remote")?.pluginManager, () => ctx.remote?.pluginManager]) {
       try {

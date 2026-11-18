@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
-const bundle=await build({stdin:{contents:"export * from './src/businesses/video/providers/connection-check.ts';export * from './src/businesses/video/integrations/connection-check.ts';export * from './src/businesses/video/client/connection-check.ts';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm'});
+const bundle=await build({stdin:{contents:"export * from './src/businesses/video-generation/providers/connection-check.ts';export * from './src/businesses/video-generation/integrations/connection-check.ts';export * from './src/businesses/video-generation/client/connection-check.ts';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm'});
 const api=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 const config={connectionMode:'metaontic',baseUrl:'https://relay.invalid/v1/',model:'video-test',imageModel:'image-test',textModel:'deepseek-v4.1',metaonticApiKey:'video-private',imageApiKey:'image-private',textApiKey:'text-private'};
 const ok=()=>Response.json({data:[{id:'video-test'},{id:'image-test'},{id:'deepseek-v4.1'}]});

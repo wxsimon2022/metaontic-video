@@ -9,7 +9,7 @@ function setup() {
   const h = vm.createContext({ window: { localStorage: {
     getItem: key => saved.get(key) || null, setItem: (key, value) => saved.set(key, value), removeItem: key => saved.delete(key),
   } } });
-  vm.runInContext(sourceOf('client/updates'), h);
+  vm.runInContext(sourceOf('ui/updates/update.service'), h);
   const context = {
     UPDATE_CACHE_KEY: 'test', UPDATE_MAX_AGE_MS: 1000, updateCommit: { current: '' },
     get updateLatest() { return state.latest; }, get updateConfirm() { return state.confirmed; },

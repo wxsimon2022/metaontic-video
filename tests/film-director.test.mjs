@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
-const result=await build({stdin:{contents:"export * from './src/businesses/film-director/runtime/project.ts'; export * from './src/businesses/film-director/workflows/orchestration.ts'; export * from './src/businesses/film-director/roles/index.ts'; export * from './src/businesses/film-director/workflows/revisions.ts'; export * from './src/businesses/film-director/runtime/deliverables.ts'; export * from './src/businesses/film-director/runtime/approvals.ts'; export * from './src/businesses/film-director/runtime/issues.ts'; export * from './src/businesses/film-director/runtime/spec.ts'; export * from './src/businesses/film-director/runtime/storage.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
+const result=await build({stdin:{contents:"export * from './src/businesses/film-production/artifacts/artifact.service.ts'; export * from './src/businesses/film-production/workflows/workflow.engine.ts'; export * from './src/businesses/film-production/roles/index.ts'; export * from './src/businesses/film-production/artifacts/artifact.version.ts'; export * from './src/businesses/film-production/artifacts/artifact.repository.ts'; export * from './src/businesses/film-production/approvals/approval.service.ts'; export * from './src/businesses/film-production/reviews/issue.service.ts'; export * from './src/businesses/film-production/projects/project.service.ts'; export * from './src/businesses/film-production/projects/project.repository.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
 const api=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
 const initial=()=>({revision:0,duration_ms:15000,artifacts:{},approvals:{}});
 test('创意未批准阻止剧本，旧版本不能覆盖，改稿失效下游',()=>{
@@ -228,4 +228,15 @@ test('磁盘排他锁阻止其他进程写同一项目，释放后可恢复',asy
   assert.equal(child.status,0);await assert.rejects(()=>api.acquireProjectLock(dir),/PROJECT_LOCKED/);
   await release();const releaseAgain=await api.acquireProjectLock(dir);await releaseAgain();
  }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test('短视频角色专项随当前角色加载，长片不误套短视频时长规则',()=>{
+ const markers={director:'【总导演专项】',creative:'【创意专项】',screenwriter:'【编剧专项】',character:'【人物专项】',scene:'【美术专项】',storyboard:'【分镜专项】','prompt-engineer':'【执行提示词专项】',reviewer:'【监制专项】'};
+ for(const [role,marker] of Object.entries(markers)){
+  const short=api.roleInstructions(initial(),role);
+  assert.ok(short.includes(marker),role);
+  for(const [other,otherMarker] of Object.entries(markers))if(other!==role)assert.ok(!short.includes(otherMarker),role+' leaked '+other);
+  assert.ok(!api.roleInstructions({...initial(),duration_ms:60001},role).includes(marker));
+  assert.ok(api.roleInstructions({...initial(),duration_ms:60000},role).includes(marker));
+ }
 });

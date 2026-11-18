@@ -5,7 +5,7 @@ import { sourceOf } from './source.mjs';
 import { api } from './module-test-api.mjs';
 
 /** 画布组件要用 canvas-stages 的阶段常量与投影函数：测试里一起编译，保持与真实打包一致的同一作用域。 */
-const VIEW_SOURCE = sourceOf('businesses/video/integrations/canvas-stages', 'businesses/video/client/canvas-view');
+const VIEW_SOURCE = sourceOf('businesses/video-generation/integrations/canvas-stages', 'businesses/video-generation/client/canvas-view');
 
 const TOKENS = { text: 'text', muted: 'muted', border: 'border', cardFill: 'card', controlFill: 'control', primaryFill: 'primary', error: 'error', success: 'success' };
 const PAGE_CSS_STUB = '/* PAGE_CSS 控件样式 */';

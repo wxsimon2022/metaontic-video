@@ -6,7 +6,7 @@
 
 | 参考目录 | 当前落点 | 实际职责 |
 | --- | --- | --- |
-| agents | src/businesses/film-director/roles | 八角色提示词，逻辑职责切换 |
+| agents | src/businesses/film-production/roles | 八角色提示词，逻辑职责切换 |
 | skills | skills/video-director及promo-video | 阶段方法与按需参考文档 |
 | workflows | workflows/orchestration.ts、workflows/revisions.ts | 依赖、下一动作、局部修订及任务登记 |
 | contracts | contracts/index.ts、contracts/schema.ts、contracts/references.ts | 共同契约、结构与交叉引用检查 |

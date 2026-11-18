@@ -2,7 +2,7 @@
 
 ## 运行接入
 
-`src/businesses/film-director/profiles/` 是实际加载的配置注册层，六个文件分别定义剧情、喜剧、生活Vlog/氛围、纪录/知识、产品广告和品牌/地域宣传的策略、边界、角色补充、产物字段与审核准则。公共角色保持八种逻辑职责，不增加独立模型或后台执行器。
+`src/businesses/film-production/profiles/` 是实际加载的配置注册层，六个文件分别定义剧情、喜剧、生活Vlog/氛围、纪录/知识、产品广告和品牌/地域宣传的策略、边界、角色补充、产物字段与审核准则。公共角色保持八种逻辑职责，不增加独立模型或后台执行器。
 
 `createProjectSpec` 保存 `work_type`、运行时生成的 `profile_revision`、独立的 `narrative_mode` 与 `visual_style`。`genre` 继续保留为自由题材标签，不从自由文本偷偷推断已批准的类型。未选择类型的新项目显示 UNSELECTED；创意草拟可以继续，但批准前必须保存明确类型。旧项目无 work_type 字段显示 LEGACY_GENERIC，不自动迁移或失效既有批准。未知类型、未知配置修订、错误叙事方式直接报错，不静默回退。
 
@@ -34,6 +34,6 @@ tests/film-profiles.test.mjs 覆盖六类及八角色加载、未知配置拒绝
 
 ## 四维组合配置
 
-专业项目支持 genre/format/purpose/style_profile，tone 与 visual_style 独立。注册表与解析器见 `src/businesses/film-director/profiles/dimensions.ts`，实际可选项由 read/next/route 的 resolved_profiles.available_profiles 返回。配置使用 create/configure_profile，不创建假想 YAML 文件。配置变更保留原材料并失效全部下游、清除批准；未选维度不从其他维度推断。只选风格不能替代内容方向确认。
+专业项目支持 genre/format/purpose/style_profile，tone 与 visual_style 独立。注册表与解析器见 `src/businesses/film-production/profiles/profile.resolver.ts`，实际可选项由 read/next/route 的 resolved_profiles.available_profiles 返回。配置使用 create/configure_profile，不创建假想 YAML 文件。配置变更保留原材料并失效全部下游、清除批准；未选维度不从其他维度推断。只选风格不能替代内容方向确认。
 
 旧 work_type 保持原字段和类型审核；组合配置额外要求 dimension_review 逐维记录版本、证据和状态。未评估不能通过终审，艺术建议与客观阻断继续分开。审批记录与产物清单关联解析配置版本。画布快速入口仍选择原六类作品，不冒充专业项目四维配置界面。

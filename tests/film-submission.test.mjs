@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
-const result=await build({stdin:{contents:"export * from './src/businesses/film-director/contracts/submission.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
+const result=await build({stdin:{contents:"export * from './src/businesses/film-production/contracts/submission.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
 const {checkSubmission}=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
 const state=()=>({revision:5,schema_version:'3.1.0',duration_ms:15000,artifacts:{script:{data:{characters:[],scenes:[],dialogue:[]}}},approvals:{script:2}});
 test('多余字符与缺失资产数组在预检集中返回，不改变状态或猜测道具',()=>{

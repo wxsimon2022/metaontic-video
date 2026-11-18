@@ -1,8 +1,8 @@
 # Agent 提示词 V4.0 接入
 
-八个角色的专业提示词与共同契约来自根目录 `Agent_Prompts.md`。角色正文分别位于 `src/businesses/film-director/roles/`，共同契约位于 `contracts/index.ts`，由角色注册入口统一注入。回归测试逐段比对文档原文，防止同步遗漏。
+八个角色的专业提示词与共同契约来自根目录 `Agent_Prompts.md`。角色正文集中位于 `src/agents/<角色>/prompt.ts`，`src/businesses/film-production/roles/` 仅保留兼容转导出，共同契约位于 `contracts/index.ts`，由角色注册入口统一注入。回归测试逐段比对文档原文，防止同步遗漏。
 
-`roles/runtime-contract.ts` 将文档的输出示例映射到当前工具协议：创意段落使用 structure，剧本保留 screenplay/chapters/scenes/dialogue，人物与场景合并为 assets，镜头使用 shots，提示词使用 prompts，审核使用平铺报告。文档中的外壳与别名不是新的工具参数。
+角色正文与根提示词文档直接使用当前工具提交字段；`roles/runtime-contract.ts` 补充运行约束与历史别名说明：创意段落使用 structure，剧本保留 screenplay/chapters/scenes/dialogue，人物与场景合并为 assets，镜头使用 shots，提示词使用 prompts，审核使用平铺报告。新产物不输出历史嵌套外壳；兼容别名不是另一套提交协议。
 
 V4.0 是提示词版本，持久化 schema 仍沿用实际项目版本。版本审批、依赖、时间轴、引用、审核评分及费用授权继续由现有运行时代码控制，不能靠自然语言修改策略绕过。
 
@@ -17,3 +17,11 @@ V4.0 是提示词版本，持久化 schema 仍沿用实际项目版本。版本�
 分镜与提示词的逐项数组要求集中在 `contracts/fields.ts`。next/route 返回 submission_contract，预检一次收集所有镜头缺失的 costume_ids/dialogue_refs 等字段，提交校验复用同一定义。没有对白才使用空 dialogue_refs；服装引用必须来自已批准角色的 costumes，不能自动填空绕过引用。
 
 目标模型只接受真实模型 ID 或未指定，不接受占位文字。实际配置 ID 从 read/next 的 execution_plan.model_name 读取；项目已有占位值用 configure_profile 更新 target_model，不手改持久化文件。只改模型会保留创意/剧本及其批准，失效 assets/shots/prompts/review 并重新检查模型适配；改变创意相关配置仍按原规则重新审批。项目目标模型与实际配置不一致继续阻断 compile，不静默切换实际接入。
+
+## 角色质量与专项加载
+
+八个角色分别补充创作验收、独特切入、行动因果与潜台词、身份与造型分层、空间证据、可读分镜与交接、模型正文与制作说明分离、证据审核规则。根提示词文档与实际角色保持同源比对。
+
+`roleInstructions` 对明确目标时长大于0且不超过60000毫秒的项目，注入短视频共用标准和当前角色唯一的专项卡；长片不加载短视频秒数策略，类型Profile仍独立解析。回归覆盖八角色隔离及60秒边界。镜头只对应独立提示词，实际生成任务与费用沿用production_strategy及制作编译，不改付费审批。
+
+自动验证为构建和683项测试；没有进行实际模型创作对照或付费视频生成，不能把规则优化声称为已验证的成片质量提升。Windows与macOS使用相同提示词产物，本次未运行双平台桌面验证。

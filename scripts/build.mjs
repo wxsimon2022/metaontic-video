@@ -16,3 +16,11 @@ if (target === 'all' || target === 'locale') {
 }
 if (target === 'all' || target === 'host') await build({entryPoints:['src/index.ts'],bundle:true,charset:'utf8',format:'esm',platform:'node',target:'node20',define:{__PLUGIN_VERSION__:JSON.stringify(version)},outfile:'index.js'});
 if (target === 'all' || target === 'client') await build({entryPoints:['src/client.ts'],bundle:true,charset:'utf8',format:'iife',platform:'browser',target:'es2022',loader:{'.svg':'text'},define:{__PLUGIN_VERSION__:JSON.stringify(version)},outfile:'client.js'});
+
+// 预设入口源码统一放 src；发布目录仅保留构建产物与静态资源。
+if (target === 'all' || target === 'host') {
+  await mkdir('presets', { recursive: true });
+  for (const preset of ['video-director', 'promo-video']) {
+    await build({entryPoints:[`src/agents/presets/${preset}.ts`],bundle:true,charset:'utf8',format:'esm',platform:'node',target:'node20',external:['@deepseek-ai/dsh-agent-preset'],outfile:`presets/${preset}.js`});
+  }
+}

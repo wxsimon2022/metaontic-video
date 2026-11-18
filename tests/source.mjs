@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 
-/** 写死的固定配置（src/core/hardcoded-config.ts）是所有模块的共享基础，sourceOf 默认带上它，
+/** 写死的固定配置（src/shared/constants/plugin.ts）是所有模块的共享基础，sourceOf 默认带上它，
  *  这样测试只需要列自己要塞依赖的业务模块。 */
-const SHARED = 'core/hardcoded-config';
+const SHARED = 'shared/constants/plugin';
 
 /** Compile modules for isolated dependency mocks without relying on bundle order or renamed imports. */
 export function sourceOf(...modules) {

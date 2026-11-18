@@ -7,7 +7,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {build} from 'esbuild';
 const dir=await mkdtemp(path.join(tmpdir(),'混合音轨 '));after(()=>rm(dir,{recursive:true,force:true}));
-await build({stdin:{contents:"export {mergeClips} from './src/businesses/video/media/merge.ts'",resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',outfile:path.join(dir,'api.mjs'),plugins:[{name:'audio-fixture',setup(b){b.onLoad({filter:/media\/ffmpeg\.ts$/},()=>({loader:'js',contents:`
+await build({stdin:{contents:"export {mergeClips} from './src/businesses/video-generation/media/merge.ts'",resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',outfile:path.join(dir,'api.mjs'),plugins:[{name:'audio-fixture',setup(b){b.onLoad({filter:/media\/ffmpeg\.ts$/},()=>({loader:'js',contents:`
 import {writeFile} from 'node:fs/promises';
 export const resolveBinary=()=> 'offline';
 export const probeMedia=async file=>globalThis.__audioMerge.media[file];

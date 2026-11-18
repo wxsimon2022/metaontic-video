@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 const ctx=vm.createContext({FORWARD_TRANSITION:'FORWARD_DEFAULT',CLOSEUP_TRANSITION:'CLOSEUP_DEFAULT',CONTINUOUS_TRANSITION:'CONTINUOUS_DEFAULT',isOmniExtendModel:()=>false});
-vm.runInContext(sourceOf('businesses/video/prompts/generation')+'\nObject.assign(globalThis,{buildExtensionPrompt,buildSegmentExecutionPrompt});',ctx);
+vm.runInContext(sourceOf('businesses/video-generation/prompts/generation')+'\nObject.assign(globalThis,{buildExtensionPrompt,buildSegmentExecutionPrompt});',ctx);
 const args={prompt:'镜头1：女子抬眼，平静地说{我知道了。}',seconds:15,startAt:15,mode:'continuous'};
 test('完整单段允许结尾，多段首段不提前收尾，末段不再要求交接',()=>{
  const prompt='女孩将钥匙放回抽屉，说{明天见。}';
@@ -47,13 +47,13 @@ test('non-text transition descriptions are refused before any request',()=>{
  assert.throws(()=>ctx.buildExtensionPrompt({...args,transitionDescription:{invalid:true}}),/过渡描述必须是文字/);
 });
 test('settings no longer provide a global continuation mode control',()=>{
- const settings=vm.createContext({});vm.runInContext(sourceOf('businesses/video/connection-defaults','businesses/video/client/config')+'\nObject.assign(globalThis,createClientConfig());',settings);
+ const settings=vm.createContext({});vm.runInContext(sourceOf('businesses/video-generation/connection-defaults','businesses/video-generation/client/config')+'\nObject.assign(globalThis,createClientConfig());',settings);
  assert.equal(settings.SELECTS.mode,undefined);assert.equal(settings.FIELD_BY_KEY.mode,undefined);
  assert.equal(settings.SECTIONS.some(s=>s.fields.includes('mode')),false);
 });
 
 test('Volcano Engine direct is hidden from the connection list while existing configs keep working',()=>{
- const settings=vm.createContext({});vm.runInContext(sourceOf('businesses/video/connection-defaults','businesses/video/client/config')+'\nObject.assign(globalThis,createClientConfig());',settings);
+ const settings=vm.createContext({});vm.runInContext(sourceOf('businesses/video-generation/connection-defaults','businesses/video-generation/client/config')+'\nObject.assign(globalThis,createClientConfig());',settings);
  assert.equal(Array.from(settings.SELECTS.connectionMode).join(','),'metaontic');
  // 隐藏只在设置页：默认值、旧配置校验与运行端都不受影响的取值仍在 schema 里。
  assert.equal(settings.FIELD_BY_KEY.volcengineApiKey.kind,'text');
