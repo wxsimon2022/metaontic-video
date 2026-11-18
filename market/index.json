@@ -35,7 +35,7 @@
   },
   "plugins": [
     {
-      "name": "metaontic-video",
+      "name": "dsh-metaontic-video",
       "title": {
         "en": "dsh-metaontic-video",
         "zh": "dsh-metaontic-video"
@@ -79,62 +79,16 @@
         "sortKeys": {}
       },
       "dist-tags": {
-        "latest": "3.32.0"
+        "latest": "4.0.1"
       },
       "versions": [
         {
-          "version": "3.32.0",
-          "publishTimestamp": 1794964809,
+          "version": "4.0.1",
+          "publishTimestamp": 1794974884,
           "source": {
             "type": "git",
             "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "3065927b5ad0404a747115bf3d41e157f4e79d65"
-          },
-          "engines": {
-            "dsh": ">=0.2.0"
-          }
-        },
-        {
-          "version": "3.31.0",
-          "publishTimestamp": 1794911105,
-          "source": {
-            "type": "git",
-            "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "138f26aad0bdb058a4006003facbe20087cf1409"
-          },
-          "engines": {
-            "dsh": ">=0.2.0"
-          }
-        },
-        {
-          "version": "3.30.1",
-          "publishTimestamp": 1794895466,
-          "source": {
-            "type": "git",
-            "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "24dfb4c1e4076f5eb7813b1a98b691d431fe0606"
-          },
-          "engines": {
-            "dsh": ">=0.2.0"
-          }
-        },
-        {
-          "version": "3.30.0",
-          "publishTimestamp": 1794887271,
-          "source": {
-            "type": "git",
-            "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "cf44e6eccf0f7fd3c97e4e17ce47aca7effcb8ae"
-          },
-          "engines": {
-            "dsh": ">=0.2.0"
-          }
-        },
-        {
-          "version": "3.29.2",
-          "publishTimestamp": 1794839384,
-          "source": {
-            "type": "npm"
+            "commit": "cb81d24ff97a4c15db0f739b6f24d51b400caf6d"
           },
           "engines": {
             "dsh": ">=0.2.0"
