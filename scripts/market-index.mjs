@@ -25,6 +25,7 @@ const MAX_VERSIONS = 5;
 const NPM_REGISTRY = 'https://registry.npmjs.org/';
 
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+const withdrawn = new Set(JSON.parse(readFileSync(join(root, 'docs/engineering/withdrawn-releases.json'), 'utf8')));
 const git = (...args) => execFileSync('git', args, { cwd: root }).toString().trim();
 const argv = process.argv.slice(2);
 const skipRegistry = argv.includes('--no-registry');
@@ -51,6 +52,7 @@ async function npmPublishTime(version) {
 const tags = git('tag', '--sort=-v:refname', '--list', 'v[0-9]*.[0-9]*.[0-9]*')
   .split('\n')
   .filter(Boolean)
+  .filter(tag => !withdrawn.has(tag.slice(1)))
   .filter(tag => JSON.parse(git('show', `${tag}:package.json`)).name === pkg.name)
   .slice(0, MAX_VERSIONS);
 if (tags.length === 0) throw new Error('当前包名没有已发布的 vX.Y.Z 标签，先发一版再生成索引');

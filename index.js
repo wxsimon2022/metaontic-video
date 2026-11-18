@@ -17,7 +17,7 @@ var __export = (target, all) => {
 var PLUGIN_VERSION;
 var init_version = __esm({
   "src/core/version.ts"() {
-    PLUGIN_VERSION = true ? "4.0.0".trim().replace(/^v/i, "") : "";
+    PLUGIN_VERSION = true ? "4.0.1".trim().replace(/^v/i, "") : "";
   }
 });
 
@@ -4705,6 +4705,51 @@ var filmDirectorBusiness = {
     }));
   }
 };
+
+// src/core/installation/bundle-identity.ts
+init_hardcoded_config();
+function hasLegacyBundleConflict(rows) {
+  return rows.some((row) => row.name === PLUGIN_ID && row.installed === true && row.enabled === true) && rows.some((row) => row.name === PLUGIN_PACKAGE && row.installed === true && row.enabled === true);
+}
+function bundleRows(result) {
+  const rows = Array.isArray(result) ? result : result?.ok === true ? result.value : null;
+  if (!Array.isArray(rows)) throw new Error("Bundle inventory unavailable");
+  return rows;
+}
+
+// src/core/installation/bundle-host.ts
+function mountBundleAwareHost(ctx, mount2) {
+  let manager;
+  try {
+    manager = ctx.get?.("pluginManager");
+  } catch {
+  }
+  if (!manager || typeof manager.listBundles !== "function") return mount2();
+  let alive = true, mounted = false, dispose, timer;
+  const check = async () => {
+    try {
+      const conflict = hasLegacyBundleConflict(bundleRows(await manager.listBundles()));
+      if (!alive) return;
+      if (!conflict) {
+        mounted = true;
+        dispose = mount2();
+        return;
+      }
+    } catch {
+      if (mounted) {
+        ctx.logger?.warn?.("\u89C6\u9891\u63D2\u4EF6\u52A0\u8F7D\u5931\u8D25\uFF0C\u8BF7\u5728\u63D2\u4EF6\u7BA1\u7406\u4E2D\u68C0\u67E5\u7EC4\u4EF6\u72B6\u6001\u3002");
+        return;
+      }
+    }
+    if (alive) timer = setTimeout(check, 1e3);
+  };
+  void check();
+  return () => {
+    alive = false;
+    if (timer) clearTimeout(timer);
+    dispose?.();
+  };
+}
 
 // src/core/agent-registry.ts
 function selectedAgentId(context, ctx) {
@@ -12524,7 +12569,8 @@ var Config = Schema.object({ ...commonConfigFields, ...videoConfigFields });
 
 // src/index.ts
 var inject = ["tools"];
-var apply = createPluginRuntime({ agents, businesses: [videoBusiness, filmDirectorBusiness] });
+var mount = createPluginRuntime({ agents, businesses: [videoBusiness, filmDirectorBusiness] });
+var apply = (ctx, config = {}) => mountBundleAwareHost(ctx, () => mount(ctx, config));
 export {
   Config,
   apply,

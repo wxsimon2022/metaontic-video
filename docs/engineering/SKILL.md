@@ -199,3 +199,5 @@ Agent组件图标使用<完整预设模块>/icon导出，SVG在presets/icons，�
 README 不展示各版本更新条目；发布脚本只同步其在线安装链接，更新内容写入 CHANGELOG、包内 releaseNotes 与 Release。包名为 dsh-metaontic-video，配置命名空间与历史数据目录仍为 metaontic-video；发布附件文件名保持 metaontic-video-X.Y.Z.tgz。市场索引只收录清单包名匹配的标签，不能将旧包名版本伪装成新包名版本。
 
 README 编辑先遵守 docs/engineering/readme-guidelines.md，功能变化不逐条追加到首页。纯文档修改只检查文档结构和链接，无需构建或重复业务测试。
+
+包名迁移必须验证双包同时安装且启用的真实状态，不能在测试中手动改好启用列表后称迁移通过。新宿主等待旧 bundle 停用后才注册工具，新客户端先挂独立迁移设置页，核实 setBundleEnabled 后再装配共享界面。停用不等于卸载，不删除配置或任务；仅真实 restart-required 提示重启。docs/engineering/withdrawn-releases.json 中的版本不得重新发布或出现在市场索引中。

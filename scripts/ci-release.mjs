@@ -71,6 +71,8 @@ export async function runCiRelease({ cwd = process.cwd(), dist = 'dist', tag = '
     log(`流水线发版：本次不是正式版标签（${name || '无标签'}），只留制品、不发布 Release。`);
     return { status: 'skipped', reason: 'not-a-version-tag', tag: name };
   }
+  const withdrawnFile = path.join(cwd, 'docs/engineering/withdrawn-releases.json');
+  if (existsSync(withdrawnFile) && JSON.parse(readFileSync(withdrawnFile, 'utf8')).includes(version)) throw new Error(`v${version} 已撤回，禁止重新发布`);
   const pkgPath = path.join(cwd, 'package.json');
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
   if (String(pkg.version) !== version) throw new Error(`标签 ${name} 与包内版本 v${pkg.version} 不一致：先按标签更新版本号与 releaseNotes，再重新打标签。`);

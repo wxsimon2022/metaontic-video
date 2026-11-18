@@ -1264,7 +1264,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "4.0.0".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "4.0.1".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1730,7 +1730,7 @@
   // package.json
   var package_default = {
     name: "dsh-metaontic-video",
-    version: "4.0.0",
+    version: "4.0.1",
     description: "\u9762\u5411\u65B0\u624B\u7684 AI \u89C6\u9891\u521B\u4F5C\u52A9\u624B\uFF1A\u4ECE\u60F3\u6CD5\u3001\u811A\u672C\u5230\u89C6\u9891\u751F\u6210\uFF0C\u5168\u7A0B\u5F15\u5BFC\uFF1B\u901A\u8FC7\u5206\u6BB5\u7EED\u62CD\u4E0E\u672C\u5730\u5408\u5E76\uFF0C\u63D0\u4F9B\u4F4E\u6210\u672C\u957F\u89C6\u9891\u5236\u4F5C\u65B9\u6848\u3002",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1844,11 +1844,11 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "4.0.0",
+      version: "4.0.1",
       prerelease: false,
-      publishedAt: "2026-11-18T02:09:51.509Z",
+      publishedAt: "2026-11-18T04:07:59.397Z",
       items: [
-        "\u4F18\u5316\uFF1A\u6682\u9690\u85CF\u6D41\u7A0B\u753B\u5E03\uFF0C\u7EDF\u4E00\u901A\u8FC7\u89C6\u9891\u52A9\u624B\u521B\u4F5C\uFF1B\u5B89\u88C5\u540D\u8C03\u6574\u4E3A dsh-metaontic-video\uFF0C\u65E7\u7248\u505C\u7528\u540E\u5B89\u88C5\uFF0C\u4FDD\u7559\u539F\u914D\u7F6E\u4E0E\u4EFB\u52A1\u8D44\u6599\u3002"
+        "\u4F18\u5316\uFF1A\u6682\u9690\u85CF\u6D41\u7A0B\u753B\u5E03\uFF0C\u7EDF\u4E00\u7531\u89C6\u9891\u52A9\u624B\u521B\u4F5C\uFF1B\u5B89\u88C5\u540D\u6539\u4E3A dsh-metaontic-video\uFF0C\u63D0\u4F9B\u4FDD\u7559\u8D44\u6599\u7684\u8FC1\u79FB\u5165\u53E3\uFF0C\u89E3\u51B3\u65B0\u65E7\u63D2\u4EF6\u51B2\u7A81\u4E0E\u8BBE\u7F6E\u9875\u7F3A\u5931\u3002"
       ]
     }
   };
@@ -5452,9 +5452,122 @@
     };
   }
 
+  // src/core/installation/bundle-identity.ts
+  function hasLegacyBundleConflict(rows) {
+    return rows.some((row) => row.name === PLUGIN_ID && row.installed === true && row.enabled === true) && rows.some((row) => row.name === PLUGIN_PACKAGE && row.installed === true && row.enabled === true);
+  }
+  function bundleRows(result) {
+    const rows = Array.isArray(result) ? result : result?.ok === true ? result.value : null;
+    if (!Array.isArray(rows)) throw new Error("Bundle inventory unavailable");
+    return rows;
+  }
+  async function disableLegacyBundle(manager) {
+    if (!hasLegacyBundleConflict(bundleRows(await manager.listBundles()))) return "ready";
+    if (typeof manager.setBundleEnabled !== "function") throw new Error("Bundle migration unavailable");
+    const answer = await manager.setBundleEnabled(PLUGIN_ID, false);
+    const value = answer?.ok === true ? answer.value : answer;
+    if (answer?.ok === false || value?.error || !value) throw new Error("Bundle migration rejected");
+    if (value.application === "restart-required") return "restart-required";
+    const rows = bundleRows(await manager.listBundles());
+    if (rows.some((row) => row.name === PLUGIN_ID && row.enabled === true) || !rows.some((row) => row.name === PLUGIN_PACKAGE && row.enabled === true)) throw new Error("Bundle migration not applied");
+    return "ready";
+  }
+
+  // src/client/bundle-migration.ts
+  function migrationManager(ctx) {
+    try {
+      return ctx.get?.("remote.pluginManager") || ctx.get?.("remote")?.pluginManager;
+    } catch {
+      return null;
+    }
+  }
+  async function mountBundleAwareClient(ctx, React, mount) {
+    const manager = migrationManager(ctx);
+    if (!manager || typeof manager.listBundles !== "function") return mount();
+    let alive = true, status = "checking", running = null;
+    const listeners = /* @__PURE__ */ new Set();
+    const set = (next) => {
+      if (!alive) return;
+      status = next;
+      for (const listener of listeners) listener();
+    };
+    ctx.effect(() => () => {
+      alive = false;
+      listeners.clear();
+    }, "video: migration lifetime");
+    const ns = "settings.metaonticVideoMigration";
+    ctx.effect(() => ctx.locale.register(ns, {
+      zh: { title: "\u63D2\u4EF6\u8FC1\u79FB", checking: "\u6B63\u5728\u68C0\u67E5\u63D2\u4EF6\u5B89\u88C5\u72B6\u6001\u2026", conflict: "\u65E7\u7248\u548C\u65B0\u7248\u540C\u65F6\u542F\u7528\uFF0C\u53EF\u80FD\u5BFC\u81F4\u8BBE\u7F6E\u9875\u4E0E\u5DE5\u5177\u51B2\u7A81\u3002\u8BF7\u5148\u7B49\u5F85\u89C6\u9891\u4EFB\u52A1\u7ED3\u675F\uFF0C\u518D\u5207\u6362\u5230\u65B0\u7248\u3002", action: "\u505C\u7528\u65E7\u7248\u5E76\u5207\u6362", working: "\u6B63\u5728\u5207\u6362\u2026", loadFailed: "\u63D2\u4EF6\u754C\u9762\u52A0\u8F7D\u5931\u8D25\uFF0C\u8BF7\u5728\u63D2\u4EF6\u7BA1\u7406\u4E2D\u6838\u5BF9\u542F\u7528\u72B6\u6001\u3002\u914D\u7F6E\u548C\u4EFB\u52A1\u672A\u5220\u9664\u3002", failed: "\u5207\u6362\u672A\u5B8C\u6210\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u7BA1\u7406\u72B6\u6001\u540E\u91CD\u8BD5\u3002\u539F\u914D\u7F6E\u3001\u4EFB\u52A1\u548C\u5B89\u88C5\u6587\u4EF6\u5747\u4FDD\u7559\u3002", blocked: "\u65E0\u6CD5\u6838\u5B9E\u63D2\u4EF6\u5B89\u88C5\u72B6\u6001\uFF0C\u8BF7\u68C0\u67E5\u63D2\u4EF6\u7BA1\u7406\u670D\u52A1\u540E\u91CD\u8BD5\u3002", restart: "\u5BBF\u4E3B\u8981\u6C42\u91CD\u542F\u4EE5\u5B8C\u6210\u5207\u6362\u3002\u8BF7\u5148\u4FDD\u5B58\u5DE5\u4F5C\uFF0C\u518D\u91CD\u542F Harness\u3002", retry: "\u91CD\u65B0\u68C0\u67E5", preserved: "\u4EC5\u505C\u7528\u65E7\u63D2\u4EF6\uFF0C\u4E0D\u5378\u8F7D\u3001\u4E0D\u5220\u9664 API\u5BC6\u94A5\u3001\u4EFB\u52A1\u6216\u7D20\u6750\u3002" },
+      en: { title: "Plugin migration", checking: "Checking installed plugins\u2026", conflict: "The old and new plugins are both enabled and share component IDs. Wait for active video tasks to finish before switching.", action: "Disable old plugin and switch", working: "Switching\u2026", loadFailed: "The plugin UI could not load. Check enabled plugins; settings and tasks are preserved.", failed: "Switching was not completed. Check plugin management and retry. Settings, tasks and installed files are preserved.", blocked: "Plugin inventory could not be verified. Check plugin management and retry.", restart: "Harness requires a restart to finish switching. Save your work before restarting.", retry: "Check again", preserved: "Only disables the old plugin. No uninstall or deletion of credentials, tasks or assets." }
+    }), "video: migration messages");
+    const t = ctx.locale.bind(ns), h = React.createElement;
+    const start = () => {
+      if (running) return running;
+      set("working");
+      running = disableLegacyBundle(manager).then((result) => {
+        if (!alive) return;
+        if (result === "restart-required") {
+          set("restart");
+          return;
+        }
+        return activate();
+      }).catch(() => set("failed")).finally(() => {
+        running = null;
+      });
+      return running;
+    };
+    const check = async () => {
+      set("checking");
+      try {
+        const rows = bundleRows(await manager.listBundles());
+        if (!alive) return;
+        if (hasLegacyBundleConflict(rows)) {
+          set("conflict");
+          return;
+        }
+        return activate();
+      } catch {
+        set("blocked");
+      }
+    };
+    function Page() {
+      const state = React.useSyncExternalStore((listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      }, () => status, () => status);
+      return h(
+        "section",
+        { style: { padding: 20, maxWidth: 640 }, "data-metaontic-migration": state },
+        h("h3", null, t("title")),
+        h("p", { role: state === "failed" || state === "blocked" ? "alert" : "status" }, t(state)),
+        h("p", null, t("preserved")),
+        state === "conflict" || state === "failed" ? h("button", { type: "button", onClick: start }, t("action")) : null,
+        state === "blocked" ? h("button", { type: "button", onClick: check }, t("retry")) : null
+      );
+    }
+    const registerPage = () => ctx.effect(() => ctx.slots.inject("plugins.bundle.config", () => ctx.slots.register({ name: "plugins.bundle.config", key: PLUGIN_PACKAGE, locale: ns }, Page)), "video: migration settings");
+    let off = registerPage();
+    let activated = false;
+    function activate() {
+      if (!alive || activated) return;
+      activated = true;
+      if (typeof off === "function") off();
+      try {
+        return mount();
+      } catch {
+        off = registerPage();
+        set("loadFailed");
+      }
+    }
+    return check();
+  }
+
   // src/client.ts
   window.__ModuleLoader__.load({
     id: PLUGIN_PACKAGE,
-    factory: (require2) => createClientRuntime(require2, [{ id: "video", create: createVideoClient }])
+    factory: (require2) => {
+      const runtime = createClientRuntime(require2, [{ id: "video", create: createVideoClient }]);
+      return { ...runtime, apply: (ctx) => mountBundleAwareClient(ctx, require2("react"), () => runtime.apply(ctx)) };
+    }
   });
 })();

@@ -171,3 +171,12 @@ test('流水线发版的发布核对写真话：成品来自流水线、本机�
   assert.match(line, /未运行 GitHub 双平台 CI/);
   assert.doesNotMatch(releaseVerification(false, '', false), /流水线/, '本地发版仍按原来的口径记录');
 });
+
+test('withdrawn releases cannot be recreated by CI even when a valid archive and token exist', async () => {
+ const dir=await fixture({version:'4.0.0'});
+ try {
+  await mkdir(path.join(dir,'docs/engineering'),{recursive:true});
+  await writeFile(path.join(dir,'docs/engineering/withdrawn-releases.json'),'["4.0.0"]');
+  await assert.rejects(runCiRelease({cwd:dir,tag:'v4.0.0',env:{GITEE_TOKEN:'fixture'},publish:()=>assert.fail('must not publish')}),/已撤回/);
+ } finally {await rm(dir,{recursive:true,force:true});}
+});

@@ -15,7 +15,7 @@ function switchForm(value = {}) {
   };
 }
 
-function boot(form) {
+async function boot(form) {
   let entry;
   vm.runInNewContext(readFileSync(new URL('../client.js', import.meta.url), 'utf8'), {
     window: { __ModuleLoader__: { load(value) { entry = value; } } },
@@ -24,13 +24,13 @@ function boot(form) {
   const components = {}, dictionaries = {};
   const host = createPreviewHost({ form, components, dictionaries, getLocale: () => 'zh', onUpdate() {} });
   for (const service of plugin.inject) assert.ok(host[service], service);
-  assert.doesNotThrow(() => plugin.apply(host));
+  await assert.doesNotReject(async () => plugin.apply(host));
   return { host, components, dictionaries };
 }
 
-test('流程画布暂隐藏，旧配置及开关变化都不能重新注册入口', () => {
+test('流程画布暂隐藏，旧配置及开关变化都不能重新注册入口', async () => {
   const form = switchForm({ canvasEnabled: false });
-  const off = boot(form);
+  const off = await boot(form);
   assert.equal(off.components['sidebar.panellist:metaontic-video-canvas'], undefined, '关闭时不该有画布图标');
   assert.equal(off.components['main:metaontic-video-canvas'], undefined, '关闭时不该有画布页');
   // 视频创作入口不受影响。
@@ -42,15 +42,15 @@ test('流程画布暂隐藏，旧配置及开关变化都不能重新注册入�
   assert.equal(off.components['sidebar.panellist:metaontic-video-canvas'], undefined, '再关掉又消失');
 });
 
-test('只开「自动创建画布」不开「流程画布」时左侧栏依旧没有画布入口', () => {
-  const { components } = boot(switchForm({ canvasEnabled: false, autoCreateCanvas: true }));
+test('只开「自动创建画布」不开「流程画布」时左侧栏依旧没有画布入口', async () => {
+  const { components } = await boot(switchForm({ canvasEnabled: false, autoCreateCanvas: true }));
   assert.equal(components['sidebar.panellist:metaontic-video-canvas'], undefined, '总开关关着就不该有画布图标');
   assert.equal(components['main:metaontic-video-canvas'], undefined, '总开关关着就不该有画布页');
 });
 
-test('standalone preview host mounts the real client and registers settings and progress views', () => {
+test('standalone preview host mounts the real client and registers settings and progress views', async () => {
   // 把 slot 注册项按 名称:key 存下来，便于分别断言设置页、进度视图与左侧栏面板。
-  const { host, components, dictionaries } = boot(switchForm({ canvasEnabled: true }));
+  const { host, components, dictionaries } = await boot(switchForm({ canvasEnabled: true }));
   for (const key of ['metaontic-video', 'video_generate', 'video_extend', 'video_status', 'metaontic-video-progress']) {
     assert.equal(typeof components[key], 'function', key);
   }

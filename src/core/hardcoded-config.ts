@@ -8,7 +8,7 @@
  * 服务端与浏览器端共用：只放可公开的值，不放任何密钥。
  */
 
-/** 插件标识：包名、配置命名空间、面板 id 都基于它。 */
+/** 持久化标识不随 npm 包名改变；配置命名空间与面板 id 保持稳定。 */
 export const PLUGIN_ID = 'metaontic-video';
 export const PLUGIN_PACKAGE = 'dsh-metaontic-video';
 export const PLUGIN_NAMESPACE = PLUGIN_ID;

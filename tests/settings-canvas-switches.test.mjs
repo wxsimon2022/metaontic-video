@@ -10,7 +10,7 @@ import { createPreviewHost } from '../preview/host.mjs';
  * 设置页两个画布开关的显示联动：总开关「流程画布」关着时不该出现「自动创建画布」，
  * 打开后立刻出现，再关掉又隐藏。用真实客户端组件做服务端渲染，不连宿主、不写配置。
  */
-function bootSettings(initial) {
+async function bootSettings(initial) {
   globalThis.window = {
     navigator: { userAgent: 'node' },
     setTimeout, clearTimeout,
@@ -33,7 +33,7 @@ function bootSettings(initial) {
   };
   const components = {}, dictionaries = {};
   const host = createPreviewHost({ form, components, dictionaries, getLocale: () => 'zh', onUpdate() {} });
-  plugin.apply(host);
+  await plugin.apply(host);
   const Page = components['plugins.bundle.config:dsh-metaontic-video'];
   assert.equal(typeof Page, 'function', '设置页组件已注册');
   const render = () => renderToStaticMarkup(React.createElement(Page, { view: 'full' }));
@@ -44,8 +44,8 @@ function bootSettings(initial) {
 const hasAutoCreateSwitch = (html) => html.includes('流程画布打开后有效');
 const hasCanvasSwitch = (html) => html.includes('关闭时左侧栏不出现');
 
-test('设置页隐藏全部画布开关，旧的开启配置也不重新显示', () => {
-  const { render, form } = bootSettings({ canvasEnabled: false });
+test('设置页隐藏全部画布开关，旧的开启配置也不重新显示', async () => {
+  const { render, form } = await bootSettings({ canvasEnabled: false });
   const off = render();
   assert.ok(!hasCanvasSwitch(off), '总开关隐藏');
   assert.ok(!hasAutoCreateSwitch(off), '总开关关着时不该出现自动创建画布');

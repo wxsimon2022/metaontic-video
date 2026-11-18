@@ -104,6 +104,8 @@ export async function main(argv) {
   // Current workflow mirrors to this configured Gitee repository. Reject silently publishing elsewhere.
   if(gitee.slug!=='hackloop/metaontic-video')throw Error('当前CI绑定hackloop/metaontic-video，变更目标前请同步CI镜像配置');
   process.chdir(root);
+  const withdrawnFile=path.join(root,'docs/engineering/withdrawn-releases.json');
+  if (existsSync(withdrawnFile) && JSON.parse(readFileSync(withdrawnFile,'utf8')).includes(version)) throw Error(`v${version} 已撤回，禁止重新发布或续跑；请使用新版本号`);
   const run=(command,args,{capture=false,optional=false}={})=>{
     const result=spawnSync(command,args,{cwd:root,encoding:'utf8',stdio:capture?'pipe':'inherit',shell:false});
     if(result.error || result.status!==0) { if(optional)return null; throw Error(`${command} ${args[0]||''} 失败（${result.status??result.error?.code}）`); }

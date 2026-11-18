@@ -28,8 +28,8 @@ test('canvas connection indicator exposes the active models and readiness withou
   assert.ok(!JSON.stringify(info).includes('secret-never-persist')); assert.equal(s.calls(), 0); s.dispose();
 });
 const start = (s, id, extra = {}) => s.handle({ action: 'start', id, confirmPlan: true, confirmCost: true, textOnly: true, ...extra });
-async function settled(s, id) {
-  for (let n = 0; n < 100; n++) { const { job } = await s.handle({ action: 'status', id }); if (job.state !== 'running') return job; await new Promise(r => setTimeout(r, 10)); }
+async function settled(s, id, ready = () => true) {
+  for (let n = 0; n < 100; n++) { const { job } = await s.handle({ action: 'status', id }); if (job.state !== 'running' && ready(job)) return job; await new Promise(r => setTimeout(r, 10)); }
   throw Error('job did not settle');
 }
 test('native plan preserves duration/audio; rejects missing specs, unsupported ports and overlong nodes', () => {
@@ -66,7 +66,7 @@ test('one paid submission, duplicate start is idempotent, result blocks next gen
 });
 test('failed publication can only republish existing media; never calls generation again', async () => {
   let count = 0; const s = await service({ publish: async () => { if (!count++) throw Error('offline'); return { status: 'synced' }; } });
-  const { proposal } = await prepare(s); await start(s, proposal.id); const job = await settled(s, proposal.id);
+  const { proposal } = await prepare(s); await start(s, proposal.id); const job = await settled(s, proposal.id, job => !!job.sync);
   assert.equal(job.sync.status, 'pending');
   await s.handle({ action: 'sync', id: job.id }); assert.equal(s.calls(), 1);
   assert.equal((await s.handle({ action: 'status', id: job.id })).job.sync.status, 'synced'); s.dispose();
