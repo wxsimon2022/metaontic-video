@@ -148,12 +148,12 @@ test('流水线发版接在 Gitee Go 流水线的打包步骤后面，只对 v �
   assert.doesNotMatch(workflow, /github\.com[^"\n]*\$GITHUB_TOKEN/, '令牌不能直接拼进推送地址');
 });
 
-test('GitHub 侧按标签发布时优先镜像 Gitee 同一份成品，没有才自己打包', async () => {
+test('GitHub 侧按标签发布时复用 Gitee 或本机草稿中的同一份成品', async () => {
   const workflow = await readFile(new URL('../.github/workflows/publish.yml', import.meta.url), 'utf8');
-  // 标签触发：先看 Gitee 有没有这一版，有就镜像同一个 tgz（不重打包），没有才自己构建打包。
+  // 标签触发：先看 Gitee 有没有这一版，有就镜像同一个 tgz（不重打包），没有则等待本机上传草稿成品。
   assert.match(workflow, /releases\/tags\/v\$VERSION/);
   assert.match(workflow, /echo "mirror=1" >> "\$GITHUB_OUTPUT"; echo "version=\$VERSION" >> "\$GITHUB_OUTPUT"; echo "sha=-" >> "\$GITHUB_OUTPUT"/);
-  assert.match(workflow, /if: \$\{\{ steps\.source\.outputs\.mirror != '1' \}\}/);
+  assert.match(workflow, /if: \$\{\{ steps\.source\.outputs\.mirror == 'staged' \}\}/);
   assert.match(workflow, /if: \$\{\{ steps\.source\.outputs\.mirror == '1' \}\}/);
   assert.match(workflow, /python3 scripts\/download-published-release\.py "\$\{\{ steps\.source\.outputs\.version \}\}" dist "\$\{\{ steps\.source\.outputs\.sha \}\}"/);
   // 手动镜像（existing_version）仍必须带上原成品 sha256，不能退化成不校验。

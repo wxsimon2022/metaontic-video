@@ -9,6 +9,7 @@ Readme.md → README.markdown → README 找文档，找到就整篇显示，找
 """
 
 import os
+import gzip
 import sys
 import tarfile
 
@@ -22,7 +23,7 @@ if not os.path.isfile(path):
 DROPPED = 'package/README.md'
 temp = f'{path}.tmp'
 removed = False
-with tarfile.open(path, 'r:gz') as source, tarfile.open(temp, 'w:gz') as target:
+with open(temp, 'wb') as output, gzip.GzipFile(filename='', mode='wb', fileobj=output, mtime=0) as compressed, tarfile.open(path, 'r:gz') as source, tarfile.open(fileobj=compressed, mode='w') as target:
     for member in source.getmembers():
         if member.name == DROPPED:
             removed = True

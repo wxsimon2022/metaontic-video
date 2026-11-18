@@ -88,3 +88,16 @@ test('release and mirror publish only universal tgz while retaining both platfor
  assert.match(release, /const assets=\[?`metaontic-video-\$\{version\}\.tgz`\]/);
  assert.doesNotMatch(release, /scripts\/package-windows\.py/);
 });
+
+test('dual release stages local bytes, waits for the tag commit and leaves independent GitHub history intact', async () => {
+ const source = await readFile(new URL('../scripts/release.mjs', import.meta.url), 'utf8');
+ const workflow = await readFile(new URL('../.github/workflows/publish.yml', import.meta.url), 'utf8');
+ assert.match(source, /push\(github,'github.com','GitHub 标签',\[tag\]\)/);
+ assert.match(source, /headSha===git\('rev-parse',`\$\{tag\}\^\{commit\}`\)/);
+ assert.match(source, /'--draft'/);
+ assert.match(source, /remoteDigest!==localDigest/);
+ assert.match(workflow, /Download the staged local package/);
+ assert.match(workflow, /--draft=false --prerelease=false/);
+ assert.match(workflow, /previous\/\*\.tgz/);
+ assert.doesNotMatch(workflow, /gh release upload .*--clobber/);
+});

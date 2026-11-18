@@ -79,7 +79,7 @@ jobs:
           python3 - "$VERSION" <<'PYTHON'
           import runpy, sys
           from pathlib import Path
-          runpy.run_path('scripts/download-published-release.py')['verify_artifacts'](sys.argv[1], Path('dist'), '-')
+          runpy.run_path('scripts/download-published-release.py')['verify_artifacts'](sys.argv[1], Path('dist'), '')
           PYTHON
       - name: Prepare public release notes
         run: |
