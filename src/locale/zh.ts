@@ -8,12 +8,14 @@ export interface PluginLocale {
   meta: {
     title: string;
     description: string;
+    detail?: string;
   };
 }
 
 export const locale: PluginLocale = {
   meta: {
     title: 'MetaOnticVideo',
+    detail: 'plugin-detail.md',
     description: '让新手快速上手视频创作：说出想法，助手带你完善创意、写脚本并确认制作；通过分段续拍与本机合并，提供低成本长视频生成方案。',
   },
 };

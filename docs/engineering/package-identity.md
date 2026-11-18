@@ -9,3 +9,5 @@ README 不展示版本更新条目；发布脚本只同步 README 安装链接�
 验证：构建通过、654 项自动测试通过、实际 Harness Schema 检查 11 个工具通过；本地 tgz 清单及预设模块引用检查通过。旧、新包名在相同 URL 的锁记录分别校验，保留合法旧记录。未安装到用户配置、未发布。
 
 Windows/macOS：路径使用 node:path、文件规范化使用 Node rename；更新/打包脚本不新增 shell 平台依赖。本次未执行 Windows/macOS 双平台实际安装升级。包名变化属于新包身份；保留数据目录不等于验证了宿主旧包到新包的迁移。正式发布前必须验证旧包到新包的迁移、避免同时加载两份插件，并通过同一 tgz 双平台安装升级检查。
+
+插件详情不展示仓库 README：中英文 locale 的 `meta.detail` 显式指向包内空白 `plugin-detail.md`，阻止宿主默认回退读取 README。保留仓库 README 与包内安装文档，不通过全局 CSS 隐藏宿主区域；该声明在 Windows/macOS 共用成品中一致。

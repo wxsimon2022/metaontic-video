@@ -20,8 +20,10 @@ const TOKENS = {
      * 所以集中在这张表里；class 统一 mov- 前缀，避免和宿主其他插件串味。
      */
     const PAGE_CSS = `
+      /* 仅收紧包含本插件设置的宿主详情区，不依赖宿主生成的 CSS 类名。 */
+      div:has(> section[data-plugin-config] .mov-page) { margin-top: 12px; gap: 16px; }
       /* 整页纵向排布：块与块之间统一 16px，比一整片表单好扫 */
-      .mov-page { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; color: ${TOKENS.text}; }
+      .mov-page { display: flex; flex-direction: column; gap: 16px; padding: 0; color: ${TOKENS.text}; }
       /* 分组卡片：16 个字段摊在一格里太糊，按用途各装一张卡 */
       .mov-section { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
       .mov-advanced { display: block; }
@@ -79,11 +81,12 @@ const TOKENS = {
       .mov-field-wide { grid-column: 1 / -1; }
       .mov-label { display: block; font-size: 12px; color: ${TOKENS.muted}; margin-bottom: 6px; }
       .mov-input { padding: 8px 10px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; color: ${TOKENS.text}; font: inherit; font-size: 13px; height: 36px; }
-      .mov-key-control { position: relative; min-width: 0; }
-      .mov-key-control .mov-input { padding-right: 40px; }
-      .mov-key-eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 30px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 5px; background: transparent; color: ${TOKENS.muted}; cursor: pointer; }
-      .mov-key-eye:hover { color: ${TOKENS.text}; background: ${TOKENS.border}; }
-      .mov-key-eye:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
+      .mov-key-control { display: flex; align-items: center; gap: 6px; min-width: 0; }
+      .mov-key-control .mov-input { flex: 1 1 0; width: 0; min-width: 0; }
+      .mov-key-eye { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 32px; height: 36px; padding: 0; border: 0; border-radius: 6px; color: ${TOKENS.muted}; background: transparent; cursor: pointer; }
+      .mov-key-eye:hover { color: ${TOKENS.text}; background: ${TOKENS.controlFill}; }
+      .mov-key-eye:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+      .mov-key-verify { flex: 0 0 auto; height: 36px; white-space: nowrap; }
       .mov-input:focus, .mov-input:focus-visible { outline: none; border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 3px rgba(36, 123, 191, .18); }
       /* 模型 ID 与可执行文件路径很长：等宽字体 + 省略，不把整行撑变形 */
       .mov-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; }

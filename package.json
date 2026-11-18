@@ -63,7 +63,8 @@
     "THIRD_PARTY_NOTICES.md",
     "presets/*.js",
     "locale/presets/**/*.json",
-    "presets/icons/*.svg"
+    "presets/icons/*.svg",
+    "plugin-detail.md"
   ],
   "engines": {
     "node": ">=20",

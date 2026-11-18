@@ -74,3 +74,15 @@ test('设置专用接口拒绝跨站、GET及配置覆盖，不发起外网请�
   const result=await request('POST',{'content-type':'application/json',origin:'http://localhost'});assert.equal(result.statusCode,200);assert.equal(result.body.checks.length,3);assert.equal(calls,1);
  }finally{globalThis.fetch=previous;}
 });
+
+test('模型清单403但令牌只读鉴权正常时不误判生成权限失败',async()=>{
+ const calls=[];
+ const result=await api.checkConnections(config,{fetcher:async(url,options)=>{calls.push(url);assert.equal(options.method,'GET');assert.equal(options.body,undefined);return url.endsWith('/v1/models')?new Response('{}',{status:403}):Response.json({success:true,data:[]});}});
+ assert.deepEqual(calls,['https://relay.invalid/v1/models','https://relay.invalid/api/log/token']);
+ assert.ok(result.checks.every(c=>c.code==='auth_reachable'&&c.level==='warning'));
+ assert.equal(result.generation_tested,false);
+});
+test('补充鉴权失败保留403证据，不将未知权限标为通过',async()=>{
+ const result=await api.checkConnections(config,{fetcher:async()=>new Response('{}',{status:403})});
+ assert.ok(result.checks.every(c=>c.code==='forbidden'&&c.level==='warning'));
+});

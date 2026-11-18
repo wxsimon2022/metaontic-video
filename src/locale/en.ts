@@ -4,6 +4,7 @@ import type { PluginLocale } from './zh';
 export const locale: PluginLocale = {
   meta: {
     title: 'MetaOnticVideo',
+    detail: 'plugin-detail.md',
     description: 'Get started with video creation quickly, even as a beginner: describe an idea and follow the guided script-to-video workflow. Create longer videos with a low-cost segment continuation and local merging workflow.',
   },
 };

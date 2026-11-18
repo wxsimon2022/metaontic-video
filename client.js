@@ -41,6 +41,120 @@
     };
   }
 
+  // src/core/hardcoded-config.ts
+  var PLUGIN_ID = "metaontic-video";
+  var PLUGIN_PACKAGE = "dsh-metaontic-video";
+  var PLUGIN_NAMESPACE = PLUGIN_ID;
+  var PANEL_ID = PLUGIN_ID;
+  var FLOW_CANVAS_AVAILABLE = false;
+  var CANVAS_PANEL_ID = `${PLUGIN_ID}-canvas`;
+  var GUIDE_URL = "https://ai.mybfs.cn";
+  var SUPPORT_URL = "https://work.weixin.qq.com/kfid/kfcd6fc4ca793eeac18";
+  var GITEE = {
+    slug: "hackloop/metaontic-video",
+    web: "https://gitee.com/hackloop/metaontic-video",
+    api: "https://gitee.com/api/v5/repos/hackloop/metaontic-video",
+    transport: "git@gitee.com:hackloop/metaontic-video.git"
+  };
+  var GITHUB = {
+    slug: "wxsimon2022/metaontic-video",
+    web: "https://github.com/wxsimon2022/metaontic-video",
+    api: "https://api.github.com/repos/wxsimon2022/metaontic-video",
+    transport: "git@ssh.github.com:wxsimon2022/metaontic-video.git"
+  };
+  var CHANGELOG_URL = `${GITHUB.web}/blob/master/CHANGELOG.md`;
+  var UPDATE_SPEC = `git+${GITEE.web}.git`;
+  var UPDATE_CACHE_KEY = `${PLUGIN_ID}.update-check-v3`;
+  var UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
+  var UPDATE_ATTEMPTS = 3;
+  var releaseArchiveName = (version) => `${PLUGIN_ID}-${version}.tgz`;
+  var releaseDownloadUrl = (version, channel = "gitee") => `${(channel === "github" ? GITHUB : GITEE).web}/releases/download/v${version}/${releaseArchiveName(version)}`;
+  var RELAY = {
+    baseUrl: "https://ai.bileego.com",
+    //signupUrl: 'https://ai.bileego.com/sign-up?aff=VzYr',
+    signupUrl: "https://ai.bileego.com",
+    pricingUrl: "https://ai.bileego.com/pricing",
+    submitPath: "/doubao/api/v3/contents/generations/tasks",
+    queryPath: "/doubao/api/v3/contents/generations/tasks/{task_id}",
+    baseEnv: ["NEWAPI_VIDEO_BASE_URL", "NEWAPI_BASE_URL"],
+    modelEnv: ["NEWAPI_VIDEO_MODEL"],
+    textModelEnv: ["NEWAPI_TEXT_MODEL"]
+  };
+  var VOLCENGINE = {
+    modeAvailable: false,
+    baseUrl: "https://ark.cn-beijing.volces.com",
+    submitPath: "/api/v3/contents/generations/tasks",
+    queryPath: "/api/v3/contents/generations/tasks/{task_id}",
+    pricingUrl: "https://docs.volcengine.com/docs/ark/model-pricing"
+  };
+  var VIDEO_MODEL = "doubao-seedance-2-0-mini-260615";
+  var VIDEO_MODEL_OPTIONS = [
+    "doubao-seedance-2-0-mini-260615",
+    "doubao-seedance-2-0-fast-260128"
+  ];
+  var IMAGE_MODEL = "doubao-seedream-5-0-pro-260628";
+  var RETIRED_IMAGE_MODELS = ["doubao-seedream-5-0-260128"];
+  var TEXT_MODELS = ["deepseek v4.1 flash", "deepseekv4pro"];
+  var TEXT_MODEL = TEXT_MODELS[0];
+  var RETIRED_TEXT_MODELS = ["doubao-seed-1-6-250615"];
+  var REFERENCE_TMP_DIR = `${PLUGIN_ID}-reference`;
+
+  // src/client/support-action.ts
+  function createSupportAction({ React, t, PAGE_CSS }) {
+    const h = React.createElement;
+    return function SupportAction({ subject }) {
+      const [open, setOpen] = React.useState(false);
+      const dialog = React.useRef(null);
+      const ownBundle = subject?.kind === "bundle" && subject.pkg?.name === PLUGIN_PACKAGE;
+      React.useEffect(() => {
+        setOpen(false);
+      }, [ownBundle]);
+      React.useEffect(() => {
+        if (open && dialog.current && !dialog.current.open) dialog.current.showModal();
+      }, [open]);
+      if (!ownBundle) return null;
+      return h(
+        React.Fragment,
+        null,
+        h("style", null, PAGE_CSS),
+        h("button", {
+          type: "button",
+          className: "mov-btn mov-btn-sm",
+          "data-action": "contact-support",
+          style: { alignSelf: "center", whiteSpace: "nowrap" },
+          "aria-haspopup": "dialog",
+          "aria-expanded": open,
+          onClick: () => setOpen(true)
+        }, t("supportContact")),
+        open ? h("dialog", {
+          ref: dialog,
+          className: "mov-support-dialog",
+          "aria-labelledby": "mov-support-title",
+          onCancel: () => setOpen(false),
+          onClose: () => setOpen(false),
+          onClick: (event) => {
+            if (event.target === event.currentTarget) {
+              const rect = event.currentTarget.getBoundingClientRect();
+              if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setOpen(false);
+            }
+          }
+        }, h(
+          "div",
+          { className: "mov-support-content" },
+          h(
+            "div",
+            { className: "mov-card-head" },
+            h("strong", { id: "mov-support-title" }, t("supportContact")),
+            h("button", { type: "button", className: "mov-btn mov-btn-sm mov-trailing", "aria-label": t("supportClose"), onClick: () => setOpen(false) }, t("supportClose"))
+          ),
+          h("p", { className: "mov-hint" }, t("supportScan")),
+          h("iframe", { className: "mov-support-frame", title: t("supportContact"), src: SUPPORT_URL, referrerPolicy: "no-referrer" }),
+          h("a", { href: SUPPORT_URL, target: "_blank", rel: "noopener noreferrer" }, t("supportOpenPage"))
+        )) : null
+      );
+    };
+  }
+
   // src/client/auth-notice.ts
   var TOOL_ARGS_JSON = /Tool call[^\n]*JSON|Expected ',' or '\}' after property value|Unexpected (?:token|end of JSON input)/i;
   function createAuthNotice({ h, Original, hostT, t }) {
@@ -301,8 +415,10 @@
     };
     const inputStyle = { width: "100%", boxSizing: "border-box" };
     const PAGE_CSS = `
+      /* 仅收紧包含本插件设置的宿主详情区，不依赖宿主生成的 CSS 类名。 */
+      div:has(> section[data-plugin-config] .mov-page) { margin-top: 12px; gap: 16px; }
       /* 整页纵向排布：块与块之间统一 16px，比一整片表单好扫 */
-      .mov-page { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; color: ${TOKENS.text}; }
+      .mov-page { display: flex; flex-direction: column; gap: 16px; padding: 0; color: ${TOKENS.text}; }
       /* 分组卡片：16 个字段摊在一格里太糊，按用途各装一张卡 */
       .mov-section { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
       .mov-advanced { display: block; }
@@ -360,11 +476,12 @@
       .mov-field-wide { grid-column: 1 / -1; }
       .mov-label { display: block; font-size: 12px; color: ${TOKENS.muted}; margin-bottom: 6px; }
       .mov-input { padding: 8px 10px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; color: ${TOKENS.text}; font: inherit; font-size: 13px; height: 36px; }
-      .mov-key-control { position: relative; min-width: 0; }
-      .mov-key-control .mov-input { padding-right: 40px; }
-      .mov-key-eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 30px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 5px; background: transparent; color: ${TOKENS.muted}; cursor: pointer; }
-      .mov-key-eye:hover { color: ${TOKENS.text}; background: ${TOKENS.border}; }
-      .mov-key-eye:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
+      .mov-key-control { display: flex; align-items: center; gap: 6px; min-width: 0; }
+      .mov-key-control .mov-input { flex: 1 1 0; width: 0; min-width: 0; }
+      .mov-key-eye { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 32px; height: 36px; padding: 0; border: 0; border-radius: 6px; color: ${TOKENS.muted}; background: transparent; cursor: pointer; }
+      .mov-key-eye:hover { color: ${TOKENS.text}; background: ${TOKENS.controlFill}; }
+      .mov-key-eye:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+      .mov-key-verify { flex: 0 0 auto; height: 36px; white-space: nowrap; }
       .mov-input:focus, .mov-input:focus-visible { outline: none; border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 3px rgba(36, 123, 191, .18); }
       /* 模型 ID 与可执行文件路径很长：等宽字体 + 省略，不把整行撑变形 */
       .mov-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
@@ -582,64 +699,6 @@
     return { videoExecutionSource, VideoTaskProgress, VideoProgressDock };
   }
 
-  // src/core/hardcoded-config.ts
-  var PLUGIN_ID = "metaontic-video";
-  var PLUGIN_PACKAGE = "dsh-metaontic-video";
-  var PLUGIN_NAMESPACE = PLUGIN_ID;
-  var PANEL_ID = PLUGIN_ID;
-  var FLOW_CANVAS_AVAILABLE = false;
-  var CANVAS_PANEL_ID = `${PLUGIN_ID}-canvas`;
-  var GUIDE_URL = "https://ai.mybfs.cn";
-  var SUPPORT_URL = "https://work.weixin.qq.com/kfid/kfcd6fc4ca793eeac18";
-  var GITEE = {
-    slug: "hackloop/metaontic-video",
-    web: "https://gitee.com/hackloop/metaontic-video",
-    api: "https://gitee.com/api/v5/repos/hackloop/metaontic-video",
-    transport: "git@gitee.com:hackloop/metaontic-video.git"
-  };
-  var GITHUB = {
-    slug: "wxsimon2022/metaontic-video",
-    web: "https://github.com/wxsimon2022/metaontic-video",
-    api: "https://api.github.com/repos/wxsimon2022/metaontic-video",
-    transport: "git@ssh.github.com:wxsimon2022/metaontic-video.git"
-  };
-  var CHANGELOG_URL = `${GITHUB.web}/blob/master/CHANGELOG.md`;
-  var UPDATE_SPEC = `git+${GITEE.web}.git`;
-  var UPDATE_CACHE_KEY = `${PLUGIN_ID}.update-check-v3`;
-  var UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-  var UPDATE_ATTEMPTS = 3;
-  var releaseArchiveName = (version) => `${PLUGIN_ID}-${version}.tgz`;
-  var releaseDownloadUrl = (version, channel = "gitee") => `${(channel === "github" ? GITHUB : GITEE).web}/releases/download/v${version}/${releaseArchiveName(version)}`;
-  var RELAY = {
-    baseUrl: "https://ai.bileego.com",
-    //signupUrl: 'https://ai.bileego.com/sign-up?aff=VzYr',
-    signupUrl: "https://ai.bileego.com",
-    pricingUrl: "https://ai.bileego.com/pricing",
-    submitPath: "/doubao/api/v3/contents/generations/tasks",
-    queryPath: "/doubao/api/v3/contents/generations/tasks/{task_id}",
-    baseEnv: ["NEWAPI_VIDEO_BASE_URL", "NEWAPI_BASE_URL"],
-    modelEnv: ["NEWAPI_VIDEO_MODEL"],
-    textModelEnv: ["NEWAPI_TEXT_MODEL"]
-  };
-  var VOLCENGINE = {
-    modeAvailable: false,
-    baseUrl: "https://ark.cn-beijing.volces.com",
-    submitPath: "/api/v3/contents/generations/tasks",
-    queryPath: "/api/v3/contents/generations/tasks/{task_id}",
-    pricingUrl: "https://docs.volcengine.com/docs/ark/model-pricing"
-  };
-  var VIDEO_MODEL = "doubao-seedance-2-0-mini-260615";
-  var VIDEO_MODEL_OPTIONS = [
-    "doubao-seedance-2-0-mini-260615",
-    "doubao-seedance-2-0-fast-260128"
-  ];
-  var IMAGE_MODEL = "doubao-seedream-5-0-pro-260628";
-  var RETIRED_IMAGE_MODELS = ["doubao-seedream-5-0-260128"];
-  var TEXT_MODELS = ["deepseek v4.1 flash", "deepseekv4pro"];
-  var TEXT_MODEL = TEXT_MODELS[0];
-  var RETIRED_TEXT_MODELS = ["doubao-seed-1-6-250615"];
-  var REFERENCE_TMP_DIR = `${PLUGIN_ID}-reference`;
-
   // src/businesses/video/connection-defaults.ts
   var METAONTIC_BASE_URL = RELAY.baseUrl;
   var VOLCENGINE_MODE_AVAILABLE = VOLCENGINE.modeAvailable;
@@ -796,7 +855,8 @@
       connectionResult_key_missing: "未填写此模型实际使用的 API密钥，请填写并保存。",
       connectionResult_invalid_address: "接口地址格式不正确，请检查已保存的地址。",
       connectionResult_auth_failed: "鉴权未通过（401），请核对 API密钥及接口地址。",
-      connectionResult_forbidden: "访问被拒绝（403），请核对密钥权限、渠道限制及地址。",
+      connectionResult_forbidden: "只读验证接口被拒绝（403），尚不能据此判断生成权限，请核对渠道接口限制。",
+      connectionResult_auth_reachable: "密钥鉴权正常；渠道限制了模型清单查询，当前模型生成权限尚未验证。",
       connectionResult_models_unsupported: "服务未提供模型查询接口，无法仅靠只读请求确认可用性。",
       connectionResult_rate_limited: "请求受限（429），请稍后重试并核对渠道限制。",
       connectionResult_server_error: "上游接口异常，请核对地址或稍后重试。",
@@ -979,7 +1039,8 @@
       connectionResult_key_missing: "The API key used by this model is missing. Enter it and save.",
       connectionResult_invalid_address: "Invalid endpoint address. Check the saved URL.",
       connectionResult_auth_failed: "Authentication failed (401). Check the API key and endpoint.",
-      connectionResult_forbidden: "Access denied (403). Check key permissions, channel restrictions and endpoint.",
+      connectionResult_forbidden: "Read-only check denied (403). Generation permissions remain unverified; check provider endpoint restrictions.",
+      connectionResult_auth_reachable: "Key authentication responded successfully; model listing is restricted. Generation permissions remain unverified.",
       connectionResult_models_unsupported: "Model listing is unsupported. Read-only checks cannot confirm availability.",
       connectionResult_rate_limited: "Rate limited (429). Retry later and check provider limits.",
       connectionResult_server_error: "Upstream error. Check the endpoint or retry later.",
@@ -1722,7 +1783,8 @@
           h("path", { key: "eye", d: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" }),
           h("circle", { key: "pupil", cx: 12, cy: 12, r: 3 }),
           revealed ? h("path", { key: "slash", d: "M3 3l18 18" }) : null
-        ]))
+        ])),
+        context.renderKeyAction?.(field)
       ]);
     }
     return { save, reset, control };
@@ -1794,7 +1856,8 @@
       "THIRD_PARTY_NOTICES.md",
       "presets/*.js",
       "locale/presets/**/*.json",
-      "presets/icons/*.svg"
+      "presets/icons/*.svg",
+      "plugin-detail.md"
     ],
     engines: {
       node: ">=20",
@@ -1891,14 +1954,6 @@
         const selectedMode = draft.connectionMode ?? value.connectionMode ?? "metaontic";
         const directMode = selectedMode === "volcengine";
         const [visibleKey, setVisibleKey] = React.useState("");
-        const [supportOpen, setSupportOpen] = React.useState(false);
-        const supportDialog = React.useRef(null);
-        React.useEffect(() => {
-          if (supportOpen && supportDialog.current && !supportDialog.current.open) supportDialog.current.showModal();
-        }, [supportOpen]);
-        React.useEffect(() => {
-          setSupportOpen(false);
-        }, [selectedMode]);
         React.useEffect(() => {
           setVisibleKey("");
         }, [selectedMode]);
@@ -2076,6 +2131,7 @@
           optionLabel,
           edit,
           visibleKey,
+          renderKeyAction: (field) => showsSharedValidation(field) ? connectionButton() : null,
           confirm: (message) => window.confirm(message)
         });
         const hints = {
@@ -2090,6 +2146,9 @@
           autoCreateCanvas: t("autoCreateCanvasHint"),
           maxWaitMs: t("waitSecondsHint")
         };
+        function showsSharedValidation(field) {
+          return !directMode && field.key === "metaonticApiKey" && (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
+        }
         function fieldCell(field) {
           const classes = ["mov-field"];
           if (field.kind === "switch") classes.push("mov-field-switch");
@@ -2097,6 +2156,7 @@
           return h("div", { key: field.key, className: classes.join(" ") }, [
             field.kind === "switch" ? null : h("label", { key: "label", className: "mov-label", htmlFor: `metaontic-video-${field.key}` }, t(["metaonticApiKey", "volcengineApiKey"].includes(field.key) ? !directMode && (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false ? "sharedModelKey" : "videoModelKey" : field.key)),
             control(field),
+            showsSharedValidation(field) ? connectionFeedback() : null,
             hints[field.key] ? h("span", { key: "hint", className: "mov-hint", style: { marginTop: 4 } }, hints[field.key]) : null
           ]);
         }
@@ -2139,14 +2199,24 @@
             fields.filter((key) => (key !== "volcengineApiKey" || directMode) && (!["imageModel", "imageUseVideoKey", "imageApiKey"].includes(key) || !directMode) && (key !== "imageApiKey" || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) === false) && (key !== "metaonticApiKey" || selectedMode === "metaontic") && (key !== "autoCreateCanvas" || canvasOn)).map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean)
           );
         };
-        const connectionBox = h("div", { key: "connection-check", className: "mov-section", "data-field": "connectionCheck", style: { marginTop: 20 } }, [
-          h("div", { key: "head", className: "mov-card-head" }, [
-            h("span", { key: "title", className: "mov-card-title" }, t("connectionCheckTitle")),
-            h("button", { key: "button", type: "button", className: "mov-btn", "data-action": "check-connection", disabled: pending.length > 0 || status === "saving" || snapshot.status !== "ready" || connectionCheck.status === "working", onClick: () => checkController.current.run(!pending.length && status !== "saving" && form.getSnapshot()?.status === "ready") }, t(connectionCheck.status === "working" ? "connectionChecking" : "connectionCheckButton"))
-          ]),
-          h("p", { key: "hint", className: "mov-hint" }, t(pending.length ? "connectionCheckSaveFirst" : "connectionCheckHint")),
-          h("div", { key: "result", role: "status", "aria-live": "polite" }, connectionCheck.status === "failed" ? h("p", { style: { color: TOKENS.error } }, t("connectionCheckFailed")) : connectionCheck.checks.map((check) => h("p", { key: check.target, style: { color: check.level === "error" ? TOKENS.error : check.level === "success" ? TOKENS.success : TOKENS.muted } }, `${t("connectionTarget_" + check.target)}：${t("connectionResult_" + check.code)}`)))
-        ]);
+        function connectionButton() {
+          return h("button", {
+            key: "verify",
+            type: "button",
+            className: "mov-btn mov-key-verify",
+            "data-action": "check-connection",
+            disabled: pending.length > 0 || status === "saving" || snapshot.status !== "ready" || connectionCheck.status === "working",
+            onClick: () => checkController.current.run(!pending.length && status !== "saving" && form.getSnapshot()?.status === "ready")
+          }, t(connectionCheck.status === "working" ? "connectionChecking" : "connectionCheckButton"));
+        }
+        function connectionFeedback() {
+          return h(
+            "div",
+            { key: "connection-feedback", role: "status", "aria-live": "polite" },
+            pending.length ? h("p", { className: "mov-hint" }, t("connectionCheckSaveFirst")) : null,
+            connectionCheck.status === "failed" ? h("p", { style: { color: TOKENS.error } }, t("connectionCheckFailed")) : connectionCheck.checks.map((check) => h("p", { key: check.target, style: { margin: "4px 0", fontSize: 12, color: check.level === "error" ? TOKENS.error : check.level === "success" ? TOKENS.success : TOKENS.muted } }, `${t("connectionTarget_" + check.target)}：${t("connectionResult_" + check.code)}`))
+          );
+        }
         const settingsRows = () => [
           h("div", { key: "generation", className: "mov-section" }, [
             h("div", { key: "title", className: "mov-section-title" }, t("sectionGeneration")),
@@ -2280,23 +2350,10 @@
         if (snapshot.status === "loading") notice = t("loading");
         else if (snapshot.value === void 0) notice = t("unavailable");
         else if (snapshot.writable === false) notice = t("readOnly");
-        const blobs = notice && !snapshot.value ? [] : [footer, versionBox, connectionBox, resetRow];
+        const blobs = notice && !snapshot.value ? [] : [footer, versionBox, resetRow];
         return h("div", { className: "mov-page" }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
           h("style", { key: "styles" }, PAGE_CSS),
-          h(
-            "div",
-            { key: "support-actions", className: "mov-card-head", style: { justifyContent: "flex-end", marginBottom: 12 } },
-            h("button", {
-              key: "support",
-              type: "button",
-              className: "mov-btn mov-btn-sm",
-              "data-action": "contact-support",
-              "aria-haspopup": "dialog",
-              "aria-expanded": supportOpen,
-              onClick: () => setSupportOpen(true)
-            }, t("supportContact"))
-          ),
           !notice || snapshot.value ? renderUpdateNotice({
             h,
             t,
@@ -2314,29 +2371,7 @@
           }) : null,
           notice ? h("p", { key: "notice", className: "mov-notice" }, notice) : null,
           ...notice && !snapshot.value ? [] : settingsRows(),
-          ...blobs,
-          supportOpen ? h("dialog", {
-            key: "support-dialog",
-            ref: supportDialog,
-            className: "mov-support-dialog",
-            "aria-labelledby": "mov-support-title",
-            onCancel: () => setSupportOpen(false),
-            onClose: () => setSupportOpen(false),
-            onClick: (event) => {
-              if (event.target === event.currentTarget) {
-                const rect = event.currentTarget.getBoundingClientRect();
-                if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setSupportOpen(false);
-              }
-            }
-          }, h("div", { className: "mov-support-content" }, [
-            h("div", { key: "heading", className: "mov-card-head" }, [
-              h("strong", { key: "title", id: "mov-support-title" }, t("supportContact")),
-              h("button", { key: "close", type: "button", className: "mov-btn mov-btn-sm mov-trailing", "aria-label": t("supportClose"), onClick: () => setSupportOpen(false) }, t("supportClose"))
-            ]),
-            h("p", { key: "hint", className: "mov-hint" }, t("supportScan")),
-            h("iframe", { key: "qr", className: "mov-support-frame", title: t("supportContact"), src: SUPPORT_URL, referrerPolicy: "no-referrer" }),
-            h("a", { key: "fallback", href: SUPPORT_URL, target: "_blank", rel: "noopener noreferrer" }, t("supportOpenPage"))
-          ])) : null
+          ...blobs
         ]);
       };
     }
@@ -5315,6 +5350,12 @@
         }), "metaontic-video: actual video execution");
         const t = ctx.locale.bind(NS);
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), "metaontic-video: dictionaries");
+        const SupportAction = createSupportAction({ React, t, PAGE_CSS });
+        ctx.effect(() => ctx.slots.inject("plugins.detail.actions", () => ctx.slots.register({
+          name: "plugins.detail.actions",
+          id: "metaontic-video-support",
+          locale: NS
+        }, SupportAction)), "metaontic-video: support action");
         ctx.effect(() => ctx.slots.inject("conversation.chat.node", () => registerAuthNotice(ctx, h, t)), "metaontic-video: friendly service authentication notice");
         const form = ctx.configForms.get(NAMESPACE);
         for (const tool of ["video_generate", "video_extend", "video_status", "video_prepare_image", "video_project", "video_estimate"]) {

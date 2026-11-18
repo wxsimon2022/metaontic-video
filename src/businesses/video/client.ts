@@ -1,3 +1,4 @@
+import { createSupportAction } from '../../client/support-action.js';
 import { registerAuthNotice } from '../../client/auth-notice.js';
 import { createToolResultView } from './client/tool-result.js';
 import { createMediaPreview } from './client/media-preview.js';
@@ -40,6 +41,10 @@ export function createVideoClient(require) {
         }), 'metaontic-video: actual video execution');
         const t = ctx.locale.bind(NS);
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'metaontic-video: dictionaries');
+        const SupportAction = createSupportAction({ React, t, PAGE_CSS });
+        ctx.effect(() => ctx.slots.inject('plugins.detail.actions', () => ctx.slots.register({
+          name: 'plugins.detail.actions', id: 'metaontic-video-support', locale: NS,
+        }, SupportAction)), 'metaontic-video: support action');
         ctx.effect(() => ctx.slots.inject('conversation.chat.node', () => registerAuthNotice(ctx, h, t)), 'metaontic-video: friendly service authentication notice');
         const form = ctx.configForms.get(NAMESPACE);
         for (const tool of ['video_generate', 'video_extend', 'video_status', 'video_prepare_image', 'video_project', 'video_estimate']) {

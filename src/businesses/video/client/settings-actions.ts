@@ -149,6 +149,7 @@ export function createSettingsActions(context: any) {
                 h('circle', { key: 'pupil', cx: 12, cy: 12, r: 3 }),
                 revealed ? h('path', { key: 'slash', d: 'M3 3l18 18' }) : null,
             ])),
+            context.renderKeyAction?.(field),
         ]);
     }
     return { save, reset, control };

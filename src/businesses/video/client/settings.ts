@@ -4,7 +4,7 @@ import { VOLCENGINE_MODE_AVAILABLE } from '../connection-defaults.js';
 import { createUpdateActions, renderUpdateNotice, formatReleaseTime } from '../../../client/updates.js';
 /** 浏览器端 settings：由入口注入宿主 React 与共享依赖。 */
 import packageInfo from '../../../../package.json';
-import { CHANGELOG_URL, RELAY, SUPPORT_URL } from '../../../core/hardcoded-config.js';
+import { CHANGELOG_URL, RELAY } from '../../../core/hardcoded-config.js';
 /** 设置页工厂：入口注入宿主 React、配置表单及更新服务。 */
 export function createSettingsPage(deps: any) {
   const {
@@ -22,12 +22,6 @@ function makePage({ form, t, manager }) {
         const selectedMode = draft.connectionMode ?? value.connectionMode ?? 'metaontic';
         const directMode = selectedMode === 'volcengine';
         const [visibleKey, setVisibleKey] = React.useState('');
-        const [supportOpen, setSupportOpen] = React.useState(false);
-        const supportDialog = React.useRef(null);
-        React.useEffect(() => {
-          if (supportOpen && supportDialog.current && !supportDialog.current.open) supportDialog.current.showModal();
-        }, [supportOpen]);
-        React.useEffect(() => { setSupportOpen(false); }, [selectedMode]);
         React.useEffect(() => { setVisibleKey(''); }, [selectedMode]);
         const [status, setStatus] = React.useState('idle');
         const [saveError, setSaveError] = React.useState('');
@@ -146,7 +140,7 @@ function makePage({ form, t, manager }) {
           saveInFlight, connectionBusy, setSaveError, setStatus, form, draft, same,
           validateSettings, persistConnection, persistBatch, setDraft, flashStatus, settingsError,
           t, snapshot, PLUGIN_OWNED_KEYS, setVisibleKey, value, h, SELECTS, inputStyle,
-          optionLabel, edit, visibleKey, confirm: message => window.confirm(message),
+          optionLabel, edit, visibleKey, renderKeyAction: field => showsSharedValidation(field) ? connectionButton() : null, confirm: message => window.confirm(message),
         });
 
         // 少数需要解释的字段：模型选哪个（mini 便宜 / fast 贵一些）
@@ -165,6 +159,11 @@ function makePage({ form, t, manager }) {
           maxWaitMs: t('waitSecondsHint'),
         };
 
+        function showsSharedValidation(field) {
+          return !directMode && field.key === 'metaonticApiKey'
+            && (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
+        }
+
         /** 一个可编辑字段：标签 + 控件（开关自带标签，就不重复画）。 */
         function fieldCell(field) {
           const classes = ['mov-field'];
@@ -176,6 +175,7 @@ function makePage({ form, t, manager }) {
               ? null
               : h('label', { key: 'label', className: 'mov-label', htmlFor: `metaontic-video-${field.key}` }, t(['metaonticApiKey', 'volcengineApiKey'].includes(field.key) ? (!directMode && ((draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false) ? 'sharedModelKey' : 'videoModelKey') : field.key)),
             control(field),
+            showsSharedValidation(field) ? connectionFeedback() : null,
             hints[field.key] ? h('span', { key: 'hint', className: 'mov-hint', style: { marginTop: 4 } }, hints[field.key]) : null,
           ]);
         }
@@ -229,16 +229,20 @@ function makePage({ form, t, manager }) {
             && (key !== 'autoCreateCanvas' || canvasOn))
             .map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean));
         };
-        const connectionBox=h('div',{key:'connection-check',className:'mov-section','data-field':'connectionCheck',style:{marginTop:20}},[
-          h('div',{key:'head',className:'mov-card-head'},[
-            h('span',{key:'title',className:'mov-card-title'},t('connectionCheckTitle')),
-            h('button',{key:'button',type:'button',className:'mov-btn','data-action':'check-connection',disabled:pending.length>0||status==='saving'||snapshot.status!=='ready'||connectionCheck.status==='working',onClick:()=>checkController.current.run(!pending.length&&status!=='saving'&&form.getSnapshot()?.status==='ready')},t(connectionCheck.status==='working'?'connectionChecking':'connectionCheckButton')),
-          ]),
-          h('p',{key:'hint',className:'mov-hint'},t(pending.length?'connectionCheckSaveFirst':'connectionCheckHint')),
-          h('div',{key:'result',role:'status','aria-live':'polite'},connectionCheck.status==='failed'
-            ?h('p',{style:{color:TOKENS.error}},t('connectionCheckFailed'))
-            :connectionCheck.checks.map((check:any)=>h('p',{key:check.target,style:{color:check.level==='error'?TOKENS.error:check.level==='success'?TOKENS.success:TOKENS.muted}},`${t('connectionTarget_'+check.target)}：${t('connectionResult_'+check.code)}`))),
-        ]);
+        function connectionButton() {
+          return h('button', { key: 'verify', type: 'button', className: 'mov-btn mov-key-verify',
+            'data-action': 'check-connection',
+            disabled: pending.length > 0 || status === 'saving' || snapshot.status !== 'ready' || connectionCheck.status === 'working',
+            onClick: () => checkController.current.run(!pending.length && status !== 'saving' && form.getSnapshot()?.status === 'ready'),
+          }, t(connectionCheck.status === 'working' ? 'connectionChecking' : 'connectionCheckButton'));
+        }
+        function connectionFeedback() {
+          return h('div', { key: 'connection-feedback', role: 'status', 'aria-live': 'polite' },
+            pending.length ? h('p', { className: 'mov-hint' }, t('connectionCheckSaveFirst')) : null,
+            connectionCheck.status === 'failed'
+              ? h('p', { style: { color: TOKENS.error } }, t('connectionCheckFailed'))
+              : connectionCheck.checks.map((check: any) => h('p', { key: check.target, style: { margin: '4px 0', fontSize: 12, color: check.level === 'error' ? TOKENS.error : check.level === 'success' ? TOKENS.success : TOKENS.muted } }, `${t('connectionTarget_' + check.target)}：${t('connectionResult_' + check.code)}`)));
+        }
         const settingsRows = () => [
           h('div', { key: 'generation', className: 'mov-section' }, [
             h('div', { key: 'title', className: 'mov-section-title' }, t('sectionGeneration')),
@@ -417,16 +421,11 @@ function makePage({ form, t, manager }) {
         // 配置读不出来（没有表单 / 不可写）时只显示提示，配置项与卡片一律不渲染。
         const blobs = notice && !snapshot.value
           ? []
-          : [footer, versionBox, connectionBox, resetRow];
+          : [footer, versionBox, resetRow];
 
         return h('div', { className: 'mov-page' }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
           h('style', { key: 'styles' }, PAGE_CSS),
-          h('div', { key: 'support-actions', className: 'mov-card-head', style: { justifyContent: 'flex-end', marginBottom: 12 } },
-            h('button', { key: 'support', type: 'button', className: 'mov-btn mov-btn-sm',
-              'data-action': 'contact-support', 'aria-haspopup': 'dialog', 'aria-expanded': supportOpen,
-              onClick: () => setSupportOpen(true),
-            }, t('supportContact'))),
           !notice || snapshot.value ? renderUpdateNotice({
             h, t, available: updateAvailable, latest: updateLatest, deferred: updateDeferred,
             status: updateStatus, confirmed: updateConfirm,
@@ -436,20 +435,6 @@ function makePage({ form, t, manager }) {
           notice ? h('p', { key: 'notice', className: 'mov-notice' }, notice) : null,
           ...(notice && !snapshot.value ? [] : settingsRows()),
           ...blobs,
-          supportOpen ? h('dialog', {
-            key: 'support-dialog', ref: supportDialog, className: 'mov-support-dialog',
-            'aria-labelledby': 'mov-support-title',
-            onCancel: () => setSupportOpen(false), onClose: () => setSupportOpen(false),
-            onClick: (event) => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setSupportOpen(false); } },
-          }, h('div', { className: 'mov-support-content' }, [
-            h('div', { key: 'heading', className: 'mov-card-head' }, [
-              h('strong', { key: 'title', id: 'mov-support-title' }, t('supportContact')),
-              h('button', { key: 'close', type: 'button', className: 'mov-btn mov-btn-sm mov-trailing', 'aria-label': t('supportClose'), onClick: () => setSupportOpen(false) }, t('supportClose')),
-            ]),
-            h('p', { key: 'hint', className: 'mov-hint' }, t('supportScan')),
-            h('iframe', { key: 'qr', className: 'mov-support-frame', title: t('supportContact'), src: SUPPORT_URL, referrerPolicy: 'no-referrer' }),
-            h('a', { key: 'fallback', href: SUPPORT_URL, target: '_blank', rel: 'noopener noreferrer' }, t('supportOpenPage')),
-          ])) : null,
         ]);
       };
     }

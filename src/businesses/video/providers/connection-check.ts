@@ -21,7 +21,20 @@ export async function checkConnections(liveConfig:any,options:any={}) {
       try {
         const response=await fetcher(url.href,{method:'GET',redirect:'error',headers:{accept:'application/json',Authorization:`Bearer ${key}`},signal});
         if(response.status===401)return {code:'auth_failed',level:'error',http_status:401};
-        if(response.status===403)return {code:'forbidden',level:'error',http_status:403};
+        if(response.status===403) {
+          if (!isVolcengine(cfg)) {
+            // New API 可限制模型清单，但仍允许令牌查询与生成；仅补充只读鉴权证据。
+            const authUrl = new URL('/api/log/token', url);
+            try {
+              const auth = await fetcher(authUrl.href, {method:'GET',redirect:'error',headers:{accept:'application/json',Authorization:`Bearer ${key}`},signal});
+              if (auth.ok) {
+                const body = await auth.json();
+                if (body?.success === true && Array.isArray(body?.data)) return {code:'auth_reachable',level:'warning',http_status:403};
+              }
+            } catch { /* 补充探测失败不能覆盖模型清单实际返回的状态。 */ }
+          }
+          return {code:'forbidden',level:'warning',http_status:403};
+        }
         if(isVolcengine(cfg))return {code:response.status===404?'query_reachable':'query_unverified',level:'warning',http_status:response.status};
         if(response.status===404||response.status===405)return {code:'models_unsupported',level:'warning',http_status:response.status};
         if(response.status===429)return {code:'rate_limited',level:'warning',http_status:429};

@@ -5478,7 +5478,20 @@ async function checkConnections(liveConfig, options = {}) {
       try {
         const response = await fetcher(url.href, { method: "GET", redirect: "error", headers: { accept: "application/json", Authorization: `Bearer ${key}` }, signal });
         if (response.status === 401) return { code: "auth_failed", level: "error", http_status: 401 };
-        if (response.status === 403) return { code: "forbidden", level: "error", http_status: 403 };
+        if (response.status === 403) {
+          if (!isVolcengine(cfg)) {
+            const authUrl = new URL("/api/log/token", url);
+            try {
+              const auth = await fetcher(authUrl.href, { method: "GET", redirect: "error", headers: { accept: "application/json", Authorization: `Bearer ${key}` }, signal });
+              if (auth.ok) {
+                const body2 = await auth.json();
+                if (body2?.success === true && Array.isArray(body2?.data)) return { code: "auth_reachable", level: "warning", http_status: 403 };
+              }
+            } catch {
+            }
+          }
+          return { code: "forbidden", level: "warning", http_status: 403 };
+        }
         if (isVolcengine(cfg)) return { code: response.status === 404 ? "query_reachable" : "query_unverified", level: "warning", http_status: response.status };
         if (response.status === 404 || response.status === 405) return { code: "models_unsupported", level: "warning", http_status: response.status };
         if (response.status === 429) return { code: "rate_limited", level: "warning", http_status: 429 };
