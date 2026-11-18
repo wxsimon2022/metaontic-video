@@ -1,5 +1,6 @@
 /** Explicitly invoked release command. --dry-run never writes, commits or pushes. */
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -253,18 +254,32 @@ export async function main(argv) {
   if(!token && !pipeline)throw Error('缺少 GITEE_TOKEN，无法发布 Gitee Release 附件；设置后可用相同版本 --resume 续跑');
   if(!token && pipeline)console.log('本机不发布 Release，无需 GITEE_TOKEN；令牌配在 Gitee 流水线变量里（GITEE_TOKEN）。');
   // 双仓并行推送，单仓失败按退避重试三次；GitHub 走 ssh 443，实测偶尔整段连不通，单次就放弃最耗时。
-  const push=async(repo,host,label)=>{
+  const push=async(repo,host,label,refs=[target,tag])=>{
     const args=repo.transport.startsWith('git@ssh.')?['-c',`core.sshCommand=ssh -p 443 -o HostKeyAlias=${host} -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3`]:[];
     for(let attempt=1;attempt<=3;attempt++) {
-      const result=spawnSync('git',[...args,'push',repo.transport,target,tag],{cwd:root,encoding:'utf8',stdio:'inherit',shell:false});
+      const result=spawnSync('git',[...args,'push',repo.transport,...refs],{cwd:root,encoding:'utf8',stdio:'inherit',shell:false});
       if(!result.error&&result.status===0) { console.log(`${label} 已推送`);return true; }
       if(attempt<3) { console.log(`${label} 第 ${attempt} 次推送失败，${attempt*10} 秒后重试`);await new Promise(r=>setTimeout(r,attempt*10000)); }
     }
     console.log(`${label} 推送失败`);
     return false;
   };
-  const remotes=includeGithub?[[gitee,'gitee.com','Gitee'],[github,'github.com','GitHub']]:[[gitee,'gitee.com','Gitee']];
-  if((await Promise.all(remotes.map(([repo,host,label])=>push(repo,host,label)))).some(ok=>!ok)) { printLinks();throw Error('有仓库推送失败；网络恢复后用相同版本 --resume 续跑，不要重新打版本'); }
+  if (includeGithub) {
+    // Stage the local package as a draft; CI checks these exact bytes before public release.
+    // Only the version tag is pushed to GitHub: its default branch may have independent history.
+    if (!await push(gitee,'gitee.com','Gitee 分支',[target])) throw Error('Gitee 分支推送失败；保留标签后用 --resume 续跑');
+    if (!await push(github,'github.com','GitHub 标签',[tag])) throw Error('GitHub 标签推送失败；保留标签后用 --resume 续跑');
+    const archive=path.join(out,assets[0]);
+    if (!existsSync(archive)) throw Error(`缺少成品 ${archive}`);
+    const staged=run('gh',['release','view',tag,'--repo',github.slug,'--json','isDraft'],{capture:true,optional:true});
+    if (!staged) run('gh',['release','create',tag,archive,'--repo',github.slug,'--verify-tag','--draft','--title',`MetaOnticVideo ${tag}`,'--notes-file',path.join(out,'release-notes.txt')]);
+    else if (JSON.parse(staged).isDraft) {
+      const listed=JSON.parse(gh('release','view',tag,'--repo',github.slug,'--json','assets')).assets||[];
+      if (!listed.some(a=>a.name===assets[0])) run('gh',['release','upload',tag,archive,'--repo',github.slug]);
+    }
+  } else if (!await push(gitee,'gitee.com','Gitee')) {
+    printLinks();throw Error('Gitee 推送失败；保留标签后用 --resume 续跑');
+  }
   if(pipeline) {
     // 流水线按标签触发：构建、测试、打包、制品库归档、发布与附件核对都在 Gitee 构建机上跑，完成后回来核对发布页。
     console.log(`\n已推送 ${tag}：Gitee Go 流水线会按这个标签构建、打包，把成品归档到制品库并发布 Gitee Release（scripts/ci-release.mjs），发布页与附件核对结果见流水线日志。`);
@@ -288,7 +303,7 @@ export async function main(argv) {
   let workflow;
   for(let i=0;i<20;i++) {
     const runs=JSON.parse(gh('run','list','--repo',github.slug,'--workflow','publish.yml','--branch',tag,'--limit','10','--json','databaseId,headSha,status,conclusion'));
-    workflow=runs.find(x=>x.headSha===git('rev-parse','HEAD'));
+    workflow=runs.find(x=>x.headSha===git('rev-parse',`${tag}^{commit}`));
     if(workflow)break;await new Promise(r=>setTimeout(r,3000));
   }
   if(!workflow) {printLinks();throw Error('已推送，但尚未找到匹配CI；稍后用--resume续跑');}
@@ -303,7 +318,12 @@ export async function main(argv) {
   if(!complete||watched===null)throw Error('发布未全部完成；保留现有标签，用相同版本--resume续跑，不要重新打版本');
   if(data.body.trim()!==notesText.trim())throw Error('GitHub发行版说明与本版用户更新条目不一致');
   // 双仓模式必须先通过双平台安装检查，再用GitHub同一成品发布Gitee。
-  run('gh',['release','download',tag,'--repo',github.slug,'--dir',out,'--pattern',`metaontic-video-${version}.tgz`,'--clobber']);
+  const localDigest=createHash('sha256').update(readFileSync(path.join(out,assets[0]))).digest('hex');
+  const verifiedDir=path.join(out,'verified');mkdirSync(verifiedDir,{recursive:true});
+  run('gh',['release','download',tag,'--repo',github.slug,'--dir',verifiedDir,'--pattern',`metaontic-video-${version}.tgz`,'--clobber']);
+  const remoteDigest=createHash('sha256').update(readFileSync(path.join(verifiedDir,assets[0]))).digest('hex');
+  if (remoteDigest!==localDigest) throw Error('GitHub 安装包与本机原始成品不一致，停止向 Gitee 发布');
+  if (!await push(gitee,'gitee.com','Gitee 标签',[tag])) throw Error('Gitee 标签推送失败；保留同版成品后续跑');
   for(const name of assets)await publishGitee({token,tag,archive:path.join(out,name),notes:notesText,prerelease:false});
   console.log(`双平台CI通过，GitHub与Gitee已发布同一成品：${assets.join('、')}`);
 

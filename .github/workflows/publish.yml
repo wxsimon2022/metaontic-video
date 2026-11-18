@@ -45,17 +45,17 @@ jobs:
             echo "Gitee 已有 v$VERSION 正式版：按原成品镜像到 GitHub"
             echo "mirror=1" >> "$GITHUB_OUTPUT"; echo "version=$VERSION" >> "$GITHUB_OUTPUT"; echo "sha=-" >> "$GITHUB_OUTPUT"
           else
-            echo "Gitee 还没有 v$VERSION 的成品：本次由 GitHub 自己构建打包"
-            echo "mirror=0" >> "$GITHUB_OUTPUT"
+            echo "等待本机上传的草稿成品，双平台检查复用该包"
+            echo "mirror=staged" >> "$GITHUB_OUTPUT"
           fi
       - name: Install build tooling
-        if: ${{ steps.source.outputs.mirror != '1' }}
+        if: ${{ steps.source.outputs.mirror == '0' }}
         run: npm ci
       - name: Build and test
-        if: ${{ steps.source.outputs.mirror != '1' }}
+        if: ${{ steps.source.outputs.mirror == '0' }}
         run: npm run build && node --test tests/*.test.mjs
       - name: Pack plugin
-        if: ${{ steps.source.outputs.mirror != '1' }}
+        if: ${{ steps.source.outputs.mirror == '0' }}
         run: |
           mkdir -p dist
           npm pack --pack-destination dist
@@ -65,6 +65,22 @@ jobs:
       - name: Reuse the published Gitee artifact
         if: ${{ steps.source.outputs.mirror == '1' }}
         run: python3 scripts/download-published-release.py "${{ steps.source.outputs.version }}" dist "${{ steps.source.outputs.sha }}"
+      - name: Download the staged local package
+        if: ${{ steps.source.outputs.mirror == 'staged' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p dist
+          for attempt in $(seq 1 24); do
+            if gh release download "v$VERSION" --pattern "metaontic-video-$VERSION.tgz" --dir dist --clobber; then break; fi
+            sleep 5
+          done
+          python3 - "$VERSION" <<'PYTHON'
+          import runpy, sys
+          from pathlib import Path
+          runpy.run_path('scripts/download-published-release.py')['verify_artifacts'](sys.argv[1], Path('dist'), '-')
+          PYTHON
       - name: Prepare public release notes
         run: |
           node --input-type=module -e 'import {readFileSync,writeFileSync} from "node:fs"; import {publicReleaseNotes} from "./scripts/release.mjs"; const p=JSON.parse(readFileSync("package.json","utf8")); writeFileSync("dist/release-notes.txt", publicReleaseNotes(p.version,p.releaseNotes.items));'
@@ -91,9 +107,14 @@ jobs:
           path: dist
       - name: Install fixed pnpm tooling
         run: npm install --global pnpm@11.28.5
-      - name: Validate managed package installation
+      - name: Download the previous real release
         shell: bash
-        run: node scripts/check-package-install.mjs dist/*.tgz
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download v3.32.0 --repo wxsimon2022/metaontic-video --pattern metaontic-video-3.32.0.tgz --dir previous
+      - name: Validate managed package installation and previous release migration
+        shell: bash
+        run: node scripts/check-package-install.mjs dist/*.tgz previous/*.tgz
 
   release:
     needs: [prepare, platform-install]
@@ -121,8 +142,8 @@ jobs:
             RELEASE_FLAGS+=(--prerelease)
           fi
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" --notes-file dist/release-notes.txt
-            gh release upload "$RELEASE_TAG" dist/*.tgz --clobber
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --notes-file dist/release-notes.txt
+            # The draft already contains the exact package checked by both runners; do not replace it.
           else
             gh release create "$RELEASE_TAG" dist/*.tgz --verify-tag --title "MetaOnticVideo $RELEASE_TAG" --notes-file dist/release-notes.txt "${RELEASE_FLAGS[@]}"
           fi

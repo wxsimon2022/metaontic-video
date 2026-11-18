@@ -42,7 +42,20 @@ try {
   assert.ok(changed, 'Fixture manifest was found');
   chunks.push(Buffer.alloc(1024));
   const previousArchive = path.join(temp, 'previous package.tgz');
-  const previousBytes = gzipSync(Buffer.concat(chunks));
+  const previousBytes = process.argv[3] ? await readFile(path.resolve(process.argv[3])) : gzipSync(Buffer.concat(chunks));
+  let previousName = packageName, previousVersion = '0.0.0';
+  if (process.argv[3]) {
+    const prior = gunzipSync(previousBytes);
+    for (let offset = 0; offset + 512 <= prior.length;) {
+      const header = prior.subarray(offset, offset + 512);
+      const size = parseInt(header.subarray(124, 136).toString().replace(/\0.*$/, '').trim() || '0', 8);
+      if (header.subarray(0, 100).toString().replace(/\0.*$/, '') === 'package/package.json') {
+        const manifest = JSON.parse(prior.subarray(offset + 512, offset + 512 + size));
+        previousName = manifest.name; previousVersion = manifest.version; break;
+      }
+      offset += 512 + Math.ceil(size / 512) * 512;
+    }
+  }
   await writeFile(previousArchive, previousBytes);
   const runInstall = file => execFileSync(process.execPath, [cli, '--dir', profile, 'add', file,
     `--config.store-dir=${path.join(temp, 'store')}`, `--config.cache-dir=${path.join(temp, 'cache')}`], { encoding: 'utf8', timeout: 120000 });
@@ -51,8 +64,22 @@ try {
   const taskFile = path.join(profile, 'saved-task.json');
   await writeFile(settingsFile, '# preserve existing settings sentinel\n');
   await writeFile(taskFile, '{"task_id":"existing-task-do-not-resubmit"}');
-  assert.equal(JSON.parse(await readFile(path.join(profile, 'node_modules', packageName, 'package.json'), 'utf8')).version, '0.0.0');
+  assert.equal(JSON.parse(await readFile(path.join(profile, 'node_modules', previousName, 'package.json'), 'utf8')).version, previousVersion);
+  // Package rename is a migration: disable the old bundle before adding the new one.
+  // Keep the old dependency, settings and task files; never uninstall it first.
+  const profileFile = path.join(profile, 'package.json');
+  const manifestBefore = JSON.parse(await readFile(profileFile, 'utf8'));
+  manifestBefore.dsh = { profile: { bundles: [] } };
+  await writeFile(profileFile, JSON.stringify(manifestBefore));
   console.log(runInstall(downloaded));
+  const migrated = JSON.parse(await readFile(profileFile, 'utf8'));
+  migrated.dsh.profile.bundles = [packageName];
+  await writeFile(profileFile, JSON.stringify(migrated));
+  assert.deepEqual(migrated.dsh.profile.bundles, [packageName]);
+  if (previousName !== packageName) {
+    assert.ok(migrated.dependencies[previousName], 'Preserve the disabled old dependency');
+    assert.ok(migrated.dependencies[packageName], 'Install the new package identity');
+  }
   assert.deepEqual(await readFile(previousArchive), previousBytes, 'Update must preserve the original installation file');
   assert.equal(await readFile(settingsFile, 'utf8'), '# preserve existing settings sentinel\n');
   assert.equal(await readFile(taskFile, 'utf8'), '{"task_id":"existing-task-do-not-resubmit"}');
@@ -76,7 +103,7 @@ try {
   const plugin = await import(pathToFileURL(path.join(installed, 'index.js')).href);
   assert.equal(typeof plugin.apply, 'function');
   assert.ok(plugin.Config);
-  console.log(`PASS ${process.platform}: strict package installation and upgrade, settings/tasks preserved, Unicode/spaces, locale metadata, resources, source relocation and entry import (${pkg.version})`);
+  console.log(`PASS ${process.platform}: strict package installation and migration, old bundle disabled, settings/tasks preserved, Unicode/spaces, locale metadata, resources, source relocation and entry import (${pkg.version})`);
 } finally {
   await rm(temp, { recursive: true, force: true });
 }
