@@ -8,10 +8,10 @@ import { createPreviewHost } from '../preview/host.mjs';
 
 const legacy = {name:'metaontic-video',installed:true,enabled:true};
 const current = {name:'dsh-metaontic-video',installed:true,enabled:true};
-function setup({rows=[legacy,current], reject=false, restart=false, wrapper=false, unavailable=false}={}) {
+function setup({rows=[legacy,current], reject=false, restart=false, wrapper=false, unavailable=false, queryTimeoutMs=8000}={}) {
   rows=rows.map(row=>({...row}));
   let entry, consent;const actions={};const calls=[];const components={},dictionaries={},cleanups=[];
-  vm.runInNewContext(readFileSync(new URL('../client.js',import.meta.url),'utf8'),{window:{__ModuleLoader__:{load(x){entry=x;}}}});
+  vm.runInNewContext(readFileSync(new URL('../client.js',import.meta.url),'utf8'),{AbortController,setTimeout:(fn,delay,...args)=>setTimeout(fn,delay===8000?queryTimeoutMs:delay,...args),clearTimeout,window:{__ModuleLoader__:{load(x){entry=x;}}}});
   const react={...React,createElement(type,props,...children){if(type==='button' && props?.['data-migration-action'])actions[props['data-migration-action']]=props.onClick;if(type==='input' && props?.['data-migration-consent'])consent=props.onChange;return React.createElement(type,props,...children);}};
   const plugin=entry.factory(name=>{assert.equal(name,'react');return react;});
   const host=createPreviewHost({form:{getSnapshot:()=>({status:'ready',value:{connectionMode:'metaontic'},writable:true}),subscribe:()=>()=>{}},components,dictionaries,getLocale:()=> 'zh',onUpdate(){}});
@@ -150,4 +150,68 @@ test('remote property fallback is used even if full-name lookup throws',async()=
  const state=setup({rows:[current]});const get=state.host.get.bind(state.host);
  state.host.remote={pluginManager:state.manager};state.host.get=name=>{if(name==='remote.pluginManager')throw Error('unsupported');return get(name);};
  await state.plugin.apply(state.host);assert.match(state.render(),/API/);
+});
+
+
+test('disposing during the cleanup inventory query prevents the subsequent uninstall',async()=>{
+ const state=setup({rows:[{...legacy,enabled:false},current]});
+ await state.plugin.apply(state.host);state.render();state.confirm();
+ let finish,calls=0;const original=state.manager.listBundles;
+ state.manager.listBundles=async()=>++calls===2?new Promise(resolve=>{finish=resolve;}):original();
+ const pending=state.click('cleanup');
+ while(!finish)await new Promise(resolve=>setTimeout(resolve,0));
+ for(const off of state.cleanups.toReversed())off();finish(state.rows);await pending;
+ assert.deepEqual(state.calls,[]);assert.equal(state.rows[0].installed,true);
+});
+
+test('disposing during the pre-disable inventory query prevents any mutation',async()=>{
+ const state=setup();await state.plugin.apply(state.host);state.render();state.confirm();let finish;
+ state.manager.listBundles=()=>new Promise(resolve=>{finish=resolve;});
+ const pending=state.click('cleanup');for(const off of state.cleanups.toReversed())off();finish(state.rows);await pending;
+ assert.deepEqual(state.calls,[]);assert.equal(state.rows[0].enabled,true);
+});
+
+test('client inventory timeout exposes retry and ignores late results',async()=>{
+ const state=setup({queryTimeoutMs:15});let finish;
+ state.manager.listBundles=()=>new Promise(resolve=>{finish=resolve;});
+ await state.plugin.apply(state.host);assert.match(state.render(),/查询超时/);assert.match(state.render(),/重新检查/);
+ finish([current]);await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(state.components['sidebar.panellist:metaontic-video'],undefined);
+ state.manager.listBundles=async()=>[current];await state.click('check');assert.match(state.render(),/API/);
+ assert.deepEqual(state.calls,[]);
+});
+
+test('concurrent client rechecks share one inventory request',async()=>{
+ const state=setup({unavailable:true});await state.plugin.apply(state.host);state.render();let finish,count=0;
+ state.manager.listBundles=()=>{count++;return new Promise(resolve=>{finish=resolve;});};
+ const a=state.click('check'),b=state.click('check');assert.equal(a,b);assert.equal(count,1);
+ finish([current]);await a;assert.match(state.render(),/API/);
+});
+
+test('cleanup query timeout cannot trigger a late uninstall',async()=>{
+ const state=setup({rows:[{...legacy,enabled:false},current],queryTimeoutMs:15});
+ await state.plugin.apply(state.host);state.render();state.confirm();let finish,count=0;
+ state.manager.listBundles=async()=>++count===2?new Promise(resolve=>{finish=resolve;}):state.rows;
+ await state.click('cleanup');assert.match(state.render(),/查询超时/);assert.match(state.render(),/API/);
+ finish(state.rows);await new Promise(resolve=>setTimeout(resolve,0));assert.deepEqual(state.calls,[]);
+});
+
+test('inventory cancellation and timeout release timers and reject late results',async()=>{
+ const {api}=await import('./module-test-api.mjs');
+ let finish;const controller=new AbortController();
+ const pending=api.readBundleInventory({listBundles:()=>new Promise(resolve=>{finish=resolve;})},{signal:controller.signal,timeoutMs:1000});
+ controller.abort();await assert.rejects(pending,e=>e.code==='aborted');finish([current]);
+ await assert.rejects(api.readBundleInventory({listBundles:()=>new Promise(()=>{})},{timeoutMs:5}),e=>e.code==='timeout');
+});
+
+test('Host query timeouts back off, report fixed diagnostics once and recover',async(t)=>{
+ const {api}=await import('./module-test-api.mjs');const original=setTimeout,delays=[],warnings=[],infos=[];
+ t.mock.method(globalThis,'setTimeout',(fn,delay,...args)=>{delays.push(delay);return original(fn,delay,...args);});
+ let available=false,mounts=0;
+ const off=api.mountBundleAwareHost({get:()=>({listBundles:()=>available?Promise.resolve([current]):new Promise(()=>{})}),logger:{warn:x=>warnings.push(x),info:x=>infos.push(x)}},()=>{mounts++;return()=>{};},{timeoutMs:5,retryMs:7,maxRetryMs:28});
+ t.after(off);
+ await new Promise(resolve=>original(resolve,80));
+ assert.equal(mounts,0);assert.equal(warnings.length,1);assert.match(warnings[0],/超时/);
+ assert.ok(delays.includes(7)&&delays.includes(14)&&delays.includes(28),'bounded exponential backoff');
+ available=true;await new Promise(resolve=>original(resolve,60));assert.equal(mounts,1);assert.equal(infos.length,1);
 });

@@ -1,5 +1,6 @@
 /** Cross-platform release smoke test. No paid API calls or real Harness profile writes. */
 import assert from 'node:assert/strict';
+import { checkClientMigration } from './check-client-migration.mjs';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, writeFile, readFile, readdir, realpath, copyFile, rename, rm } from 'node:fs/promises';
@@ -65,20 +66,52 @@ try {
   await writeFile(settingsFile, '# preserve existing settings sentinel\n');
   await writeFile(taskFile, '{"task_id":"existing-task-do-not-resubmit"}');
   assert.equal(JSON.parse(await readFile(path.join(profile, 'node_modules', previousName, 'package.json'), 'utf8')).version, previousVersion);
-  // Package rename is a migration: disable the old bundle before adding the new one.
-  // Keep the old dependency, settings and task files; never uninstall it first.
   const profileFile = path.join(profile, 'package.json');
+  // Seed the observed broken starting state, not the expected result. Only the
+  // actual bundled client's buttons may drive changes after this point.
   const manifestBefore = JSON.parse(await readFile(profileFile, 'utf8'));
-  manifestBefore.dsh = { profile: { bundles: [] } };
+  manifestBefore.dsh = { profile: { bundles: [previousName] } };
   await writeFile(profileFile, JSON.stringify(manifestBefore));
   console.log(runInstall(downloaded));
-  const migrated = JSON.parse(await readFile(profileFile, 'utf8'));
-  migrated.dsh.profile.bundles = [packageName];
-  await writeFile(profileFile, JSON.stringify(migrated));
-  assert.deepEqual(migrated.dsh.profile.bundles, [packageName]);
+  const initial = JSON.parse(await readFile(profileFile, 'utf8'));
+  initial.dsh.profile.bundles = [...new Set([previousName, packageName])];
+  await writeFile(profileFile, JSON.stringify(initial));
   if (previousName !== packageName) {
-    assert.ok(migrated.dependencies[previousName], 'Preserve the disabled old dependency');
-    assert.ok(migrated.dependencies[packageName], 'Install the new package identity');
+    assert.equal(previousName, 'metaontic-video');
+    assert.equal(packageName, 'dsh-metaontic-video');
+    const operations = [];
+    const manager = {
+      async listBundles() {
+        const manifest = JSON.parse(await readFile(profileFile, 'utf8'));
+        return Object.keys(manifest.dependencies || {}).map(name => ({
+          name, installed: true, enabled: manifest.dsh.profile.bundles.includes(name), removable: true,
+        }));
+      },
+      async setBundleEnabled(name, enabled) {
+        assert.equal(name, previousName); assert.equal(enabled, false);
+        const manifest = JSON.parse(await readFile(profileFile, 'utf8'));
+        manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter(bundle => bundle !== name);
+        await writeFile(profileFile, JSON.stringify(manifest));
+        operations.push('disable');
+        return { ok: true, value: { application: 'applied' } };
+      },
+      async removeBundle(name) {
+        assert.equal(name, previousName);
+        assert.ok(!(await manager.listBundles()).find(row => row.name === name).enabled);
+        execFileSync(process.execPath, [cli, '--dir', profile, 'remove', name,
+          '--config.ignore-scripts=true', '--config.offline=true',
+          `--config.store-dir=${path.join(temp, 'store')}`, `--config.cache-dir=${path.join(temp, 'cache')}`],
+          { encoding: 'utf8', timeout: 120000 });
+        operations.push('remove');
+        return { ok: true, value: { application: 'applied' } };
+      },
+    };
+    await checkClientMigration(path.join(profile, 'node_modules', packageName), manager);
+    assert.deepEqual(operations, ['disable', 'remove']);
+    const migrated = JSON.parse(await readFile(profileFile, 'utf8'));
+    assert.deepEqual(migrated.dsh.profile.bundles, [packageName]);
+    assert.ok(!migrated.dependencies[previousName], 'Old dependency removed through the client migration action');
+    assert.ok(migrated.dependencies[packageName]);
   }
   assert.deepEqual(await readFile(previousArchive), previousBytes, 'Update must preserve the original installation file');
   assert.equal(await readFile(settingsFile, 'utf8'), '# preserve existing settings sentinel\n');
@@ -103,7 +136,7 @@ try {
   const plugin = await import(pathToFileURL(path.join(installed, 'index.js')).href);
   assert.equal(typeof plugin.apply, 'function');
   assert.ok(plugin.Config);
-  console.log(`PASS ${process.platform}: strict package installation and migration, old bundle disabled, settings/tasks preserved, Unicode/spaces, locale metadata, resources, source relocation and entry import (${pkg.version})`);
+  console.log(`PASS ${process.platform}: managed package installation and bundled-client migration contract (not desktop UI), settings/tasks preserved, Unicode/spaces, locale metadata, resources, source relocation and entry import (${pkg.version})`);
 } finally {
   await rm(temp, { recursive: true, force: true });
 }

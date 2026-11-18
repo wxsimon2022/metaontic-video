@@ -18,7 +18,7 @@ async function bootSettings(initial) {
     confirm: () => true,
   };
   globalThis.window.__ModuleLoader__ = { load(entry) { globalThis.__entry = entry; } };
-  vm.runInNewContext(readFileSync(new URL('../client.js', import.meta.url), 'utf8'), { window: globalThis.window });
+  vm.runInNewContext(readFileSync(new URL('../client.js', import.meta.url), 'utf8'), { AbortController, setTimeout, clearTimeout, window: globalThis.window });
   const plugin = globalThis.__entry.factory((name) => {
     if (name === 'react') return React;
     throw new Error(`未注入的宿主依赖：${name}`);

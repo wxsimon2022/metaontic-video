@@ -1,6 +1,6 @@
 {
   "name": "dsh-metaontic-video",
-  "version": "4.0.2",
+  "version": "4.0.3",
   "description": "面向新手的 AI 视频创作助手：从想法、脚本到视频生成，全程引导；通过分段续拍与本地合并，提供低成本长视频制作方案。",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
@@ -114,11 +114,11 @@
   },
   "dependencies": {},
   "releaseNotes": {
-    "version": "4.0.2",
+    "version": "4.0.3",
     "prerelease": false,
-    "publishedAt": "2026-11-18T05:40:29.749Z",
+    "publishedAt": "2026-11-18T09:42:44.891Z",
     "items": [
-      "优化：完善旧版迁移，支持切换并清理旧包；保留配置与任务，清理失败可重试，新版设置持续可用。"
+      "优化：完善迁移中断保护与安装状态超时处理，失败可重新检查，避免旧包误清理和长时间等待。"
     ]
   }
 }

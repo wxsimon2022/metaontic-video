@@ -5,7 +5,7 @@
     return {
       register(page) {
         const group = pages.get(page.namespace) || [];
-        if (group.some((existing) => existing.id === page.id)) throw new Error(`\u91CD\u590D\u7684\u8BBE\u7F6E\u9875\uFF1A${page.id}`);
+        if (group.some((existing) => existing.id === page.id)) throw new Error(`重复的设置页：${page.id}`);
         group.push(page);
         pages.set(page.namespace, group);
       },
@@ -27,7 +27,7 @@
   function createClientRuntime(require2, modules) {
     const ids = /* @__PURE__ */ new Set();
     const plugins = modules.map((module) => {
-      if (!module.id || ids.has(module.id)) throw new Error(`\u91CD\u590D\u6216\u65E0\u6548\u7684\u754C\u9762\u6A21\u5757\uFF1A${module.id}`);
+      if (!module.id || ids.has(module.id)) throw new Error(`重复或无效的界面模块：${module.id}`);
       ids.add(module.id);
       return module.create(require2);
     });
@@ -78,12 +78,12 @@
   }
 
   // src/businesses/video/client/tool-result.ts
-  var SUMMARY_TOOLS = { video_project: "\u811A\u672C\u5BA1\u6838", video_estimate: "\u8D39\u7528\u8BD5\u7B97" };
-  var ACTION_LABELS = { prepare: "\u51C6\u5907\u9879\u76EE", review: "\u811A\u672C\u5BA1\u6838", review_segment: "\u5206\u6BB5\u7ED3\u679C\u5BA1\u6838", status: "\u8BFB\u53D6\u9879\u76EE\u72B6\u6001" };
-  var STATUS_LABELS = { approved: "\u5DF2\u901A\u8FC7", draft: "\u5F85\u4FEE\u6539", pending: "\u5F85\u786E\u8BA4", blocked: "\u672A\u901A\u8FC7\u6821\u9A8C", running: "\u8FDB\u884C\u4E2D" };
-  var CANVAS_SYNC_LABELS = { synced: "\u5DF2\u540C\u6B65", pending: "\u5F85\u8865\u4F20\uFF08\u7528video_canvas\u8865\u4F20\uFF0C\u4E0D\u91CD\u65B0\u751F\u6210\uFF09", unavailable: "\u6682\u4E0D\u53EF\u7528", external: "\u6CBF\u7528\u6240\u9009\u753B\u5E03" };
+  var SUMMARY_TOOLS = { video_project: "脚本审核", video_estimate: "费用试算" };
+  var ACTION_LABELS = { prepare: "准备项目", review: "脚本审核", review_segment: "分段结果审核", status: "读取项目状态" };
+  var STATUS_LABELS = { approved: "已通过", draft: "待修改", pending: "待确认", blocked: "未通过校验", running: "进行中" };
+  var CANVAS_SYNC_LABELS = { synced: "已同步", pending: "待补传（用video_canvas补传，不重新生成）", unavailable: "暂不可用", external: "沿用所选画布" };
   var textOf = (block) => (Array.isArray(block?.content) ? block.content : []).filter((part) => part?.type === "text").map((part) => String(part.text || "")).join("\n").trim();
-  var money = (value) => Number.isFinite(Number(value)) ? `\xA5${(Math.round(Number(value) * 1e4) / 1e4).toFixed(4)}` : "";
+  var money = (value) => Number.isFinite(Number(value)) ? `¥${(Math.round(Number(value) * 1e4) / 1e4).toFixed(4)}` : "";
   function parseJson(text) {
     const body = text.trim().replace(/^```[a-zA-Z]*\s*/, "").replace(/```$/, "").trim();
     try {
@@ -100,34 +100,34 @@
     if (!block || !("kind" in block)) {
       const args = block?.args || {};
       const rows2 = [];
-      if (args.action) rows2.push(["\u52A8\u4F5C", ACTION_LABELS[String(args.action)] || String(args.action)]);
-      if (args.duration) rows2.push(["\u76EE\u6807\u65F6\u957F", `${Number(args.duration)} \u79D2`]);
-      if (args.resolution) rows2.push(["\u6E05\u6670\u5EA6", String(args.resolution).toUpperCase()]);
-      return { title, state: "running", stateLabel: "\u8FDB\u884C\u4E2D", rows: rows2, raw: "" };
+      if (args.action) rows2.push(["动作", ACTION_LABELS[String(args.action)] || String(args.action)]);
+      if (args.duration) rows2.push(["目标时长", `${Number(args.duration)} 秒`]);
+      if (args.resolution) rows2.push(["清晰度", String(args.resolution).toUpperCase()]);
+      return { title, state: "running", stateLabel: "进行中", rows: rows2, raw: "" };
     }
-    if (block.isError) return { title, state: "error", stateLabel: "\u672A\u5B8C\u6210", rows: [], raw };
+    if (block.isError) return { title, state: "error", stateLabel: "未完成", rows: [], raw };
     const data = parseJson(raw);
-    if (!data) return { title, state: "done", stateLabel: "\u5DF2\u5B8C\u6210", rows: [], raw };
+    if (!data) return { title, state: "done", stateLabel: "已完成", rows: [], raw };
     const rows = [];
     const push = (label, value) => {
       if (value !== void 0 && value !== null && String(value) !== "") rows.push([label, String(value)]);
     };
     if (toolName === "video_estimate") {
-      push("\u76EE\u6807\u65F6\u957F", data.duration ? `${data.duration} \u79D2` : "");
-      push("\u753B\u5E45 / \u6E05\u6670\u5EA6", [data.ratio, data.resolution && String(data.resolution).toUpperCase()].filter(Boolean).join(" \xB7 "));
-      push("\u706B\u5C71\u5B98\u65B9\u65B9\u6848", money(data.official?.cny));
-      push("\u63D2\u4EF6\u65B9\u6848", money(data.plugin?.cny));
-      push("\u4EF7\u76EE\u65E5\u671F", data.priceDate);
-      return { title, state: "ok", stateLabel: "\u5DF2\u8BD5\u7B97", rows, raw };
+      push("目标时长", data.duration ? `${data.duration} 秒` : "");
+      push("画幅 / 清晰度", [data.ratio, data.resolution && String(data.resolution).toUpperCase()].filter(Boolean).join(" · "));
+      push("火山官方方案", money(data.official?.cny));
+      push("插件方案", money(data.plugin?.cny));
+      push("价目日期", data.priceDate);
+      return { title, state: "ok", stateLabel: "已试算", rows, raw };
     }
-    push("\u72B6\u6001", STATUS_LABELS[String(data.status)] || data.status);
-    push("\u9879\u76EE", data.projectId);
-    push("\u4E0B\u4E00\u6B65", data.nextAction);
-    push("\u8BF4\u660E", data.reason);
+    push("状态", STATUS_LABELS[String(data.status)] || data.status);
+    push("项目", data.projectId);
+    push("下一步", data.nextAction);
+    push("说明", data.reason);
     const canvasSync = String(data.canvasProject?.status || "");
-    if (canvasSync && canvasSync !== "disabled") push("\u753B\u5E03\u540C\u6B65", CANVAS_SYNC_LABELS[canvasSync] || canvasSync);
+    if (canvasSync && canvasSync !== "disabled") push("画布同步", CANVAS_SYNC_LABELS[canvasSync] || canvasSync);
     const state = data.status === "approved" ? "ok" : ["draft", "blocked"].includes(String(data.status)) ? "warn" : "done";
-    return { title, state, stateLabel: STATUS_LABELS[String(data.status)] || "\u5DF2\u5B8C\u6210", rows, raw };
+    return { title, state, stateLabel: STATUS_LABELS[String(data.status)] || "已完成", rows, raw };
   }
   var SUMMARY_CSS = `
   .mov-summary { box-sizing: border-box; width: 100%; min-width: 0; margin: 6px 0; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2,#dfe3eb); border-radius: 10px; color: inherit; }
@@ -156,7 +156,7 @@
           h("dd", { key: `${key}-value`, className: "mov-summary-val" }, value)
         ])) : null,
         summary.raw ? h("details", { key: "raw", className: "mov-summary-raw" }, [
-          h("summary", { key: "label" }, "\u67E5\u770B\u5B8C\u6574\u8FD4\u56DE"),
+          h("summary", { key: "label" }, "查看完整返回"),
           h("div", { key: "text", className: "mov-summary-text" }, summary.raw)
         ]) : null
       ]);
@@ -209,7 +209,7 @@
           continue;
         }
       }
-      media.push({ kind, label: match[1] || (kind === "image" ? "\u56FE\u7247" : "\u89C6\u9891"), ...url ? { url } : { localPath: file } });
+      media.push({ kind, label: match[1] || (kind === "image" ? "图片" : "视频"), ...url ? { url } : { localPath: file } });
       if (media.length >= 40) break;
     }
     return media;
@@ -235,14 +235,14 @@
         if (index + 1 < sources.length) setIndex(index + 1);
         else setFailed(true);
       };
-      const label = String(item.label || (item.kind === "image" ? "\u56FE\u7247" : "\u89C6\u9891"));
-      const media = !source || failed ? h("p", { role: "status", className: "mov-media-error" }, item.kind === "image" ? "\u56FE\u7247\u9884\u89C8\u65E0\u6CD5\u52A0\u8F7D\uFF0C\u6587\u4EF6\u53EF\u80FD\u5DF2\u79FB\u52A8\u6216\u94FE\u63A5\u5DF2\u8FC7\u671F\u3002\u8BF7\u5C1D\u8BD5\u6253\u5F00\u539F\u56FE\u3002" : "\u89C6\u9891\u9884\u89C8\u65E0\u6CD5\u64AD\u653E\uFF0C\u53EF\u80FD\u662F\u6587\u4EF6\u5DF2\u79FB\u52A8\u3001\u94FE\u63A5\u5DF2\u8FC7\u671F\u6216\u7F16\u7801\u4E0D\u53D7\u652F\u6301\u3002\u8BF7\u5C1D\u8BD5\u6253\u5F00\u539F\u89C6\u9891\u6216\u4E0B\u8F7D\u540E\u64AD\u653E\u3002") : item.kind === "image" ? h("button", { type: "button", className: "mov-media-image-button", onClick: () => setZoom(true), "aria-label": `\u653E\u5927${label}` }, h("img", { src: source, alt: label, loading: "lazy", onError: error, className: "mov-media-image", referrerPolicy: "no-referrer" })) : h("video", { key: source, src: source, controls: true, playsInline: true, preload: "metadata", onError: error, className: "mov-media-video", "aria-label": label, referrerPolicy: "no-referrer" });
+      const label = String(item.label || (item.kind === "image" ? "图片" : "视频"));
+      const media = !source || failed ? h("p", { role: "status", className: "mov-media-error" }, item.kind === "image" ? "图片预览无法加载，文件可能已移动或链接已过期。请尝试打开原图。" : "视频预览无法播放，可能是文件已移动、链接已过期或编码不受支持。请尝试打开原视频或下载后播放。") : item.kind === "image" ? h("button", { type: "button", className: "mov-media-image-button", onClick: () => setZoom(true), "aria-label": `放大${label}` }, h("img", { src: source, alt: label, loading: "lazy", onError: error, className: "mov-media-image", referrerPolicy: "no-referrer" })) : h("video", { key: source, src: source, controls: true, playsInline: true, preload: "metadata", onError: error, className: "mov-media-video", "aria-label": label, referrerPolicy: "no-referrer" });
       return h("figure", { className: "mov-media-item", "data-media-kind": item.kind }, [
         h("figcaption", { key: "caption", className: "mov-media-caption" }, label),
         h("div", { key: "body", className: "mov-media-surface" }, media),
         sources.length ? h("div", { key: "links", className: "mov-media-links" }, [
-          h("a", { key: "open", href: source || sources[0], target: "_blank", rel: "noopener noreferrer", referrerPolicy: "no-referrer" }, item.kind === "image" ? "\u6253\u5F00\u539F\u56FE" : "\u6253\u5F00\u539F\u89C6\u9891"),
-          item.localPath && remoteMediaUrl(item.url) ? h("a", { key: "remote", href: remoteMediaUrl(item.url), target: "_blank", rel: "noopener noreferrer", referrerPolicy: "no-referrer" }, "\u4E0A\u6E38\u94FE\u63A5") : null
+          h("a", { key: "open", href: source || sources[0], target: "_blank", rel: "noopener noreferrer", referrerPolicy: "no-referrer" }, item.kind === "image" ? "打开原图" : "打开原视频"),
+          item.localPath && remoteMediaUrl(item.url) ? h("a", { key: "remote", href: remoteMediaUrl(item.url), target: "_blank", rel: "noopener noreferrer", referrerPolicy: "no-referrer" }, "上游链接") : null
         ]) : null,
         zoom && item.kind === "image" ? h("dialog", { key: "zoom", ref: dialog, className: "mov-media-dialog", "aria-label": label, onCancel: () => setZoom(false), onClose: () => setZoom(false), onClick: (e) => {
           if (e.target === e.currentTarget) setZoom(false);
@@ -250,7 +250,7 @@
           h("button", { key: "close", type: "button", className: "mov-media-close", onClick: () => {
             dialog.current?.close();
             setZoom(false);
-          }, "aria-label": "\u5173\u95ED\u56FE\u7247\u9884\u89C8" }, "\u5173\u95ED"),
+          }, "aria-label": "关闭图片预览" }, "关闭"),
           h("img", { key: "image", src: source, alt: label, className: "mov-media-zoom", referrerPolicy: "no-referrer", onError: error })
         ]) : null
       ]);
@@ -260,7 +260,7 @@
       const [expanded, setExpanded] = React.useState(false);
       if (!items.length) return null;
       const visible = expanded ? items : items.slice(0, 2);
-      return h("section", { className: "mov-media-preview", "aria-label": "\u751F\u6210\u7ED3\u679C\u9884\u89C8", "data-field": "media-preview" }, [
+      return h("section", { className: "mov-media-preview", "aria-label": "生成结果预览", "data-field": "media-preview" }, [
         h("style", { key: "styles" }, `
         .mov-media-preview{margin-top:12px;min-width:0;color:var(--dsw-alias-label-primary,inherit)}
         .mov-media-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;min-width:0}
@@ -281,7 +281,7 @@
         .mov-media-image-button:focus-visible,.mov-media-more:focus-visible,.mov-media-close:focus-visible{outline:2px solid #247bbf;outline-offset:-2px}
       `),
         h("div", { key: "grid", className: "mov-media-grid" }, visible.map((item) => h(MediaItem, { key: `${item.kind}:${item.localPath || item.url}`, item }))),
-        items.length > 2 ? h("button", { key: "more", type: "button", className: "mov-media-more", onClick: () => setExpanded(!expanded), "aria-expanded": expanded }, expanded ? "\u6536\u8D77\u5176\u4ED6\u6210\u679C" : `\u5C55\u5F00\u5176\u4ED6\u6210\u679C\uFF08${items.length - 2}\uFF09`) : null
+        items.length > 2 ? h("button", { key: "more", type: "button", className: "mov-media-more", onClick: () => setExpanded(!expanded), "aria-expanded": expanded }, expanded ? "收起其他成果" : `展开其他成果（${items.length - 2}）`) : null
       ]);
     }
     return { MediaPreview };
@@ -301,9 +301,9 @@
     };
     const inputStyle = { width: "100%", boxSizing: "border-box" };
     const PAGE_CSS = `
-      /* \u6574\u9875\u7EB5\u5411\u6392\u5E03\uFF1A\u5757\u4E0E\u5757\u4E4B\u95F4\u7EDF\u4E00 16px\uFF0C\u6BD4\u4E00\u6574\u7247\u8868\u5355\u597D\u626B */
+      /* 整页纵向排布：块与块之间统一 16px，比一整片表单好扫 */
       .mov-page { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; color: ${TOKENS.text}; }
-      /* \u5206\u7EC4\u5361\u7247\uFF1A16 \u4E2A\u5B57\u6BB5\u644A\u5728\u4E00\u683C\u91CC\u592A\u7CCA\uFF0C\u6309\u7528\u9014\u5404\u88C5\u4E00\u5F20\u5361 */
+      /* 分组卡片：16 个字段摊在一格里太糊，按用途各装一张卡 */
       .mov-section { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
       .mov-advanced { display: block; }
       .mov-advanced-toggle { cursor: pointer; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
@@ -323,10 +323,10 @@
       @container (max-width: 480px) { .mov-advanced-body .mov-grid { grid-template-columns: minmax(0, 1fr); } .mov-advanced-group .mov-label { min-height: 0; } }
       .mov-advanced { container-type: inline-size; }
       .mov-section-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
-      /* \u6807\u9898\u5DE6\u8FB9\u4E00\u9053\u4E3B\u8272\u7AD6\u6761\uFF0C\u4EE3\u66FF\u7EAF\u6587\u5B57\u5206\u7EC4\u6807\u9898 */
+      /* 标题左边一道主色竖条，代替纯文字分组标题 */
       .mov-section-title::before { content: ""; flex: 0 0 auto; width: 3px; height: 13px; border-radius: 2px; background: ${TOKENS.primaryFill}; }
       .mov-section-title::after { content: ""; flex: 1 1 auto; height: 1px; background: ${TOKENS.border}; }
-      /* \u4E24\u5217\u81EA\u9002\u5E94\uFF1A\u5355\u5217\u81F3\u5C11 240px\uFF0C\u7A84\u9762\u677F\u81EA\u52A8\u843D\u6210\u4E00\u5217 */
+      /* 两列自适应：单列至少 240px，窄面板自动落成一列 */
       .mov-parameter-group { container-type: inline-size; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
       .mov-parameter-group + .mov-parameter-group { border-top: 1px solid ${TOKENS.border}; padding-top: 16px; }
       .mov-parameter-heading { font-size: 12px; font-weight: 600; color: ${TOKENS.muted}; }
@@ -355,7 +355,7 @@
       @container (max-width: 480px) { .mov-av-grid { grid-template-columns: minmax(0, 1fr); } }
       @media (prefers-reduced-motion: reduce) { .mov-av-audio .mov-switch input, .mov-av-audio .mov-switch input::after { transition: none; } }
 
-      /* \u5F00\u5173\u6CA1\u6709\u6807\u7B7E\u884C\uFF0C\u9760\u5E95\u5BF9\u9F50\u624D\u80FD\u8DDF\u65C1\u8FB9\u8F93\u5165\u6846\u7684\u63A7\u5236\u7EBF\u9F50\u5E73 */
+      /* 开关没有标签行，靠底对齐才能跟旁边输入框的控制线齐平 */
       .mov-field-switch { justify-content: flex-end; }
       .mov-field-wide { grid-column: 1 / -1; }
       .mov-label { display: block; font-size: 12px; color: ${TOKENS.muted}; margin-bottom: 6px; }
@@ -366,9 +366,9 @@
       .mov-key-eye:hover { color: ${TOKENS.text}; background: ${TOKENS.border}; }
       .mov-key-eye:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
       .mov-input:focus, .mov-input:focus-visible { outline: none; border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 3px rgba(36, 123, 191, .18); }
-      /* \u6A21\u578B ID \u4E0E\u53EF\u6267\u884C\u6587\u4EF6\u8DEF\u5F84\u5F88\u957F\uFF1A\u7B49\u5BBD\u5B57\u4F53 + \u7701\u7565\uFF0C\u4E0D\u628A\u6574\u884C\u6491\u53D8\u5F62 */
+      /* 模型 ID 与可执行文件路径很长：等宽字体 + 省略，不把整行撑变形 */
       .mov-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
-      /* \u5F00\u5173\u505A\u6210\u8DDF\u8F93\u5165\u6846\u540C\u9AD8\u7684\u5C0F\u65B9\u5757\uFF0C\u548C\u5468\u56F4\u63A7\u4EF6\u4E00\u6761\u7EBF */
+      /* 开关做成跟输入框同高的小方块，和周围控件一条线 */
       .mov-switch { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 36px; box-sizing: border-box; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.controlFill}; font-size: 13px; color: ${TOKENS.text}; cursor: pointer; }
       .mov-switch:hover { border-color: ${TOKENS.primaryFill}; }
       .mov-switch input { width: 15px; height: 15px; accent-color: ${TOKENS.primaryFill}; cursor: pointer; }
@@ -392,7 +392,7 @@
       .mov-support-content p { margin: 0; }
       .mov-support-frame { width: 100%; height: min(480px, 62vh); border: 0; border-radius: 8px; background: white; }
       .mov-trailing { margin-left: auto; }
-      /* \u989D\u5EA6\uFF1A\u4E09\u4E2A\u6570\u5B57\u5757\uFF0C\u4E00\u773C\u5206\u6E05\u5269\u4F59 / \u5DF2\u7528 / \u603B\u989D\u5EA6 */
+      /* 额度：三个数字块，一眼分清剩余 / 已用 / 总额度 */
       .mov-quota-compact { padding: 8px 12px; gap: 10px 14px; flex-direction: row; align-items: center; flex-wrap: wrap; }
       .mov-quota-compact .mov-card-head { min-height: 24px; flex: 0 0 auto; gap: 8px; }
       .mov-quota-compact .mov-stats { display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 8px 16px; min-width: 0; }
@@ -405,12 +405,12 @@
       .mov-stat-label { font-size: 11.5px; color: ${TOKENS.muted}; }
       .mov-stat-value { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
       .mov-foot-note { font-size: 11.5px; color: ${TOKENS.muted}; }
-      /* ffmpeg \u5B89\u88C5\u547D\u4EE4\uFF1A\u4E00\u884C\u7B49\u5BBD\u3001\u53EF\u590D\u5236\uFF0C\u4E0D\u7528\u6491\u6EE1\u6574\u884C */
+      /* ffmpeg 安装命令：一行等宽、可复制，不用撑满整行 */
       .mov-cmd-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
       .mov-tag { flex: 0 0 auto; min-width: 132px; font-size: 12px; color: ${TOKENS.muted}; }
       .mov-code { flex: 0 0 auto; max-width: 100%; padding: 6px 10px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.controlFill}; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
-      /* \u4F7F\u7528\u8BB0\u5F55\uFF1A\u6591\u9A6C\u7EB9 + \u7EC6\u8868\u5934\uFF0C\u6A21\u578B\u5217\u5403\u6389\u5269\u4F59\u5BBD\u5EA6 */
-      /* \u9762\u677F\u5F88\u7A84\u65F6\u8868\u683C\u6A2A\u5411\u6EDA\u52A8\uFF0C\u4E5F\u4E0D\u628A\u300C\u65F6\u95F4\u300D\u6324\u6210\u4E24\u884C */
+      /* 使用记录：斑马纹 + 细表头，模型列吃掉剩余宽度 */
+      /* 面板很窄时表格横向滚动，也不把「时间」挤成两行 */
       .mov-table { display: flex; flex-direction: column; margin: 0 -6px; overflow-x: auto; }
       .mov-table-head, .mov-table-row { display: grid; grid-template-columns: 106px 78px minmax(72px, 1fr) 84px 60px; align-items: center; gap: 10px; padding: 8px 10px; }
       .mov-table-head > :nth-child(1), .mov-table-row > :nth-child(1) { white-space: nowrap; }
@@ -418,18 +418,18 @@
       .mov-table-row { font-size: 12.5px; border-radius: 8px; }
       .mov-table-row:nth-child(even) { background: rgba(127, 127, 127, .05); }
       .mov-table-row:hover { background: rgba(127, 127, 127, .1); }
-      /* \u8D39\u7528\u4E0E\u7ED3\u679C\u4E24\u5217\u53F3\u5BF9\u9F50\uFF0C\u6570\u5B57\u7AD6\u7740\u5BF9\u5F97\u9F50 */
+      /* 费用与结果两列右对齐，数字竖着对得齐 */
       .mov-table-head > :nth-child(4), .mov-table-row > :nth-child(4),
       .mov-table-head > :nth-child(5), .mov-table-row > :nth-child(5) { text-align: right; }
       .mov-model { min-width: 0; overflow: hidden; color: ${TOKENS.muted}; white-space: nowrap; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
       .mov-num { font-variant-numeric: tabular-nums; }
-      /* \u7ED3\u679C\u7528\u80F6\u56CA\u6807\u7B7E\uFF0C\u6BD4\u88F8\u6587\u5B57\u66F4\u5BB9\u6613\u4E00\u773C\u626B\u5230 */
+      /* 结果用胶囊标签，比裸文字更容易一眼扫到 */
       .mov-chip { display: inline-flex; align-items: center; justify-content: center; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; line-height: 1.7; }
       .mov-chip-ok { color: ${TOKENS.success}; background: rgba(46, 158, 91, .12); }
       .mov-chip-bad { color: ${TOKENS.error}; background: rgba(217, 83, 79, .12); }
-      /* \u6CE8\u518C\u8868\u5355\uFF1A\u8F93\u5165\u6846\u5403\u6389\u591A\u4F59\u5BBD\u5EA6\uFF0C\u4E24\u4E2A\u6309\u94AE\u4E0D\u6362\u884C */
+      /* 注册表单：输入框吃掉多余宽度，两个按钮不换行 */
       .mov-register-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-      /* \u5E95\u90E8\u64CD\u4F5C\u6761\uFF1A\u4E0A\u8FB9\u7EBF\u628A\u300C\u4FDD\u5B58\u300D\u548C\u914D\u7F6E\u5185\u5BB9\u5206\u5F00 */
+      /* 底部操作条：上边线把「保存」和配置内容分开 */
       .mov-footer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 2px 2px; border-top: 1px solid ${TOKENS.border}; }
       .mov-notice { margin: 0; font-size: 12px; color: ${TOKENS.muted}; line-height: 1.5; }
     `;
@@ -514,12 +514,12 @@
         return null;
       if (!["video_generate", "video_extend"].includes(toolName) || block.phase !== "start" || beganAt === void 0)
         return null;
-      const status = "\u6B63\u5728\u751F\u6210 \xB7 \u7B49\u5F85\u7ED3\u679C";
+      const status = "正在生成 · 等待结果";
       const duration = block.args?.duration;
       const estimatedWait = estimatedVideoWait(duration);
       const progress = estimatedVideoProgress(elapsed, duration);
       const waitingDots = ".".repeat(elapsed % 3 + 1);
-      const title = toolName === "video_extend" ? "\u89C6\u9891\u7EED\u62CD" : "\u89C6\u9891\u751F\u6210";
+      const title = toolName === "video_extend" ? "视频续拍" : "视频生成";
       return h("div", { className: "mov-task mov-task-running", "data-field": "video-task-progress" }, [
         h("style", { key: "style" }, `
           @keyframes mov-task-spin { to { transform: rotate(360deg); } }
@@ -546,17 +546,17 @@
           h("span", { key: "spinner", className: "mov-task-spinner", "aria-hidden": true }),
           h("strong", { key: "title" }, title),
           h("span", { key: "status", role: "status" }, [status, h("span", { key: "dots", className: "mov-task-dots", "aria-hidden": true }, waitingDots)]),
-          h("span", { key: "elapsed", style: { marginLeft: "auto", fontVariantNumeric: "tabular-nums" } }, `\u5DF2\u7B49\u5F85 ${Math.floor(elapsed / 60)}\u5206${String(elapsed % 60).padStart(2, "0")}\u79D2`)
+          h("span", { key: "elapsed", style: { marginLeft: "auto", fontVariantNumeric: "tabular-nums" } }, `已等待 ${Math.floor(elapsed / 60)}分${String(elapsed % 60).padStart(2, "0")}秒`)
         ]),
         h("div", { key: "progress", className: "mov-task-rail" }, [
-          h("div", { className: "mov-task-track mov-task-active", role: "progressbar", "aria-label": "\u4F30\u7B97\u8FDB\u5EA6", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": progress }, h("div", { className: "mov-task-fill", style: { width: `${progress}%` } })),
+          h("div", { className: "mov-task-track mov-task-active", role: "progressbar", "aria-label": "估算进度", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": progress }, h("div", { className: "mov-task-fill", style: { width: `${progress}%` } })),
           // 装饰用的小乌龟：跟着进度条填充的右端一起从左往右爬，只表示「还在忙」，不代表真实进度；屏幕阅读器不读它。
-          h("span", { key: "turtle", className: "mov-task-turtle", style: { left: `${progress}%` }, "aria-hidden": true }, "\u{1F422}")
+          h("span", { key: "turtle", className: "mov-task-turtle", style: { left: `${progress}%` }, "aria-hidden": true }, "🐢")
         ]),
-        h("div", { key: "percent", className: "mov-task-note" }, `${progress}% \xB7 \u4F30\u7B97\u8FDB\u5EA6`),
+        h("div", { key: "percent", className: "mov-task-note" }, `${progress}% · 估算进度`),
         h("div", { key: "note", className: "mov-task-note" }, [
           h("span", { key: "live", className: "mov-task-live", "aria-hidden": true }),
-          `${duration ? `\u76EE\u6807 ${duration} \u79D2 \xB7 \u9884\u8BA1\u7B49\u5F85\u7EA6 ${Math.round(estimatedWait)} \u79D2 \xB7 ` : ""}${progress >= 99 ? "\u4EFB\u52A1\u4ECD\u5728\u7B49\u5F85\u7ED3\u679C\uFF0C\u8FDB\u5EA6\u505C\u572899%\u4E0D\u8868\u793A\u5931\u8D25\u3002" : "\u4EFB\u52A1\u5904\u7406\u4E2D\uFF0C\u5B8C\u6210\u540E\u81EA\u52A8\u663E\u793A\u7ED3\u679C\u3002"}\u8BF7\u52FF\u91CD\u590D\u63D0\u4EA4\u3002`
+          `${duration ? `目标 ${duration} 秒 · 预计等待约 ${Math.round(estimatedWait)} 秒 · ` : ""}${progress >= 99 ? "任务仍在等待结果，进度停在99%不表示失败。" : "任务处理中，完成后自动显示结果。"}请勿重复提交。`
         ])
       ]);
     }
@@ -782,192 +782,192 @@
   // src/businesses/video/client/locale.ts
   function createDictionaries() {
     const zh = {
-      connectionCheckTitle: "API \u8FDE\u63A5\u9A8C\u8BC1",
-      connectionCheckButton: "\u9A8C\u8BC1\u8FDE\u63A5",
-      connectionChecking: "\u6B63\u5728\u9A8C\u8BC1\u2026",
-      connectionCheckSaveFirst: "\u6709\u672A\u4FDD\u5B58\u7684\u4FEE\u6539\uFF0C\u8BF7\u5148\u4FDD\u5B58\u540E\u9A8C\u8BC1\u3002",
-      connectionCheckHint: "\u68C0\u67E5\u5DF2\u4FDD\u5B58\u7684\u63A5\u53E3\u3001\u9274\u6743\u54CD\u5E94\u548C\u6A21\u578B\u6E05\u5355\uFF0C\u4E0D\u63D0\u4EA4\u751F\u6210\u4EFB\u52A1\u3001\u4E0D\u4EA7\u751F\u6A21\u578B\u751F\u6210\u8D39\u7528\uFF1B\u901A\u8FC7\u4E0D\u4EE3\u8868\u5B9E\u9645\u751F\u6210\u6548\u679C\u5DF2\u9A8C\u8BC1\u3002",
-      connectionCheckFailed: "\u9A8C\u8BC1\u672A\u5B8C\u6210\uFF0C\u8BF7\u786E\u8BA4\u63D2\u4EF6\u670D\u52A1\u53EF\u7528\u540E\u91CD\u8BD5\u3002",
-      connectionTarget_video: "\u89C6\u9891\u6A21\u578B",
-      connectionTarget_image: "\u56FE\u7247\u6A21\u578B",
-      connectionTarget_text: "\u6587\u672C\u6A21\u578B",
-      connectionResult_ok: "\u9274\u6743\u63A5\u53E3\u54CD\u5E94\u6B63\u5E38\uFF0C\u5F53\u524D\u6A21\u578B\u5DF2\u5217\u51FA\u3002",
-      connectionResult_model_not_listed: "\u63A5\u53E3\u54CD\u5E94\u6B63\u5E38\uFF0C\u4F46\u5F53\u524D\u6A21\u578B\u672A\u5217\u51FA\uFF0C\u8BF7\u6838\u5BF9\u6A21\u578B\u540D\u79F0\u4E0E\u4F7F\u7528\u6743\u9650\u3002",
-      connectionResult_key_missing: "\u672A\u586B\u5199\u6B64\u6A21\u578B\u5B9E\u9645\u4F7F\u7528\u7684 API\u5BC6\u94A5\uFF0C\u8BF7\u586B\u5199\u5E76\u4FDD\u5B58\u3002",
-      connectionResult_invalid_address: "\u63A5\u53E3\u5730\u5740\u683C\u5F0F\u4E0D\u6B63\u786E\uFF0C\u8BF7\u68C0\u67E5\u5DF2\u4FDD\u5B58\u7684\u5730\u5740\u3002",
-      connectionResult_auth_failed: "\u9274\u6743\u672A\u901A\u8FC7\uFF08401\uFF09\uFF0C\u8BF7\u6838\u5BF9 API\u5BC6\u94A5\u53CA\u63A5\u53E3\u5730\u5740\u3002",
-      connectionResult_forbidden: "\u8BBF\u95EE\u88AB\u62D2\u7EDD\uFF08403\uFF09\uFF0C\u8BF7\u6838\u5BF9\u5BC6\u94A5\u6743\u9650\u3001\u6E20\u9053\u9650\u5236\u53CA\u5730\u5740\u3002",
-      connectionResult_models_unsupported: "\u670D\u52A1\u672A\u63D0\u4F9B\u6A21\u578B\u67E5\u8BE2\u63A5\u53E3\uFF0C\u65E0\u6CD5\u4EC5\u9760\u53EA\u8BFB\u8BF7\u6C42\u786E\u8BA4\u53EF\u7528\u6027\u3002",
-      connectionResult_rate_limited: "\u8BF7\u6C42\u53D7\u9650\uFF08429\uFF09\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u5E76\u6838\u5BF9\u6E20\u9053\u9650\u5236\u3002",
-      connectionResult_server_error: "\u4E0A\u6E38\u63A5\u53E3\u5F02\u5E38\uFF0C\u8BF7\u6838\u5BF9\u5730\u5740\u6216\u7A0D\u540E\u91CD\u8BD5\u3002",
-      connectionResult_invalid_response: "\u8FD4\u56DE\u5185\u5BB9\u4E0D\u662F\u9884\u671F\u7684\u6A21\u578B\u6E05\u5355\uFF0C\u8BF7\u68C0\u67E5\u63A5\u53E3\u5730\u5740\u3002",
-      connectionResult_api_rejected: "\u4E0A\u6E38\u62D2\u7EDD\u4E86\u9A8C\u8BC1\u8BF7\u6C42\uFF0C\u8BF7\u6838\u5BF9 API\u5BC6\u94A5\u548C\u5730\u5740\u3002",
-      connectionResult_timeout: "\u8FDE\u63A5\u8D85\u65F6\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u548C\u63A5\u53E3\u5730\u5740\u540E\u91CD\u8BD5\u3002",
-      connectionResult_network_error: "\u65E0\u6CD5\u8FDE\u63A5\u63A5\u53E3\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u3001\u8BC1\u4E66\u6216\u63A5\u53E3\u5730\u5740\u3002",
-      connectionResult_query_reachable: "\u67E5\u8BE2\u63A5\u53E3\u5DF2\u54CD\u5E94\uFF1B\u53EA\u8BFB\u63A2\u6D4B\u5C1A\u4E0D\u80FD\u786E\u8BA4\u5F53\u524D\u6A21\u578B\u7684\u751F\u6210\u6743\u9650\u3002",
-      connectionResult_query_unverified: "\u53EA\u8BFB\u67E5\u8BE2\u672A\u80FD\u786E\u8BA4\u8FDE\u63A5\uFF0C\u8BF7\u6838\u5BF9\u706B\u5C71\u63A5\u53E3\u914D\u7F6E\u53CA\u6743\u9650\u3002",
-      summaryEmpty: "\u8BF7\u9009\u62E9\u63A5\u5165\u65B9\u5F0F\uFF0C\u586B\u5199 API\u5BC6\u94A5\u540E\u4FDD\u5B58\u3002",
-      panelTitle: "\u89C6\u9891\u521B\u4F5C",
-      panelSidebarLabel: "\u89C6\u9891\u521B\u4F5C\u52A9\u624B",
-      sidebarUpdateBadge: "\u6709\u66F4\u65B0",
-      panelIntro: "\u5728\u5BF9\u8BDD\u91CC\u8BF4\u6E05\u521B\u610F\u3001\u65F6\u957F\u4E0E\u753B\u5E45\uFF0C\u811A\u672C\u3001\u5206\u955C\u3001\u751F\u6210\u548C\u672C\u673A\u5408\u5E76\u90FD\u7531\u63D2\u4EF6\u5B8C\u6210\u3002",
-      panelStart: "\u5F00\u59CB\u521B\u4F5C",
-      panelNew: "\u65B0\u5EFA\u89C6\u9891\u521B\u4F5C\u4F1A\u8BDD",
-      panelSettings: "\u6253\u5F00\u63D2\u4EF6\u8BBE\u7F6E",
-      panelGuide: "\u4F7F\u7528\u8BF4\u660E",
-      panelHighlights: "\u4E3A\u4EC0\u4E48\u7528\u5B83",
-      panelHighlight1Title: "\u65B0\u624B\u4E5F\u80FD\u4E0A\u624B",
-      panelHighlight1Desc: "\u4E0D\u7528\u7814\u7A76\u63D0\u793A\u8BCD\uFF1A\u8BF4\u6E05\u521B\u610F\u3001\u65F6\u957F\u548C\u753B\u5E45\u5C31\u80FD\u5F00\u59CB\uFF0C\u811A\u672C\u3001\u5206\u955C\u3001\u751F\u6210\u548C\u672C\u673A\u5408\u5E76\u90FD\u7531\u52A9\u624B\u5B8C\u6210\u3002",
-      panelHighlight2Title: "\u5206\u6BB5\u5236\u4F5C\u957F\u89C6\u9891",
-      panelHighlight2Desc: "\u8D85\u8FC7\u5355\u6BB5\u4E0A\u9650\u65F6\u5206\u6BB5\u7EED\u62CD\uFF0C\u6BCF\u6BB5\u9884\u89C8\u786E\u8BA4\u540E\u7EE7\u7EED\uFF0C\u5168\u90E8\u5B8C\u6210\u540E\u5728\u672C\u673A\u5408\u5E76\u3002",
-      panelFlow: "\u4F7F\u7528\u6D41\u7A0B",
-      panelStep1Title: "\u8BF4\u6E05\u521B\u610F",
-      panelStep1Desc: "\u4E3B\u9898\u3001\u65F6\u957F\u3001\u753B\u5E45\uFF0816:9 / 9:16\uFF09\u4E0E\u6E05\u6670\u5EA6\uFF1B\u6CA1\u5199\u753B\u5E45\u65F6\u52A9\u624B\u4F1A\u5148\u95EE\u3002",
-      panelStep2Title: "\u811A\u672C\u5206\u955C",
-      panelStep2Desc: "\u5148\u51FA\u811A\u672C\u4E0E\u5206\u955C\uFF0C\u4F60\u5BA1\u6838\u786E\u8BA4\u540E\u518D\u7EE7\u7EED\u3002",
-      panelStep3Title: "\u9010\u6BB5\u751F\u6210",
-      panelStep3Desc: "\u786E\u8BA4\u8D39\u7528\u540E\u751F\u6210\uFF1B\u5206\u6BB5\u9884\u89C8\u786E\u8BA4\u540E\u7EE7\u7EED\u4E0B\u4E00\u6BB5\uFF0C\u652F\u6301\u65AD\u70B9\u7EED\u505A\u3002",
-      panelStep4Title: "\u672C\u673A\u5408\u5E76",
-      panelStep4Desc: "\u5206\u6BB5\u751F\u6210\u7684\u7ED3\u679C\u5728\u672C\u673A\u5408\u5E76\u6210\u7247\uFF0C\u53EF\u9010\u6BB5\u9884\u89C8\u3002",
-      summary: "{provider} \xB7 {model}",
-      apiKeyConfigured: "\u5DF2\u914D\u7F6E\uFF0C\u7559\u7A7A\u4FDD\u7559\u73B0\u6709 API\u5BC6\u94A5",
-      connectionMode: "\u63A5\u5165\u65B9\u5F0F",
-      connectionModeHint: "\u4F7F\u7528\u81EA\u5DF1\u7684 MetaOntic AI API\u5BC6\u94A5\u3002\u5207\u6362\u540E\u4FDD\u5B58\u751F\u6548\u3002",
-      connectionVolcengineUnavailable: "\u706B\u5C71\u5F15\u64CE\u76F4\u8FDE\u5F53\u524D\u6682\u4E0D\u63D0\u4F9B\u9009\u62E9\uFF1A\u5DF2\u6709\u7684\u914D\u7F6E\u4ECD\u53EF\u7EE7\u7EED\u751F\u6210\uFF1B\u5982\u9700\u66F4\u6362\uFF0C\u8BF7\u5728\u300C\u63A5\u5165\u65B9\u5F0F\u300D\u91CC\u9009\u62E9 MetaOntic AI\u3002",
-      connectionMetaonticHint: "\u4F7F\u7528 MetaOntic AI \u7684 API\u5BC6\u94A5\uFF0C\u586B\u5199\u540E\u4FDD\u5B58\u751F\u6548\u3002",
-      connectionMetaonticRegister: "\u6CE8\u518C\u83B7\u53D6 API\u5BC6\u94A5",
-      volcengineKeyHint: "\u586B\u5199\u706B\u5C71\u65B9\u821F\u63A7\u5236\u53F0\u7684 API\u5BC6\u94A5\u540E\u4FDD\u5B58\uFF0C\u8D39\u7528\u7531\u706B\u5C71\u5F15\u64CE\u8D26\u6237\u627F\u62C5\u3002\u9700\u8981\u81EA\u884C\u6838\u5BF9\u597D API\u5BC6\u94A5\u7684\u6A21\u578B\u80FD\u529B\u3002",
+      connectionCheckTitle: "API 连接验证",
+      connectionCheckButton: "验证连接",
+      connectionChecking: "正在验证…",
+      connectionCheckSaveFirst: "有未保存的修改，请先保存后验证。",
+      connectionCheckHint: "检查已保存的接口、鉴权响应和模型清单，不提交生成任务、不产生模型生成费用；通过不代表实际生成效果已验证。",
+      connectionCheckFailed: "验证未完成，请确认插件服务可用后重试。",
+      connectionTarget_video: "视频模型",
+      connectionTarget_image: "图片模型",
+      connectionTarget_text: "文本模型",
+      connectionResult_ok: "鉴权接口响应正常，当前模型已列出。",
+      connectionResult_model_not_listed: "接口响应正常，但当前模型未列出，请核对模型名称与使用权限。",
+      connectionResult_key_missing: "未填写此模型实际使用的 API密钥，请填写并保存。",
+      connectionResult_invalid_address: "接口地址格式不正确，请检查已保存的地址。",
+      connectionResult_auth_failed: "鉴权未通过（401），请核对 API密钥及接口地址。",
+      connectionResult_forbidden: "访问被拒绝（403），请核对密钥权限、渠道限制及地址。",
+      connectionResult_models_unsupported: "服务未提供模型查询接口，无法仅靠只读请求确认可用性。",
+      connectionResult_rate_limited: "请求受限（429），请稍后重试并核对渠道限制。",
+      connectionResult_server_error: "上游接口异常，请核对地址或稍后重试。",
+      connectionResult_invalid_response: "返回内容不是预期的模型清单，请检查接口地址。",
+      connectionResult_api_rejected: "上游拒绝了验证请求，请核对 API密钥和地址。",
+      connectionResult_timeout: "连接超时，请检查网络和接口地址后重试。",
+      connectionResult_network_error: "无法连接接口，请检查网络、证书或接口地址。",
+      connectionResult_query_reachable: "查询接口已响应；只读探测尚不能确认当前模型的生成权限。",
+      connectionResult_query_unverified: "只读查询未能确认连接，请核对火山接口配置及权限。",
+      summaryEmpty: "请选择接入方式，填写 API密钥后保存。",
+      panelTitle: "视频创作",
+      panelSidebarLabel: "视频创作助手",
+      sidebarUpdateBadge: "有更新",
+      panelIntro: "在对话里说清创意、时长与画幅，脚本、分镜、生成和本机合并都由插件完成。",
+      panelStart: "开始创作",
+      panelNew: "新建视频创作会话",
+      panelSettings: "打开插件设置",
+      panelGuide: "使用说明",
+      panelHighlights: "为什么用它",
+      panelHighlight1Title: "新手也能上手",
+      panelHighlight1Desc: "不用研究提示词：说清创意、时长和画幅就能开始，脚本、分镜、生成和本机合并都由助手完成。",
+      panelHighlight2Title: "分段制作长视频",
+      panelHighlight2Desc: "超过单段上限时分段续拍，每段预览确认后继续，全部完成后在本机合并。",
+      panelFlow: "使用流程",
+      panelStep1Title: "说清创意",
+      panelStep1Desc: "主题、时长、画幅（16:9 / 9:16）与清晰度；没写画幅时助手会先问。",
+      panelStep2Title: "脚本分镜",
+      panelStep2Desc: "先出脚本与分镜，你审核确认后再继续。",
+      panelStep3Title: "逐段生成",
+      panelStep3Desc: "确认费用后生成；分段预览确认后继续下一段，支持断点续做。",
+      panelStep4Title: "本机合并",
+      panelStep4Desc: "分段生成的结果在本机合并成片，可逐段预览。",
+      summary: "{provider} · {model}",
+      apiKeyConfigured: "已配置，留空保留现有 API密钥",
+      connectionMode: "接入方式",
+      connectionModeHint: "使用自己的 MetaOntic AI API密钥。切换后保存生效。",
+      connectionVolcengineUnavailable: "火山引擎直连当前暂不提供选择：已有的配置仍可继续生成；如需更换，请在「接入方式」里选择 MetaOntic AI。",
+      connectionMetaonticHint: "使用 MetaOntic AI 的 API密钥，填写后保存生效。",
+      connectionMetaonticRegister: "注册获取 API密钥",
+      volcengineKeyHint: "填写火山方舟控制台的 API密钥后保存，费用由火山引擎账户承担。需要自行核对好 API密钥的模型能力。",
       metaontic: "MetaOntic AI",
-      metaonticApiKey: "MetaOntic AI API\u5BC6\u94A5",
-      showKey: "\u663E\u793A API\u5BC6\u94A5",
-      hideKey: "\u9690\u85CF API\u5BC6\u94A5",
-      metaonticKeyHint: "\u586B\u5199 API\u5BC6\u94A5\u540E\u4FDD\u5B58\uFF0C\u65E0\u9700\u90AE\u7BB1\u767B\u5F55\u3002\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39\uFF0C\u8D39\u7528\u4E0E\u7528\u91CF\u8BF7\u5728\u6E20\u9053\u5E73\u53F0\u67E5\u770B\u3002",
-      volcengineApiKey: "\u706B\u5C71\u5F15\u64CE API\u5BC6\u94A5",
-      volcengine: "\u706B\u5C71\u5F15\u64CE\u76F4\u8FDE",
-      volcengineUnavailable: "\u706B\u5C71\u5F15\u64CE\u76F4\u8FDE\uFF08\u6682\u4E0D\u63D0\u4F9B\u9009\u62E9\uFF09",
-      seamTrimSeconds: "\u63A5\u7F1D\u88C1\u526A\u79D2\u6570\uFF08\u5982 0.5,0\uFF09",
-      modelHiddenCurrent: "\u5F53\u524D\u6A21\u578B\uFF08\u6682\u4E0D\u63D0\u4F9B\u9009\u62E9\uFF09",
-      releaseNotesTitle: "\u66F4\u65B0\u5185\u5BB9",
+      metaonticApiKey: "MetaOntic AI API密钥",
+      showKey: "显示 API密钥",
+      hideKey: "隐藏 API密钥",
+      metaonticKeyHint: "填写 API密钥后保存，无需邮箱登录。按实际调用计费，费用与用量请在渠道平台查看。",
+      volcengineApiKey: "火山引擎 API密钥",
+      volcengine: "火山引擎直连",
+      volcengineUnavailable: "火山引擎直连（暂不提供选择）",
+      seamTrimSeconds: "接缝裁剪秒数（如 0.5,0）",
+      modelHiddenCurrent: "当前模型（暂不提供选择）",
+      releaseNotesTitle: "更新内容",
       releaseUpdatedAt: "{time}",
-      resetConfirm: "\u786E\u5B9A\u91CD\u7F6E\u63D2\u4EF6\u5417\uFF1F\u8FD9\u4F1A\u6E05\u9664\u672C\u63D2\u4EF6\u4FDD\u5B58\u7684\u914D\u7F6E\u548CAPI\u5BC6\u94A5\uFF0C\u9700\u8981\u91CD\u65B0\u914D\u7F6E\u3002\u5DF2\u751F\u6210\u7684\u89C6\u9891\u4E0D\u4F1A\u5220\u9664\u3002",
-      model: "\u89C6\u9891\u6A21\u578B",
-      imageModel: "\u56FE\u7247\u6A21\u578B",
-      textModel: "\u6587\u672C\u6A21\u578B\uFF08\u5199\u811A\u672C\uFF09",
-      imageUseVideoKey: "\u89C6\u9891 / \u56FE\u7247 / \u6587\u672C\u6A21\u578B\u5171\u7528 API\u5BC6\u94A5",
-      sharedModelKey: "\u5171\u7528 API\u5BC6\u94A5",
-      videoModelKey: "\u89C6\u9891\u6A21\u578B API\u5BC6\u94A5",
-      imageApiKey: "\u56FE\u7247\u6A21\u578B API\u5BC6\u94A5",
-      textApiKey: "\u6587\u672C\u6A21\u578B API\u5BC6\u94A5",
-      resolution: "\u89C6\u9891\u6E05\u6670\u5EA6",
-      imageModelHint: "Seedream\u53EF\u751F\u6210\u89D2\u8272\u56FE\uFF1B\u9047\u771F\u4EBA\u9650\u5236\u65F6\uFF0C\u7ECF\u540C\u610F\u53EF\u8F6C\u6362\u53C2\u8003\u56FE\u3002\u56FE\u7247\u8C03\u7528\u5355\u72EC\u8BA1\u8D39\uFF0C\u7ED3\u679C\u9700\u5BA1\u6838\u3002",
-      textModelHint: "\u4FDD\u7559\u914D\u7F6E\uFF1A\u6D41\u7A0B\u753B\u5E03\u6682\u9690\u85CF\uFF0C\u5BF9\u8BDD\u5199\u811A\u672C\u4F7F\u7528Harness\u4F1A\u8BDD\u6A21\u578B\u3002\u539F\u753B\u5E03\u300C\u521B\u4F5C\u6D41\u7A0B\u300D\u91CC\u7528\u8FD9\u4E2A\u578B\u53F7\u628A\u4E00\u6BB5\u60F3\u6CD5\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF1B\u8D70\u540C\u4E00\u4E2D\u8F6C\u7AD9\u7684 /v1/chat/completions\uFF0C\u5355\u72EC\u6309\u6587\u672C\u8BA1\u8D39\u3002\u5019\u9009\u4E0E\u4E2D\u8F6C\u7AD9\u5728\u552E\u7684\u6587\u672C\u6A21\u578B\u4E00\u81F4\uFF0C\u65E7\u7684\u9ED8\u8BA4\u578B\u53F7\u5DF2\u4E0B\u7EBF\uFF0C\u8BFB\u5230\u4F1A\u81EA\u52A8\u6362\u6210\u9ED8\u8BA4\u9879\u3002",
-      modelHint: "mini \u4FA7\u91CD\u6210\u672C\uFF0Cfast \u4FA7\u91CD\u751F\u6210\u901F\u5EA6\u3002\u5B9E\u9645\u4EF7\u683C\u4EE5\u6240\u9009\u6E20\u9053\u4E3A\u51C6\u3002",
-      mergeMode: "\u5408\u5E76\u65B9\u5F0F",
-      mergeModeSeamless: "\u76F4\u63A5\u62FC\u63A5\uFF08\u65E7\u914D\u7F6E\u517C\u5BB9\uFF09",
-      mergeModeCopy: "\u65E0\u635F\u62FC\u63A5",
-      mergeModeReencode: "\u91CD\u7F16\u7801\u62FC\u63A5",
-      ffmpegBinary: "ffmpeg \u8DEF\u5F84",
-      ffprobeBinary: "ffprobe \u8DEF\u5F84",
-      ffmpegTitle: "\u957F\u89C6\u9891\u5408\u5E76\u9700\u8981 ffmpeg",
-      ffmpegBody: "\u89C6\u9891\u8D85\u8FC7\u6A21\u578B\u5355\u6B21\u4E0A\u9650\uFF082.0 \u4E3A 15 \u79D2\u30012.5 \u4E3A 30 \u79D2\uFF09\u65F6\u4F1A\u62C6\u6210\u51E0\u6BB5\u5206\u522B\u751F\u6210\u3001\u518D\u5728\u672C\u673A\u5408\u5E76\u6210\u4E00\u6761\u2014\u2014\u5408\u5E76\u8FD9\u4E00\u6B65\u7528\u7684\u662F ffmpeg\u3002\u9ED8\u8BA4\u5408\u5E76\u524D\u4F1A\u68C0\u67E5\u662F\u5426\u5B89\u88C5\uFF1B\u660E\u786E\u9009\u62E9\u53EA\u751F\u6210\u5206\u6BB5\u65F6\u53EF\u4E0D\u5408\u5E76\u3002",
-      ffmpegInstallFor: "\u6309\u4F60\u7684\u7CFB\u7EDF\u88C5\u4E00\u4E0B\uFF08\u70B9\u53F3\u8FB9\u6309\u94AE\u590D\u5236\u547D\u4EE4\uFF09\uFF1A",
-      ffmpegCopy: "\u590D\u5236",
-      ffmpegCopied: "\u5DF2\u590D\u5236",
-      ffmpegMore: "\u5176\u4ED6\u7CFB\u7EDF",
-      ffmpegLess: "\u6536\u8D77\u5176\u4ED6\u7CFB\u7EDF",
-      ffmpegAfter: "\u4E0D\u60F3\u81EA\u5DF1\u6572\u547D\u4EE4\u7684\u8BDD\uFF0C\u76F4\u63A5\u5728\u5BF9\u8BDD\u91CC\u8BF4\u300C\u5E2E\u6211\u88C5 ffmpeg\u300D\u2014\u2014\u63D2\u4EF6\u4F1A\u6267\u884C\u5B89\u88C5\uFF08\u547D\u4EE4\u4F1A\u5148\u8BA9\u4F60\u786E\u8BA4\uFF09\uFF1B\u88C5\u597D\u540E\u7528\u539F\u6682\u505C\u8FDB\u5EA6\u91CD\u8BD5\u4E0B\u8F7D\u6216\u5408\u5E76\uFF0C\u4E0D\u91CD\u65B0\u63D0\u4EA4\u89C6\u9891\u751F\u6210\u3002ffmpeg \u88C5\u5728\u975E\u9ED8\u8BA4\u4F4D\u7F6E\u7684\u8BDD\uFF0C\u628A\u7EDD\u5BF9\u8DEF\u5F84\u586B\u5230\u4E0A\u9762\u7684\u300Cffmpeg \u8DEF\u5F84\u300D\u4E5F\u4E00\u6837\u7BA1\u7528\u3002\u5B89\u88C5\u5305\u81EA\u5E26 ffprobe\uFF0C\u5206\u6BB5\u65F6\u957F\u63A2\u6D4B\u4F1A\u4E00\u8D77\u89E3\u51B3\u3002",
-      ffmpegManual: "\u60F3\u81EA\u5DF1\u88C5\uFF1AmacOS \u7528 Homebrew\uFF0CWindows \u7528 winget\uFF0CLinux \u7528\u7CFB\u7EDF\u5305\u7BA1\u7406\u5668\uFF1B\u88C5\u5B8C\u786E\u8BA4\u547D\u4EE4\u884C\u91CC\u80FD\u8DD1 ffmpeg -version \u5C31\u884C\u3002",
-      supportContact: "\u5BA2\u670D",
-      advancedStats: "\u4F7F\u7528\u7EDF\u8BA1",
-      usageStatsEnabled: "\u533F\u540D\u4F7F\u7528\u7EDF\u8BA1",
-      usageStatsHint: "\u7528\u4E8E\u7EDF\u8BA1\u9996\u6B21\u542F\u7528\u3001\u542F\u52A8\u548C\u529F\u80FD\u4F7F\u7528\u60C5\u51B5\uFF0C\u4EC5\u4E0A\u62A5\u533F\u540D\u6807\u8BC6\u3001\u7248\u672C\u3001\u57FA\u7840\u8BBE\u5907\u4FE1\u606F\u4E0E\u8C03\u7528\u7ED3\u679C\uFF0C\u4E0D\u542B\u5BF9\u8BDD\u3001\u7D20\u6750\u6216API\u5BC6\u94A5\u3002\u5173\u95ED\u4E0D\u5F71\u54CD\u89C6\u9891\u521B\u4F5C\u3002",
-      toolArgsNoticeTitle: "\u8FD9\u4E00\u8F6E\u52A9\u624B\u628A\u5DE5\u5177\u53C2\u6570\u5199\u6210\u4E86\u4E0D\u5408\u6CD5\u7684 JSON",
-      toolArgsNoticeHint: "\u591A\u534A\u662F 480p\u300116:9 \u8FD9\u7C7B\u503C\u5C11\u4E86\u5F15\u53F7\uFF0C\u672C\u8F6E\u6CA1\u6709\u771F\u6B63\u8C03\u7528\u5DE5\u5177\u3001\u4E5F\u6CA1\u6709\u4EA7\u751F\u8D39\u7528\uFF1B\u56DE\u4E00\u53E5\u300C\u6309\u539F\u53C2\u6570\u91CD\u8BD5\u300D\u5373\u53EF\uFF0C\u52A9\u624B\u4F1A\u8865\u9F50\u5F15\u53F7\u6309\u539F\u6765\u7684\u6E05\u6670\u5EA6\u3001\u753B\u5E45\u548C\u65F6\u957F\u91CD\u53D1\u3002",
-      authNoticeTitle: "\u670D\u52A1\u8FDE\u63A5\u9A8C\u8BC1\u672A\u901A\u8FC7",
-      authNoticeHint: "\u8BF7\u5230 Harness \u7684\u6A21\u578B\u8BBE\u7F6E\u68C0\u67E5\u5F53\u524D API\u5BC6\u94A5\u548C\u4E2D\u8F6C\u5730\u5740\uFF1B\u5982\u679C\u914D\u7F6E\u65E0\u8BEF\uFF0C\u8BF7\u8054\u7CFB\u5BA2\u670D\u6838\u67E5\u3002",
-      supportClose: "\u5173\u95ED",
-      supportScan: "\u8BF7\u6309\u9875\u9762\u63D0\u793A\u4F7F\u7528\u5FAE\u4FE1\u8054\u7CFB\u5BA2\u670D\uFF0C\u54A8\u8BE2\u4F7F\u7528\u6216\u63A5\u5165\u95EE\u9898\u3002\u9875\u9762\u672A\u52A0\u8F7D\u65F6\u53EF\u70B9\u51FB\u4E0B\u65B9\u94FE\u63A5\u3002",
-      supportOpenPage: "\u6253\u5F00\u5BA2\u670D\u9875\u9762",
-      versionTitle: "\u63D2\u4EF6\u7248\u672C",
-      versionCurrent: "\u5F53\u524D\u7248\u672C v{version}",
-      versionCheck: "\u68C0\u67E5\u66F4\u65B0",
-      versionChecking: "\u68C0\u67E5\u4E2D\u2026",
-      versionLatest: "\u5DF2\u662F\u6700\u65B0\u7248\u672C",
-      versionNew: "\u6709\u65B0\u7248\u672C v{version}",
-      versionFailed: "\u68C0\u67E5\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
-      versionUpdate: "\u7ACB\u5373\u66F4\u65B0",
-      versionOptional: "\u8FD9\u662F\u666E\u901A\u66F4\u65B0\uFF0C\u4F60\u53EF\u4EE5\u81EA\u884C\u51B3\u5B9A\u662F\u5426\u5347\u7EA7\u3002\u7A0D\u540E\u5904\u7406\u4E0D\u5F71\u54CD\u7EE7\u7EED\u4F7F\u7528\uFF0C\u63D2\u4EF6\u4E0D\u4F1A\u81EA\u52A8\u5B89\u88C5\u3002",
-      versionLater: "\u7A0D\u540E\u518D\u8BF4",
-      versionUpdateConfirm: "\u786E\u8BA4\u66F4\u65B0\u5230 v{version}",
-      versionUpdateConfirmHint: "\u66F4\u65B0\u671F\u95F4\u8BBE\u7F6E\u9875\u53EF\u80FD\u77ED\u6682\u5173\u95ED\uFF0C\u73B0\u6709\u914D\u7F6E\u4E0E API\u5BC6\u94A5\u4F1A\u4FDD\u7559\u3002",
-      versionUpdating: "\u66F4\u65B0\u4E2D\u2026",
-      versionUpdateDone: "\u5DF2\u66F4\u65B0\u5230 v{version}\uFF0C\u5DF2\u901A\u8FC7\u70ED\u52A0\u8F7D\u751F\u6548\uFF0C\u65E0\u9700\u91CD\u542F\u3002\u73B0\u6709\u5BF9\u8BDD\u4E0B\u4E00\u8F6E\u4F7F\u7528\u6700\u65B0\u63D2\u4EF6\u89C4\u5219\u3002",
-      versionUpdatePending: "v{version} \u5DF2\u5B89\u88C5\uFF0C\u5F53\u524D\u914D\u7F6E\u5C1A\u672A\u542F\u7528\u65B0\u7248\uFF0C\u8BF7\u5728\u63D2\u4EF6\u9875\u68C0\u67E5\u542F\u7528\u72B6\u6001\u3002",
-      versionUpdateRestart: "\u65B0\u7248\u672C v{version} \u5DF2\u88C5\u597D\uFF1A\u91CD\u542F Harness \u540E\u751F\u6548\u3002",
-      versionUpdateCancelled: "\u66F4\u65B0\u5DF2\u53D6\u6D88\u3002",
-      versionUpdateRetry: "\u66F4\u65B0\u672A\u5B8C\u6210\uFF0C\u6B63\u5728\u91CD\u8BD5\uFF08{attempt}/{total}\uFF09\u2026",
-      versionUpdateFailed: "\u5728\u7EBF\u66F4\u65B0\u5931\u8D25\uFF1A{message}",
-      versionUpdateRemoved: "\u672A\u80FD\u786E\u8BA4\u63D2\u4EF6\u5B89\u88C5\u72B6\u6001\uFF0C\u8BF7\u5230\u300C\u63D2\u4EF6\u300D\u9875\u68C0\u67E5\uFF1B\u4FDD\u7559\u73B0\u6709\u914D\u7F6E\uFF0C\u4E0D\u8981\u76F4\u63A5\u5378\u8F7D\u3002",
-      versionUpdateRateLimited: "Gitee \u8BF7\u6C42\u8FC7\u4E8E\u9891\u7E41\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002\u73B0\u6709\u914D\u7F6E\u4E0E API\u5BC6\u94A5\u4F1A\u4FDD\u7559\u3002",
-      versionUpdateLockfile: "\u5B89\u88C5\u76EE\u5F55\u7684 pnpm-lock.yaml \u91CC\u6709\u672C\u63D2\u4EF6\u7F3A\u5C11 integrity \u7684\u65E7\u8BB0\u5F55\uFF0Cpnpm \u56E0\u6B64\u62D2\u7EDD\u5B89\u88C5\uFF08ERR_PNPM_MISSING_TARBALL_INTEGRITY\uFF09\u3002\u63D2\u4EF6\u4F1A\u6BCF 2 \u79D2\u68C0\u67E5\u4E00\u6B21\u3001\u81EA\u52A8\u6E05\u7406\u8FD9\u4E9B\u65E0\u6548\u8BB0\u5F55\u5E76\u4FDD\u7559\u5907\u4EFD\uFF0C\u66F4\u65B0\u5931\u8D25\u540E\u4E5F\u4F1A\u7B49\u6E05\u7406\u5B8C\u6210\u81EA\u52A8\u91CD\u8BD5\uFF1B\u82E5\u4ECD\u7136\u5931\u8D25\uFF0C\u5B8C\u5168\u9000\u51FA Harness \u540E\u624B\u52A8\u5220\u9664\u63D2\u4EF6\u5B89\u88C5\u76EE\u5F55\u4E0B\u7684 pnpm-lock.yaml \u518D\u8BD5\u3002",
-      versionUpdateUnavailable: "\u5F53\u524D Harness \u4E0D\u652F\u6301\u6B64\u5728\u7EBF\u66F4\u65B0\u5165\u53E3\uFF0C\u8BF7\u4FDD\u7559\u73B0\u6709\u63D2\u4EF6\u4E0E\u914D\u7F6E\uFF0C\u53C2\u8003\u4F7F\u7528\u8BF4\u660E\u901A\u8FC7\u6B63\u5F0F\u7248\u6210\u54C1\u5305\u66F4\u65B0\u3002",
-      versionHint: "\u53EF\u5728\u6B64\u68C0\u67E5\u5E76\u5B89\u88C5\u65B0\u7248\u672C\uFF0C\u73B0\u6709\u914D\u7F6E\u4E0E API\u5BC6\u94A5\u4F1A\u4FDD\u7559\u3002",
-      versionCheckedAt: "\u68C0\u67E5\u4E8E {time}",
-      sectionGeneration: "\u751F\u6210\u53C2\u6570",
-      sectionConnection: "\u63A5\u5165\u4E0E API\u5BC6\u94A5",
-      sectionVideo: "\u753B\u9762\u4E0E\u58F0\u97F3",
-      sectionCanvas: "\u6D41\u7A0B\u753B\u5E03",
-      canvasPanelLabel: "MetaOnticVideo\u6D41\u7A0B\u753B\u5E03",
-      canvasEnabled: "\u6D41\u7A0B\u753B\u5E03",
-      canvasEnabledHint: "\u9ED8\u8BA4\u5173\u95ED\uFF1A\u5173\u95ED\u65F6\u5DE6\u4FA7\u680F\u4E0D\u51FA\u73B0\u300CMetaOnticVideo\u6D41\u7A0B\u753B\u5E03\u300D\u5165\u53E3\uFF0C\u753B\u5E03\u4E0D\u53EF\u7528\uFF1B\u5DF2\u6709\u753B\u5E03\u4E0E\u6210\u679C\u4ECD\u4FDD\u7559\u5728\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\uFF0C\u91CD\u65B0\u6253\u5F00\u5C31\u80FD\u7EE7\u7EED\u3002\u5F00\u542F\u540E\u5DE6\u4FA7\u680F\u51FA\u73B0\u6D41\u7A0B\u753B\u5E03\u5165\u53E3\uFF0C\u53EF\u7528\u72EC\u7ACB\u753B\u5E03\u9875\u521B\u4F5C\u3002\u6D41\u7A0B\u753B\u5E03\u662F\u672C\u63D2\u4EF6\u81EA\u5E26\u7EC4\u4EF6\uFF0C\u4E0D\u9700\u8981\u5B89\u88C5\u5176\u4ED6\u753B\u5E03\u63D2\u4EF6\u3002",
-      autoCreateCanvas: "\u81EA\u52A8\u521B\u5EFA\u753B\u5E03",
-      autoCreateCanvasHint: "\u6D41\u7A0B\u753B\u5E03\u6253\u5F00\u540E\u6709\u6548\uFF0C\u9ED8\u8BA4\u5F00\u542F\uFF1A\u521B\u4F5C\u65F6\u81EA\u52A8\u5EFA\u56FE\uFF0C\u5BA1\u6838\u524D\u540C\u6B65\u5267\u672C\u3001\u5206\u955C\u548C\u5236\u4F5C\u8BA1\u5212\uFF0C\u751F\u6210\u540E\u56DE\u586B\u6210\u679C\uFF1B\u5173\u95ED\u540E\u4E0D\u81EA\u52A8\u5EFA\u56FE\uFF0C\u4EC5\u5728\u753B\u5E03\u5185\u660E\u786E\u9009\u4E2D\u8282\u70B9\u65F6\u8054\u52A8\u3002",
-      sectionModels: "\u6A21\u578B\u914D\u7F6E",
-      sectionCombined: "\u66F4\u591A\u8BBE\u7F6E",
-      advancedPicture: "\u753B\u9762",
-      advancedMerge: "\u89C6\u9891\u5408\u5E76",
-      advancedWait: "\u67E5\u8BE2\u4E0E\u7B49\u5F85",
-      advancedTools: "\u672C\u5730\u5DE5\u5177",
-      sectionCombinedHint: "\u753B\u9762 \xB7 \u5408\u5E76 \xB7 \u7B49\u5F85 \xB7 \u672C\u5730\u5DE5\u5177",
-      toolsHint: "\u901A\u5E38\u65E0\u9700\u586B\u5199\uFF1B\u5DF2\u5B89\u88C5\u4F46\u65E0\u6CD5\u81EA\u52A8\u8BC6\u522B\u65F6\uFF0C\u53EF\u6307\u5B9A\u53EF\u6267\u884C\u6587\u4EF6\u8DEF\u5F84\u3002",
-      segmentsRetained: "\u6240\u6709\u539F\u59CB\u5206\u6BB5\u81EA\u52A8\u4FDD\u7559\uFF0C\u4FBF\u4E8E\u9884\u89C8\u3001\u7EED\u505A\u548C\u91CD\u65B0\u526A\u8F91\u3002",
-      ratio: "\u753B\u9762\u6BD4\u4F8B",
-      audioSettings: "\u58F0\u97F3\u8BBE\u7F6E",
-      ratioLayoutHint: "\u9009\u62E9\u6A2A\u5C4F\u3001\u7AD6\u5C4F\u6216\u81EA\u52A8\u9002\u914D\u753B\u9762\u3002",
-      audioLayoutHint: "\u5BF9\u767D\u3001\u97F3\u4E50\u4E0E\u73AF\u5883\u58F0\u6309\u811A\u672C\u5B89\u6392\u3002",
-      generateAudio: "\u751F\u6210\u97F3\u9891",
-      watermark: "\u6DFB\u52A0\u6C34\u5370",
-      pollIntervalMs: "\u72B6\u6001\u67E5\u8BE2\u95F4\u9694\uFF08\u79D2\uFF09",
-      maxWaitMs: "\u5355\u4E2A\u4EFB\u52A1\u6700\u957F\u7B49\u5F85\u65F6\u95F4\uFF08\u79D2\uFF09",
-      save: "\u4FDD\u5B58",
-      reset: "\u91CD\u7F6E\u63D2\u4EF6",
-      resetHint: "\u6E05\u9664\u672C\u673A\u4FDD\u5B58\u7684 API\u5BC6\u94A5\u4E0E\u81EA\u5B9A\u4E49\u8BBE\u7F6E\uFF0C\u6062\u590D\u9ED8\u8BA4\u914D\u7F6E\u3002",
-      saving: "\u4FDD\u5B58\u4E2D\u2026",
-      saved: "\u8BBE\u7F6E\u5DF2\u4FDD\u5B58\uFF0C\u914D\u7F6E\u91CD\u65B0\u52A0\u8F7D\u540E\u751F\u6548\u3002",
-      saveFailed: "\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u8BBE\u7F6E\u540E\u91CD\u8BD5\u3002",
-      dirty: "\u6709\u672A\u4FDD\u5B58\u7684\u6539\u52A8",
-      loading: "\u8BFB\u53D6\u914D\u7F6E\u4E2D\u2026",
-      unavailable: "\u6682\u65F6\u65E0\u6CD5\u52A0\u8F7D\u63D2\u4EF6\u8BBE\u7F6E\uFF0C\u8BF7\u91CD\u542F Harness \u540E\u91CD\u8BD5\uFF1B\u82E5\u4ECD\u65E0\u6CD5\u52A0\u8F7D\uFF0C\u8BF7\u68C0\u67E5 Harness \u4E0E\u63D2\u4EF6\u7684\u7248\u672C\u662F\u5426\u517C\u5BB9\u3002",
-      readOnly: "\u5F53\u524D\u914D\u7F6E\u4E3A\u53EA\u8BFB\uFF0C\u65E0\u6CD5\u4FDD\u5B58\u4FEE\u6539\u3002",
-      seamTrimSecondsHint: "\u5206\u522B\u88C1\u526A\u7B2C 2\u30013\u2026\u6BB5\u5F00\u5934\uFF0C\u4F8B\u5982 0.5,0\u3002\u7559\u7A7A\u4F7F\u7528\u6A21\u578B\u9ED8\u8BA4\u503C\uFF0C\u586B 0 \u5173\u95ED\uFF1B\u6BCF\u9879\u4E3A 0\u20133 \u79D2\u3002",
-      waitSecondsHint: "\u81F3\u5C11 1 \u79D2\uFF0C\u652F\u6301\u5C0F\u6570\u3002\u6700\u957F\u7B49\u5F85\u65F6\u95F4\u4E0D\u5F97\u5C0F\u4E8E\u67E5\u8BE2\u95F4\u9694\u3002",
-      versionHistory: "\u5386\u53F2\u66F4\u65B0",
-      versionCheckFirst: "\u8BF7\u5148\u68C0\u67E5\u5E76\u9009\u62E9\u53EF\u7528\u7684\u6B63\u5F0F\u7248\u672C\uFF0C\u518D\u786E\u8BA4\u5B89\u88C5\u3002",
-      unknownConnection: "\u672A\u77E5\u63A5\u5165\u65B9\u5F0F\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u3002",
-      atomicUnsupported: "\u5F53\u524D Harness \u4E0D\u652F\u6301\u6279\u91CF\u4FDD\u5B58\uFF0C\u8BF7\u66F4\u65B0 Harness \u540E\u91CD\u8BD5\u3002",
-      atomicRejected: "\u8F6F\u4EF6\u672A\u63A5\u53D7\u672C\u6B21\u4FDD\u5B58\uFF0C\u8F93\u5165\u5DF2\u4FDD\u7559\u3002\u8BF7\u91CD\u65B0\u6253\u5F00\u8BBE\u7F6E\u9875\u6838\u5BF9\u540E\u91CD\u8BD5\u3002",
-      settingsUnavailable: "\u8BBE\u7F6E\u9875\u6B63\u5728\u52A0\u8F7D\u6216\u5DF2\u66F4\u65B0\uFF0C\u8F93\u5165\u5DF2\u4FDD\u7559\u3002\u8BF7\u91CD\u65B0\u6253\u5F00\u8BBE\u7F6E\u9875\u540E\u91CD\u8BD5\u3002",
-      settingsConflict: "\u914D\u7F6E\u540C\u65F6\u88AB\u5176\u4ED6\u64CD\u4F5C\u4FEE\u6539\uFF0C\u8F93\u5165\u5DF2\u4FDD\u7559\u3002\u8BF7\u6838\u5BF9\u6700\u65B0\u8BBE\u7F6E\u540E\u91CD\u8BD5\u3002",
-      settingsTransport: "\u4FDD\u5B58\u8FDE\u63A5\u4E2D\u65AD\uFF0C\u7ED3\u679C\u5C1A\u672A\u786E\u8BA4\u3002\u8F93\u5165\u5DF2\u4FDD\u7559\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u8BBE\u7F6E\u9875\u6838\u5BF9\u540E\u518D\u4FDD\u5B58\u3002",
-      invalidWait: "\u7B49\u5F85\u65F6\u95F4\u987B\u4E3A\u81F3\u5C11 1 \u79D2\u7684\u6709\u6548\u6570\u503C\uFF0C\u4E14\u6700\u957F\u7B49\u5F85\u65F6\u95F4\u4E0D\u5F97\u5C0F\u4E8E\u67E5\u8BE2\u95F4\u9694\u3002",
-      invalidSeam: "\u63A5\u7F1D\u88C1\u526A\u987B\u4E3A\u9017\u53F7\u5206\u9694\u7684 0\u20133 \u79D2\u6570\u503C\uFF0C\u4F8B\u5982 0.5,0\u3002",
-      resetDone: "\u5DF2\u6E05\u9664\u672C\u673A\u914D\u7F6E\uFF0C\u6062\u590D\u9ED8\u8BA4\u8BBE\u7F6E\u3002",
-      resetFailed: "\u91CD\u7F6E\u5931\u8D25\uFF1A{message}"
+      resetConfirm: "确定重置插件吗？这会清除本插件保存的配置和API密钥，需要重新配置。已生成的视频不会删除。",
+      model: "视频模型",
+      imageModel: "图片模型",
+      textModel: "文本模型（写脚本）",
+      imageUseVideoKey: "视频 / 图片 / 文本模型共用 API密钥",
+      sharedModelKey: "共用 API密钥",
+      videoModelKey: "视频模型 API密钥",
+      imageApiKey: "图片模型 API密钥",
+      textApiKey: "文本模型 API密钥",
+      resolution: "视频清晰度",
+      imageModelHint: "Seedream可生成角色图；遇真人限制时，经同意可转换参考图。图片调用单独计费，结果需审核。",
+      textModelHint: "保留配置：流程画布暂隐藏，对话写脚本使用Harness会话模型。原画布「创作流程」里用这个型号把一段想法写成剧本与分镜表；走同一中转站的 /v1/chat/completions，单独按文本计费。候选与中转站在售的文本模型一致，旧的默认型号已下线，读到会自动换成默认项。",
+      modelHint: "mini 侧重成本，fast 侧重生成速度。实际价格以所选渠道为准。",
+      mergeMode: "合并方式",
+      mergeModeSeamless: "直接拼接（旧配置兼容）",
+      mergeModeCopy: "无损拼接",
+      mergeModeReencode: "重编码拼接",
+      ffmpegBinary: "ffmpeg 路径",
+      ffprobeBinary: "ffprobe 路径",
+      ffmpegTitle: "长视频合并需要 ffmpeg",
+      ffmpegBody: "视频超过模型单次上限（2.0 为 15 秒、2.5 为 30 秒）时会拆成几段分别生成、再在本机合并成一条——合并这一步用的是 ffmpeg。默认合并前会检查是否安装；明确选择只生成分段时可不合并。",
+      ffmpegInstallFor: "按你的系统装一下（点右边按钮复制命令）：",
+      ffmpegCopy: "复制",
+      ffmpegCopied: "已复制",
+      ffmpegMore: "其他系统",
+      ffmpegLess: "收起其他系统",
+      ffmpegAfter: "不想自己敲命令的话，直接在对话里说「帮我装 ffmpeg」——插件会执行安装（命令会先让你确认）；装好后用原暂停进度重试下载或合并，不重新提交视频生成。ffmpeg 装在非默认位置的话，把绝对路径填到上面的「ffmpeg 路径」也一样管用。安装包自带 ffprobe，分段时长探测会一起解决。",
+      ffmpegManual: "想自己装：macOS 用 Homebrew，Windows 用 winget，Linux 用系统包管理器；装完确认命令行里能跑 ffmpeg -version 就行。",
+      supportContact: "客服",
+      advancedStats: "使用统计",
+      usageStatsEnabled: "匿名使用统计",
+      usageStatsHint: "用于统计首次启用、启动和功能使用情况，仅上报匿名标识、版本、基础设备信息与调用结果，不含对话、素材或API密钥。关闭不影响视频创作。",
+      toolArgsNoticeTitle: "这一轮助手把工具参数写成了不合法的 JSON",
+      toolArgsNoticeHint: "多半是 480p、16:9 这类值少了引号，本轮没有真正调用工具、也没有产生费用；回一句「按原参数重试」即可，助手会补齐引号按原来的清晰度、画幅和时长重发。",
+      authNoticeTitle: "服务连接验证未通过",
+      authNoticeHint: "请到 Harness 的模型设置检查当前 API密钥和中转地址；如果配置无误，请联系客服核查。",
+      supportClose: "关闭",
+      supportScan: "请按页面提示使用微信联系客服，咨询使用或接入问题。页面未加载时可点击下方链接。",
+      supportOpenPage: "打开客服页面",
+      versionTitle: "插件版本",
+      versionCurrent: "当前版本 v{version}",
+      versionCheck: "检查更新",
+      versionChecking: "检查中…",
+      versionLatest: "已是最新版本",
+      versionNew: "有新版本 v{version}",
+      versionFailed: "检查更新失败：{message}",
+      versionUpdate: "立即更新",
+      versionOptional: "这是普通更新，你可以自行决定是否升级。稍后处理不影响继续使用，插件不会自动安装。",
+      versionLater: "稍后再说",
+      versionUpdateConfirm: "确认更新到 v{version}",
+      versionUpdateConfirmHint: "更新期间设置页可能短暂关闭，现有配置与 API密钥会保留。",
+      versionUpdating: "更新中…",
+      versionUpdateDone: "已更新到 v{version}，已通过热加载生效，无需重启。现有对话下一轮使用最新插件规则。",
+      versionUpdatePending: "v{version} 已安装，当前配置尚未启用新版，请在插件页检查启用状态。",
+      versionUpdateRestart: "新版本 v{version} 已装好：重启 Harness 后生效。",
+      versionUpdateCancelled: "更新已取消。",
+      versionUpdateRetry: "更新未完成，正在重试（{attempt}/{total}）…",
+      versionUpdateFailed: "在线更新失败：{message}",
+      versionUpdateRemoved: "未能确认插件安装状态，请到「插件」页检查；保留现有配置，不要直接卸载。",
+      versionUpdateRateLimited: "Gitee 请求过于频繁，请稍后重试。现有配置与 API密钥会保留。",
+      versionUpdateLockfile: "安装目录的 pnpm-lock.yaml 里有本插件缺少 integrity 的旧记录，pnpm 因此拒绝安装（ERR_PNPM_MISSING_TARBALL_INTEGRITY）。插件会每 2 秒检查一次、自动清理这些无效记录并保留备份，更新失败后也会等清理完成自动重试；若仍然失败，完全退出 Harness 后手动删除插件安装目录下的 pnpm-lock.yaml 再试。",
+      versionUpdateUnavailable: "当前 Harness 不支持此在线更新入口，请保留现有插件与配置，参考使用说明通过正式版成品包更新。",
+      versionHint: "可在此检查并安装新版本，现有配置与 API密钥会保留。",
+      versionCheckedAt: "检查于 {time}",
+      sectionGeneration: "生成参数",
+      sectionConnection: "接入与 API密钥",
+      sectionVideo: "画面与声音",
+      sectionCanvas: "流程画布",
+      canvasPanelLabel: "MetaOnticVideo流程画布",
+      canvasEnabled: "流程画布",
+      canvasEnabledHint: "默认关闭：关闭时左侧栏不出现「MetaOnticVideo流程画布」入口，画布不可用；已有画布与成果仍保留在插件数据目录，重新打开就能继续。开启后左侧栏出现流程画布入口，可用独立画布页创作。流程画布是本插件自带组件，不需要安装其他画布插件。",
+      autoCreateCanvas: "自动创建画布",
+      autoCreateCanvasHint: "流程画布打开后有效，默认开启：创作时自动建图，审核前同步剧本、分镜和制作计划，生成后回填成果；关闭后不自动建图，仅在画布内明确选中节点时联动。",
+      sectionModels: "模型配置",
+      sectionCombined: "更多设置",
+      advancedPicture: "画面",
+      advancedMerge: "视频合并",
+      advancedWait: "查询与等待",
+      advancedTools: "本地工具",
+      sectionCombinedHint: "画面 · 合并 · 等待 · 本地工具",
+      toolsHint: "通常无需填写；已安装但无法自动识别时，可指定可执行文件路径。",
+      segmentsRetained: "所有原始分段自动保留，便于预览、续做和重新剪辑。",
+      ratio: "画面比例",
+      audioSettings: "声音设置",
+      ratioLayoutHint: "选择横屏、竖屏或自动适配画面。",
+      audioLayoutHint: "对白、音乐与环境声按脚本安排。",
+      generateAudio: "生成音频",
+      watermark: "添加水印",
+      pollIntervalMs: "状态查询间隔（秒）",
+      maxWaitMs: "单个任务最长等待时间（秒）",
+      save: "保存",
+      reset: "重置插件",
+      resetHint: "清除本机保存的 API密钥与自定义设置，恢复默认配置。",
+      saving: "保存中…",
+      saved: "设置已保存，配置重新加载后生效。",
+      saveFailed: "保存失败，请检查设置后重试。",
+      dirty: "有未保存的改动",
+      loading: "读取配置中…",
+      unavailable: "暂时无法加载插件设置，请重启 Harness 后重试；若仍无法加载，请检查 Harness 与插件的版本是否兼容。",
+      readOnly: "当前配置为只读，无法保存修改。",
+      seamTrimSecondsHint: "分别裁剪第 2、3…段开头，例如 0.5,0。留空使用模型默认值，填 0 关闭；每项为 0–3 秒。",
+      waitSecondsHint: "至少 1 秒，支持小数。最长等待时间不得小于查询间隔。",
+      versionHistory: "历史更新",
+      versionCheckFirst: "请先检查并选择可用的正式版本，再确认安装。",
+      unknownConnection: "未知接入方式，请重新选择。",
+      atomicUnsupported: "当前 Harness 不支持批量保存，请更新 Harness 后重试。",
+      atomicRejected: "软件未接受本次保存，输入已保留。请重新打开设置页核对后重试。",
+      settingsUnavailable: "设置页正在加载或已更新，输入已保留。请重新打开设置页后重试。",
+      settingsConflict: "配置同时被其他操作修改，输入已保留。请核对最新设置后重试。",
+      settingsTransport: "保存连接中断，结果尚未确认。输入已保留，请重新打开设置页核对后再保存。",
+      invalidWait: "等待时间须为至少 1 秒的有效数值，且最长等待时间不得小于查询间隔。",
+      invalidSeam: "接缝裁剪须为逗号分隔的 0–3 秒数值，例如 0.5,0。",
+      resetDone: "已清除本机配置，恢复默认设置。",
+      resetFailed: "重置失败：{message}"
     };
     const en = {
       connectionCheckTitle: "API connection check",
       connectionCheckButton: "Check connection",
-      connectionChecking: "Checking\u2026",
+      connectionChecking: "Checking…",
       connectionCheckSaveFirst: "Save your changes before checking.",
       connectionCheckHint: "Checks saved endpoints, authentication responses and model listings without submitting generation tasks or incurring model generation charges. Success does not verify generation quality.",
       connectionCheckFailed: "Check could not finish. Confirm the plugin service is available and retry.",
@@ -1012,7 +1012,7 @@
       panelStep3Desc: "Confirm the cost to generate, then review each segment before continuing to the next. Resume saved progress when needed.",
       panelStep4Title: "Merge locally",
       panelStep4Desc: "Segments are merged into the final video on your machine, with per-segment preview.",
-      summary: "{provider} \xB7 {model}",
+      summary: "{provider} · {model}",
       apiKeyConfigured: "Configured; leave blank to keep the current key",
       connectionMode: "Connection",
       connectionModeHint: "Log in by email to receive a key, or use your own MetaOntic AI key. Save to apply a change.",
@@ -1058,14 +1058,14 @@
       ffmpegCopied: "Copied",
       ffmpegMore: "Other systems",
       ffmpegLess: "Hide other systems",
-      ffmpegAfter: 'Rather not touch a terminal? Just say "\u5E2E\u6211\u88C5 ffmpeg" in the chat and the plugin runs the install after you confirm the command. Resume the original saved progress to retry downloading or merging without submitting new generation tasks. Installed somewhere unusual? Put the absolute path in the "ffmpeg path" field above. The package ships ffprobe too, so segment probing is fixed at the same time.',
-      ffmpegManual: "Installing by hand: Homebrew on macOS, winget on Windows, your distro package manager on Linux \u2014 you are set once `ffmpeg -version` works in a terminal.",
+      ffmpegAfter: 'Rather not touch a terminal? Just say "帮我装 ffmpeg" in the chat and the plugin runs the install after you confirm the command. Resume the original saved progress to retry downloading or merging without submitting new generation tasks. Installed somewhere unusual? Put the absolute path in the "ffmpeg path" field above. The package ships ffprobe too, so segment probing is fixed at the same time.',
+      ffmpegManual: "Installing by hand: Homebrew on macOS, winget on Windows, your distro package manager on Linux — you are set once `ffmpeg -version` works in a terminal.",
       supportContact: "Support",
       advancedStats: "Usage statistics",
       usageStatsEnabled: "Anonymous usage statistics",
       usageStatsHint: "Reports an anonymous installation ID, version, basic device information and operation results. No conversations, media or API keys. Turning it off does not affect video creation.",
       toolArgsNoticeTitle: "The assistant wrote invalid JSON for a tool call",
-      toolArgsNoticeHint: "Usually a value like 480p or 16:9 is missing its quotes. Nothing was executed and nothing was billed; reply \u201Cretry with the same settings\u201D and the assistant will re-send with the same resolution, aspect ratio and duration.",
+      toolArgsNoticeHint: "Usually a value like 480p or 16:9 is missing its quotes. Nothing was executed and nothing was billed; reply “retry with the same settings” and the assistant will re-send with the same resolution, aspect ratio and duration.",
       authNoticeTitle: "Service authentication could not be verified",
       authNoticeHint: "Check the API key and relay URL in Harness model settings. If they are correct, contact support.",
       supportClose: "Close",
@@ -1074,7 +1074,7 @@
       versionTitle: "Plugin version",
       versionCurrent: "Installed v{version}",
       versionCheck: "Check for updates",
-      versionChecking: "Checking\u2026",
+      versionChecking: "Checking…",
       versionLatest: "Up to date",
       versionNew: "v{version} is available",
       versionFailed: "Update check failed: {message}",
@@ -1083,12 +1083,12 @@
       versionLater: "Later",
       versionUpdateConfirm: "Confirm update to v{version}",
       versionUpdateConfirmHint: "The settings page may briefly close during the update. Your settings and keys will be kept.",
-      versionUpdating: "Updating\u2026",
+      versionUpdating: "Updating…",
       versionUpdateDone: "v{version} applied through hot reload; no restart needed. Existing conversations use updated plugin rules on the next turn.",
       versionUpdatePending: "v{version} installed, but not activated by the current configuration. Check its enabled state in Plugins.",
       versionUpdateRestart: "v{version} installed; restart Harness to apply it.",
       versionUpdateCancelled: "Update cancelled.",
-      versionUpdateRetry: "Update incomplete. Retrying ({attempt}/{total})\u2026",
+      versionUpdateRetry: "Update incomplete. Retrying ({attempt}/{total})…",
       versionUpdateFailed: "Online update failed: {message}",
       versionUpdateRemoved: "The installation state could not be confirmed. Check the Plugins page and preserve your configuration; do not uninstall immediately.",
       versionUpdateRateLimited: "Gitee is limiting requests. Try again later. Your settings and keys will be kept.",
@@ -1125,14 +1125,14 @@
       save: "Save",
       reset: "Reset plugin",
       resetHint: "Clear locally saved keys and custom settings to restore defaults.",
-      saving: "Saving\u2026",
+      saving: "Saving…",
       saved: "Settings saved. Changes apply after configuration reloads.",
       saveFailed: "Could not save. Check your settings and try again.",
       dirty: "Unsaved changes",
-      loading: "Reading configuration\u2026",
+      loading: "Reading configuration…",
       unavailable: "Plugin settings could not be loaded. Restart Harness and try again. If this continues, check that your Harness and plugin versions are compatible.",
       readOnly: "These settings are read-only and cannot be changed.",
-      seamTrimSecondsHint: "Trim the start of segments 2, 3, etc., e.g. 0.5,0. Leave blank for model defaults; use 0 to disable. Each value: 0\u20133 seconds.",
+      seamTrimSecondsHint: "Trim the start of segments 2, 3, etc., e.g. 0.5,0. Leave blank for model defaults; use 0 to disable. Each value: 0–3 seconds.",
       waitSecondsHint: "At least 1 second; decimals allowed. Maximum wait must be at least the check interval.",
       versionHistory: "Update history",
       versionCheckFirst: "Check and select an available stable version before confirming installation.",
@@ -1265,7 +1265,7 @@
 
   // src/client/updates.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "4.0.2".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "4.0.3".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1403,11 +1403,11 @@
       }
       context.setUpdateStatus("installing");
       context.setUpdateMessage("");
-      const probe = context.manager ? context.manager() : { manager: null, tried: ["\u672A\u6CE8\u5165"] };
+      const probe = context.manager ? context.manager() : { manager: null, tried: ["未注入"] };
       const pluginManager = probe.manager;
       if (!pluginManager || typeof pluginManager.installBundle !== "function") {
         context.setUpdateStatus("failed");
-        context.setUpdateMessage(context.t("versionUpdateUnavailable", { detail: probe.tried.join("\uFF0C") }));
+        context.setUpdateMessage(context.t("versionUpdateUnavailable", { detail: probe.tried.join("，") }));
         return;
       }
       try {
@@ -1422,13 +1422,13 @@
         const local = /^(?:file:|[a-z]:[\\/]|[\\/]|~[\\/])/i.test(source);
         if (linked || local && !/\.(?:tgz|tar\.gz)(?:[?#].*)?$/i.test(source)) {
           context.setUpdateStatus("failed");
-          context.setUpdateMessage("\u5F53\u524D\u4E3A\u672C\u5730\u76EE\u5F55\u94FE\u63A5\u5B89\u88C5\uFF0C\u5DF2\u505C\u6B62\u5728\u7EBF\u66F4\u65B0\uFF0C\u672A\u6267\u884C\u66FF\u6362\u3002\u76EE\u5F55\u94FE\u63A5\u5207\u6362\u4E3A\u6210\u54C1\u5305\u5B58\u5728\u6587\u4EF6\u88AB\u6E05\u7A7A\u6216\u4ECD\u52A0\u8F7D\u65E7\u76EE\u5F55\u7684\u98CE\u9669\u3002\u8BF7\u5148\u5907\u4EFD\u5E76\u4FDD\u7559\u539F\u76EE\u5F55\uFF0C\u4F7F\u7528\u6210\u54C1\u5305\u8FC1\u79FB\u6D41\u7A0B\uFF1B\u82E5\u76EE\u5F55\u5DF2\u7A7A\uFF0C\u5148\u6062\u590D\u5B8C\u6574package\u3002\u4E0D\u8981\u91CD\u7F6E API\u5BC6\u94A5\u6216\u76F4\u63A5\u5378\u8F7D\u3002");
+          context.setUpdateMessage("当前为本地目录链接安装，已停止在线更新，未执行替换。目录链接切换为成品包存在文件被清空或仍加载旧目录的风险。请先备份并保留原目录，使用成品包迁移流程；若目录已空，先恢复完整package。不要重置 API密钥或直接卸载。");
           return;
         }
         if (bundle.error || bundle.meta?.error) throw new Error("metadata-unavailable");
       } catch {
         context.setUpdateStatus("failed");
-        context.setUpdateMessage("\u65E0\u6CD5\u6838\u5B9E\u63D2\u4EF6\u5B89\u88C5\u6765\u6E90\u6216\u5143\u4FE1\u606F\uFF0C\u5DF2\u505C\u6B62\u66F4\u65B0\uFF0C\u672A\u6267\u884C\u66FF\u6362\u3002\u8BF7\u4FDD\u7559\u73B0\u6709\u914D\u7F6E\u548C\u5B89\u88C5\u76EE\u5F55\uFF0C\u6838\u5BF9\u5B89\u88C5\u72B6\u6001\u540E\u518D\u5904\u7406\uFF1B\u4E0D\u8981\u91CD\u7F6E API\u5BC6\u94A5\u6216\u5148\u5378\u8F7D\u3002");
+        context.setUpdateMessage("无法核实插件安装来源或元信息，已停止更新，未执行替换。请保留现有配置和安装目录，核对安装状态后再处理；不要重置 API密钥或先卸载。");
         return;
       }
       const requestId = `${context.PLUGIN_PACKAGE}-update-${Date.now()}`;
@@ -1731,8 +1731,8 @@
   // package.json
   var package_default = {
     name: "dsh-metaontic-video",
-    version: "4.0.2",
-    description: "\u9762\u5411\u65B0\u624B\u7684 AI \u89C6\u9891\u521B\u4F5C\u52A9\u624B\uFF1A\u4ECE\u60F3\u6CD5\u3001\u811A\u672C\u5230\u89C6\u9891\u751F\u6210\uFF0C\u5168\u7A0B\u5F15\u5BFC\uFF1B\u901A\u8FC7\u5206\u6BB5\u7EED\u62CD\u4E0E\u672C\u5730\u5408\u5E76\uFF0C\u63D0\u4F9B\u4F4E\u6210\u672C\u957F\u89C6\u9891\u5236\u4F5C\u65B9\u6848\u3002",
+    version: "4.0.3",
+    description: "面向新手的 AI 视频创作助手：从想法、脚本到视频生成，全程引导；通过分段续拍与本地合并，提供低成本长视频制作方案。",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
     keywords: [
@@ -1785,8 +1785,8 @@
       "icon.svg",
       "logo.svg",
       "README.en.md",
-      "MetaOnticVideo\u4F7F\u7528\u8BF4\u660E\u4E66.md",
-      "MetaOnticVideo\u4F7F\u7528\u8BF4\u660E\u4E66.pdf",
+      "MetaOnticVideo使用说明书.md",
+      "MetaOnticVideo使用说明书.pdf",
       "CHANGELOG.md",
       "LICENSE",
       "docs/guide/*.svg",
@@ -1845,11 +1845,11 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "4.0.2",
+      version: "4.0.3",
       prerelease: false,
-      publishedAt: "2026-11-18T05:40:29.749Z",
+      publishedAt: "2026-11-18T09:42:44.891Z",
       items: [
-        "\u4F18\u5316\uFF1A\u5B8C\u5584\u65E7\u7248\u8FC1\u79FB\uFF0C\u652F\u6301\u5207\u6362\u5E76\u6E05\u7406\u65E7\u5305\uFF1B\u4FDD\u7559\u914D\u7F6E\u4E0E\u4EFB\u52A1\uFF0C\u6E05\u7406\u5931\u8D25\u53EF\u91CD\u8BD5\uFF0C\u65B0\u7248\u8BBE\u7F6E\u6301\u7EED\u53EF\u7528\u3002"
+        "优化：完善迁移中断保护与安装状态超时处理，失败可重新检查，避免旧包误清理和长时间等待。"
       ]
     }
   };
@@ -2145,7 +2145,7 @@
             h("button", { key: "button", type: "button", className: "mov-btn", "data-action": "check-connection", disabled: pending.length > 0 || status === "saving" || snapshot.status !== "ready" || connectionCheck.status === "working", onClick: () => checkController.current.run(!pending.length && status !== "saving" && form.getSnapshot()?.status === "ready") }, t(connectionCheck.status === "working" ? "connectionChecking" : "connectionCheckButton"))
           ]),
           h("p", { key: "hint", className: "mov-hint" }, t(pending.length ? "connectionCheckSaveFirst" : "connectionCheckHint")),
-          h("div", { key: "result", role: "status", "aria-live": "polite" }, connectionCheck.status === "failed" ? h("p", { style: { color: TOKENS.error } }, t("connectionCheckFailed")) : connectionCheck.checks.map((check) => h("p", { key: check.target, style: { color: check.level === "error" ? TOKENS.error : check.level === "success" ? TOKENS.success : TOKENS.muted } }, `${t("connectionTarget_" + check.target)}\uFF1A${t("connectionResult_" + check.code)}`)))
+          h("div", { key: "result", role: "status", "aria-live": "polite" }, connectionCheck.status === "failed" ? h("p", { style: { color: TOKENS.error } }, t("connectionCheckFailed")) : connectionCheck.checks.map((check) => h("p", { key: check.target, style: { color: check.level === "error" ? TOKENS.error : check.level === "success" ? TOKENS.success : TOKENS.muted } }, `${t("connectionTarget_" + check.target)}：${t("connectionResult_" + check.code)}`)))
         ]);
         const settingsRows = () => [
           h("div", { key: "generation", className: "mov-section" }, [
@@ -2238,7 +2238,7 @@
           ]),
           releaseNotes?.items?.length ? h("div", { key: "release-notes", "data-field": "releaseNotes" }, [
             h("div", { key: "heading", style: { display: "flex", alignItems: "baseline", gap: 12 } }, [
-              h("span", { key: "title", className: "mov-card-title" }, `${releaseNotes.version} \xB7 ${t("releaseNotesTitle")}`),
+              h("span", { key: "title", className: "mov-card-title" }, `${releaseNotes.version} · ${t("releaseNotesTitle")}`),
               formatReleaseTime(releaseNotes.publishedAt) ? h("span", { key: "published-at", "data-field": "releasePublishedAt", className: "mov-foot-note" }, t("releaseUpdatedAt", { time: formatReleaseTime(releaseNotes.publishedAt) })) : null
             ]),
             h(
@@ -2346,13 +2346,13 @@
   // src/client/update-hint.ts
   var UPDATE_HINT_CSS = `
   .mov-rail-hint { position: relative; display: inline-flex; align-items: center; }
-  /* \u6536\u8D77\u4FA7\u680F\uFF1A\u7EA2\u70B9\u843D\u5728\u56FE\u6807\u53F3\u4E0A\u89D2 */
+  /* 收起侧栏：红点落在图标右上角 */
   .mov-rail-dot {
     position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; border-radius: 50%;
     background: var(--dsw-alias-state-error-primary, #e5533d);
     box-shadow: 0 0 0 2px var(--dsw-specific-sidebar-fill, transparent);
   }
-  /* \u5C55\u5F00\u4FA7\u680F\uFF1A\u8FD9\u4E00\u884C\u6709\u540D\u5B57\uFF0C\u7EC4\u4EF6\u91CC\u7684\u5706\u70B9\u6536\u8D77\uFF0C\u6539\u5728\u540D\u5B57\u6700\u540E\u4E00\u4E2A\u5B57\u7684\u53F3\u4E0A\u89D2\u70B9\u4E00\u4E2A\u89D2\u6807\uFF1B\u8D34\u7740\u5B57\u4E0D\u538B\u5B57\uFF0C\u6240\u4EE5\u4E0D\u63CF\u8FB9 */
+  /* 展开侧栏：这一行有名字，组件里的圆点收起，改在名字最后一个字的右上角点一个角标；贴着字不压字，所以不描边 */
   button:has(.mov-rail-dot):has(> span:nth-child(2)) .mov-rail-dot { display: none; }
   button:has(.mov-rail-dot):has(> span:nth-child(2)) > span:nth-child(2)::after {
     content: ""; display: inline-block; width: 8px; height: 8px; margin-left: -1px; border-radius: 50%;
@@ -2607,45 +2607,45 @@
     const LOGO_SRC = LOGO_SVG ? `data:image/svg+xml,${encodeURIComponent(LOGO_SVG)}` : "";
     const PANEL_CSS = `
       .mov-panel { width: 100%; max-width: 880px; margin: 0 auto; padding: 30px 32px 44px; display: flex; flex-direction: column; gap: 18px; }
-      /* \u6709\u66F4\u65B0\u65F6\u7684\u9876\u90E8\u63D0\u793A\uFF1A\u6CBF\u7528\u8BBE\u7F6E\u9875\u7684 .mov-notice\uFF0C\u53EA\u8865\u9762\u677F\u91CC\u7684\u95F4\u8DDD\u4E0E\u5DE6\u4FA7\u8272\u6761 */
+      /* 有更新时的顶部提示：沿用设置页的 .mov-notice，只补面板里的间距与左侧色条 */
       .mov-panel-update { display: flex; flex-direction: column; gap: 8px; padding: 13px 14px; border: 1px solid ${TOKENS.border}; border-left: 3px solid ${TOKENS.primaryFill}; border-radius: 12px; background: ${TOKENS.cardFill}; }
       .mov-panel-update .mov-notice strong { display: block; font-size: 13px; color: ${TOKENS.text}; }
       .mov-panel-update-line { margin: 0; font-size: 12px; line-height: 1.5; color: ${TOKENS.muted}; }
-      /* \u54C1\u724C\u5934\u56FE\uFF1A\u63D2\u4EF6 logo + \u6807\u9898/\u7B80\u4ECB\uFF0C\u7ED9\u7A7A\u8361\u7684\u5185\u5BB9\u533A\u4E00\u4E2A\u89C6\u89C9\u951A\u70B9 */
+      /* 品牌头图：插件 logo + 标题/简介，给空荡的内容区一个视觉锚点 */
       .mov-panel-hero { display: flex; align-items: center; gap: 14px; }
       .mov-panel-mark { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; color: ${TOKENS.primaryFill}; }
       .mov-panel-logo { width: 100%; height: 100%; object-fit: contain; }
-      /* \u5DE6\u4FA7\u680F\u90A3\u4E00\u884C\u7684 logo\uFF1A\u6309\u5BBF\u4E3B\u7ED9\u7684\u5C3A\u5BF8\u539F\u6837\u94FA\u5F00\uFF0C\u4E0D\u53C2\u4E0E\u4E3B\u9898\u53D6\u8272 */
+      /* 左侧栏那一行的 logo：按宿主给的尺寸原样铺开，不参与主题取色 */
       .mov-rail-logo { display: block; object-fit: contain; }
       .mov-panel-head { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
       .mov-panel-title { margin: 0; font-size: 19px; font-weight: 600; color: ${TOKENS.text}; }
       .mov-panel-intro { margin: 0; font-size: 13px; line-height: 1.55; color: ${TOKENS.muted}; }
-      /* \u4E3B\u6309\u94AE\u5403\u6389\u591A\u4F59\u5BBD\u5EA6\uFF0C\u6B21\u8981\u6309\u94AE\u4E0E\u94FE\u63A5\u9000\u5230\u7B2C\u4E8C\u6392 */
+      /* 主按钮吃掉多余宽度，次要按钮与链接退到第二排 */
       .mov-panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
       .mov-panel-actions .mov-btn-primary { flex: 1 1 220px; width: auto; min-width: 160px; height: 38px; }
       .mov-panel-actions .mov-btn:not(.mov-btn-primary) { min-width: 132px; }
       .mov-panel-link { margin-left: auto; font-size: 12px; color: ${TOKENS.primaryFill}; text-decoration: none; border-bottom: 1px solid transparent; }
       .mov-panel-link:hover { border-bottom-color: currentColor; }
-      /* \u4E24\u5757\u4EF7\u503C\u70B9\u5361\u7247\uFF1A\u56FE\u6807 + \u6807\u9898 + \u4E00\u53E5\u8BF4\u660E\uFF0C\u7A84\u5BB9\u5668\u81EA\u52A8\u843D\u6210\u4E00\u5217 */
+      /* 两块价值点卡片：图标 + 标题 + 一句说明，窄容器自动落成一列 */
       .mov-panel-highlights { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; }
       .mov-panel-highlight { display: flex; align-items: flex-start; gap: 12px; padding: 13px 14px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.cardFill}; }
       .mov-panel-highlight-icon { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px; color: ${TOKENS.primaryFill}; background: ${TOKENS.controlFill}; }
       .mov-panel-highlight-body { min-width: 0; }
       .mov-panel-highlight-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       .mov-panel-highlight-desc { margin: 4px 0 0; font-size: 12px; line-height: 1.55; color: ${TOKENS.muted}; }
-      /* \u6D41\u7A0B\u6F14\u793A\uFF1A\u56DB\u6B65\u5361\u7247\u6A2A\u6392\uFF0C\u5361\u7247\u4E4B\u95F4\u7528\u7BAD\u5934\u8FDE\u8D77\u6765\uFF1B\u7A84\u5BB9\u5668\u843D\u6210\u4E00\u5217 */
+      /* 流程演示：四步卡片横排，卡片之间用箭头连起来；窄容器落成一列 */
       .mov-panel-flow { display: flex; align-items: stretch; }
       .mov-panel-step { position: relative; overflow: hidden; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 7px; padding: 13px 14px 14px; border: 1px solid ${TOKENS.border}; border-radius: 12px; background: ${TOKENS.cardFill}; animation: mov-flow-card 9s ease-in-out infinite; }
       .mov-panel-step-head { display: flex; align-items: center; gap: 8px; }
       .mov-panel-step-badge { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 600; color: ${TOKENS.primaryFill}; background: ${TOKENS.controlFill}; animation: mov-flow-badge 9s ease-in-out infinite; }
       .mov-panel-step-title { min-width: 0; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       .mov-panel-step-desc { margin: 0; font-size: 12px; line-height: 1.55; color: ${TOKENS.muted}; }
-      /* \u53F3\u4E0A\u89D2\u7684\u6DE1\u8272\u6C34\u5370\u56FE\u6807\uFF0C\u53EA\u505A\u88C5\u9970 */
+      /* 右上角的淡色水印图标，只做装饰 */
       .mov-panel-step-icon { position: absolute; top: 10px; right: 10px; color: ${TOKENS.primaryFill}; opacity: .14; pointer-events: none; }
-      /* \u5361\u7247\u4E4B\u95F4\u7684\u7BAD\u5934\uFF1A\u6A2A\u6392\u65F6\u5411\u53F3\uFF0C\u7A84\u5BB9\u5668\u91CC\u8F6C\u6210\u5411\u4E0B */
+      /* 卡片之间的箭头：横排时向右，窄容器里转成向下 */
       .mov-panel-conn { flex: 0 0 26px; align-self: center; height: 2px; border-radius: 1px; background: ${TOKENS.border}; position: relative; }
       .mov-panel-conn::after { content: ''; position: absolute; top: 50%; right: -1px; width: 5px; height: 5px; border-top: 2px solid ${TOKENS.border}; border-right: 2px solid ${TOKENS.border}; transform: translateY(-50%) rotate(45deg); }
-      /* \u56DB\u6B65\u4F9D\u6B21\u70B9\u4EAE\uFF0C\u5F62\u6210\u4E00\u6761\u8D70\u52A8\u7684\u6D41\u7A0B\uFF1B\u5EF6\u8FDF\u6309\u6B65\u53F7\u9519\u5F00 */
+      /* 四步依次点亮，形成一条走动的流程；延迟按步号错开 */
       @keyframes mov-flow-card { 0%, 16% { border-color: ${TOKENS.primaryFill}; } 28%, 100% { border-color: ${TOKENS.border}; } }
       @keyframes mov-flow-badge { 0%, 16% { color: #fff; background: ${TOKENS.primaryFill}; } 28%, 100% { color: ${TOKENS.primaryFill}; background: ${TOKENS.controlFill}; } }
       .mov-panel-step[data-step="1"], .mov-panel-step[data-step="1"] .mov-panel-step-badge { animation-delay: 2.25s; }
@@ -2654,7 +2654,7 @@
       .mov-panel { container-type: inline-size; }
       @container (max-width: 620px) {
         .mov-panel-flow { flex-direction: column; align-items: stretch; }
-        /* \u7AD6\u5411\u6392\u5E03\u65F6\u4E0D\u80FD\u518D\u6309\u5269\u4F59\u7A7A\u95F4\u62C9\u4F38\uFF0C\u5426\u5219\u5361\u7247\u4F1A\u88AB\u538B\u6241 */
+        /* 竖向排布时不能再按剩余空间拉伸，否则卡片会被压扁 */
         .mov-panel-step { flex: 0 0 auto; }
         .mov-panel-conn { flex: 0 0 18px; width: 2px; height: 18px; align-self: flex-start; margin-left: 24px; }
         .mov-panel-conn::after { top: auto; right: 50%; bottom: -1px; transform: translateX(50%) rotate(135deg); }
@@ -2832,38 +2832,38 @@
   var STAGE_REV = 2;
   var STAGE_KEYS = ["requirement", "script", "storyboard", "assets", "cost", "segments", "film"];
   var STAGE_LABELS = {
-    requirement: "\u2460 \u9700\u6C42\u786E\u8BA4",
-    script: "\u2461 \u811A\u672C\u5BA1\u6838",
-    storyboard: "\u2462 \u5206\u955C\u786E\u8BA4",
-    assets: "\u2463 \u7D20\u6750\u51C6\u5907",
-    cost: "\u2464 \u8D39\u7528\u786E\u8BA4",
-    segments: "\u2465 \u9010\u6BB5\u5236\u4F5C",
-    film: "\u2466 \u5408\u6210\u6210\u7247"
+    requirement: "① 需求确认",
+    script: "② 脚本审核",
+    storyboard: "③ 分镜确认",
+    assets: "④ 素材准备",
+    cost: "⑤ 费用确认",
+    segments: "⑥ 逐段制作",
+    film: "⑦ 合成成片"
   };
-  var STAGE_STATE_TEXT = { done: "\u5DF2\u5B8C\u6210", active: "\u8FDB\u884C\u4E2D", review: "\u5F85\u5BA1\u6838", ready: "\u5F85\u5408\u6210", pending: "\u672A\u5F00\u59CB" };
+  var STAGE_STATE_TEXT = { done: "已完成", active: "进行中", review: "待审核", ready: "待合成", pending: "未开始" };
   var STAGE_ACTIONS = {
-    requirement: { label: "\u586B\u9700\u6C42", hint: "\u5199\u60F3\u62CD\u4EC0\u4E48\u3001\u603B\u65F6\u957F\u3001\u6BCF\u6BB5\u65F6\u957F\u3001\u753B\u5E45\u4E0E\u6E05\u6670\u5EA6\uFF0C\u4E5F\u53EF\u4EE5\u8BA9\u6587\u672C\u6A21\u578B\u628A\u60F3\u6CD5\u5199\u6210\u5267\u672C\uFF08\u6587\u672C\u6309\u7528\u91CF\u5355\u72EC\u8BA1\u8D39\uFF09\uFF1B\u94FA\u8282\u70B9\u672C\u8EAB\u4E0D\u4EA7\u751F\u89C6\u9891\u8D39\u7528" },
-    script: { label: "\u770B\u5267\u672C", hint: "\u6253\u5F00\u5267\u672C\u8282\u70B9\u6838\u5BF9\u6216\u4FEE\u6539\u5185\u5BB9\uFF0C\u5206\u955C\u4E0E\u5206\u6BB5\u8BA1\u5212\u968F\u811A\u672C\u4E00\u8D77\u94FA\u5F00\uFF1B\u8FD9\u4E00\u6B65\u53EA\u6539\u8282\u70B9\u5185\u5BB9\uFF0C\u4E0D\u751F\u6210\u89C6\u9891\u3001\u4E0D\u8BA1\u8D39" },
-    storyboard: { label: "\u770B\u5206\u955C", hint: "\u6253\u5F00\u5206\u955C\u8282\u70B9\u6838\u5BF9\u6BCF\u4E2A\u955C\u5934\u7684\u753B\u9762\u3001\u666F\u522B\u3001\u89C6\u89D2\u4E0E\u8FD0\u955C\uFF1B\u6CA1\u8BC6\u522B\u5230\u5206\u955C\u8868\u65F6\u6309\u573A\u666F\u4E0E\u53E5\u5B50\u5207\u6BB5\uFF0C\u8FD9\u4E00\u6B65\u53EA\u6539\u5185\u5BB9\u3001\u4E0D\u751F\u6210\u89C6\u9891\u3001\u4E0D\u8BA1\u8D39" },
-    assets: { label: "\u51C6\u5907\u7D20\u6750", hint: "\u9010\u6BB5\u751F\u6210\u524D\u628A\u89D2\u8272\u56FE\u3001\u9996\u5E27\u6216\u53C2\u8003\u56FE\u51C6\u5907\u597D\uFF1A\u53EF\u4EE5\u5BFC\u5165\u81EA\u5DF1\u7684\u56FE\uFF0C\u4E5F\u53EF\u4EE5\u5728\u56FE\u7247\u8282\u70B9\u91CC\u8BA9\u6A21\u578B\u751F\u6210\uFF08\u56FE\u7247\u5355\u72EC\u8BA1\u8D39\u5E76\u8981\u5BA1\u6838\uFF09\uFF1B\u771F\u4EBA\u7167\u7247\u8981\u5148\u8F6C\u6210\u975E\u771F\u4EBA\u4E8C\u7EF4\u52A8\u753B\u98CE\u683C" },
-    cost: { label: "\u770B\u4F30\u4EF7", hint: "\u5217\u51FA\u6BCF\u6BB5\u63D0\u793A\u8BCD\u3001\u65F6\u957F\u4E0E\u6574\u6761\u94FE\u8DEF\u7684\u9884\u4F30\u5408\u8BA1\uFF0C\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u540E\u624D\u5F00\u8DD1" },
-    segments: { label: "\u505A\u8FD9\u4E00\u6BB5", hint: "\u6253\u5F00\u5F53\u524D\u8FD8\u6CA1\u6210\u679C\u7684\u5236\u4F5C\u8282\u70B9\uFF0C\u6838\u5BF9\u5236\u4F5C\u65B9\u6848\u5E76\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u540E\u624D\u4F1A\u8C03\u7528\u6A21\u578B" },
-    film: { label: "\u5408\u6210\u6210\u7247", hint: "\u628A\u5DF2\u6709\u6210\u679C\u6309\u8FDE\u7EBF\u987A\u5E8F\u62FC\u6210\u4E00\u6761\u6210\u7247\uFF0C\u53EA\u8BFB\u6210\u679C\u3001\u4E0D\u91CD\u65B0\u751F\u6210\u3001\u4E0D\u989D\u5916\u8BA1\u8D39" }
+    requirement: { label: "填需求", hint: "写想拍什么、总时长、每段时长、画幅与清晰度，也可以让文本模型把想法写成剧本（文本按用量单独计费）；铺节点本身不产生视频费用" },
+    script: { label: "看剧本", hint: "打开剧本节点核对或修改内容，分镜与分段计划随脚本一起铺开；这一步只改节点内容，不生成视频、不计费" },
+    storyboard: { label: "看分镜", hint: "打开分镜节点核对每个镜头的画面、景别、视角与运镜；没识别到分镜表时按场景与句子切段，这一步只改内容、不生成视频、不计费" },
+    assets: { label: "准备素材", hint: "逐段生成前把角色图、首帧或参考图准备好：可以导入自己的图，也可以在图片节点里让模型生成（图片单独计费并要审核）；真人照片要先转成非真人二维动画风格" },
+    cost: { label: "看估价", hint: "列出每段提示词、时长与整条链路的预估合计，确认方案与费用后才开跑" },
+    segments: { label: "做这一段", hint: "打开当前还没成果的制作节点，核对制作方案并单独确认费用后才会调用模型" },
+    film: { label: "合成成片", hint: "把已有成果按连线顺序拼成一条成片，只读成果、不重新生成、不额外计费" }
   };
   function stageAction(key) {
     return STAGE_ACTIONS[key] || null;
   }
   var STAGE_DRAFT_ACTION = {
-    script: { label: "\u5199\u811A\u672C", hint: "\u6309\u7B2C\u4E00\u6B65\u521B\u5EFA\u7684\u9700\u6C42\u5199\u5267\u672C\u4E0E\u5206\u955C\uFF08\u53EF\u4EE5\u8BA9\u6587\u672C\u6A21\u578B\u5199\uFF0C\u4E5F\u53EF\u4EE5\u81EA\u5DF1\u5199\uFF0C\u6587\u672C\u6309\u7528\u91CF\u5355\u72EC\u8BA1\u8D39\uFF09\uFF1B\u8FD9\u4E00\u6B65\u53EA\u51FA\u5267\u672C\u4E0E\u5206\u955C\u3001\u4E0D\u751F\u6210\u89C6\u9891\u3001\u4E0D\u4EA7\u751F\u89C6\u9891\u8D39\u7528\uFF0C\u5199\u597D\u540E\u5148\u6838\u5BF9\u6BCF\u6BB5\u63D0\u793A\u8BCD\uFF0C\u518D\u786E\u8BA4\u811A\u672C" }
+    script: { label: "写脚本", hint: "按第一步创建的需求写剧本与分镜（可以让文本模型写，也可以自己写，文本按用量单独计费）；这一步只出剧本与分镜、不生成视频、不产生视频费用，写好后先核对每段提示词，再确认脚本" }
   };
   var STAGE_STORYBOARD_ACTION = {
-    storyboard: { label: "\u751F\u6210\u5206\u955C", hint: "\u6309\u5DF2\u5BA1\u6838\u7684\u811A\u672C\u5207\u5206\u955C\u4E0E\u6BCF\u6BB5\u63D0\u793A\u8BCD\uFF1A\u5199\u6210 Markdown \u5206\u955C\u8868\u5C31\u6309\u955C\u53F7\u5207\u6BB5\uFF0C\u5426\u5219\u6309\u573A\u666F\u4E0E\u53E5\u5B50\u5207\u6BB5\uFF1B\u8FD9\u4E00\u6B65\u53EA\u94FA\u8282\u70B9\u3001\u4E0D\u751F\u6210\u89C6\u9891\u3001\u4E0D\u4EA7\u751F\u89C6\u9891\u8D39\u7528" }
+    storyboard: { label: "生成分镜", hint: "按已审核的脚本切分镜与每段提示词：写成 Markdown 分镜表就按镜号切段，否则按场景与句子切段；这一步只铺节点、不生成视频、不产生视频费用" }
   };
   var STAGE_REVIEW_ACTION = {
-    script: { label: "\u786E\u8BA4\u811A\u672C", hint: "\u6838\u5BF9\u8FC7\u5267\u672C\u4E0E\u6BCF\u6BB5\u63D0\u793A\u8BCD\u5C31\u70B9\u8FD9\u91CC\uFF1A\u811A\u672C\u5BA1\u6838\u901A\u8FC7\u540E\u9636\u6BB5\u5361\u2461\u6807\u4E3A\u5DF2\u5B8C\u6210\uFF0C\u63A5\u7740\u770B\u6574\u6761\u94FE\u8DEF\u4F30\u4EF7\uFF1B\u8D39\u7528\u4ECD\u9010\u6BB5\u5355\u72EC\u786E\u8BA4" }
+    script: { label: "确认脚本", hint: "核对过剧本与每段提示词就点这里：脚本审核通过后阶段卡②标为已完成，接着看整条链路估价；费用仍逐段单独确认" }
   };
   var STAGE_EDIT_ACTION = {
-    requirement: { label: "\u6539\u9700\u6C42", hint: "\u9700\u6C42\u5DF2\u521B\u5EFA\uFF1A\u8981\u6539\u60F3\u62CD\u4EC0\u4E48\u3001\u603B\u65F6\u957F\u3001\u6BCF\u6BB5\u65F6\u957F\u3001\u753B\u5E45\u6216\u6E05\u6670\u5EA6\u5C31\u70B9\u8FD9\u91CC\uFF0C\u6539\u7684\u662F\u9700\u6C42\u8282\u70B9\u4E0E\u9636\u6BB5\u5361\u3001\u4E0D\u8C03\u7528\u6A21\u578B\u4E5F\u4E0D\u8BA1\u8D39\uFF1B\u5DF2\u94FA\u5F00\u7684\u811A\u672C\u4E0E\u5236\u4F5C\u6BB5\u4E0D\u53D7\u5F71\u54CD\uFF0C\u8981\u987A\u7740\u65B0\u89C4\u683C\u91CD\u505A\u5C31\u5220\u9664\u65E7\u8282\u70B9\u518D\u8D70\u4E00\u904D" }
+    requirement: { label: "改需求", hint: "需求已创建：要改想拍什么、总时长、每段时长、画幅或清晰度就点这里，改的是需求节点与阶段卡、不调用模型也不计费；已铺开的脚本与制作段不受影响，要顺着新规格重做就删除旧节点再走一遍" }
   };
   function pendingStageAction(key, facts) {
     if (key === "requirement") return facts?.requirementSettled ? STAGE_EDIT_ACTION.requirement : null;
@@ -2878,14 +2878,14 @@
   var REQUIREMENT_MARK = "metaonticRequirement";
   function requirementNodeData(brief, seconds, segmentSeconds, ratio, resolution, workType) {
     const text = [
-      `\u60F3\u62CD\u4EC0\u4E48\uFF1A${brief}`,
-      `\u76EE\u6807\u603B\u65F6\u957F\uFF1A${seconds} \u79D2`,
-      `\u6BCF\u6BB5\u65F6\u957F\uFF1A${segmentSeconds} \u79D2`,
-      `\u753B\u5E45\uFF1A${ratio}`,
-      `\u6E05\u6670\u5EA6\uFF1A${String(resolution).toUpperCase()}`
+      `想拍什么：${brief}`,
+      `目标总时长：${seconds} 秒`,
+      `每段时长：${segmentSeconds} 秒`,
+      `画幅：${ratio}`,
+      `清晰度：${String(resolution).toUpperCase()}`
     ].join("\n");
     return {
-      label: "\u9700\u6C42",
+      label: "需求",
       text,
       status: "done",
       [REQUIREMENT_MARK]: true,
@@ -2952,7 +2952,7 @@
       const explicit = String(node?.data?.metaonticSegmentOf || "");
       const owner = String(node?.metaonticSourceNode || "");
       const serving = segments.has(explicit) ? [explicit] : feeds(owner || String(node.id));
-      return { nodeId: String(node.id), label: String(node?.data?.label || "\u7D20\u6750\u56FE"), segments: serving };
+      return { nodeId: String(node.id), label: String(node?.data?.label || "素材图"), segments: serving };
     });
   }
   function canvasSegmentStats(doc) {
@@ -2985,8 +2985,8 @@
         severity: "error",
         scope: "edge",
         nodeId: String(edge?.id || ""),
-        message: "\u6709\u4E00\u6761\u8FDE\u7EBF\u6307\u5411\u5DF2\u88AB\u5220\u9664\u7684\u8282\u70B9\u3002",
-        suggestedAction: "\u9009\u4E2D\u90A3\u6761\u7EBF\u65AD\u5F00\uFF0C\u6216\u91CD\u65B0\u8FDE\u5230\u8FD8\u5728\u7684\u8282\u70B9\u4E0A\u3002"
+        message: "有一条连线指向已被删除的节点。",
+        suggestedAction: "选中那条线断开，或重新连到还在的节点上。"
       });
     }
     for (const node of canvasSegments(doc)) {
@@ -2997,8 +2997,8 @@
         severity: "warning",
         scope: "segment",
         nodeId: String(node.id),
-        message: `\u5236\u4F5C\u6BB5\u300C${String(node?.data?.label || "\u672A\u547D\u540D")}\u300D\u8FD8\u6CA1\u6709\u6210\u679C\u3002`,
-        suggestedAction: "\u70B9\u8FD9\u4E2A\u8282\u70B9\u7684\u300C\u5236\u4F5C\u300D\uFF0C\u6838\u5BF9\u65B9\u6848\u5E76\u786E\u8BA4\u8D39\u7528\u540E\u751F\u6210\u3002"
+        message: `制作段「${String(node?.data?.label || "未命名")}」还没有成果。`,
+        suggestedAction: "点这个节点的「制作」，核对方案并确认费用后生成。"
       });
     }
     const hasResult = (id) => nodes.some((item) => String(item?.metaonticSourceNode || "") === id && (item?.data?.assetId || item?.data?.metaonticVideoUrl));
@@ -3009,8 +3009,8 @@
         severity: "warning",
         scope: "frame",
         nodeId: String(node.id),
-        message: `\u753B\u9762\u300C${String(node?.data?.label || "\u672C\u6BB5\u753B\u9762")}\u300D\u8FD8\u6CA1\u6709\u51FA\u56FE\u3002`,
-        suggestedAction: "\u5148\u70B9\u8FD9\u4E2A\u753B\u9762\u8282\u70B9\u7684\u300C\u5236\u4F5C\u300D\u51FA\u4E00\u5F20\u56FE\uFF1B\u51FA\u56FE\u540E\u5B83\u4F1A\u4F5C\u4E3A\u8FD9\u4E00\u6BB5\u7684\u9996\u5E27\u63A5\u7ED9\u540E\u9762\u7684\u89C6\u9891\u8282\u70B9\uFF0C\u56FE\u7247\u6309\u7528\u91CF\u5355\u72EC\u8BA1\u8D39\u5E76\u8981\u5BA1\u6838\u3002"
+        message: `画面「${String(node?.data?.label || "本段画面")}」还没有出图。`,
+        suggestedAction: "先点这个画面节点的「制作」出一张图；出图后它会作为这一段的首帧接给后面的视频节点，图片按用量单独计费并要审核。"
       });
     }
     for (const link of canvasAssetLinks(doc)) {
@@ -3020,8 +3020,8 @@
         severity: "info",
         scope: "asset",
         nodeId: link.nodeId,
-        message: `\u7D20\u6750\u56FE\u300C${link.label}\u300D\u8FD8\u6CA1\u63A5\u5230\u4EFB\u4F55\u5236\u4F5C\u6BB5\u3002`,
-        suggestedAction: "\u628A\u5B83\u8FDE\u5230\u67D0\u4E2A\u5236\u4F5C\u8282\u70B9\u7684\u300C\u53C2\u8003\u56FE\u300D\u6216\u300C\u9996\u5E27\u300D\u7AEF\u53E3\uFF0C\u4E0D\u7528\u7684\u7D20\u6750\u53EF\u4EE5\u5220\u6389\u3002"
+        message: `素材图「${link.label}」还没接到任何制作段。`,
+        suggestedAction: "把它连到某个制作节点的「参考图」或「首帧」端口，不用的素材可以删掉。"
       });
     }
     for (const node of nodes) {
@@ -3033,8 +3033,8 @@
         severity: "info",
         scope: "media",
         nodeId: String(node.id),
-        message: `\u6210\u679C\u300C${String(node?.data?.label || "\u89C6\u9891\u6210\u679C")}\u300D\u5BF9\u5E94\u7684\u5236\u4F5C\u6BB5\u5DF2\u88AB\u5220\u9664\u3002`,
-        suggestedAction: "\u5B83\u4E0D\u53C2\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u6570\uFF0C\u4E5F\u4E0D\u4F1A\u8FDB\u5165\u6210\u7247\uFF1B\u8981\u91CD\u505A\u5148\u6309\u6D41\u7A0B\u94FA\u51FA\u5236\u4F5C\u6BB5\uFF0C\u6210\u679C\u6587\u4EF6\u4ECD\u4FDD\u7559\u5728\u753B\u5E03\u6570\u636E\u76EE\u5F55\u3002"
+        message: `成果「${String(node?.data?.label || "视频成果")}」对应的制作段已被删除。`,
+        suggestedAction: "它不参与制作段计数，也不会进入成片；要重做先按流程铺出制作段，成果文件仍保留在画布数据目录。"
       });
     }
     const videoSegments = canvasSegments(doc).filter((node) => node?.type === "video");
@@ -3046,47 +3046,47 @@
         severity: "warning",
         scope: "film",
         nodeId: "",
-        message: `\u5DF2\u5408\u6210\u7684\u6210\u7247\u662F ${filmCount} \u6BB5\uFF0C\u753B\u5E03\u4E0A\u73B0\u5728\u7684\u89C6\u9891\u6210\u679C\u6709 ${videoDone} \u6BB5\u3002`,
+        message: `已合成的成片是 ${filmCount} 段，画布上现在的视频成果有 ${videoDone} 段。`,
         // 建议按「画布上还有没有视频制作段」分岔：一段都不剩时合并没有任何输入，会直接报错，
         // 也就不能再劝用户「每段都出成果后重新合成」。
-        suggestedAction: videoSegments.length ? "\u6BCF\u6BB5\u90FD\u51FA\u6210\u679C\u540E\u91CD\u65B0\u70B9\u300C\u5408\u6210\u6210\u7247\u300D\uFF0C\u6210\u7247\u4F1A\u6309\u5F53\u524D\u8FDE\u7EBF\u987A\u5E8F\u91CD\u62FC\u3002" : "\u753B\u5E03\u4E0A\u5DF2\u7ECF\u6CA1\u6709\u89C6\u9891\u5236\u4F5C\u6BB5\u4E86\uFF1A\u8981\u91CD\u505A\u5148\u6309\u6D41\u7A0B\u94FA\u51FA\u5236\u4F5C\u6BB5\uFF1B\u5DF2\u5408\u6210\u7684\u6210\u7247\u6587\u4EF6\u4ECD\u4FDD\u7559\u5728\u753B\u5E03\u6570\u636E\u76EE\u5F55\u3002"
+        suggestedAction: videoSegments.length ? "每段都出成果后重新点「合成成片」，成片会按当前连线顺序重拼。" : "画布上已经没有视频制作段了：要重做先按流程铺出制作段；已合成的成片文件仍保留在画布数据目录。"
       });
     }
     return issues;
   }
   var CHOICE_TEXT = {
-    not_needed: "\u4E0D\u9700\u8981\u89D2\u8272\u56FE",
-    provided_images: "\u4F7F\u7528\u5DF2\u6709\u89D2\u8272\u56FE",
-    generate_first: "\u5148\u751F\u6210\u89D2\u8272\u56FE\u518D\u5236\u4F5C",
-    text_only: "\u7EAF\u6587\u672C\u751F\u6210"
+    not_needed: "不需要角色图",
+    provided_images: "使用已有角色图",
+    generate_first: "先生成角色图再制作",
+    text_only: "纯文本生成"
   };
   function stageSummary(facts = {}, stats = {}) {
     const duration = Number.isFinite(Number(facts.duration)) && facts.duration !== null && facts.duration !== void 0 ? Number(facts.duration) : null;
     const produced = Number(stats.produced || 0), total = Math.max(Number(facts.segmentTotal || 0), Number(stats.total || 0));
     const shots = Number(stats.shots || 0), assets = Number(stats.assets || 0);
-    const choice = CHOICE_TEXT[facts.choice] || facts.choice || "\u5F85\u786E\u8BA4";
+    const choice = CHOICE_TEXT[facts.choice] || facts.choice || "待确认";
     const requirementText = [
-      `\u76EE\u6807\u65F6\u957F\uFF1A${duration === null ? "\u5F85\u786E\u8BA4" : `${duration} \u79D2`}`,
-      `\u753B\u5E45\uFF1A${facts.ratio || "\u5F85\u786E\u8BA4"}`,
-      `\u6E05\u6670\u5EA6\uFF1A${String(facts.resolution || "\u5F85\u786E\u8BA4").toUpperCase()}`,
-      `\u89D2\u8272\u56FE\u8DEF\u7EBF\uFF1A${choice}`
+      `目标时长：${duration === null ? "待确认" : `${duration} 秒`}`,
+      `画幅：${facts.ratio || "待确认"}`,
+      `清晰度：${String(facts.resolution || "待确认").toUpperCase()}`,
+      `角色图路线：${choice}`
     ].join("\n");
     const scriptText = [
-      `\u5267\u672C\uFF1A${facts.scriptDrafted || facts.scriptApproved ? "\u5DF2\u540C\u6B65" : "\u672A\u5F00\u59CB"}`,
-      `\u5BA1\u6838\uFF1A${facts.scriptApproved ? "\u5DF2\u901A\u8FC7" : facts.scriptDrafted ? "\u7B49\u5F85\u7528\u6237\u5BA1\u6838" : "\u672A\u5F00\u59CB"}`
+      `剧本：${facts.scriptDrafted || facts.scriptApproved ? "已同步" : "未开始"}`,
+      `审核：${facts.scriptApproved ? "已通过" : facts.scriptDrafted ? "等待用户审核" : "未开始"}`
     ].join("\n");
-    const storyboardText = shots > 0 ? [`\u5206\u955C\uFF1A${shots} \u4E2A\u955C\u5934`, `\u6BCF\u6BB5\u63D0\u793A\u8BCD\u89C1\u5236\u4F5C\u8282\u70B9`].join("\n") : total > 0 ? [`\u5206\u955C\uFF1A\u6309\u573A\u666F\u4E0E\u53E5\u5B50\u5207\u6BB5\uFF0C\u5171 ${total} \u6BB5`, `\u6BCF\u6BB5\u63D0\u793A\u8BCD\u89C1\u5236\u4F5C\u8282\u70B9`].join("\n") : "\u8FD8\u6CA1\u6709\u5206\u955C\uFF1A\u5148\u5199\u811A\u672C\u5E76\u786E\u8BA4\u5BA1\u6838\uFF0C\u518D\u6309\u5206\u955C\u8868\u6216\u53E5\u5B50\u5207\u6BB5\u3002";
+    const storyboardText = shots > 0 ? [`分镜：${shots} 个镜头`, `每段提示词见制作节点`].join("\n") : total > 0 ? [`分镜：按场景与句子切段，共 ${total} 段`, `每段提示词见制作节点`].join("\n") : "还没有分镜：先写脚本并确认审核，再按分镜表或句子切段。";
     const bound = Number.isFinite(Number(stats.assetsBound)) ? Number(stats.assetsBound) : assets;
     const assetsText = [
-      `\u89D2\u8272\u56FE\u8DEF\u7EBF\uFF1A${choice}`,
-      `\u7D20\u6750\u56FE\uFF1A${assets} \u5F20\uFF08\u89D2\u8272\u56FE / \u9996\u5E27 / \u53C2\u8003\u56FE\uFF09${assets > bound ? `\uFF0C\u5176\u4E2D ${assets - bound} \u5F20\u8FD8\u6CA1\u63A5\u5230\u5236\u4F5C\u6BB5` : ""}`
+      `角色图路线：${choice}`,
+      `素材图：${assets} 张（角色图 / 首帧 / 参考图）${assets > bound ? `，其中 ${assets - bound} 张还没接到制作段` : ""}`
     ].join("\n");
     const costText = [
-      `\u5236\u4F5C\u65B9\u6848\uFF1A${facts.specApproved ? "\u5DF2\u5BA1\u6838" : "\u672A\u4EA7\u51FA"}`,
-      `\u8D39\u7528\uFF1A${produced > 0 ? "\u5DF2\u786E\u8BA4\uFF08\u5DF2\u6709\u751F\u6210\u8BB0\u5F55\uFF09" : "\u751F\u6210\u524D\u4ECD\u8981\u5355\u72EC\u786E\u8BA4"}`
+      `制作方案：${facts.specApproved ? "已审核" : "未产出"}`,
+      `费用：${produced > 0 ? "已确认（已有生成记录）" : "生成前仍要单独确认"}`
     ].join("\n");
-    const segmentsText = total > 0 ? [`\u5236\u4F5C\u6BB5\uFF1A${total} \u6BB5`, `\u5DF2\u5B8C\u6210\uFF1A${Math.min(produced, total)} \u6BB5`].join("\n") : "\u6682\u65E0\u5236\u4F5C\u6BB5\uFF1A\u5148\u5728\u753B\u5E03\u4E0A\u5199\u811A\u672C\u3001\u786E\u8BA4\u811A\u672C\u5BA1\u6838\u4E0E\u5236\u4F5C\u65B9\u6848\u3002";
-    const filmText = stats.filmReady ? `\u5DF2\u5408\u6210\u6210\u7247\uFF08${Number(stats.filmCount || 0)} \u6BB5\uFF09` : total > 0 && produced >= total ? "\u6BCF\u6BB5\u90FD\u6709\u6210\u679C\uFF0C\u53EF\u4EE5\u70B9\u300C\u5408\u6210\u6210\u7247\u300D" : "\u7B49\u5F85\u6BCF\u6BB5\u90FD\u4EA7\u51FA\u6210\u679C";
+    const segmentsText = total > 0 ? [`制作段：${total} 段`, `已完成：${Math.min(produced, total)} 段`].join("\n") : "暂无制作段：先在画布上写脚本、确认脚本审核与制作方案。";
+    const filmText = stats.filmReady ? `已合成成片（${Number(stats.filmCount || 0)} 段）` : total > 0 && produced >= total ? "每段都有成果，可以点「合成成片」" : "等待每段都产出成果";
     const needsAssets = !["not_needed", "text_only"].includes(String(facts.choice || ""));
     const state = {
       requirement: { state: facts.requirementSettled ? "done" : "active", text: requirementText },
@@ -3124,34 +3124,34 @@
   var entry = (label, creative, screenwriter, storyboard, criterion) => ({ label, rules: { creative, screenwriter, storyboard, reviewer: criterion }, criterion });
   var REGISTRY = {
     genre: {
-      comedy: entry("\u559C\u5267", "\u5BFB\u627E\u4EBA\u7269\u6B32\u671B\u4E0E\u60C5\u5883\u53CD\u5DEE\uFF0C\u4E0D\u5F3A\u5236\u53CD\u8F6C\u3002", "\u4EE5\u94FA\u57AB\u3001\u5347\u7EA7\u3001\u884C\u4E3A\u7B11\u70B9\u4E0E\u56DE\u5E94\u63A8\u8FDB\u3002", "\u4E3A\u7B11\u70B9\u5151\u73B0\u548C\u53CD\u5E94\u7559\u65F6\u95F4\uFF0C\u4E0D\u9760\u5BC6\u96C6\u5207\u955C\u3002", "\u7B11\u70B9\u6709\u94FA\u57AB\u4E14\u7B26\u5408\u4EBA\u7269\u903B\u8F91\u3002"),
-      drama: entry("\u5267\u60C5", "\u5EFA\u7ACB\u76EE\u6807\u3001\u963B\u788D\u3001\u9009\u62E9\u4E0E\u540E\u679C\u3002", "\u4E8B\u4EF6\u56E0\u679C\u63A8\u52A8\u4EBA\u7269\u6216\u5173\u7CFB\u53D8\u5316\u3002", "\u5448\u73B0\u51B3\u5B9A\u4E0E\u540E\u679C\uFF0C\u4E0D\u7528\u7A7A\u955C\u4EE3\u66FF\u884C\u52A8\u3002", "\u4EBA\u7269\u9009\u62E9\u4E0E\u53EF\u89C1\u540E\u679C\u6210\u7ACB\u3002"),
-      documentary: entry("\u7EAA\u5F55", "\u5EFA\u7ACB\u771F\u5B9E\u95EE\u9898\u3001\u89C2\u5BDF\u5BF9\u8C61\u4E0E\u7D20\u6750\u6765\u6E90\u3002", "\u4F7F\u7528\u771F\u5B9E\u6750\u6599\u3001\u91C7\u8BBF\u95EE\u9898\u6216\u660E\u786E\u6807\u6CE8\u7684\u620F\u5267\u5316\u91CD\u73B0\uFF0C\u4E0D\u7F16\u9020\u53D7\u8BBF\u8005\u539F\u8BDD\u3002", "\u533A\u5206\u62DF\u62CD\u6444\u65B9\u6848\u3001\u771F\u5B9E\u7D20\u6750\u548C\u91CD\u73B0\u955C\u5934\u3002", "\u9648\u8FF0\u6709\u6765\u6E90\uFF0CVERIFIED_FACT/USER_PROVIDED/UNVERIFIED/DRAMATIZATION \u5206\u79BB\u3002"),
-      animation: entry("\u52A8\u753B", "\u660E\u786E\u4E16\u754C\u89C4\u5219\u3001\u89D2\u8272\u8FA8\u8BC6\u4E0E\u76EE\u6807\u53D7\u4F17\u3002", "\u52A8\u4F5C\u6709\u89C6\u89C9\u56E0\u679C\uFF0C\u9075\u5B88\u4E16\u754C\u89C4\u5219\u3002", "\u52A8\u4F5C\u8DEF\u5F84\u6E05\u695A\uFF0C\u89D2\u8272\u6BD4\u4F8B\u4E0E\u7A7A\u95F4\u89C4\u5219\u7A33\u5B9A\u3002", "\u4E16\u754C\u89C4\u5219\u3001\u89D2\u8272\u548C\u52A8\u4F5C\u53EF\u8BFB\u6027\u4E00\u81F4\u3002"),
-      romance: entry("\u7231\u60C5", "\u56F4\u7ED5\u5177\u4F53\u5173\u7CFB\u53D8\u5316\u4E0E\u60C5\u611F\u969C\u788D\u63D0\u70BC\u4F53\u9A8C\u3002", "\u7528\u4E92\u52A8\u3001\u8BD5\u63A2\u3001\u56DE\u5E94\u63A8\u8FDB\u5173\u7CFB\uFF0C\u4E0D\u9760\u544A\u767D\u53E3\u53F7\u3002", "\u901A\u8FC7\u8DDD\u79BB\u3001\u89C6\u7EBF\u4E0E\u56DE\u5E94\u5448\u73B0\u5173\u7CFB\u53D8\u5316\u3002", "\u60C5\u611F\u53D8\u5316\u6709\u5177\u4F53\u4E92\u52A8\u4E0E\u56DE\u5E94\u652F\u6491\u3002"),
-      thriller: entry("\u60AC\u7591\u60CA\u609A", "\u89C4\u5212\u89C2\u4F17\u5DF2\u77E5\u548C\u672A\u77E5\u4FE1\u606F\u53CA\u7EBF\u7D22\u3002", "\u60AC\u5FF5\u6709\u56E0\u679C\u94FA\u57AB\u4E0E\u56DE\u6536\uFF0C\u4E0D\u4F9D\u8D56\u65E0\u539F\u56E0\u53CD\u8F6C\u3002", "\u63A7\u5236\u89C6\u70B9\u4E0E\u4FE1\u606F\u63ED\u793A\uFF0C\u4E0D\u80FD\u85CF\u6389\u7406\u89E3\u6240\u9700\u8BC1\u636E\u3002", "\u7EBF\u7D22\u516C\u5E73\u3001\u56E0\u679C\u6210\u7ACB\u4E14\u5173\u952E\u60AC\u5FF5\u5F97\u5230\u5904\u7406\u3002")
+      comedy: entry("喜剧", "寻找人物欲望与情境反差，不强制反转。", "以铺垫、升级、行为笑点与回应推进。", "为笑点兑现和反应留时间，不靠密集切镜。", "笑点有铺垫且符合人物逻辑。"),
+      drama: entry("剧情", "建立目标、阻碍、选择与后果。", "事件因果推动人物或关系变化。", "呈现决定与后果，不用空镜代替行动。", "人物选择与可见后果成立。"),
+      documentary: entry("纪录", "建立真实问题、观察对象与素材来源。", "使用真实材料、采访问题或明确标注的戏剧化重现，不编造受访者原话。", "区分拟拍摄方案、真实素材和重现镜头。", "陈述有来源，VERIFIED_FACT/USER_PROVIDED/UNVERIFIED/DRAMATIZATION 分离。"),
+      animation: entry("动画", "明确世界规则、角色辨识与目标受众。", "动作有视觉因果，遵守世界规则。", "动作路径清楚，角色比例与空间规则稳定。", "世界规则、角色和动作可读性一致。"),
+      romance: entry("爱情", "围绕具体关系变化与情感障碍提炼体验。", "用互动、试探、回应推进关系，不靠告白口号。", "通过距离、视线与回应呈现关系变化。", "情感变化有具体互动与回应支撑。"),
+      thriller: entry("悬疑惊悚", "规划观众已知和未知信息及线索。", "悬念有因果铺垫与回收，不依赖无原因反转。", "控制视点与信息揭示，不能藏掉理解所需证据。", "线索公平、因果成立且关键悬念得到处理。")
     },
     format: {
-      skit: entry("\u60C5\u666F\u5C0F\u54C1", "\u96C6\u4E2D\u5728\u5355\u4E00\u60C5\u5883\u4E0E\u6838\u5FC3\u4E92\u52A8\u3002", "\u51CF\u5C11\u652F\u7EBF\uFF0C\u52A8\u4F5C\u3001\u5BF9\u767D\u548C\u53CD\u5E94\u53EF\u5728\u9884\u7B97\u5185\u5B8C\u6210\u3002", "\u5C11\u91CF\u5FC5\u8981\u673A\u4F4D\u4FDD\u6301\u4E92\u52A8\u53EF\u8BFB\u3002", "\u5355\u4E00\u60C5\u5883\u5B8C\u6574\uFF0C\u5173\u952E\u53CD\u5E94\u6709\u65F6\u957F\u3002"),
-      short_film: entry("\u77ED\u7247", "\u6784\u5EFA\u9002\u5408\u65F6\u957F\u7684\u5B8C\u6574\u4F53\u9A8C\u3002", "\u6BCF\u573A\u6709\u529F\u80FD\u4E0E\u72B6\u6001\u53D8\u5316\u3002", "\u955C\u5934\u8986\u76D6\u5173\u952E\u4E8B\u4EF6\u5E76\u63A7\u5236\u8282\u594F\u3002", "\u7ED3\u6784\u5B8C\u6574\uFF0C\u573A\u666F\u63A8\u8FDB\u6709\u5FC5\u8981\u6027\u3002"),
-      micro_drama: entry("\u5FAE\u77ED\u5267", "\u8BBE\u8BA1\u5355\u96C6\u6838\u5FC3\u4E8B\u4EF6\u4E0E\u8FDE\u7EED\u4EBA\u7269\u5173\u7CFB\u3002", "\u8BB0\u5F55\u5173\u7CFB\u53D8\u5316\u548C\u672A\u89E3\u51B3\u7EBF\u7D22\uFF0C\u4E0D\u91CD\u7F6E\u89D2\u8272\u3002", "\u5173\u952E\u51B2\u7A81\u4E0E\u56DE\u5E94\u6E05\u695A\uFF0C\u4E0D\u80FD\u7528\u5FEB\u5207\u63A9\u76D6\u56E0\u679C\u3002", "\u5355\u96C6\u6210\u7ACB\u5E76\u4E0E\u8FDE\u7EED\u4EBA\u7269\u7EBF\u4E00\u81F4\u3002"),
-      series: entry("\u8FDE\u7EED\u4F5C\u54C1", "\u5EFA\u7ACB\u5168\u7247\u4E3B\u7EBF\u3001\u5355\u96C6\u529F\u80FD\u4E0E\u8DE8\u96C6\u72B6\u6001\u3002", "\u7EF4\u62A4\u4F0F\u7B14\u3001\u524D\u60C5\u4E0E\u4EBA\u7269\u72B6\u6001\uFF0C\u6309\u7AE0\u4EA4\u4ED8\u3002", "\u5206\u7AE0\u573A\u955C\u5206\u5C42\u89C4\u5212\uFF0C\u590D\u67E5\u8DE8\u7AE0\u8FB9\u754C\u3002", "\u5355\u96C6\u8FDB\u5EA6\u548C\u5168\u7247\u5B8C\u6210\u72B6\u6001\u51C6\u786E\uFF0C\u7EBF\u7D22\u53EF\u8FFD\u8E2A\u3002"),
-      interview: entry("\u8BBF\u8C08", "\u660E\u786E\u95EE\u9898\u3001\u5BF9\u8C61\u4E0E\u771F\u5B9E\u7D20\u6750\u9700\u6C42\u3002", "\u63D0\u4F9B\u91C7\u8BBF\u95EE\u9898\uFF1B\u672A\u53D6\u5F97\u7684\u56DE\u7B54\u4E0D\u5F97\u5F53\u6210\u771F\u5B9E\u539F\u8BDD\u3002", "\u5B89\u6392\u91C7\u8BBF\u3001\u53CD\u5E94\u4E0E\u76F8\u5173\u8BC1\u636E\u753B\u9762\uFF0C\u4E0D\u865A\u6784\u5DF2\u62CD\u7D20\u6750\u3002", "\u91C7\u8BBF\u6765\u6E90\u771F\u5B9E\uFF0C\u62DF\u95EE\u4E0E\u5DF2\u56DE\u7B54\u5185\u5BB9\u533A\u5206\u3002"),
-      commercial: entry("\u5E7F\u544A\u7247", "\u56F4\u7ED5\u9700\u6C42\u3001\u53EF\u4FE1\u5229\u76CA\u4E0E\u884C\u52A8\u76EE\u6807\u8BBE\u8BA1\u3002", "\u53EA\u4F7F\u7528\u6709\u4F9D\u636E\u7684\u4EA7\u54C1\u4E3B\u5F20\u4E0E\u6F14\u793A\u3002", "\u5C55\u793A\u4EA7\u54C1\u4F7F\u7528\u8FC7\u7A0B\u548C\u8BC1\u636E\uFF0C\u907F\u514D\u6697\u793A\u672A\u8BC1\u5B9E\u529F\u6548\u3002", "\u4EA7\u54C1\u4E3B\u5F20\u6709\u4F9D\u636E\uFF0C\u4F7F\u7528\u4E0E\u884C\u52A8\u76EE\u6807\u6E05\u695A\u3002"),
-      vlog: entry("\u751F\u6D3B\u8BB0\u5F55", "\u5BFB\u627E\u65E5\u5E38\u89C2\u5BDF\u3001\u7EC6\u8282\u4E0E\u4F53\u9A8C\u53D8\u5316\u3002", "\u4FDD\u7559\u81EA\u7136\u884C\u52A8\u548C\u73AF\u5883\u53CD\u9988\uFF0C\u4E0D\u5F3A\u52A0\u620F\u5267\u51B2\u7A81\u3002", "\u89C2\u5BDF\u6027\u6784\u56FE\u4E0E\u81EA\u7136\u8282\u594F\uFF0C\u907F\u514D\u65E0\u610F\u4E49\u8FD0\u955C\u3002", "\u65E5\u5E38\u7EC6\u8282\u6709\u89C2\u5BDF\u4EF7\u503C\uFF0C\u8282\u594F\u81EA\u7136\u3002"),
-      music_video: entry("\u97F3\u4E50\u5F71\u50CF", "\u5EFA\u7ACB\u97F3\u4E50\u4E0E\u89C6\u89C9\u6BCD\u9898\u7684\u5173\u8054\u3002", "\u7528\u52A8\u4F5C\u548C\u610F\u8C61\u9012\u8FDB\uFF0C\u4E0D\u5F3A\u585E\u5BF9\u767D\u6216\u5267\u60C5\u3002", "\u6309\u97F3\u4E50\u6BB5\u843D\u89C4\u5212\u8282\u594F\u4E0E\u89C6\u89C9\u53D8\u5316\u3002", "\u58F0\u753B\u5173\u8054\u548C\u610F\u8C61\u9012\u8FDB\u660E\u786E\u3002")
+      skit: entry("情景小品", "集中在单一情境与核心互动。", "减少支线，动作、对白和反应可在预算内完成。", "少量必要机位保持互动可读。", "单一情境完整，关键反应有时长。"),
+      short_film: entry("短片", "构建适合时长的完整体验。", "每场有功能与状态变化。", "镜头覆盖关键事件并控制节奏。", "结构完整，场景推进有必要性。"),
+      micro_drama: entry("微短剧", "设计单集核心事件与连续人物关系。", "记录关系变化和未解决线索，不重置角色。", "关键冲突与回应清楚，不能用快切掩盖因果。", "单集成立并与连续人物线一致。"),
+      series: entry("连续作品", "建立全片主线、单集功能与跨集状态。", "维护伏笔、前情与人物状态，按章交付。", "分章场镜分层规划，复查跨章边界。", "单集进度和全片完成状态准确，线索可追踪。"),
+      interview: entry("访谈", "明确问题、对象与真实素材需求。", "提供采访问题；未取得的回答不得当成真实原话。", "安排采访、反应与相关证据画面，不虚构已拍素材。", "采访来源真实，拟问与已回答内容区分。"),
+      commercial: entry("广告片", "围绕需求、可信利益与行动目标设计。", "只使用有依据的产品主张与演示。", "展示产品使用过程和证据，避免暗示未证实功效。", "产品主张有依据，使用与行动目标清楚。"),
+      vlog: entry("生活记录", "寻找日常观察、细节与体验变化。", "保留自然行动和环境反馈，不强加戏剧冲突。", "观察性构图与自然节奏，避免无意义运镜。", "日常细节有观察价值，节奏自然。"),
+      music_video: entry("音乐影像", "建立音乐与视觉母题的关联。", "用动作和意象递进，不强塞对白或剧情。", "按音乐段落规划节奏与视觉变化。", "声画关联和意象递进明确。")
     },
     purpose: {
-      entertainment: entry("\u5A31\u4E50", "\u660E\u786E\u89C2\u4F17\u7684\u60C5\u7EEA\u6536\u76CA\u3002", "\u4FDD\u6301\u4EBA\u7269\u4E0E\u4E8B\u4EF6\u5438\u5F15\u529B\uFF0C\u907F\u514D\u7A7A\u6D1E\u523A\u6FC0\u3002", "\u4FDD\u8BC1\u770B\u70B9\u53EF\u89C1\u4E14\u8282\u594F\u53EF\u8BFB\u3002", "\u89C2\u4F17\u4F53\u9A8C\u6709\u4E8B\u4EF6\u6216\u753B\u9762\u652F\u6491\u3002"),
-      promotion: entry("\u5BA3\u4F20", "\u63D0\u70BC\u5730\u57DF\u6216\u54C1\u724C\u8FA8\u8BC6\u4E0E\u8BB0\u5FC6\u70B9\u3002", "\u7528\u5177\u4F53\u53EF\u6838\u5B9E\u7EC6\u8282\u4EE3\u66FF\u53E3\u53F7\u3002", "\u5C55\u793A\u53EF\u8FA8\u8BC6\u5730\u70B9\u3001\u4EBA\u7269\u548C\u751F\u6D3B\u7EC6\u8282\u3002", "\u8FA8\u8BC6\u5EA6\u4E0E\u4F20\u64AD\u4FE1\u606F\u5177\u4F53\u4E14\u53EF\u4FE1\u3002"),
-      education: entry("\u79D1\u666E\u6559\u80B2", "\u786E\u5B9A\u89C2\u4F17\u8981\u7406\u89E3\u7684\u95EE\u9898\u4E0E\u8FB9\u754C\u3002", "\u6309\u95EE\u9898\u3001\u8BC1\u636E\u3001\u89E3\u91CA\u63A8\u8FDB\uFF0C\u4E8B\u5B9E\u4E0D\u786E\u5B9A\u5904\u6807\u5F85\u6838\u5B9E\u3002", "\u7528\u6F14\u793A\u6216\u5BF9\u6BD4\u89E3\u91CA\u4FE1\u606F\uFF0C\u4E0D\u53EA\u5806\u5B57\u5E55\u3002", "\u77E5\u8BC6\u51C6\u786E\uFF0C\u89E3\u91CA\u6E05\u695A\uFF0C\u6709\u8BC1\u636E\u4E0E\u9002\u7528\u8FB9\u754C\u3002"),
-      sales: entry("\u9500\u552E\u8F6C\u5316", "\u5B9A\u4E49\u9700\u6C42\u3001\u8BC1\u636E\u4E0E\u884C\u52A8\u76EE\u6807\u3002", "\u4E0D\u7F16\u9020\u6027\u80FD\u3001\u6570\u636E\u3001\u8BA4\u8BC1\u6216\u627F\u8BFA\u3002", "\u8BA9\u4F7F\u7528\u8FC7\u7A0B\u4E0E\u5229\u76CA\u8BC1\u636E\u53EF\u89C1\u3002", "\u5356\u70B9\u53EF\u4FE1\uFF0C\u884C\u52A8\u6E05\u695A\uFF0C\u65E0\u5938\u5927\u4E3B\u5F20\u3002")
+      entertainment: entry("娱乐", "明确观众的情绪收益。", "保持人物与事件吸引力，避免空洞刺激。", "保证看点可见且节奏可读。", "观众体验有事件或画面支撑。"),
+      promotion: entry("宣传", "提炼地域或品牌辨识与记忆点。", "用具体可核实细节代替口号。", "展示可辨识地点、人物和生活细节。", "辨识度与传播信息具体且可信。"),
+      education: entry("科普教育", "确定观众要理解的问题与边界。", "按问题、证据、解释推进，事实不确定处标待核实。", "用演示或对比解释信息，不只堆字幕。", "知识准确，解释清楚，有证据与适用边界。"),
+      sales: entry("销售转化", "定义需求、证据与行动目标。", "不编造性能、数据、认证或承诺。", "让使用过程与利益证据可见。", "卖点可信，行动清楚，无夸大主张。")
     },
     style_profile: {
-      rural_documentary: entry("\u4E61\u6751\u89C2\u5BDF", "\u4ECE\u5177\u4F53\u751F\u6D3B\u89C2\u5BDF\u5BFB\u627E\u7EC6\u8282\uFF0C\u4E0D\u523B\u677F\u5316\u519C\u6751\u3002", "\u8BED\u8A00\u81EA\u7136\uFF0C\u5730\u57DF\u4E8B\u5B9E\u9700\u6765\u6E90\u3002", "\u81EA\u7136\u5149\u3001\u73B0\u573A\u58F0\u4E0E\u53EF\u8FA8\u7A7A\u95F4\uFF0C\u4E0D\u81EA\u52A8\u6DFB\u52A0\u7834\u8D25\u8D2B\u56F0\u3002", "\u751F\u6D3B\u7EC6\u8282\u53EF\u4FE1\uFF0C\u5730\u57DF\u4E8B\u5B9E\u4E0E\u89C2\u5BDF\u8FB9\u754C\u6E05\u695A\u3002"),
-      minidv: entry("\u5343\u79A7 MiniDV", "\u4EE5\u751F\u6D3B\u7247\u6BB5\u4E0E\u81EA\u7136\u89C2\u5BDF\u7EC4\u7EC7\u89C6\u89C9\u6BCD\u9898\u3002", "\u5BF9\u767D\u5C0F\u58F0\u81EA\u7136\uFF0C\u52A8\u4F5C\u4E0E\u505C\u987F\u6709\u751F\u6D3B\u611F\u3002", "\u6309\u9700\u8F7B\u5FAE\u624B\u6301\u3001\u5BF9\u7126\u641C\u7D22\u3001\u4F4E\u9971\u548C\u539F\u751F\u8272\u5F69\u548C\u9897\u7C92\uFF0C\u4E0D\u63A9\u76D6\u5173\u952E\u52A8\u4F5C\u3002", "DV \u8868\u73B0\u514B\u5236\uFF0C\u4EBA\u7269\u52A8\u4F5C\u4E0E\u5173\u952E\u4FE1\u606F\u4FDD\u6301\u6E05\u695A\u3002"),
-      cinematic_realism: entry("\u5199\u5B9E\u7535\u5F71", "\u4EE5\u5177\u4F53\u4E8B\u4EF6\u627F\u8F7D\u8868\u8FBE\u3002", "\u884C\u4E3A\u548C\u5BF9\u767D\u81EA\u7136\uFF0C\u4E0D\u7528\u62BD\u8C61\u5F62\u5BB9\u8BCD\u4EE3\u66FF\u5267\u60C5\u3002", "\u4EE5\u5149\u6E90\u3001\u6750\u8D28\u3001\u7A7A\u95F4\u548C\u52A8\u4F5C\u63CF\u8FF0\u98CE\u683C\uFF0C\u4E0D\u5806\u53C2\u6570\u3002", "\u89C6\u89C9\u7EC6\u8282\u771F\u5B9E\u5E76\u670D\u52A1\u53D9\u4E8B\u3002"),
-      stylized_animation: entry("\u98CE\u683C\u5316\u52A8\u753B", "\u660E\u786E\u7EDF\u4E00\u7684\u9020\u578B\u548C\u4E16\u754C\u89C4\u5219\u3002", "\u8868\u6F14\u4E0E\u52A8\u4F5C\u7B26\u5408\u8BBE\u5B9A\u3002", "\u7EDF\u4E00\u6BD4\u4F8B\u3001\u6750\u8D28\u3001\u8272\u5F69\u548C\u52A8\u4F5C\u7269\u7406\u89C4\u5219\u3002", "\u9020\u578B\u98CE\u683C\u4E0E\u4E16\u754C\u7269\u7406\u89C4\u5219\u8DE8\u955C\u4E00\u81F4\u3002")
+      rural_documentary: entry("乡村观察", "从具体生活观察寻找细节，不刻板化农村。", "语言自然，地域事实需来源。", "自然光、现场声与可辨空间，不自动添加破败贫困。", "生活细节可信，地域事实与观察边界清楚。"),
+      minidv: entry("千禧 MiniDV", "以生活片段与自然观察组织视觉母题。", "对白小声自然，动作与停顿有生活感。", "按需轻微手持、对焦搜索、低饱和原生色彩和颗粒，不掩盖关键动作。", "DV 表现克制，人物动作与关键信息保持清楚。"),
+      cinematic_realism: entry("写实电影", "以具体事件承载表达。", "行为和对白自然，不用抽象形容词代替剧情。", "以光源、材质、空间和动作描述风格，不堆参数。", "视觉细节真实并服务叙事。"),
+      stylized_animation: entry("风格化动画", "明确统一的造型和世界规则。", "表演与动作符合设定。", "统一比例、材质、色彩和动作物理规则。", "造型风格与世界物理规则跨镜一致。")
     }
   };
 
@@ -3159,30 +3159,30 @@
   var drama_default = {
     "id": "DRAMA",
     "revision": "1",
-    "label": "\u5267\u60C5\u77ED\u7247",
-    "strategy": "\u4EBA\u7269\u76EE\u6807\u2192\u963B\u788D\u2192\u9009\u62E9\u2192\u53EF\u89C1\u540E\u679C",
-    "boundary": "\u5141\u8BB8\u514B\u5236\u7684\u65E5\u5E38\u77DB\u76FE\uFF0C\u4E0D\u673A\u68B0\u6DFB\u52A0\u60B2\u60C5\u6216\u53CD\u8F6C\u3002",
+    "label": "剧情短片",
+    "strategy": "人物目标→阻碍→选择→可见后果",
+    "boundary": "允许克制的日常矛盾，不机械添加悲情或反转。",
     "creative_fields": {
-      "character_goal": "\u4EBA\u7269\u6B64\u523B\u7684\u5177\u4F53\u76EE\u6807",
-      "choice_and_consequence": "\u5173\u952E\u9009\u62E9\u4E0E\u540E\u679C"
+      "character_goal": "人物此刻的具体目标",
+      "choice_and_consequence": "关键选择与后果"
     },
     "script_fields": {
-      "causal_progression": "\u4E8B\u4EF6\u4E4B\u95F4\u7684\u56E0\u679C\u63A8\u8FDB",
-      "character_change": "\u4EBA\u7269\u6216\u5173\u7CFB\u7684\u53D8\u5316"
+      "causal_progression": "事件之间的因果推进",
+      "character_change": "人物或关系的变化"
     },
     "review_criteria": [
       {
         "id": "drama_1",
-        "description": "\u52A8\u673A\u662F\u5426\u7531\u884C\u52A8\u4F53\u73B0"
+        "description": "动机是否由行动体现"
       },
       {
         "id": "drama_2",
-        "description": "\u9009\u62E9\u548C\u7ED3\u679C\u662F\u5426\u6709\u56E0\u679C\u4F9D\u636E"
+        "description": "选择和结果是否有因果依据"
       }
     ],
     "role_rules": {
-      "screenwriter": "\u56F4\u7ED5\u4EBA\u7269\u9009\u62E9\u5199\u573A\u666F\uFF0C\u914D\u89D2\u6709\u81EA\u8EAB\u7406\u7531\uFF0C\u4E0D\u7528\u673A\u68B0\u8BEF\u4F1A\u5236\u9020\u963B\u788D\u3002",
-      "storyboard": "\u8BA9\u89C2\u4F17\u770B\u6E05\u9009\u62E9\u53D1\u751F\u7684\u77AC\u95F4\u4E0E\u540E\u679C\uFF0C\u53CD\u5E94\u955C\u5934\u627F\u62C5\u5173\u7CFB\u53D8\u5316\u3002"
+      "screenwriter": "围绕人物选择写场景，配角有自身理由，不用机械误会制造阻碍。",
+      "storyboard": "让观众看清选择发生的瞬间与后果，反应镜头承担关系变化。"
     }
   };
 
@@ -3190,30 +3190,30 @@
   var comedy_default = {
     "id": "COMEDY",
     "revision": "1",
-    "label": "\u60C5\u666F\u559C\u5267",
-    "strategy": "\u9884\u671F\u2192\u5347\u7EA7\u2192\u53CD\u5DEE\u2192\u56DE\u6536",
-    "boundary": "\u7B11\u70B9\u6765\u81EA\u4EBA\u7269\u4E0E\u60C5\u5883\uFF0C\u4E0D\u4F9D\u8D56\u523B\u677F\u5370\u8C61\u3001\u5938\u5F20\u8868\u60C5\u6216\u97F3\u6548\u3002",
+    "label": "情景喜剧",
+    "strategy": "预期→升级→反差→回收",
+    "boundary": "笑点来自人物与情境，不依赖刻板印象、夸张表情或音效。",
     "creative_fields": {
-      "comic_premise": "\u89C2\u4F17\u9884\u671F\u4E0E\u559C\u5267\u524D\u63D0",
-      "payoff": "\u53CD\u5DEE\u843D\u70B9\u4E0E\u56DE\u6536"
+      "comic_premise": "观众预期与喜剧前提",
+      "payoff": "反差落点与回收"
     },
     "script_fields": {
-      "setup_payoff": "\u94FA\u57AB\u4E0E\u7B11\u70B9\u7684\u5BF9\u5E94",
-      "reaction_budget": "\u7B11\u70B9\u524D\u540E\u53CD\u5E94\u4E0E\u505C\u987F\u7684\u65F6\u95F4\u5B89\u6392"
+      "setup_payoff": "铺垫与笑点的对应",
+      "reaction_budget": "笑点前后反应与停顿的时间安排"
     },
     "review_criteria": [
       {
         "id": "comedy_1",
-        "description": "\u7B11\u70B9\u662F\u5426\u6709\u53EF\u8FA8\u8BC6\u7684\u94FA\u57AB"
+        "description": "笑点是否有可辨识的铺垫"
       },
       {
         "id": "comedy_2",
-        "description": "\u53CD\u5DEE\u662F\u5426\u7531\u4EBA\u7269\u884C\u4E3A\u5F15\u53D1\u4E14\u6709\u53CD\u5E94\u65F6\u95F4"
+        "description": "反差是否由人物行为引发且有反应时间"
       }
     ],
     "role_rules": {
-      "screenwriter": "\u5148\u8BA9\u9884\u671F\u6210\u7ACB\u518D\u504F\u79BB\uFF0C\u907F\u514D\u89D2\u8272\u4E3A\u7B11\u8BDD\u7A81\u7136\u5931\u53BB\u5E38\u8BC6\u3002",
-      "storyboard": "\u5173\u952E\u7B11\u70B9\u4FE1\u606F\u4E0D\u53EF\u88AB\u8FD0\u955C\u906E\u4F4F\uFF0C\u7ED9\u89C2\u4F17\u8BFB\u61C2\u53CD\u5DEE\u548C\u4EBA\u7269\u53CD\u5E94\u7684\u65F6\u95F4\u3002"
+      "screenwriter": "先让预期成立再偏离，避免角色为笑话突然失去常识。",
+      "storyboard": "关键笑点信息不可被运镜遮住，给观众读懂反差和人物反应的时间。"
     }
   };
 
@@ -3221,30 +3221,30 @@
   var lifestyle_default = {
     "id": "LIFESTYLE",
     "revision": "1",
-    "label": "\u751F\u6D3BVlog\uFF0F\u6C1B\u56F4\u7247",
-    "strategy": "\u4F53\u9A8C\u8D77\u70B9\u2192\u7EC6\u8282\u53D1\u73B0\u2192\u611F\u53D7\u53D8\u5316",
-    "boundary": "\u53EF\u4EE5\u65E0\u51B2\u7A81\u3001\u65E0\u5BF9\u767D\u3001\u65E0\u4EBA\u50CF\uFF1B\u751F\u6D3B\u8D28\u611F\u4E0E\u89C2\u5BDF\u987A\u5E8F\u6210\u7ACB\u5373\u53EF\uFF0C\u4E0D\u5F3A\u9020\u620F\u5267\u3002",
+    "label": "生活Vlog／氛围片",
+    "strategy": "体验起点→细节发现→感受变化",
+    "boundary": "可以无冲突、无对白、无人像；生活质感与观察顺序成立即可，不强造戏剧。",
     "creative_fields": {
-      "experience_line": "\u672C\u7247\u4F53\u9A8C\u6216\u89C2\u5BDF\u4E3B\u7EBF",
-      "detail_discovery": "\u503C\u5F97\u89C2\u770B\u7684\u5177\u4F53\u7EC6\u8282\u53D1\u73B0"
+      "experience_line": "本片体验或观察主线",
+      "detail_discovery": "值得观看的具体细节发现"
     },
     "script_fields": {
-      "observation_progression": "\u7EC6\u8282\u5982\u4F55\u9010\u6B65\u88AB\u53D1\u73B0",
-      "sensory_rhythm": "\u751F\u6D3B\u52A8\u4F5C\u3001\u73AF\u5883\u58F0\u53CA\u7559\u767D\u7684\u8282\u594F"
+      "observation_progression": "细节如何逐步被发现",
+      "sensory_rhythm": "生活动作、环境声及留白的节奏"
     },
     "review_criteria": [
       {
         "id": "lifestyle_1",
-        "description": "\u89C2\u5BDF\u662F\u5426\u6709\u63A8\u8FDB\u800C\u975E\u91CD\u590D\u98CE\u666F"
+        "description": "观察是否有推进而非重复风景"
       },
       {
         "id": "lifestyle_2",
-        "description": "\u751F\u6D3B\u52A8\u4F5C\u548C\u58F0\u97F3\u662F\u5426\u53EF\u4FE1\u4E14\u7B26\u5408\u7528\u6237\u6C1B\u56F4"
+        "description": "生活动作和声音是否可信且符合用户氛围"
       }
     ],
     "role_rules": {
-      "screenwriter": "\u4EE5\u751F\u6D3B\u52A8\u4F5C\u548C\u611F\u5B98\u53D1\u73B0\u7EC4\u7EC7\u5185\u5BB9\uFF0C\u5141\u8BB8\u7559\u767D\uFF0C\u4E0D\u865A\u6784\u82E6\u96BE\u6216\u786C\u52A0\u53CD\u8F6C\u3002",
-      "storyboard": "\u6784\u56FE\u8BA9\u89C2\u4F17\u53D1\u73B0\u7EC6\u8282\uFF0C\u7A7A\u95F4\u5149\u7EBF\u4E0E\u73AF\u5883\u58F0\u97F3\u53C2\u4E0E\u53D9\u4E8B\uFF0C\u56FA\u5B9A\u673A\u4F4D\u53EF\u4EE5\u6210\u7ACB\u3002"
+      "screenwriter": "以生活动作和感官发现组织内容，允许留白，不虚构苦难或硬加反转。",
+      "storyboard": "构图让观众发现细节，空间光线与环境声音参与叙事，固定机位可以成立。"
     }
   };
 
@@ -3252,30 +3252,30 @@
   var documentary_default = {
     "id": "DOCUMENTARY",
     "revision": "1",
-    "label": "\u7EAA\u5F55\uFF0F\u77E5\u8BC6\u7247",
-    "strategy": "\u6838\u5FC3\u95EE\u9898\u2192\u8BC1\u636E\u4E0E\u4F8B\u5B50\u2192\u89E3\u91CA\u2192\u56DE\u5E94",
-    "boundary": "\u533A\u5206\u5DF2\u6838\u5B9E\u4E8B\u5B9E\u3001\u7528\u6237\u6750\u6599\u3001\u5F85\u6838\u5B9E\u5185\u5BB9\u4E0E\u620F\u5267\u5316\u91CD\u73B0\uFF1B\u4E0D\u7F16\u9020\u91C7\u8BBF\u548C\u771F\u5B9E\u7ECF\u5386\u3002",
+    "label": "纪录／知识片",
+    "strategy": "核心问题→证据与例子→解释→回应",
+    "boundary": "区分已核实事实、用户材料、待核实内容与戏剧化重现；不编造采访和真实经历。",
     "creative_fields": {
-      "central_question": "\u8981\u56DE\u5E94\u7684\u5177\u4F53\u95EE\u9898",
-      "evidence_plan": "\u5DF2\u6709\u6765\u6E90\u4E0E\u5F85\u8865\u8BC1\u636E\u8BA1\u5212"
+      "central_question": "要回应的具体问题",
+      "evidence_plan": "已有来源与待补证据计划"
     },
     "script_fields": {
-      "evidence_sources": "\u8BBA\u636E\u4E0E\u5BF9\u5E94\u6765\u6E90\uFF0C\u7F3A\u5931\u6807\u5F85\u6838\u5B9E",
-      "fact_fiction_boundary": "\u4E8B\u5B9E\u3001\u89E3\u91CA\u548C\u91CD\u73B0\u7684\u8FB9\u754C"
+      "evidence_sources": "论据与对应来源，缺失标待核实",
+      "fact_fiction_boundary": "事实、解释和重现的边界"
     },
     "review_criteria": [
       {
         "id": "documentary_1",
-        "description": "\u5173\u952E\u9648\u8FF0\u662F\u5426\u6709\u6765\u6E90\u6216\u660E\u786E\u5F85\u6838\u5B9E"
+        "description": "关键陈述是否有来源或明确待核实"
       },
       {
         "id": "documentary_2",
-        "description": "\u4E8B\u5B9E\u4E0E\u865A\u6784\u91CD\u73B0\u662F\u5426\u6E05\u695A\u533A\u5206"
+        "description": "事实与虚构重现是否清楚区分"
       }
     ],
     "role_rules": {
-      "screenwriter": "\u7528\u53EF\u6838\u5B9E\u6750\u6599\u652F\u6491\u8BF4\u660E\uFF0C\u4E0D\u4E3A\u5236\u9020\u51B2\u7A81\u7F16\u9020\u771F\u5B9E\u4EBA\u7269\u5FC3\u7406\u3002",
-      "storyboard": "\u8BC1\u636E\u753B\u9762\u4E0E\u89E3\u91CA\u5BF9\u5E94\uFF0C\u91CD\u73B0\u987B\u660E\u786E\u6807\u8BC6\uFF0C\u753B\u9762\u4E0D\u80FD\u6697\u793A\u672A\u7ECF\u8BC1\u5B9E\u7684\u56E0\u679C\u3002"
+      "screenwriter": "用可核实材料支撑说明，不为制造冲突编造真实人物心理。",
+      "storyboard": "证据画面与解释对应，重现须明确标识，画面不能暗示未经证实的因果。"
     }
   };
 
@@ -3283,30 +3283,30 @@
   var commercial_default = {
     "id": "COMMERCIAL",
     "revision": "1",
-    "label": "\u4EA7\u54C1\u5E7F\u544A",
-    "strategy": "\u9700\u6C42\u2192\u4F7F\u7528\u8FC7\u7A0B\u2192\u4EF7\u503C\u8BC1\u636E\u2192\u884C\u52A8",
-    "boundary": "\u4EA7\u54C1\u5916\u89C2\u3001\u529F\u6548\u3001\u6570\u636E\u4E0E\u8BA4\u8BC1\u987B\u6709\u4F9D\u636E\uFF0C\u4E0D\u901A\u8FC7\u753B\u9762\u6697\u793A\u672A\u8BC1\u5B9E\u6548\u679C\u3002",
+    "label": "产品广告",
+    "strategy": "需求→使用过程→价值证据→行动",
+    "boundary": "产品外观、功效、数据与认证须有依据，不通过画面暗示未证实效果。",
     "creative_fields": {
-      "user_need": "\u5177\u4F53\u7528\u6237\u9700\u6C42",
-      "supported_benefit": "\u6709\u8D44\u6599\u652F\u6301\u7684\u4EA7\u54C1\u5229\u76CA"
+      "user_need": "具体用户需求",
+      "supported_benefit": "有资料支持的产品利益"
     },
     "script_fields": {
-      "claims_and_evidence": "\u5356\u70B9\u53CA\u5BF9\u5E94\u4F9D\u636E\uFF0C\u7F3A\u5931\u6807\u5F85\u6838\u5B9E",
-      "usage_and_action": "\u53EF\u89C2\u5BDF\u4F7F\u7528\u8FC7\u7A0B\u4E0E\u884C\u52A8\u5F15\u5BFC"
+      "claims_and_evidence": "卖点及对应依据，缺失标待核实",
+      "usage_and_action": "可观察使用过程与行动引导"
     },
     "review_criteria": [
       {
         "id": "commercial_1",
-        "description": "\u5356\u70B9\u662F\u5426\u7531\u6750\u6599\u652F\u6301"
+        "description": "卖点是否由材料支持"
       },
       {
         "id": "commercial_2",
-        "description": "\u4F7F\u7528\u8FC7\u7A0B\u662F\u5426\u6E05\u695A\u4E14\u4EA7\u54C1\u8EAB\u4EFD\u51C6\u786E"
+        "description": "使用过程是否清楚且产品身份准确"
       }
     ],
     "role_rules": {
-      "screenwriter": "\u5C55\u793A\u771F\u5B9E\u9700\u6C42\u4E0E\u4F7F\u7528\u8FC7\u7A0B\uFF0C\u907F\u514D\u5806\u5356\u70B9\u53CA\u65E0\u4F9D\u636E\u524D\u540E\u6548\u679C\u3002",
-      "storyboard": "\u5173\u952E\u4EA7\u54C1\u7EC6\u8282\u548C\u4F7F\u7528\u6B65\u9AA4\u6E05\u695A\u53EF\u89C1\uFF0C\u54C1\u724C\u6587\u5B57\u4E0ELogo\u4F9D\u8D56\u6388\u6743\u7D20\u6750\u53CA\u540E\u671F\u80FD\u529B\u3002"
+      "screenwriter": "展示真实需求与使用过程，避免堆卖点及无依据前后效果。",
+      "storyboard": "关键产品细节和使用步骤清楚可见，品牌文字与Logo依赖授权素材及后期能力。"
     }
   };
 
@@ -3314,30 +3314,30 @@
   var promotional_default = {
     "id": "PROMOTIONAL",
     "revision": "1",
-    "label": "\u54C1\u724C\uFF0F\u5730\u57DF\u5BA3\u4F20",
-    "strategy": "\u8BC6\u522B\u7279\u5F81\u2192\u5177\u4F53\u751F\u6D3B\u2192\u4EBA\u7269\u6216\u89C2\u5BDF\u5BF9\u8C61\u2192\u60C5\u7EEA\u843D\u70B9",
-    "boundary": "\u5730\u57DF\u548C\u54C1\u724C\u7279\u5F81\u5177\u4F53\u53EF\u4FE1\uFF0C\u4E0D\u7528\u7A7A\u6CDB\u8D5E\u7F8E\u66FF\u4EE3\u5185\u5BB9\uFF1B\u4E0D\u5F3A\u5236\u589E\u52A0\u4EBA\u7269\u3002",
+    "label": "品牌／地域宣传",
+    "strategy": "识别特征→具体生活→人物或观察对象→情绪落点",
+    "boundary": "地域和品牌特征具体可信，不用空泛赞美替代内容；不强制增加人物。",
     "creative_fields": {
-      "recognizable_identity": "\u54C1\u724C\u6216\u5730\u57DF\u7684\u53EF\u8FA8\u8BC6\u7279\u5F81",
-      "emotional_anchor": "\u60C5\u7EEA\u843D\u70B9\u53CA\u5176\u5177\u4F53\u8F7D\u4F53"
+      "recognizable_identity": "品牌或地域的可辨识特征",
+      "emotional_anchor": "情绪落点及其具体载体"
     },
     "script_fields": {
-      "distinctive_details": "\u5177\u6709\u8FA8\u8BC6\u5EA6\u7684\u751F\u6D3B\u6216\u54C1\u724C\u7EC6\u8282",
-      "identity_progression": "\u7EC6\u8282\u5982\u4F55\u5171\u540C\u5448\u73B0\u4E3B\u9898"
+      "distinctive_details": "具有辨识度的生活或品牌细节",
+      "identity_progression": "细节如何共同呈现主题"
     },
     "review_criteria": [
       {
         "id": "promotional_1",
-        "description": "\u753B\u9762\u662F\u5426\u5177\u6709\u5F53\u5730\u6216\u54C1\u724C\u8FA8\u8BC6\u5EA6"
+        "description": "画面是否具有当地或品牌辨识度"
       },
       {
         "id": "promotional_2",
-        "description": "\u60C5\u7EEA\u662F\u5426\u7531\u5177\u4F53\u7EC6\u8282\u800C\u975E\u53E3\u53F7\u652F\u6491"
+        "description": "情绪是否由具体细节而非口号支撑"
       }
     ],
     "role_rules": {
-      "screenwriter": "\u628A\u8EAB\u4EFD\u7279\u5F81\u843D\u5728\u5177\u4F53\u4F7F\u7528\u6216\u751F\u6D3B\u7EC6\u8282\uFF0C\u771F\u5B9E\u5730\u70B9\u8D44\u6599\u4E0D\u8DB3\u6807\u5F85\u6838\u5B9E\u3002",
-      "storyboard": "\u7A7A\u95F4\u3001\u4EBA\u7269\u6216\u7269\u4EF6\u5173\u7CFB\u4F53\u73B0\u5730\u57DF\u54C1\u724C\u7279\u5F81\uFF0C\u4E0D\u7528\u901A\u7528\u822A\u62CD\u548C\u7D20\u6750\u5806\u780C\u66FF\u4EE3\u3002"
+      "screenwriter": "把身份特征落在具体使用或生活细节，真实地点资料不足标待核实。",
+      "storyboard": "空间、人物或物件关系体现地域品牌特征，不用通用航拍和素材堆砌替代。"
     }
   };
 
@@ -3356,9 +3356,9 @@
     try {
       body = await response.json();
     } catch {
-      throw new Error("\u753B\u5E03\u5236\u4F5C\u670D\u52A1\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u52A0\u8F7D\u72B6\u6001\u3002");
+      throw new Error("画布制作服务尚未就绪，请核对插件加载状态。");
     }
-    if (!response.ok || body?.error) throw new Error(body?.error || "\u5236\u4F5C\u8BF7\u6C42\u672A\u5B8C\u6210\uFF0C\u8BF7\u67E5\u8BE2\u539F\u8BB0\u5F55\uFF0C\u4E0D\u8981\u91CD\u590D\u751F\u6210\u3002");
+    if (!response.ok || body?.error) throw new Error(body?.error || "制作请求未完成，请查询原记录，不要重复生成。");
     return body;
   }
   function duplicateNodePayload(node, spot) {
@@ -3394,7 +3394,7 @@
       ordered.push(node);
     };
     for (const node of author) visit(node);
-    return ordered.map((node) => ({ id: node.id, type: node.type, label: String(node?.data?.label || (node.type === "image" ? "\u56FE\u7247" : "\u89C6\u9891")), done: produced.has(node.id) }));
+    return ordered.map((node) => ({ id: node.id, type: node.type, label: String(node?.data?.label || (node.type === "image" ? "图片" : "视频")), done: produced.has(node.id) }));
   }
   function filmStatus(canvas) {
     const nodes = Object.values(canvas?.nodes || {});
@@ -3500,25 +3500,25 @@
     const rpc = async (method, args = {}) => {
       const response = await fetch("/metaontic-video/canvas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ method, args }) });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok || body?.error) throw new Error(body?.error || "\u6D41\u7A0B\u753B\u5E03\u670D\u52A1\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u52A0\u8F7D\u72B6\u6001\u3002");
+      if (!response.ok || body?.error) throw new Error(body?.error || "流程画布服务尚未就绪，请核对插件加载状态。");
       return body;
     };
     const mediaUrl = (assetId) => `/metaontic-video/canvas-media?assetId=${encodeURIComponent(assetId)}`;
     const sizeOf = (node) => nodeSize(node);
-    const labelOf = (node) => String(node?.data?.label || { script: "\u5267\u672C", storyboard: "\u5206\u955C", text: "\u8BF4\u660E", video: "\u89C6\u9891", image: "\u56FE\u7247" }[node?.type] || "\u8282\u70B9");
+    const labelOf = (node) => String(node?.data?.label || { script: "剧本", storyboard: "分镜", text: "说明", video: "视频", image: "图片" }[node?.type] || "节点");
     const textOf2 = (node) => String(node?.data?.output || node?.data?.text || node?.data?.prompt || "");
     const RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4"];
     const RESOLUTIONS = ["480p", "720p"];
-    const money2 = (value) => Number.isFinite(Number(value)) ? `\xA5${(Math.round(Number(value) * 1e4) / 1e4).toFixed(4)}` : "\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39";
+    const money2 = (value) => Number.isFinite(Number(value)) ? `¥${(Math.round(Number(value) * 1e4) / 1e4).toFixed(4)}` : "按实际调用计费";
     const phaseText = (state) => ({
-      succeeded: "\u751F\u6210\u6210\u529F",
-      running: "\u6B63\u5728\u5236\u4F5C",
-      interrupted: "\u5DF2\u4E2D\u65AD\uFF0C\u53EF\u67E5\u8BE2\u539F\u4EFB\u52A1",
-      failed: "\u5236\u4F5C\u5931\u8D25\uFF0C\u672A\u81EA\u52A8\u91CD\u8BD5",
-      unknown: "\u4EFB\u52A1\u72B6\u6001\u5F85\u786E\u8BA4",
-      submission_unknown: "\u63D0\u4EA4\u7ED3\u679C\u672A\u786E\u8BA4",
-      cancelled: "\u5DF2\u53D6\u6D88"
-    })[state] || "\u72B6\u6001\u672A\u77E5";
+      succeeded: "生成成功",
+      running: "正在制作",
+      interrupted: "已中断，可查询原任务",
+      failed: "制作失败，未自动重试",
+      unknown: "任务状态待确认",
+      submission_unknown: "提交结果未确认",
+      cancelled: "已取消"
+    })[state] || "状态未知";
     const CSS = `
 .movc { display: flex; flex-direction: column; gap: 14px; }
 .movc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -3526,22 +3526,22 @@
 .movc-list { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
 .movc-pick { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; }
 .movc-name-empty { font-size: 13px; font-weight: 600; color: ${TOKENS.muted}; }
-/* \u753B\u5E03\u5185\u6309\u94AE\u7EDF\u4E00\u6210\u4E00\u5957\uFF1A\u63CF\u8FB9 + \u4E3B\u8272\u60AC\u505C\uFF0C\u4E0D\u5403\u5BBF\u4E3B\u9ED8\u8BA4\u7684\u7070\u5E95\uFF1B\u4E3B\u6309\u94AE\u624D\u7528\u5B9E\u5FC3\u4E3B\u8272\u3002 */
+/* 画布内按钮统一成一套：描边 + 主色悬停，不吃宿主默认的灰底；主按钮才用实心主色。 */
 .movc .mov-btn, .movc-modal .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12px; line-height: 1.2; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
 .movc .mov-btn:hover:not(:disabled), .movc-modal .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; background: transparent; color: ${TOKENS.primaryFill}; }
 .movc .mov-btn:disabled, .movc-modal .mov-btn:disabled { opacity: .5; cursor: default; }
 .movc .mov-btn-primary, .movc-modal .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
 .movc .mov-btn-primary:hover:not(:disabled), .movc-modal .mov-btn-primary:hover:not(:disabled) { background: ${TOKENS.primaryFill}; color: #fff; opacity: .88; }
 .movc .movc-danger:hover:not(:disabled), .movc-modal .movc-danger:hover:not(:disabled) { border-color: ${TOKENS.error}; color: ${TOKENS.error}; }
-/* \u5DE5\u5177\u6761\u6309\u94AE\uFF1A\u53EA\u628A\u56FA\u5B9A 120px \u5BBD\u6539\u6210\u6309\u5185\u5BB9\u6392\u5E03\uFF0C\u9AD8\u5EA6\u4E0E\u5185\u8DDD\u548C\u9009\u62E9\u753B\u5E03\u80F6\u56CA\u5BF9\u9F50\u3002 */
+/* 工具条按钮：只把固定 120px 宽改成按内容排布，高度与内距和选择画布胶囊对齐。 */
 .movc-ops { flex: 1 1 auto; min-width: 0; gap: 6px; row-gap: 8px; container-type: inline-size; }
 .movc-ops .mov-btn { flex: 0 0 auto; width: auto; min-width: 0; height: 32px; min-height: 32px; padding: 0 14px; overflow-wrap: normal; }
 .movc-flow { flex: 0 0 auto; font-size: 12px; color: ${TOKENS.muted}; white-space: nowrap; }
-/* \u6D41\u7A0B\u4E3B\u884C\u52A8\uFF1A\u7528\u4E3B\u8272\u63CF\u8FB9\u7A81\u51FA\uFF0C\u4F46\u4E0D\u548C\u300C\u65B0\u5EFA\u753B\u5E03\u2026\u300D\u7684\u5B9E\u5FC3\u4E3B\u6309\u94AE\u62A2\u6CE8\u610F\u529B\u3002 */
+/* 流程主行动：用主色描边突出，但不和「新建画布…」的实心主按钮抢注意力。 */
 .movc-ops .movc-run { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-ops .movc-run:disabled { border-color: ${TOKENS.border}; color: ${TOKENS.text}; }
 .movc-sep { flex: 0 0 auto; width: 1px; height: 18px; margin: 0 2px; background: ${TOKENS.border}; }
-/* \u9762\u677F\u7A84\u7684\u65F6\u5019\u6309\u94AE\u672C\u6765\u5C31\u4F1A\u6362\u884C\uFF0C\u5206\u7EC4\u7AD6\u7EBF\u4F1A\u843D\u5728\u884C\u9996\uFF0C\u76F4\u63A5\u4E0D\u6536\u3002 */
+/* 面板窄的时候按钮本来就会换行，分组竖线会落在行首，直接不收。 */
 @container (max-width: 460px) { .movc-sep { display: none; } }
 .movc-ops .mov-btn:focus-visible, .movc-chip:focus-visible, .movc-mini:focus-visible, .movc-name-text:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 1px; }
 .movc-ops .mov-btn:active:not(:disabled), .movc-chip:active, .movc-mini:active { opacity: .82; }
@@ -3606,7 +3606,7 @@
 .movc-name-text:hover { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
 .movc-name input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 13px; color: inherit; background: ${TOKENS.controlFill}; border: 1px solid ${TOKENS.primaryFill}; border-radius: 8px; padding: 5px 12px; }
 .movc-name-err { flex: 1 1 100%; font-size: 12px; color: #c0392b; }
-/* \u5F39\u7A97\u91CC\u7684\u6309\u94AE\u6309\u5185\u5BB9\u81EA\u9002\u5E94\uFF0C\u4E0D\u6491\u6210\u8BBE\u7F6E\u9875\u90A3\u79CD 120px \u65B9\u5757\u3002 */
+/* 弹窗里的按钮按内容自适应，不撑成设置页那种 120px 方块。 */
 .movc-modal .mov-btn { flex: 0 0 auto; width: auto; min-width: 104px; border-radius: 8px; white-space: nowrap; overflow-wrap: normal; }
 `;
     function shotVisual(shot) {
@@ -3622,19 +3622,19 @@
         ...node.type === "image" ? { src: mediaUrl(data.assetId), alt: data.label || "" } : { src: mediaUrl(data.assetId), controls: true, preload: "metadata" }
       });
       if (node.type === "storyboard" && Array.isArray(data.shots) && data.shots.length) return h("div", { key: "shots", className: "movc-body" }, [
-        h("ul", { key: "list", className: "movc-shots" }, data.shots.slice(0, 12).map((shot, index) => h("li", { key: index }, `${shot?.index || index + 1}. ${[shot?.camera, shotVisual(shot).slice(0, 60)].filter(Boolean).join(" \xB7 ")}`))),
-        data.shots.length > 12 ? h("div", { key: "more" }, `\u2026\u5171 ${data.shots.length} \u4E2A\u955C\u5934`) : null
+        h("ul", { key: "list", className: "movc-shots" }, data.shots.slice(0, 12).map((shot, index) => h("li", { key: index }, `${shot?.index || index + 1}. ${[shot?.camera, shotVisual(shot).slice(0, 60)].filter(Boolean).join(" · ")}`))),
+        data.shots.length > 12 ? h("div", { key: "more" }, `…共 ${data.shots.length} 个镜头`) : null
       ]);
       const text = textOf2(node);
-      return h("div", { key: "text", className: "movc-body" }, text ? text.slice(0, 600) : "\uFF08\u6682\u65E0\u5185\u5BB9\uFF0C\u53EF\u5148\u7F16\u8F91\uFF09");
+      return h("div", { key: "text", className: "movc-body" }, text ? text.slice(0, 600) : "（暂无内容，可先编辑）");
     }
     const chainStatusText = (chain) => ({
-      running: `\u8FDE\u62CD\u8FDB\u884C\u4E2D\uFF1A\u7B2C ${chain.index + 1}/${chain.total} \u6BB5\u751F\u6210\u4E2D\u2026`,
-      review: `\u7B2C ${chain.index + 1}/${chain.total} \u6BB5\u5DF2\u6709\u6210\u679C\uFF0C\u7B49\u4F60\u5BA1\u6838`,
-      done: `\u8FDE\u62CD\u5B8C\u6210\uFF1A${chain.total} \u6BB5\u90FD\u5DF2\u6709\u6210\u679C`,
-      stopped: `\u8FDE\u62CD\u5DF2\u505C\u6B62\uFF1A\u5DF2\u5B8C\u6210 ${chain.done}/${chain.total} \u6BB5`,
-      stale: `\u8FDE\u62CD\u9700\u8981\u91CD\u6392\uFF1A\u5DF2\u5B8C\u6210 ${chain.done}/${chain.total} \u6BB5`
-    })[chain.state] || `\u8FDE\u62CD\u72B6\u6001\uFF1A${chain.state}`;
+      running: `连拍进行中：第 ${chain.index + 1}/${chain.total} 段生成中…`,
+      review: `第 ${chain.index + 1}/${chain.total} 段已有成果，等你审核`,
+      done: `连拍完成：${chain.total} 段都已有成果`,
+      stopped: `连拍已停止：已完成 ${chain.done}/${chain.total} 段`,
+      stale: `连拍需要重排：已完成 ${chain.done}/${chain.total} 段`
+    })[chain.state] || `连拍状态：${chain.state}`;
     function FlowCanvas() {
       const [list, setList] = React.useState([]);
       const [canvas, setCanvas] = React.useState(null);
@@ -3691,7 +3691,7 @@
           setSelectedIds([]);
           setMarquee(null);
         } catch (e) {
-          setError(e?.message || "\u6D41\u7A0B\u753B\u5E03\u8BFB\u53D6\u5931\u8D25");
+          setError(e?.message || "流程画布读取失败");
         }
       }, []);
       React.useEffect(() => {
@@ -3724,7 +3724,7 @@
         const id = `usr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
         await saveNode(id, duplicateNodePayload(node, spot));
         setSelectedIds([id]);
-        setNotice("\u5DF2\u590D\u5236\u8282\u70B9\uFF08\u4E0D\u542B\u6210\u679C\u7D20\u6750\u4E0E\u539F\u4EFB\u52A1\u6807\u8BC6\uFF09\uFF1B\u6539\u5B8C\u5185\u5BB9\u518D\u751F\u6210\uFF0C\u8D39\u7528\u7167\u5E38\u5355\u72EC\u786E\u8BA4\u3002");
+        setNotice("已复制节点（不含成果素材与原任务标识）；改完内容再生成，费用照常单独确认。");
       }, [canvas, positions, saveNode]);
       const exportCanvas = React.useCallback(() => {
         if (!canvas || typeof document === "undefined") return;
@@ -3740,7 +3740,7 @@
           link.remove();
           setTimeout(() => URL.revokeObjectURL(url), 1e3);
         } catch (e) {
-          setError(e?.message || "\u5BFC\u51FA\u753B\u5E03\u5931\u8D25");
+          setError(e?.message || "导出画布失败");
         }
       }, [canvas]);
       const importImages = React.useCallback(async (files, attachTo) => {
@@ -3756,7 +3756,7 @@
               { method: "POST", headers: { "content-type": file?.type || "application/octet-stream" }, body: file }
             );
             const body = await response.json().catch(() => ({}));
-            if (!response.ok || body?.error) throw new Error(body?.error || "\u5BFC\u5165\u56FE\u7247\u672A\u5B8C\u6210\u3002");
+            if (!response.ok || body?.error) throw new Error(body?.error || "导入图片未完成。");
             const id = `usr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
             const count = Object.keys(canvas.nodes || {}).length + made.length;
             await saveNode(id, {
@@ -3766,7 +3766,7 @@
               w: NODE_SIZE.image[0],
               h: NODE_SIZE.image[1],
               data: {
-                label: body.name || String(file?.name || "\u5BFC\u5165\u56FE\u7247"),
+                label: body.name || String(file?.name || "导入图片"),
                 assetId: body.assetId,
                 ratio: "1:1",
                 resolution: "720p",
@@ -3780,11 +3780,11 @@
           if (made.length) {
             setSelectedIds(made);
             await refresh();
-            if (attachTo) setNotice(`\u5DF2\u5BFC\u5165 ${made.length} \u5F20\u53C2\u8003\u7D20\u6750\uFF0C\u5E76\u8FDE\u5230\u672C\u8282\u70B9\u7684\u300C\u53C2\u8003\u56FE\u300D\u7AEF\u53E3\uFF1B\u5728\u5236\u4F5C\u7A97\u53E3\u91CC\u4E5F\u53EF\u4EE5\u628A\u7AEF\u53E3\u5207\u6210\u300C\u9996\u5E27\u300D\u3002\u771F\u4EBA\u7167\u7247\u4F1A\u88AB\u89C6\u9891\u63A5\u53E3\u62D2\u7EDD\uFF0C\u5148\u628A\u7167\u7247\u8FDE\u5230\u56FE\u7247\u8282\u70B9\u751F\u6210\u4E00\u5F20\u975E\u771F\u4EBA\u4E8C\u7EF4\u52A8\u753B\u98CE\u683C\u7684\u56FE\uFF0C\u518D\u7528\u90A3\u5F20\u5F53\u9996\u5E27\u3002`);
-            else setNotice(`\u5DF2\u5BFC\u5165 ${made.length} \u5F20\u56FE\u7247\u7D20\u6750\uFF1A\u8FDE\u5230\u89C6\u9891\u8282\u70B9\u7684\u300C\u9996\u5E27\u300D\u6216\u300C\u53C2\u8003\u56FE\u300D\u7AEF\u53E3\u5C31\u80FD\u76F4\u63A5\u7528\u4E8E\u5236\u4F5C\u3002\u771F\u4EBA\u7167\u7247\u4F1A\u88AB\u89C6\u9891\u63A5\u53E3\u62D2\u7EDD\uFF0C\u5148\u628A\u7167\u7247\u8FDE\u5230\u56FE\u7247\u8282\u70B9\u751F\u6210\u4E00\u5F20\u975E\u771F\u4EBA\u4E8C\u7EF4\u52A8\u753B\u98CE\u683C\u7684\u56FE\uFF0C\u518D\u7528\u90A3\u5F20\u5F53\u9996\u5E27\u3002`);
+            if (attachTo) setNotice(`已导入 ${made.length} 张参考素材，并连到本节点的「参考图」端口；在制作窗口里也可以把端口切成「首帧」。真人照片会被视频接口拒绝，先把照片连到图片节点生成一张非真人二维动画风格的图，再用那张当首帧。`);
+            else setNotice(`已导入 ${made.length} 张图片素材：连到视频节点的「首帧」或「参考图」端口就能直接用于制作。真人照片会被视频接口拒绝，先把照片连到图片节点生成一张非真人二维动画风格的图，再用那张当首帧。`);
           }
         } catch (e) {
-          setError(e?.message || "\u5BFC\u5165\u56FE\u7247\u5931\u8D25");
+          setError(e?.message || "导入图片失败");
         } finally {
           setImporting(false);
           if (importRef.current) importRef.current.value = "";
@@ -3798,9 +3798,9 @@
           const data = await canvasNativeRpc({ action: "mergeFilm", projectId: canvas.projectId }, fetch, 9e5);
           setFilmDialog({ busy: false, film: data?.film || null, message: "" });
           await refresh();
-          setNotice(`\u6210\u7247\u5DF2\u5408\u6210\uFF1A${data?.film?.count || 0} \u6BB5${data?.film?.seconds ? ` \xB7 \u7EA6 ${Math.round(data.film.seconds)} \u79D2` : ""}\uFF0C\u53EF\u76F4\u63A5\u9884\u89C8\u6216\u4E0B\u8F7D\u3002`);
+          setNotice(`成片已合成：${data?.film?.count || 0} 段${data?.film?.seconds ? ` · 约 ${Math.round(data.film.seconds)} 秒` : ""}，可直接预览或下载。`);
         } catch (e) {
-          setFilmDialog((current) => ({ ...current || {}, busy: false, message: e?.message || "\u5408\u6210\u6210\u7247\u672A\u5B8C\u6210\u3002" }));
+          setFilmDialog((current) => ({ ...current || {}, busy: false, message: e?.message || "合成成片未完成。" }));
         }
       }, [canvas, refresh]);
       const applyLayout = React.useCallback(async (doc) => {
@@ -3847,7 +3847,7 @@
           if (data?.chain && !["running", "review"].includes(data.chain.state)) await refresh();
           return data?.chain || null;
         } catch (e) {
-          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "\u8FDE\u62CD\u72B6\u6001\u6CA1\u8BFB\u5230\u3002" });
+          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "连拍状态没读到。" });
           return null;
         }
       }, [canvas, patchChainDialog, refresh, stopChainPolling]);
@@ -3870,7 +3870,7 @@
             await pullChain(data.active.id);
           }
         } catch (e) {
-          if (alive.current) patchChainDialog({ loading: false, error: e?.message || "\u8FDE\u62CD\u65B9\u6848\u6CA1\u7B97\u51FA\u6765\u3002" });
+          if (alive.current) patchChainDialog({ loading: false, error: e?.message || "连拍方案没算出来。" });
         }
       }, [canvas, patchChainDialog, pullChain, watchChain]);
       const startChain = React.useCallback(async () => {
@@ -3881,9 +3881,9 @@
           if (!alive.current) return;
           patchChainDialog({ chain, busy: false });
           watchChain(chain?.id);
-          setNotice("\u8FDE\u62CD\u5DF2\u5F00\u59CB\uFF1A\u4F1A\u6309\u987A\u5E8F\u9010\u6BB5\u751F\u6210\uFF0C\u6BCF\u6BB5\u51FA\u6210\u679C\u540E\u505C\u4E0B\u6765\u7B49\u4F60\u5BA1\u6838\uFF0C\u786E\u8BA4\u65E0\u8BEF\u518D\u7EE7\u7EED\u4E0B\u4E00\u6BB5\u3002");
+          setNotice("连拍已开始：会按顺序逐段生成，每段出成果后停下来等你审核，确认无误再继续下一段。");
         } catch (e) {
-          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "\u8FDE\u62CD\u6CA1\u5F00\u59CB\u3002" });
+          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "连拍没开始。" });
         }
       }, [canvas, chainDialog, patchChainDialog, watchChain]);
       const advanceChain = React.useCallback(async (accept) => {
@@ -3897,7 +3897,7 @@
           if (chain?.state === "running") watchChain(chain.id);
           else stopChainPolling();
         } catch (e) {
-          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "\u8FD9\u4E00\u6BB5\u6CA1\u80FD\u7EE7\u7EED\u3002" });
+          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "这一段没能继续。" });
         }
       }, [chainDialog, patchChainDialog, refresh, stopChainPolling, watchChain]);
       const stopChain = React.useCallback(async () => {
@@ -3909,7 +3909,7 @@
           stopChainPolling();
           patchChainDialog({ chain, busy: false });
         } catch (e) {
-          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "\u8FDE\u62CD\u6CA1\u80FD\u505C\u4E0B\u3002" });
+          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "连拍没能停下。" });
         }
       }, [chainDialog, patchChainDialog, stopChainPolling]);
       const syncChainSegment = React.useCallback(async () => {
@@ -3921,7 +3921,7 @@
           await refresh();
           await pullChain(chainDialog.chain.id);
         } catch (e) {
-          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "\u8865\u56DE\u586B\u6CA1\u5B8C\u6210\u3002" });
+          if (alive.current) patchChainDialog({ busy: false, error: e?.message || "补回填没完成。" });
         }
       }, [chainDialog, patchChainDialog, pullChain, refresh]);
       const tidy = React.useCallback(async () => {
@@ -3931,15 +3931,15 @@
           const { canvas: doc } = await rpc("get", { projectId: canvas.projectId });
           const { spots, moved } = await applyLayout(doc);
           if (!moved) {
-            setNotice("\u5F53\u524D\u5E03\u5C40\u5DF2\u7ECF\u6574\u9F50\uFF0C\u65E0\u9700\u8C03\u6574\u3002");
+            setNotice("当前布局已经整齐，无需调整。");
             return;
           }
           setPositions({});
           await refresh();
           fitStage(doc, spots);
-          setNotice(`\u5DF2\u7F8E\u5316\u5E03\u5C40\uFF1A${moved} \u4E2A\u8282\u70B9\u6309\u8FDE\u7EBF\u91CD\u6392\uFF1B\u5185\u5BB9\u4E0E\u8FDE\u7EBF\u6CA1\u52A8\uFF0C\u4E4B\u540E\u4ECD\u53EF\u624B\u52A8\u5FAE\u8C03\u3002`);
+          setNotice(`已美化布局：${moved} 个节点按连线重排；内容与连线没动，之后仍可手动微调。`);
         } catch (e) {
-          setError(e?.message || "\u7F8E\u5316\u5E03\u5C40\u5931\u8D25");
+          setError(e?.message || "美化布局失败");
         }
       }, [canvas, refresh, applyLayout, fitStage]);
       const patchScriptDialog = React.useCallback((patch) => setScriptDialog((current) => current ? { ...current, ...patch } : current), []);
@@ -3970,10 +3970,10 @@
             textReady: info?.textReady !== false,
             totalSeconds: Math.min(15, info?.singleMax || 15),
             segmentSeconds: info?.singleMax || 15,
-            ...info?.videoReady === false ? { error: "\u8FD8\u6CA1\u914D\u7F6E\u89C6\u9891API\u5BC6\u94A5\uFF0C\u53EF\u4EE5\u5148\u521B\u5EFA\u9700\u6C42\uFF0C\u914D\u7F6E\u597D\u518D\u751F\u6210\u3002" } : {}
+            ...info?.videoReady === false ? { error: "还没配置视频API密钥，可以先创建需求，配置好再生成。" } : {}
           });
         } catch (e) {
-          if (alive.current) patchScriptDialog({ error: e?.message || "\u5236\u4F5C\u670D\u52A1\u5C1A\u672A\u5C31\u7EEA\u3002" });
+          if (alive.current) patchScriptDialog({ error: e?.message || "制作服务尚未就绪。" });
         }
       }, [canvas, patchScriptDialog]);
       const openScript = React.useCallback(async () => {
@@ -4001,17 +4001,17 @@
             singleMax: info?.singleMax || 15,
             textModel: info?.textModel || "",
             textReady: info?.textReady !== false,
-            ...info?.videoReady === false ? { error: "\u8FD8\u6CA1\u914D\u7F6E\u89C6\u9891API\u5BC6\u94A5\uFF0C\u53EF\u4EE5\u5148\u5199\u811A\u672C\uFF0C\u914D\u7F6E\u597D\u518D\u751F\u6210\u3002" } : {}
+            ...info?.videoReady === false ? { error: "还没配置视频API密钥，可以先写脚本，配置好再生成。" } : {}
           });
         } catch (e) {
-          if (alive.current) patchScriptDialog({ error: e?.message || "\u5236\u4F5C\u670D\u52A1\u5C1A\u672A\u5C31\u7EEA\u3002" });
+          if (alive.current) patchScriptDialog({ error: e?.message || "制作服务尚未就绪。" });
         }
       }, [canvas, patchScriptDialog]);
       const writeWithModel = React.useCallback(async () => {
         if (!canvas || !scriptDialog) return;
         const idea = String(scriptDialog.idea || "").trim();
         if (!idea) {
-          patchScriptDialog({ error: "\u5148\u5199\u4E00\u53E5\u60F3\u62CD\u4EC0\u4E48\uFF0C\u6587\u672C\u6A21\u578B\u624D\u6709\u5F97\u5199\u3002" });
+          patchScriptDialog({ error: "先写一句想拍什么，文本模型才有得写。" });
           return;
         }
         patchScriptDialog({ busy: true, writing: true, writingSince: Date.now(), error: "", plan: null });
@@ -4031,18 +4031,18 @@
             writing: false,
             writingSince: 0,
             text: result.script,
-            error: result.truncated === true ? "\u6587\u672C\u6A21\u578B\u5199\u5230\u4E86\u8F93\u51FA\u4E0A\u9650\uFF0C\u811A\u672C\u53EF\u80FD\u4E0D\u5B8C\u6574\uFF1A\u628A\u76EE\u6807\u65F6\u957F\u8C03\u77ED\u4E00\u4E9B\uFF0C\u6216\u5206\u4E24\u6B21\u5199\uFF0C\u518D\u6838\u5BF9\u5206\u955C\u8868\u3002" : ""
+            error: result.truncated === true ? "文本模型写到了输出上限，脚本可能不完整：把目标时长调短一些，或分两次写，再核对分镜表。" : ""
           });
-          setNotice(`\u6587\u672C\u6A21\u578B\uFF08${result.model}\uFF09\u5DF2\u5199\u51FA\u5267\u672C\uFF1A\u6838\u5BF9\u5206\u955C\u8868\u540E\u70B9\u300C\u9884\u89C8\u5206\u6BB5\u300D\uFF0C\u518D\u751F\u6210\u5236\u4F5C\u8282\u70B9\u3002`);
+          setNotice(`文本模型（${result.model}）已写出剧本：核对分镜表后点「预览分段」，再生成制作节点。`);
         } catch (e) {
-          if (alive.current) patchScriptDialog({ busy: false, writing: false, writingSince: 0, error: e?.message || "\u6587\u672C\u6A21\u578B\u6CA1\u6709\u5199\u51FA\u811A\u672C\u3002" });
+          if (alive.current) patchScriptDialog({ busy: false, writing: false, writingSince: 0, error: e?.message || "文本模型没有写出脚本。" });
         }
       }, [canvas, scriptDialog, patchScriptDialog]);
       const previewScript = React.useCallback(async () => {
         if (!canvas || !scriptDialog) return;
         const text = String(scriptDialog.text || "").trim();
         if (!text) {
-          patchScriptDialog({ error: "\u8BF7\u5148\u5199\u4E0B\u811A\u672C\u5185\u5BB9\u3002" });
+          patchScriptDialog({ error: "请先写下脚本内容。" });
           return;
         }
         patchScriptDialog({ busy: true, error: "", plan: null });
@@ -4057,14 +4057,14 @@
           if (!alive.current) return;
           patchScriptDialog({ busy: false, plan });
         } catch (e) {
-          if (alive.current) patchScriptDialog({ busy: false, error: e?.message || "\u5206\u6BB5\u8BA1\u5212\u6CA1\u7B97\u51FA\u6765\u3002" });
+          if (alive.current) patchScriptDialog({ busy: false, error: e?.message || "分段计划没算出来。" });
         }
       }, [canvas, scriptDialog, patchScriptDialog]);
       const createRequirement = React.useCallback(async () => {
         if (!canvas || !scriptDialog) return;
         const brief = String(scriptDialog.idea || "").trim();
         if (!brief) {
-          patchScriptDialog({ error: "\u5148\u5199\u4E00\u53E5\u60F3\u62CD\u4EC0\u4E48\uFF0C\u9700\u6C42\u624D\u6709\u5185\u5BB9\u3002" });
+          patchScriptDialog({ error: "先写一句想拍什么，需求才有内容。" });
           return;
         }
         patchScriptDialog({ busy: true, error: "" });
@@ -4091,7 +4091,7 @@
           const facts = {
             requirementSettled: true,
             duration: seconds,
-            choice: "\u753B\u5E03\u5185\u521B\u4F5C",
+            choice: "画布内创作",
             ratio,
             resolution,
             scriptDrafted: false,
@@ -4116,16 +4116,16 @@
           await refresh();
           fitStage(doc, spots);
           setScriptDialog(null);
-          setNotice("\u9700\u6C42\u5DF2\u521B\u5EFA\uFF1A\u2460 \u9700\u6C42\u786E\u8BA4\u6807\u4E3A\u5DF2\u5B8C\u6210\u3002\u518D\u70B9\u753B\u5E03\u7A7A\u767D\u5904\u6216\u9636\u6BB5\u5361\u2461\u7684\u300C\u5199\u811A\u672C\u300D\uFF0C\u6309\u8FD9\u4EFD\u9700\u6C42\u5199\u5267\u672C\u4E0E\u5206\u955C\u3002");
+          setNotice("需求已创建：① 需求确认标为已完成。再点画布空白处或阶段卡②的「写脚本」，按这份需求写剧本与分镜。");
         } catch (e) {
-          if (alive.current) patchScriptDialog({ busy: false, error: e?.message || "\u9700\u6C42\u8282\u70B9\u6CA1\u5EFA\u51FA\u6765\u3002" });
+          if (alive.current) patchScriptDialog({ busy: false, error: e?.message || "需求节点没建出来。" });
         }
       }, [canvas, scriptDialog, patchScriptDialog, saveNode, applyLayout, refresh, fitStage]);
       const createFromScript = React.useCallback(async () => {
         if (!canvas || !scriptDialog) return;
         const text = String(scriptDialog.text || "").trim();
         if (!text) {
-          patchScriptDialog({ error: "\u8BF7\u5148\u5199\u4E0B\u811A\u672C\u5185\u5BB9\u3002" });
+          patchScriptDialog({ error: "请先写下脚本内容。" });
           return;
         }
         patchScriptDialog({ busy: true, error: "" });
@@ -4143,12 +4143,12 @@
           const count = Object.keys(canvas.nodes || {}).length;
           const baseX = 60 + count % 3 * 60, baseY = 60 + count % 3 * 60;
           const scriptId = `usr_${stamp}_script`;
-          await saveNode(scriptId, { type: "script", x: baseX, y: baseY, w: 420, h: 320, data: { label: "\u5267\u672C", text } });
+          await saveNode(scriptId, { type: "script", x: baseX, y: baseY, w: 420, h: 320, data: { label: "剧本", text } });
           let upstream = scriptId;
           if (plan.shots?.length) {
             const boardId = `usr_${stamp}_board`;
             const shots = plan.shots.map((shot) => ({ index: shot.index, visual: shot.visual, ...shot.camera ? { camera: shot.camera } : {}, ...shot.sfx ? { sfx: shot.sfx } : {}, ...shot.duration ? { duration: shot.duration } : {} }));
-            await saveNode(boardId, { type: "storyboard", x: baseX + 560, y: baseY, w: 460, h: 340, data: { label: "\u5206\u955C", shots } });
+            await saveNode(boardId, { type: "storyboard", x: baseX + 560, y: baseY, w: 460, h: 340, data: { label: "分镜", shots } });
             await rpc("edgeAdd", { projectId, fromNode: scriptId, toNode: boardId, fromPort: "out", toPort: "script" });
             upstream = boardId;
           }
@@ -4160,7 +4160,7 @@
               y: baseY + index * 340,
               w: 360,
               h: 300,
-              data: { label: `\u7B2C${index + 1}\u6BB5 \xB7 \u753B\u9762`, prompt: segment.prompt, ratio, resolution, imageCount: 1, [FRAME_MARK]: id }
+              data: { label: `第${index + 1}段 · 画面`, prompt: segment.prompt, ratio, resolution, imageCount: 1, [FRAME_MARK]: id }
             });
             await saveNode(id, {
               type: "video",
@@ -4168,7 +4168,7 @@
               y: baseY + index * 340,
               w: 360,
               h: 300,
-              data: { label: `\u7B2C${index + 1}\u6BB5 \xB7 ${segment.seconds}\u79D2`, prompt: segment.prompt, ratio, resolution, duration: segment.seconds }
+              data: { label: `第${index + 1}段 · ${segment.seconds}秒`, prompt: segment.prompt, ratio, resolution, duration: segment.seconds }
             });
             await rpc("edgeAdd", { projectId, fromNode: upstream, toNode: frameId, fromPort: "out", toPort: "prompt" });
             await rpc("edgeAdd", { projectId, fromNode: frameId, toNode: id, fromPort: "out", toPort: "frame" });
@@ -4187,7 +4187,7 @@
           const facts = {
             requirementSettled: true,
             duration: Number(scriptDialog.totalSeconds) || null,
-            choice: "\u753B\u5E03\u5185\u521B\u4F5C",
+            choice: "画布内创作",
             ratio,
             resolution,
             scriptDrafted: true,
@@ -4218,9 +4218,9 @@
           await refresh();
           fitStage(doc, spots);
           setScriptDialog(null);
-          setNotice(`\u5DF2\u6309\u811A\u672C\u94FA\u5F00 ${plan.segments.length} \u6BB5\u6D41\u7A0B\uFF08\u5267\u672C \u2192 \u5206\u955C \u2192 \u753B\u9762 \u2192 \u89C6\u9891\uFF09\uFF1A\u5148\u6838\u5BF9\u6BCF\u6BB5\u63D0\u793A\u8BCD\uFF0C\u786E\u8BA4\u65E0\u8BEF\u540E\u70B9\u5267\u672C\u8282\u70B9\u6216\u9636\u6BB5\u5361\u2461\u7684\u300C\u786E\u8BA4\u811A\u672C\u300D\uFF0C\u518D\u70B9\u300C\u5236\u4F5C\u300C\u2026\u300D\u300D\u9010\u6BB5\u8D70\u2014\u2014\u5148\u51FA\u6BCF\u6BB5\u524D\u9762\u7684\u300C\u753B\u9762\u300D\uFF08\u5B83\u63A5\u6210\u8FD9\u4E00\u6BB5\u7684\u9996\u5E27\uFF09\uFF0C\u518D\u51FA\u89C6\u9891\uFF1B\u56FE\u7247\u4E0E\u89C6\u9891\u90FD\u5355\u72EC\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002`);
+          setNotice(`已按脚本铺开 ${plan.segments.length} 段流程（剧本 → 分镜 → 画面 → 视频）：先核对每段提示词，确认无误后点剧本节点或阶段卡②的「确认脚本」，再点「制作「…」」逐段走——先出每段前面的「画面」（它接成这一段的首帧），再出视频；图片与视频都单独确认方案与费用。`);
         } catch (e) {
-          if (alive.current) patchScriptDialog({ busy: false, error: e?.message || "\u811A\u672C\u8282\u70B9\u6CA1\u5EFA\u51FA\u6765\u3002" });
+          if (alive.current) patchScriptDialog({ busy: false, error: e?.message || "脚本节点没建出来。" });
         }
       }, [canvas, scriptDialog, patchScriptDialog, saveNode, applyLayout, refresh, fitStage]);
       const connectTo = React.useCallback(async (to) => {
@@ -4246,7 +4246,7 @@
           await rpc("edgeAdd", { projectId: canvas.projectId, fromNode: edge.fromNode, toNode: edge.toNode, fromPort: "out", toPort });
           await refresh();
         } catch (e) {
-          setError(e?.message || "\u5207\u6362\u7D20\u6750\u7AEF\u53E3\u672A\u5B8C\u6210\u3002");
+          setError(e?.message || "切换素材端口未完成。");
         }
       }, [canvas, refresh]);
       const addReferenceImage = React.useCallback(async (nodeId) => {
@@ -4262,7 +4262,7 @@
             w: NODE_SIZE.image[0],
             h: NODE_SIZE.image[1],
             data: {
-              label: "\u53C2\u8003\u56FE",
+              label: "参考图",
               prompt: "",
               ratio: "1:1",
               resolution: "720p",
@@ -4274,9 +4274,9 @@
           await rpc("edgeAdd", { projectId: canvas.projectId, fromNode: id, toNode: nodeId, fromPort: "out", toPort: "ref" });
           setSelectedIds([id]);
           await refresh();
-          setNotice("\u5DF2\u65B0\u5EFA\u53C2\u8003\u56FE\u8282\u70B9\u5E76\u63A5\u5230\u672C\u8282\u70B9\u7684\u300C\u53C2\u8003\u56FE\u300D\u7AEF\u53E3\uFF1A\u70B9\u5B83\u7684\u300C\u5236\u4F5C\u300D\u751F\u6210\u56FE\u7247\uFF0C\u751F\u6210\u524D\u4ECD\u8981\u5355\u72EC\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002");
+          setNotice("已新建参考图节点并接到本节点的「参考图」端口：点它的「制作」生成图片，生成前仍要单独确认方案与费用。");
         } catch (e) {
-          setError(e?.message || "\u65B0\u5EFA\u53C2\u8003\u56FE\u8282\u70B9\u672A\u5B8C\u6210\u3002");
+          setError(e?.message || "新建参考图节点未完成。");
         }
       }, [canvas, saveNode, refresh]);
       const deleteCanvas = React.useCallback(async () => {
@@ -4288,10 +4288,10 @@
           setConfirmDelete(false);
           const next = list.find((item) => item.projectId !== gone)?.projectId;
           await load(next);
-          setNotice("\u753B\u5E03\u5DF2\u5220\u9664\uFF1B\u5DF2\u751F\u6210\u7684\u6210\u679C\u7D20\u6750\u6587\u4EF6\u4ECD\u4FDD\u7559\u5728\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\uFF0C\u4FBF\u4E8E\u53E6\u884C\u53D6\u7528\u3002");
+          setNotice("画布已删除；已生成的成果素材文件仍保留在插件数据目录，便于另行取用。");
         } catch (e) {
           setConfirmDelete(false);
-          setError(e?.message || "\u5220\u9664\u753B\u5E03\u5931\u8D25");
+          setError(e?.message || "删除画布失败");
         }
       }, [canvas, list, load]);
       const commitRename = React.useCallback(async () => {
@@ -4299,7 +4299,7 @@
         const name = String(inline.value || "").trim();
         if (!name) {
           setInline(null);
-          setError("\u753B\u5E03\u540D\u4E0D\u80FD\u4E3A\u7A7A\uFF0C\u5DF2\u4FDD\u7559\u539F\u540D\u3002");
+          setError("画布名不能为空，已保留原名。");
           return;
         }
         if (name === canvas.name) {
@@ -4313,23 +4313,23 @@
           await refresh();
         } catch (e) {
           setInline(null);
-          setError(e?.message || "\u6539\u540D\u672A\u4FDD\u5B58\uFF0C\u5DF2\u4FDD\u7559\u539F\u540D\u3002");
+          setError(e?.message || "改名未保存，已保留原名。");
         }
       }, [canvas, inline, refresh]);
       const submitCreate = React.useCallback(async () => {
         if (!createDialog) return;
         const name = String(createDialog.value || "").trim();
         if (!name) {
-          setCreateDialog({ ...createDialog, error: "\u753B\u5E03\u540D\u4E0D\u80FD\u4E3A\u7A7A" });
+          setCreateDialog({ ...createDialog, error: "画布名不能为空" });
           return;
         }
         try {
           const { canvas: made } = await rpc("create", { name });
           setCreateDialog(null);
           await load(made.projectId);
-          setNotice("\u5DF2\u65B0\u5EFA\u6D41\u7A0B\u753B\u5E03\uFF1A\u53EF\u4EE5\u52A0\u8282\u70B9\u5F00\u59CB\u753B\u5E03\u5185\u7684\u5236\u4F5C\uFF0C\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7528\u4E8E\u65E2\u6709\u521B\u4F5C\u9879\u76EE\u3002");
+          setNotice("已新建流程画布：可以加节点开始画布内的制作，也可以直接用于既有创作项目。");
         } catch (e) {
-          setCreateDialog({ ...createDialog, error: e?.message || "\u65B0\u5EFA\u753B\u5E03\u672A\u5B8C\u6210\u3002" });
+          setCreateDialog({ ...createDialog, error: e?.message || "新建画布未完成。" });
         }
       }, [createDialog, load]);
       const stopPolling = React.useCallback(() => {
@@ -4437,7 +4437,7 @@
           if (response.job) patchDialog({ stage: "job", job: response.job, busy: false });
           else patchDialog({ plan: response.proposal, confirm: { plan: false, cost: false, textOnly: false }, busy: false });
         } catch (e) {
-          if (alive.current) patchDialog({ busy: false, message: e?.message || "\u5236\u4F5C\u65B9\u6848\u672A\u751F\u6210\u3002" });
+          if (alive.current) patchDialog({ busy: false, message: e?.message || "制作方案未生成。" });
         }
       }, [canvas, dialog, patchDialog]);
       const start = React.useCallback(async () => {
@@ -4455,7 +4455,7 @@
           patchDialog({ stage: "job", job, busy: false });
           watch(job.id);
         } catch (e) {
-          if (alive.current) patchDialog({ busy: false, message: e?.message || "\u5236\u4F5C\u672A\u63D0\u4EA4\u3002" });
+          if (alive.current) patchDialog({ busy: false, message: e?.message || "制作未提交。" });
         }
       }, [dialog, patchDialog, watch]);
       const act = React.useCallback(async (action, extra = {}) => {
@@ -4467,7 +4467,7 @@
           patchDialog({ job, busy: false });
           if (["sync", "review"].includes(action)) await refresh();
         } catch (e) {
-          if (alive.current) patchDialog({ busy: false, message: e?.message || "\u64CD\u4F5C\u672A\u5B8C\u6210\u3002" });
+          if (alive.current) patchDialog({ busy: false, message: e?.message || "操作未完成。" });
         }
       }, [dialog, patchDialog, refresh]);
       const onWheel = (event) => {
@@ -4565,12 +4565,12 @@
         if (node?.data?.metaonticStage) {
           const state = String(node.data.metaonticStageState || "");
           return {
-            text: STAGE_STATE_TEXT[state] || "\u5F85\u5236\u4F5C",
+            text: STAGE_STATE_TEXT[state] || "待制作",
             className: state === "done" ? "mov-chip mov-chip-ok" : state === "pending" ? "mov-chip movc-badge" : `mov-chip movc-stage-${state === "active" ? "active" : "review"}`
           };
         }
-        if (materialOf(node)) return { text: "\u7D20\u6750", className: "mov-chip movc-badge" };
-        return achieved(node) ? { text: "\u5DF2\u5B8C\u6210", className: "mov-chip mov-chip-ok" } : { text: "\u5F85\u5236\u4F5C", className: "mov-chip movc-badge" };
+        if (materialOf(node)) return { text: "素材", className: "mov-chip movc-badge" };
+        return achieved(node) ? { text: "已完成", className: "mov-chip mov-chip-ok" } : { text: "待制作", className: "mov-chip movc-badge" };
       };
       const stageNodes = nodes.filter((node) => node?.data?.metaonticStage);
       const currentStage = stageNodes.find((node) => ["active", "review", "ready"].includes(String(node?.data?.metaonticStageState))) || stageNodes.find((node) => node?.data?.metaonticStageState !== "done");
@@ -4586,10 +4586,10 @@
       const readinessWarnings = readiness.filter((item) => item.severity === "warning").length;
       const readinessNotes = readiness.length - readinessErrors - readinessWarnings;
       const readinessBrief = [
-        readinessErrors ? `${readinessErrors} \u5904\u9519\u8BEF` : "",
-        readinessWarnings ? `${readinessWarnings} \u5904\u63D0\u9192` : "",
-        readinessNotes ? `${readinessNotes} \u5904\u63D0\u793A` : ""
-      ].filter(Boolean).join("\u3001");
+        readinessErrors ? `${readinessErrors} 处错误` : "",
+        readinessWarnings ? `${readinessWarnings} 处提醒` : "",
+        readinessNotes ? `${readinessNotes} 处提示` : ""
+      ].filter(Boolean).join("、");
       const chainable = canvasSegments(canvas).some((node) => node?.type === "video");
       const geometry = (node) => node ? { ...node, ...sizeOf(node), ...positions[node.id] || {} } : null;
       const at = (id) => geometry((canvas?.nodes || {})[id]);
@@ -4603,14 +4603,14 @@
         return { key: `stage-${to.id}`, d: `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}` };
       });
       const batchChecks = [
-        { key: "shots", ok: storyboardReady, label: "\u300C\u786E\u8BA4\u955C\u5934\u300D", hint: "\u81F3\u5C11\u5DF2\u5207\u51FA 1 \u6BB5\u5236\u4F5C\u5185\u5BB9" },
+        { key: "shots", ok: storyboardReady, label: "「确认镜头」", hint: "至少已切出 1 段制作内容" },
         {
           key: "assets",
           ok: assetsReady || ["not_needed", "text_only"].includes(String(stageFactsOf("requirement").choice || "")),
-          label: "\u300C\u51C6\u5907\u7D20\u6750\u300D",
-          hint: `\u4E3A\u89D2\u8272\u56FE / \u9996\u5E27 / \u53C2\u8003\u56FE\u51C6\u5907\u5F62\u8C61\u56FE\uFF08\u5F53\u524D ${stageStats.assets} \u5F20\uFF09`
+          label: "「准备素材」",
+          hint: `为角色图 / 首帧 / 参考图准备形象图（当前 ${stageStats.assets} 张）`
         },
-        { key: "cost", ok: true, label: "\u300C\u786E\u8BA4\u8D39\u7528\u300D", hint: "\u6BCF\u6BB5\u751F\u6210\u524D\u4ECD\u8981\u5355\u72EC\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528" }
+        { key: "cost", ok: true, label: "「确认费用」", hint: "每段生成前仍要单独确认方案与费用" }
       ];
       const chainPlanPending = chainDialog?.plan ? chainDialog.plan.segments.filter((segment) => !segment.skip).length : 0;
       const confirmScript = React.useCallback(async () => {
@@ -4623,9 +4623,9 @@
         try {
           for (const id of changed) await saveNode(id, { data: rewritten[id].data });
           await refresh();
-          setNotice("\u811A\u672C\u5BA1\u6838\u5DF2\u901A\u8FC7\uFF1A\u753B\u5E03\u4E0A\u7684\u9636\u6BB5\u5361\u2461\u6807\u4E3A\u5DF2\u5B8C\u6210\u3002\u63A5\u7740\u70B9\u300C\u770B\u4F30\u4EF7\u300D\u6838\u5BF9\u6574\u6761\u94FE\u8DEF\uFF0C\u6216\u70B9\u300C\u505A\u8FD9\u4E00\u6BB5\u300D\u9010\u6BB5\u751F\u6210\uFF0C\u6BCF\u6BB5\u4ECD\u8981\u5355\u72EC\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002");
+          setNotice("脚本审核已通过：画布上的阶段卡②标为已完成。接着点「看估价」核对整条链路，或点「做这一段」逐段生成，每段仍要单独确认方案与费用。");
         } catch (e) {
-          setError(e?.message || "\u811A\u672C\u5BA1\u6838\u6CA1\u8BB0\u4E0A\uFF0C\u8BF7\u91CD\u8BD5\u3002");
+          setError(e?.message || "脚本审核没记上，请重试。");
         }
       }, [canvas, refresh, saveNode, stageFactsOf, openScript]);
       const runStageAction = (key) => {
@@ -4661,13 +4661,13 @@
             void openDialog(board);
             return;
           }
-          setNotice("\u8FD9\u4EFD\u811A\u672C\u6309\u573A\u666F\u4E0E\u53E5\u5B50\u5207\u6BB5\uFF0C\u6CA1\u6709\u5355\u72EC\u7684\u5206\u955C\u8282\u70B9\uFF1B\u6BCF\u6BB5\u63D0\u793A\u8BCD\u5728\u5BF9\u5E94\u7684\u5236\u4F5C\u8282\u70B9\u91CC\u3002");
+          setNotice("这份脚本按场景与句子切段，没有单独的分镜节点；每段提示词在对应的制作节点里。");
           return;
         }
         if (key === "assets") {
           const node = (canvas.nodes || {})[nextStep?.id];
           if (!node) {
-            setNotice("\u5236\u4F5C\u6BB5\u90FD\u5DF2\u6709\u6210\u679C\uFF1B\u8981\u8865\u7D20\u6750\uFF0C\u70B9\u67D0\u4E2A\u8282\u70B9\u81EA\u5DF1\u7684\u300C\u5236\u4F5C\u300D\uFF0C\u5728\u7A97\u53E3\u91CC\u7528\u300C\u5BFC\u5165\u56FE\u7247\u7D20\u6750\u300D\u6216\u300C\u65B0\u5EFA\u53C2\u8003\u56FE\u8282\u70B9\u300D\u3002");
+            setNotice("制作段都已有成果；要补素材，点某个节点自己的「制作」，在窗口里用「导入图片素材」或「新建参考图节点」。");
             return;
           }
           if (!assetsReady) {
@@ -4691,7 +4691,7 @@
             void openDialog(node);
             return;
           }
-          setNotice("\u5236\u4F5C\u6BB5\u90FD\u5DF2\u6709\u6210\u679C\uFF1B\u8981\u91CD\u505A\u67D0\u4E00\u6BB5\uFF0C\u70B9\u90A3\u4E2A\u8282\u70B9\u81EA\u5DF1\u7684\u300C\u5236\u4F5C\u300D\uFF0C\u91CD\u65B0\u6838\u5BF9\u65B9\u6848\u5E76\u786E\u8BA4\u8D39\u7528\u3002");
+          setNotice("制作段都已有成果；要重做某一段，点那个节点自己的「制作」，重新核对方案并确认费用。");
         }
       };
       const stageBody = (node) => {
@@ -4715,17 +4715,17 @@
       };
       const mediaInbound = dialog?.type === "video" && dialog.stage === "form" ? edges.filter((edge) => edge.toNode === dialog.nodeId && ["ref", "frame"].includes(edge.toPort) && ["image", "video"].includes(kindOf(edge.fromNode))) : [];
       const formFields = dialog && ["form", "plan", "edit"].includes(dialog.stage) ? h("div", { key: "fields" }, [
-        dialog.stage === "edit" ? h("label", { key: "text", className: "movc-field" }, ["\u8282\u70B9\u5185\u5BB9", h("textarea", { value: dialog.form.text, onChange: (e) => patchDialog({ form: { ...dialog.form, text: e.target.value } }) })]) : h("label", { key: "prompt", className: "movc-field" }, ["\u672C\u6B21\u8981\u751F\u6210\u7684\u753B\u9762 / \u7EED\u62CD\u5185\u5BB9", h("textarea", { value: dialog.form.prompt, placeholder: "\u5199\u6E05\u4E3B\u4F53\u3001\u52A8\u4F5C\u3001\u955C\u5934\u4E0E\u58F0\u97F3\uFF1B\u7559\u7A7A\u4F1A\u7528\u8282\u70B9\u4E0E\u4E0A\u6E38\u811A\u672C\u6587\u672C\u3002", onChange: (e) => patchDialog({ form: { ...dialog.form, prompt: e.target.value } }) })]),
+        dialog.stage === "edit" ? h("label", { key: "text", className: "movc-field" }, ["节点内容", h("textarea", { value: dialog.form.text, onChange: (e) => patchDialog({ form: { ...dialog.form, text: e.target.value } }) })]) : h("label", { key: "prompt", className: "movc-field" }, ["本次要生成的画面 / 续拍内容", h("textarea", { value: dialog.form.prompt, placeholder: "写清主体、动作、镜头与声音；留空会用节点与上游脚本文本。", onChange: (e) => patchDialog({ form: { ...dialog.form, prompt: e.target.value } }) })]),
         dialog.type === "video" && dialog.stage !== "edit" ? h("div", { key: "spec", className: "movc-row" }, [
-          h("label", { key: "ratio", className: "movc-field" }, ["\u753B\u5E45", h("select", { value: dialog.form.ratio, onChange: (e) => patchDialog({ form: { ...dialog.form, ratio: e.target.value } }) }, RATIOS.map((r) => h("option", { key: r, value: r }, r)))]),
-          h("label", { key: "duration", className: "movc-field" }, ["\u672C\u6BB5\u65F6\u957F\uFF08\u79D2\uFF09", h("input", { type: "number", min: 4, value: dialog.form.duration, onChange: (e) => patchDialog({ form: { ...dialog.form, duration: e.target.value } }) })]),
-          h("label", { key: "resolution", className: "movc-field" }, ["\u6E05\u6670\u5EA6", h("select", { value: dialog.form.resolution, onChange: (e) => patchDialog({ form: { ...dialog.form, resolution: e.target.value } }) }, RESOLUTIONS.map((r) => h("option", { key: r, value: r }, r.toUpperCase())))])
+          h("label", { key: "ratio", className: "movc-field" }, ["画幅", h("select", { value: dialog.form.ratio, onChange: (e) => patchDialog({ form: { ...dialog.form, ratio: e.target.value } }) }, RATIOS.map((r) => h("option", { key: r, value: r }, r)))]),
+          h("label", { key: "duration", className: "movc-field" }, ["本段时长（秒）", h("input", { type: "number", min: 4, value: dialog.form.duration, onChange: (e) => patchDialog({ form: { ...dialog.form, duration: e.target.value } }) })]),
+          h("label", { key: "resolution", className: "movc-field" }, ["清晰度", h("select", { value: dialog.form.resolution, onChange: (e) => patchDialog({ form: { ...dialog.form, resolution: e.target.value } }) }, RESOLUTIONS.map((r) => h("option", { key: r, value: r }, r.toUpperCase())))])
         ]) : null,
-        dialog.type === "video" && dialog.stage !== "edit" ? h("label", { key: "audio", className: "movc-check" }, [h("input", { type: "checkbox", checked: dialog.form.generateAudio === true, onChange: (e) => patchDialog({ form: { ...dialog.form, generateAudio: e.target.checked } }) }), " \u672C\u6B21\u751F\u6210\u97F3\u9891"]) : null,
+        dialog.type === "video" && dialog.stage !== "edit" ? h("label", { key: "audio", className: "movc-check" }, [h("input", { type: "checkbox", checked: dialog.form.generateAudio === true, onChange: (e) => patchDialog({ form: { ...dialog.form, generateAudio: e.target.checked } }) }), " 本次生成音频"]) : null,
         // 参考素材在制作窗口里就地补充：导入自己的图片，或新建一个图片节点去生成参考图。
         dialog.type === "video" && dialog.stage === "form" ? h("div", { key: "refs-add", className: "movc-row" }, [
-          h("button", { key: "import", type: "button", className: "mov-btn", disabled: importing, title: "\u628A\u81EA\u5DF1\u7684\u56FE\u7247\u5199\u8FDB\u753B\u5E03\u6570\u636E\u76EE\u5F55\uFF0C\u5E76\u63A5\u5230\u672C\u8282\u70B9\u7684\u300C\u53C2\u8003\u56FE\u300D\u7AEF\u53E3", onClick: () => importRef.current?.click() }, importing ? "\u5BFC\u5165\u4E2D\u2026" : "\u5BFC\u5165\u56FE\u7247\u7D20\u6750"),
-          h("button", { key: "image-node", type: "button", className: "mov-btn", title: "\u65B0\u5EFA\u4E00\u4E2A\u56FE\u7247\u8282\u70B9\u5E76\u63A5\u5230\u672C\u8282\u70B9\u7684\u300C\u53C2\u8003\u56FE\u300D\u7AEF\u53E3\uFF0C\u5728\u5B83\u81EA\u5DF1\u7684\u300C\u5236\u4F5C\u300D\u91CC\u751F\u6210\u53C2\u8003\u56FE", onClick: () => void addReferenceImage(dialog.nodeId) }, "\u65B0\u5EFA\u53C2\u8003\u56FE\u8282\u70B9"),
+          h("button", { key: "import", type: "button", className: "mov-btn", disabled: importing, title: "把自己的图片写进画布数据目录，并接到本节点的「参考图」端口", onClick: () => importRef.current?.click() }, importing ? "导入中…" : "导入图片素材"),
+          h("button", { key: "image-node", type: "button", className: "mov-btn", title: "新建一个图片节点并接到本节点的「参考图」端口，在它自己的「制作」里生成参考图", onClick: () => void addReferenceImage(dialog.nodeId) }, "新建参考图节点"),
           h("input", {
             key: "import-input",
             type: "file",
@@ -4736,31 +4736,31 @@
             onChange: (e) => void importImages(e.target.files, dialog.nodeId)
           })
         ]) : null,
-        dialog.stage === "plan" && dialog.plan?.operation === "extend" ? h("label", { key: "transition", className: "movc-field" }, ["\u4E0A\u4E00\u6BB5\u7ED3\u5C3E\u5230\u672C\u6BB5\u7684\u8854\u63A5\u63CF\u8FF0", h("textarea", { value: dialog.form.transitionDescription, onChange: (e) => patchDialog({ form: { ...dialog.form, transitionDescription: e.target.value } }) })]) : null,
+        dialog.stage === "plan" && dialog.plan?.operation === "extend" ? h("label", { key: "transition", className: "movc-field" }, ["上一段结尾到本段的衔接描述", h("textarea", { value: dialog.form.transitionDescription, onChange: (e) => patchDialog({ form: { ...dialog.form, transitionDescription: e.target.value } }) })]) : null,
         mediaInbound.length ? h("div", { key: "ports", className: "movc-plan" }, [
-          h("div", { key: "hint" }, "\u4E0A\u6E38\u7D20\u6750\u7AEF\u53E3\uFF1A\u300C\u9996\u5E27\u300D\u7528\u4E00\u5F20\u56FE\u5F00\u753B\uFF0C\u300C\u53C2\u8003\u56FE\u300D\u6309\u53C2\u8003\u7D20\u6750\u53C2\u4E0E\u751F\u6210\uFF1B\u4E24\u8005\u4E0D\u80FD\u540C\u65F6\u4F7F\u7528\u3002"),
+          h("div", { key: "hint" }, "上游素材端口：「首帧」用一张图开画，「参考图」按参考素材参与生成；两者不能同时使用。"),
           ...mediaInbound.map((edge) => h("div", { key: edge.id, className: "movc-row" }, [
             h("span", { key: "name" }, labelOf((canvas?.nodes || {})[edge.fromNode])),
             h(
               "select",
               { key: "port", value: edge.toPort, onChange: (e) => void setEdgePort(edge, e.target.value) },
-              ["ref", "frame"].map((port) => h("option", { key: port, value: port }, port === "frame" ? "\u9996\u5E27" : "\u53C2\u8003\u56FE"))
+              ["ref", "frame"].map((port) => h("option", { key: port, value: port }, port === "frame" ? "首帧" : "参考图"))
             ),
-            h("button", { key: "off", type: "button", className: "mov-btn movc-danger", onClick: () => void removeEdge(edge.id) }, "\u65AD\u5F00")
+            h("button", { key: "off", type: "button", className: "mov-btn movc-danger", onClick: () => void removeEdge(edge.id) }, "断开")
           ]))
         ]) : null
       ]) : null;
       const planView = dialog?.stage === "plan" && dialog.plan ? h("div", { key: "plan", className: "movc-plan" }, [
         h("div", { key: "prompt", style: { whiteSpace: "pre-wrap", maxHeight: "26vh", overflow: "auto" } }, dialog.plan.prompt),
-        h("div", { key: "spec" }, `${dialog.plan.model} \xB7 ${dialog.plan.ratio}${dialog.plan.duration ? ` \xB7 ${dialog.plan.duration}\u79D2 \xB7 ${String(dialog.plan.resolution).toUpperCase()} \xB7 \u97F3\u9891${dialog.plan.generateAudio ? "\u5F00" : "\u5173"}` : " \xB7 2048\xD72048"}`),
-        h("div", { key: "refs" }, dialog.plan.references?.length ? `\u53C2\u8003\u7D20\u6750\uFF1A${dialog.plan.references.map((r) => `${r.port}\u2190${r.nodeId}`).join("\u3001")}` : "\u65E0\u53C2\u8003\u7D20\u6750\uFF08\u7EAF\u6587\u672C\u751F\u6210\uFF09"),
-        h("div", { key: "cost" }, dialog.plan.estimate ? `\u9884\u4F30\u8D39\u7528\uFF1A${money2(dialog.plan.estimate.cny)}\uFF08\u57FA\u7840\u516C\u5F0F\u4F30\u4EF7\uFF0C\u5B9E\u9645\u6309\u6E20\u9053\u8D26\u5355\u7ED3\u7B97\uFF09` : "\u5F53\u524D\u4EF7\u76EE\u672A\u77E5\uFF1A\u786E\u8BA4\u540E\u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39\uFF0C\u4E0D\u7F16\u9020\u91D1\u989D\u3002"),
+        h("div", { key: "spec" }, `${dialog.plan.model} · ${dialog.plan.ratio}${dialog.plan.duration ? ` · ${dialog.plan.duration}秒 · ${String(dialog.plan.resolution).toUpperCase()} · 音频${dialog.plan.generateAudio ? "开" : "关"}` : " · 2048×2048"}`),
+        h("div", { key: "refs" }, dialog.plan.references?.length ? `参考素材：${dialog.plan.references.map((r) => `${r.port}←${r.nodeId}`).join("、")}` : "无参考素材（纯文本生成）"),
+        h("div", { key: "cost" }, dialog.plan.estimate ? `预估费用：${money2(dialog.plan.estimate.cny)}（基础公式估价，实际按渠道账单结算）` : "当前价目未知：确认后按实际调用计费，不编造金额。"),
         ...(dialog.plan.notes || []).map((note, index) => h("div", { key: `n${index}` }, note))
       ]) : null;
       const jobView = dialog?.stage === "job" && dialog.job ? h("div", { key: "job" }, [
         h("div", { key: "state", className: "movc-plan" }, [
-          h("div", { key: "s" }, `${dialog.job.operation === "extend" ? "\u7EED\u62CD" : "\u751F\u6210"} \xB7 ${phaseText(dialog.job.state)}${dialog.job.taskId ? ` \xB7 \u4EFB\u52A1 ${dialog.job.taskId}` : ""}`),
-          h("div", { key: "r" }, `\u7ED3\u679C\u5BA1\u6838\uFF1A${dialog.job.reviewed ? "\u5DF2\u901A\u8FC7" : "\u672A\u901A\u8FC7"}\uFF1B\u56DE\u586B\uFF1A${dialog.job.sync?.status || (dialog.job.media?.length ? "\u5F85\u56DE\u586B" : "\u65E0\u6210\u679C")}`),
+          h("div", { key: "s" }, `${dialog.job.operation === "extend" ? "续拍" : "生成"} · ${phaseText(dialog.job.state)}${dialog.job.taskId ? ` · 任务 ${dialog.job.taskId}` : ""}`),
+          h("div", { key: "r" }, `结果审核：${dialog.job.reviewed ? "已通过" : "未通过"}；回填：${dialog.job.sync?.status || (dialog.job.media?.length ? "待回填" : "无成果")}`),
           dialog.job.message ? h("div", { key: "m" }, dialog.job.message) : null
         ]),
         ...(dialog.job.media || []).map((media, index) => h(media.kind === "image" ? "img" : "video", {
@@ -4773,17 +4773,17 @@
           style: { maxHeight: "38vh" }
         })),
         h("div", { key: "ops", className: "movc-row" }, [
-          dialog.job.media?.length && !dialog.job.reviewed ? h("button", { key: "ok", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => void act("review", { accept: true }) }, "\u786E\u8BA4\u7ED3\u679C\u5E76\u7EE7\u7EED") : null,
-          dialog.job.media?.length && !dialog.job.reviewed ? h("button", { key: "no", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => void closeDialog() }, "\u4E0D\u901A\u8FC7\uFF08\u4FDD\u7559\u6210\u679C\uFF09") : null,
-          dialog.job.sync?.status !== "synced" && dialog.job.media?.length ? h("button", { key: "sync", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => void act("sync") }, "\u8865\u56DE\u586B\u753B\u5E03") : null,
-          ["unknown", "interrupted", "submission_unknown"].includes(dialog.job.state) ? h("button", { key: "query", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => void act("query") }, "\u67E5\u8BE2\u539F\u4EFB\u52A1") : null,
-          dialog.type === "video" && dialog.job.reviewed && dialog.job.media?.length ? h("button", { key: "extend", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => patchDialog({ stage: "form", plan: null }) }, "\u7EED\u62CD\u4E0B\u4E00\u6BB5") : null,
-          dialog.job.state !== "running" ? h("button", { key: "again", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => patchDialog({ stage: "form", job: null, plan: null }) }, "\u91CD\u65B0\u751F\u6210\uFF08\u91CD\u65B0\u786E\u8BA4\u8D39\u7528\uFF09") : null
+          dialog.job.media?.length && !dialog.job.reviewed ? h("button", { key: "ok", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => void act("review", { accept: true }) }, "确认结果并继续") : null,
+          dialog.job.media?.length && !dialog.job.reviewed ? h("button", { key: "no", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => void closeDialog() }, "不通过（保留成果）") : null,
+          dialog.job.sync?.status !== "synced" && dialog.job.media?.length ? h("button", { key: "sync", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => void act("sync") }, "补回填画布") : null,
+          ["unknown", "interrupted", "submission_unknown"].includes(dialog.job.state) ? h("button", { key: "query", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => void act("query") }, "查询原任务") : null,
+          dialog.type === "video" && dialog.job.reviewed && dialog.job.media?.length ? h("button", { key: "extend", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => patchDialog({ stage: "form", plan: null }) }, "续拍下一段") : null,
+          dialog.job.state !== "running" ? h("button", { key: "again", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => patchDialog({ stage: "form", job: null, plan: null }) }, "重新生成（重新确认费用）") : null
         ])
       ]) : null;
       return h("section", { className: ROOT_CLASS }, [
         h("style", { key: "css" }, PAGE_CSS + CSS),
-        h("div", { key: "title", className: "mov-section-title" }, "\u6D41\u7A0B\u753B\u5E03"),
+        h("div", { key: "title", className: "mov-section-title" }, "流程画布"),
         // 画布操作全部放最上面：先选画布、再操作当前画布，画布区只负责画本事。
         h("div", { key: "top", className: "movc-top" }, [
           h("div", { key: "ops", className: "movc-bar movc-ops" }, [
@@ -4792,7 +4792,7 @@
                 key: "input",
                 autoFocus: true,
                 value: inline.value,
-                "aria-label": "\u753B\u5E03\u540D\u79F0",
+                "aria-label": "画布名称",
                 onChange: (e) => setInline({ value: e.target.value, error: "" }),
                 onKeyDown: (e) => {
                   if (e.key === "Enter") {
@@ -4807,21 +4807,21 @@
                 onBlur: () => void commitRename()
               })
             ] : [
-              h("button", { key: "text", type: "button", className: "movc-name-text", title: "\u53CC\u51FB\u753B\u5E03\u540D\u91CD\u547D\u540D", onDoubleClick: () => setInline({ value: canvas.name || "", error: "" }) }, canvas.name || canvas.projectId),
-              h("button", { key: "edit", type: "button", className: "movc-mini", title: "\u91CD\u547D\u540D", onClick: () => setInline({ value: canvas.name || "", error: "" }) }, "\u270E")
-            ]) : h("span", { key: "name-empty", className: "movc-name-empty" }, "\u672A\u9009\u62E9\u753B\u5E03"),
+              h("button", { key: "text", type: "button", className: "movc-name-text", title: "双击画布名重命名", onDoubleClick: () => setInline({ value: canvas.name || "", error: "" }) }, canvas.name || canvas.projectId),
+              h("button", { key: "edit", type: "button", className: "movc-mini", title: "重命名", onClick: () => setInline({ value: canvas.name || "", error: "" }) }, "✎")
+            ]) : h("span", { key: "name-empty", className: "movc-name-empty" }, "未选择画布"),
             h("span", { key: "sep-a", className: "movc-sep" }),
-            h("button", { key: "new-canvas", type: "button", className: "mov-btn mov-btn-primary", onClick: () => setCreateDialog({ value: "", error: "" }) }, "\u65B0\u5EFA\u753B\u5E03\u2026"),
+            h("button", { key: "new-canvas", type: "button", className: "mov-btn mov-btn-primary", onClick: () => setCreateDialog({ value: "", error: "" }) }, "新建画布…"),
             canvas ? h("span", { key: "sep-b", className: "movc-sep" }) : null,
-            canvas ? h("button", { key: "chain", type: "button", className: "mov-btn", title: "\u4E00\u6B21\u786E\u8BA4\u6574\u6761\u94FE\u8DEF\u7684\u65B9\u6848\u4E0E\u603B\u8D39\u7528\uFF0C\u6309\u987A\u5E8F\u9010\u6BB5\u751F\u6210\uFF1B\u6BCF\u6BB5\u6210\u679C\u4ECD\u9700\u4F60\u5BA1\u6838", onClick: () => void openChain() }, "\u8FDE\u62CD") : null,
+            canvas ? h("button", { key: "chain", type: "button", className: "mov-btn", title: "一次确认整条链路的方案与总费用，按顺序逐段生成；每段成果仍需你审核", onClick: () => void openChain() }, "连拍") : null,
             canvas ? h("button", {
               key: "merge-film",
               type: "button",
               className: "mov-btn movc-run",
               disabled: Boolean(filmDialog?.busy) || !film?.total,
-              title: film?.missing?.length ? `\u8FD8\u6709 ${film.missing.length} \u6BB5\u6CA1\u6709\u6210\u679C\uFF1A${film.missing.join("\u3001")}` : film?.total ? "\u628A\u5DF2\u751F\u6210\u7684\u6BCF\u6BB5\u89C6\u9891\u6309\u8FDE\u7EBF\u987A\u5E8F\u62FC\u6210\u4E00\u6761\u6210\u7247\uFF0C\u53EA\u9700\u4E00\u6B21\u786E\u8BA4" : "\u753B\u5E03\u4E0A\u8FD8\u6CA1\u6709\u89C6\u9891\u8282\u70B9",
+              title: film?.missing?.length ? `还有 ${film.missing.length} 段没有成果：${film.missing.join("、")}` : film?.total ? "把已生成的每段视频按连线顺序拼成一条成片，只需一次确认" : "画布上还没有视频节点",
               onClick: () => void mergeFilm()
-            }, filmDialog?.busy ? "\u5408\u6210\u4E2D\u2026" : "\u5408\u6210\u6210\u7247") : null,
+            }, filmDialog?.busy ? "合成中…" : "合成成片") : null,
             canvas ? h("span", { key: "sep-flow", className: "movc-sep" }) : null,
             canvas ? h(
               "button",
@@ -4830,35 +4830,35 @@
                 type: "button",
                 className: "mov-btn movc-run",
                 disabled: !nextStep,
-                title: nextStep ? `\u5F53\u524D\u8BFB\u53D6\u8282\u70B9\u5185\u5BB9\u5E76\u6CBF\u4E0A\u6E38\u62FC\u63A5\u63D0\u793A\u8BCD\uFF0C\u751F\u6210\u524D\u4ECD\u9700\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528` : "\u6D41\u7A0B\u91CC\u7684\u5236\u4F5C\u8282\u70B9\u90FD\u5DF2\u6709\u6210\u679C",
+                title: nextStep ? `当前读取节点内容并沿上游拼接提示词，生成前仍需确认方案与费用` : "流程里的制作节点都已有成果",
                 onClick: () => {
                   const node = (canvas?.nodes || {})[nextStep?.id];
                   if (node) void openDialog(node);
                 }
               },
-              nextStep ? `\u5236\u4F5C\u300C${labelOf((canvas?.nodes || {})[nextStep.id])}\u300D` : "\u6D41\u7A0B\u5DF2\u5B8C\u6210"
+              nextStep ? `制作「${labelOf((canvas?.nodes || {})[nextStep.id])}」` : "流程已完成"
             ) : null,
-            canvas && steps.length ? h("span", { key: "flow-progress", className: "movc-flow" }, `\u6D41\u7A0B\u8FDB\u5EA6 ${doneSteps}/${steps.length}${nextStep ? "" : " \xB7 \u5168\u90E8\u6709\u6210\u679C"}`) : null,
+            canvas && steps.length ? h("span", { key: "flow-progress", className: "movc-flow" }, `流程进度 ${doneSteps}/${steps.length}${nextStep ? "" : " · 全部有成果"}`) : null,
             canvas ? h("span", { key: "sep-c", className: "movc-sep" }) : null,
-            canvas ? h("button", { key: "refresh", type: "button", className: "mov-btn", onClick: () => void refresh() }, "\u5237\u65B0") : null,
-            canvas ? h("button", { key: "tidy", type: "button", className: "mov-btn", title: "\u6309\u8FDE\u7EBF\u91CD\u6392\u8282\u70B9\u3001\u81EA\u52A8\u7559\u767D\u5BF9\u9F50\u5E76\u9002\u914D\u89C6\u56FE\uFF0C\u4E0D\u6539\u5185\u5BB9\u4E0E\u8FDE\u7EBF", onClick: () => void tidy() }, "\u7F8E\u5316\u5E03\u5C40") : null,
-            canvas ? h("button", { key: "reset", type: "button", className: "mov-btn", title: "\u628A\u89C6\u56FE\u6062\u590D\u5230\u9ED8\u8BA4\u4F4D\u7F6E\uFF1B\u5E26\u6D41\u7A0B\u9636\u6BB5\u6761\u65F6\u6309\u6574\u5F20\u56FE\u9002\u914D", onClick: () => stageNodes.length ? fitStage(canvas, {}) : setView({ x: 30, y: 24, scale: 1 }) }, "\u91CD\u7F6E\u89C6\u56FE") : null,
-            canvas ? h("button", { key: "export", type: "button", className: "mov-btn", onClick: () => exportCanvas() }, "\u5BFC\u51FA JSON") : null,
+            canvas ? h("button", { key: "refresh", type: "button", className: "mov-btn", onClick: () => void refresh() }, "刷新") : null,
+            canvas ? h("button", { key: "tidy", type: "button", className: "mov-btn", title: "按连线重排节点、自动留白对齐并适配视图，不改内容与连线", onClick: () => void tidy() }, "美化布局") : null,
+            canvas ? h("button", { key: "reset", type: "button", className: "mov-btn", title: "把视图恢复到默认位置；带流程阶段条时按整张图适配", onClick: () => stageNodes.length ? fitStage(canvas, {}) : setView({ x: 30, y: 24, scale: 1 }) }, "重置视图") : null,
+            canvas ? h("button", { key: "export", type: "button", className: "mov-btn", onClick: () => exportCanvas() }, "导出 JSON") : null,
             canvas ? h("span", { key: "sep-d", className: "movc-sep" }) : null,
-            canvas && selectedIds.length ? h("button", { key: "del-selected", type: "button", className: "mov-btn movc-danger", onClick: () => void removeNodes(selectedIds) }, `\u5220\u9664\u9009\u4E2D\uFF08${selectedIds.length}\uFF09`) : null,
-            canvas ? h("button", { key: "del-canvas", type: "button", className: "mov-btn movc-danger", onClick: () => setConfirmDelete(true) }, "\u5220\u9664\u753B\u5E03") : null
+            canvas && selectedIds.length ? h("button", { key: "del-selected", type: "button", className: "mov-btn movc-danger", onClick: () => void removeNodes(selectedIds) }, `删除选中（${selectedIds.length}）`) : null,
+            canvas ? h("button", { key: "del-canvas", type: "button", className: "mov-btn movc-danger", onClick: () => setConfirmDelete(true) }, "删除画布") : null
           ]),
           h("div", { key: "picker", className: "movc-bar movc-picker" }, [
-            h("span", { key: "pick-label", className: "movc-pick" }, "\u9009\u62E9\u753B\u5E03"),
+            h("span", { key: "pick-label", className: "movc-pick" }, "选择画布"),
             list.length ? h("div", { key: "list", className: "movc-list" }, list.map((item) => h(
               "button",
               { key: item.projectId, type: "button", className: "movc-chip", "data-active": String(canvas?.projectId === item.projectId), onClick: () => void load(item.projectId) },
-              `${item.name} \xB7 ${item.nodeCount} \u8282\u70B9`
-            ))) : h("span", { key: "no-canvas", className: "movc-hint" }, "\u6682\u65E0\u753B\u5E03\uFF0C\u70B9\u300C\u65B0\u5EFA\u753B\u5E03\u2026\u300D\u521B\u5EFA\u4E00\u4EFD\u7A7A\u767D\u6587\u6863\u3002")
+              `${item.name} · ${item.nodeCount} 节点`
+            ))) : h("span", { key: "no-canvas", className: "movc-hint" }, "暂无画布，点「新建画布…」创建一份空白文档。")
           ])
         ]),
         error ? h("p", { key: "error", className: "movc-hint" }, error) : null,
-        !list.length ? h("p", { key: "empty", className: "movc-hint" }, "\u8FD8\u6CA1\u6709\u6D41\u7A0B\u753B\u5E03\uFF1A\u70B9\u300C\u65B0\u5EFA\u753B\u5E03\u2026\u300D\u53EF\u4EE5\u7ACB\u523B\u521B\u5EFA\u4E00\u4EFD\u7A7A\u767D\u6587\u6863\uFF1B\u5982\u679C\u5728\u8BBE\u7F6E\u9875\u6253\u5F00\u300C\u81EA\u52A8\u521B\u5EFA\u6D41\u7A0B\u753B\u5E03\u300D\uFF08\u9ED8\u8BA4\u5173\u95ED\uFF09\uFF0C\u666E\u901A\u521B\u4F5C\u786E\u8BA4\u9700\u6C42\u540E\u4E5F\u4F1A\u5728\u8FD9\u91CC\u81EA\u52A8\u5EFA\u7ACB\uFF0C\u811A\u672C\u5BA1\u6838\u540E\u540C\u6B65\u5206\u955C\u4E0E\u5236\u4F5C\u6BB5\u8BA1\u5212\uFF0C\u751F\u6210\u6210\u679C\u81EA\u52A8\u56DE\u586B\u3002") : null,
+        !list.length ? h("p", { key: "empty", className: "movc-hint" }, "还没有流程画布：点「新建画布…」可以立刻创建一份空白文档；如果在设置页打开「自动创建流程画布」（默认关闭），普通创作确认需求后也会在这里自动建立，脚本审核后同步分镜与制作段计划，生成成果自动回填。") : null,
         canvas ? h("div", {
           key: "stage",
           ref: stageRef,
@@ -4907,7 +4907,7 @@
                         e.stopPropagation();
                         void removeEdge(edge.id);
                       } },
-                      h("title", { key: "title" }, "\u70B9\u51FB\u65AD\u5F00\u8FD9\u6761\u8FDE\u7EBF")
+                      h("title", { key: "title" }, "点击断开这条连线")
                     )
                   ]);
                 }),
@@ -4947,31 +4947,31 @@
                       key: "approve",
                       type: "button",
                       className: `movc-mini${scriptApproved ? "" : " movc-mini-primary"}`,
-                      title: scriptApproved ? "\u5267\u672C\u5DF2\u6838\u5BF9\u901A\u8FC7\uFF1B\u70B9\u5F00\u53EF\u7EE7\u7EED\u4FEE\u6539\u5185\u5BB9" : "\u6838\u5BF9\u8FC7\u5267\u672C\u4E0E\u6BCF\u6BB5\u63D0\u793A\u8BCD\u540E\u70B9\u8FD9\u91CC\uFF1A\u811A\u672C\u5BA1\u6838\u901A\u8FC7\uFF0C\u9636\u6BB5\u5361\u2461\u6807\u4E3A\u5DF2\u5B8C\u6210",
+                      title: scriptApproved ? "剧本已核对通过；点开可继续修改内容" : "核对过剧本与每段提示词后点这里：脚本审核通过，阶段卡②标为已完成",
                       onPointerDown: (e) => e.stopPropagation(),
                       onClick: (e) => {
                         e.stopPropagation();
                         if (scriptApproved) void openDialog(node);
                         else void confirmScript();
                       }
-                    }, scriptApproved ? "\u5DF2\u5BA1\u6838" : "\u786E\u8BA4\u811A\u672C") : null,
+                    }, scriptApproved ? "已审核" : "确认脚本") : null,
                     h("button", { key: "edit", type: "button", className: "movc-mini", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
                       e.stopPropagation();
                       void openDialog(node);
-                    } }, media ? "\u5236\u4F5C" : "\u7F16\u8F91"),
+                    } }, media ? "制作" : "编辑"),
                     h("button", { key: "copy", type: "button", className: "movc-mini", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
                       e.stopPropagation();
                       void duplicateNode(node);
-                    } }, "\u590D\u5236"),
+                    } }, "复制"),
                     h("button", { key: "link", type: "button", className: "movc-mini", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
                       e.stopPropagation();
                       setConnectFrom(connectFrom === node.id ? "" : node.id);
                       setSelectedIds([node.id]);
-                    } }, connectFrom === node.id ? "\u53D6\u6D88\u8FDE\u7EBF" : "\u8FDE\u7EBF"),
+                    } }, connectFrom === node.id ? "取消连线" : "连线"),
                     h("button", { key: "del", type: "button", className: "movc-mini movc-mini-danger", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
                       e.stopPropagation();
                       void removeNodes([node.id]);
-                    } }, "\u5220\u9664")
+                    } }, "删除")
                   ])
                 ]),
                 isStage ? stageBody(node) : nodeBody(node)
@@ -4985,10 +4985,10 @@
             height: Math.abs(marquee.y2 - marquee.y1)
           } }) : null,
           // 画布本身就是生成流程：入口放在画布上，不放工具条的一排建节点按钮。
-          canvas && nodes.length ? h("button", { key: "flow-entry", type: "button", className: "movc-flow-entry", title: "\u8DDF\u5BF9\u8BDD\u4E00\u6837\u4E24\u6B65\u8D70\uFF1A\u5148\u521B\u5EFA\u9700\u6C42\uFF0C\u518D\u5199\u811A\u672C\uFF0C\u7136\u540E\u94FA\u5F00\u5206\u955C\u4E0E\u6BCF\u6BB5\u5236\u4F5C", onClick: (event) => {
+          canvas && nodes.length ? h("button", { key: "flow-entry", type: "button", className: "movc-flow-entry", title: "跟对话一样两步走：先创建需求，再写脚本，然后铺开分镜与每段制作", onClick: (event) => {
             event.stopPropagation();
             void openFlow();
-          } }, "\uFF0B \u521B\u4F5C\u6D41\u7A0B") : null,
+          } }, "＋ 创作流程") : null,
           canvas && !nodes.length ? h("div", {
             key: "invite",
             className: "movc-invite",
@@ -5005,31 +5005,31 @@
               }
             }
           }, [
-            h("strong", { key: "h" }, "\u70B9\u51FB\u753B\u5E03\u5F00\u59CB\u521B\u4F5C"),
-            h("span", { key: "p" }, "\u8DDF\u5BF9\u8BDD\u4E00\u6837\u4E24\u6B65\u8D70\uFF1A\u5148\u521B\u5EFA\u9700\u6C42\uFF0C\u518D\u5199\u811A\u672C\uFF0C\u7136\u540E\u94FA\u5F00\u6574\u6761\u751F\u6210\u6D41\u7A0B\u2014\u2014\u9700\u6C42\u786E\u8BA4 \u2192 \u5267\u672C \u2192 \u5206\u955C \u2192 \u6BCF\u6BB5\u5236\u4F5C \u2192 \u5408\u6210\u6210\u7247\u3002\u751F\u6210\u524D\u4ECD\u8981\u9010\u6BB5\u786E\u8BA4\u65B9\u6848\u4E0E\u8D39\u7528\u3002")
+            h("strong", { key: "h" }, "点击画布开始创作"),
+            h("span", { key: "p" }, "跟对话一样两步走：先创建需求，再写脚本，然后铺开整条生成流程——需求确认 → 剧本 → 分镜 → 每段制作 → 合成成片。生成前仍要逐段确认方案与费用。")
           ]) : null
         ]) : null,
         canvas?.film?.assetId ? h("div", { key: "film-bar", className: "movc-bar" }, [
-          h("span", { key: "label", className: "movc-flow" }, `\u6210\u7247\uFF1A${canvas.film.count} \u6BB5${canvas.film.seconds ? ` \xB7 \u7EA6 ${Math.round(canvas.film.seconds)} \u79D2` : ""} \xB7 ${new Date(canvas.film.updatedAt || Date.now()).toLocaleString()} \xB7 \u5DF2\u4FDD\u5B58\u5230\u753B\u5E03\u6570\u636E\u76EE\u5F55`),
-          h("button", { key: "play", type: "button", className: "mov-btn", onClick: () => setFilmDialog({ busy: false, film: { ...canvas.film, url: mediaUrl(canvas.film.assetId) }, message: "" }) }, "\u64AD\u653E\u6210\u7247"),
-          h("a", { key: "download", className: "movc-link", href: mediaUrl(canvas.film.assetId), download: `${String(canvas.name || "\u6210\u7247")}.mp4` }, "\u4E0B\u8F7D\u6210\u7247")
+          h("span", { key: "label", className: "movc-flow" }, `成片：${canvas.film.count} 段${canvas.film.seconds ? ` · 约 ${Math.round(canvas.film.seconds)} 秒` : ""} · ${new Date(canvas.film.updatedAt || Date.now()).toLocaleString()} · 已保存到画布数据目录`),
+          h("button", { key: "play", type: "button", className: "mov-btn", onClick: () => setFilmDialog({ busy: false, film: { ...canvas.film, url: mediaUrl(canvas.film.assetId) }, message: "" }) }, "播放成片"),
+          h("a", { key: "download", className: "movc-link", href: mediaUrl(canvas.film.assetId), download: `${String(canvas.name || "成片")}.mp4` }, "下载成片")
         ]) : null,
-        canvas && steps.length ? h("p", { key: "flow-hint", className: "movc-hint" }, nextStep ? `\u6D41\u7A0B\uFF1A\u6309\u8FDE\u7EBF\u987A\u5E8F\u9010\u4E2A\u5236\u4F5C\uFF0C\u5F53\u524D\u8F6E\u5230\u300C${nextStep.label}\u300D\uFF08\u753B\u5E03\u4E0A\u865A\u7EBF\u6846\u6807\u51FA\uFF09\u3002\u70B9\u300C\u5236\u4F5C\u300C${nextStep.label}\u300D\u300D\u4F1A\u8BFB\u53D6\u8282\u70B9\u5185\u5BB9\u4E0E\u4E0A\u6E38\u5267\u672C/\u5206\u955C\u62FC\u51FA\u63D0\u793A\u8BCD\uFF0C\u4ECD\u7136\u8981\u5148\u6838\u5BF9\u5236\u4F5C\u65B9\u6848\u3001\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u624D\u4F1A\u8C03\u7528\u6A21\u578B\u3002` : `\u6D41\u7A0B\uFF1A${steps.length} \u4E2A\u5236\u4F5C\u8282\u70B9\u90FD\u5DF2\u6709\u56DE\u586B\u6210\u679C\u3002\u8981\u91CD\u505A\u67D0\u4E00\u6BB5\uFF0C\u70B9\u8BE5\u8282\u70B9\u91CC\u7684\u300C\u5236\u4F5C\u300D\uFF0C\u91CD\u65B0\u6838\u5BF9\u65B9\u6848\u5E76\u786E\u8BA4\u8D39\u7528\u3002`) : null,
-        stageNodes.length ? h("p", { key: "stage-hint", className: "movc-hint" }, "\u753B\u5E03\u4E0A\u7684\u4E03\u5F20\u300C\u6D41\u7A0B\u9636\u6BB5\u300D\u5361\u5C31\u662F\u8FD9\u6761\u751F\u6210\u6D41\u7A0B\uFF0C\u7BAD\u5934\u8868\u793A\u5148\u540E\uFF0C\u6B65\u9AA4\u8DDF\u5BF9\u8BDD\u4E0E\u4E13\u4E1A\u753B\u5E03\u4E00\u81F4\uFF1A\u2460 \u586B\u9700\u6C42\uFF08\u5199\u60F3\u6CD5/\u65F6\u957F/\u753B\u5E45/\u6E05\u6670\u5EA6\uFF0C\u53EA\u5EFA\u9700\u6C42\u8282\u70B9\u4E0E\u9636\u6BB5\u5361\uFF0C\u4E0D\u8C03\u7528\u6A21\u578B\uFF09\u2192 \u2461 \u5199\u811A\u672C\uFF08\u6CA1\u6709\u811A\u672C\u65F6\uFF09/\u786E\u8BA4\u811A\u672C\uFF08\u5199\u597D\u770B\uFF09/\u770B\u5267\u672C\uFF08\u901A\u8FC7\u540E\uFF09\u2192 \u2462 \u770B\u5206\u955C\uFF08\u6CA1\u6709\u5206\u955C\u65F6\u662F\u300C\u751F\u6210\u5206\u955C\u300D\uFF09\u2192 \u2463 \u51C6\u5907\u7D20\u6750\uFF08\u89D2\u8272\u56FE/\u9996\u5E27/\u53C2\u8003\u56FE\uFF09\u2192 \u2464 \u770B\u4F30\u4EF7 \u2192 \u2465 \u505A\u8FD9\u4E00\u6BB5 \u2192 \u2466 \u5408\u6210\u6210\u7247\u3002\u72B6\u6001\u7531\u63D2\u4EF6\u540C\u6B65\uFF0C\u5F53\u524D\u9636\u6BB5\u7528\u865A\u7EBF\u6846\u6807\u51FA\uFF1B\u5361\u4E0A\u7684\u6309\u94AE\u53EA\u662F\u5165\u53E3\uFF0C\u751F\u6210\u524D\u4ECD\u8981\u9010\u6BB5\u6838\u5BF9\u65B9\u6848\u3001\u5355\u72EC\u786E\u8BA4\u8D39\u7528\uFF0C\u5361\u672C\u8EAB\u4E0D\u53C2\u4E0E\u751F\u6210\u3002") : null,
-        canvas && readiness.length ? h("p", { key: "health", className: "movc-hint" }, `\u753B\u5E03\u4F53\u68C0\uFF1A${readinessBrief}\u2014\u2014${readiness[0].message}${chainable ? "\u70B9\u300C\u8FDE\u62CD\u300D\u53EF\u4EE5\u770B\u5230\u5B8C\u6574\u6E05\u5355\u4E0E\u5904\u7406\u5EFA\u8BAE\uFF1B" : ""}\u8FD9\u91CC\u53EA\u63D0\u793A\u753B\u5E03\u5185\u5BB9\u95EE\u9898\uFF0C\u4E0D\u6D89\u53CA\u8D39\u7528\u4E0E\u5BA1\u6838\u3002`) : null,
-        canvas ? h("p", { key: "hint", className: "movc-hint" }, `\u70B9\u51FB\u753B\u5E03\u7A7A\u767D\u5904\u5C31\u4F1A\u6253\u5F00\u300C\u521B\u4F5C\u6D41\u7A0B\u300D\u9762\u677F\uFF08\u6709\u9009\u4E2D\u7684\u8282\u70B9\u65F6\u5148\u53D6\u6D88\u9009\u62E9\uFF09\uFF1B\u62D6\u52A8\u7A7A\u767D\u5904\u5E73\u79FB\u3001\u6EDA\u8F6E\u7F29\u653E\uFF0C\u62D6\u52A8\u8282\u70B9\u79FB\u52A8\uFF08\u62D6\u52A8\u5DF2\u9009\u4E2D\u7684\u4EFB\u4E00\u8282\u70B9\u53EF\u6574\u7EC4\u79FB\u52A8\uFF09\uFF0CShift+\u62D6\u7A7A\u767D\u6846\u9009\uFF08Shift+\u70B9\u8282\u70B9\u53EF\u52A0\u9009\uFF09\uFF0C\u70B9\u300C\u8FDE\u7EBF\u300D\u540E\u518D\u70B9\u76EE\u6807\u8282\u70B9\u8FDE\u63A5\uFF08\u70B9\u8FDE\u7EBF\u53EF\u65AD\u5F00\uFF09\uFF1B\u60F3\u4E00\u6B21\u786E\u8BA4\u6574\u6761\u94FE\u8DEF\u518D\u9010\u6BB5\u751F\u6210\u5C31\u70B9\u300C\u8FDE\u62CD\u300D\uFF0C\u53C2\u8003\u7D20\u6750\u5728\u89C6\u9891\u8282\u70B9\u7684\u5236\u4F5C\u7A97\u53E3\u91CC\u7528\u300C\u5BFC\u5165\u56FE\u7247\u7D20\u6750\u300D\u6216\u300C\u65B0\u5EFA\u53C2\u8003\u56FE\u8282\u70B9\u300D\u8865\uFF0C\u6BCF\u6BB5\u90FD\u51FA\u6210\u679C\u540E\u70B9\u300C\u5408\u6210\u6210\u7247\u300D\u62FC\u6210\u4E00\u6761\u53EF\u9884\u89C8\u3001\u53EF\u4E0B\u8F7D\u7684\u6210\u7247\u3002\u6570\u636E\u76EE\u5F55\uFF1A${canvas.dataRoot}\uFF08\u7D20\u6750\u4E0E\u6210\u679C\u7531\u672C\u63D2\u4EF6\u4FDD\u5B58\uFF09`) : null,
-        connectFrom ? h("p", { key: "connect", className: "movc-hint" }, "\u8FDE\u7EBF\u6A21\u5F0F\uFF1A\u70B9\u51FB\u76EE\u6807\u8282\u70B9\u5B8C\u6210\u8FDE\u63A5\uFF0C\u70B9\u7A7A\u767D\u5904\u53D6\u6D88\u3002") : null,
+        canvas && steps.length ? h("p", { key: "flow-hint", className: "movc-hint" }, nextStep ? `流程：按连线顺序逐个制作，当前轮到「${nextStep.label}」（画布上虚线框标出）。点「制作「${nextStep.label}」」会读取节点内容与上游剧本/分镜拼出提示词，仍然要先核对制作方案、单独确认费用才会调用模型。` : `流程：${steps.length} 个制作节点都已有回填成果。要重做某一段，点该节点里的「制作」，重新核对方案并确认费用。`) : null,
+        stageNodes.length ? h("p", { key: "stage-hint", className: "movc-hint" }, "画布上的七张「流程阶段」卡就是这条生成流程，箭头表示先后，步骤跟对话与专业画布一致：① 填需求（写想法/时长/画幅/清晰度，只建需求节点与阶段卡，不调用模型）→ ② 写脚本（没有脚本时）/确认脚本（写好看）/看剧本（通过后）→ ③ 看分镜（没有分镜时是「生成分镜」）→ ④ 准备素材（角色图/首帧/参考图）→ ⑤ 看估价 → ⑥ 做这一段 → ⑦ 合成成片。状态由插件同步，当前阶段用虚线框标出；卡上的按钮只是入口，生成前仍要逐段核对方案、单独确认费用，卡本身不参与生成。") : null,
+        canvas && readiness.length ? h("p", { key: "health", className: "movc-hint" }, `画布体检：${readinessBrief}——${readiness[0].message}${chainable ? "点「连拍」可以看到完整清单与处理建议；" : ""}这里只提示画布内容问题，不涉及费用与审核。`) : null,
+        canvas ? h("p", { key: "hint", className: "movc-hint" }, `点击画布空白处就会打开「创作流程」面板（有选中的节点时先取消选择）；拖动空白处平移、滚轮缩放，拖动节点移动（拖动已选中的任一节点可整组移动），Shift+拖空白框选（Shift+点节点可加选），点「连线」后再点目标节点连接（点连线可断开）；想一次确认整条链路再逐段生成就点「连拍」，参考素材在视频节点的制作窗口里用「导入图片素材」或「新建参考图节点」补，每段都出成果后点「合成成片」拼成一条可预览、可下载的成片。数据目录：${canvas.dataRoot}（素材与成果由本插件保存）`) : null,
+        connectFrom ? h("p", { key: "connect", className: "movc-hint" }, "连线模式：点击目标节点完成连接，点空白处取消。") : null,
         confirmDelete ? h(
           "div",
           { key: "delete-modal", className: "movc-modal", onPointerDown: (e) => e.stopPropagation(), onClick: (e) => {
             if (e.target === e.currentTarget) setConfirmDelete(false);
           } },
           h("div", { key: "body", className: "movc-modal-body", style: { width: "min(420px, calc(100vw - 32px))" } }, [
-            h("h4", { key: "h" }, "\u5220\u9664\u753B\u5E03"),
-            h("p", { key: "ask", className: "movc-status" }, `\u786E\u5B9A\u5220\u9664\u300C${canvas?.name || ""}\u300D\u5417\uFF1F\u753B\u5E03\u4E0A\u7684\u8282\u70B9\u4E0E\u8FDE\u7EBF\u4F1A\u4E00\u8D77\u5220\u9664\uFF0C\u4E14\u4E0D\u4F1A\u81EA\u52A8\u91CD\u5EFA\uFF1B\u5DF2\u751F\u6210\u7684\u6210\u679C\u7D20\u6750\u6587\u4EF6\u4ECD\u4FDD\u7559\u5728\u63D2\u4EF6\u6570\u636E\u76EE\u5F55\u3002`),
+            h("h4", { key: "h" }, "删除画布"),
+            h("p", { key: "ask", className: "movc-status" }, `确定删除「${canvas?.name || ""}」吗？画布上的节点与连线会一起删除，且不会自动重建；已生成的成果素材文件仍保留在插件数据目录。`),
             h("div", { key: "ops", className: "movc-bar" }, [
-              h("button", { key: "cancel", type: "button", className: "mov-btn", onClick: () => setConfirmDelete(false) }, "\u53D6\u6D88"),
-              h("button", { key: "ok", type: "button", className: "mov-btn", onClick: () => void deleteCanvas() }, "\u786E\u8BA4\u5220\u9664")
+              h("button", { key: "cancel", type: "button", className: "mov-btn", onClick: () => setConfirmDelete(false) }, "取消"),
+              h("button", { key: "ok", type: "button", className: "mov-btn", onClick: () => void deleteCanvas() }, "确认删除")
             ])
           ])
         ) : null,
@@ -5039,13 +5039,13 @@
             if (e.target === e.currentTarget && !filmDialog.busy) setFilmDialog(null);
           } },
           h("div", { key: "body", className: "movc-modal-body" }, [
-            h("h4", { key: "h" }, "\u5408\u6210\u6210\u7247"),
-            filmDialog.busy ? h("p", { key: "busy", className: "movc-status" }, "\u6B63\u5728\u6309\u8FDE\u7EBF\u987A\u5E8F\u8BFB\u53D6\u6BCF\u6BB5\u6210\u679C\u5E76\u5408\u5E76\uFF0C\u957F\u89C6\u9891\u9700\u8981\u4E00\u70B9\u65F6\u95F4\u2026") : null,
+            h("h4", { key: "h" }, "合成成片"),
+            filmDialog.busy ? h("p", { key: "busy", className: "movc-status" }, "正在按连线顺序读取每段成果并合并，长视频需要一点时间…") : null,
             filmDialog.film?.url ? h("video", { key: "player", src: filmDialog.film.url, controls: true, preload: "metadata", className: "movc-media", style: { maxHeight: "46vh" } }) : null,
             filmDialog.film ? h(
               "p",
               { key: "info", className: "movc-status" },
-              `\u6210\u7247\uFF1A${filmDialog.film.count} \u6BB5${filmDialog.film.seconds ? ` \xB7 \u7EA6 ${Math.round(filmDialog.film.seconds)} \u79D2` : ""}\uFF1B\u6587\u4EF6\u5DF2\u4FDD\u5B58\u5230\u753B\u5E03\u6570\u636E\u76EE\u5F55\uFF0C\u53EF\u76F4\u63A5\u9884\u89C8\u6216\u4E0B\u8F7D\u3002`
+              `成片：${filmDialog.film.count} 段${filmDialog.film.seconds ? ` · 约 ${Math.round(filmDialog.film.seconds)} 秒` : ""}；文件已保存到画布数据目录，可直接预览或下载。`
             ) : null,
             filmDialog.film?.segments?.length ? h(
               "div",
@@ -5053,15 +5053,15 @@
               filmDialog.film.segments.map((segment) => h(
                 "div",
                 { key: `s${segment.index}` },
-                `\u7B2C${segment.index}\u6BB5\u300C${segment.label}\u300D${segment.seconds ? `${segment.seconds}\u79D2` : ""}`
+                `第${segment.index}段「${segment.label}」${segment.seconds ? `${segment.seconds}秒` : ""}`
               ))
             ) : null,
             filmDialog.message ? h("p", { key: "msg", className: "movc-status", "data-error": "true" }, filmDialog.message) : null,
-            h("p", { key: "note", className: "movc-status" }, "\u5408\u6210\u53EA\u8BFB\u53D6\u5DF2\u7ECF\u751F\u6210\u7684\u6210\u679C\uFF0C\u4E0D\u4F1A\u91CD\u65B0\u751F\u6210\u4EFB\u4F55\u6BB5\u843D\uFF0C\u4E5F\u4E0D\u4EA7\u751F\u65B0\u7684\u6A21\u578B\u8D39\u7528\u3002"),
+            h("p", { key: "note", className: "movc-status" }, "合成只读取已经生成的成果，不会重新生成任何段落，也不产生新的模型费用。"),
             h("div", { key: "ops", className: "movc-bar" }, [
-              h("button", { key: "close", type: "button", className: "mov-btn", disabled: filmDialog.busy, onClick: () => setFilmDialog(null) }, "\u5173\u95ED"),
-              filmDialog.film?.url ? h("a", { key: "download", className: "movc-link", href: filmDialog.film.url, download: `${String(canvas?.name || "\u6210\u7247")}.mp4` }, "\u4E0B\u8F7D\u6210\u7247") : null,
-              !filmDialog.busy ? h("button", { key: "again", type: "button", className: "mov-btn mov-btn-primary", onClick: () => void mergeFilm() }, "\u91CD\u65B0\u5408\u6210") : null
+              h("button", { key: "close", type: "button", className: "mov-btn", disabled: filmDialog.busy, onClick: () => setFilmDialog(null) }, "关闭"),
+              filmDialog.film?.url ? h("a", { key: "download", className: "movc-link", href: filmDialog.film.url, download: `${String(canvas?.name || "成片")}.mp4` }, "下载成片") : null,
+              !filmDialog.busy ? h("button", { key: "again", type: "button", className: "mov-btn mov-btn-primary", onClick: () => void mergeFilm() }, "重新合成") : null
             ])
           ])
         ) : null,
@@ -5074,23 +5074,23 @@
             }
           } },
           h("div", { key: "body", className: "movc-modal-body" }, [
-            h("h4", { key: "h" }, "\u8FDE\u62CD\uFF1A\u4E00\u6B21\u786E\u8BA4\uFF0C\u9010\u6BB5\u751F\u6210"),
-            chainDialog.loading ? h("p", { key: "loading", className: "movc-status" }, "\u6B63\u5728\u6309\u753B\u5E03\u4E0A\u7684\u89C6\u9891\u8282\u70B9\u6392\u8FDE\u62CD\u65B9\u6848\u2026") : null,
+            h("h4", { key: "h" }, "连拍：一次确认，逐段生成"),
+            chainDialog.loading ? h("p", { key: "loading", className: "movc-status" }, "正在按画布上的视频节点排连拍方案…") : null,
             chainDialog.plan ? h("div", { key: "plan", className: "movc-plan" }, [
-              h("div", { key: "head" }, chainPlanPending ? `\u8FDE\u62CD\u65B9\u6848\uFF1A\u672C\u6B21\u751F\u6210 ${chainPlanPending} \u6BB5${chainDialog.plan.segments.length > chainPlanPending ? `\uFF08\u53E6\u6709 ${chainDialog.plan.segments.length - chainPlanPending} \u6BB5\u5DF2\u6709\u6210\u679C\uFF0C\u8DF3\u8FC7\u4E0D\u91CD\u590D\u751F\u6210\uFF09` : ""}${chainDialog.plan.cny !== null ? ` \xB7 \u9884\u4F30 \xA5${(Math.round(chainDialog.plan.cny * 1e4) / 1e4).toFixed(4)}\uFF08\u57FA\u7840\u516C\u5F0F\uFF0C\u6309\u6E20\u9053\u8D26\u5355\u7ED3\u7B97\uFF09` : " \xB7 \u6309\u5B9E\u9645\u8C03\u7528\u8BA1\u8D39"}${chainDialog.plan.priceDate ? ` \xB7 \u4EF7\u76EE ${chainDialog.plan.priceDate}` : ""}` : `\u8FDE\u62CD\u65B9\u6848\uFF1A\u6574\u6761\u94FE\u8DEF ${chainDialog.plan.segments.length} \u6BB5\u90FD\u5DF2\u6709\u6210\u679C\uFF0C\u6CA1\u6709\u8981\u751F\u6210\u7684\u4E86`),
+              h("div", { key: "head" }, chainPlanPending ? `连拍方案：本次生成 ${chainPlanPending} 段${chainDialog.plan.segments.length > chainPlanPending ? `（另有 ${chainDialog.plan.segments.length - chainPlanPending} 段已有成果，跳过不重复生成）` : ""}${chainDialog.plan.cny !== null ? ` · 预估 ¥${(Math.round(chainDialog.plan.cny * 1e4) / 1e4).toFixed(4)}（基础公式，按渠道账单结算）` : " · 按实际调用计费"}${chainDialog.plan.priceDate ? ` · 价目 ${chainDialog.plan.priceDate}` : ""}` : `连拍方案：整条链路 ${chainDialog.plan.segments.length} 段都已有成果，没有要生成的了`),
               ...chainDialog.plan.segments.map((segment) => h(
                 "div",
                 { key: `s${segment.index}`, ...segment.skip ? { "data-skip": "true" } : {} },
-                segment.skip ? `\u2713 \u7B2C${segment.index + 1}\u6BB5\u300C${segment.label}\u300D${segment.seconds}\u79D2\uFF1A\u5DF2\u6709\u6210\u679C\uFF0C\u672C\u6B21\u8DF3\u8FC7\uFF08\u4E0D\u91CD\u590D\u751F\u6210\u3001\u4E0D\u91CD\u590D\u8BA1\u8D39\uFF09` : `\u7B2C${segment.index + 1}\u6BB5\u300C${segment.label}\u300D${segment.seconds}\u79D2 \xB7 ${segment.operation === "extend" ? "\u7EED\u62CD\u4E0A\u4E00\u6BB5" : "\u9996\u6BB5\u76F4\u51FA"} \xB7 ${segment.ratio} ${String(segment.resolution).toUpperCase()}\uFF1A${String(segment.prompt).slice(0, 70)}${String(segment.prompt).length > 70 ? "\u2026" : ""}`
+                segment.skip ? `✓ 第${segment.index + 1}段「${segment.label}」${segment.seconds}秒：已有成果，本次跳过（不重复生成、不重复计费）` : `第${segment.index + 1}段「${segment.label}」${segment.seconds}秒 · ${segment.operation === "extend" ? "续拍上一段" : "首段直出"} · ${segment.ratio} ${String(segment.resolution).toUpperCase()}：${String(segment.prompt).slice(0, 70)}${String(segment.prompt).length > 70 ? "…" : ""}`
               )),
-              h("div", { key: "note" }, "\u6CA1\u6709\u6210\u679C\u7684\u6BB5\u624D\u4F1A\u751F\u6210\uFF1A\u63A5\u7740\u5DF2\u6709\u6210\u679C\u7684\u6BB5\u843D\u7EED\u62CD\uFF0C\u6574\u6761\u94FE\u8DEF\u4E00\u6BB5\u6210\u679C\u90FD\u6CA1\u6709\u65F6\u7B2C 1 \u6BB5\u76F4\u51FA\uFF1B\u6BCF\u6BB5\u51FA\u6210\u679C\u540E\u90FD\u4F1A\u505C\u4E0B\u6765\u7B49\u4F60\u5BA1\u6838\uFF0C\u5BA1\u6838\u901A\u8FC7\u624D\u7EE7\u7EED\u4E0B\u4E00\u6BB5\u3002\u5DF2\u6709\u6210\u679C\u7684\u6BB5\u4E0D\u91CD\u590D\u751F\u6210\uFF0C\u4E5F\u4E0D\u91CD\u590D\u8BA1\u8D39\u3002")
+              h("div", { key: "note" }, "没有成果的段才会生成：接着已有成果的段落续拍，整条链路一段成果都没有时第 1 段直出；每段出成果后都会停下来等你审核，审核通过才继续下一段。已有成果的段不重复生成，也不重复计费。")
             ]) : null,
             chainDialog.chain ? h("div", { key: "chain", className: "movc-plan" }, [
               h("div", { key: "head" }, `${chainStatusText(chainDialog.chain)}`),
               chainDialog.chain.segments.map((segment) => h(
                 "div",
                 { key: `c${segment.index}` },
-                `${segment.index < chainDialog.chain.done ? "\u2713 " : segment.index === chainDialog.chain.index ? "\u25B6 " : "\xB7 "}\u7B2C${segment.index + 1}\u6BB5\u300C${segment.label}\u300D${segment.seconds}\u79D2${segment.skip ? "\uFF1A\u5DF2\u6709\u6210\u679C\uFF0C\u672C\u6B21\u8DF3\u8FC7" : segment.index < chainDialog.chain.done ? "\uFF1A\u5DF2\u6709\u6210\u679C" : ""}`
+                `${segment.index < chainDialog.chain.done ? "✓ " : segment.index === chainDialog.chain.index ? "▶ " : "· "}第${segment.index + 1}段「${segment.label}」${segment.seconds}秒${segment.skip ? "：已有成果，本次跳过" : segment.index < chainDialog.chain.done ? "：已有成果" : ""}`
               )),
               chainDialog.chain.message ? h("div", { key: "msg" }, chainDialog.chain.message) : null
             ]) : null,
@@ -5107,19 +5107,19 @@
                 style: { maxHeight: "38vh" }
               }))
             ) : null,
-            chainDialog.chain && chainDialog.chain.state === "review" ? h("p", { key: "review-note", className: "movc-status" }, "\u5148\u770B\u8FD9\u4E00\u6BB5\uFF1A\u6EE1\u610F\u5C31\u300C\u786E\u8BA4\u5E76\u7EE7\u7EED\u4E0B\u4E00\u6BB5\u300D\uFF0C\u4E0D\u6EE1\u610F\u53EF\u4EE5\u505C\u6B62\u8FDE\u62CD\uFF0C\u5DF2\u751F\u6210\u7684\u6210\u679C\u90FD\u4FDD\u7559\u5728\u753B\u5E03\u4E0A\u3002") : null,
+            chainDialog.chain && chainDialog.chain.state === "review" ? h("p", { key: "review-note", className: "movc-status" }, "先看这一段：满意就「确认并继续下一段」，不满意可以停止连拍，已生成的成果都保留在画布上。") : null,
             chainDialog.error ? h("p", { key: "err", className: "movc-status", "data-error": "true" }, chainDialog.error) : null,
             chainDialog.plan && !chainDialog.chain && chainPlanPending ? h("div", { key: "batch-checks", className: "movc-plan" }, [
-              h("div", { key: "head" }, "\u5F00\u59CB\u6279\u91CF\u751F\u6210\u524D\uFF0C\u8BF7\u5148\u5B8C\u6210\uFF1A"),
+              h("div", { key: "head" }, "开始批量生成前，请先完成："),
               ...batchChecks.map((item) => h(
                 "div",
                 { key: item.key, "data-batch-check": item.key, "data-ok": String(item.ok) },
-                `${item.ok ? "\u2713 " : "\xB7 "}${item.label}\u2014 ${item.hint}`
+                `${item.ok ? "✓ " : "· "}${item.label}— ${item.hint}`
               )),
-              h("div", { key: "tail" }, "\u8FD9\u51E0\u9879\u90FD\u5C31\u7EEA\u540E\u518D\u5F00\u59CB\u8FDE\u62CD\uFF1B\u6BCF\u6BB5\u51FA\u6210\u679C\u4ECD\u4F1A\u505C\u4E0B\u6765\u7B49\u4F60\u5BA1\u6838\u3002")
+              h("div", { key: "tail" }, "这几项都就绪后再开始连拍；每段出成果仍会停下来等你审核。")
             ]) : null,
             chainDialog.plan && !chainDialog.chain && chainPlanPending ? h("div", { key: "readiness", className: "movc-plan" }, [
-              h("div", { key: "head" }, readiness.length ? `\u753B\u5E03\u4F53\u68C0\uFF1A\u8FD8\u6709 ${readiness.length} \u5904\u6CA1\u51C6\u5907\u9F50` : "\u753B\u5E03\u4F53\u68C0\uFF1A\u6CA1\u6709\u53D1\u73B0\u95EE\u9898"),
+              h("div", { key: "head" }, readiness.length ? `画布体检：还有 ${readiness.length} 处没准备齐` : "画布体检：没有发现问题"),
               ...readiness.slice(0, 6).map((item) => h(
                 "div",
                 {
@@ -5127,31 +5127,31 @@
                   "data-readiness": item.code,
                   "data-severity": item.severity
                 },
-                `${item.severity === "error" ? "\u2715 " : "\xB7 "}${item.message}${item.suggestedAction}`
+                `${item.severity === "error" ? "✕ " : "· "}${item.message}${item.suggestedAction}`
               )),
-              readiness.length > 6 ? h("div", { key: "more" }, `\u8FD8\u6709 ${readiness.length - 6} \u5904\uFF0C\u5148\u5904\u7406\u4E0A\u9762\u8FD9\u4E9B\u3002`) : null,
-              h("div", { key: "tail" }, "\u4F53\u68C0\u53EA\u770B\u753B\u5E03\u5185\u5BB9\uFF1A\u7F3A\u6210\u679C\u7684\u6BB5\u3001\u6CA1\u63A5\u5230\u5236\u4F5C\u6BB5\u7684\u7D20\u6750\u3001\u65AD\u6389\u7684\u8FDE\u7EBF\uFF0C\u4EE5\u53CA\u6210\u7247\u6BB5\u6570\u548C\u73B0\u5728\u7684\u89C6\u9891\u6210\u679C\u5BF9\u4E0D\u4E0A\u3002\u8D39\u7528\u4E0E\u5BA1\u6838\u4ECD\u6309\u6BCF\u6BB5\u81EA\u5DF1\u786E\u8BA4\u3002")
+              readiness.length > 6 ? h("div", { key: "more" }, `还有 ${readiness.length - 6} 处，先处理上面这些。`) : null,
+              h("div", { key: "tail" }, "体检只看画布内容：缺成果的段、没接到制作段的素材、断掉的连线，以及成片段数和现在的视频成果对不上。费用与审核仍按每段自己确认。")
             ]) : null,
-            chainDialog.plan && !chainDialog.chain && !chainPlanPending ? h("p", { key: "nothing", className: "movc-status" }, "\u6574\u6761\u94FE\u8DEF\u7684\u89C6\u9891\u6BB5\u90FD\u5DF2\u6709\u6210\u679C\uFF0C\u4E0D\u9700\u8981\u518D\u8FDE\u62CD\uFF1B\u8981\u91CD\u505A\u54EA\u4E00\u6BB5\uFF0C\u5C31\u70B9\u90A3\u4E2A\u8282\u70B9\u81EA\u5DF1\u7684\u300C\u5236\u4F5C\u300D\u3002") : null,
+            chainDialog.plan && !chainDialog.chain && !chainPlanPending ? h("p", { key: "nothing", className: "movc-status" }, "整条链路的视频段都已有成果，不需要再连拍；要重做哪一段，就点那个节点自己的「制作」。") : null,
             chainDialog.plan && !chainDialog.chain && chainPlanPending ? h("div", { key: "confirms" }, [
-              h("label", { key: "p", className: "movc-check" }, [h("input", { type: "checkbox", checked: chainDialog.confirm.plan === true, onChange: (e) => patchChainDialog({ confirm: { ...chainDialog.confirm, plan: e.target.checked } }) }), " \u6211\u5DF2\u6838\u5BF9\u6574\u6761\u94FE\u8DEF\u7684\u65B9\u6848\uFF08\u6BCF\u6BB5\u63D0\u793A\u8BCD\u3001\u65F6\u957F\u3001\u753B\u5E45\u4E0E\u6E05\u6670\u5EA6\uFF09"]),
-              h("label", { key: "c", className: "movc-check" }, [h("input", { type: "checkbox", checked: chainDialog.confirm.cost === true, onChange: (e) => patchChainDialog({ confirm: { ...chainDialog.confirm, cost: e.target.checked } }) }), " \u6211\u5DF2\u786E\u8BA4\u6574\u6761\u94FE\u8DEF\u7684\u9884\u4F30\u8D39\u7528\uFF0C\u6309\u6E20\u9053\u8D26\u5355\u7ED3\u7B97"])
+              h("label", { key: "p", className: "movc-check" }, [h("input", { type: "checkbox", checked: chainDialog.confirm.plan === true, onChange: (e) => patchChainDialog({ confirm: { ...chainDialog.confirm, plan: e.target.checked } }) }), " 我已核对整条链路的方案（每段提示词、时长、画幅与清晰度）"]),
+              h("label", { key: "c", className: "movc-check" }, [h("input", { type: "checkbox", checked: chainDialog.confirm.cost === true, onChange: (e) => patchChainDialog({ confirm: { ...chainDialog.confirm, cost: e.target.checked } }) }), " 我已确认整条链路的预估费用，按渠道账单结算"])
             ]) : null,
             h("div", { key: "ops", className: "movc-bar" }, [
               h("button", { key: "close", type: "button", className: "mov-btn", disabled: chainDialog.busy, onClick: () => {
                 stopChainPolling();
                 setChainDialog(null);
-              } }, "\u5173\u95ED"),
-              chainDialog.chain?.state === "running" ? h("button", { key: "stop", type: "button", className: "mov-btn movc-danger", disabled: chainDialog.busy, onClick: () => void stopChain() }, "\u505C\u6B62\u8FDE\u62CD") : null,
-              chainDialog.chain?.state === "review" && chainDialog.chain.job?.sync?.status !== "synced" ? h("button", { key: "sync", type: "button", className: "mov-btn", disabled: chainDialog.busy, onClick: () => void syncChainSegment() }, "\u8865\u56DE\u586B\u753B\u5E03") : null,
-              chainDialog.chain?.state === "review" ? h("button", { key: "stop2", type: "button", className: "mov-btn movc-danger", disabled: chainDialog.busy, onClick: () => void stopChain() }, "\u505C\u6B62\u8FDE\u62CD") : null,
-              chainDialog.chain?.state === "review" ? h("button", { key: "next", type: "button", className: "mov-btn mov-btn-primary", disabled: chainDialog.busy, onClick: () => void advanceChain(true) }, "\u786E\u8BA4\u5E76\u7EE7\u7EED\u4E0B\u4E00\u6BB5") : null,
-              chainDialog.plan && !chainDialog.chain && chainPlanPending ? h("button", { key: "start", type: "button", className: "mov-btn mov-btn-primary", disabled: chainDialog.busy || !(chainDialog.confirm.plan && chainDialog.confirm.cost), onClick: () => void startChain() }, "\u786E\u8BA4\u5E76\u5F00\u59CB\u8FDE\u62CD") : null,
-              chainDialog.chain && ["done", "stopped", "stale"].includes(chainDialog.chain.state) && chainDialog.plan ? h("button", { key: "again", type: "button", className: "mov-btn", disabled: chainDialog.busy, onClick: () => void openChain() }, "\u91CD\u65B0\u770B\u65B9\u6848") : null,
+              } }, "关闭"),
+              chainDialog.chain?.state === "running" ? h("button", { key: "stop", type: "button", className: "mov-btn movc-danger", disabled: chainDialog.busy, onClick: () => void stopChain() }, "停止连拍") : null,
+              chainDialog.chain?.state === "review" && chainDialog.chain.job?.sync?.status !== "synced" ? h("button", { key: "sync", type: "button", className: "mov-btn", disabled: chainDialog.busy, onClick: () => void syncChainSegment() }, "补回填画布") : null,
+              chainDialog.chain?.state === "review" ? h("button", { key: "stop2", type: "button", className: "mov-btn movc-danger", disabled: chainDialog.busy, onClick: () => void stopChain() }, "停止连拍") : null,
+              chainDialog.chain?.state === "review" ? h("button", { key: "next", type: "button", className: "mov-btn mov-btn-primary", disabled: chainDialog.busy, onClick: () => void advanceChain(true) }, "确认并继续下一段") : null,
+              chainDialog.plan && !chainDialog.chain && chainPlanPending ? h("button", { key: "start", type: "button", className: "mov-btn mov-btn-primary", disabled: chainDialog.busy || !(chainDialog.confirm.plan && chainDialog.confirm.cost), onClick: () => void startChain() }, "确认并开始连拍") : null,
+              chainDialog.chain && ["done", "stopped", "stale"].includes(chainDialog.chain.state) && chainDialog.plan ? h("button", { key: "again", type: "button", className: "mov-btn", disabled: chainDialog.busy, onClick: () => void openChain() }, "重新看方案") : null,
               chainDialog.chain && chainDialog.chain.state === "done" ? h("button", { key: "close2", type: "button", className: "mov-btn", disabled: chainDialog.busy, onClick: () => {
                 stopChainPolling();
                 setChainDialog(null);
-              } }, "\u5B8C\u6210") : null
+              } }, "完成") : null
             ])
           ])
         ) : null,
@@ -5162,57 +5162,57 @@
           } },
           h("div", { key: "body", className: "movc-modal-body" }, scriptDialog.step === "requirement" ? [
             // 第一步：只创建需求（想法 + 规格），不写脚本、不调用模型、不产生视频费用。
-            h("h4", { key: "h" }, "\u521B\u5EFA\u9700\u6C42"),
-            h("p", { key: "flow-note", className: "movc-status" }, "\u8DDF\u5BF9\u8BDD\u4E00\u6837\u5148\u786E\u8BA4\u9700\u6C42\uFF1A\u5199\u4E0B\u60F3\u62CD\u4EC0\u4E48\u4E0E\u89C4\u683C\uFF0C\u521B\u5EFA\u540E\u9636\u6BB5\u5361\u2460\u6807\u4E3A\u5DF2\u5B8C\u6210\uFF1B\u518D\u70B9\u4E00\u6B21\u753B\u5E03\u6216\u9636\u6BB5\u5361\u2461\u5199\u811A\u672C\u3002\u8FD9\u4E00\u6B65\u53EA\u5EFA\u9700\u6C42\u8282\u70B9\u4E0E\u9636\u6BB5\u5361\uFF0C\u4E0D\u8C03\u7528\u4EFB\u4F55\u6A21\u578B\u3001\u4E0D\u4EA7\u751F\u89C6\u9891\u8D39\u7528\u3002"),
-            h("label", { key: "idea", className: "movc-field" }, ["\u60F3\u62CD\u4EC0\u4E48", h("input", {
+            h("h4", { key: "h" }, "创建需求"),
+            h("p", { key: "flow-note", className: "movc-status" }, "跟对话一样先确认需求：写下想拍什么与规格，创建后阶段卡①标为已完成；再点一次画布或阶段卡②写脚本。这一步只建需求节点与阶段卡，不调用任何模型、不产生视频费用。"),
+            h("label", { key: "idea", className: "movc-field" }, ["想拍什么", h("input", {
               value: scriptDialog.idea,
-              placeholder: "\u4E00\u53E5\u8BDD\u5C31\u591F\uFF0C\u4F8B\u5982\uFF1A\u9752\u65C5\u5929\u53F0\u7684\u6E05\u6668\uFF0C\u4E00\u4E2A\u4EBA\u62D6\u7740\u884C\u674E\u4F4F\u8FDB\u57CE\u5E02\u3002",
+              placeholder: "一句话就够，例如：青旅天台的清晨，一个人拖着行李住进城市。",
               onChange: (e) => patchScriptDialog({ idea: e.target.value, error: "" })
             })]),
-            h("label", { key: "work-type", className: "movc-field" }, ["\u4F5C\u54C1\u7C7B\u578B", h("select", { value: scriptDialog.workType || "", onChange: (e) => patchScriptDialog({ workType: e.target.value }) }, [h("option", { key: "unspecified", value: "" }, "\u672A\u6307\u5B9A\uFF0C\u4FDD\u7559\u539F\u610F"), ...availableProfiles().map((p) => h("option", { key: p.work_type, value: p.work_type }, p.label))])]),
+            h("label", { key: "work-type", className: "movc-field" }, ["作品类型", h("select", { value: scriptDialog.workType || "", onChange: (e) => patchScriptDialog({ workType: e.target.value }) }, [h("option", { key: "unspecified", value: "" }, "未指定，保留原意"), ...availableProfiles().map((p) => h("option", { key: p.work_type, value: p.work_type }, p.label))])]),
             h("div", { key: "spec", className: "movc-row" }, [
-              h("label", { key: "total", className: "movc-field" }, ["\u76EE\u6807\u603B\u65F6\u957F\uFF08\u79D2\uFF09", h("input", { type: "number", min: 4, max: 3600, value: scriptDialog.totalSeconds, onChange: (e) => patchScriptDialog({ totalSeconds: e.target.value }) })]),
-              h("label", { key: "segment", className: "movc-field" }, ["\u6BCF\u6BB5\u65F6\u957F\uFF08\u79D2\uFF09", h("input", { type: "number", min: 4, max: scriptDialog.singleMax || 15, value: scriptDialog.segmentSeconds, onChange: (e) => patchScriptDialog({ segmentSeconds: e.target.value }) })])
+              h("label", { key: "total", className: "movc-field" }, ["目标总时长（秒）", h("input", { type: "number", min: 4, max: 3600, value: scriptDialog.totalSeconds, onChange: (e) => patchScriptDialog({ totalSeconds: e.target.value }) })]),
+              h("label", { key: "segment", className: "movc-field" }, ["每段时长（秒）", h("input", { type: "number", min: 4, max: scriptDialog.singleMax || 15, value: scriptDialog.segmentSeconds, onChange: (e) => patchScriptDialog({ segmentSeconds: e.target.value }) })])
             ]),
             h("div", { key: "spec2", className: "movc-row" }, [
-              h("label", { key: "ratio", className: "movc-field" }, ["\u753B\u5E45", h("select", { value: scriptDialog.ratio, onChange: (e) => patchScriptDialog({ ratio: e.target.value }) }, RATIOS.map((r) => h("option", { key: r, value: r }, r)))]),
-              h("label", { key: "resolution", className: "movc-field" }, ["\u6E05\u6670\u5EA6", h("select", { value: scriptDialog.resolution, onChange: (e) => patchScriptDialog({ resolution: e.target.value }) }, RESOLUTIONS.map((r) => h("option", { key: r, value: r }, r.toUpperCase())))])
+              h("label", { key: "ratio", className: "movc-field" }, ["画幅", h("select", { value: scriptDialog.ratio, onChange: (e) => patchScriptDialog({ ratio: e.target.value }) }, RATIOS.map((r) => h("option", { key: r, value: r }, r)))]),
+              h("label", { key: "resolution", className: "movc-field" }, ["清晰度", h("select", { value: scriptDialog.resolution, onChange: (e) => patchScriptDialog({ resolution: e.target.value }) }, RESOLUTIONS.map((r) => h("option", { key: r, value: r }, r.toUpperCase())))])
             ]),
-            h("p", { key: "note", className: "movc-status" }, `\u5F53\u524D\u6A21\u578B\u5355\u6BB5\u4E0A\u9650 ${scriptDialog.singleMax || 15} \u79D2\uFF1A\u76EE\u6807\u65F6\u957F\u4E0D\u8D85\u8FC7\u4E0A\u9650\u53EA\u5EFA\u4E00\u6BB5\uFF0C\u8D85\u8FC7\u624D\u6309\u6BCF\u6BB5\u65F6\u957F\u6392\u7EED\u62CD\u6BB5\u3002\u9700\u6C42\u786E\u8BA4\u540E\u4ECD\u8981\u9010\u6BB5\u6838\u5BF9\u65B9\u6848\u3001\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u3002`),
+            h("p", { key: "note", className: "movc-status" }, `当前模型单段上限 ${scriptDialog.singleMax || 15} 秒：目标时长不超过上限只建一段，超过才按每段时长排续拍段。需求确认后仍要逐段核对方案、单独确认费用。`),
             scriptDialog.error ? h("p", { key: "err", className: "movc-status", "data-error": "true" }, scriptDialog.error) : null,
             h("div", { key: "ops", className: "movc-bar" }, [
-              h("button", { key: "cancel", type: "button", className: "mov-btn", disabled: scriptDialog.busy, onClick: () => setScriptDialog(null) }, "\u53D6\u6D88"),
-              h("button", { key: "ok", type: "button", className: "mov-btn mov-btn-primary", disabled: scriptDialog.busy, onClick: () => void createRequirement() }, scriptDialog.busy ? "\u521B\u5EFA\u4E2D\u2026" : "\u521B\u5EFA\u9700\u6C42")
+              h("button", { key: "cancel", type: "button", className: "mov-btn", disabled: scriptDialog.busy, onClick: () => setScriptDialog(null) }, "取消"),
+              h("button", { key: "ok", type: "button", className: "mov-btn mov-btn-primary", disabled: scriptDialog.busy, onClick: () => void createRequirement() }, scriptDialog.busy ? "创建中…" : "创建需求")
             ])
           ] : [
             // 第二步：按第一步的需求写脚本，预览分段后再铺制作节点。
-            h("h4", { key: "h" }, "\u5199\u811A\u672C"),
-            h("p", { key: "flow-note", className: "movc-status" }, "\u6309\u7B2C\u4E00\u6B65\u521B\u5EFA\u7684\u9700\u6C42\u5199\u5267\u672C\u4E0E\u5206\u955C\uFF1A\u53EF\u4EE5\u81EA\u5DF1\u5199\uFF0C\u4E5F\u53EF\u4EE5\u8BA9\u6587\u672C\u6A21\u578B\u5199\u3002\u5148\u300C\u9884\u89C8\u5206\u6BB5\u300D\u770B\u6E05\u4F1A\u88AB\u62C6\u6210\u51E0\u6BB5\u3001\u6BCF\u6BB5\u591A\u5C11\u79D2\u4E0E\u63D0\u793A\u8BCD\uFF0C\u518D\u300C\u751F\u6210\u5236\u4F5C\u8282\u70B9\u300D\uFF1B\u8282\u70B9\u5EFA\u597D\u540E\u4ECD\u8981\u9010\u6BB5\u6838\u5BF9\u65B9\u6848\u3001\u5355\u72EC\u786E\u8BA4\u8D39\u7528\u3002"),
+            h("h4", { key: "h" }, "写脚本"),
+            h("p", { key: "flow-note", className: "movc-status" }, "按第一步创建的需求写剧本与分镜：可以自己写，也可以让文本模型写。先「预览分段」看清会被拆成几段、每段多少秒与提示词，再「生成制作节点」；节点建好后仍要逐段核对方案、单独确认费用。"),
             h("div", { key: "need", className: "movc-plan" }, [
-              h("div", { key: "brief" }, `\u9700\u6C42\uFF1A${String(scriptDialog.idea || "").trim() || "\uFF08\u9700\u6C42\u8282\u70B9\u91CC\u6CA1\u6709\u5199\u4E0B\u60F3\u6CD5\uFF0C\u5148\u8865\u4E00\u53E5\uFF09"}`),
-              h("div", { key: "spec" }, `\u76EE\u6807 ${scriptDialog.totalSeconds} \u79D2 \xB7 \u6BCF\u6BB5 ${scriptDialog.segmentSeconds} \u79D2 \xB7 ${scriptDialog.ratio} \xB7 ${String(scriptDialog.resolution).toUpperCase()}${scriptDialog.textModel ? ` \xB7 \u6587\u672C\u6A21\u578B ${scriptDialog.textModel}` : ""}`)
+              h("div", { key: "brief" }, `需求：${String(scriptDialog.idea || "").trim() || "（需求节点里没有写下想法，先补一句）"}`),
+              h("div", { key: "spec" }, `目标 ${scriptDialog.totalSeconds} 秒 · 每段 ${scriptDialog.segmentSeconds} 秒 · ${scriptDialog.ratio} · ${String(scriptDialog.resolution).toUpperCase()}${scriptDialog.textModel ? ` · 文本模型 ${scriptDialog.textModel}` : ""}`)
             ]),
-            !String(scriptDialog.idea || "").trim() ? h("label", { key: "idea", className: "movc-field" }, ["\u60F3\u62CD\u4EC0\u4E48\uFF08\u8BA9\u6587\u672C\u6A21\u578B\u5199\u811A\u672C\u7528\uFF09", h("input", {
+            !String(scriptDialog.idea || "").trim() ? h("label", { key: "idea", className: "movc-field" }, ["想拍什么（让文本模型写脚本用）", h("input", {
               value: scriptDialog.idea,
-              placeholder: "\u4E00\u53E5\u8BDD\u5C31\u591F\uFF0C\u4F8B\u5982\uFF1A\u9752\u65C5\u5929\u53F0\u7684\u6E05\u6668\uFF0C\u4E00\u4E2A\u4EBA\u62D6\u7740\u884C\u674E\u4F4F\u8FDB\u57CE\u5E02\u3002",
+              placeholder: "一句话就够，例如：青旅天台的清晨，一个人拖着行李住进城市。",
               onChange: (e) => patchScriptDialog({ idea: e.target.value, error: "" })
             })]) : null,
-            h("label", { key: "text", className: "movc-field" }, ["\u811A\u672C\u5185\u5BB9\uFF08\u53EF\u4EE5\u76F4\u63A5\u5199\uFF0C\u4E5F\u53EF\u4EE5\u8BA9\u6587\u672C\u6A21\u578B\u5199\uFF09", h("textarea", {
+            h("label", { key: "text", className: "movc-field" }, ["脚本内容（可以直接写，也可以让文本模型写）", h("textarea", {
               value: scriptDialog.text,
-              placeholder: "\u5199\u4E0B\u8981\u62CD\u7684\u5185\u5BB9\u3002\u5199\u6210 Markdown \u5206\u955C\u8868\uFF08\u8868\u5934\u542B\u300C\u955C\u53F7\u300D\u300C\u955C\u522B\u300D\u300C\u89C6\u89D2\u300D\u300C\u8FD0\u955C\u300D\u300C\u753B\u9762\u300D\u5217\uFF09\u65F6\u4F1A\u6309\u5206\u955C\u5207\u6BB5\uFF0C\u955C\u522B\u3001\u89C6\u89D2\u4E0E\u8FD0\u955C\u4F1A\u4E00\u8D77\u5E26\u8FDB\u8BE5\u6BB5\u63D0\u793A\u8BCD\uFF1B\u5426\u5219\u6309\u53E5\u5B50\u3001\u6BB5\u843D\u6309\u5B57\u6570\u5747\u5206\u3002\u5199\u591A\u5C11\u62C6\u591A\u5C11\uFF0C\u4E0D\u81EA\u52A8\u7F16\u5185\u5BB9\u3002",
+              placeholder: "写下要拍的内容。写成 Markdown 分镜表（表头含「镜号」「镜别」「视角」「运镜」「画面」列）时会按分镜切段，镜别、视角与运镜会一起带进该段提示词；否则按句子、段落按字数均分。写多少拆多少，不自动编内容。",
               onChange: (e) => patchScriptDialog({ text: e.target.value, error: "" })
             })]),
-            h("p", { key: "note", className: "movc-status" }, `\u300CAI \u5199\u811A\u672C\u300D\u4F1A\u6309\u8BBE\u7F6E\u9875\u7684\u6587\u672C\u6A21\u578B\uFF08${scriptDialog.textModel || "\u6587\u672C\u6A21\u578B"}\uFF09\u628A\u9700\u6C42\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF0C\u5355\u72EC\u6309\u6587\u672C\u8BA1\u8D39\uFF1B\u8981\u6539\u65F6\u957F\u3001\u753B\u5E45\u6216\u6E05\u6670\u5EA6\uFF0C\u5148\u56DE\u4E0A\u4E00\u6B65\u300C\u6539\u9700\u6C42\u300D\u3002${scriptDialog.writing ? ` \u6587\u672C\u6A21\u578B\u6B63\u5728\u5199\uFF1A\u5DF2\u7B49\u5F85 ${Math.max(0, Math.round((clock - (scriptDialog.writingSince || clock)) / 1e3))} \u79D2\uFF08\u4E00\u6B21\u901A\u5E38 30\u201390 \u79D2\uFF0C\u53EF\u4EE5\u5148\u53BB\u522B\u7684\u5730\u65B9\u770B\u770B\uFF09\u3002` : ""}`),
+            h("p", { key: "note", className: "movc-status" }, `「AI 写脚本」会按设置页的文本模型（${scriptDialog.textModel || "文本模型"}）把需求写成剧本与分镜表，单独按文本计费；要改时长、画幅或清晰度，先回上一步「改需求」。${scriptDialog.writing ? ` 文本模型正在写：已等待 ${Math.max(0, Math.round((clock - (scriptDialog.writingSince || clock)) / 1e3))} 秒（一次通常 30–90 秒，可以先去别的地方看看）。` : ""}`),
             scriptDialog.plan ? h("div", { key: "plan", className: "movc-plan" }, [
-              h("div", { key: "head" }, `\u5206\u6BB5\u8BA1\u5212\uFF1A${scriptDialog.plan.segments.length} \u6BB5 \xB7 \u5171 ${scriptDialog.plan.totalSeconds} \u79D2${scriptDialog.plan.shots?.length ? ` \xB7 \u8BC6\u522B\u5230 ${scriptDialog.plan.shots.length} \u4E2A\u5206\u955C` : ""}`),
-              ...scriptDialog.plan.segments.map((segment, index) => h("div", { key: `s${index}` }, `\u7B2C${index + 1}\u6BB5 ${segment.seconds} \u79D2\uFF08${segment.kind === "extend" ? "\u7EED\u62CD" : "\u9996\u6BB5"}\uFF09\uFF1A${String(segment.prompt).slice(0, 90)}${String(segment.prompt).length > 90 ? "\u2026" : ""}`))
+              h("div", { key: "head" }, `分段计划：${scriptDialog.plan.segments.length} 段 · 共 ${scriptDialog.plan.totalSeconds} 秒${scriptDialog.plan.shots?.length ? ` · 识别到 ${scriptDialog.plan.shots.length} 个分镜` : ""}`),
+              ...scriptDialog.plan.segments.map((segment, index) => h("div", { key: `s${index}` }, `第${index + 1}段 ${segment.seconds} 秒（${segment.kind === "extend" ? "续拍" : "首段"}）：${String(segment.prompt).slice(0, 90)}${String(segment.prompt).length > 90 ? "…" : ""}`))
             ]) : null,
             scriptDialog.error ? h("p", { key: "err", className: "movc-status", "data-error": "true" }, scriptDialog.error) : null,
             h("div", { key: "ops", className: "movc-bar" }, [
-              h("button", { key: "cancel", type: "button", className: "mov-btn", disabled: scriptDialog.busy, onClick: () => setScriptDialog(null) }, "\u53D6\u6D88"),
-              h("button", { key: "write", type: "button", className: "mov-btn", disabled: scriptDialog.busy, title: "\u7528\u8BBE\u7F6E\u9875\u91CC\u914D\u7F6E\u7684\u6587\u672C\u6A21\u578B\u628A\u9700\u6C42\u5199\u6210\u5267\u672C\u4E0E\u5206\u955C\u8868\uFF0C\u4F1A\u8C03\u7528\u4E00\u6B21\u6587\u672C\u6A21\u578B", onClick: () => void writeWithModel() }, scriptDialog.writing ? "\u6B63\u5728\u5199\u811A\u672C\u2026" : "AI \u5199\u811A\u672C"),
-              h("button", { key: "preview", type: "button", className: "mov-btn", disabled: scriptDialog.busy, onClick: () => void previewScript() }, "\u9884\u89C8\u5206\u6BB5"),
-              h("button", { key: "ok", type: "button", className: "mov-btn mov-btn-primary", disabled: scriptDialog.busy, onClick: () => void createFromScript() }, "\u751F\u6210\u5236\u4F5C\u8282\u70B9")
+              h("button", { key: "cancel", type: "button", className: "mov-btn", disabled: scriptDialog.busy, onClick: () => setScriptDialog(null) }, "取消"),
+              h("button", { key: "write", type: "button", className: "mov-btn", disabled: scriptDialog.busy, title: "用设置页里配置的文本模型把需求写成剧本与分镜表，会调用一次文本模型", onClick: () => void writeWithModel() }, scriptDialog.writing ? "正在写脚本…" : "AI 写脚本"),
+              h("button", { key: "preview", type: "button", className: "mov-btn", disabled: scriptDialog.busy, onClick: () => void previewScript() }, "预览分段"),
+              h("button", { key: "ok", type: "button", className: "mov-btn mov-btn-primary", disabled: scriptDialog.busy, onClick: () => void createFromScript() }, "生成制作节点")
             ])
           ])
         ) : null,
@@ -5222,11 +5222,11 @@
             if (e.target === e.currentTarget) setCreateDialog(null);
           } },
           h("div", { key: "body", className: "movc-modal-body", style: { width: "min(420px, calc(100vw - 32px))" } }, [
-            h("h4", { key: "h" }, "\u65B0\u5EFA\u753B\u5E03"),
-            h("label", { key: "name", className: "movc-field" }, ["\u753B\u5E03\u540D\u79F0", h("input", {
+            h("h4", { key: "h" }, "新建画布"),
+            h("label", { key: "name", className: "movc-field" }, ["画布名称", h("input", {
               autoFocus: true,
               value: createDialog.value,
-              placeholder: "\u753B\u5E03\u540D\u79F0",
+              placeholder: "画布名称",
               onChange: (e) => setCreateDialog({ ...createDialog, value: e.target.value, error: "" }),
               onKeyDown: (e) => {
                 if (e.key === "Enter") {
@@ -5240,14 +5240,14 @@
               }
             })]),
             createDialog.error ? h("p", { key: "err", className: "movc-status", "data-error": "true" }, createDialog.error) : null,
-            h("p", { key: "note", className: "movc-status" }, "\u65B0\u753B\u5E03\u662F\u4E00\u4EFD\u7A7A\u767D\u6587\u6863\uFF0C\u4E0E\u81EA\u52A8\u521B\u5EFA\u7684\u753B\u5E03\u5E76\u5B58\uFF1B\u540D\u79F0\u4E0D\u80FD\u4E3A\u7A7A\uFF0C\u4E5F\u4E0D\u80FD\u548C\u5DF2\u6709\u753B\u5E03\u91CD\u540D\u3002"),
+            h("p", { key: "note", className: "movc-status" }, "新画布是一份空白文档，与自动创建的画布并存；名称不能为空，也不能和已有画布重名。"),
             h("div", { key: "ops", className: "movc-bar" }, [
-              h("button", { key: "cancel", type: "button", className: "mov-btn", onClick: () => setCreateDialog(null) }, "\u53D6\u6D88"),
-              h("button", { key: "ok", type: "button", className: "mov-btn mov-btn-primary", onClick: () => void submitCreate() }, "\u65B0\u5EFA\u753B\u5E03")
+              h("button", { key: "cancel", type: "button", className: "mov-btn", onClick: () => setCreateDialog(null) }, "取消"),
+              h("button", { key: "ok", type: "button", className: "mov-btn mov-btn-primary", onClick: () => void submitCreate() }, "新建画布")
             ])
           ])
         ) : null,
-        selectedIds.length > 1 ? h("p", { key: "multi", className: "movc-hint" }, `\u5DF2\u9009\u4E2D ${selectedIds.length} \u4E2A\u8282\u70B9\uFF1A\u53EF\u6574\u7EC4\u62D6\u52A8\u6216\u5220\u9664\u3002`) : null,
+        selectedIds.length > 1 ? h("p", { key: "multi", className: "movc-hint" }, `已选中 ${selectedIds.length} 个节点：可整组拖动或删除。`) : null,
         notice ? h("p", { key: "notice", className: "movc-hint" }, notice) : null,
         dialog ? h(
           "div",
@@ -5255,12 +5255,12 @@
             if (e.target === e.currentTarget) closeDialog();
           } },
           h("div", { key: "body", className: "movc-modal-body" }, [
-            h("h4", { key: "h" }, dialogNode ? `${labelOf(dialogNode)} \xB7 ${dialog.stage === "job" ? "\u5236\u4F5C\u8BB0\u5F55\u4E0E\u7ED3\u679C\u5BA1\u6838" : dialog.type === "video" || dialog.type === "image" ? "\u5236\u4F5C\u4E0E\u8D39\u7528\u786E\u8BA4" : "\u7F16\u8F91\u8282\u70B9\u5185\u5BB9"}` : "\u6D41\u7A0B\u753B\u5E03"),
+            h("h4", { key: "h" }, dialogNode ? `${labelOf(dialogNode)} · ${dialog.stage === "job" ? "制作记录与结果审核" : dialog.type === "video" || dialog.type === "image" ? "制作与费用确认" : "编辑节点内容"}` : "流程画布"),
             formFields,
             planView,
             jobView,
             dialog.message ? h("p", { key: "msg", className: "movc-status", "data-error": "true" }, dialog.message) : null,
-            h("p", { key: "note", className: "movc-status" }, "\u751F\u6210\u524D\u5FC5\u987B\u5206\u522B\u786E\u8BA4\u5236\u4F5C\u65B9\u6848\u4E0E\u8D39\u7528\uFF1B\u786E\u8BA4\u540E\u624D\u4F1A\u8C03\u7528\u6A21\u578B\u3002\u6210\u679C\u56DE\u586B\u53EA\u65B0\u589E\u6210\u679C\u8282\u70B9\uFF0C\u4E0D\u4EE3\u8868\u7ED3\u679C\u5DF2\u5BA1\u6838\u3002"),
+            h("p", { key: "note", className: "movc-status" }, "生成前必须分别确认制作方案与费用；确认后才会调用模型。成果回填只新增成果节点，不代表结果已审核。"),
             h("div", { key: "ops", className: "movc-bar" }, [
               dialog.stage === "edit" ? h("button", { key: "save", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: async () => {
                 patchDialog({ busy: true, message: "" });
@@ -5268,20 +5268,20 @@
                   await saveNode(dialog.nodeId, { data: { text: dialog.form.text } });
                   closeDialog();
                 } catch (e) {
-                  patchDialog({ busy: false, message: e?.message || "\u4FDD\u5B58\u5931\u8D25" });
+                  patchDialog({ busy: false, message: e?.message || "保存失败" });
                 }
-              } }, "\u4FDD\u5B58\u5185\u5BB9") : null,
-              dialog.stage === "form" ? h("button", { key: "gen", type: "button", className: "mov-btn mov-btn-primary", disabled: dialog.busy, onClick: () => void prepare("generate") }, "\u751F\u6210\u5E76\u786E\u8BA4\u8D39\u7528") : null,
-              dialog.job?.reviewed && dialog.stage === "job" ? h("button", { key: "extend-form", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => patchDialog({ stage: "form", plan: null }) }, "\u7EED\u62CD\u4E0B\u4E00\u6BB5") : null,
-              dialog.stage === "form" && dialog.job?.reviewed ? h("button", { key: "extend", type: "button", className: "mov-btn mov-btn-primary", disabled: dialog.busy, onClick: () => void prepare("extend") }, "\u786E\u8BA4\u7EED\u62CD\u4E0E\u8D39\u7528") : null,
-              dialog.stage === "plan" ? h("button", { key: "confirm", type: "button", className: "mov-btn mov-btn-primary", disabled: dialog.busy || !(dialog.confirm.plan && dialog.confirm.cost), onClick: () => void start() }, "\u786E\u8BA4\u5E76\u5F00\u59CB") : null,
-              dialog.stage === "plan" ? h("button", { key: "back", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => patchDialog({ stage: "form", plan: null }) }, "\u8FD4\u56DE\u4FEE\u6539") : null,
-              h("button", { key: "close", type: "button", className: "mov-btn", onClick: () => closeDialog() }, "\u5173\u95ED")
+              } }, "保存内容") : null,
+              dialog.stage === "form" ? h("button", { key: "gen", type: "button", className: "mov-btn mov-btn-primary", disabled: dialog.busy, onClick: () => void prepare("generate") }, "生成并确认费用") : null,
+              dialog.job?.reviewed && dialog.stage === "job" ? h("button", { key: "extend-form", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => patchDialog({ stage: "form", plan: null }) }, "续拍下一段") : null,
+              dialog.stage === "form" && dialog.job?.reviewed ? h("button", { key: "extend", type: "button", className: "mov-btn mov-btn-primary", disabled: dialog.busy, onClick: () => void prepare("extend") }, "确认续拍与费用") : null,
+              dialog.stage === "plan" ? h("button", { key: "confirm", type: "button", className: "mov-btn mov-btn-primary", disabled: dialog.busy || !(dialog.confirm.plan && dialog.confirm.cost), onClick: () => void start() }, "确认并开始") : null,
+              dialog.stage === "plan" ? h("button", { key: "back", type: "button", className: "mov-btn", disabled: dialog.busy, onClick: () => patchDialog({ stage: "form", plan: null }) }, "返回修改") : null,
+              h("button", { key: "close", type: "button", className: "mov-btn", onClick: () => closeDialog() }, "关闭")
             ]),
             dialog.stage === "plan" ? h("div", { key: "confirms" }, [
-              h("label", { key: "p", className: "movc-check" }, [h("input", { type: "checkbox", checked: dialog.confirm.plan === true, onChange: (e) => patchDialog({ confirm: { ...dialog.confirm, plan: e.target.checked } }) }), " \u6211\u5DF2\u6838\u5BF9\u672C\u6B21\u5236\u4F5C\u65B9\u6848\uFF08\u8282\u70B9\u5185\u5BB9\u3001\u753B\u5E45\u3001\u65F6\u957F\u4E0E\u6E05\u6670\u5EA6\uFF09"]),
-              h("label", { key: "c", className: "movc-check" }, [h("input", { type: "checkbox", checked: dialog.confirm.cost === true, onChange: (e) => patchDialog({ confirm: { ...dialog.confirm, cost: e.target.checked } }) }), " \u6211\u5DF2\u786E\u8BA4\u8D39\u7528\uFF0C\u6309\u6E20\u9053\u8D26\u5355\u7ED3\u7B97"]),
-              dialog.plan?.kind === "video" && dialog.plan?.operation === "generate" && !(dialog.plan?.references || []).length ? h("label", { key: "t", className: "movc-check" }, [h("input", { type: "checkbox", checked: dialog.confirm.textOnly === true, onChange: (e) => patchDialog({ confirm: { ...dialog.confirm, textOnly: e.target.checked } }) }), " \u672C\u6B21\u6CA1\u6709\u53C2\u8003\u7D20\u6750\uFF0C\u786E\u8BA4\u6309\u7EAF\u6587\u751F\u89C6\u9891\u63D0\u4EA4"]) : null
+              h("label", { key: "p", className: "movc-check" }, [h("input", { type: "checkbox", checked: dialog.confirm.plan === true, onChange: (e) => patchDialog({ confirm: { ...dialog.confirm, plan: e.target.checked } }) }), " 我已核对本次制作方案（节点内容、画幅、时长与清晰度）"]),
+              h("label", { key: "c", className: "movc-check" }, [h("input", { type: "checkbox", checked: dialog.confirm.cost === true, onChange: (e) => patchDialog({ confirm: { ...dialog.confirm, cost: e.target.checked } }) }), " 我已确认费用，按渠道账单结算"]),
+              dialog.plan?.kind === "video" && dialog.plan?.operation === "generate" && !(dialog.plan?.references || []).length ? h("label", { key: "t", className: "movc-check" }, [h("input", { type: "checkbox", checked: dialog.confirm.textOnly === true, onChange: (e) => patchDialog({ confirm: { ...dialog.confirm, textOnly: e.target.checked } }) }), " 本次没有参考素材，确认按纯文生视频提交"]) : null
             ]) : null
           ])
         ) : null
@@ -5335,7 +5335,7 @@
             if (direct && typeof direct.installBundle === "function") return { manager: direct, tried };
             tried.push(`remote.pluginManager=${shape(direct)}`);
           } catch (error) {
-            tried.push(`remote.pluginManager \u629B\u9519\uFF1A${error && error.message ? error.message : String(error)}`);
+            tried.push(`remote.pluginManager 抛错：${error && error.message ? error.message : String(error)}`);
           }
           try {
             const remote = typeof ctx.get === "function" ? ctx.get("remote") : void 0;
@@ -5343,7 +5343,7 @@
             if (nested && typeof nested.installBundle === "function") return { manager: nested, tried };
             tried.push(`remote=${shape(remote)}`);
           } catch (error) {
-            tried.push(`remote \u629B\u9519\uFF1A${error && error.message ? error.message : String(error)}`);
+            tried.push(`remote 抛错：${error && error.message ? error.message : String(error)}`);
           }
           return { manager: null, tried };
         };
@@ -5453,47 +5453,87 @@
     };
   }
 
+  // src/core/installation/bundle-inventory.ts
+  var BundleInventoryError = class extends Error {
+    constructor(code) {
+      super(`Bundle inventory ${code}`);
+      this.code = code;
+    }
+    code;
+  };
+  function assertMigrationActive(options) {
+    if (options.signal?.aborted) throw new BundleInventoryError("aborted");
+  }
+  function readBundleInventory(manager, options = {}) {
+    assertMigrationActive(options);
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (error, rows) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        options.signal?.removeEventListener("abort", abort);
+        error ? reject(error) : resolve(rows);
+      };
+      const abort = () => finish(new BundleInventoryError("aborted"));
+      const timer = setTimeout(() => finish(new BundleInventoryError("timeout")), options.timeoutMs ?? 8e3);
+      options.signal?.addEventListener("abort", abort, { once: true });
+      let request;
+      try {
+        assertMigrationActive(options);
+        request = manager.listBundles();
+      } catch {
+        finish(new BundleInventoryError(options.signal?.aborted ? "aborted" : "unavailable"));
+        return;
+      }
+      Promise.resolve(request).then((result) => {
+        const rows = Array.isArray(result) ? result : result?.ok === true ? result.value : null;
+        if (!Array.isArray(rows)) finish(new BundleInventoryError("unavailable"));
+        else finish(void 0, rows);
+      }, () => finish(new BundleInventoryError(options.signal?.aborted ? "aborted" : "unavailable")));
+    });
+  }
+
   // src/core/installation/bundle-identity.ts
   function hasLegacyBundleConflict(rows) {
     return rows.some((row) => row.name === PLUGIN_ID && row.installed === true && row.enabled === true) && rows.some((row) => row.name === PLUGIN_PACKAGE && row.installed === true && row.enabled === true);
   }
-  function bundleRows(result) {
-    const rows = Array.isArray(result) ? result : result?.ok === true ? result.value : null;
-    if (!Array.isArray(rows)) throw new Error("Bundle inventory unavailable");
-    return rows;
-  }
-  async function disableLegacyBundle(manager) {
-    if (!hasLegacyBundleConflict(bundleRows(await manager.listBundles()))) return "ready";
+  async function disableLegacyBundle(manager, options = {}) {
+    if (!hasLegacyBundleConflict(await readBundleInventory(manager, options))) return "ready";
     if (typeof manager.setBundleEnabled !== "function") throw new Error("Bundle migration unavailable");
+    assertMigrationActive(options);
     const answer = await manager.setBundleEnabled(PLUGIN_ID, false);
+    assertMigrationActive(options);
     const value = answer?.ok === true ? answer.value : answer;
     if (answer?.ok === false || value?.error || !value) throw new Error("Bundle migration rejected");
     if (value.application === "restart-required") return "restart-required";
-    const rows = bundleRows(await manager.listBundles());
+    const rows = await readBundleInventory(manager, options);
     if (rows.some((row) => row.name === PLUGIN_ID && row.enabled === true) || !rows.some((row) => row.name === PLUGIN_PACKAGE && row.enabled === true)) throw new Error("Bundle migration not applied");
     return "ready";
   }
   function hasLegacyBundle(rows) {
     return rows.some((row) => row.name === PLUGIN_ID && row.installed === true);
   }
-  async function cleanupLegacyBundle(manager) {
-    const rows = bundleRows(await manager.listBundles());
+  async function cleanupLegacyBundle(manager, options = {}) {
+    const rows = await readBundleInventory(manager, options);
     if (!hasLegacyBundle(rows)) return "ready";
     const current = rows.find((row) => row.name === PLUGIN_PACKAGE);
     const legacy = rows.find((row) => row.name === PLUGIN_ID);
     if (current?.installed !== true || current?.enabled !== true || legacy?.enabled !== false) return "retained";
     if (legacy.removable === false || typeof manager.removeBundle !== "function") return "manual";
     let answer;
+    assertMigrationActive(options);
     try {
       answer = await manager.removeBundle(PLUGIN_ID);
     } catch {
       return "retained";
     }
+    assertMigrationActive(options);
     const value = answer?.ok === true ? answer.value : answer;
     if (value?.error?.code === "stop-profile") return "stop-profile";
     if (value?.application === "restart-required") return "restart-required";
     if (answer?.ok === false || value?.error || !value) return "retained";
-    const after = bundleRows(await manager.listBundles());
+    const after = await readBundleInventory(manager, options);
     if (hasLegacyBundle(after)) return "retained";
     if (!after.some((row) => row.name === PLUGIN_PACKAGE && row.installed === true && row.enabled === true)) throw new Error("Current bundle unavailable");
     return "ready";
@@ -5513,6 +5553,9 @@
   async function mountBundleAwareClient(ctx, React, mount) {
     const manager = migrationManager(ctx);
     if (!manager) return mount();
+    const abort = new AbortController();
+    const inventory = { signal: abort.signal };
+    let checking = null;
     let alive = true, status = "checking", confirmed = false, running = null;
     const listeners = /* @__PURE__ */ new Set();
     const notify = () => {
@@ -5526,45 +5569,48 @@
     };
     ctx.effect(() => () => {
       alive = false;
+      abort.abort();
       listeners.clear();
     }, "video: migration lifetime");
     const ns = "settings.metaonticVideoMigration";
     ctx.effect(() => ctx.locale.register(ns, {
       zh: {
-        title: "\u65E7\u7248\u63D2\u4EF6\u8FC1\u79FB",
-        checking: "\u6B63\u5728\u68C0\u67E5\u63D2\u4EF6\u5B89\u88C5\u72B6\u6001\u2026",
-        conflict: "\u65E7\u7248 metaontic-video \u548C\u65B0\u7248 dsh-metaontic-video \u540C\u65F6\u542F\u7528\u3002\u66F4\u65B0\u6216\u91CD\u542F\u4E0D\u4F1A\u81EA\u52A8\u79FB\u9664\u65E7\u5305\uFF0C\u8BF7\u5B8C\u6210\u8FC1\u79FB\u3002",
-        retained: "\u65B0\u7248\u5DF2\u53EF\u4F7F\u7528\uFF0C\u4F46\u65E7\u5305\u4ECD\u5728\u5DF2\u5B89\u88C5\u5217\u8868\u4E2D\u3002\u53EF\u6E05\u7406\u65E7\u5305\uFF0C\u907F\u514D\u518D\u6B21\u8BEF\u542F\u7528\u3002",
-        ready: "\u8FC1\u79FB\u5B8C\u6210\uFF1A\u5DF2\u79FB\u9664\u65E7\u5305\uFF0C\u4FDD\u7559\u65B0\u7248\u3002",
-        action: "\u5207\u6362\u5E76\u6E05\u7406\u65E7\u7248",
-        cleanup: "\u6E05\u7406\u65E7\u7248\u5B89\u88C5\u5305",
-        switchOnly: "\u4EC5\u505C\u7528\u65E7\u7248\u5E76\u5207\u6362",
-        working: "\u6B63\u5728\u5904\u7406\uFF0C\u8BF7\u52FF\u91CD\u590D\u64CD\u4F5C\u2026",
-        consent: "\u6211\u5DF2\u7ED3\u675F\u6240\u6709\u89C6\u9891\u4EFB\u52A1\uFF0C\u540C\u610F\u505C\u7528\u5E76\u5378\u8F7D\u65E7\u5305 metaontic-video\u3002",
-        preserved: "\u914D\u7F6E\u3001API\u5BC6\u94A5\u3001\u5386\u53F2\u4EFB\u52A1\u548C\u7D20\u6750\u7EE7\u7EED\u4FDD\u7559\uFF1B\u4EC5\u5904\u7406\u65E7\u5B89\u88C5\u5305\u3002",
-        failed: "\u8FC1\u79FB\u672A\u5B8C\u6210\uFF0C\u8BF7\u91CD\u65B0\u68C0\u67E5\u3002\u4E0D\u4F1A\u81EA\u52A8\u5220\u9664\u914D\u7F6E\u6216\u91CD\u88C5\u63D2\u4EF6\u3002",
-        blocked: "\u65E0\u6CD5\u6838\u5B9E\u5B89\u88C5\u72B6\u6001\uFF0C\u8BF7\u91CD\u65B0\u68C0\u67E5\uFF1B\u6682\u4E0D\u6E05\u7406\u65E7\u5305\u3002",
-        restart: "\u5BBF\u4E3B\u8981\u6C42\u91CD\u542F\u4EE5\u5B8C\u6210\u5207\u6362\u3002\u8BF7\u5148\u4FDD\u5B58\u5DE5\u4F5C\uFF0C\u91CD\u542F\u540E\u56DE\u5230\u6B64\u5904\u68C0\u67E5\u5E76\u7EE7\u7EED\u6E05\u7406\u3002",
-        stop: "\u65B0\u7248\u5DF2\u53EF\u4F7F\u7528\uFF0C\u65E7\u5305\u5DF2\u505C\u7528\uFF1B\u5BBF\u4E3B\u8981\u6C42\u5148\u9000\u51FA\u5F53\u524D\u8FD0\u884C\u73AF\u5883\u624D\u80FD\u5378\u8F7D\u3002\u8BF7\u5728\u63D2\u4EF6\u7BA1\u7406\u4E2D\u5B8C\u6210\u65E7\u5305\u5378\u8F7D\uFF0C\u4E0D\u8981\u5220\u9664\u914D\u7F6E\u6216\u4EFB\u52A1\u76EE\u5F55\u3002",
-        manual: "\u65B0\u7248\u5DF2\u53EF\u4F7F\u7528\uFF1B\u5F53\u524D\u5BBF\u4E3B\u4E0D\u652F\u6301\u5728\u8FD9\u91CC\u5378\u8F7D\u65E7\u5305\uFF0C\u8BF7\u5230\u63D2\u4EF6\u7BA1\u7406\u4E2D\u5378\u8F7D metaontic-video\u3002",
-        cleanupFailed: "\u65B0\u7248\u5DF2\u53EF\u4F7F\u7528\uFF0C\u65E7\u5305\u6E05\u7406\u5C1A\u672A\u5B8C\u6210\u3002\u8BF7\u91CD\u65B0\u68C0\u67E5\u540E\u91CD\u8BD5\uFF0C\u52FF\u518D\u6B21\u542F\u7528\u65E7\u7248\u3002",
-        loadFailed: "\u63D2\u4EF6\u754C\u9762\u52A0\u8F7D\u5931\u8D25\uFF0C\u8BF7\u5728\u63D2\u4EF6\u7BA1\u7406\u4E2D\u6838\u5BF9\u542F\u7528\u72B6\u6001\u3002\u914D\u7F6E\u548C\u4EFB\u52A1\u672A\u5220\u9664\u3002",
-        retry: "\u91CD\u65B0\u68C0\u67E5"
+        title: "旧版插件迁移",
+        checking: "正在检查插件安装状态…",
+        conflict: "旧版 metaontic-video 和新版 dsh-metaontic-video 同时启用。更新或重启不会自动移除旧包，请完成迁移。",
+        retained: "新版已可使用，但旧包仍在已安装列表中。可清理旧包，避免再次误启用。",
+        ready: "迁移完成：已移除旧包，保留新版。",
+        action: "切换并清理旧版",
+        cleanup: "清理旧版安装包",
+        switchOnly: "仅停用旧版并切换",
+        working: "正在处理，请勿重复操作…",
+        consent: "我已结束所有视频任务，同意停用并卸载旧包 metaontic-video。",
+        preserved: "配置、API密钥、历史任务和素材继续保留；仅处理旧安装包。",
+        failed: "迁移未完成，请重新检查。不会自动删除配置或重装插件。",
+        blocked: "无法核实安装状态，请重新检查；暂不清理旧包。",
+        timeout: "安装状态查询超时，请点击重新检查。暂不执行停用或卸载，迟到的查询结果不会继续操作。",
+        restart: "宿主要求重启以完成切换。请先保存工作，重启后回到此处检查并继续清理。",
+        stop: "新版已可使用，旧包已停用；宿主要求先退出当前运行环境才能卸载。请在插件管理中完成旧包卸载，不要删除配置或任务目录。",
+        manual: "新版已可使用；当前宿主不支持在这里卸载旧包，请到插件管理中卸载 metaontic-video。",
+        cleanupFailed: "新版已可使用，旧包清理尚未完成。请重新检查后重试，勿再次启用旧版。",
+        loadFailed: "插件界面加载失败，请在插件管理中核对启用状态。配置和任务未删除。",
+        retry: "重新检查"
       },
       en: {
         title: "Legacy plugin migration",
-        checking: "Checking installed plugins\u2026",
+        checking: "Checking installed plugins…",
         conflict: "metaontic-video and dsh-metaontic-video are both enabled. Updating or restarting does not remove the old package.",
         retained: "The new plugin is ready. Remove the disabled old package to avoid enabling it again.",
         ready: "Migration complete. The old package was removed; the new plugin is retained.",
         action: "Switch and remove old package",
         cleanup: "Remove old package",
         switchOnly: "Disable old plugin and switch only",
-        working: "Working\u2026",
+        working: "Working…",
         consent: "All video tasks have finished. I agree to disable and uninstall metaontic-video.",
         preserved: "Settings, API credentials, task history and assets are retained. Only the old installation package is removed.",
         failed: "Migration was not completed. Check again. Settings will not be deleted and no reinstall is attempted.",
         blocked: "Installation state could not be verified. Check again before cleanup.",
+        timeout: "Installation check timed out. Check again; no disable or uninstall will follow a late response.",
         restart: "Harness requires a restart. Save your work, restart and return here to finish cleanup.",
         stop: "The new plugin is ready and the old plugin is disabled. Harness requires the running profile to stop before uninstalling. Finish removal in plugin management; keep settings and task directories.",
         manual: "The new plugin is ready. Use plugin management to uninstall metaontic-video; this Host cannot remove it here.",
@@ -5575,20 +5621,28 @@
     }), "video: migration messages");
     const t = ctx.locale.bind(ns), h = React.createElement;
     let activated = false;
-    const check = async () => {
+    const check = () => {
+      if (!alive) return Promise.resolve();
+      if (checking) return checking;
+      if (running) return running;
       set("checking");
-      try {
-        const rows = bundleRows(await manager.listBundles());
-        if (!alive) return;
-        if (hasLegacyBundleConflict(rows)) {
-          set("conflict");
-          return;
+      checking = (async () => {
+        try {
+          const rows = await readBundleInventory(manager, inventory);
+          if (!alive) return;
+          if (hasLegacyBundleConflict(rows)) {
+            set("conflict");
+            return;
+          }
+          set(hasLegacyBundle(rows) ? "retained" : "ready");
+          return activate();
+        } catch (error) {
+          if (alive) set(error instanceof BundleInventoryError && error.code === "timeout" ? "timeout" : "blocked");
         }
-        set(hasLegacyBundle(rows) ? "retained" : "ready");
-        return activate();
-      } catch {
-        set("blocked");
-      }
+      })().finally(() => {
+        checking = null;
+      });
+      return checking;
     };
     const start = (cleanup) => {
       if (!alive || cleanup && !confirmed) return Promise.resolve();
@@ -5596,24 +5650,29 @@
       set("working");
       running = (async () => {
         try {
-          const result = await disableLegacyBundle(manager);
+          const result = await disableLegacyBundle(manager, inventory);
           if (!alive) return;
           if (result === "restart-required") {
             set("restart");
             return;
           }
           if (cleanup) {
-            const outcome = await cleanupLegacyBundle(manager);
+            const outcome = await cleanupLegacyBundle(manager, inventory);
             if (!alive) return;
             set(outcome === "ready" ? "ready" : outcome === "stop-profile" ? "stop" : outcome === "restart-required" ? "restart" : outcome === "manual" ? "manual" : "cleanupFailed");
           } else {
-            const rows = bundleRows(await manager.listBundles());
+            const rows = await readBundleInventory(manager, inventory);
             set(hasLegacyBundle(rows) ? "retained" : "ready");
           }
           return activate();
-        } catch {
+        } catch (error) {
+          if (!alive) return;
+          if (error instanceof BundleInventoryError && error.code === "timeout") {
+            set("timeout");
+            return;
+          }
           try {
-            const rows = bundleRows(await manager.listBundles());
+            const rows = await readBundleInventory(manager, inventory);
             if (!hasLegacyBundleConflict(rows)) {
               set("cleanupFailed");
               return activate();
@@ -5639,7 +5698,7 @@
         "section",
         { style: { padding: 20, maxWidth: 680 }, "data-metaontic-migration": state },
         h("h3", null, t("title")),
-        h("p", { role: ["failed", "blocked", "cleanupFailed"].includes(state) ? "alert" : "status" }, t(state)),
+        h("p", { role: ["failed", "blocked", "timeout", "cleanupFailed"].includes(state) ? "alert" : "status" }, t(state)),
         h("p", null, t("preserved")),
         cleanupAllowed ? h("label", null, h("input", { type: "checkbox", checked: confirmed, "data-migration-consent": true, onChange: (event) => {
           confirmed = event.target.checked === true;
