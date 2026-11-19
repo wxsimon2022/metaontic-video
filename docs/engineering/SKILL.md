@@ -209,3 +209,7 @@ README 编辑先遵守 docs/engineering/readme-guidelines.md，功能变化不�
 ## 市场固定安装包
 
 GitHub 正式版完成双平台安装检查后，通过 `scripts/publish-stable-alias.mjs` 将已验证版本包原字节复制为 `metaontic-video.tgz`，下载复核后公开并维护 Latest；续跑不覆盖附件，补发旧版不倒退 Latest。清理附件时保留该固定名称。市场固定地址首次切换须等待正式版真实具备附件，不能提前提交失效地址；具体流程见 `stable-market-download.md`。内部升级仍使用具体版本成品地址。
+
+## 专业工具返回与审核补展示
+
+Harness 拒绝带 undefined 的工具输出，错误为 INVALID_TOOL_OUTPUT / value is not lossless JSON；execute 内部成功不等于宿主接收成功。film_project 在返回边界转换为可无损传输的 JSON，回归覆盖 create/read/next/route/export；非有限数字拒绝返回。发生输出错误时不要重复create或未经用户决定降级，应先核对保存状态。审核守卫拦截若返回presentation，按其markdown补齐同一保存稿和绑定原图，沿原projectId与specification重试；分镜失效才重新storyboard，不自行转图或查源码试错。

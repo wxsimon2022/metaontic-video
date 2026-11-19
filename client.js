@@ -1326,7 +1326,7 @@
 
   // src/ui/updates/update.service.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "4.0.6".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "4.0.7".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1793,7 +1793,7 @@
   // package.json
   var package_default = {
     name: "dsh-metaontic-video",
-    version: "4.0.6",
+    version: "4.0.7",
     description: "面向新手的 AI 视频创作助手：从想法、脚本到视频生成，全程引导；通过分段续拍与本地合并，提供低成本长视频制作方案。",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1908,12 +1908,12 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "4.0.6",
+      version: "4.0.7",
       prerelease: false,
-      publishedAt: "2026-11-19T14:18:10.793Z",
+      publishedAt: "2026-11-19T22:46:23.697Z",
       items: [
-        "优化：脚本待确认事项逐项留存，分镜绑定当前项目与稿件，减少重复审核。",
-        "优化：统一制作参数默认值，避免误判变更；防止重复续做抢占任务。"
+        "优化：修复专业项目返回解析异常，避免重复建项目或自动降级。",
+        "优化：脚本审核受阻时提供准确补展示材料，复用当前项目与原图继续审核。"
       ]
     }
   };

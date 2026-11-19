@@ -169,7 +169,17 @@ export function projectTool(config, ctx, reviewGuard, generationProperties, exte
         }
         const canvasOutput = canvasProject ? { canvasProject } : {};
         const gate = await reviewGuard.gate({ ...exec, name: 'ask_user_question', arguments: { requireStoryboard: true, requiredProjectId:data.id,requiredScriptPath:scriptPath,requiredScriptHash:scriptHash,requiredStoryboard:data.storyboard,requiredScriptText: scriptBody, questions: [{ id: 'script_review', question: '审核当前脚本' }] } });
-        if (gate) return { projectId: data.id, status: 'blocked', ...canvasOutput, reason: gate.reason };
+        if (gate) {
+          const board=data.storyboard;
+          const currentBoard=board?.projectId===data.id && board.scriptHash===scriptHash
+            && path.resolve(board.scriptPath)===scriptPath
+            && await scriptDigest(board.path).catch(()=>'')===board.imageHash;
+          return {projectId:data.id,status:'blocked',...canvasOutput,reason:gate.reason,
+            repairAction:currentBoard?'present_current_materials':'regenerate_storyboard',
+            ...(currentBoard?{presentation:{scriptPath,storyboardPath:board.path,
+              markdown:scriptBody+`\n\n![分镜示意图](<${board.path}>)\n\n[打开原图](<${board.path}>)`}}:{}),
+            nextAction:currentBoard?'将presentation.markdown原样放在一条用户可见正文中（不要省略项目行、改写或自行转图），然后沿用同一projectId、scriptPath和specification重试review；不重建项目、不重写文件、不重复捕获脚本。':'本项目分镜缺失或已过期。沿用本projectId与scriptPath调用storyboard，展示返回的原图后再review；不使用其他项目或自行转换的图片。'};
+        }
         const service = ctx.get?.('userQuestions') || exec.agent?.ctx?.get?.('userQuestions');
         if (!service?.ask || approvalPolicy(ctx, exec) === 'never') return { projectId: data.id, status: 'pending', ...canvasOutput, reason: '无法取得脚本审核答复，未生成。' };
         data.approved = null; await writeProject(data);

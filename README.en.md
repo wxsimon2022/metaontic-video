@@ -20,13 +20,13 @@ Paste a link into Harness → Plugins → Add plugin. Windows and macOS use the 
 Gitee:
 
 ```text
-https://gitee.com/hackloop/metaontic-video/releases/download/v4.0.6/metaontic-video-4.0.6.tgz
+https://gitee.com/hackloop/metaontic-video/releases/download/v4.0.7/metaontic-video-4.0.7.tgz
 ```
 
 GitHub mirror:
 
 ```text
-https://github.com/wxsimon2022/metaontic-video/releases/download/v4.0.6/metaontic-video-4.0.6.tgz
+https://github.com/wxsimon2022/metaontic-video/releases/download/v4.0.7/metaontic-video-4.0.7.tgz
 ```
 
 ## Get started

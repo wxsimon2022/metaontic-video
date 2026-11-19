@@ -17,6 +17,7 @@ export function buildPromptGuidance(config) {
   return [
     '【阶段适用范围】专业film_project当前阶段以next/route返回的角色职责为准。以下全链路方法按阶段应用：Creative不写正式剧本，Screenwriter不提前写最终分镜与模型提示词。关于示意图、制作脚本、两项费用预算、角色图和video_project审核的要求，仅用于普通制作或专业项目编译进入实际制作时，不得提前施加到创意/编剧批准。不要把所有环节压缩成一次填表输出。',
     CREATIVE_GUIDANCE,
+    REVIEW_REPAIR_GUIDANCE,
 
     ...(FLOW_CANVAS_AVAILABLE ? [
     `· 当前流程画布：${canvasOn ? `开启；自动创建画布：${autoCreate ? '开启' : '关闭'}` : '关闭（默认关闭，可在插件设置页打开）'}。这两个开关只能在插件设置页修改，video_config可只读核对。`,
@@ -133,3 +134,5 @@ export function buildPromptGuidance(config) {
       + '使用记录卡片暂时隐藏，也不要引导用户去看。',
   ].join('\n');
 }
+
+export const REVIEW_REPAIR_GUIDANCE = 'review若返回blocked且带presentation，按nextAction将presentation.markdown原样展示一次，再以同项目同稿件重试review；这是补齐未完整展示，不是改稿。不再自行读取守卫源码、重新编写脚本或转换分镜图片，不把blocked当作工具不可用。repairAction为regenerate_storyboard时仅用原项目与稿件重新storyboard，不能新建项目或跳过审核。';

@@ -17,7 +17,7 @@ var __export = (target, all) => {
 var PLUGIN_VERSION;
 var init_version = __esm({
   "src/shared/constants/version.ts"() {
-    PLUGIN_VERSION = true ? "4.0.6".trim().replace(/^v/i, "") : "";
+    PLUGIN_VERSION = true ? "4.0.7".trim().replace(/^v/i, "") : "";
   }
 });
 
@@ -1326,6 +1326,14 @@ async function appendRequestLog(record) {
 // src/businesses/film-production/validation/budget.validator.ts
 var ACTIONS = ["create", "read", "validate", "submit", "approve", "export", "next", "compile", "revise", "schedule", "task_result", "route", "verify_issue", "configure_profile", "diagnose", "recover_lock"];
 var STAGES = ["creative", "script", "assets", "shots", "prompts", "review"];
+function filmOutput(value) {
+  const text = JSON.stringify(value, (_key, item) => {
+    if (typeof item === "number" && !Number.isFinite(item)) throw Error("INVALID_FILM_OUTPUT:nonfinite_number");
+    return item;
+  });
+  if (text === void 0) throw Error("INVALID_FILM_OUTPUT:empty_result");
+  return JSON.parse(text);
+}
 function withFilmDiagnostics(tool) {
   return { ...tool, async execute(args, exec) {
     const started = performance.now();
@@ -1333,7 +1341,7 @@ function withFilmDiagnostics(tool) {
     let outcome = "failed";
     let category = "INTERNAL_ERROR";
     try {
-      result = await tool.execute(args, exec);
+      result = filmOutput(await tool.execute(args, exec));
       outcome = "success";
       return result;
     } catch (e) {
@@ -4603,6 +4611,7 @@ shots：{shots:[{shot_id,scene_id,character_ids,start_ms,end_ms,duration_ms,narr
 prompts：{prompts:[{shot_id,prompt,target_model,location_id,scene_state_id,duration_ms,generation_mode,dialogue_refs,capability_warnings,...}]}，每镜恰有一个非空prompt；保留资产锚点与源版本，不把一镜一提示词误当一镜一次付费调用。
 review：新版Reviewer V3.1提交review_status、scores八维（不适用null）、issues、delivery_allowed、blocking_issue_count和真实reviewed_revisions（creative/script/assets/shots/prompts对应实际修订号）、review_id/review_stage/review_scope/unverified_items等完整报告。CRITICAL/MAJOR未VERIFIED阻断；加权分由程序复算，失败报告也可保存但禁止编译。最终通过只接受FINAL_REVIEW及完整review_scope，适用维度不得用null跳过。重大问题不得删除或降级；首次问题OPEN，责任产物真实改版后才标RESOLVED。Reviewer按当前版本复审后用verify_issue(issueId,content:{evidence,review_revision,source_revisions},expectedRevision)登记，再提交含VERIFIED的终审；问题台账与复审时间由运行时维护，不能自填验证通过。旧报告score/passed协议兼容。
 创意和剧本的批准分别绑定材料版本，沉默/取消/修改意见不算批准。改稿后按工具stale状态更新下游，不假称已实现实体级自动修订。超过180秒按章规划，600秒以上维护全片摘要和章间状态，分批创作但按当前工具提交完整阶段聚合对象；超出上下文能力时停在可恢复草稿，不截断冒充完整。
+工具报错先区分参数/产物校验失败与宿主输出协议失败。INVALID_TOOL_OUTPUT或“value is not lossless JSON”不代表写入失败、工具不可用或已获准降级；create返回结果不明时禁止重复create，先诊断并恢复已保存项目。不得仅因重试次数达到两次就宣布专业通道不可用、改走video_project或跳过创意/剧本批准。只有用户明确改选流程才切换；错误未解决则保留材料并报告具体阻断。
 export返回JSON和Markdown内容，不是已写入导出文件；没有实际文件不得编造下载链接。Markdown应为同版本JSON的可读投影。实际视频仍须走video_project脚本审核、费用确认与逐段结果审核，创作批准不替代制作授权。`;
 var ORCHESTRATION_GUIDANCE = `推进专业创作先调用film_project(action:next)，只加载返回的role、inputs与scope所需资料，再按许可动作提交或请求批准；不把完整历史反复塞给镜头任务。当前role是同一助手的专业职责，不是独立运行的子Agent。完成审核后调用compile(expectedRevision,ratio,resolution)编译制作计划，返回production.videoProjectId及specification。用该videoProjectId执行video_project prepare完成角色图路线，再展示制作脚本、真实分镜构图示意图与估价并review。分镜JSON/镜头列表不等于图：完整制作脚本在正文展示一次后，调用 video_project(action:"storyboard",captureScript:true,scriptPath)由插件免费本地绘图，使用返回markdown内嵌图片并附原图链接，再review；不要手写绘图代码或SVG，不擅自付费出图。不得把创作批准当费用授权。compile只读规划不产生付费调用；重复同版本同规格编译复用绑定。创作改稿后旧绑定禁止新增生成，已提交任务查询和交付仍可恢复。next/route返回execution_plan制作预规划；分镜应与真实生成段边界对齐。compile发现跨段截断镜头或同段多地点时拒绝并要求Storyboard重规划，不复制整条动作/台词到两段。project_spec锁定的画幅、清晰度和目标模型与制作不符时先修订并重审，不静默换参数。全片最长3600秒，按模型单段能力逐段生成、审核和续做，不承诺一次请求生成整片。`;
 var INTENT_GUIDANCE = `用户请求专业创作、改稿或核查时先理解语义再选择film_project(action:route,intent,entityIds)。意图枚举：develop_idea创意、write_script剧本、revise_dialogue对白、revise_story剧情、design_character/revise_character人物、design_scene/revise_scene场景、design_shots分镜、revise_camera镜头、revise_timing时长、write_prompts提示词、adapt_model模型适配、review审核、verify_facts事实核查、resume续作、produce制作、clarify澄清。局部修改传用户明确对象的稳定ID，目标不明先read定位再澄清，不能自行扩大scope。多个意图分别路由，先上游后下游；否定句、引用文字不作为执行指令。route只返回角色指令与状态，不写入或授权。needs_input先补条件，ready也不代表批准。新项目先完成需求并create，未创建时由总导演澄清，不编造projectId。每次只使用当前角色提示词；输出须遵守当前工具字段契约，专业规则不改变API。`;
@@ -6703,7 +6712,27 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         }
         const canvasOutput = canvasProject ? { canvasProject } : {};
         const gate = await reviewGuard.gate({ ...exec, name: "ask_user_question", arguments: { requireStoryboard: true, requiredProjectId: data.id, requiredScriptPath: scriptPath, requiredScriptHash: scriptHash, requiredStoryboard: data.storyboard, requiredScriptText: scriptBody, questions: [{ id: "script_review", question: "审核当前脚本" }] } });
-        if (gate) return { projectId: data.id, status: "blocked", ...canvasOutput, reason: gate.reason };
+        if (gate) {
+          const board = data.storyboard;
+          const currentBoard = board?.projectId === data.id && board.scriptHash === scriptHash && path13.resolve(board.scriptPath) === scriptPath && await scriptDigest(board.path).catch(() => "") === board.imageHash;
+          return {
+            projectId: data.id,
+            status: "blocked",
+            ...canvasOutput,
+            reason: gate.reason,
+            repairAction: currentBoard ? "present_current_materials" : "regenerate_storyboard",
+            ...currentBoard ? { presentation: {
+              scriptPath,
+              storyboardPath: board.path,
+              markdown: scriptBody + `
+
+![分镜示意图](<${board.path}>)
+
+[打开原图](<${board.path}>)`
+            } } : {},
+            nextAction: currentBoard ? "将presentation.markdown原样放在一条用户可见正文中（不要省略项目行、改写或自行转图），然后沿用同一projectId、scriptPath和specification重试review；不重建项目、不重写文件、不重复捕获脚本。" : "本项目分镜缺失或已过期。沿用本projectId与scriptPath调用storyboard，展示返回的原图后再review；不使用其他项目或自行转换的图片。"
+          };
+        }
         const service = ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
         if (!service?.ask || approvalPolicy(ctx, exec) === "never") return { projectId: data.id, status: "pending", ...canvasOutput, reason: "无法取得脚本审核答复，未生成。" };
         data.approved = null;
@@ -12614,6 +12643,7 @@ function buildPromptGuidance(config) {
   return [
     "【阶段适用范围】专业film_project当前阶段以next/route返回的角色职责为准。以下全链路方法按阶段应用：Creative不写正式剧本，Screenwriter不提前写最终分镜与模型提示词。关于示意图、制作脚本、两项费用预算、角色图和video_project审核的要求，仅用于普通制作或专业项目编译进入实际制作时，不得提前施加到创意/编剧批准。不要把所有环节压缩成一次填表输出。",
     CREATIVE_GUIDANCE,
+    REVIEW_REPAIR_GUIDANCE,
     ...FLOW_CANVAS_AVAILABLE ? [
       `· 当前流程画布：${canvasOn ? `开启；自动创建画布：${autoCreate ? "开启" : "关闭"}` : "关闭（默认关闭，可在插件设置页打开）"}。这两个开关只能在插件设置页修改，video_config可只读核对。`,
       "· 流程画布是插件自带组件（左侧栏「MetaOnticVideo流程画布」那一行打开独立页面，视频创作面板里不再内嵌），不需要安装任何第三方画布插件；按当前开关决定是否自动投影。" + (!canvasOn ? "当前流程画布关闭：左侧栏没有画布入口，不要自动建图、不要自动同步，也不要对用户说已经建好或打开了流程画布；用户要用画布时先在插件设置页打开「流程画布」，再按下面的画布联动规则手动处理。" : autoCreate ? "普通创作照常调用video_project prepare/review，工具会自动建流程画布项目、同步完整脚本与制作段计划，并提示用户到左侧栏「MetaOnticVideo流程画布」查看；不要要求用户另建项目/节点或另问是否同步。" : "当前流程画布已打开但关闭了自动创建画布：不要自动建图、不要自动同步，也不要对用户说已经自动建好；用户明确选中画布节点时再按下面的画布联动规则手动处理。") + "开启后生成传projectId，续做传原resume，成果回到已绑定的画布节点，不必手工拼自动canvas绑定。canvasProject为disabled表示未开启自动投影，unavailable/pending如实说明，用video_project status重试同步，不重建创作项目或重生成；内置画布只能由用户自己从左侧栏打开，工具无法代开，不要声称已打开。仍保留脚本、费用和分段结果审核。",
@@ -12669,6 +12699,7 @@ function buildPromptGuidance(config) {
     "· 当前设置页提供的接入方式：MetaOntic AI（手填 API密钥）。火山引擎直连暂不提供选择，已有该配置的安装仍可继续生成；不要主动帮用户切到该方式，也不要在新会话里主动推荐或引导配置未提供的方式。使用记录卡片暂时隐藏，也不要引导用户去看。"
   ].join("\n");
 }
+var REVIEW_REPAIR_GUIDANCE = "review若返回blocked且带presentation，按nextAction将presentation.markdown原样展示一次，再以同项目同稿件重试review；这是补齐未完整展示，不是改稿。不再自行读取守卫源码、重新编写脚本或转换分镜图片，不把blocked当作工具不可用。repairAction为regenerate_storyboard时仅用原项目与稿件重新storyboard，不能新建项目或跳过审核。";
 
 // src/businesses/video-generation/generation.service.ts
 init_config();
