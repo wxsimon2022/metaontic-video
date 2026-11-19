@@ -14,3 +14,13 @@ MetaOnticVideo v4.0.6
 - 桌面GUI与付费调用未由发布脚本自动验证。
 
 指南核对：已逐项核对并同步Markdown与PDF：待确认答复保留及落实、当前项目与脚本绑定的分镜、同版复用、默认制作参数及进程存活锁规则。GitHub安装地址对应本次正式版，Gitee保留已有正式版地址；不含版本日志，配图无需变化。
+
+## 实际发布结果
+
+- 最初按仅 GitHub 准备；用户随后明确增加 Gitee，两个仓库均已发布 v4.0.6 正式版。未覆盖公开标签。
+- 本地构建及698项测试通过。Windows/macOS同包安装、真实旧版升级检查均通过：https://github.com/wxsimon2022/metaontic-video/actions/runs/44542305024 。这是自动安装验证，未做桌面实机及付费调用。
+- 原始成品、GitHub固定 Latest下载及Gitee附件下载复核 SHA-256 均为 `7422b9fa56ecda412854b8795f7c74af1266b7645e23bca73edafef13da286c4`。
+- 使用说明书Markdown与PDF已纳入同一成品；发布渠道安装示例在准备时按GitHub单仓保留Gitee已发布地址。后续Gitee同步仍沿用已验证包，未为渠道示例重新打包。
+- 用户明确要求并再次确认，将GitHub v4.0.2的同名附件直接替换成上述成品，不另行备份；保留原标签及源码，附件标签注明“实际安装版本 v4.0.6”。下载后核对包内版本及SHA-256一致。此为单次用户指令，不改变默认附件不覆盖规则。
+- 插件市场PR #16988已改为固定Latest地址，尚待维护者合并和市场刷新：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16988 。
+- 未安装到真实本地profile、未热加载或重启。

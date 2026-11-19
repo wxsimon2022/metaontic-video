@@ -20,7 +20,7 @@ DeepSeek Harness 视频创作插件：**新手快速上手，低成本制作长�
 Gitee：
 
 ```text
-https://gitee.com/hackloop/metaontic-video/releases/download/v4.0.5/metaontic-video-4.0.5.tgz
+https://gitee.com/hackloop/metaontic-video/releases/download/v4.0.6/metaontic-video-4.0.6.tgz
 ```
 
 GitHub 备用：
