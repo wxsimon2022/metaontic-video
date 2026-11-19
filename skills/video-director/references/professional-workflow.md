@@ -51,3 +51,7 @@ work_type与visual_style（视觉风格）、narrative_mode（叙事方式）、
 creative/script按角色指令增加type_details对象，填写当前配置所列字段的具体非空文本，不复述规则。六类侧重点分别是选择与后果、铺垫与回收、观察与感官节奏、证据来源与事实边界、卖点依据与使用过程、辨识细节与情绪载体。纪录和广告证据缺失标待核实，不编造。
 
 终审增加type_review（work_type、profile_revision、checks）；每个criterion_id匹配work_profile.profile.review_criteria，给status与evidence。status为PASS、CONCERN或NOT_EVALUATED；CONCERN另带issue_id关联已有问题，艺术建议不伪装客观错误；未评估项不能通过终审。共同的版本、时长、引用、对白、用户硬约束仍须检查，不因类型放宽。类型规则不会保证实际生成质量，不自动调用视频。
+
+## 工具异常与恢复
+
+INVALID_TOOL_OUTPUT / value is not lossless JSON 是宿主输出协议错误，不代表项目未保存。create结果不明时不要重复create或擅自改走普通制作，先恢复已保存项目并检查返回协议。参数或材料JSON校验失败时只修正对应格式与字段，保留创意及已批准内容；重复失败不构成跳过专业审批的授权，改选流程须用户明确决定。
