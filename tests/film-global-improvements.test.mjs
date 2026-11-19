@@ -236,7 +236,10 @@ test('video project status reports stale source or model despite unchanged local
   const stale=await tool.execute({action:'status',projectId:video.id},exec);assert.equal(stale.status,'draft');assert.equal(stale.approval_stale,true);
   await writeFile(sourcePath,JSON.stringify(source));
   assert.equal((await workflowApi.projectTool({model:'changed-model'}, {},{},{},{}).execute({action:'status',projectId:video.id},exec)).approval_stale,true);
-  video.choice='not_needed';video.duration=15;await api.writeProject(video);
+  video.choice='not_needed';video.duration=15;
+  const boardPath=path.join(home,'storyboard.svg');await writeFile(boardPath,'<svg/>');
+  video.storyboard={projectId:video.id,path:boardPath,scriptPath,scriptHash:await api.scriptDigest(scriptPath),imageHash:await api.scriptDigest(boardPath),version:1};
+  await api.writeProject(video);
   const [generation,extension]=workflowApi.properties(config);
   const reviewer=workflowApi.projectTool(config,{get:()=>({ask:async()=>{await writeFile(sourcePath,JSON.stringify({...source,revision:8}));return {answers:[{id:'script_review',selected:['脚本通过']}]};}})},{gate:async()=>null},generation,extension);
   await assert.rejects(reviewer.execute({action:'review',projectId:video.id,toolName:'video_generate',scriptPath,specification:spec},exec),/已改稿/);

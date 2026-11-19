@@ -120,6 +120,9 @@ jobs:
 
   release:
     needs: [prepare, platform-install]
+    concurrency:
+      group: stable-release-publication
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -139,13 +142,11 @@ jobs:
           RELEASE_TAG: ${{ inputs.existing_version && format('v{0}', inputs.existing_version) || github.ref_name }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          RELEASE_FLAGS=()
-          if [ "$(node -p "Boolean(require('./package.json').releaseNotes.prerelease)")" = "true" ]; then
-            RELEASE_FLAGS+=(--prerelease)
-          fi
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --notes-file dist/release-notes.txt
+            gh release edit "$RELEASE_TAG" --notes-file dist/release-notes.txt
             # The draft already contains the exact package checked by both runners; do not replace it.
           else
-            gh release create "$RELEASE_TAG" dist/*.tgz --verify-tag --title "MetaOnticVideo $RELEASE_TAG" --notes-file dist/release-notes.txt "${RELEASE_FLAGS[@]}"
+            gh release create "$RELEASE_TAG" dist/*.tgz --verify-tag --title "MetaOnticVideo $RELEASE_TAG" --notes-file dist/release-notes.txt --draft
           fi
+          VERSION="${RELEASE_TAG#v}"
+          node scripts/publish-stable-alias.mjs "$RELEASE_TAG" "dist/metaontic-video-$VERSION.tgz" "$GITHUB_REPOSITORY"

@@ -26,7 +26,7 @@ https://gitee.com/hackloop/metaontic-video/releases/download/v4.0.5/metaontic-vi
 GitHub mirror:
 
 ```text
-https://github.com/wxsimon2022/metaontic-video/releases/download/v4.0.5/metaontic-video-4.0.5.tgz
+https://github.com/wxsimon2022/metaontic-video/releases/download/v4.0.6/metaontic-video-4.0.6.tgz
 ```
 
 ## Get started

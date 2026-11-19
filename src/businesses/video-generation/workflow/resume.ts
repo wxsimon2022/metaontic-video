@@ -1,3 +1,4 @@
+import { acquireFileLock } from '../../../shared/utils/file-lock.js';
 import { validatePauseRecord } from './result-state.js';
 /** workflow/resume：从宿主入口拆出的独立职责模块。 */
 import path from 'node:path';
@@ -50,103 +51,16 @@ export async function readPauseFile(dir) {
 
 const RESUME_LOCK = 'resume.lock';
 
-/** 锁过期时间：0 / 负数表示永不过期（配置成 0 的人就是不想让后来者抢）。 */
-function resumeLockStaleMs(config) {
-  const minutes = Number(ref(config, 'resumeLockStaleMinutes', 60));
-  if (!Number.isFinite(minutes) || minutes <= 0) return 0;
-  return minutes * 60 * 1000;
-}
-
-/** 锁文件是不是「过期残留」（进程被杀 / 宿主放弃调用，没来得及删）：只有过期才允许抢过来。 */
-async function resumeLockExpired(file, staleMs) {
-  const raw = await readFile(file, 'utf8').catch(() => null);
-  if (raw === null) return true;              // 刚好被删掉：当成可以重试
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    return true;                              // 内容坏了（崩在写锁中途）：当过期
-  }
-  const started = Date.parse(String(data?.startedAt || ''));
-  if (!Number.isFinite(started)) return true;
-  if (!staleMs) return false;
-  return Date.now() - started > staleMs;
-}
-
-/** 读锁文件里「谁拿着」，只用来写一句清楚的报错。 */
-async function describeResumeLock(file) {
-  const raw = await readFile(file, 'utf8').catch(() => null);
-  if (!raw) return '';
-  try {
-    const data = JSON.parse(raw);
-    const bits = [data?.tool, data?.startedAt && `${data.startedAt} 开始`, data?.pid && `pid ${data.pid}`]
-      .filter(Boolean);
-    return bits.length ? `（${bits.join('，')}）` : '';
-  } catch {
-    return '';
-  }
-}
-
-/**
- * 拿到「续做锁」：用 `wx` 独占创建锁文件，这个操作是原子的，同进程 / 跨进程都拦得住。
- * 用户连点两次「继续」、或两个会话同时去续做同一份暂停进度时，只有第一个能进，
- * 第二个直接报错——否则双方各自把剩下的段提交一遍，同样的段生成两遍、钱花两遍。
- * @returns { file, release } —— release 只删自己写的那把锁（目录可能已经换人用了）。
- */
-async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
-  const empty = { file: null, async release() {} };
-  const file = path.join(dir, RESUME_LOCK);
-  const token = uniqueSuffix('lock');
-  const record = {
-    tool: toolName,
-    callId: callId || null,
-    pid: process.pid,
-    host: os.hostname(),
-    startedAt: new Date().toISOString(),
-    token,
-  };
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const handle = await open(file, 'wx');
-      try {
-        await handle.writeFile(`${JSON.stringify(record, null, 2)}\n`, 'utf8');
-      } finally {
-        await handle.close();
-      }
-      return {
-        file,
-        async release() {
-          const raw = await readFile(file, 'utf8').catch(() => null);
-          if (raw) {
-            try {
-              if (JSON.parse(raw)?.token !== token) return;   // 已经被别人接手了，别删
-            } catch {
-              return;
-            }
-          }
-          await rm(file, { force: true }).catch(() => {});
-        },
-      };
-    } catch (failure) {
-      // 目录都还没有（resume 传错路径）：不拦，交给下面「没找到暂停记录」的提示去说清楚
-      if (failure?.code === 'ENOENT') return empty;
-      if (failure?.code !== 'EEXIST') throw failure;
-      if (attempt === 0 && await resumeLockExpired(file, staleMs)) {
-        await rm(file, { force: true }).catch(() => {});
-        continue;
-      }
-      const holder = await describeResumeLock(file);
-      const minutes = staleMs ? Math.round(staleMs / 60000) : 0;
-      throw Object.assign(new Error(
-        `这份暂停进度已经有一次「继续」在跑了${holder}，本次续做已拦截，未新增生成任务。请等待现有调用完成，避免并发提交导致`
-        + '重复计费。之后按原 resume 恢复进度，文件位置以返回结果为准。'
-        + (minutes
-          ? `如果确认那一次已经中断了，等 ${minutes} 分钟锁会自动过期，也可以把 ${file} 删掉再试。`
-          : `确认那一次已经中断了就删掉 ${file} 再试。`),
-      ), { code: 'resume_locked' });
-    }
-  }
-  throw new Error(`拿不到 ${file} 的锁（同名文件一直被抢），稍后重试。`);
+/** 仅恢复同机、明确死亡进程的锁；超时、损坏或异机锁不得自动抢占。 */
+async function acquireResumeLock(dir, {toolName,callId}) {
+ const file=path.join(dir,RESUME_LOCK);
+ try {
+  const release=await acquireFileLock(file,{recoverDead:true,metadata:{tool:toolName,callId:callId||null}});
+  return {file,release};
+ } catch(error) {
+  if(error?.code==='ENOENT')return {file:null,async release(){}};
+  throw Object.assign(new Error('这份暂停进度已有续做锁，或无法确认旧调用是否结束。本次已停止，未新增任务；请先核对原调用，不能按等待时间抢锁或手动删除未知锁。'),{code:'resume_locked'});
+ }
 }
 
 export function withResumeLock(tool, toolName, config) {
@@ -162,7 +76,7 @@ export function withResumeLock(tool, toolName, config) {
           resuming: Boolean(dir), resumeDir: dir || undefined });
         try {
           if (dir) {
-            lock = await acquireResumeLock(dir, { toolName, callId: exec?.callId, staleMs: resumeLockStaleMs(config) });
+            lock = await acquireResumeLock(dir, { toolName, callId: exec?.callId,  });
             await appendRequestLog({ event: 'resume_lock_acquired', resumeDir: dir });
           }
           const result = await tool.execute(args, exec);

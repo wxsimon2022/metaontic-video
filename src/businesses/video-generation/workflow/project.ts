@@ -70,12 +70,27 @@ export function hasProjectImages(args) {
   return [args?.firstFrameUrl, args?.lastFrameUrl, ...(args?.productionStrategy==='independent_shots' && Array.isArray(args.shotFrames)?args.shotFrames.flatMap(frame=>[frame?.firstFrameUrl,frame?.lastFrameUrl]):[]), ...(Array.isArray(args?.referenceImages) ? args.referenceImages : [args?.referenceImages]), ...(args?.characterReferenceImages || [])].some(v => typeof v === 'string' && v.trim());
 }
 /** 绑定全部生成字段与实际非敏感配置；审批、交付控制参数不影响内容审核。 */
-export function productionFingerprint(config, name, args) {
+function legacyProductionFingerprint(config, name, args) {
   const ignore = new Set(['projectId', 'resume', 'merge', 'cumulativePreview', 'outputDir', 'keepSegments', 'resetCharacterChoice', 'resumeWithCurrentConfig', 'referenceImagesReviewed', 'inputVideoSeconds']);
   const parameters = Object.fromEntries(Object.entries(args || {}).filter(([k]) => !ignore.has(k)));
   return hash(JSON.stringify(stable({ name, parameters, model: resolveModel(config), baseUrl: resolveBaseUrl(config), submitPath: resolveSubmitPath(config),
     mode: ref(config, 'connectionMode', 'metaontic'), ratio: args.ratio ?? ref(config, 'ratio', '9:16'), resolution: resolveResolution(config, args),
     audio: args.generateAudio ?? ref(config, 'generateAudio', true), watermark: args.watermark ?? ref(config, 'watermark', false), extra: ref(config, 'extraParams', '') })));
+}
+/** 审核和执行使用同一份有效值；显式相同默认值不构成改稿。 */
+export function normalizeProductionSpec(config, name, args) {
+ return {...args,ratio:args?.ratio ?? ref(config,'ratio','9:16'),resolution:resolveResolution(config,args||{}),
+  generateAudio:args?.generateAudio ?? ref(config,'generateAudio',true),watermark:args?.watermark ?? ref(config,'watermark',false),
+  ...(name==='video_generate'?{productionStrategy:args?.productionStrategy ?? 'continuous_segments',mode:args?.mode ?? 'continuous'}:{mode:args?.mode ?? ref(config,'mode','continuous')})};
+}
+export function productionFingerprint(config,name,args) {
+ return legacyProductionFingerprint(config,name,normalizeProductionSpec(config,name,args));
+}
+/** 旧审核先核对其原始摘要，配置变化不能借兼容路径绕过审核。 */
+export function matchesProductionApproval(config,approval,name,args) {
+ const actual=productionFingerprint(config,name,args);
+ return actual===approval.fingerprint || (legacyProductionFingerprint(config,name,approval.specification)===approval.fingerprint
+  && actual===productionFingerprint(config,name,approval.specification));
 }
 export async function scriptDigest(file) { return hash(await readFile(file)); }
 export async function assertProjectApproved(config, exec, args) {
@@ -107,7 +122,7 @@ export async function assertProjectApproved(config, exec, args) {
   if (await scriptDigest(data.approved.scriptPath) !== data.approved.scriptHash) throw new Error('脚本已修改，请重新审核当前版本。');
   // 续做时沿用完整审核参数，只覆盖用户本次明确传入的字段。
   const parameters = args.resume ? { ...data.approved.specification, ...args } : candidate;
-  if (productionFingerprint(config, exec.name, parameters) !== data.approved.fingerprint) throw new Error('制作参数或接入配置已变化，请重新审核脚本和本次完整 specification。');
+  if (!matchesProductionApproval(config,data.approved,exec.name,parameters)) throw new Error('制作参数或接入配置已变化，请重新审核脚本和本次完整 specification。');
   if (data.choice === 'generate_first' && !hasProjectImages(parameters)) throw new Error('请先生成或提供角色图、展示审核后再制作。');
 }
 export async function projectCharacterGate(config, exec, args) {

@@ -318,7 +318,7 @@ test('review在用户答复前同步已验证草稿，取消审核保留画布�
   assert.equal(Object.values(doc.nodes).filter(n=>n.type==='video').length,1);
   const during=await api.readProject(project.id,exec);assert.ok(during.canvasAuto.projectId);assert.equal(during.approved,null);
   answer({answers:[]});const result=await running;assert.equal(result.status,'draft');assert.equal(result.canvasProject.status,'synced');
-  const saved=await api.readProject(project.id,exec);assert.ok(saved.canvasAuto.canvas);assert.deepEqual(saved.canvasDraft.specification,spec);assert.equal(saved.approved,null);
+  const saved=await api.readProject(project.id,exec);assert.ok(saved.canvasAuto.canvas);assert.deepEqual(saved.canvasDraft.specification,api.normalizeProductionSpec({},'video_generate',spec));assert.equal(saved.approved,null);
   await sync.sync(project.id,exec);assert.ok(Object.values(doc.nodes).some(n=>n.type==='storyboard'&&n.data.shots.length===1));
  }finally{if(old===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=old;await rm(root,{recursive:true,force:true});}
 });

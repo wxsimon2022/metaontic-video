@@ -71,11 +71,12 @@ export function matchesPattern(tag, patterns) {
   });
 }
 
-/** 该版本发行版应当携带的三个成品附件；其余附件视为残留。 */
+/** 保留版本包、市场固定名称包及历史 ZIP；不要求旧版补传附件。 */
 export function expectedAssets(tag) {
   const version = String(tag).replace(/^v/, '');
   return [
     `metaontic-video-${version}.tgz`,
+    'metaontic-video.tgz',
     `MetaOnticVideo-Windows-${version}.zip`,
     `MetaOnticVideo-Windows-${version}.zip.sha256`,
   ];
@@ -96,7 +97,7 @@ export function documentedTags(contents) {
  * 当前 package.json 版本和文档引用的版本；其余符合 patterns 的标签连同发行版、附件一起删除，
  * maxAgeDays > 0 时跳过太新的版本。
  */
-export function planCleanup({ tags = [], releases = {}, keep = 5, keepTags = keep, keepPrerelease = false, maxAgeDays = 0, patterns = ['v*'], currentVersion = '', protectedTags = [], drafts = true, now = Date.now() } = {}) {
+function planCleanupSingle({ tags = [], releases = {}, keep = 5, keepTags = keep, keepPrerelease = false, maxAgeDays = 0, patterns = ['v*'], currentVersion = '', protectedTags = [], drafts = true, now = Date.now() } = {}) {
   if (!Number.isInteger(keep) || keep < 1) throw new Error('保留数量必须是不小于 1 的整数，避免删掉最新版本。');
   if (!Number.isInteger(keepTags) || keepTags < 1) throw new Error('保留标签数量必须是不小于 1 的整数。');
   if (!Number.isInteger(maxAgeDays) || maxAgeDays < 0) throw new Error('--max-age-days 必须是不小于 0 的整数。');
@@ -181,6 +182,28 @@ export function planCleanup({ tags = [], releases = {}, keep = 5, keepTags = kee
     },
     drafts: drafts ? (releases.github || []).filter(item => item.draft && !item.tag) : [],
   };
+}
+
+/** 各仓库独立保留最近 N 个；同一版本可只从其中一个仓库清理。 */
+export function planCleanup(options={}) {
+ const hosts=['github','gitee'].filter(host=>Object.hasOwn(options.releases||{},host));
+ if(hosts.length<2)return planCleanupSingle(options);
+ const plans=Object.fromEntries(hosts.map(host=>[host,planCleanupSingle({...options,tags:options.tagsByHost?.[host]||options.tags||[],releases:{[host]:options.releases[host]}})]));
+ const kept=new Map(),removed=new Map(),retained=new Map();
+ for(const host of hosts) {
+  const plan=plans[host];
+  for(const item of plan.keep)kept.set(item.tag,item);
+  for(const item of plan.retained)retained.set(item.tag,item);
+  for(const item of plan.remove) {
+   const record=removed.get(item.tag)||{...item,github:null,gitee:null,removeTags:{github:false,gitee:false}};
+   record[host]=item[host];record.removeTags[host]=true;removed.set(item.tag,record);
+  }
+ }
+ const remove=[...removed.values()].sort((a,b)=>compareVersions(b.tag,a.tag));
+ return {keep:[...kept.values()].sort((a,b)=>compareVersions(b.tag,a.tag)),remove,retained:[...retained.values()],
+  hostPlans:plans,localProtectedTags:[...new Set([...kept.keys(),...retained.keys()])],
+  ignored:[...new Set(hosts.flatMap(host=>plans[host].ignored))],staleAssets:hosts.flatMap(host=>plans[host].staleAssets),
+  drafts:plans.github.drafts,freedBytes:{github:plans.github.freedBytes.github,gitee:plans.gitee.freedBytes.gitee,total:plans.github.freedBytes.github+plans.gitee.freedBytes.gitee}};
 }
 
 function assetsBytes(release) {
@@ -345,17 +368,27 @@ export async function applyCleanup({ plan, github, gitee, local, pruneAssets = f
     catch (error) { errors.push(`${label}：${error.message}`); return null; }
   };
   for (const item of plan.remove) {
-    if (github && item.github) {
-      for (const asset of item.github.assets) await attempt(`删除 GitHub 附件 ${item.tag}/${asset.name}`, () => github.remove(`/repos/${github.slug}/releases/assets/${asset.id}`));
-      await attempt(`删除 GitHub 发行版 ${item.tag}`, () => github.remove(`/repos/${github.slug}/releases/${item.github.id}`));
+    const finished={github:!github,gitee:!gitee};
+    for(const [host,client] of [['github',github],['gitee',gitee]]) {
+      if(!client)continue;
+      const selected=item.removeTags?.[host] ?? true;
+      if(!selected)continue;
+      const release=item[host];let ready=true;
+      for(const asset of release?.assets||[]) {
+        const resource=host==='github'?`/repos/${client.slug}/releases/assets/${asset.id}`:`/releases/${release.id}/attach_files/${asset.id}`;
+        if(await attempt(`删除 ${host==='github'?'GitHub':'Gitee'} 附件 ${item.tag}/${asset.name}`,()=>client.remove(resource))===null)ready=false;
+      }
+      if(ready&&release) {
+        const resource=host==='github'?`/repos/${client.slug}/releases/${release.id}`:`/releases/${release.id}`;
+        ready=await attempt(`删除 ${host==='github'?'GitHub':'Gitee'} 发行版 ${item.tag}`,()=>client.remove(resource))!==null;
+      }
+      if(ready) {
+        finished[host]=await attempt(`删除 ${host==='github'?'GitHub':'Gitee'} 标签 ${item.tag}`,()=>host==='github'
+          ?client.remove(`/repos/${client.slug}/git/refs/tags/${encodeURIComponent(item.tag)}`):client.removeTag(item.tag))!==null;
+      }
     }
-    if (gitee && item.gitee) {
-      for (const asset of item.gitee.assets) await attempt(`删除 Gitee 附件 ${item.tag}/${asset.name}`, () => gitee.remove(`/releases/${item.gitee.id}/attach_files/${asset.id}`));
-      await attempt(`删除 Gitee 发行版 ${item.tag}`, () => gitee.remove(`/releases/${item.gitee.id}`));
-    }
-    if (github) await attempt(`删除 GitHub 标签 ${item.tag}`, () => github.remove(`/repos/${github.slug}/git/refs/tags/${encodeURIComponent(item.tag)}`));
-    if (gitee) await attempt(`删除 Gitee 标签 ${item.tag}`, () => gitee.removeTag(item.tag));
-    if (local) await attempt(`删除本地标签 ${item.tag}`, () => local.deleteTag(item.tag));
+    if(local && github && gitee && finished.github && finished.gitee && !plan.localProtectedTags?.includes(item.tag))
+      await attempt(`删除本地标签 ${item.tag}`,()=>local.deleteTag(item.tag));
   }
   for (const item of plan.drafts) await attempt(`删除 GitHub 草稿发行版 ${item.id}`, () => github.remove(`/repos/${github.slug}/releases/${item.id}`));
   if (pruneAssets) {
@@ -376,6 +409,16 @@ export async function applyCleanup({ plan, github, gitee, local, pruneAssets = f
         }
       }
     }
+  }
+  for(const [host,client] of [['github',github],['gitee',gitee]]) {
+    if(!client?.listTags)continue;
+    await attempt(`核对 ${host} 发行版与标签`,async()=>{
+      const [releases,tags]=await Promise.all([client.listReleases(),client.listTags()]);
+      const planned=plan.hostPlans?.[host]||plan;
+      const removed=plan.remove.filter(item=>item.removeTags?.[host]??true);
+      if(removed.some(item=>tags.includes(item.tag)||releases.some(r=>r.tag===item.tag))
+        || planned.keep.some(item=>!tags.includes(item.tag)))throw Error('清理结果与保留计划不一致，保留现状并报告。');
+    });
   }
   if (errors.length) throw new Error(`清理未全部成功：\n${errors.join('\n')}`);
 }
@@ -402,13 +445,14 @@ export function remoteTags(remote, run = defaultRun) {
 }
 
 /** 默认由平台 API 提供真实标签；读取失败时停止，不以不完整本地数据执行删除。 */
-export async function collectTags({ github, gitee, remote, run = defaultRun, log = console.log }) {
+export async function collectTags({ github, gitee, remote, run = defaultRun, log = console.log, inventory = {} }) {
   const tags = new Set();
   const platforms = [];
   for (const [name, client] of [['GitHub', github], ['Gitee', gitee]]) {
     if (!client) continue;
     const listed = await client.listTags();
     if (!Array.isArray(listed)) throw new Error(`${name} 标签接口返回格式异常，已停止。`);
+    inventory[name==='GitHub'?'github':'gitee']=listed;
     for (const tag of listed) tags.add(tag);
     platforms.push(name);
   }
@@ -480,13 +524,14 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     if (token || options.apply) gitee = createGiteeClient({ slug, token, request: deps.request || fetch, run });
     else log('提示：未设置 GITEE_TOKEN，演练不读取 Gitee 标签、发行版与附件，仅列出其他可用来源。');
   }
-  const tags = await collectTags({ github, gitee, remote: options.remote, run, log });
+  const tagsByHost={};
+  const tags = await collectTags({ github, gitee, remote: options.remote, run, log,inventory:tagsByHost });
   const giteeReleases = gitee ? await gitee.listReleases() : [];
   // Gitee 的发行版列表不含附件，逐个补读，计划与删除都以实际附件为准。
   await mapPool(giteeReleases, 5, async release => { release.assets = await gitee.listAttachments(release.id); });
-  const releases = { github: github ? await github.listReleases() : [], gitee: giteeReleases };
+  const releases = { ...(github?{github:await github.listReleases()}:{}),...(gitee?{gitee:giteeReleases}:{}) };
   const plan = planCleanup({
-    tags,
+    tags,tagsByHost,
     releases, keep: options.keep, keepTags: options.keepTags, keepPrerelease: options.keepPrerelease, maxAgeDays: options.maxAgeDays,
     patterns: options.patterns, currentVersion, drafts: !options.keepDrafts,
     protectedTags: [...documentedTags(DOCUMENTED_FILES.map(name => {

@@ -1,6 +1,7 @@
 /** 监听当前会话的真实展示事件；审核提问不能仅凭 present 登记放行。 */
 import path from 'node:path';
-import { stat, readdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { stat, readdir, readFile } from 'node:fs/promises';
 import { appendRequestLog } from '../../../shared/utils/logging.js';
 
 /** 分镜图：png/jpg/webp/svg，且文件名或描述里带「分镜/示意/storyboard」。 */
@@ -33,7 +34,7 @@ export function scriptCoverage(script, visible) {
 }
 
 export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
-  const sessions = new WeakMap<object, { turn: number; active: boolean; files: string[]; shown: Set<string>; awaitingReview: boolean; text: string; scriptText: string }>();
+  const sessions = new WeakMap<object, { turn: number; active: boolean; files: string[]; shown: Set<string>; awaitingReview: boolean; text: string; scriptText: string; messages:string[]; images:Map<string,Promise<string>> }>();
   /** 上一轮展示过本版脚本却没弹审核窗时留痕：正文单独成一条消息时助手常直接结束回合。 */
   async function reportMissing(state) {
     state.awaitingReview = false;
@@ -43,7 +44,7 @@ export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     let state = sessions.get(session);
     if (state && Number.isInteger(turn) && turn !== state.turn && state.awaitingReview) void reportMissing(state);
     if (!state || (Number.isInteger(turn) && turn !== state.turn)) {
-      state = { turn, active: false, files: [], shown: new Set(), awaitingReview: false, text: '', scriptText: '' };
+      state = { turn, active: false, files: [], shown: new Set(), awaitingReview: false, text: '', scriptText: '', messages:state?.messages || [],images:state?.images || new Map() };
       sessions.set(session, state);
     }
     return state;
@@ -69,6 +70,8 @@ export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
       const content = data.message?.content;
       const text = Array.isArray(content) ? content.filter(block => block.type === 'text').map(block => block.text || '').join('\n') : '';
       state.text = (state.text + '\n' + text).slice(-250000);
+      state.messages.push(text);
+      while(state.messages.length>1 && state.messages.join('').length>250000)state.messages.shift();
       // 捕获只使用最近一条完整脚本消息，不能将多版正文拼接落盘。
       if (/^#\s+\S/m.test(text) && text.length >= 200) state.scriptText = text;
       let storyboard = false;
@@ -77,6 +80,7 @@ export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
         try {
           const full = path.resolve(session.header?.cwd || process.cwd(), decodeURI(target));
           state.shown.add(full);
+          state.images.set(full,readFile(full).then(bytes=>createHash('sha256').update(bytes).digest('hex')).catch(()=>''));
           if (STORYBOARD_FILE.test(path.basename(full))) storyboard = true;
         } catch { /* malformed image target */ }
       }
@@ -132,13 +136,29 @@ export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     if (args.requiredScriptText) {
       // 以前要求正文逐字包含 script.md：助手把脚本整理成带标题、加「· 第 1 版」的展示版就会被误拦，
       // 审核窗一直开不出来。改成按覆盖率判断，仍能挡下摘要、删段与只给链接。
-      const coverage = scriptCoverage(args.requiredScriptText, state?.text);
+      const coverage = scriptCoverage(args.requiredScriptText, args.requiredProjectId ? state?.messages.join('\n') : state?.text);
       if (coverage < SCRIPT_COVERAGE_MIN) {
         const percent = Math.round(coverage * 100);
         await appendRequestLog({ event: 'storyboard_review_blocked', reason: 'script_text_mismatch', coverage: Math.round(coverage * 1000) / 1000 });
         return { kind: 'deny', reason: `脚本审核暂未打开：本版script.md正文只在本轮用户可见正文里出现 ${percent}%。`
           + '请把script.md正文原样贴进本轮正文再单独调用review；标题、加粗、表格这类排版差异不算问题，但不要改写措辞、删段，也不要只给文件链接或摘要。' };
       }
+    }
+    if(args.requiredProjectId) {
+      const binding=args.requiredStoryboard;
+      if(!binding || binding.projectId!==args.requiredProjectId || binding.scriptHash!==args.requiredScriptHash
+        || path.resolve(binding.scriptPath)!==path.resolve(args.requiredScriptPath)) {
+        return {kind:'deny',reason:'本项目分镜未绑定当前脚本版本，请先调用storyboard生成并展示本版分镜。'};
+      }
+      if(!state?.messages.some(text=>readableText(text).includes(readableText(args.requiredScriptText)))) {
+        return {kind:'deny',reason:'当前版本脚本尚未完整展示，不能用旧稿或多条摘要拼接通过。请完整展示当前稿件一次。'};
+      }
+      const shownHash=await state?.images.get(binding.path);
+      const currentHash=await readFile(binding.path).then(bytes=>createHash('sha256').update(bytes).digest('hex')).catch(()=>'');
+      if(!shownHash || shownHash!==binding.imageHash || currentHash!==binding.imageHash) {
+        return {kind:'deny',reason:'本项目当前版本分镜尚未实际展示，或图片已改变。'+linkHint(binding.path)};
+      }
+      return null;
     }
     const embedded = [...(state?.shown || [])].filter(target => STORYBOARD_FILE.test(path.basename(target)));
     let ready = embedded.length > 0;

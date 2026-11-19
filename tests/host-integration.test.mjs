@@ -149,10 +149,13 @@ for (const mode of ['metaontic', 'volcengine']) test(`${mode}: bundled tools sub
     async function reviewed(name, supplied) {
       const spec = {ratio:'9:16',resolution:'720p',...supplied};
       const project = await host.tools.get('video_project').execute({action:'prepare',subjectType:'scenery',duration:spec.duration*(name==='video_extend'?(spec.segments||1):1)},exec);
-      const scriptPath=path.join(directory,project.projectId+'.md'), image=path.join(directory,'storyboard.svg');
-      await writeFile(scriptPath,'Script '+spec.prompt); await writeFile(image,'<svg/>');
+      const scriptPath=path.join(directory,project.projectId+'.md');
+      const body='Script '+spec.prompt+'\n| 镜头 | 时间 | 画面 |\n| --- | --- | --- |\n| 1 | 0–5秒 | 海边 |';
+      await writeFile(scriptPath,body);
+      const board=await host.tools.get('video_project').execute({action:'storyboard',projectId:project.projectId,scriptPath},exec);
+      const image=board.path;
       await host.observe(exec.agent.session,{type:'tool/call',data:{turn:1,name:'video_project'}});
-      await host.observe(exec.agent.session,{type:'assistant/message',data:{turn:1,message:{content:[{type:'text',text:`Script ${spec.prompt}\n![分镜](<${image}>)`}]}}});
+      await host.observe(exec.agent.session,{type:'assistant/message',data:{turn:1,message:{content:[{type:'text',text:`${body}\n![分镜](<${image}>)`}]}}});
       const review=await host.tools.get('video_project').execute({action:'review',projectId:project.projectId,scriptPath,specification:spec,toolName:name},exec);
       assert.equal(review.status,'approved');
       return host.tools.get(name).execute({...spec,projectId:project.projectId},exec);

@@ -84,9 +84,7 @@ export const videoConfigFields = {
   resumeLockStaleMinutes: z.number().min(0)
     .default(60)
     .description(
-      '暂停目录的「续做锁」超过多少分钟算过期残留（默认 60，0=永不过期）。'
-      + '同一份暂停进度同时只能有一次 resume 在跑，否则剩下的段会被提交两遍、重复扣费；'
-      + '上一次被强杀 / 宿主放弃调用时锁文件会留下，超过这个时间才允许后来者抢过来。',
+      '旧配置兼容字段，不再按时间判定续做锁过期。仅同机且明确已退出进程的残留锁可自动恢复；活跃、异机或未知锁均保留。',
     )
     .volatile(),
   ffmpegBinary: z.string()

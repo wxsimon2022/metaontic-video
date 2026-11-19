@@ -17,7 +17,7 @@ var __export = (target, all) => {
 var PLUGIN_VERSION;
 var init_version = __esm({
   "src/shared/constants/version.ts"() {
-    PLUGIN_VERSION = true ? "4.0.5".trim().replace(/^v/i, "") : "";
+    PLUGIN_VERSION = true ? "4.0.6".trim().replace(/^v/i, "") : "";
   }
 });
 
@@ -1056,7 +1056,7 @@ var init_config = __esm({
       outputDir: Schema.string().default("").description("成片输出目录；留空用会话工作目录下的 metaontic-video/").volatile(),
       keepSegments: Schema.boolean().default(true).description("旧配置兼容字段；原始分段始终保留，此值不再控制删除。").volatile(),
       resumeLockStaleMinutes: Schema.number().min(0).default(60).description(
-        "暂停目录的「续做锁」超过多少分钟算过期残留（默认 60，0=永不过期）。同一份暂停进度同时只能有一次 resume 在跑，否则剩下的段会被提交两遍、重复扣费；上一次被强杀 / 宿主放弃调用时锁文件会留下，超过这个时间才允许后来者抢过来。"
+        "旧配置兼容字段，不再按时间判定续做锁过期。仅同机且明确已退出进程的残留锁可自动恢复；活跃、异机或未知锁均保留。"
       ).volatile(),
       ffmpegBinary: Schema.string().default("ffmpeg").description("ffmpeg 可执行文件；PATH 里没有时填绝对路径").volatile(),
       ffprobeBinary: Schema.string().default("ffprobe").description("ffprobe 可执行文件；PATH 里没有时填绝对路径").volatile(),
@@ -2431,11 +2431,14 @@ function configureProfile(state, input, expected) {
 }
 
 // src/businesses/film-production/projects/project.repository.ts
-import { open, unlink, readFile, readdir, stat, link } from "node:fs/promises";
+import { readFile as readFile2, readdir, stat, unlink as unlink2 } from "node:fs/promises";
 import path3 from "node:path";
+
+// src/shared/utils/file-lock.ts
+import { open, unlink, readFile, link } from "node:fs/promises";
 import os2 from "node:os";
 import { randomUUID } from "node:crypto";
-async function inspectLock(file) {
+async function inspectFileLock(file) {
   let raw;
   try {
     raw = await readFile(file, "utf8");
@@ -2449,7 +2452,7 @@ async function inspectLock(file) {
   } catch {
     return { status: "unknown", recoverable: false };
   }
-  if (record?.host && record.host !== os2.hostname()) return { status: "foreign_host", recoverable: false };
+  if (!record?.host || record.host !== os2.hostname()) return { status: "foreign_host", recoverable: false };
   if (!Number.isSafeInteger(record?.pid) || record.pid <= 0) return { status: "unknown", recoverable: false };
   try {
     process.kill(record.pid, 0);
@@ -2457,9 +2460,6 @@ async function inspectLock(file) {
   } catch (e) {
     return { status: e.code === "ESRCH" ? "interrupted" : "unknown", recoverable: e.code === "ESRCH", record };
   }
-}
-async function inspectProjectLock(dir) {
-  return { ...await inspectLock(path3.join(dir, ".write.lock")), recovery: await inspectLock(path3.join(dir, ".recovery.lock")) };
 }
 function lockRecord(token) {
   return { pid: process.pid, host: os2.hostname(), token, created_at: (/* @__PURE__ */ new Date()).toISOString() };
@@ -2474,11 +2474,11 @@ async function removeOwned(file, token) {
   }
   if (record.token === token) await unlink(file);
 }
-async function publishLock(file, token) {
+async function publishLock(file, token, metadata = {}) {
   const prepared = `${file}.${token}.tmp`;
   const handle = await open(prepared, "wx", 384);
   try {
-    await handle.writeFile(JSON.stringify(lockRecord(token)));
+    await handle.writeFile(JSON.stringify({ ...metadata, ...lockRecord(token) }));
     await handle.close();
     await link(prepared, file);
   } finally {
@@ -2489,7 +2489,7 @@ async function publishLock(file, token) {
   }
 }
 async function reclaimDeadLock(file, depth = 0) {
-  const check = await inspectLock(file);
+  const check = await inspectFileLock(file);
   if (check.status === "unlocked") return;
   if (depth > 32 || !check.recoverable || !/^[a-f0-9-]{36}$/.test(check.record?.token || "")) throw Error("RECOVERY_LOCK_UNSAFE:恢复锁活跃或无法确定所属进程，保留原锁。");
   const claim = `${file}.reclaim-${check.record.token}`;
@@ -2514,9 +2514,7 @@ async function reclaimDeadLock(file, depth = 0) {
     await removeOwned(claim, token);
   }
 }
-async function recoverProjectLock(dir) {
-  const file = path3.join(dir, ".write.lock");
-  const guardFile = path3.join(dir, ".recovery.lock");
+async function recoverFileLock(file, guardFile = `${file}.recovery`) {
   const token = randomUUID();
   try {
     await publishLock(guardFile, token);
@@ -2526,7 +2524,7 @@ async function recoverProjectLock(dir) {
     await publishLock(guardFile, token);
   }
   try {
-    const check = await inspectLock(file);
+    const check = await inspectFileLock(file);
     if (check.status === "unlocked") return { status: "unlocked", recoverable: false };
     if (!check.recoverable) throw Error("LOCK_RECOVERY_UNSAFE:锁仍活跃或无法确认所属进程，保留原锁。");
     await unlink(file);
@@ -2535,18 +2533,30 @@ async function recoverProjectLock(dir) {
     await removeOwned(guardFile, token);
   }
 }
-async function acquireProjectLock(dir) {
-  const file = path3.join(dir, ".write.lock");
+async function acquireFileLock(file, { recoverDead = false, metadata = {} } = {}) {
   const token = randomUUID();
   try {
-    await publishLock(file, token);
+    await publishLock(file, token, metadata);
   } catch (e) {
-    if (e.code === "EEXIST") throw Error("PROJECT_LOCKED:使用diagnose检查，明确中断后recover_lock恢复。");
-    throw e;
+    if (e.code !== "EEXIST") throw e;
+    if (!recoverDead) throw Error("PROJECT_LOCKED:使用diagnose检查，明确中断后recover_lock恢复。");
+    await recoverFileLock(file);
+    await publishLock(file, token, metadata);
   }
   return async () => {
     await removeOwned(file, token);
   };
+}
+
+// src/businesses/film-production/projects/project.repository.ts
+async function inspectProjectLock(dir) {
+  return { ...await inspectFileLock(path3.join(dir, ".write.lock")), recovery: await inspectFileLock(path3.join(dir, ".recovery.lock")) };
+}
+async function recoverProjectLock(dir) {
+  return recoverFileLock(path3.join(dir, ".write.lock"), path3.join(dir, ".recovery.lock"));
+}
+async function acquireProjectLock(dir) {
+  return acquireFileLock(path3.join(dir, ".write.lock"));
 }
 async function pruneProjectSnapshots(dir, state, keep = 30) {
   const folder = path3.join(dir, "snapshots");
@@ -2564,11 +2574,11 @@ async function pruneProjectSnapshots(dir, state, keep = 30) {
     const file = path3.join(folder, item.name);
     let saved;
     try {
-      saved = JSON.parse(await readFile(file, "utf8"));
+      saved = JSON.parse(await readFile2(file, "utf8"));
     } catch {
       continue;
     }
-    if (saved.revision === item.revision) await unlink(file);
+    if (saved.revision === item.revision) await unlink2(file);
   }
 }
 
@@ -3360,7 +3370,7 @@ function estimatePlan(config, toolName, args) {
 
 // src/businesses/video-generation/workflow/segment-review.ts
 import path6 from "node:path";
-import { readFile as readFile3, writeFile as writeFile2, rename as rename2, rm as rm2, stat as stat3 } from "node:fs/promises";
+import { readFile as readFile4, writeFile as writeFile2, rename as rename2, rm as rm2, stat as stat3 } from "node:fs/promises";
 import { randomUUID as randomUUID2 } from "node:crypto";
 
 // src/businesses/video-generation/workflow/result-state.ts
@@ -3422,7 +3432,7 @@ function validatePauseRecord(data, file = "paused-plan.json") {
 // src/businesses/video-generation/workflow/resume.ts
 init_config();
 import path5 from "node:path";
-import { readFile as readFile2, open as open2, rm, mkdir as mkdir3, writeFile, rename } from "node:fs/promises";
+import { readFile as readFile3, rm, mkdir as mkdir3, writeFile, rename } from "node:fs/promises";
 
 // src/businesses/video-generation/utils/files.ts
 init_config();
@@ -3485,7 +3495,6 @@ async function resolveOutputDir(config, exec, deps) {
 }
 
 // src/businesses/video-generation/workflow/resume.ts
-import os3 from "node:os";
 init_connection();
 var PAUSE_FILE = "paused-plan.json";
 function resumeDirOf(value) {
@@ -3497,7 +3506,7 @@ async function readPauseFile(dir) {
   const file = path5.join(dir, PAUSE_FILE);
   let text;
   try {
-    text = await readFile2(file, "utf8");
+    text = await readFile3(file, "utf8");
   } catch {
     throw new Error(
       `没有找到暂停记录：${file}。resume 要传上一次结果里的 resumeDir（用户选择先不继续时，结果里给的那个分段目录），不要自己拼路径。`
@@ -3512,89 +3521,16 @@ async function readPauseFile(dir) {
   return validatePauseRecord(data, file);
 }
 var RESUME_LOCK = "resume.lock";
-function resumeLockStaleMs(config) {
-  const minutes = Number(ref(config, "resumeLockStaleMinutes", 60));
-  if (!Number.isFinite(minutes) || minutes <= 0) return 0;
-  return minutes * 60 * 1e3;
-}
-async function resumeLockExpired(file, staleMs) {
-  const raw = await readFile2(file, "utf8").catch(() => null);
-  if (raw === null) return true;
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    return true;
-  }
-  const started = Date.parse(String(data?.startedAt || ""));
-  if (!Number.isFinite(started)) return true;
-  if (!staleMs) return false;
-  return Date.now() - started > staleMs;
-}
-async function describeResumeLock(file) {
-  const raw = await readFile2(file, "utf8").catch(() => null);
-  if (!raw) return "";
-  try {
-    const data = JSON.parse(raw);
-    const bits = [data?.tool, data?.startedAt && `${data.startedAt} 开始`, data?.pid && `pid ${data.pid}`].filter(Boolean);
-    return bits.length ? `（${bits.join("，")}）` : "";
-  } catch {
-    return "";
-  }
-}
-async function acquireResumeLock(dir, { toolName, callId, staleMs }) {
-  const empty = { file: null, async release() {
-  } };
+async function acquireResumeLock(dir, { toolName, callId }) {
   const file = path5.join(dir, RESUME_LOCK);
-  const token = uniqueSuffix("lock");
-  const record = {
-    tool: toolName,
-    callId: callId || null,
-    pid: process.pid,
-    host: os3.hostname(),
-    startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    token
-  };
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const handle = await open2(file, "wx");
-      try {
-        await handle.writeFile(`${JSON.stringify(record, null, 2)}
-`, "utf8");
-      } finally {
-        await handle.close();
-      }
-      return {
-        file,
-        async release() {
-          const raw = await readFile2(file, "utf8").catch(() => null);
-          if (raw) {
-            try {
-              if (JSON.parse(raw)?.token !== token) return;
-            } catch {
-              return;
-            }
-          }
-          await rm(file, { force: true }).catch(() => {
-          });
-        }
-      };
-    } catch (failure) {
-      if (failure?.code === "ENOENT") return empty;
-      if (failure?.code !== "EEXIST") throw failure;
-      if (attempt === 0 && await resumeLockExpired(file, staleMs)) {
-        await rm(file, { force: true }).catch(() => {
-        });
-        continue;
-      }
-      const holder = await describeResumeLock(file);
-      const minutes = staleMs ? Math.round(staleMs / 6e4) : 0;
-      throw Object.assign(new Error(
-        `这份暂停进度已经有一次「继续」在跑了${holder}，本次续做已拦截，未新增生成任务。请等待现有调用完成，避免并发提交导致重复计费。之后按原 resume 恢复进度，文件位置以返回结果为准。` + (minutes ? `如果确认那一次已经中断了，等 ${minutes} 分钟锁会自动过期，也可以把 ${file} 删掉再试。` : `确认那一次已经中断了就删掉 ${file} 再试。`)
-      ), { code: "resume_locked" });
-    }
+  try {
+    const release = await acquireFileLock(file, { recoverDead: true, metadata: { tool: toolName, callId: callId || null } });
+    return { file, release };
+  } catch (error) {
+    if (error?.code === "ENOENT") return { file: null, async release() {
+    } };
+    throw Object.assign(new Error("这份暂停进度已有续做锁，或无法确认旧调用是否结束。本次已停止，未新增任务；请先核对原调用，不能按等待时间抢锁或手动删除未知锁。"), { code: "resume_locked" });
   }
-  throw new Error(`拿不到 ${file} 的锁（同名文件一直被抢），稍后重试。`);
 }
 function withResumeLock(tool, toolName, config) {
   return {
@@ -3615,7 +3551,7 @@ function withResumeLock(tool, toolName, config) {
         });
         try {
           if (dir) {
-            lock = await acquireResumeLock(dir, { toolName, callId: exec?.callId, staleMs: resumeLockStaleMs(config) });
+            lock = await acquireResumeLock(dir, { toolName, callId: exec?.callId });
             await appendRequestLog({ event: "resume_lock_acquired", resumeDir: dir });
           }
           const result = await tool.execute(args, exec);
@@ -3800,7 +3736,7 @@ async function segmentSnapshot(dir) {
 var reviewFile = (dir) => path6.join(dir, "segment-review.json");
 async function accepted(dir, key, exec) {
   try {
-    const data = JSON.parse(await readFile3(reviewFile(dir), "utf8"));
+    const data = JSON.parse(await readFile4(reviewFile(dir), "utf8"));
     return data.version === 1 && data.owner === sessionOwner(exec) && data.key === key && data.approved === true;
   } catch {
     return false;
@@ -3875,14 +3811,14 @@ function createSegmentReview(ctx) {
 
 // src/businesses/video-generation/workflow/project.ts
 import { createHash as createHash3, randomUUID as randomUUID3 } from "node:crypto";
-import { mkdir as mkdir5, readdir as readdir3, readFile as readFile5, writeFile as writeFile3, rename as rename4, rm as rm4 } from "node:fs/promises";
+import { mkdir as mkdir5, readdir as readdir3, readFile as readFile6, writeFile as writeFile3, rename as rename4, rm as rm4 } from "node:fs/promises";
 import path8 from "node:path";
 
 // src/businesses/video-generation/media/references.ts
 init_plugin();
 import path7 from "node:path";
-import os4 from "node:os";
-import { stat as stat4, mkdir as mkdir4, rename as rename3, rm as rm3, open as open3, readdir as readdir2, readFile as readFile4 } from "node:fs/promises";
+import os3 from "node:os";
+import { stat as stat4, mkdir as mkdir4, rename as rename3, rm as rm3, open as open3, readdir as readdir2, readFile as readFile5 } from "node:fs/promises";
 
 // src/businesses/video-generation/media/ffmpeg.ts
 init_config();
@@ -4094,16 +4030,16 @@ async function findInstalledFfmpeg(signal) {
 }
 function ffmpegInstallHint(config) {
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  const { os: os6, installs } = ffmpegInstallOptions();
+  const { os: os5, installs } = ffmpegInstallOptions();
   const lines = [
     `本机没有找到可用的 ffmpeg（${binary}），所以「把多段合并成一条」这步暂时没做，已生成结果以返回的分段列表为准；本地文件是否齐全请核对各段路径。`,
-    `装一下 ffmpeg 就能合并（你当前是 ${os6}）：`,
+    `装一下 ffmpeg 就能合并（你当前是 ${os5}）：`,
     ...installs.map((item) => `  · ${item.label}：${item.command}`),
     "装好后使用原resume恢复已有任务的下载或合并，不重新提交生成任务；如果 ffmpeg 已经装了但不在默认位置，把它的绝对路径填到插件设置里的「ffmpeg 路径」也一样管用。",
     "ffmpeg 的安装包里自带 ffprobe，装完分段探测也一起好了。",
     "想让我来装就说一声 —— 我会用 video_setup 执行安装（执行前宿主会先让你确认命令）。"
   ];
-  return { binary, os: os6, installs, hint: lines.join("\n") };
+  return { binary, os: os5, installs, hint: lines.join("\n") };
 }
 async function probeMedia(file, config, signal) {
   try {
@@ -4172,7 +4108,7 @@ function canvasSize(ratio) {
   return CANVAS_SIZES[String(ratio ?? "").trim()] || null;
 }
 function referenceCacheDir() {
-  return path7.join(os4.tmpdir(), REFERENCE_TMP_DIR);
+  return path7.join(os3.tmpdir(), REFERENCE_TMP_DIR);
 }
 async function isUsableFit(dest, width, height, config, signal) {
   const info = await stat4(dest).catch(() => null);
@@ -4354,7 +4290,7 @@ async function resolveImageInput(value, label, fit = null) {
       uploadIndex: index
     };
   } else {
-    abs = path7.resolve(raw.startsWith("~/") || raw === "~" ? path7.join(os4.homedir(), raw.slice(1)) : raw);
+    abs = path7.resolve(raw.startsWith("~/") || raw === "~" ? path7.join(os3.homedir(), raw.slice(1)) : raw);
     const ext = path7.extname(abs).toLowerCase();
     if (!IMAGE_EXT_TO_MIME[ext]) {
       throw new Error(
@@ -4378,7 +4314,7 @@ async function resolveImageInput(value, label, fit = null) {
       `${label} 太大（${(size / 1048576).toFixed(1)} MB），请压到 ${MAX_IMAGE_BYTES / 1048576} MB 以内再传：${abs}`
     );
   }
-  const buffer = await readFile4(submitPath);
+  const buffer = await readFile5(submitPath);
   const mime = sniffImageMime(buffer);
   if (!mime) throw new Error(`${label} 不是有效的图片文件（读到的内容不是 jpg/png/webp/bmp/gif/tiff）：${abs}`);
   const resolved = {
@@ -4430,7 +4366,7 @@ async function allProjects() {
   for (const name of names) {
     if (!name.endsWith(".json")) continue;
     try {
-      found.push(JSON.parse(await readFile5(path8.join(dir, name), "utf8")));
+      found.push(JSON.parse(await readFile6(path8.join(dir, name), "utf8")));
     } catch {
     }
   }
@@ -4450,7 +4386,7 @@ function projectFile(id) {
   return path8.join(dshHome(), DATA_DIR, "projects", `${id}.json`);
 }
 async function readProject(id, exec) {
-  const data = JSON.parse(await readFile5(projectFile(id), "utf8"));
+  const data = JSON.parse(await readFile6(projectFile(id), "utf8"));
   if (data.version !== 1 || data.owner !== sessionOwner(exec)) throw new Error("此项目不属于当前会话。");
   return data;
 }
@@ -4483,7 +4419,7 @@ async function createProject(exec, subjectType) {
 function hasProjectImages(args) {
   return [args?.firstFrameUrl, args?.lastFrameUrl, ...args?.productionStrategy === "independent_shots" && Array.isArray(args.shotFrames) ? args.shotFrames.flatMap((frame) => [frame?.firstFrameUrl, frame?.lastFrameUrl]) : [], ...Array.isArray(args?.referenceImages) ? args.referenceImages : [args?.referenceImages], ...args?.characterReferenceImages || []].some((v) => typeof v === "string" && v.trim());
 }
-function productionFingerprint(config, name, args) {
+function legacyProductionFingerprint(config, name, args) {
   const ignore = /* @__PURE__ */ new Set(["projectId", "resume", "merge", "cumulativePreview", "outputDir", "keepSegments", "resetCharacterChoice", "resumeWithCurrentConfig", "referenceImagesReviewed", "inputVideoSeconds"]);
   const parameters = Object.fromEntries(Object.entries(args || {}).filter(([k]) => !ignore.has(k)));
   return hash(JSON.stringify(stable({
@@ -4500,8 +4436,25 @@ function productionFingerprint(config, name, args) {
     extra: ref(config, "extraParams", "")
   })));
 }
+function normalizeProductionSpec(config, name, args) {
+  return {
+    ...args,
+    ratio: args?.ratio ?? ref(config, "ratio", "9:16"),
+    resolution: resolveResolution(config, args || {}),
+    generateAudio: args?.generateAudio ?? ref(config, "generateAudio", true),
+    watermark: args?.watermark ?? ref(config, "watermark", false),
+    ...name === "video_generate" ? { productionStrategy: args?.productionStrategy ?? "continuous_segments", mode: args?.mode ?? "continuous" } : { mode: args?.mode ?? ref(config, "mode", "continuous") }
+  };
+}
+function productionFingerprint(config, name, args) {
+  return legacyProductionFingerprint(config, name, normalizeProductionSpec(config, name, args));
+}
+function matchesProductionApproval(config, approval, name, args) {
+  const actual = productionFingerprint(config, name, args);
+  return actual === approval.fingerprint || legacyProductionFingerprint(config, name, approval.specification) === approval.fingerprint && actual === productionFingerprint(config, name, approval.specification);
+}
 async function scriptDigest(file) {
-  return hash(await readFile5(file));
+  return hash(await readFile6(file));
 }
 async function assertProjectApproved(config, exec, args) {
   let candidate = args;
@@ -4524,13 +4477,13 @@ async function assertProjectApproved(config, exec, args) {
   if (data.approved?.resumeDir && resumeDirOf(args.resume) !== data.approved.resumeDir) throw new Error("此次审核绑定了原续做目录，请使用原resume。");
   if (data.filmSource) {
     if (exec.name !== "video_generate") throw Error("COMPILED_TOOL_MISMATCH:专业编译方案必须使用video_generate。");
-    const source = JSON.parse(await readFile5(data.filmSource.path, "utf8"));
+    const source = JSON.parse(await readFile6(data.filmSource.path, "utf8"));
     assertCompiledProduction(data, source, args.resume ? { ...data.approved?.specification, ...candidate } : candidate, resolveModel(config));
   }
   if (!data.approved) throw new Error("本项目脚本尚未审核通过，请先展示脚本和分镜，再调用 video_project(action:review)。");
   if (await scriptDigest(data.approved.scriptPath) !== data.approved.scriptHash) throw new Error("脚本已修改，请重新审核当前版本。");
   const parameters = args.resume ? { ...data.approved.specification, ...args } : candidate;
-  if (productionFingerprint(config, exec.name, parameters) !== data.approved.fingerprint) throw new Error("制作参数或接入配置已变化，请重新审核脚本和本次完整 specification。");
+  if (!matchesProductionApproval(config, data.approved, exec.name, parameters)) throw new Error("制作参数或接入配置已变化，请重新审核脚本和本次完整 specification。");
   if (data.choice === "generate_first" && !hasProjectImages(parameters)) throw new Error("请先生成或提供角色图、展示审核后再制作。");
 }
 async function projectCharacterGate(config, exec, args) {
@@ -4549,7 +4502,7 @@ function withProjectApproval(tool, config) {
 
 // src/businesses/film-production/production.service.ts
 import { randomUUID as randomUUID4, createHash as createHash4 } from "node:crypto";
-import { mkdir as mkdir6, readFile as readFile6, writeFile as writeFile4, rename as rename5, rm as rm5 } from "node:fs/promises";
+import { mkdir as mkdir6, readFile as readFile7, writeFile as writeFile4, rename as rename5, rm as rm5 } from "node:fs/promises";
 import path9 from "node:path";
 init_plugin();
 
@@ -4709,7 +4662,7 @@ var filmDirectorBusiness = {
           if (args.action === "create") {
             if (!Number.isInteger(args.durationSeconds) || args.durationSeconds < 15 || args.durationSeconds > 3600 || !args.title?.trim() || !args.sourceBrief?.trim()) throw Error("INVALID_REQUIREMENTS");
             state = { quality_policy: "evidence_v1", schema_version: "3.1.0", project_id: id, title: args.title, source_brief: args.sourceBrief, duration_ms: args.durationSeconds * 1e3, project_spec: createProjectSpec(args.title, args.sourceBrief, args.durationSeconds * 1e3, args.projectSpec ? JSON.parse(args.projectSpec) : { ...args.ratio ? { aspect_ratio: args.ratio } : {}, ...args.resolution ? { resolution: args.resolution } : {} }), revision: 0, status: "REQUIREMENT_ANALYSIS", artifacts: {}, approvals: {}, decisions: [] };
-          } else state = JSON.parse(await readFile6(file, "utf8"));
+          } else state = JSON.parse(await readFile7(file, "utf8"));
           const originalState = JSON.stringify(state);
           const executionContext = () => {
             try {
@@ -4957,9 +4910,9 @@ function bindAgentRegistry(ctx, registry2) {
 
 // src/platform/telemetry/reporter.ts
 import { randomUUID as randomUUID5, createHash as createHash5 } from "node:crypto";
-import { mkdir as mkdir7, readFile as readFile7, writeFile as writeFile5 } from "node:fs/promises";
+import { mkdir as mkdir7, readFile as readFile8, writeFile as writeFile5 } from "node:fs/promises";
 import path10 from "node:path";
-import os5 from "node:os";
+import os4 from "node:os";
 init_version();
 init_value();
 init_plugin();
@@ -4992,7 +4945,7 @@ async function analyticsIdentity() {
     const present = [];
     for (const file of files) {
       try {
-        present.push(parse(await readFile7(file, "utf8")));
+        present.push(parse(await readFile8(file, "utf8")));
       } catch {
         present.push(null);
       }
@@ -5006,7 +4959,7 @@ async function analyticsIdentity() {
         id = created;
       } catch (error) {
         if (error.code !== "EEXIST") throw error;
-        id = parse(await readFile7(files[0], "utf8").catch(() => ""));
+        id = parse(await readFile8(files[0], "utf8").catch(() => ""));
         if (!id) {
           id = created;
           await writeFile5(files[0], JSON.stringify({ installationId: id }), { mode: 384 });
@@ -5050,9 +5003,9 @@ function createAnalyticsReporter(config, options = {}) {
   const request = options.request || ((...args) => globalThis.fetch(...args));
   const identity = options.identity || analyticsIdentity;
   const device = options.device || (() => ({
-    arch: ["arm64", "x64", "ia32", "arm"].includes(os5.arch()) ? os5.arch() : "other",
-    osRelease: deviceText(os5.release(), true),
-    memoryGb: Math.max(1, Math.min(4096, Math.round(os5.totalmem() / 1024 ** 3))),
+    arch: ["arm64", "x64", "ia32", "arm"].includes(os4.arch()) ? os4.arch() : "other",
+    osRelease: deviceText(os4.release(), true),
+    memoryGb: Math.max(1, Math.min(4096, Math.round(os4.totalmem() / 1024 ** 3))),
     harnessVersion: deviceText(process.env.DSH_CLIENT_VERSION || process.env.DSH_APP_VERSION, false)
   }));
   const delay = options.delayMs ?? 1e3;
@@ -5794,12 +5747,12 @@ async function ensureProjectDuration(ctx, exec, project, requested, save2) {
 }
 
 // src/businesses/video-generation/tools/video-project.ts
-import { mkdir as mkdir9, readFile as readFile9, readdir as readdir4, writeFile as writeFile7 } from "node:fs/promises";
+import { mkdir as mkdir9, readFile as readFile10, readdir as readdir4, writeFile as writeFile7 } from "node:fs/promises";
 import path13 from "node:path";
 
 // src/businesses/video-generation/workflow/character-choice.ts
 import { createHash as createHash6 } from "node:crypto";
-import { mkdir as mkdir8, readFile as readFile8, writeFile as writeFile6, rename as rename6, rm as rm6 } from "node:fs/promises";
+import { mkdir as mkdir8, readFile as readFile9, writeFile as writeFile6, rename as rename6, rm as rm6 } from "node:fs/promises";
 import path12 from "node:path";
 init_connection();
 var waiting = /* @__PURE__ */ new Map();
@@ -5823,7 +5776,7 @@ async function characterChoiceGate(ctx, config, exec, args) {
       if (project?.choice && args?.resetCharacterChoice !== true) return project.choice;
       if (!project && stableId && args?.resetCharacterChoice !== true) {
         try {
-          const saved = JSON.parse(await readFile8(file, "utf8"));
+          const saved = JSON.parse(await readFile9(file, "utf8"));
           if (saved.version === 1 && ["text_only", "generate_first"].includes(saved.choice)) return saved.choice;
         } catch (error) {
           if (error?.code !== "ENOENT") return null;
@@ -6017,20 +5970,20 @@ function approvalPolicy(ctx, exec) {
 function setupGate(ctx, exec) {
   const args = exec.arguments && typeof exec.arguments === "object" ? exec.arguments : {};
   if (args?.install !== true) return { kind: "allow" };
-  const { os: os6, installs, bootstrap } = ffmpegInstallOptions();
+  const { os: os5, installs, bootstrap } = ffmpegInstallOptions();
   const command = String(args?.target || "ffmpeg") === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
   if (approvalPolicy(ctx, exec) === "never") {
     return {
       kind: "deny",
-      reason: `当前权限模式关闭了审批提示（完全访问），装环境这种会在本机跑命令的操作没法确认，已停止。把权限切到「工作区写入」或「只读」后再让我装；也可以照着这条命令自己在终端执行：${command}（${os6}）。`
+      reason: `当前权限模式关闭了审批提示（完全访问），装环境这种会在本机跑命令的操作没法确认，已停止。把权限切到「工作区写入」或「只读」后再让我装；也可以照着这条命令自己在终端执行：${command}（${os5}）。`
     };
   }
   return {
     kind: "ask",
-    reason: `人工确认：在 ${os6} 上执行安装命令「${command}」。`,
+    reason: `人工确认：在 ${os5} 上执行安装命令「${command}」。`,
     displayReason: {
-      zh: `准备在这台电脑上装 ffmpeg：${command}（${os6}）。点了「允许」才会执行，安装完成只验证工具；新生成仍需单独确认费用，已有任务按原进度恢复。`,
-      en: `About to install ffmpeg on this machine: ${command} (${os6}). It runs only after you allow it; installation only verifies the tool; new video generation requires separate cost confirmation, while existing tasks should resume their saved progress.`
+      zh: `准备在这台电脑上装 ffmpeg：${command}（${os5}）。点了「允许」才会执行，安装完成只验证工具；新生成仍需单独确认费用，已有任务按原进度恢复。`,
+      en: `About to install ffmpeg on this machine: ${command} (${os5}). It runs only after you allow it; installation only verifies the tool; new video generation requires separate cost confirmation, while existing tasks should resume their saved progress.`
     }
   };
 }
@@ -6054,14 +6007,14 @@ async function ffmpegConsentGate(config, exec, args) {
   const allSteps = [...doneSteps, ...plan || []];
   if (!plan || allSteps.length < 2) return null;
   if (await hasFfmpeg(config, exec.signal)) return null;
-  const { os: os6, installs } = ffmpegInstallOptions();
+  const { os: os5, installs } = ffmpegInstallOptions();
   const command = installs[0].command;
   const sizes = allSteps.map((step) => `${step.seconds}s`).join(" + ");
   const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
   const lines = [
     `本机没有 ${binary}，本次计划总时长是 ${allSteps.reduce((sum, step) => sum + step.seconds, 0)} 秒（会拆成 ${allSteps.length} 段：${sizes}），没有 ffmpeg 就没法合并成一条，所以先停下来了，还没有调用模型、没有产生费用。`,
     "请在对话框里先和用户确认，不要自己绕过这一步：",
-    `1) 问用户要不要现在装 ffmpeg —— 说清他的系统（${os6}）和命令：${command}`,
+    `1) 问用户要不要现在装 ffmpeg —— 说清他的系统（${os5}）和命令：${command}`,
     "   （装好后，已有任务用原resume重试下载或合并；尚未提交的新任务再确认生成费用）。",
     '2) 用户同意安装：调用 video_setup（install:true）——插件会执行上面的命令，宿主会先把这条命令拿给用户确认；装完它会自己验证，成功后你按原 duration 重新调用 video_generate 继续生成即可（一般是先装包管理器：本机连 brew 都没有时，video_setup 会返回 nextStep，用 target:"package-manager" 再装一次）。',
     "3) 用户不想装、或者装不了：带 `merge:false` 重新调用 video_generate，插件就只生成并返回分段列表（每段上游链接，不下载本地文件），这次不会再拦。",
@@ -6070,7 +6023,7 @@ async function ffmpegConsentGate(config, exec, args) {
   return {
     kind: "deny",
     reason: lines.join("\n"),
-    info: { ffmpegMissing: true, os: os6, command, segments: allSteps.length }
+    info: { ffmpegMissing: true, os: os5, command, segments: allSteps.length }
   };
 }
 async function estimateArgsFor(config, toolName, args) {
@@ -6203,26 +6156,63 @@ async function preflightGate(ctx, config, exec) {
 }
 
 // src/businesses/video-generation/workflow/script-questions.ts
+import { createHash as createHash7 } from "node:crypto";
 function pendingScriptQuestions(script) {
-  const questions = [];
-  let active2 = false;
-  let depth = 0;
-  for (const line of script.split(/\r?\n/)) {
-    const heading = /^(#{1,6})\s+(.+)$/.exec(line.trim());
-    if (heading) {
-      if (active2 && heading[1].length <= depth) active2 = false;
-      if (/^(?:[一二三四五六七八九十\d]+[、.．）)]\s*)?(?:用户)?待确认(?:问题|事项)?(?:\s*[（(:：]|\s*$)/.test(heading[2])) {
+  const result = [];
+  let active2 = false, depth = 0;
+  const headingTitle = (text) => text.replace(/[*`]/g, "").replace(/^[一二三四五六七八九十\d]+[、.．）)]\s*/, "").trim();
+  const isPending = (text) => /^(?:用户)?(?:待(?:用户)?确认(?:的)?(?:问题|事项)?|确认事项)(?:\s*[（(:：]|\s*$)/.test(text);
+  for (const raw of script.split(/\r?\n/)) {
+    const line = raw.trim();
+    const heading = /^(#{1,6})\s+(.+)$/.exec(line);
+    const bold = /^\*\*(.+?)\*\*[:：]?$/.exec(line);
+    if (heading || bold) {
+      const level = heading ? heading[1].length : 2, title = headingTitle(heading ? heading[2] : bold[1]);
+      if (active2 && level <= depth) active2 = false;
+      if (isPending(title)) {
         active2 = true;
-        depth = heading[1].length;
+        depth = level;
       }
       continue;
     }
     if (!active2) continue;
-    const value = line.trim().replace(/^(?:[-*+]\s+|\d+[.、）)]\s*)/, "").trim();
-    if (!value || /^(?:无|暂无|无待确认(?:事项|问题)?|无需确认|均已确认|已全部确认)[。.!！]?$/.test(value)) continue;
-    questions.push(value);
+    const value = line.replace(/^(?:[-*+]\s+(?:\[[ xX]\]\s*)?|\d+[.、）)]\s*)/, "").trim();
+    if (!value || /^[-*_\s]+$/.test(value) || /^(?:无|暂无|无待确认(?:事项|问题)?|无需确认|均已确认|已全部确认)[。.!！]?$/.test(value)) continue;
+    result.push(value);
   }
-  return [...new Set(questions)];
+  return [...new Set(result)];
+}
+function questionId(question) {
+  return "script_pending_" + createHash7("sha256").update(question.replace(/\s/g, "")).digest("hex").slice(0, 20);
+}
+function syncScriptQuestions(project, questions, scriptHash) {
+  const records = project.clarifications ||= [];
+  for (const question of questions) {
+    const id = questionId(question);
+    if (!records.some((item) => item.id === id)) records.push({ id, question, status: "PENDING", introducedScriptHash: scriptHash });
+  }
+  const current = new Set(questions.map(questionId));
+  for (const item of records) {
+    if (current.has(item.id) && item.status === "APPLIED") item.status = "ANSWERED";
+    if (item.status === "ANSWERED" && !current.has(item.id) && item.answeredScriptHash !== scriptHash) {
+      item.status = "APPLIED";
+      item.appliedScriptHash = scriptHash;
+    }
+  }
+  return records.filter((item) => item.status !== "APPLIED");
+}
+function recordQuestionAnswers(records, asked, result, scriptHash, aborted) {
+  if (aborted) return;
+  for (const item of asked) {
+    const answer = result?.answers?.find((value) => value.id === item.id);
+    const text = typeof answer?.custom === "string" ? answer.custom.trim() : "";
+    if (!text) continue;
+    const record = records.find((value) => value.id === item.id);
+    record.answer = text;
+    record.status = "ANSWERED";
+    record.answeredScriptHash = scriptHash;
+    record.answeredAt = (/* @__PURE__ */ new Date()).toISOString();
+  }
 }
 
 // src/businesses/video-generation/workflow/script-capture.ts
@@ -6584,37 +6574,45 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         let staleReason;
         if (data2.approved && data2.filmSource) {
           try {
-            assertCompiledProduction(data2, JSON.parse(await readFile9(data2.filmSource.path, "utf8")), data2.approved.specification, resolveModel(config));
+            assertCompiledProduction(data2, JSON.parse(await readFile10(data2.filmSource.path, "utf8")), data2.approved.specification, resolveModel(config));
           } catch {
             sourceCurrent = false;
             staleReason = "专业源项目、模型或编译方案已改变或无法读取，请重新编译并审核。";
           }
         }
-        const current = sourceCurrent && data2.approved && await scriptDigest(data2.approved.scriptPath).catch(() => "") === data2.approved.scriptHash && productionFingerprint(config, data2.approved.name, data2.approved.specification) === data2.approved.fingerprint;
+        const current = sourceCurrent && data2.approved && await scriptDigest(data2.approved.scriptPath).catch(() => "") === data2.approved.scriptHash && matchesProductionApproval(config, data2.approved, data2.approved.name, data2.approved.specification);
         return { projectId: data2.id, subjectType: data2.subjectType, choice: data2.choice, duration: data2.duration, status: current ? "approved" : "draft", ...staleReason ? { approval_stale: true, reason: staleReason } : {} };
       }
       if (args.action === "storyboard") {
-        const session = exec.agent?.session;
-        const scriptPath = path13.resolve(session?.header?.cwd || process.cwd(), String(args.scriptPath || ""));
-        if (!/\.md$/i.test(scriptPath)) throw new Error("storyboard需传脚本文件路径scriptPath（.md）。");
-        if (args.captureScript === true && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(session) || "")) {
-          throw new Error("正文里没有找到完整脚本：先把本版脚本正文完整贴进用户可见正文（摘要、链接、示意图都不算），再让插件出分镜示意图。");
-        }
-        const script = await readFile9(scriptPath, "utf8").catch(() => "");
-        if (!String(script).trim()) throw new Error("还没读到脚本文件：先在正文贴出完整脚本并传captureScript，或先把脚本写到scriptPath。");
-        const version = nextStoryboardVersion(await readdir4(path13.dirname(scriptPath)).catch(() => []));
-        const svg = renderStoryboardSvg(script, { version });
-        const target = path13.join(path13.dirname(scriptPath), storyboardFileName(version));
-        await writeFile7(target, svg, { mode: 384 });
-        return {
-          path: target,
-          version,
-          shots: scriptStoryboardShots(script).length,
-          bytes: Buffer.byteLength(svg, "utf8"),
-          markdown: `![分镜示意图](<${target}>)`,
-          link: `[打开原图](<${target}>)`,
-          hint: "脚本已保存，后续review只传scriptPath，不传captureScript，也不重复展示同版脚本。把 markdown 内嵌进本轮正文、link 一并给出，再调用review；示意图由插件本地渲染，不要自己写绘图代码或 SVG，也不要调用付费出图模型。"
-        };
+        const owner = await readProject(args.projectId, exec);
+        return lockProject(owner.id, async () => {
+          const project = await readProject(owner.id, exec);
+          const session = exec.agent?.session;
+          const scriptPath = path13.resolve(session?.header?.cwd || process.cwd(), String(args.scriptPath || ""));
+          if (!/\.md$/i.test(scriptPath)) throw new Error("storyboard需传脚本文件路径scriptPath（.md）。");
+          if (args.captureScript === true && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(session) || "")) {
+            throw new Error("正文里没有找到完整脚本：先把本版脚本正文完整贴进用户可见正文（摘要、链接、示意图都不算），再让插件出分镜示意图。");
+          }
+          const script = await readFile10(scriptPath, "utf8").catch(() => "");
+          if (!String(script).trim()) throw new Error("还没读到脚本文件：先在正文贴出完整脚本并传captureScript，或先把脚本写到scriptPath。");
+          const version = nextStoryboardVersion(await readdir4(path13.dirname(scriptPath)).catch(() => []));
+          const svg = renderStoryboardSvg(script, { version });
+          const target = path13.join(path13.dirname(scriptPath), storyboardFileName(version));
+          await writeFile7(target, svg, { mode: 384, flag: "wx" });
+          project.storyboard = { projectId: project.id, path: target, scriptPath, scriptHash: await scriptDigest(scriptPath), imageHash: await scriptDigest(target), version };
+          syncScriptQuestions(project, pendingScriptQuestions(script), project.storyboard.scriptHash);
+          project.approved = null;
+          await writeProject(project);
+          return {
+            path: target,
+            version,
+            shots: scriptStoryboardShots(script).length,
+            bytes: Buffer.byteLength(svg, "utf8"),
+            markdown: `![分镜示意图](<${target}>)`,
+            link: `[打开原图](<${target}>)`,
+            hint: "脚本已保存，后续review只传scriptPath，不传captureScript，也不重复展示同版脚本。把 markdown 内嵌进本轮正文、link 一并给出，再调用review；示意图由插件本地渲染，不要自己写绘图代码或 SVG，也不要调用付费出图模型。"
+          };
+        });
       }
       if (!["prepare", "review"].includes(args.action)) throw new Error("未知项目操作");
       let data = args.projectId ? await readProject(args.projectId, exec) : null;
@@ -6642,14 +6640,14 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
           const saved = await readProject(data.id, exec);
           return { projectId: data.id, duration: data.duration, choice: saved.choice, status: saved.choice ? "prepared" : "pending", nextAction: gate2?.reason || "编写脚本与分镜，完成后review。" };
         }
-        const spec = args.specification;
+        const spec = args.specification ? normalizeProductionSpec(config, args.toolName || "video_generate", args.specification) : null;
         if (data.filmSource) {
           if (args.toolName && args.toolName !== "video_generate") throw Error("COMPILED_TOOL_MISMATCH");
-          const source = JSON.parse(await readFile9(data.filmSource.path, "utf8"));
+          const source = JSON.parse(await readFile10(data.filmSource.path, "utf8"));
           assertCompiledProduction(data, source, spec, resolveModel(config));
         }
         const allowed = new Set(Object.keys(args.toolName === "video_extend" ? extensionProperties : generationProperties));
-        if (spec && Object.keys(spec).some((k) => !allowed.has(k))) throw new Error("specification只能包含对应生成工具的公开参数，禁止凭据或未知字段。");
+        if (args.specification && Object.keys(args.specification).some((k) => !allowed.has(k))) throw new Error("specification只能包含对应生成工具的公开参数，禁止凭据或未知字段。");
         if (!spec || !spec.prompt || !spec.duration || !spec.ratio || !spec.resolution || spec.projectId) throw new Error("review需完整specification：prompt、duration、ratio、resolution，不能包含projectId。");
         if (!data.choice) throw new Error("角色图选择未完成，请先prepare。");
         if (["generate_first", "provided_images"].includes(data.choice) && !hasProjectImages(spec)) throw new Error("先提供角色图并展示审核，再提交带图specification。");
@@ -6661,29 +6659,33 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         if (requestedTotal !== data.duration && !spec.resume) throw new Error("脚本时长与用户确认的总时长不一致，请先用prepare确认变更，再重新审核。");
         const scriptPath = path13.resolve(exec.agent.session.header?.cwd || process.cwd(), String(args.scriptPath || ""));
         if (!/\.md$/i.test(scriptPath)) throw new Error("scriptPath需为Markdown脚本文件。");
-        if (args.captureScript === true && !await readFile9(scriptPath, "utf8").catch(() => "") && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(exec.agent.session) || "")) {
+        if (args.captureScript === true && !await readFile10(scriptPath, "utf8").catch(() => "") && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(exec.agent.session) || "")) {
           throw new Error("正文里没有找到完整脚本：请先把本版脚本正文完整贴进用户可见正文（摘要、链接、示意图都不算），再调用review；脚本只需在正文写这一次，插件会据此落成script.md。");
         }
         const scriptHash = await scriptDigest(scriptPath);
-        const scriptBody = (await readFile9(scriptPath, "utf8")).replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
+        const scriptBody = (await readFile10(scriptPath, "utf8")).replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
         if (!scriptBody) throw new Error("脚本正文不能为空。");
-        const pendingQuestions = pendingScriptQuestions(scriptBody);
-        if (pendingQuestions.length) {
+        const unresolved = syncScriptQuestions(data, pendingScriptQuestions(scriptBody), scriptHash);
+        await writeProject(data);
+        if (unresolved.length) {
           data.approved = null;
           await writeProject(data);
+          const asked = unresolved.filter((item) => item.status === "PENDING").slice(0, 3);
           const service2 = ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
-          const result2 = service2?.ask && approvalPolicy(ctx, exec) !== "never" ? await service2.ask({
+          const result2 = asked.length && service2?.ask && approvalPolicy(ctx, exec) !== "never" ? await service2.ask({
             agent: exec.agent,
             signal: exec.signal,
             ...exec.callId ? { wait: { callId: exec.callId } } : {},
-            questions: pendingQuestions.slice(0, 3).map((question, index) => ({ id: `script_pending_${index + 1}`, header: "待确认事项", question, multiSelect: false }))
+            questions: asked.map((item) => ({ id: item.id, header: "待确认事项", question: item.question, multiSelect: false }))
           }) : null;
+          recordQuestionAnswers(data.clarifications, asked, result2, scriptHash, Boolean(exec.signal?.aborted));
+          await writeProject(data);
           return {
             projectId: data.id,
             status: "blocked",
-            pendingQuestions,
-            answers: exec.signal?.aborted ? [] : result2?.answers || [],
-            reason: "脚本仍有待确认事项，尚未批准。先取得这些问题的明确答复，将决定落实到脚本并移出待确认清单，再展示新版分镜并重新review；取消或未答不能采用默认值。"
+            pendingQuestions: unresolved.map((item) => item.question),
+            clarifications: data.clarifications,
+            reason: "待确认事项尚未全部落实。未回答的问题须明确答复；已回答问题无需重复询问，按保存答复修改脚本、移出待确认清单，再展示新版分镜并review。删除问题不能代替答复，答复也不等于脚本批准。"
           };
         }
         if (name === "video_generate" && !spec.resume) resolveSegmentPrompts(spec.segmentPrompts, estimatePlan(config, name, spec).length);
@@ -6700,7 +6702,7 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
           data = await readProject(data.id, exec);
         }
         const canvasOutput = canvasProject ? { canvasProject } : {};
-        const gate = await reviewGuard.gate({ ...exec, name: "ask_user_question", arguments: { requireStoryboard: true, requiredScriptText: scriptBody, questions: [{ id: "script_review", question: "审核当前脚本" }] } });
+        const gate = await reviewGuard.gate({ ...exec, name: "ask_user_question", arguments: { requireStoryboard: true, requiredProjectId: data.id, requiredScriptPath: scriptPath, requiredScriptHash: scriptHash, requiredStoryboard: data.storyboard, requiredScriptText: scriptBody, questions: [{ id: "script_review", question: "审核当前脚本" }] } });
         if (gate) return { projectId: data.id, status: "blocked", ...canvasOutput, reason: gate.reason };
         const service = ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
         if (!service?.ask || approvalPolicy(ctx, exec) === "never") return { projectId: data.id, status: "pending", ...canvasOutput, reason: "无法取得脚本审核答复，未生成。" };
@@ -6709,8 +6711,8 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         const result = await service.ask({ agent: exec.agent, signal: exec.signal, ...exec.callId ? { wait: { callId: exec.callId } } : {}, questions: [{ id: "script_review", header: "脚本审核", question: "请审核刚展示的本版脚本、分镜、角色图及费用预估。是否通过？通过后仍会单独确认视频调用费用。", multiSelect: false, options: [{ label: "脚本通过", description: "使用本版材料，下一步确认视频制作费用。" }, { label: "需要修改", description: "先修改并重新展示审核，不生成。" }] }] });
         const answer = result?.answers?.find((a) => a.id === "script_review");
         if (exec.signal?.aborted || answer?.custom || answer?.selected?.length !== 1 || answer.selected[0] !== "脚本通过") return { projectId: data.id, status: "draft", ...canvasOutput, reason: "未取得审核通过，未生成。" };
-        if (await scriptDigest(scriptPath) !== scriptHash || productionFingerprint(config, name, spec) !== fingerprint) throw new Error("等待审核期间材料或配置改变，请重新展示审核。");
-        if (data.filmSource) assertCompiledProduction(data, JSON.parse(await readFile9(data.filmSource.path, "utf8")), spec, resolveModel(config));
+        if (!data.storyboard || await scriptDigest(data.storyboard.path).catch(() => "") !== data.storyboard.imageHash || await scriptDigest(scriptPath) !== scriptHash || productionFingerprint(config, name, spec) !== fingerprint) throw new Error("等待审核期间材料或配置改变，请重新展示审核。");
+        if (data.filmSource) assertCompiledProduction(data, JSON.parse(await readFile10(data.filmSource.path, "utf8")), spec, resolveModel(config));
         data.approved = { scriptPath, scriptHash, fingerprint, specification: spec, name, resumeDir: resumeDirOf(spec.resume), reviewedAt: (/* @__PURE__ */ new Date()).toISOString() };
         await writeProject(data);
         return { projectId: data.id, status: "approved", ...canvasOutput, nextAction: `直接调用${name}并带projectId和本次specification；工具付费审批承担制作确认，不再另问一次。` };
@@ -6721,7 +6723,8 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
 
 // src/businesses/video-generation/workflow/storyboard-review.ts
 import path14 from "node:path";
-import { stat as stat5, readdir as readdir5 } from "node:fs/promises";
+import { createHash as createHash8 } from "node:crypto";
+import { stat as stat5, readdir as readdir5, readFile as readFile11 } from "node:fs/promises";
 var STORYBOARD_FILE = /storyboard|分镜|示意/i;
 var IMAGE_FILE = /\.(png|jpe?g|webp|svg)$/i;
 function readableText(value) {
@@ -6752,7 +6755,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     let state = sessions.get(session);
     if (state && Number.isInteger(turn) && turn !== state.turn && state.awaitingReview) void reportMissing(state);
     if (!state || Number.isInteger(turn) && turn !== state.turn) {
-      state = { turn, active: false, files: [], shown: /* @__PURE__ */ new Set(), awaitingReview: false, text: "", scriptText: "" };
+      state = { turn, active: false, files: [], shown: /* @__PURE__ */ new Set(), awaitingReview: false, text: "", scriptText: "", messages: state?.messages || [], images: state?.images || /* @__PURE__ */ new Map() };
       sessions.set(session, state);
     }
     return state;
@@ -6778,6 +6781,8 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
       const content = data.message?.content;
       const text = Array.isArray(content) ? content.filter((block) => block.type === "text").map((block) => block.text || "").join("\n") : "";
       state.text = (state.text + "\n" + text).slice(-25e4);
+      state.messages.push(text);
+      while (state.messages.length > 1 && state.messages.join("").length > 25e4) state.messages.shift();
       if (/^#\s+\S/m.test(text) && text.length >= 200) state.scriptText = text;
       let storyboard = false;
       for (const match of text.matchAll(/!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))\s*\)/g)) {
@@ -6785,6 +6790,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
         try {
           const full = path14.resolve(session.header?.cwd || process.cwd(), decodeURI(target));
           state.shown.add(full);
+          state.images.set(full, readFile11(full).then((bytes) => createHash8("sha256").update(bytes).digest("hex")).catch(() => ""));
           if (STORYBOARD_FILE.test(path14.basename(full))) storyboard = true;
         } catch {
         }
@@ -6843,12 +6849,27 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     if (review && state) state.awaitingReview = false;
     if (!review || !args.requireStoryboard && !state?.active) return null;
     if (args.requiredScriptText) {
-      const coverage = scriptCoverage(args.requiredScriptText, state?.text);
+      const coverage = scriptCoverage(args.requiredScriptText, args.requiredProjectId ? state?.messages.join("\n") : state?.text);
       if (coverage < SCRIPT_COVERAGE_MIN) {
         const percent2 = Math.round(coverage * 100);
         await appendRequestLog({ event: "storyboard_review_blocked", reason: "script_text_mismatch", coverage: Math.round(coverage * 1e3) / 1e3 });
         return { kind: "deny", reason: `脚本审核暂未打开：本版script.md正文只在本轮用户可见正文里出现 ${percent2}%。请把script.md正文原样贴进本轮正文再单独调用review；标题、加粗、表格这类排版差异不算问题，但不要改写措辞、删段，也不要只给文件链接或摘要。` };
       }
+    }
+    if (args.requiredProjectId) {
+      const binding = args.requiredStoryboard;
+      if (!binding || binding.projectId !== args.requiredProjectId || binding.scriptHash !== args.requiredScriptHash || path14.resolve(binding.scriptPath) !== path14.resolve(args.requiredScriptPath)) {
+        return { kind: "deny", reason: "本项目分镜未绑定当前脚本版本，请先调用storyboard生成并展示本版分镜。" };
+      }
+      if (!state?.messages.some((text) => readableText(text).includes(readableText(args.requiredScriptText)))) {
+        return { kind: "deny", reason: "当前版本脚本尚未完整展示，不能用旧稿或多条摘要拼接通过。请完整展示当前稿件一次。" };
+      }
+      const shownHash = await state?.images.get(binding.path);
+      const currentHash = await readFile11(binding.path).then((bytes) => createHash8("sha256").update(bytes).digest("hex")).catch(() => "");
+      if (!shownHash || shownHash !== binding.imageHash || currentHash !== binding.imageHash) {
+        return { kind: "deny", reason: "本项目当前版本分镜尚未实际展示，或图片已改变。" + linkHint(binding.path) };
+      }
+      return null;
     }
     const embedded = [...state?.shown || []].filter((target2) => STORYBOARD_FILE.test(path14.basename(target2)));
     let ready = embedded.length > 0;
@@ -7231,8 +7252,8 @@ function jsonSafeTool(tool) {
 
 // src/businesses/video-generation/providers/submissions.ts
 import path17 from "node:path";
-import { createHash as createHash7, randomUUID as randomUUID8 } from "node:crypto";
-import { mkdir as mkdir10, readFile as readFile10, writeFile as writeFile8, rename as rename7, rm as rm7, open as open4, readdir as readdir6 } from "node:fs/promises";
+import { createHash as createHash9, randomUUID as randomUUID8 } from "node:crypto";
+import { mkdir as mkdir10, readFile as readFile12, writeFile as writeFile8, rename as rename7, rm as rm7, open as open4, readdir as readdir6 } from "node:fs/promises";
 init_plugin();
 init_connection();
 
@@ -7491,7 +7512,7 @@ async function waitForCompletion(config, taskId, signal) {
 }
 
 // src/businesses/video-generation/providers/submissions.ts
-var hash2 = (value) => createHash7("sha256").update(value).digest("hex");
+var hash2 = (value) => createHash9("sha256").update(value).digest("hex");
 function submissionIdentity(config) {
   return hash2(JSON.stringify([isVolcengine(config) ? "volcengine" : "metaontic", resolveBaseUrl(config), hash2(resolveApiKey(config))]));
 }
@@ -7567,7 +7588,7 @@ async function finishKnownTask(config, taskId) {
   })) {
     if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
     const file = path17.join(directory(), name);
-    const raw = await readFile10(file, "utf8").catch((error) => {
+    const raw = await readFile12(file, "utf8").catch((error) => {
       if (error.code === "ENOENT") return null;
       throw error;
     });
@@ -7578,7 +7599,7 @@ async function finishKnownTask(config, taskId) {
 }
 async function readSubmission(id) {
   if (!/^[a-f0-9]{64}$/.test(String(id))) throw new Error("提交记录 ID 格式不正确。");
-  const record = JSON.parse(await readFile10(path17.join(directory(), `${id}.json`), "utf8"));
+  const record = JSON.parse(await readFile12(path17.join(directory(), `${id}.json`), "utf8"));
   if (record.id !== id) throw new Error("提交记录损坏，已停止。");
   return record;
 }
@@ -7636,15 +7657,15 @@ function submissionTool(liveConfig) {
 }
 
 // src/businesses/video-generation/integrations/canvas.ts
-import { createHash as createHash9, randomUUID as randomUUID10 } from "node:crypto";
-import { mkdir as mkdir13, readFile as readFile12, writeFile as writeFile10, rename as rename10, copyFile, stat as stat8, open as open5 } from "node:fs/promises";
+import { createHash as createHash11, randomUUID as randomUUID10 } from "node:crypto";
+import { mkdir as mkdir13, readFile as readFile14, writeFile as writeFile10, rename as rename10, copyFile, stat as stat8, open as open5 } from "node:fs/promises";
 import path20 from "node:path";
 init_plugin();
 
 // src/businesses/video-generation/integrations/canvas-builtin.ts
-import { mkdir as mkdir11, readFile as readFile11, writeFile as writeFile9, rename as rename8, readdir as readdir7, stat as stat7 } from "node:fs/promises";
+import { mkdir as mkdir11, readFile as readFile13, writeFile as writeFile9, rename as rename8, readdir as readdir7, stat as stat7 } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { createHash as createHash8, randomUUID as randomUUID9 } from "node:crypto";
+import { createHash as createHash10, randomUUID as randomUUID9 } from "node:crypto";
 import path18 from "node:path";
 init_plugin();
 var BUILTIN_BACKEND = "builtin";
@@ -7659,7 +7680,7 @@ var docFile = (id) => {
 };
 async function readJson(file, fallback = null) {
   try {
-    return JSON.parse(await readFile11(file, "utf8"));
+    return JSON.parse(await readFile13(file, "utf8"));
   } catch {
     return fallback;
   }
@@ -7859,7 +7880,7 @@ async function builtinCanvasImport(args) {
   if (bytes.length > IMPORT_LIMIT_BYTES) throw new Error("单张图片不能超过 32MB。");
   const extension = imageExtension(args?.mime, bytes);
   if (!extension) throw new Error("只支持 PNG、JPEG、WebP 图片。");
-  const id = `mov_img_${createHash8("sha256").update(bytes).digest("hex").slice(0, 24)}`;
+  const id = `mov_img_${createHash10("sha256").update(bytes).digest("hex").slice(0, 24)}`;
   const label = String(args?.name || "").trim().slice(0, 80) || `导入图片${extension}`;
   const rel = `projects/${doc.id}/image/${id}${extension}`;
   const dest = path18.join(dataRootOf(), rel);
@@ -8327,7 +8348,7 @@ var canvasLinkSchema = { type: "object", properties: {
   nodeId: { type: "string" },
   fingerprint: { type: "string" }
 }, required: ["projectId", "nodeId", "fingerprint"], description: "video_canvas(action:read)返回的流程画布定位与内容摘要；原样传入，不猜测。" };
-var digest = (value) => createHash9("sha256").update(JSON.stringify(value)).digest("hex");
+var digest = (value) => createHash11("sha256").update(JSON.stringify(value)).digest("hex");
 var validId2 = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 function location(link2) {
   if (!validId2(link2?.projectId) || !validId2(link2?.nodeId) || link2.canvasId && !validId2(link2.canvasId)) throw new Error("画布项目或节点标识无效");
@@ -8537,7 +8558,7 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
     if (busy.has(token)) throw new Error("此成果正在回填，请稍后查询。");
     busy.add(token);
     try {
-      const record = JSON.parse(await readFile12(resultFile(token), "utf8"));
+      const record = JSON.parse(await readFile14(resultFile(token), "utf8"));
       if (record.owner !== sessionOwner(exec)) throw new Error("此成果不属于当前会话");
       return await publishCanvasResult(await resolveCanvasAdapter(record?.canvas?.projectId, load), record);
     } finally {
@@ -8625,11 +8646,11 @@ function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
 }
 
 // src/businesses/video-generation/integrations/canvas-project.ts
-import { createHash as createHash10 } from "node:crypto";
-import { readFile as readFile13 } from "node:fs/promises";
+import { createHash as createHash12 } from "node:crypto";
+import { readFile as readFile15 } from "node:fs/promises";
 import path21 from "node:path";
 init_config();
-var digest2 = (value) => createHash10("sha256").update(JSON.stringify(value)).digest("hex");
+var digest2 = (value) => createHash12("sha256").update(JSON.stringify(value)).digest("hex");
 async function adapterForNewCanvas(binding, load) {
   if (binding?.projectId) return resolveCanvasAdapter(binding.projectId, load);
   if (load !== loadCanvasAdapter) return load();
@@ -8691,7 +8712,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
       if (draft.scriptPath) {
         const scriptPath = path21.resolve(exec.agent.session.header?.cwd || process.cwd(), draft.scriptPath);
         if (!/\.md$/i.test(scriptPath)) throw new Error("自动同步脚本需要Markdown文件。");
-        script = await readFile13(scriptPath, "utf8");
+        script = await readFile15(scriptPath, "utf8");
         if (script.length > 2e5) throw new Error("脚本过大，自动画布未覆盖旧节点。");
       }
       const specification = draft.specification || null;
@@ -8921,8 +8942,8 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
 
 // src/businesses/video-generation/integrations/canvas-native.ts
 import path23 from "node:path";
-import { createHash as createHash12, randomUUID as randomUUID11 } from "node:crypto";
-import { mkdir as mkdir15, readFile as readFile14, writeFile as writeFile12, rename as rename12, stat as stat10 } from "node:fs/promises";
+import { createHash as createHash14, randomUUID as randomUUID11 } from "node:crypto";
+import { mkdir as mkdir15, readFile as readFile16, writeFile as writeFile12, rename as rename12, stat as stat10 } from "node:fs/promises";
 init_plugin();
 init_connection();
 
@@ -8996,7 +9017,7 @@ function endWithPunctuation(text) {
 }
 
 // src/businesses/video-generation/workflow/real-person.ts
-import { createHash as createHash11 } from "node:crypto";
+import { createHash as createHash13 } from "node:crypto";
 
 // src/businesses/video-generation/tools/results.ts
 import { resolve as resolve2 } from "node:path";
@@ -9358,7 +9379,7 @@ async function recoverRealPersonImages(config, body, ctx, exec, final, state = {
   try {
     for (const item of images) {
       const source = String(item.image_url.url);
-      const key = createHash11("sha256").update(source).digest("hex");
+      const key = createHash13("sha256").update(source).digest("hex");
       const entry2 = state.images[key] ||= {};
       if (entry2.failed) throw new Error(`图片任务 ${entry2.taskId || ""} 已明确失败：${entry2.failed}。不自动再次出图。`);
       if (!entry2.imageUrl) {
@@ -10210,7 +10231,7 @@ async function downloadSegmentsAndMerge(config, {
 
 // src/businesses/video-generation/integrations/canvas-native.ts
 init_config();
-var hash3 = (value) => createHash12("sha256").update(JSON.stringify(value)).digest("hex");
+var hash3 = (value) => createHash14("sha256").update(JSON.stringify(value)).digest("hex");
 var validToken = (value) => /^[a-f0-9-]{36}$/.test(String(value || ""));
 var terminal = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled"]);
 function splitEvenly(items, count) {
@@ -10399,7 +10420,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
     await writeFile12(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
     await rename12(temp, dest);
   }
-  const read = async (id) => JSON.parse(await readFile14(file(id), "utf8"));
+  const read = async (id) => JSON.parse(await readFile16(file(id), "utf8"));
   const chainFile = (id) => {
     if (!validToken(id)) throw new Error("连拍记录标识无效。");
     return path23.join(chainDirectory, `${id}.json`);
@@ -10411,11 +10432,11 @@ function createCanvasNativeService(liveConfig, options = {}) {
     await writeFile12(temp, JSON.stringify(chain), { mode: 384, flag: "wx" });
     await rename12(temp, dest);
   }
-  const readChain = async (id) => JSON.parse(await readFile14(chainFile(id), "utf8"));
+  const readChain = async (id) => JSON.parse(await readFile16(chainFile(id), "utf8"));
   async function previousChain(link2) {
     let id;
     try {
-      id = JSON.parse(await readFile14(chainPointer(link2), "utf8")).id;
+      id = JSON.parse(await readFile16(chainPointer(link2), "utf8")).id;
     } catch (e) {
       if (e.code === "ENOENT") return null;
       throw e;
@@ -10425,7 +10446,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
   async function previous(link2) {
     let id;
     try {
-      id = JSON.parse(await readFile14(pointer(link2), "utf8")).id;
+      id = JSON.parse(await readFile16(pointer(link2), "utf8")).id;
     } catch (e) {
       if (e.code === "ENOENT") return null;
       throw e;
@@ -12142,7 +12163,7 @@ function setupTool(config) {
       render(_args, value) {
         const {
           status,
-          os: os6,
+          os: os5,
           ffmpegVersion,
           ffmpegPath,
           ffprobeVersion,
@@ -12157,7 +12178,7 @@ function setupTool(config) {
           lines.push("ffmpeg 装好了，长视频现在可以合并成一条。");
         } else if (status === "missing") {
           lines.push("本机还没有 ffmpeg：生成超过模型单次上限的视频时只能给分段，没法合并成一条。");
-          lines.push(`装一下就好（${os6 || "当前系统"}）：${installCommand || ""}`);
+          lines.push(`装一下就好（${os5 || "当前系统"}）：${installCommand || ""}`);
           lines.push("用户同意的话，我可以用 video_setup（install=true）直接帮他装。");
         } else if (status === "failed") {
           lines.push("ffmpeg 没装成功，得手动装一下。");
@@ -12185,14 +12206,14 @@ function setupTool(config) {
       const signal = exec?.signal;
       const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
       const probeBinary = resolveBinary(config, "ffprobeBinary", "ffprobe");
-      const { os: os6, installs, bootstrap } = ffmpegInstallOptions();
+      const { os: os5, installs, bootstrap } = ffmpegInstallOptions();
       const wantsInstall = args?.install === true;
       const target = String(args?.target || "ffmpeg");
       const manualSteps = installs.map((item) => `${item.label}：${item.command}`);
       const installCommand = target === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
       const ffmpegVersion = await probeBinaryVersion(binary, signal);
       const ffprobeVersion = await probeBinaryVersion(probeBinary, signal);
-      const base = { os: os6, installCommand, manualSteps, ffmpegVersion, ffprobeVersion };
+      const base = { os: os5, installCommand, manualSteps, ffmpegVersion, ffprobeVersion };
       if (ffmpegVersion) {
         const note = ffprobeVersion ? "ffmpeg 与 ffprobe 都可用，长视频会正常合并成一条。" : "ffmpeg 可用；没有 ffprobe，分段时长探测会被跳过（不影响合并）。";
         return { status: "ready", ...base, ffmpegPath: binary, note };
@@ -12211,7 +12232,7 @@ function setupTool(config) {
           return {
             status: "failed",
             ...base,
-            note: `${os6} 不需要另外装包管理器，直接用系统自带的包管理器装 ffmpeg 就行。`
+            note: `${os5} 不需要另外装包管理器，直接用系统自带的包管理器装 ffmpeg 就行。`
           };
         }
         const result = await runProcess(shellCommand, [], {
@@ -12252,7 +12273,7 @@ function setupTool(config) {
         installCommand: needsBootstrap ? bootstrap.command : installs[0].command,
         manualSteps: needsBootstrap ? [`先装包管理器：${bootstrap.command}`, ...manualSteps] : manualSteps,
         output,
-        note: needsBootstrap ? `本机没有 ${os6} 的包管理器，得先装它：${bootstrap.command}；装好之后再装 ffmpeg。这两步都可以让我来做 —— 说一声就行。` : "安装命令没成功（可能是没权限、没联网或被安全策略拦下）。上面是手动步骤，照着在终端里跑一遍即可。"
+        note: needsBootstrap ? `本机没有 ${os5} 的包管理器，得先装它：${bootstrap.command}；装好之后再装 ffmpeg。这两步都可以让我来做 —— 说一声就行。` : "安装命令没成功（可能是没权限、没联网或被安全策略拦下）。上面是手动步骤，照着在终端里跑一遍即可。"
       };
     }
   };
@@ -12637,7 +12658,7 @@ function buildPromptGuidance(config) {
     "· 脚本审核只调用video_project(action:review)，由插件创建简短审核窗口。完整材料先在正文展示，不把脚本塞进问题或选项。",
     "· 修改方向确认：用户已明确说出修改要求时直接按要求改稿，不再弹方向选择。仅“修改一下”等方向不明确时，才问一个简短问题，默认提供2–3个互斥的单选方向（multi_select为false或省略），选项标签不超过12个汉字、描述不超过一行；不默认给出5项多选，不添加“我自己说”等空操作选项，自由输入由宿主提供。提问中简短提示“选好后点击提交，也可直接输入修改要求”。只有用户明确要组合多个方向时才使用多选，并说明“可多选，选完点击提交”；方向答复只是改稿要求，不等于脚本审核或制作授权。",
     "· 脚本审核使用video_project，不使用ask_user_question冒充审核状态；制作确认使用生成工具自带审批，不重复询问。",
-    `· 默认 continuous_segments 新视频用 video_generate，duration 传目标总秒数。用户明确选择并审核 independent_shots 时走 shotDurations 独立生成、单独计费，每镜审核后resume，不输入上一段视频；下列最少分段约束仅适用于连续路线。**硬规则：总时长 ≤ ${singleMax} 秒（单段上限）的整条视频必须一次直出，禁止按叙事镜头拆成多次 video_generate 再拼接**——例如「15 秒」就是一次 15 秒，不许拆成 8+7；按故事选择一镜到底或少量有动机的切镜，镜头方案先写进待审核脚本，已审核的切镜在同一次生成提示词中安排；用户指定的镜头形式优先。超过上限时（如 20 秒）会自动拆成首段 + 若干续拍段再合并——那是同一条视频往下续拍，不是多镜拼接。所以「20 秒视频」直接传 duration=20，不用手动拆成多个独立调用，也不用跟用户解释「模型一次只能出 15 秒」；**超过单段上限的成片是「循环迭代」的：每段生成完先返回视频成果供展示，用户预览并确认后再用 resume 继续，不要绕过它、也不要自己拆成多次生成**；分段交付时结果里带 paused=true、resumeDir、remainingSeconds——这时先把已经生成的部分交付给他，分段结果审核通过并确认下一段费用后，再把 resumeDir 原样传给 video_generate 的 resume 参数（插件接着已有的分段往下做，已完成分段不重生成，新增分段仍计费），不要从头再来一遍；同一份暂停进度（resumeDir）同一时间只允许一次 resume 在跑：如果结果说「已经有一次『继续』在跑」，就让用户等那一次跑完（或确认它已中断、锁过期）再继续，不要重复发 resume——并发续做会被拦截；请勿绕过锁重复提交；用户中途点了「停止」或这一轮等超时也一样：已经生成好的段会尝试下载并提供预览；是否合并以返回结果为准（结果里同样是 paused=true + 已完成分段 + resumeDir），不要把那几段丢掉重来；单条成片最长 ${MAX_TOTAL_SECONDS} 秒（最多 ${MAX_SEGMENTS} 段），用户要更长的就按 ${MAX_TOTAL_SECONDS} 秒生成并说明这是插件当前的上限，不要反复加大 duration；成片默认落在会话工作目录下的 metaontic-video/。`,
+    `· 默认 continuous_segments 新视频用 video_generate，duration 传目标总秒数。用户明确选择并审核 independent_shots 时走 shotDurations 独立生成、单独计费，每镜审核后resume，不输入上一段视频；下列最少分段约束仅适用于连续路线。**硬规则：总时长 ≤ ${singleMax} 秒（单段上限）的整条视频必须一次直出，禁止按叙事镜头拆成多次 video_generate 再拼接**——例如「15 秒」就是一次 15 秒，不许拆成 8+7；按故事选择一镜到底或少量有动机的切镜，镜头方案先写进待审核脚本，已审核的切镜在同一次生成提示词中安排；用户指定的镜头形式优先。超过上限时（如 20 秒）会自动拆成首段 + 若干续拍段再合并——那是同一条视频往下续拍，不是多镜拼接。所以「20 秒视频」直接传 duration=20，不用手动拆成多个独立调用，也不用跟用户解释「模型一次只能出 15 秒」；**超过单段上限的成片是「循环迭代」的：每段生成完先返回视频成果供展示，用户预览并确认后再用 resume 继续，不要绕过它、也不要自己拆成多次生成**；分段交付时结果里带 paused=true、resumeDir、remainingSeconds——这时先把已经生成的部分交付给他，分段结果审核通过并确认下一段费用后，再把 resumeDir 原样传给 video_generate 的 resume 参数（插件接着已有的分段往下做，已完成分段不重生成，新增分段仍计费），不要从头再来一遍；同一份暂停进度（resumeDir）同一时间只允许一次 resume 在跑：如果结果说「已经有一次『继续』在跑」，就让用户等那一次跑完（或确认它所属的本机进程已退出）再继续，不要重复发 resume——并发续做会被拦截；请勿绕过锁重复提交；用户中途点了「停止」或这一轮等超时也一样：已经生成好的段会尝试下载并提供预览；是否合并以返回结果为准（结果里同样是 paused=true + 已完成分段 + resumeDir），不要把那几段丢掉重来；单条成片最长 ${MAX_TOTAL_SECONDS} 秒（最多 ${MAX_SEGMENTS} 段），用户要更长的就按 ${MAX_TOTAL_SECONDS} 秒生成并说明这是插件当前的上限，不要反复加大 duration；成片默认落在会话工作目录下的 metaontic-video/。`,
     "· 给已有视频接长用 video_extend，输入必须是公网 URL；提示词以「向后延长视频1」或「向前延长视频1」开头，全程用「视频1」指代素材，不要写「参考视频1」；写清延长方向、剧情发展、主体状态、镜头运动、声音延续（背景音乐接在视频1结尾处、不要从头播放，环境声和对白也要连续）；每段 4 至模型上限（2.0 为 15、2.5 为 30） 秒，默认按上限拆、段数最少；连着延长多段时每段完成先交付预览，用户确认后用 resume 继续，并默认下载分段在本机合并成一条成片（缺 ffmpeg 会先拦下来问）；用户点「拒绝」或中途被停止时，已经延长好的部分照样先交付（paused=true + resumeDir），之后把 resumeDir 传给 video_extend 的 resume 参数接着做即可，已完成分段不重生成；新增分段仍需确认费用并计费。",
     "· 「生成视频」一律先弹人工确认：插件会写明本次要调用的模型、清晰度、分段与预估费用，点了「允许」才会真正调用模型。任何接入方式都不要跳过这一步；MetaOntic AI 与火山引擎不判断余额，按当前 API密钥在渠道的实际用量计费。不要替用户确认，也不要用付款或其他方式绕过这道确认。",
     "· 生成通常要几分钟：单次调用返回 timeout 不等于失败，优先用原工具加 resume 查询并接回进度，也可用 video_status 加 taskId 继续查（上游链接有效期由渠道决定，请及时保存），不要重复提交同一段。下载或合并失败时使用原resume重试交付，不新建生成任务。模型或接入渠道变化时先说明并取得用户明确确认，才传resumeWithCurrentConfig:true；还有待查询任务时必须恢复原配置。",

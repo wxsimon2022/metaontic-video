@@ -13,7 +13,8 @@ async function fixture(run) {
   process.env.DSH_HOME = dir;
   const config = {connectionMode:'metaontic',metaonticApiKey:'test-secret',model:'doubao-seedance-2-0-mini-260615',baseUrl:'https://mock.invalid'};
   const tools = new Map(), observers = []; let gate, asks = 0, posts = 0;
-  const answers = { review:'脚本通过', character:'直接文生视频', during:null };
+  const answers = { review:'脚本通过', character:'直接文生视频', during:null,clarification:null };
+  let currentProject='';
   const exec = {callId:'workflow',agent:{session:{id:'session-1',header:{cwd:dir}}}};
   const ctx = {
     tools:{register(t){tools.set(t.name,t);return ()=>{};}}, inject(){},
@@ -21,6 +22,7 @@ async function fixture(run) {
     get(name){return name==='userQuestions'?{ask:async request=>{
       asks++; await answers.during?.();
       const id=request.questions[0].id, choice=id==='script_review'?answers.review:answers.character;
+      if(id.startsWith('script_pending_'))return answers.clarification?{answers:request.questions.map(q=>({id:q.id,custom:answers.clarification}))}:{answers:[]};
       return choice?{answers:[{id,selected:[choice]}]}:{answers:[]};
     }}:undefined;},
   };
@@ -32,16 +34,17 @@ async function fixture(run) {
     return Response.json({status:'succeeded',content:{video_url:'https://mock.invalid/result.mp4'}});
   };
   const spec={prompt:'清晨湖面',duration:5,ratio:'16:9',resolution:'480p',merge:false};
-  const script=path.join(dir,'script.md'), image=path.join(dir,'storyboard.svg');
+  const script=path.join(dir,'script.md');let image=path.join(dir,'storyboard.svg');
   await writeFile(script,'# 湖面\n清晨的湖面，镜头缓缓推进。\n费用预估：按渠道实际调用。');await writeFile(image,'<svg/>');
   async function show(body=true){
+    if(body && currentProject){const board=await project.execute({action:'storyboard',projectId:currentProject,scriptPath:script},exec);image=board.path;}
     for(const observer of observers)await observer(exec.agent.session,{type:'tool/call',data:{turn:1,name:'video_project'}});
     const text=(body?await readFile(script,'utf8'):'摘要')+`\n![分镜](<${image}>)`;
     for(const observer of observers)await observer(exec.agent.session,{type:'assistant/message',data:{turn:1,message:{content:[{type:'text',text}]}}});
   }
   const say=async text=>{for(const observer of observers)await observer(exec.agent.session,{type:'assistant/message',data:{turn:1,message:{content:[{type:'text',text}]}}});};
   const project=tools.get('video_project');
-  async function prepare(subjectType='scenery'){return project.execute({action:'prepare',subjectType,duration:spec.duration},exec);}
+  async function prepare(subjectType='scenery'){const result=await project.execute({action:'prepare',subjectType,duration:spec.duration},exec);currentProject=result.projectId;return result;}
   async function review(id,extra={}){await show();return project.execute({action:'review',projectId:id,scriptPath:script,toolName:'video_generate',specification:spec,...extra},exec);}
   try {await run({dir,config,tools,exec,answers,spec,script,image,project,prepare,review,show,say,gate:x=>gate(x,()=>null),get asks(){return asks;},get posts(){return posts;}});}
   finally{dispose();globalThis.fetch=oldFetch;if(oldHome===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=oldHome;await rm(dir,{recursive:true,force:true});}

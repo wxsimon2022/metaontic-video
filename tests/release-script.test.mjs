@@ -97,7 +97,9 @@ test('dual release stages local bytes, waits for the tag commit and leaves indep
  assert.match(source, /'--draft'/);
  assert.match(source, /remoteDigest!==localDigest/);
  assert.match(workflow, /Download the staged local package/);
- assert.match(workflow, /--draft=false --prerelease=false/);
+ assert.match(workflow, /scripts\/publish-stable-alias\.mjs/);
+ const alias = await readFile(new URL('../scripts/publish-stable-alias.mjs', import.meta.url), 'utf8');
+ assert.match(alias, /'--draft=false', '--prerelease=false'/);
  assert.match(workflow, /previous\/\*\.tgz/);
  assert.doesNotMatch(workflow, /gh release upload .*--clobber/);
 });

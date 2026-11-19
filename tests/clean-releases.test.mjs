@@ -22,6 +22,7 @@ test('标签模式与成品附件名按当前约定推导', () => {
   assert.equal(matchesPattern('release-v1', ['v*']), false);
   assert.deepEqual(expectedAssets('v3.13.11'), [
     'metaontic-video-3.13.11.tgz',
+    'metaontic-video.tgz',
     'MetaOnticVideo-Windows-3.13.11.zip',
     'MetaOnticVideo-Windows-3.13.11.zip.sha256',
   ]);
@@ -105,9 +106,9 @@ test('执行阶段按附件、发行版、标签顺序删除两个仓库并清�
   assert.deepEqual(calls, [
     'gh /repos/owner/repo/releases/assets/21',
     'gh /repos/owner/repo/releases/20',
+    'gh /repos/owner/repo/git/refs/tags/v3.2.0',
     'gitee /releases/20/attach_files/31',
     'gitee /releases/20',
-    'gh /repos/owner/repo/git/refs/tags/v3.2.0',
     'gitee tag v3.2.0',
     'git tag -d v3.2.0',
     'gh /repos/owner/repo/git/refs/tags/ci-test',
@@ -292,13 +293,14 @@ test('演练不删除任何东西，加 --apply 才真正下发删除', async ()
   const tagLines = ['v3.13.11', 'v3.2.0', 'ci-test'].map((tag, index) => `sha${index}\trefs/tags/${tag}`).join('\n');
   const githubReleases = [release('v3.13.11', { id: 11 }), release('v3.2.0', { id: 20 })].map(item => JSON.stringify({ id: item.id, tag_name: item.tag, draft: false, prerelease: false, created_at: item.createdAt, assets: [] })).join('\n');
   const commands = [];
+  const removedTags = new Set(), removedReleases = new Set();
   const run = (command, args) => {
     const line = `${command} ${args.join(' ')}`;
     if (command === 'git' && args[0] === 'ls-remote') return { status: 0, stdout: tagLines, stderr: '' };
     if (command === 'git' && args[0] === 'tag' && args[1] === '-d') { commands.push(line); return { status: 0, stdout: '', stderr: '' }; }
-    if (command === 'gh' && args.some(a => a.includes('/tags?'))) return { status: 0, stdout: tagLines.split('\n').map(line => JSON.stringify({name:line.split('refs/tags/')[1]})).join('\n'), stderr: '' };
-    if (command === 'gh' && args.includes('--paginate')) return { status: 0, stdout: githubReleases, stderr: '' };
-    if (command === 'gh') { commands.push(line); return { status: 0, stdout: '', stderr: '' }; }
+    if (command === 'gh' && args.some(a => a.includes('/tags?'))) return { status: 0, stdout: tagLines.split('\n').filter(line => !removedTags.has(line.split('refs/tags/')[1])).map(line => JSON.stringify({name:line.split('refs/tags/')[1]})).join('\n'), stderr: '' };
+    if (command === 'gh' && args.includes('--paginate')) return { status: 0, stdout: githubReleases.split('\n').filter(line => !removedReleases.has(String(JSON.parse(line).id))).join('\n'), stderr: '' };
+    if (command === 'gh') { commands.push(line); const endpoint = args.find(a => a.startsWith('/repos/')); if (endpoint?.includes('/git/refs/tags/')) removedTags.add(endpoint.split('/tags/')[1]); else if (/\/releases\/\d+$/.test(endpoint || '')) removedReleases.add(endpoint.split('/').at(-1)); return { status: 0, stdout: '', stderr: '' }; }
     return { status: 0, stdout: '', stderr: '' };
   };
   const output = [];
