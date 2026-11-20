@@ -68,3 +68,24 @@ test('lockfile integrity failure waits for the background cleanup and retries, n
   assert.equal(state.status,'failed');
   assert.match(state.message,/^versionUpdateLockfile/);
 });
+
+test('updates use fixed latest assets with a version-specific cache key on both mirrors', () => {
+  const sandbox = vm.createContext({});
+  vm.runInContext(sourceOf('shared/constants/plugin'), sandbox);
+  assert.equal(vm.runInContext("releaseDownloadUrl('4.0.8')", sandbox), 'https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz?version=4.0.8');
+  assert.equal(vm.runInContext("releaseDownloadUrl('4.0.8','github')", sandbox), 'https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaontic-video.tgz?version=4.0.8');
+});
+
+test('cached latest asset with a different installed version is not reported as success', async () => {
+  const state = {};
+  const sandbox = vm.createContext({window:{localStorage:{removeItem(){}}}});
+  vm.runInContext(sourceOf('ui/updates/update.service'), sandbox);
+  const manager = {listBundles:async()=>[{name:'metaontic-video',installed:true,source:'https://example.com/pkg.tgz'}],
+    installBundle:async()=>({ok:true,value:{application:'applied',version:'4.0.6'}})};
+  const context = {updateConfirm:true,PLUGIN_VERSION:'4.0.6',updateLatest:'4.0.7',availableVersions:['4.0.7'],
+    PLUGIN_PACKAGE:'metaontic-video',UPDATE_ATTEMPTS:1,UPDATE_CACHE_KEY:'test',manager:()=>({manager}),isNewerVersion:()=>true,
+    setUpdateConfirm(){},setUpdateLatest(){},setUpdateStatus:v=>{state.status=v},setUpdateMessage:v=>{state.message=v},setUpdateAt(){},t:key=>key};
+  await sandbox.createUpdateActions(context).runOnlineUpdate();
+  assert.equal(state.status, 'failed');
+  assert.match(state.message, /4\.0\.6.*4\.0\.7.*不一致/);
+});

@@ -70,7 +70,8 @@
   var releaseDownloadUrl = (version, channel = "gitee") => `${(channel === "github" ? GITHUB : GITEE).web}${channel === "github" ? "/releases/latest/download" : "/releases/download/latest"}/${PLUGIN_ID}.tgz?version=${encodeURIComponent(version)}`;
   var RELAY = {
     baseUrl: "https://ai.bileego.com",
-    signupUrl: 'https://ai.bileego.com/sign-up?aff=VzYr',
+    //signupUrl: 'https://ai.bileego.com/sign-up?aff=VzYr',
+    signupUrl: "https://ai.bileego.com",
     pricingUrl: "https://ai.bileego.com/pricing",
     submitPath: "/doubao/api/v3/contents/generations/tasks",
     queryPath: "/doubao/api/v3/contents/generations/tasks/{task_id}",
@@ -1324,7 +1325,7 @@
 
   // src/ui/updates/update.service.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "4.0.7".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "4.0.8".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1797,7 +1798,7 @@
   // package.json
   var package_default = {
     name: "dsh-metaontic-video",
-    version: "4.0.7",
+    version: "4.0.8",
     description: "面向新手的 AI 视频创作助手：从想法、脚本到视频生成，全程引导；通过分段续拍与本地合并，提供低成本长视频制作方案。",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1912,12 +1913,11 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "4.0.7",
+      version: "4.0.8",
       prerelease: false,
-      publishedAt: "2026-11-19T22:46:23.697Z",
+      publishedAt: "2026-11-20T12:52:52.102Z",
       items: [
-        "优化：修复专业项目返回解析异常，避免重复建项目或自动降级。",
-        "优化：脚本审核受阻时提供准确补展示材料，复用当前项目与原图继续审核。"
+        "优化：在线安装与插件更新统一使用最新版固定地址，后续发版自动同步安装包，并校验成品一致性。"
       ]
     }
   };
