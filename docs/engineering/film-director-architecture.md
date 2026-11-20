@@ -1,22 +1,24 @@
 # 影视创作架构与参考目录映射
 
+[最新架构总览与流程图](./plugin-workflow.md)
+
 ## 分层
 
 当前插件采用TypeScript/Node，不建立另一套Python状态机。推荐目录的职责映射如下；只有真实接入宿主的代码才算运行能力。
 
 | 参考目录 | 当前落点 | 实际职责 |
 | --- | --- | --- |
-| agents | src/businesses/film-production/roles | 八角色提示词，逻辑职责切换 |
-| skills | skills/video-director及promo-video | 阶段方法与按需参考文档 |
-| workflows | workflows/orchestration.ts、workflows/revisions.ts | 依赖、下一动作、局部修订及任务登记 |
-| contracts | contracts/index.ts、contracts/schema.ts、contracts/references.ts | 共同契约、结构与交叉引用检查 |
-| config/project | runtime/spec.ts | 项目规格、原始要求、来源标记 |
-| config/quality | quality/review.ts、runtime/issues.ts | 加权评分、阻断规则与问题生命周期 |
-| models | contracts.ts模型档案与video/providers | 未知能力明确标记，执行能力以当前接入为准 |
-| runtime | index.ts、runtime/project.ts、runtime/storage.ts、runtime/approvals.ts | 宿主工具、状态提交、跨进程锁和真实审批 |
-| tools/build_manifest | runtime/deliverables.ts | 版本、JSON指针与SHA-256清单，可读导出 |
-| projects | 宿主DATA_DIR/film-projects/会话归属/项目UUID | 项目权威状态与不可变快照，源码库不存运行数据 |
-| tests | tests/film-director.test.mjs及video测试 | 流程、版本、时长、引用、恢复与执行回归 |
+| agents | src/agents/<role>/prompt.ts、src/businesses/film-production/roles | 八角色提示词与当前阶段契约，逻辑职责切换 |
+| skills | skills/video-director、skills/promo-video | 阶段方法与按需参考文档 |
+| workflows | film-production/workflows/workflow.engine.ts | 依赖、下一动作及制作编译 |
+| contracts | film-production/contracts、validation | 字段、结构、时间轴与交叉引用检查 |
+| project | film-production/projects/project.service.ts | 项目规格、原始要求与配置修订 |
+| quality | film-production/reviews | 加权评分、阻断规则与问题复审 |
+| models | video-generation/providers/capabilities.ts | 本地能力档案，未知能力不冒充实测 |
+| runtime | production.service.ts、projects/project.repository.ts、approvals | 工具、原子提交、快照、跨进程锁与真实审批 |
+| manifest | film-production/artifacts | 版本、JSON指针、校验清单与可读导出 |
+| projects | 宿主DATA_DIR/film-projects/会话归属/项目UUID | 项目权威状态与快照，源码库不存运行数据 |
+| tests | tests/film-*.test.mjs及视频业务测试 | 阶段、批准、版本、恢复与制作绑定回归 |
 
 未来若拆出YAML配置或JSON Schema，必须由实际加载器读取，并消除代码中的重复定义，不能仅创建目录或无人读取的配置。依赖关系统一从STAGE_DEPS读取。完整JSON Schema声明、独立Agent执行与章节后台调度仍未实现。
 
@@ -34,7 +36,7 @@
 - 八角色仍由同一个宿主助手切换，没有声称独立模型并行执行。
 - schedule登记任务，不是后台执行器；完成需实际产物与结构检查。
 - Character与Scene仍汇总为一个assets阶段，完整对象提交；局部修订支持范围以工具为准。
-- 当前制作桥使用既有连续生成/续拍链，尚无任意逐镜独立执行与自动剪辑器；不支持的映射明确阻断并返回重规划。
+- 当前制作桥支持连续续拍与获审的独立镜头策略；独立镜头逐镜生成、直接拼接，不代表任意智能剪辑器。不支持的时长与分段映射明确阻断并返回重规划。
 - 长片支持全片/章节数据与时间预算，不等于已有自动逐章上下文检索和后台生产。
 - export返回内容与清单，不自动创建独立下载文件。
 - 文件锁解决互斥，不构成跨film_project与video_project的数据库事务。编译跨项目中断仍可能留下孤立制作项目，不能自行重复付费处理。
