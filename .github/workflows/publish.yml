@@ -5,6 +5,10 @@ on:
     tags: ['v*']
   workflow_dispatch:
     inputs:
+      staged_version:
+        description: "Validate an existing draft artifact without moving its version tag"
+        required: false
+        type: string
       existing_version:
         description: "Mirror an existing Gitee stable version using its exact artifacts"
         required: false
@@ -20,6 +24,7 @@ jobs:
     permissions:
       contents: write
     env:
+      STAGED_VERSION: ${{ inputs.staged_version }}
       SYNC_VERSION: ${{ inputs.existing_version }}
       SYNC_SHA256: ${{ inputs.existing_sha256 }}
     steps:
@@ -34,6 +39,10 @@ jobs:
         run: |
           node scripts/validate-release.mjs
           VERSION=$(node -p "require('./package.json').version")
+          if [ -n "$STAGED_VERSION" ]; then
+            test "$STAGED_VERSION" = "$VERSION" || exit 1
+            echo "mirror=staged" >> "$GITHUB_OUTPUT"; exit 0
+          fi
           if [ -n "$SYNC_VERSION" ]; then
             test "$SYNC_VERSION" = "$VERSION" || { echo 'Mirroring needs the checked out version to match.'; exit 1; }
             echo "mirror=1" >> "$GITHUB_OUTPUT"; echo "version=$VERSION" >> "$GITHUB_OUTPUT"; echo "sha=$SYNC_SHA256" >> "$GITHUB_OUTPUT"; exit 0
@@ -113,7 +122,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download v3.32.0 --repo wxsimon2022/metaontic-video --pattern metaontic-video-3.32.0.tgz --dir previous
+        run: node scripts/download-previous-release.mjs
       - name: Validate managed package installation and previous release migration
         shell: bash
         run: node scripts/check-package-install.mjs dist/*.tgz previous/*.tgz
@@ -139,7 +148,7 @@ jobs:
           path: dist
       - name: Upload release package
         env:
-          RELEASE_TAG: ${{ inputs.existing_version && format('v{0}', inputs.existing_version) || github.ref_name }}
+          RELEASE_TAG: ${{ inputs.staged_version && format('v{0}', inputs.staged_version) || inputs.existing_version && format('v{0}', inputs.existing_version) || github.ref_name }}
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
