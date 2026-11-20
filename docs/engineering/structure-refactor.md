@@ -1,8 +1,10 @@
 # 公共框架、业务与 Agent
 
+[最新架构总览与制作流程](./plugin-workflow.md)
+
 ## 依赖方向
 
-`src/index.ts` 装配 `app/runtime.ts`、业务模块清单及 Agent 清单；`src/client.ts` 装配浏览器业务模块。`shared/` 不依赖其他源码层，`platform/` 仅依赖自身与shared；app负责运行装配。业务可依赖公共能力，Agent 声明业务依赖并增加专题提示词。
+`src/index.ts` 装配 `app/bootstrap.ts`、业务模块清单及 Agent 清单；`src/client.ts` 装配浏览器业务模块。`shared/` 不依赖其他源码层，`platform/` 仅依赖自身与shared；app负责运行装配。业务可依赖公共能力，Agent 声明业务依赖并增加专题提示词。
 
 ```text
 src/
@@ -11,7 +13,7 @@ src/
 ├── shared/                   固定配置、版本、路径及通用工具
 ├── ui/                       公共主题、更新、迁移与鉴权界面
 ├── types/                    宿主类型声明
-├── businesses/video/
+├── businesses/video-generation/
 │   ├── index.ts              视频工具、观察器和费用卡口注册
 │   ├── client.ts             视频界面装配
 │   ├── config.ts             视频配置字段、常量及兼容读取
@@ -44,7 +46,7 @@ src/
 
 ```ts
 // src/businesses/writing/index.ts
-import type { BusinessModule } from '../../app/runtime.js';
+import type { BusinessModule } from '../../app/bootstrap.js';
 export const writingBusiness: BusinessModule = {
   id: 'writing',
   prompt: () => '当前业务为文章创作。',

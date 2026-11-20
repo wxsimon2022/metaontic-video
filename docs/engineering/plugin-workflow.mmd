@@ -1,30 +1,51 @@
 flowchart TD
-  U[用户创意] --> D{是否已明确总时长}
-  D -->|否| Q[15 / 30 / 45 / 60秒 / 自定义输入]
-  Q -->|确认并保存| P[prepare 创建项目并确认画幅与清晰度]
-  D -->|是：沿用确认值| P
-  P --> C{角色参考路线}
-  C -->|直接文生视频或已有获审图片| S[完整脚本 + 分镜图 + 逐段费用预估]
-  C -->|先生成角色图| IC[图片费用同意 → 出图 → 展示审核]
-  IC -->|通过| S
-  S --> R[review 脚本与制作参数审核]
-  R -->|修改| S
-  R -->|通过| A[生成工具付费审批：本段及剩余计划]
-  A -->|允许| E[共用执行器：生成当前一段]
-  E --> SAVE[原请求与taskId先落盘 → 轮询原任务]
-  SAVE -->|本段成功| V[下载本段并正文展示视频链接及预览]
-  V --> MORE{还有未完成分段}
-  MORE -->|是：暂停| SR[review_segment 分段结果确认]
-  SR -->|通过| NEXT[下一段费用审批]
-  NEXT -->|允许：原resume| E
-  MORE -->|否| M[单段直出 / 多段本机FFmpeg合并]
-  M --> OUT[完整成片第一 + 原始分段；最终登记present]
-  SAVE -->|查询失败或超时| STATUS[原taskId / resume继续查，禁止重新提交]
-  STATUS --> SAVE
-  SAVE -->|提交结果不明| CHECK[media_submission核对原渠道记录]
-  CHECK -->|关联已存在任务| SAVE
-  V -->|下载失败| RETRY[原resume重试交付，不新建生成任务]
-  M -->|合并失败| RETRY
-  RETRY --> V
-  SAVE -->|真人限制| CONVERT[转换费用同意 → 转图 → 展示审核 → 单次视频重试]
-  CONVERT -->|结果审核通过| SAVE
+  HOST[DeepSeek Harness 对话与插件设置] --> APP[app/bootstrap.ts 装配与工具注册]
+  HOST --> UI[src/client.ts → ui + video-generation/client]
+  APP --> ENTRY[视频创作助手 / 宣传视频助手]
+  ENTRY --> LOGIC[同一宿主助手按阶段切换八个专业角色]
+  SKILL[skills/video-director + promo-video 按需方法与参考] -.-> LOGIC
+  PROFILE[题材 / 形式 / 目的 / 风格配置] -.-> LOGIC
+  LOGIC --> F[film_project 专业创作与版本管理]
+  F --> C[Creative 创意方案]
+  C --> CA{原生创意审批一次}
+  CA -->|修改| C
+  CA -->|批准| S[Screenwriter 完整剧本并提交]
+  S --> SA{原生剧本审批一次}
+  SA -->|修改| S
+  SA -->|批准| AS[Character + Scene → assets]
+  AS --> SH[Storyboard → shots / 时间轴]
+  SH --> PR[Prompt Engineer → prompts]
+  PR --> RE[Reviewer → review / 问题复审]
+  RE -->|需修复：返回责任阶段| F
+  RE -->|通过| COMP[compile 绑定版本 / 规格 / plan_digest]
+  COMP --> VP[video_project 制作项目]
+  ENTRY -->|4–14秒或明确快速草案 / 已有制作项目| VP
+  VP --> IM[参考素材路线：已有图 / 无图 / 单独同意后出图并审核]
+  IM --> PRESENT[完整制作脚本 + 本地分镜示意图 + 费用试算]
+  PRESENT --> VR{制作审核：内容与参数}
+  VR -->|修改| VP
+  VR -->|通过| PAY{视频费用确认}
+  PAY --> GEN[生成或续拍：连接快照与防重记录先落盘]
+  GEN --> ROUTE{获审制作策略}
+  ROUTE -->|continuous_segments| CONT[最少段数连续续拍 / 上段视频输入]
+  ROUTE -->|independent_shots| IND[按分镜独立生成 / 无上段视频输入]
+  CONT --> POLL[保存taskId / 轮询原任务]
+  IND --> POLL
+  POLL --> VIEW[下载并展示本段结果]
+  VIEW --> MORE{是否还有分段}
+  MORE -->|有| SEG{分段结果审核}
+  SEG -->|通过后下一段单独费用确认| PAY
+  MORE -->|无| MERGE[单段交付 / FFmpeg 本地合并]
+  MERGE --> OUT[成片 + 原始分段 / present登记]
+  POLL -->|超时 / 查询失败| RESUME[原taskId / resume 恢复，不重新提交]
+  RESUME --> POLL
+  GEN -->|提交结果不明| CHECK[media_submission 核对原渠道]
+  CHECK -->|关联已有任务| POLL
+  VIEW -->|交付失败| DELIVERY[恢复下载或合并，不重新生成]
+  MERGE -->|合并失败| DELIVERY
+  DELIVERY --> MERGE
+  F -.-> STATE[film-projects / 原子状态 / 不可变快照 / 跨进程锁]
+  GEN -.-> RUN[制作项目 / 原请求 / taskId / 断点]
+  APP -.-> PLATFORM[platform：宿主适配 / 安装升级 / 旧包迁移 / 匿名遥测]
+  APP -.-> DIAG[shared：脱敏日志 / 调用关联 / 留存与健康诊断]
+  UI -.-> HIDDEN[流程画布暂隐藏；普通对话不依赖画布]

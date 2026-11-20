@@ -1,10 +1,10 @@
 <img src="./logo.svg" width="160" alt="MetaOnticVideo" />
 
-# dsh-metaontic-video
+# dsh-metaontic-video · AI Video Creation Plugin
 
 [简体中文](./README.md)
 
-A DeepSeek Harness plugin for **beginner-friendly video creation and a low-cost long-video workflow**.
+MetaOnticVideo is a DeepSeek Harness (DSH) AI video generation plugin for **beginner-friendly video creation and a low-cost long-video workflow**.
 
 ## What it does
 

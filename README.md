@@ -1,10 +1,10 @@
 <img src="./logo.svg" width="160" alt="MetaOnticVideo" />
 
-# dsh-metaontic-video
+# dsh-metaontic-video · AI 视频创作插件
 
 [English](./README.en.md)
 
-DeepSeek Harness 视频创作插件：**新手快速上手，低成本制作长视频。**
+DeepSeek Harness（DSH）AI 视频生成插件 MetaOnticVideo：**新手快速上手，低成本制作长视频。**
 
 ## 能做什么
 
