@@ -4,14 +4,14 @@ import { VOLCENGINE_MODE_AVAILABLE } from '../connection-defaults.js';
 import { createUpdateActions, renderUpdateNotice, formatReleaseTime } from '../../../ui/updates/update.service.js';
 /** 浏览器端 settings：由入口注入宿主 React 与共享依赖。 */
 import packageInfo from '../../../../package.json';
-import { CHANGELOG_URL, RELAY } from '../../../shared/constants/plugin.js';
+import { RELAY } from '../../../shared/constants/plugin.js';
 /** 设置页工厂：入口注入宿主 React、配置表单及更新服务。 */
 export function createSettingsPage(deps: any) {
   const {
     useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS,
     persistBatch, PLUGIN_VERSION,
     UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, SELECTS, inputStyle, optionLabel,
-    FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS,
+    FIELD_BY_KEY, SECTIONS, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS,
     isNewerVersion, updateBell, PAGE_CSS,
   } = deps;
 function makePage({ form, t, manager }) {
@@ -34,10 +34,7 @@ function makePage({ form, t, manager }) {
         const statusTimer = React.useRef(null);
         const connectionBusy = React.useRef(false);
         const saveInFlight = React.useRef(false);
-        // ffmpeg 安装引导：默认只展示当前系统那条，可展开看其他系统；复制过的命令给个「已复制」反馈
-        const [showAllFfmpeg, setShowAllFfmpeg] = React.useState(false);
-        const [copiedFfmpeg, setCopiedFfmpeg] = React.useState('');
-        // 版本 / 检查更新：只读 Gitee 默认分支的 package.json，跟本包版本比大小
+        // 更新检查只读取正式发行版，实际安装前再次确认。
         const [updateStatus, setUpdateStatus] = React.useState('idle');
         const [updateMessage, setUpdateMessage] = React.useState('');
         const [updateLatest, setUpdateLatest] = React.useState('');
@@ -52,7 +49,7 @@ function makePage({ form, t, manager }) {
           catch { return ''; }
         });
 
-        const { readUpdateCache, rememberUpdateCheck, forgetUpdateCheck, checkForUpdate, runOnlineUpdate, deferUpdate } = createUpdateActions({
+        const { readUpdateCache, checkForUpdate, runOnlineUpdate, deferUpdate } = createUpdateActions({
           get UPDATE_CACHE_KEY() { return UPDATE_CACHE_KEY; },
           get PLUGIN_VERSION() { return PLUGIN_VERSION; },
           get isNewerVersion() { return isNewerVersion; },
@@ -107,12 +104,6 @@ function makePage({ form, t, manager }) {
           setStatus((current) => (current === 'idle' ? current : 'idle'));
           setDraft((current) => ({ ...current, [key]: next }));
         };
-        const clear = (key) => setDraft((current) => {
-          const next = { ...current };
-          delete next[key];
-          return next;
-        });
-
         /** 收起定时器：改动、重新保存前都要清掉，免得旧定时器把新反馈提前收掉。 */
         function clearStatusTimer() {
           if (statusTimer.current) {

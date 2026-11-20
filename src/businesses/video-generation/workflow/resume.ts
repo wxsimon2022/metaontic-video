@@ -2,12 +2,11 @@ import { acquireFileLock } from '../../../shared/utils/file-lock.js';
 import { validatePauseRecord } from './result-state.js';
 /** workflow/resume：从宿主入口拆出的独立职责模块。 */
 import path from 'node:path';
-import { readFile, open, rm, mkdir, writeFile, rename } from 'node:fs/promises';
-import { ref, MAX_SEGMENT_SECONDS, MAX_SEGMENTS, MIN_SECONDS, MAX_TOTAL_SECONDS } from '../config.js';
+import { readFile, rm, mkdir, writeFile, rename } from 'node:fs/promises';
+import { MAX_SEGMENT_SECONDS, MAX_SEGMENTS, MIN_SECONDS, MAX_TOTAL_SECONDS } from '../config.js';
 import { uniqueSuffix } from '../utils/files.js';
-import os from 'node:os';
 import { requestLogContext, appendRequestLog } from '../../../shared/utils/logging.js';
-import { isMetaontic, isVolcengine, resolveModel, resolveBaseUrl, resolveSubmitPath, resolveQueryPath } from '../providers/connection.js';
+import { isVolcengine, resolveModel, resolveBaseUrl, resolveSubmitPath, resolveQueryPath } from '../providers/connection.js';
 import { sumStepSeconds, modelMaxSeconds } from './planning.js';
 
 /* ---------------- 长视频的循环迭代：分段之间的人工确认 + 暂停后接着做 ---------------- */

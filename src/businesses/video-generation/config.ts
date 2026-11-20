@@ -1,4 +1,3 @@
-import { ref } from '../../platform/settings/value.js';
 export { ref } from '../../platform/settings/value.js';
 export { PLUGIN_VERSION } from '../../shared/constants/version.js';
 import { METAONTIC_BASE_URL } from './connection-defaults.js';
@@ -160,7 +159,7 @@ export function normalizeResolution(value) {
   return matched ? `${matched[1]}p` : '';
 }
 
-export function resolveResolution(config, args: any = {}) {
+export function resolveResolution(_config, args: any = {}) {
   const resolution = normalizeResolution(args?.resolution ?? FIXED_RESOLUTION);
   if (!resolution) throw new Error('视频清晰度仅支持 480P 或 720P。');
   return resolution;

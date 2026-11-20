@@ -1,16 +1,5 @@
 #!/usr/bin/env node
-/**
- * 宣传页使用 Gitee 最新正式版固定地址，发版仅同步展示版本。
- *
- * 宣传页在服务端仓库（MetaOnticVideoService/frontend/public/promo/index.html），
- * 不在本插件包里；但用户会照它复制安装地址，所以安装链接固定不变，展示版本在发版时更新，
- * 否则宣传页上贴的还是旧版本附件。release.mjs 会在打包前自动调用本脚本。
- *
- * 用法：
- *   node scripts/sync-promo-address.mjs 3.15.2            # 同步到目标版本
- *   node scripts/sync-promo-address.mjs 3.15.2 --check    # 只核对，不一致非零退出
- *   METAONTIC_PROMO_PATH=/abs/path/index.html node scripts/sync-promo-address.mjs 3.15.2
- */
+/** 宣传页地址的独立维护工具；只有明确要求更新页面时才运行，发版不自动调用。 */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -93,4 +82,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error(`宣传页同步失败：${error.message}`);
     process.exitCode = 1;
   });
+}
+
+/** 宣传页（服务端仓库）当前是否已指向目标版本；只读，不写文件。 */
+export function promoStatus(version, file = findPromoPage()) {
+  if (!file) return { file: '', needsSync: false, missing: [] };
+  const before = readFileSync(file, 'utf8');
+  const { text, results } = syncPromoText(before, version);
+  return { file, needsSync: text !== before, missing: results.filter((item) => !item.hit).map((item) => item.name) };
 }

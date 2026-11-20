@@ -272,7 +272,7 @@ export function extendTool(liveConfig, deps, ctx) {
           options: { ...pickResumeOptions(args), direction, wording, startAt: state.cursor }, segments, pendingTask: state.pendingTask, operationState,
           characterReferences: state.characterReferences,
         }),
-        buildStep: async ({ step, position, state }) => {
+        buildStep: async ({ step, state }) => {
           const { body, seconds } = buildRequestBody(config, {
             ...lastOptions,
             ...args,

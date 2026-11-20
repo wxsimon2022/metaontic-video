@@ -1,5 +1,4 @@
 import { open, unlink, readFile, link } from 'node:fs/promises';
-import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 /** 不按超时抢占：只有同机且明确死亡的进程可恢复。 */

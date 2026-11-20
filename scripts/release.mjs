@@ -5,17 +5,8 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, realpa
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { findPromoPage, syncPromoFile, syncPromoText } from './sync-promo-address.mjs';
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-
-/** 宣传页（服务端仓库）当前是否已指向目标版本；只读，不写文件。 */
-export function promoStatus(version, file = findPromoPage()) {
-  if (!file) return { file: '', needsSync: false, missing: [] };
-  const before = readFileSync(file, 'utf8');
-  const { text, results } = syncPromoText(before, version);
-  return { file, needsSync: text !== before, missing: results.filter((item) => !item.hit).map((item) => item.name) };
-}
 
 export function validVersion(value) { return /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value || ''); }
 export function newer(next, previous) {

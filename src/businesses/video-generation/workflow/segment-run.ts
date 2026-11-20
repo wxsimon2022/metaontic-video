@@ -93,7 +93,7 @@ export function skipMergeDelivery({ result, paused, remainingSeconds, notes, seg
  * remainingSeconds / pauseNote 由调用方按自己的计划口径算好传进来。
  */
 export async function runSegmentDelivery({
-  config, exec, interrupted, completed, segments, segmentsDir, outDir, stamp, notes, result,
+  config, exec, interrupted, completed, segments: _segments, segmentsDir, outDir, stamp, notes, result,
   paused, remainingSeconds, pauseNote, toolName, cumulativePreview = false,
 }) {
   const previewOnly = paused && !cumulativePreview;

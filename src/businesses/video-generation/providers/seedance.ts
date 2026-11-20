@@ -9,7 +9,7 @@ import { modelMaxSeconds } from '../workflow/planning.js';
 import { buildExtensionPrompt, buildGenerationPrompt } from '../prompts/generation.js';
 import { validateImageRoles, canvasSize, resolveImageInput } from '../media/references.js';
 import { type TaskResult } from './types.js';
-import { createTask, waitForCompletion } from './transport.js';
+import { waitForCompletion } from './transport.js';
 import { extractTaskId } from './response.js';
 import { guardedSubmit, finishSubmission } from './submissions.js';
 import { recoverRealPersonImages, setReferenceReview } from '../workflow/real-person.js';

@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, rm, open, readdir } from 'node:fs/promises';
 import { dshHome } from '../media/references.js';
 import { DATA_DIR } from '../../../shared/constants/plugin.js';
-import { imageConfig, resolveApiKey, resolveBaseUrl, isVolcengine, isMetaontic } from './connection.js';
+import { imageConfig, resolveApiKey, resolveBaseUrl, isVolcengine } from './connection.js';
 import { relayRequest } from './transport.js';
 import { extractTaskId } from './response.js';
 import { abortError } from '../utils/errors.js';

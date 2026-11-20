@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { findPromoPage, syncPromoFile, syncPromoText } from '../scripts/sync-promo-address.mjs';
-import { promoStatus } from '../scripts/release.mjs';
+import { promoStatus } from '../scripts/sync-promo-address.mjs';
 
 const FIXTURE = [
   '<script type="application/ld+json">{"softwareVersion": "3.13.9"}</script>',

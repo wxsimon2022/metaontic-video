@@ -15,7 +15,7 @@ import { createSidebarPanel } from './client/panel.js';
 import { createCanvasView } from './client/canvas-view.js';
 import iconMark from '../../../icon.svg';
 
-import { PLUGIN_PACKAGE, FLOW_CANVAS_AVAILABLE, CANVAS_PANEL_ID, GUIDE_URL, PANEL_ID } from '../../shared/constants/plugin.js';
+import { FLOW_CANVAS_AVAILABLE, CANVAS_PANEL_ID, GUIDE_URL, PANEL_ID } from '../../shared/constants/plugin.js';
 
 export function createVideoClient(require) {
     const React = require('react');
@@ -86,7 +86,7 @@ export function createVideoClient(require) {
         settings.register({ id: 'video', namespace: PLUGIN_PACKAGE, locale: NS, Page });
         // 面板组件要用当前配置快照与界面字典（form/t 在 apply 里才有），所以在这里构造。
         // 流程画布只做独立页面：左侧栏有单独入口，视频创作面板里不再内嵌画布。
-        const FlowCanvasPage = FLOW_CANVAS_AVAILABLE ? createCanvasView({ React, h, TOKENS, PAGE_CSS }).FlowCanvas : null;
+        const FlowCanvasPage = (typeof __FLOW_CANVAS_AVAILABLE__ !== 'undefined' ? __FLOW_CANVAS_AVAILABLE__ : FLOW_CANVAS_AVAILABLE) ? createCanvasView({ React, h, TOKENS, PAGE_CSS }).FlowCanvas : null;
         const { PanelIcon, VideoPanel } = createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG: iconMark });
         // 有更新时只在入口那一行点一个红点：展开时贴在这行右端（原来写「有更新」的位置），收起时落在图标角上，
         // 入口名字本身不带文字。状态放在 update-hint 的轻量 store 里：宿主渲染那一行，拿不到设置页的 state。

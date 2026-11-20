@@ -1,6 +1,6 @@
 var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __esm = (fn, res, err) => function __init() {
+var __esm = (fn, res, err) => function() {
   if (err) throw err[0];
   try {
     return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
@@ -10,43 +10,30 @@ var __esm = (fn, res, err) => function __init() {
 };
 var __export = (target, all) => {
   for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
+    __defProp(target, name, { get: all[name], enumerable: !0 });
 };
 
 // src/shared/constants/version.ts
-var PLUGIN_VERSION;
-var init_version = __esm({
+var PLUGIN_VERSION, init_version = __esm({
   "src/shared/constants/version.ts"() {
-    PLUGIN_VERSION = true ? "4.0.9".trim().replace(/^v/i, "") : "";
+    PLUGIN_VERSION = "4.0.10".trim().replace(/^v/i, "");
   }
 });
 
 // src/shared/constants/plugin.ts
-var PLUGIN_ID, PLUGIN_PACKAGE, FLOW_CANVAS_AVAILABLE, CANVAS_PANEL_ID, ANALYTICS_URL, GITEE, GITHUB, CHANGELOG_URL, UPDATE_SPEC, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, RELAY, VOLCENGINE, VIDEO_MODEL, IMAGE_MODEL, RETIRED_IMAGE_MODELS, TEXT_MODELS, TEXT_MODEL, RETIRED_TEXT_MODELS, DATA_DIR, DEFAULT_OUTPUT_DIR, REFERENCE_TMP_DIR, FFMPEG_INSTALLS;
-var init_plugin = __esm({
+var PLUGIN_ID, PLUGIN_PACKAGE, FLOW_CANVAS_AVAILABLE, CANVAS_PANEL_ID, ANALYTICS_URL, GITEE, GITHUB, CHANGELOG_URL, UPDATE_SPEC, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, RELAY, VOLCENGINE, VIDEO_MODEL, IMAGE_MODEL, RETIRED_IMAGE_MODELS, TEXT_MODELS, TEXT_MODEL, RETIRED_TEXT_MODELS, DATA_DIR, DEFAULT_OUTPUT_DIR, REFERENCE_TMP_DIR, FFMPEG_INSTALLS, init_plugin = __esm({
   "src/shared/constants/plugin.ts"() {
-    PLUGIN_ID = "metaontic-video";
-    PLUGIN_PACKAGE = "dsh-metaontic-video";
-    FLOW_CANVAS_AVAILABLE = false;
-    CANVAS_PANEL_ID = `${PLUGIN_ID}-canvas`;
-    ANALYTICS_URL = "https://video.mybfs.cn/api/v1/analytics/events";
-    GITEE = {
+    PLUGIN_ID = "metaontic-video", PLUGIN_PACKAGE = "dsh-metaontic-video", FLOW_CANVAS_AVAILABLE = !1, CANVAS_PANEL_ID = `${PLUGIN_ID}-canvas`, ANALYTICS_URL = "https://video.mybfs.cn/api/v1/analytics/events", GITEE = {
       slug: "hackloop/metaontic-video",
       web: "https://gitee.com/hackloop/metaontic-video",
       api: "https://gitee.com/api/v5/repos/hackloop/metaontic-video",
       transport: "git@gitee.com:hackloop/metaontic-video.git"
-    };
-    GITHUB = {
+    }, GITHUB = {
       slug: "wxsimon2022/metaontic-video",
       web: "https://github.com/wxsimon2022/metaontic-video",
       api: "https://api.github.com/repos/wxsimon2022/metaontic-video",
       transport: "git@ssh.github.com:wxsimon2022/metaontic-video.git"
-    };
-    CHANGELOG_URL = `${GITHUB.web}/blob/master/CHANGELOG.md`;
-    UPDATE_SPEC = `git+${GITEE.web}.git`;
-    UPDATE_CACHE_KEY = `${PLUGIN_ID}.update-check-v3`;
-    UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
-    RELAY = {
+    }, CHANGELOG_URL = `${GITHUB.web}/blob/master/CHANGELOG.md`, UPDATE_SPEC = `git+${GITEE.web}.git`, UPDATE_CACHE_KEY = `${PLUGIN_ID}.update-check-v3`, UPDATE_MAX_AGE_MS = 360 * 60 * 1e3, RELAY = {
       baseUrl: "https://ai.bileego.com",
       //signupUrl: 'https://ai.bileego.com/sign-up?aff=VzYr',
       signupUrl: "https://ai.bileego.com",
@@ -56,24 +43,13 @@ var init_plugin = __esm({
       baseEnv: ["NEWAPI_VIDEO_BASE_URL", "NEWAPI_BASE_URL"],
       modelEnv: ["NEWAPI_VIDEO_MODEL"],
       textModelEnv: ["NEWAPI_TEXT_MODEL"]
-    };
-    VOLCENGINE = {
-      modeAvailable: false,
+    }, VOLCENGINE = {
+      modeAvailable: !1,
       baseUrl: "https://ark.cn-beijing.volces.com",
       submitPath: "/api/v3/contents/generations/tasks",
       queryPath: "/api/v3/contents/generations/tasks/{task_id}",
       pricingUrl: "https://docs.volcengine.com/docs/ark/model-pricing"
-    };
-    VIDEO_MODEL = "doubao-seedance-2-0-mini-260615";
-    IMAGE_MODEL = "doubao-seedream-5-0-pro-260628";
-    RETIRED_IMAGE_MODELS = ["doubao-seedream-5-0-260128"];
-    TEXT_MODELS = ["deepseek v4.1 flash", "deepseekv4pro"];
-    TEXT_MODEL = TEXT_MODELS[0];
-    RETIRED_TEXT_MODELS = ["doubao-seed-1-6-250615"];
-    DATA_DIR = PLUGIN_ID;
-    DEFAULT_OUTPUT_DIR = PLUGIN_ID;
-    REFERENCE_TMP_DIR = `${PLUGIN_ID}-reference`;
-    FFMPEG_INSTALLS = {
+    }, VIDEO_MODEL = "doubao-seedance-2-0-mini-260615", IMAGE_MODEL = "doubao-seedream-5-0-pro-260628", RETIRED_IMAGE_MODELS = ["doubao-seedream-5-0-260128"], TEXT_MODELS = ["deepseek v4.1 flash", "deepseekv4pro"], TEXT_MODEL = TEXT_MODELS[0], RETIRED_TEXT_MODELS = ["doubao-seed-1-6-250615"], DATA_DIR = PLUGIN_ID, DEFAULT_OUTPUT_DIR = PLUGIN_ID, REFERENCE_TMP_DIR = `${PLUGIN_ID}-reference`, FFMPEG_INSTALLS = {
       macos: { label: "macOS（Homebrew）", command: "brew install ffmpeg" },
       macosBootstrap: {
         label: "macOS（还没装 Homebrew）",
@@ -89,9 +65,8 @@ var init_plugin = __esm({
 
 // src/platform/settings/value.ts
 function ref(config, key, fallback) {
-  const raw = config?.[key];
-  const value = raw && typeof raw.get === "function" ? raw.get() : raw;
-  return value === void 0 || value === null || value === "" ? fallback : value;
+  let raw = config?.[key], value = raw && typeof raw.get == "function" ? raw.get() : raw;
+  return value == null || value === "" ? fallback : value;
 }
 var init_value = __esm({
   "src/platform/settings/value.ts"() {
@@ -100,30 +75,26 @@ var init_value = __esm({
 
 // src/businesses/video-generation/connection-defaults.ts
 function resolveImageModel(value) {
-  const model = String(value ?? "").trim();
-  if (!model || RETIRED_IMAGE_MODELS.includes(model)) return IMAGE_MODEL;
-  return model;
+  let model = String(value ?? "").trim();
+  return !model || RETIRED_IMAGE_MODELS.includes(model) ? IMAGE_MODEL : model;
 }
 function normalizeTextModel(value) {
-  const model = String(value ?? "").trim();
-  if (!model || RETIRED_TEXT_MODELS.includes(model)) return TEXT_MODEL;
-  return model;
+  let model = String(value ?? "").trim();
+  return !model || RETIRED_TEXT_MODELS.includes(model) ? TEXT_MODEL : model;
 }
-var METAONTIC_BASE_URL, VOLCENGINE_MODE_AVAILABLE;
-var init_connection_defaults = __esm({
+var METAONTIC_BASE_URL, VOLCENGINE_MODE_AVAILABLE, init_connection_defaults = __esm({
   "src/businesses/video-generation/connection-defaults.ts"() {
     init_plugin();
-    METAONTIC_BASE_URL = RELAY.baseUrl;
-    VOLCENGINE_MODE_AVAILABLE = VOLCENGINE.modeAvailable;
+    METAONTIC_BASE_URL = RELAY.baseUrl, VOLCENGINE_MODE_AVAILABLE = VOLCENGINE.modeAvailable;
   }
 });
 
 // node_modules/@deepseek-ai/cosmokit/lib/index.js
 function isNullable(value) {
-  return value === null || value === void 0;
+  return value == null;
 }
 function isPlainObject(data) {
-  return data && typeof data === "object" && !Array.isArray(data);
+  return data && typeof data == "object" && !Array.isArray(data);
 }
 function filterKeys(object2, filter) {
   return Object.fromEntries(Object.entries(object2).filter(([key, value]) => filter(key, value)));
@@ -133,13 +104,13 @@ function mapValues(object2, transform) {
 }
 function pick(source, keys, forced) {
   if (!keys) return { ...source };
-  const result = {};
-  for (const key of keys) if (forced || source[key] !== void 0) result[key] = source[key];
+  let result = {};
+  for (let key of keys) (forced || source[key] !== void 0) && (result[key] = source[key]);
   return result;
 }
 function snapshot(value, ancestors = /* @__PURE__ */ new Set()) {
-  if (typeof value === "function") throw new TypeError("volatile config cannot contain functions");
-  if (value === null || typeof value !== "object") return value;
+  if (typeof value == "function") throw new TypeError("volatile config cannot contain functions");
+  if (value === null || typeof value != "object") return value;
   if (ancestors.has(value)) throw new TypeError("volatile config cannot contain cycles");
   ancestors.add(value);
   try {
@@ -160,11 +131,10 @@ function createVolatile(value) {
   });
 }
 function isVolatile(value) {
-  return typeof value === "object" && value !== null && write in value;
+  return typeof value == "object" && value !== null && write in value;
 }
 function is(type, value) {
-  if (arguments.length === 1) return (value2) => is(type, value2);
-  return type in globalThis && value instanceof globalThis[type] || Object.prototype.toString.call(value).slice(8, -1) === type;
+  return arguments.length === 1 ? (value2) => is(type, value2) : type in globalThis && value instanceof globalThis[type] || Object.prototype.toString.call(value).slice(8, -1) === type;
 }
 function isArrayBufferLike(value) {
   return is("ArrayBuffer", value) || is("SharedArrayBuffer", value);
@@ -173,53 +143,48 @@ function isArrayBufferSource(value) {
   return isArrayBufferLike(value) || ArrayBuffer.isView(value);
 }
 function clone(source, refs2 = /* @__PURE__ */ new Map()) {
-  if (!source || typeof source !== "object") return source;
+  if (!source || typeof source != "object") return source;
   if (is("Date", source)) return new Date(source.valueOf());
   if (is("RegExp", source)) return new RegExp(source.source, source.flags);
   if (isArrayBufferLike(source)) return source.slice(0);
   if (ArrayBuffer.isView(source)) return source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength);
-  const cached = refs2.get(source);
+  let cached = refs2.get(source);
   if (cached) return cached;
   if (Array.isArray(source)) {
-    const result2 = [];
-    refs2.set(source, result2);
-    source.forEach((value, index) => {
+    let result2 = [];
+    return refs2.set(source, result2), source.forEach((value, index) => {
       result2[index] = Reflect.apply(clone, null, [value, refs2]);
-    });
-    return result2;
+    }), result2;
   }
-  const result = Object.create(Object.getPrototypeOf(source));
+  let result = Object.create(Object.getPrototypeOf(source));
   refs2.set(source, result);
-  for (const key of Reflect.ownKeys(source)) {
-    const descriptor = { ...Reflect.getOwnPropertyDescriptor(source, key) };
-    if ("value" in descriptor) descriptor.value = Reflect.apply(clone, null, [descriptor.value, refs2]);
-    Reflect.defineProperty(result, key, descriptor);
+  for (let key of Reflect.ownKeys(source)) {
+    let descriptor = { ...Reflect.getOwnPropertyDescriptor(source, key) };
+    "value" in descriptor && (descriptor.value = Reflect.apply(clone, null, [descriptor.value, refs2])), Reflect.defineProperty(result, key, descriptor);
   }
   return result;
 }
 function deepEqual(a, b, strict) {
-  const ancestors = /* @__PURE__ */ new Set();
+  let ancestors = /* @__PURE__ */ new Set();
   function compare(a2, b2) {
-    if (a2 === b2) return true;
+    if (a2 === b2) return !0;
     if (isVolatile(a2) || isVolatile(b2)) return isVolatile(a2) && isVolatile(b2);
-    if (!strict && isNullable(a2) && isNullable(b2)) return true;
-    if (typeof a2 !== typeof b2 || typeof a2 !== "object" || !a2 || !b2) return false;
-    if (ancestors.has(a2)) return false;
+    if (!strict && isNullable(a2) && isNullable(b2)) return !0;
+    if (typeof a2 != typeof b2 || typeof a2 != "object" || !a2 || !b2 || ancestors.has(a2)) return !1;
     function check(test, then) {
-      return test(a2) ? test(b2) ? then(a2, b2) : false : test(b2) ? false : void 0;
+      return test(a2) ? test(b2) ? then(a2, b2) : !1 : test(b2) ? !1 : void 0;
     }
     ancestors.add(a2);
     try {
       return check(Array.isArray, (a3, b3) => {
-        if (a3.length !== b3.length) return false;
-        for (let index = 0; index < a3.length; index++) if (!compare(a3[index], b3[index])) return false;
-        return true;
+        if (a3.length !== b3.length) return !1;
+        for (let index = 0; index < a3.length; index++) if (!compare(a3[index], b3[index])) return !1;
+        return !0;
       }) ?? check(is("Date"), (a3, b3) => a3.valueOf() === b3.valueOf()) ?? check(is("URL"), (a3, b3) => a3.href === b3.href) ?? check(is("RegExp"), (a3, b3) => a3.source === b3.source && a3.flags === b3.flags) ?? check(isArrayBufferLike, (a3, b3) => {
-        if (a3.byteLength !== b3.byteLength) return false;
-        const viewA = new Uint8Array(a3);
-        const viewB = new Uint8Array(b3);
-        for (let i = 0; i < viewA.length; i++) if (viewA[i] !== viewB[i]) return false;
-        return true;
+        if (a3.byteLength !== b3.byteLength) return !1;
+        let viewA = new Uint8Array(a3), viewB = new Uint8Array(b3);
+        for (let i = 0; i < viewA.length; i++) if (viewA[i] !== viewB[i]) return !1;
+        return !0;
       }) ?? ((!strict || [a2, b2].every((value) => Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)) && Object.keys({
         ...a2,
         ...b2
@@ -230,58 +195,41 @@ function deepEqual(a, b, strict) {
   }
   return compare(a, b);
 }
-var write, Binary, base64ToArrayBuffer, arrayBufferToBase64, hexToArrayBuffer, arrayBufferToHex, Time;
-var init_lib = __esm({
+var write, Binary, base64ToArrayBuffer, arrayBufferToBase64, hexToArrayBuffer, arrayBufferToHex, Time, init_lib = __esm({
   "node_modules/@deepseek-ai/cosmokit/lib/index.js"() {
     write = /* @__PURE__ */ Symbol.for("cosmokit.volatile.write");
     (function(Binary2) {
-      Binary2.is = isArrayBufferLike;
-      Binary2.isSource = isArrayBufferSource;
+      Binary2.is = isArrayBufferLike, Binary2.isSource = isArrayBufferSource;
       function fromSource(source) {
-        if (ArrayBuffer.isView(source)) return source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength);
-        else return source;
+        return ArrayBuffer.isView(source) ? source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength) : source;
       }
       Binary2.fromSource = fromSource;
       function toBase64(source) {
-        source = fromSource(source);
-        if (typeof Buffer !== "undefined") return Buffer.from(source).toString("base64");
-        let binary = "";
-        const bytes = new Uint8Array(source);
+        if (source = fromSource(source), typeof Buffer < "u") return Buffer.from(source).toString("base64");
+        let binary = "", bytes = new Uint8Array(source);
         for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
         return btoa(binary);
       }
       Binary2.toBase64 = toBase64;
       function fromBase64(source) {
-        if (typeof Buffer !== "undefined") return fromSource(Buffer.from(source, "base64"));
-        return Uint8Array.from(atob(source), (c) => c.charCodeAt(0));
+        return typeof Buffer < "u" ? fromSource(Buffer.from(source, "base64")) : Uint8Array.from(atob(source), (c) => c.charCodeAt(0));
       }
       Binary2.fromBase64 = fromBase64;
       function toHex(source) {
-        source = fromSource(source);
-        if (typeof Buffer !== "undefined") return Buffer.from(source).toString("hex");
-        return Array.from(new Uint8Array(source), (byte) => byte.toString(16).padStart(2, "0")).join("");
+        return source = fromSource(source), typeof Buffer < "u" ? Buffer.from(source).toString("hex") : Array.from(new Uint8Array(source), (byte) => byte.toString(16).padStart(2, "0")).join("");
       }
       Binary2.toHex = toHex;
       function fromHex(source) {
-        if (typeof Buffer !== "undefined") return fromSource(Buffer.from(source, "hex"));
-        const hex = source.length % 2 === 0 ? source : source.slice(0, source.length - 1);
-        const buffer = [];
+        if (typeof Buffer < "u") return fromSource(Buffer.from(source, "hex"));
+        let hex = source.length % 2 === 0 ? source : source.slice(0, source.length - 1), buffer = [];
         for (let i = 0; i < hex.length; i += 2) buffer.push(parseInt(`${hex[i]}${hex[i + 1]}`, 16));
         return Uint8Array.from(buffer).buffer;
       }
       Binary2.fromHex = fromHex;
     })(Binary || (Binary = {}));
-    base64ToArrayBuffer = Binary.fromBase64;
-    arrayBufferToBase64 = Binary.toBase64;
-    hexToArrayBuffer = Binary.fromHex;
-    arrayBufferToHex = Binary.toHex;
+    base64ToArrayBuffer = Binary.fromBase64, arrayBufferToBase64 = Binary.toBase64, hexToArrayBuffer = Binary.fromHex, arrayBufferToHex = Binary.toHex;
     (function(Time2) {
-      Time2.millisecond = 1;
-      Time2.second = 1e3;
-      Time2.minute = Time2.second * 60;
-      Time2.hour = Time2.minute * 60;
-      Time2.day = Time2.hour * 24;
-      Time2.week = Time2.day * 7;
+      Time2.millisecond = 1, Time2.second = 1e3, Time2.minute = Time2.second * 60, Time2.hour = Time2.minute * 60, Time2.day = Time2.hour * 24, Time2.week = Time2.day * 7;
       let timezoneOffset = (/* @__PURE__ */ new Date()).getTimezoneOffset();
       function setTimezoneOffset(offset) {
         timezoneOffset = offset;
@@ -292,19 +240,15 @@ var init_lib = __esm({
       }
       Time2.getTimezoneOffset = getTimezoneOffset;
       function getDateNumber(date2 = /* @__PURE__ */ new Date(), offset) {
-        if (typeof date2 === "number") date2 = new Date(date2);
-        if (offset === void 0) offset = timezoneOffset;
-        return Math.floor((date2.valueOf() / Time2.minute - offset) / 1440);
+        return typeof date2 == "number" && (date2 = new Date(date2)), offset === void 0 && (offset = timezoneOffset), Math.floor((date2.valueOf() / Time2.minute - offset) / 1440);
       }
       Time2.getDateNumber = getDateNumber;
       function fromDateNumber(value, offset) {
-        const date2 = new Date(value * Time2.day);
-        if (offset === void 0) offset = timezoneOffset;
-        return new Date(+date2 + offset * Time2.minute);
+        let date2 = new Date(value * Time2.day);
+        return offset === void 0 && (offset = timezoneOffset), new Date(+date2 + offset * Time2.minute);
       }
       Time2.fromDateNumber = fromDateNumber;
-      const numeric = /\d+(?:\.\d+)?/.source;
-      const timeRegExp = new RegExp(`^${[
+      let numeric = /\d+(?:\.\d+)?/.source, timeRegExp = new RegExp(`^${[
         "w(?:eek(?:s)?)?",
         "d(?:ay(?:s)?)?",
         "h(?:our(?:s)?)?",
@@ -312,26 +256,18 @@ var init_lib = __esm({
         "s(?:ec(?:ond)?(?:s)?)?"
       ].map((unit) => `(${numeric}${unit})?`).join("")}$`);
       function parseTime(source) {
-        const capture = timeRegExp.exec(source);
-        if (!capture) return 0;
-        return (parseFloat(capture[1]) * Time2.week || 0) + (parseFloat(capture[2]) * Time2.day || 0) + (parseFloat(capture[3]) * Time2.hour || 0) + (parseFloat(capture[4]) * Time2.minute || 0) + (parseFloat(capture[5]) * Time2.second || 0);
+        let capture = timeRegExp.exec(source);
+        return capture ? (parseFloat(capture[1]) * Time2.week || 0) + (parseFloat(capture[2]) * Time2.day || 0) + (parseFloat(capture[3]) * Time2.hour || 0) + (parseFloat(capture[4]) * Time2.minute || 0) + (parseFloat(capture[5]) * Time2.second || 0) : 0;
       }
       Time2.parseTime = parseTime;
       function parseDate(date2) {
-        const parsed = parseTime(date2);
-        if (parsed) date2 = Date.now() + parsed;
-        else if (/^\d{1,2}(:\d{1,2}){1,2}$/.test(date2)) date2 = `${(/* @__PURE__ */ new Date()).toLocaleDateString()}-${date2}`;
-        else if (/^\d{1,2}-\d{1,2}-\d{1,2}(:\d{1,2}){1,2}$/.test(date2)) date2 = `${(/* @__PURE__ */ new Date()).getFullYear()}-${date2}`;
-        return date2 ? new Date(date2) : /* @__PURE__ */ new Date();
+        let parsed = parseTime(date2);
+        return parsed ? date2 = Date.now() + parsed : /^\d{1,2}(:\d{1,2}){1,2}$/.test(date2) ? date2 = `${(/* @__PURE__ */ new Date()).toLocaleDateString()}-${date2}` : /^\d{1,2}-\d{1,2}-\d{1,2}(:\d{1,2}){1,2}$/.test(date2) && (date2 = `${(/* @__PURE__ */ new Date()).getFullYear()}-${date2}`), date2 ? new Date(date2) : /* @__PURE__ */ new Date();
       }
       Time2.parseDate = parseDate;
       function format(ms) {
-        const abs = Math.abs(ms);
-        if (abs >= Time2.day - Time2.hour / 2) return Math.round(ms / Time2.day) + "d";
-        else if (abs >= Time2.hour - Time2.minute / 2) return Math.round(ms / Time2.hour) + "h";
-        else if (abs >= Time2.minute - Time2.second / 2) return Math.round(ms / Time2.minute) + "m";
-        else if (abs >= Time2.second) return Math.round(ms / Time2.second) + "s";
-        return ms + "ms";
+        let abs = Math.abs(ms);
+        return abs >= Time2.day - Time2.hour / 2 ? Math.round(ms / Time2.day) + "d" : abs >= Time2.hour - Time2.minute / 2 ? Math.round(ms / Time2.hour) + "h" : abs >= Time2.minute - Time2.second / 2 ? Math.round(ms / Time2.minute) + "m" : abs >= Time2.second ? Math.round(ms / Time2.second) + "s" : ms + "ms";
       }
       Time2.format = format;
       function toDigits(source, length = 2) {
@@ -348,11 +284,10 @@ var init_lib = __esm({
 
 // node_modules/@deepseek-ai/schemastery/lib/index.mjs
 function mergeDesc(original, messages) {
-  const result = typeof original === "string" ? { "": original } : { ...original };
-  for (const locale in messages) {
-    const value = messages[locale];
-    if (value?.$description || value?.$desc) result[locale] = value.$description || value.$desc;
-    else if (typeof value === "string") result[locale] = value;
+  let result = typeof original == "string" ? { "": original } : { ...original };
+  for (let locale in messages) {
+    let value = messages[locale];
+    value?.$description || value?.$desc ? result[locale] = value.$description || value.$desc : typeof value == "string" && (result[locale] = value);
   }
   return result;
 }
@@ -362,65 +297,52 @@ function getInner(value) {
 function extractKeys(data) {
   return filterKeys(data ?? {}, (key) => !key.startsWith("$"));
 }
-function validateVolatileSchema(schema, path26 = [], blocked2 = false, seen = /* @__PURE__ */ new Map()) {
-  const states = seen.get(schema) ?? /* @__PURE__ */ new Set();
+function validateVolatileSchema(schema, path25 = [], blocked2 = !1, seen = /* @__PURE__ */ new Map()) {
+  let states = seen.get(schema) ?? /* @__PURE__ */ new Set();
   if (states.has(blocked2)) return;
-  states.add(blocked2);
-  seen.set(schema, states);
-  if (schema.meta?.volatile && blocked2) throw new ValidationError("volatile fields require a fixed object path without an enclosing volatile field", { path: path26 });
-  const nested = blocked2 || !!schema.meta?.volatile;
-  if (schema.dict) for (const [key, child] of Object.entries(schema.dict)) validateVolatileSchema(child, [...path26, key], nested, seen);
-  if (schema.sKey) validateVolatileSchema(schema.sKey, [...path26, "<key>"], true, seen);
-  if (schema.inner && (schema.type !== "lazy" || schema.inner[kSchema])) validateVolatileSchema(schema.inner, [...path26, "*"], true, seen);
-  if (schema.list) for (let index = 0; index < schema.list.length; index++) validateVolatileSchema(schema.list[index], [...path26, String(index)], true, seen);
+  if (states.add(blocked2), seen.set(schema, states), schema.meta?.volatile && blocked2) throw new ValidationError("volatile fields require a fixed object path without an enclosing volatile field", { path: path25 });
+  let nested = blocked2 || !!schema.meta?.volatile;
+  if (schema.dict) for (let [key, child] of Object.entries(schema.dict)) validateVolatileSchema(child, [...path25, key], nested, seen);
+  if (schema.sKey && validateVolatileSchema(schema.sKey, [...path25, "<key>"], !0, seen), schema.inner && (schema.type !== "lazy" || schema.inner[kSchema]) && validateVolatileSchema(schema.inner, [...path25, "*"], !0, seen), schema.list) for (let index = 0; index < schema.list.length; index++) validateVolatileSchema(schema.list[index], [...path25, String(index)], !0, seen);
 }
-function checkWithinRange(data, meta, description, options, skipMin = false) {
-  const { max = Infinity, min = -Infinity } = meta;
+function checkWithinRange(data, meta, description, options, skipMin = !1) {
+  let { max = 1 / 0, min = -1 / 0 } = meta;
   if (data > max) throw new ValidationError(`expected ${description} <= ${max} but got ${data}`, options);
   if (data < min && !skipMin) throw new ValidationError(`expected ${description} >= ${min} but got ${data}`, options);
 }
 function decimalShift(data, digits) {
-  const str = data.toString();
+  let str = data.toString();
   if (str.includes("e")) return data * Math.pow(10, digits);
-  const index = str.indexOf(".");
+  let index = str.indexOf(".");
   if (index === -1) return data * Math.pow(10, digits);
-  const frac = str.slice(index + 1);
-  const integer = str.slice(0, index);
-  if (frac.length <= digits) return +(integer + frac.padEnd(digits, "0"));
-  return +(integer + frac.slice(0, digits) + "." + frac.slice(digits));
+  let frac = str.slice(index + 1), integer = str.slice(0, index);
+  return frac.length <= digits ? +(integer + frac.padEnd(digits, "0")) : +(integer + frac.slice(0, digits) + "." + frac.slice(digits));
 }
 function isMultipleOf(data, min, step) {
-  step = Math.abs(step);
-  if (!/^\d+\.\d+$/.test(step.toString())) return (data - min) % step === 0;
-  const index = step.toString().indexOf(".");
-  const digits = step.toString().slice(index + 1).length;
+  if (step = Math.abs(step), !/^\d+\.\d+$/.test(step.toString())) return (data - min) % step === 0;
+  let index = step.toString().indexOf("."), digits = step.toString().slice(index + 1).length;
   return Math.abs(decimalShift(data, digits) - decimalShift(min, digits)) % decimalShift(step, digits) === 0;
 }
 function property(data, key, schema, options) {
   try {
-    const [value, adapted] = Schema.resolve(data[key], schema, {
+    let [value, adapted] = Schema.resolve(data[key], schema, {
       ...options,
       path: [...options.path || [], key]
     });
-    if (adapted !== void 0) data[key] = adapted;
-    return value;
+    return adapted !== void 0 && (data[key] = adapted), value;
   } catch (e) {
     if (!options?.autofix) throw e;
-    delete data[key];
-    return schema.meta.volatile ? createVolatile(schema.meta.default) : schema.meta.default;
+    return delete data[key], schema.meta.volatile ? createVolatile(schema.meta.default) : schema.meta.default;
   }
 }
 function merge(result, data) {
-  for (const key in data) {
-    if (key in result) continue;
-    result[key] = data[key];
-  }
+  for (let key in data)
+    key in result || (result[key] = data[key]);
 }
 function defineMethod(name, keys, format) {
-  formatters[name] = format;
-  Object.assign(Schema, { [name](...args) {
-    const schema = new Schema({ type: name });
-    keys.forEach((key, index) => {
+  formatters[name] = format, Object.assign(Schema, { [name](...args) {
+    let schema = new Schema({ type: name });
+    return keys.forEach((key, index) => {
       switch (key) {
         case "sKey":
           schema.sKey = args[index] ?? Schema.string();
@@ -436,37 +358,29 @@ function defineMethod(name, keys, format) {
           break;
         case "bits":
           schema.bits = {};
-          for (const key2 in args[index]) {
-            if (typeof args[index][key2] !== "number") continue;
-            schema.bits[key2] = args[index][key2];
-          }
+          for (let key2 in args[index])
+            typeof args[index][key2] == "number" && (schema.bits[key2] = args[index][key2]);
           break;
         case "callback": {
-          const callback = schema.callback = args[index];
-          callback["toJSON"] ||= () => callback.toString();
+          let callback = schema.callback = args[index];
+          callback.toJSON ||= () => callback.toString();
           break;
         }
         case "constructor": {
-          const constructor = schema.constructor = args[index];
-          if (typeof constructor === "function") constructor["toJSON"] ||= () => constructor["name"];
+          let constructor = schema.constructor = args[index];
+          typeof constructor == "function" && (constructor.toJSON ||= () => constructor.name);
           break;
         }
         default:
           schema[key] = args[index];
       }
-    });
-    if (name === "object" || name === "dict") schema.meta.default = {};
-    else if (name === "array" || name === "tuple") schema.meta.default = [];
-    else if (name === "bitset") schema.meta.default = 0;
-    return schema;
+    }), name === "object" || name === "dict" ? schema.meta.default = {} : name === "array" || name === "tuple" ? schema.meta.default = [] : name === "bitset" && (schema.meta.default = 0), schema;
   } });
 }
-var kSchema, kValidationError, ValidationError, Schema, resolvers, checkedVolatile, formatters;
-var init_lib2 = __esm({
+var kSchema, kValidationError, ValidationError, Schema, resolvers, checkedVolatile, formatters, init_lib2 = __esm({
   "node_modules/@deepseek-ai/schemastery/lib/index.mjs"() {
     init_lib();
-    kSchema = /* @__PURE__ */ Symbol.for("schemastery");
-    kValidationError = /* @__PURE__ */ Symbol.for("ValidationError");
+    kSchema = /* @__PURE__ */ Symbol.for("schemastery"), kValidationError = /* @__PURE__ */ Symbol.for("ValidationError");
     globalThis.__schemastery_index__ ??= 0;
     globalThis.__schemastery_refs__ = void 0;
     ValidationError = class extends TypeError {
@@ -474,47 +388,34 @@ var init_lib2 = __esm({
       name = "ValidationError";
       constructor(message, options) {
         let prefix = "$";
-        for (const segment of options.path || []) if (typeof segment === "string") prefix += "." + segment;
-        else if (typeof segment === "number") prefix += "[" + segment + "]";
-        else if (typeof segment === "symbol") prefix += `[Symbol(${segment.toString()})]`;
-        if (prefix.startsWith(".")) prefix = prefix.slice(1);
-        super((prefix === "$" ? "" : `${prefix} `) + message);
-        this.options = options;
+        for (let segment of options.path || []) typeof segment == "string" ? prefix += "." + segment : typeof segment == "number" ? prefix += "[" + segment + "]" : typeof segment == "symbol" && (prefix += `[Symbol(${segment.toString()})]`);
+        prefix.startsWith(".") && (prefix = prefix.slice(1)), super((prefix === "$" ? "" : `${prefix} `) + message), this.options = options;
       }
       static is(error) {
         return !!error?.[kValidationError];
       }
     };
-    Object.defineProperty(ValidationError.prototype, kValidationError, { value: true });
+    Object.defineProperty(ValidationError.prototype, kValidationError, { value: !0 });
     Schema = function(options) {
-      const schema = function(data, options2 = {}) {
+      let schema = function(data, options2 = {}) {
         return Schema.resolve(data, schema, options2)[0];
       };
       if (options.refs) {
-        const refs2 = mapValues(options.refs, (options2) => new Schema(options2));
-        const getRef = (uid) => refs2[uid];
-        for (const key in refs2) {
-          const options2 = refs2[key];
-          options2.sKey = getRef(options2.sKey);
-          options2.inner = getRef(options2.inner);
-          options2.list = options2.list && options2.list.map(getRef);
-          options2.dict = options2.dict && mapValues(options2.dict, getRef);
+        let refs2 = mapValues(options.refs, (options2) => new Schema(options2)), getRef = (uid) => refs2[uid];
+        for (let key in refs2) {
+          let options2 = refs2[key];
+          options2.sKey = getRef(options2.sKey), options2.inner = getRef(options2.inner), options2.list = options2.list && options2.list.map(getRef), options2.dict = options2.dict && mapValues(options2.dict, getRef);
         }
         return refs2[options.uid];
       }
-      Object.assign(schema, options);
-      if (typeof schema.callback === "string") try {
+      if (Object.assign(schema, options), typeof schema.callback == "string") try {
         schema.callback = new Function("return " + schema.callback)();
       } catch {
       }
-      Object.defineProperty(schema, "uid", { value: globalThis.__schemastery_index__++ });
-      Object.setPrototypeOf(schema, Schema.prototype);
-      schema.meta ||= {};
-      schema.toString = schema.toString.bind(schema);
-      return schema;
+      return Object.defineProperty(schema, "uid", { value: globalThis.__schemastery_index__++ }), Object.setPrototypeOf(schema, Schema.prototype), schema.meta ||= {}, schema.toString = schema.toString.bind(schema), schema;
     };
     Schema.prototype = Object.create(Function.prototype);
-    Schema.prototype[kSchema] = true;
+    Schema.prototype[kSchema] = !0;
     Object.defineProperty(Schema.prototype, "~standard", { get() {
       return {
         version: 1,
@@ -533,142 +434,105 @@ var init_lib2 = __esm({
       };
     } });
     Schema.ValidationError = ValidationError;
-    Schema.prototype.toJSON = function toJSON() {
-      if (globalThis.__schemastery_refs__) {
-        globalThis.__schemastery_refs__[this.uid] ??= JSON.parse(JSON.stringify({ ...this }));
-        return this.uid;
-      }
-      globalThis.__schemastery_refs__ = { [this.uid]: { ...this } };
-      globalThis.__schemastery_refs__[this.uid] = JSON.parse(JSON.stringify({ ...this }));
-      const result = {
+    Schema.prototype.toJSON = function() {
+      if (globalThis.__schemastery_refs__)
+        return globalThis.__schemastery_refs__[this.uid] ??= JSON.parse(JSON.stringify({ ...this })), this.uid;
+      globalThis.__schemastery_refs__ = { [this.uid]: { ...this } }, globalThis.__schemastery_refs__[this.uid] = JSON.parse(JSON.stringify({ ...this }));
+      let result = {
         uid: this.uid,
         refs: globalThis.__schemastery_refs__
       };
-      globalThis.__schemastery_refs__ = void 0;
-      return result;
+      return globalThis.__schemastery_refs__ = void 0, result;
     };
-    Schema.prototype.set = function set(key, value) {
-      this.dict[key] = value;
-      return this;
+    Schema.prototype.set = function(key, value) {
+      return this.dict[key] = value, this;
     };
-    Schema.prototype.push = function push(value) {
-      this.list.push(value);
-      return this;
+    Schema.prototype.push = function(value) {
+      return this.list.push(value), this;
     };
-    Schema.prototype.i18n = function i18n(messages) {
-      const schema = Schema(this);
-      const desc = mergeDesc(schema.meta.description, messages);
-      if (Object.keys(desc).length) schema.meta.description = desc;
-      if (schema.dict) schema.dict = mapValues(schema.dict, (inner, key) => {
-        return inner.i18n(mapValues(messages, (data) => getInner(data)?.[key] ?? data?.[key]));
-      });
-      if (schema.list) schema.list = schema.list.map((inner, index) => {
-        return inner.i18n(mapValues(messages, (data = {}) => {
-          if (Array.isArray(getInner(data))) return getInner(data)[index];
-          if (Array.isArray(data)) return data[index];
-          return extractKeys(data);
-        }));
-      });
-      if (schema.inner) schema.inner = schema.inner.i18n(mapValues(messages, (data) => {
-        if (getInner(data)) return getInner(data);
-        return extractKeys(data);
-      }));
-      if (schema.sKey) schema.sKey = schema.sKey.i18n(mapValues(messages, (data) => data?.$key));
-      return schema;
+    Schema.prototype.i18n = function(messages) {
+      let schema = Schema(this), desc = mergeDesc(schema.meta.description, messages);
+      return Object.keys(desc).length && (schema.meta.description = desc), schema.dict && (schema.dict = mapValues(schema.dict, (inner, key) => inner.i18n(mapValues(messages, (data) => getInner(data)?.[key] ?? data?.[key])))), schema.list && (schema.list = schema.list.map((inner, index) => inner.i18n(mapValues(messages, (data = {}) => Array.isArray(getInner(data)) ? getInner(data)[index] : Array.isArray(data) ? data[index] : extractKeys(data))))), schema.inner && (schema.inner = schema.inner.i18n(mapValues(messages, (data) => getInner(data) ? getInner(data) : extractKeys(data)))), schema.sKey && (schema.sKey = schema.sKey.i18n(mapValues(messages, (data) => data?.$key))), schema;
     };
-    Schema.prototype.extra = function extra(key, value) {
-      const schema = Schema(this);
-      schema.meta = {
+    Schema.prototype.extra = function(key, value) {
+      let schema = Schema(this);
+      return schema.meta = {
         ...schema.meta,
         [key]: value
-      };
-      return schema;
+      }, schema;
     };
-    for (const key of [
+    for (let key of [
       "required",
       "disabled",
       "collapse",
       "hidden",
       "loose"
-    ]) Object.assign(Schema.prototype, { [key](value = true) {
-      const schema = Schema(this);
-      schema.meta = {
+    ]) Object.assign(Schema.prototype, { [key](value = !0) {
+      let schema = Schema(this);
+      return schema.meta = {
         ...schema.meta,
         [key]: value
-      };
-      return schema;
+      }, schema;
     } });
-    Schema.prototype.deprecated = function deprecated() {
-      const schema = Schema(this);
-      schema.meta.badges ||= [];
-      schema.meta.badges.push({
+    Schema.prototype.deprecated = function() {
+      let schema = Schema(this);
+      return schema.meta.badges ||= [], schema.meta.badges.push({
         text: "deprecated",
         type: "danger"
-      });
-      return schema;
+      }), schema;
     };
-    Schema.prototype.experimental = function experimental() {
-      const schema = Schema(this);
-      schema.meta.badges ||= [];
-      schema.meta.badges.push({
+    Schema.prototype.experimental = function() {
+      let schema = Schema(this);
+      return schema.meta.badges ||= [], schema.meta.badges.push({
         text: "experimental",
         type: "warning"
-      });
-      return schema;
+      }), schema;
     };
-    Schema.prototype.pattern = function pattern(regexp) {
-      const schema = Schema(this);
-      const pattern2 = pick(regexp, ["source", "flags"]);
-      schema.meta = {
+    Schema.prototype.pattern = function(regexp) {
+      let schema = Schema(this), pattern2 = pick(regexp, ["source", "flags"]);
+      return schema.meta = {
         ...schema.meta,
         pattern: pattern2
-      };
-      return schema;
+      }, schema;
     };
-    Schema.prototype.simplify = function simplify(value) {
-      if (isVolatile(value)) value = value.get();
-      if (deepEqual(value, this.meta.default, this.type === "dict")) return null;
+    Schema.prototype.simplify = function(value) {
+      if (isVolatile(value) && (value = value.get()), deepEqual(value, this.meta.default, this.type === "dict")) return null;
       if (isNullable(value)) return value;
       if (this.type === "object" || this.type === "dict") {
-        const result = {};
-        for (const key in value) {
-          const item = (this.type === "object" ? this.dict[key] : this.inner)?.simplify(value[key]);
-          if (this.type === "dict" || !isNullable(item)) result[key] = item;
+        let result = {};
+        for (let key in value) {
+          let item = (this.type === "object" ? this.dict[key] : this.inner)?.simplify(value[key]);
+          (this.type === "dict" || !isNullable(item)) && (result[key] = item);
         }
-        if (deepEqual(result, this.meta.default, this.type === "dict")) return null;
-        return result;
+        return deepEqual(result, this.meta.default, this.type === "dict") ? null : result;
       } else if (this.type === "array" || this.type === "tuple") {
-        const result = [];
-        value.forEach((value2, index) => {
-          const schema = this.type === "array" ? this.inner : this.list[index];
-          const item = schema ? schema.simplify(value2) : value2;
+        let result = [];
+        return value.forEach((value2, index) => {
+          let schema = this.type === "array" ? this.inner : this.list[index], item = schema ? schema.simplify(value2) : value2;
           result.push(item);
-        });
-        return result;
+        }), result;
       } else if (this.type === "intersect") {
-        const result = {};
-        for (const item of this.list) Object.assign(result, item.simplify(value));
+        let result = {};
+        for (let item of this.list) Object.assign(result, item.simplify(value));
         return result;
-      } else if (this.type === "union") for (const schema of this.list) try {
-        Schema.resolve(value, schema, {});
-        return schema.simplify(value);
+      } else if (this.type === "union") for (let schema of this.list) try {
+        return Schema.resolve(value, schema, {}), schema.simplify(value);
       } catch {
       }
       return value;
     };
-    Schema.prototype.toString = function toString(inline) {
+    Schema.prototype.toString = function(inline) {
       return formatters[this.type]?.(this, inline) ?? `Schema<${this.type}>`;
     };
-    Schema.prototype.role = function role(role, extra2) {
-      const schema = Schema(this);
-      schema.meta = {
+    Schema.prototype.role = function(role, extra2) {
+      let schema = Schema(this);
+      return schema.meta = {
         ...schema.meta,
         role,
         extra: extra2
-      };
-      return schema;
+      }, schema;
     };
-    for (const key of [
+    for (let key of [
       "default",
       "link",
       "comment",
@@ -677,38 +541,32 @@ var init_lib2 = __esm({
       "min",
       "step"
     ]) Object.assign(Schema.prototype, { [key](value) {
-      const schema = Schema(this);
-      schema.meta = {
+      let schema = Schema(this);
+      return schema.meta = {
         ...schema.meta,
         [key]: value
-      };
-      return schema;
+      }, schema;
     } });
-    Schema.prototype.volatile = function volatile() {
+    Schema.prototype.volatile = function() {
       if (this.meta.volatile) throw new TypeError("volatile schema is already wrapped");
-      return this.extra("volatile", true);
+      return this.extra("volatile", !0);
     };
-    resolvers = {};
-    checkedVolatile = /* @__PURE__ */ Symbol("checked-volatile-schema");
-    Schema.extend = function extend(type, resolve3) {
+    resolvers = {}, checkedVolatile = /* @__PURE__ */ Symbol("checked-volatile-schema");
+    Schema.extend = function(type, resolve3) {
       resolvers[type] = resolve3;
     };
-    Schema.resolve = function resolve(data, schema, options = {}, strict = false) {
+    Schema.resolve = function(data, schema, options = {}, strict = !1) {
       if (!schema) return [data];
-      if (!options[checkedVolatile]) {
-        validateVolatileSchema(schema, options.path);
-        options = {
-          ...options,
-          [checkedVolatile]: true
-        };
-      }
-      if (schema.meta?.volatile) {
-        const inner = Schema(schema);
+      if (options[checkedVolatile] || (validateVolatileSchema(schema, options.path), options = {
+        ...options,
+        [checkedVolatile]: !0
+      }), schema.meta?.volatile) {
+        let inner = Schema(schema);
         inner.meta = {
           ...schema.meta,
-          volatile: false
+          volatile: !1
         };
-        const [value, adapted] = Schema.resolve(data, inner, options, strict);
+        let [value, adapted] = Schema.resolve(data, inner, options, strict);
         try {
           return [createVolatile(value), adapted];
         } catch (error) {
@@ -717,17 +575,14 @@ var init_lib2 = __esm({
       }
       if (options.ignore?.(data, schema)) return [data];
       if (isNullable(data) && schema.type !== "lazy") {
-        if (schema.meta.required) throw new ValidationError(`missing required value`, options);
-        let current = schema;
-        let fallback = schema.meta.default;
-        while (current?.type === "intersect" && isNullable(fallback)) {
-          current = current.list[0];
-          fallback = current?.meta.default;
-        }
+        if (schema.meta.required) throw new ValidationError("missing required value", options);
+        let current = schema, fallback = schema.meta.default;
+        for (; current?.type === "intersect" && isNullable(fallback); )
+          current = current.list[0], fallback = current?.meta.default;
         if (isNullable(fallback)) return [data];
         data = clone(fallback);
       }
-      const callback = resolvers[schema.type];
+      let callback = resolvers[schema.type];
       if (!callback) throw new ValidationError(`unsupported type "${schema.type}"`, options);
       try {
         return callback(data, schema, options, strict);
@@ -736,15 +591,15 @@ var init_lib2 = __esm({
         return [schema.meta.default];
       }
     };
-    Schema.from = function from(source) {
+    Schema.from = function(source) {
       if (isNullable(source)) return Schema.any();
-      else if ([
+      if ([
         "string",
         "number",
         "boolean"
       ].includes(typeof source)) return Schema.const(source).required();
-      else if (source[kSchema]) return source;
-      else if (typeof source === "function") switch (source) {
+      if (source[kSchema]) return source;
+      if (typeof source == "function") switch (source) {
         case String:
           return Schema.string().required();
         case Number:
@@ -758,77 +613,61 @@ var init_lib2 = __esm({
       }
       else throw new TypeError(`cannot infer schema from ${source}`);
     };
-    Schema.lazy = function lazy(builder) {
-      const toJSON2 = () => {
-        if (!schema.inner[kSchema]) {
-          schema.inner = schema.builder();
-          schema.inner.meta = {
-            ...schema.meta,
-            ...schema.inner.meta
-          };
-        }
-        return schema.inner.toJSON();
-      };
-      const schema = new Schema({
+    Schema.lazy = function(builder) {
+      let toJSON2 = () => (schema.inner[kSchema] || (schema.inner = schema.builder(), schema.inner.meta = {
+        ...schema.meta,
+        ...schema.inner.meta
+      }), schema.inner.toJSON()), schema = new Schema({
         type: "lazy",
         builder,
         inner: { toJSON: toJSON2 }
       });
       return schema;
     };
-    Schema.natural = function natural() {
+    Schema.natural = function() {
       return Schema.number().step(1).min(0);
     };
-    Schema.percent = function percent() {
+    Schema.percent = function() {
       return Schema.number().step(0.01).min(0).max(1).role("slider");
     };
-    Schema.date = function date() {
+    Schema.date = function() {
       return Schema.union([Schema.is(Date), Schema.transform(Schema.string().role("datetime"), (value, options) => {
-        const date2 = new Date(value);
+        let date2 = new Date(value);
         if (isNaN(+date2)) throw new ValidationError(`invalid date "${value}"`, options);
         return date2;
-      }, true)]);
+      }, !0)]);
     };
-    Schema.regExp = function regExp(flag = "") {
+    Schema.regExp = function(flag = "") {
       return Schema.union([Schema.is(RegExp), Schema.transform(Schema.string().role("regexp", { flag }), (value, options) => {
         try {
           return new RegExp(value, flag);
         } catch (e) {
           throw new ValidationError(e.message, options);
         }
-      }, true)]);
+      }, !0)]);
     };
-    Schema.arrayBuffer = function arrayBuffer(encoding) {
+    Schema.arrayBuffer = function(encoding) {
       return Schema.union([
         Schema.is(ArrayBuffer),
         Schema.is(SharedArrayBuffer),
         Schema.transform(Schema.any(), (value, options) => {
           if (Binary.isSource(value)) return Binary.fromSource(value);
           throw new ValidationError(`expected ArrayBufferSource but got ${value}`, options);
-        }, true),
+        }, !0),
         ...encoding ? [Schema.transform(Schema.string(), (value, options) => {
           try {
             return encoding === "base64" ? Binary.fromBase64(value) : Binary.fromHex(value);
           } catch (e) {
             throw new ValidationError(e.message, options);
           }
-        }, true)] : []
+        }, !0)] : []
       ]);
     };
-    Schema.extend("lazy", (data, schema, options, strict) => {
-      if (!schema.inner[kSchema]) {
-        schema.inner = schema.builder();
-        schema.inner.meta = {
-          ...schema.meta,
-          ...schema.inner.meta
-        };
-        validateVolatileSchema(schema.inner, options.path, true);
-      }
-      return Schema.resolve(data, schema.inner, options, strict);
-    });
-    Schema.extend("any", (data) => {
-      return [data];
-    });
+    Schema.extend("lazy", (data, schema, options, strict) => (schema.inner[kSchema] || (schema.inner = schema.builder(), schema.inner.meta = {
+      ...schema.meta,
+      ...schema.inner.meta
+    }, validateVolatileSchema(schema.inner, options.path, !0)), Schema.resolve(data, schema.inner, options, strict)));
+    Schema.extend("any", (data) => [data]);
     Schema.extend("never", (data, _, options) => {
       throw new ValidationError(`expected nullable but got ${data}`, options);
     });
@@ -837,52 +676,50 @@ var init_lib2 = __esm({
       throw new ValidationError(`expected ${value} but got ${data}`, options);
     });
     Schema.extend("string", (data, { meta }, options) => {
-      if (typeof data !== "string") throw new ValidationError(`expected string but got ${data}`, options);
+      if (typeof data != "string") throw new ValidationError(`expected string but got ${data}`, options);
       if (meta.pattern) {
-        const regexp = new RegExp(meta.pattern.source, meta.pattern.flags);
+        let regexp = new RegExp(meta.pattern.source, meta.pattern.flags);
         if (!regexp.test(data)) throw new ValidationError(`expect string to match regexp ${regexp}`, options);
       }
-      checkWithinRange(data.length, meta, "string length", options);
-      return [data];
+      return checkWithinRange(data.length, meta, "string length", options), [data];
     });
     Schema.extend("number", (data, { meta }, options) => {
-      if (typeof data !== "number") throw new ValidationError(`expected number but got ${data}`, options);
+      if (typeof data != "number") throw new ValidationError(`expected number but got ${data}`, options);
       checkWithinRange(data, meta, "number", options);
-      const { step } = meta;
+      let { step } = meta;
       if (step && !isMultipleOf(data, meta.min ?? 0, step)) throw new ValidationError(`expected number multiple of ${step} but got ${data}`, options);
       return [data];
     });
     Schema.extend("boolean", (data, _, options) => {
-      if (typeof data === "boolean") return [data];
+      if (typeof data == "boolean") return [data];
       throw new ValidationError(`expected boolean but got ${data}`, options);
     });
     Schema.extend("bitset", (data, { bits, meta }, options) => {
       let value = 0, keys = [];
-      if (typeof data === "number") {
+      if (typeof data == "number") {
         value = data;
-        for (const key in bits) if (data & bits[key]) keys.push(key);
+        for (let key in bits) data & bits[key] && keys.push(key);
       } else if (Array.isArray(data)) {
         keys = data;
-        for (const key of keys) {
-          if (typeof key !== "string") throw new ValidationError(`expected string but got ${key}`, options);
-          if (key in bits) value |= bits[key];
+        for (let key of keys) {
+          if (typeof key != "string") throw new ValidationError(`expected string but got ${key}`, options);
+          key in bits && (value |= bits[key]);
         }
       } else throw new ValidationError(`expected number or array but got ${data}`, options);
-      if (value === meta.default) return [value];
-      return [value, keys];
+      return value === meta.default ? [value] : [value, keys];
     });
     Schema.extend("function", (data, _, options) => {
-      if (typeof data === "function") return [data];
+      if (typeof data == "function") return [data];
       throw new ValidationError(`expected function but got ${data}`, options);
     });
     Schema.extend("is", (data, { constructor }, options) => {
-      if (typeof constructor === "function") {
+      if (typeof constructor == "function") {
         if (data instanceof constructor) return [data];
         throw new ValidationError(`expected ${constructor.name} but got ${data}`, options);
       } else {
         if (isNullable(data)) throw new ValidationError(`expected ${constructor} but got ${data}`, options);
         let prototype = Object.getPrototypeOf(data);
-        while (prototype) {
+        for (; prototype; ) {
           if (prototype.constructor?.name === constructor) return [data];
           prototype = Object.getPrototypeOf(prototype);
         }
@@ -891,13 +728,12 @@ var init_lib2 = __esm({
     });
     Schema.extend("array", (data, { inner, meta }, options) => {
       if (!Array.isArray(data)) throw new ValidationError(`expected array but got ${data}`, options);
-      checkWithinRange(data.length, meta, "array length", options, !isNullable(inner.meta.default));
-      return [data.map((_, index) => property(data, index, inner, options))];
+      return checkWithinRange(data.length, meta, "array length", options, !isNullable(inner.meta.default)), [data.map((_, index) => property(data, index, inner, options))];
     });
     Schema.extend("dict", (data, { inner, sKey }, options, strict) => {
       if (!isPlainObject(data)) throw new ValidationError(`expected object but got ${data}`, options);
-      const result = {};
-      for (const key in data) {
+      let result = {};
+      for (let key in data) {
         let rKey;
         try {
           rKey = Schema.resolve(key, sKey, options)[0];
@@ -905,32 +741,27 @@ var init_lib2 = __esm({
           if (strict) continue;
           throw error;
         }
-        result[rKey] = property(data, key, inner, options);
-        data[rKey] = data[key];
-        if (key !== rKey) delete data[key];
+        result[rKey] = property(data, key, inner, options), data[rKey] = data[key], key !== rKey && delete data[key];
       }
       return [result];
     });
     Schema.extend("tuple", (data, { list }, options, strict) => {
       if (!Array.isArray(data)) throw new ValidationError(`expected array but got ${data}`, options);
-      const result = list.map((inner, index) => property(data, index, inner, options));
-      if (strict) return [result];
-      result.push(...data.slice(list.length));
-      return [result];
+      let result = list.map((inner, index) => property(data, index, inner, options));
+      return strict ? [result] : (result.push(...data.slice(list.length)), [result]);
     });
     Schema.extend("object", (data, { dict }, options, strict) => {
       if (!isPlainObject(data)) throw new ValidationError(`expected object but got ${data}`, options);
-      const result = {};
-      for (const key in dict) {
-        const value = property(data, key, dict[key], options);
-        if (!isNullable(value) || key in data) result[key] = value;
+      let result = {};
+      for (let key in dict) {
+        let value = property(data, key, dict[key], options);
+        (!isNullable(value) || key in data) && (result[key] = value);
       }
-      if (!strict) merge(result, data);
-      return [result];
+      return strict || merge(result, data), [result];
     });
     Schema.extend("union", (data, { list, toString: toString2 }, options, strict) => {
-      const messages = [];
-      for (const inner of list) try {
+      let messages = [];
+      for (let inner of list) try {
         return Schema.resolve(data, inner, options, strict);
       } catch (error) {
         messages.push(error);
@@ -940,51 +771,41 @@ var init_lib2 = __esm({
     Schema.extend("intersect", (data, { list, toString: toString2 }, options, strict) => {
       if (!list.length) return [data];
       let result;
-      for (const inner of list) {
-        const value = Schema.resolve(data, inner, options, true)[0];
-        if (isNullable(value)) continue;
-        if (isNullable(result)) result = value;
-        else if (typeof result !== typeof value) throw new ValidationError(`expected ${toString2()} but got ${JSON.stringify(data)}`, options);
-        else if (typeof value === "object") merge(result ??= {}, value);
-        else if (result !== value) throw new ValidationError(`expected ${toString2()} but got ${JSON.stringify(data)}`, options);
+      for (let inner of list) {
+        let value = Schema.resolve(data, inner, options, !0)[0];
+        if (!isNullable(value))
+          if (isNullable(result)) result = value;
+          else {
+            if (typeof result != typeof value) throw new ValidationError(`expected ${toString2()} but got ${JSON.stringify(data)}`, options);
+            if (typeof value == "object") merge(result ??= {}, value);
+            else if (result !== value) throw new ValidationError(`expected ${toString2()} but got ${JSON.stringify(data)}`, options);
+          }
       }
-      if (!strict && isPlainObject(data)) merge(result, data);
-      return [result];
+      return !strict && isPlainObject(data) && merge(result, data), [result];
     });
     Schema.extend("transform", (data, { inner, callback, preserve }, options) => {
-      const [result, adapted = data] = Schema.resolve(data, inner, options, true);
-      if (preserve) return [callback(result)];
-      else return [callback(result), callback(adapted)];
+      let [result, adapted = data] = Schema.resolve(data, inner, options, !0);
+      return preserve ? [callback(result)] : [callback(result), callback(adapted)];
     });
     formatters = {};
-    defineMethod("is", ["constructor"], ({ constructor }) => {
-      if (typeof constructor === "function") return constructor.name;
-      else return constructor;
-    });
+    defineMethod("is", ["constructor"], ({ constructor }) => typeof constructor == "function" ? constructor.name : constructor);
     defineMethod("any", [], () => "any");
     defineMethod("never", [], () => "never");
-    defineMethod("const", ["value"], ({ value }) => typeof value === "string" ? JSON.stringify(value) : value);
+    defineMethod("const", ["value"], ({ value }) => typeof value == "string" ? JSON.stringify(value) : value);
     defineMethod("string", [], () => "string");
     defineMethod("number", [], () => "number");
     defineMethod("boolean", [], () => "boolean");
     defineMethod("bitset", ["bits"], () => "bitset");
     defineMethod("function", [], () => "function");
-    defineMethod("array", ["inner"], ({ inner }) => `${inner.toString(true)}[]`);
+    defineMethod("array", ["inner"], ({ inner }) => `${inner.toString(!0)}[]`);
     defineMethod("dict", ["inner", "sKey"], ({ inner, sKey }) => `{ [key: ${sKey.toString()}]: ${inner.toString()} }`);
     defineMethod("tuple", ["list"], ({ list }) => `[${list.map((inner) => inner.toString()).join(", ")}]`);
-    defineMethod("object", ["dict"], ({ dict }) => {
-      if (Object.keys(dict).length === 0) return "{}";
-      return `{ ${Object.entries(dict).map(([key, inner]) => {
-        return `${key}${inner.meta.required ? "" : "?"}: ${inner.toString()}`;
-      }).join(", ")} }`;
-    });
+    defineMethod("object", ["dict"], ({ dict }) => Object.keys(dict).length === 0 ? "{}" : `{ ${Object.entries(dict).map(([key, inner]) => `${key}${inner.meta.required ? "" : "?"}: ${inner.toString()}`).join(", ")} }`);
     defineMethod("union", ["list"], ({ list }, inline) => {
-      const result = list.map(({ toString: format }) => format()).join(" | ");
+      let result = list.map(({ toString: format }) => format()).join(" | ");
       return inline ? `(${result})` : result;
     });
-    defineMethod("intersect", ["list"], ({ list }) => {
-      return `${list.map((inner) => inner.toString(true)).join(" & ")}`;
-    });
+    defineMethod("intersect", ["list"], ({ list }) => `${list.map((inner) => inner.toString(!0)).join(" & ")}`);
     defineMethod("transform", [
       "inner",
       "callback",
@@ -995,24 +816,22 @@ var init_lib2 = __esm({
 
 // src/businesses/video-generation/config.ts
 function normalizeResolution(value) {
-  const text = String(value ?? "").trim().toLowerCase().replace(/\s+/g, "");
-  const matched = /^(480|720)p?$/.exec(text);
+  let text = String(value ?? "").trim().toLowerCase().replace(/\s+/g, ""), matched = /^(480|720)p?$/.exec(text);
   return matched ? `${matched[1]}p` : "";
 }
-function resolveResolution(config, args = {}) {
-  const resolution = normalizeResolution(args?.resolution ?? FIXED_RESOLUTION);
+function resolveResolution(_config, args = {}) {
+  let resolution = normalizeResolution(args?.resolution ?? FIXED_RESOLUTION);
   if (!resolution) throw new Error("视频清晰度仅支持 480P 或 720P。");
   return resolution;
 }
 function envValue(names) {
-  for (const name of names) {
-    const value = process.env[name];
-    if (typeof value === "string" && value.trim()) return value.trim();
+  for (let name of names) {
+    let value = process.env[name];
+    if (typeof value == "string" && value.trim()) return value.trim();
   }
   return "";
 }
-var videoConfigFields, DEFAULT_MODEL, MAX_SEGMENTS, MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_SEGMENT_SECONDS, MAX_TOTAL_SECONDS, FIXED_RESOLUTION, CUMULATIVE_TOLERANCE_RATIO, CUMULATIVE_TOLERANCE_MIN_SECONDS, GATED_TOOLS, RELAY_PRESET, SUCCESS_STATES, FAILED_STATES, CANCEL_STATES, QUOTA_HINTS, PRICE_HINTS, CONTENT_HINTS, VIDEO_URL_KEYS, GENERIC_URL_KEYS, IMAGE_KEY_TOKENS, IMAGE_EXTENSIONS, CONTINUOUS_TRANSITION, FORWARD_TRANSITION, CLOSEUP_TRANSITION, CONTENT_REJECTION_HINT;
-var init_config = __esm({
+var videoConfigFields, DEFAULT_MODEL, MAX_SEGMENTS, MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_SEGMENT_SECONDS, MAX_TOTAL_SECONDS, FIXED_RESOLUTION, CUMULATIVE_TOLERANCE_RATIO, CUMULATIVE_TOLERANCE_MIN_SECONDS, GATED_TOOLS, RELAY_PRESET, SUCCESS_STATES, FAILED_STATES, CANCEL_STATES, QUOTA_HINTS, PRICE_HINTS, CONTENT_HINTS, VIDEO_URL_KEYS, GENERIC_URL_KEYS, IMAGE_KEY_TOKENS, IMAGE_EXTENSIONS, CONTINUOUS_TRANSITION, FORWARD_TRANSITION, CLOSEUP_TRANSITION, CONTENT_REJECTION_HINT, init_config = __esm({
   "src/businesses/video-generation/config.ts"() {
     init_value();
     init_version();
@@ -1022,9 +841,9 @@ var init_config = __esm({
     init_lib2();
     videoConfigFields = {
       // 画布总开关：默认关闭，打开后左侧栏才出现画布入口，画布组件才可用。
-      canvasEnabled: Schema.boolean().default(false).description("流程画布（默认关闭）：打开后左侧栏出现「MetaOnticVideo流程画布」入口，可用独立画布页创作；关闭时左侧栏隐藏入口，已有画布与成果保留在插件数据目录。").volatile(),
+      canvasEnabled: Schema.boolean().default(!1).description("流程画布（默认关闭）：打开后左侧栏出现「MetaOnticVideo流程画布」入口，可用独立画布页创作；关闭时左侧栏隐藏入口，已有画布与成果保留在插件数据目录。").volatile(),
       // 自动建图：只在流程画布打开后生效，默认开启，跟着创作自动建图并回填成果。
-      autoCreateCanvas: Schema.boolean().default(true).description("自动创建画布（流程画布打开后有效，默认开启）：创作时自动建图，审核前同步剧本、分镜与制作计划，生成后回填成果；关闭后不自动建图，仅在用户明确选中画布节点时联动。").volatile(),
+      autoCreateCanvas: Schema.boolean().default(!0).description("自动创建画布（流程画布打开后有效，默认开启）：创作时自动建图，审核前同步剧本、分镜与制作计划，生成后回填成果；关闭后不自动建图，仅在用户明确选中画布节点时联动。").volatile(),
       connectionMode: Schema.union(["metaontic", "volcengine"]).default("metaontic").description("接入方式：MetaOntic AI（metaontic）；火山引擎直连（volcengine，当前设置页暂不提供选择）").volatile(),
       metaonticApiKey: Schema.string().default("").description("MetaOntic AI API密钥").volatile(),
       volcengineApiKey: Schema.string().default("").description("火山引擎直连模式的火山 API密钥").volatile(),
@@ -1034,7 +853,7 @@ var init_config = __esm({
       ).volatile(),
       submitPath: Schema.string().default("").description("创建任务路径；留空用中转站默认值 /doubao/api/v3/contents/generations/tasks").volatile(),
       queryPath: Schema.string().default("").description("查询任务路径，{task_id} 会被任务 ID 替换；留空用中转站默认值").volatile(),
-      imageUseVideoKey: Schema.boolean().default(true).description("图片模型与视频模型共用 API密钥").volatile(),
+      imageUseVideoKey: Schema.boolean().default(!0).description("图片模型与视频模型共用 API密钥").volatile(),
       imageApiKey: Schema.string().default("").description("不共用时填写的图片模型 API密钥").volatile(),
       // 文本模型（写脚本）：关闭共用密钥后跟图片一样单独配一把，没填只影响写脚本，不会改用别的密钥。
       textApiKey: Schema.string().default("").description("不共用时填写的文本模型 API密钥").volatile(),
@@ -1054,7 +873,7 @@ var init_config = __esm({
       ).volatile(),
       bgmFadeSeconds: Schema.number().min(0).max(3).default(0.8).description("旧配置兼容字段，当前直接拼接不使用音频交叉淡化，修改此值不生效。").volatile(),
       outputDir: Schema.string().default("").description("成片输出目录；留空用会话工作目录下的 metaontic-video/").volatile(),
-      keepSegments: Schema.boolean().default(true).description("旧配置兼容字段；原始分段始终保留，此值不再控制删除。").volatile(),
+      keepSegments: Schema.boolean().default(!0).description("旧配置兼容字段；原始分段始终保留，此值不再控制删除。").volatile(),
       resumeLockStaleMinutes: Schema.number().min(0).default(60).description(
         "旧配置兼容字段，不再按时间判定续做锁过期。仅同机且明确已退出进程的残留锁可自动恢复；活跃、异机或未知锁均保留。"
       ).volatile(),
@@ -1062,26 +881,16 @@ var init_config = __esm({
       ffprobeBinary: Schema.string().default("ffprobe").description("ffprobe 可执行文件；PATH 里没有时填绝对路径").volatile(),
       mode: Schema.union(["continuous", "closeup"]).default("continuous").description("旧配置兼容字段，新任务不再读取；续拍方式由已审核脚本的工具参数与过渡描述决定").volatile(),
       ratio: Schema.union(["16:9", "9:16", "4:3", "3:4", "1:1", "adaptive"]).default("adaptive").description("画面比例；seedance 2.5 延长时固定改用 adaptive").volatile(),
-      generateAudio: Schema.boolean().default(true).description("是否生成音频").volatile(),
-      watermark: Schema.boolean().default(false).description("是否添加水印；部分中转站只接受 true").volatile(),
+      generateAudio: Schema.boolean().default(!0).description("是否生成音频").volatile(),
+      watermark: Schema.boolean().default(!1).description("是否添加水印；部分中转站只接受 true").volatile(),
       extraParams: Schema.string().default("").description("JSON 对象字符串，合并进请求体，用于中转站的特有字段").volatile(),
       pollIntervalMs: Schema.natural().min(1e3).default(5e3).description("轮询任务状态的间隔（毫秒）").volatile(),
       maxWaitMs: Schema.natural().min(1e3).default(6e5).description("单次调用最长等待时间（毫秒）").volatile(),
       pollErrorRetries: Schema.natural().min(1).max(60).default(5).description(
         "轮询期间「查询失败」的容忍次数：网络抖动、中转站限流、API密钥中途被判无效都会让查询报错，这些错误不表明任务终态；连续查询失败到这个次数才停止本次等待。放弃时任务 ID 仍保留，可用 video_status 事后补查，不会把「查不到」当成「没生成」。设置页不显示这一项：默认值 5 够用。"
       ).volatile()
-    };
-    DEFAULT_MODEL = VIDEO_MODEL;
-    MAX_SEGMENTS = 900;
-    MIN_SECONDS = 4;
-    MIN_SEGMENT_SECONDS = 4;
-    MAX_SEGMENT_SECONDS = 15;
-    MAX_TOTAL_SECONDS = 3600;
-    FIXED_RESOLUTION = "720p";
-    CUMULATIVE_TOLERANCE_RATIO = 0.25;
-    CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5;
-    GATED_TOOLS = ["video_generate", "video_extend", "video_setup", "video_prepare_image", "media_submission"];
-    RELAY_PRESET = {
+    }, DEFAULT_MODEL = VIDEO_MODEL, MAX_SEGMENTS = 900, MIN_SECONDS = 4, MIN_SEGMENT_SECONDS = 4, MAX_SEGMENT_SECONDS = 15, MAX_TOTAL_SECONDS = 3600, FIXED_RESOLUTION = "720p";
+    CUMULATIVE_TOLERANCE_RATIO = 0.25, CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5, GATED_TOOLS = ["video_generate", "video_extend", "video_setup", "video_prepare_image", "media_submission"], RELAY_PRESET = {
       baseUrl: METAONTIC_BASE_URL,
       submitPath: RELAY.submitPath,
       queryPath: RELAY.queryPath,
@@ -1089,13 +898,7 @@ var init_config = __esm({
       baseEnv: RELAY.baseEnv,
       modelEnv: RELAY.modelEnv,
       textModelEnv: RELAY.textModelEnv
-    };
-    SUCCESS_STATES = /* @__PURE__ */ new Set(["succeeded", "success", "completed", "complete", "done", "finished"]);
-    FAILED_STATES = /* @__PURE__ */ new Set(["failed", "failure", "error", "cancelled", "canceled", "expired"]);
-    CANCEL_STATES = /* @__PURE__ */ new Set(["cancelled", "canceled"]);
-    QUOTA_HINTS = ["quota", "insufficient", "balance", "预扣费", "剩余额度"];
-    PRICE_HINTS = ["model_price_error", "阶梯计价", 'u("input_images")'];
-    CONTENT_HINTS = [
+    }, SUCCESS_STATES = /* @__PURE__ */ new Set(["succeeded", "success", "completed", "complete", "done", "finished"]), FAILED_STATES = /* @__PURE__ */ new Set(["failed", "failure", "error", "cancelled", "canceled", "expired"]), CANCEL_STATES = /* @__PURE__ */ new Set(["cancelled", "canceled"]), QUOTA_HINTS = ["quota", "insufficient", "balance", "预扣费", "剩余额度"], PRICE_HINTS = ["model_price_error", "阶梯计价", 'u("input_images")'], CONTENT_HINTS = [
       "real person",
       "privacyinformation",
       "privacy information",
@@ -1108,22 +911,14 @@ var init_config = __esm({
       "违规",
       "敏感",
       "涉政"
-    ];
-    VIDEO_URL_KEYS = [
+    ], VIDEO_URL_KEYS = [
       "video_url",
       "videourl",
       "download_url",
       "play_url",
       "result_url",
       "output_url"
-    ];
-    GENERIC_URL_KEYS = /* @__PURE__ */ new Set(["url", "output", "video", "file"]);
-    IMAGE_KEY_TOKENS = ["cover", "image", "thumb", "poster", "frame", "snapshot", "preview"];
-    IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"];
-    CONTINUOUS_TRANSITION = "本段第一帧必须紧接视频1最后一帧，保持同一构图、人物大小、左右位置、头部朝向、视线、手部位置和动作阶段。动作保持原有方向和速度，不重复前段动作、不定格等待、不从画面另一侧重新入场；不擅自切镜或重新居中。";
-    FORWARD_TRANSITION = "向前延长时，本段最后一帧必须紧接视频1第一帧，保持同一构图、人物大小、左右位置、头部朝向、视线、手部位置和动作阶段。动作朝向视频1的开场动作发展，不重复前段动作、不定格等待、不从画面另一侧重新入场；不擅自切镜或重新居中。";
-    CLOSEUP_TRANSITION = "镜头衔接建议（仅在本段未明确指定运镜或切镜安排时采用）：在完整台词结束处自然切到下一位说话人的近景或听话人的反应近景，再继续本段剧情。保持轴线、视线方向、左右人物关系、服装和音色，不交换角色；只改变景别，不新增场景。";
-    CONTENT_REJECTION_HINT = "参考视频被上游内容审核拒绝，延长已停止。Seedance 含人脸续拍需使用同一上游账号的受信原始视频或授权素材；请确认中转站透传了原始 video_url 与 reference_video，且前后请求使用同一上游账号。不会自动去掉参考视频生成，以免人物不一致。";
+    ], GENERIC_URL_KEYS = /* @__PURE__ */ new Set(["url", "output", "video", "file"]), IMAGE_KEY_TOKENS = ["cover", "image", "thumb", "poster", "frame", "snapshot", "preview"], IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"], CONTINUOUS_TRANSITION = "本段第一帧必须紧接视频1最后一帧，保持同一构图、人物大小、左右位置、头部朝向、视线、手部位置和动作阶段。动作保持原有方向和速度，不重复前段动作、不定格等待、不从画面另一侧重新入场；不擅自切镜或重新居中。", FORWARD_TRANSITION = "向前延长时，本段最后一帧必须紧接视频1第一帧，保持同一构图、人物大小、左右位置、头部朝向、视线、手部位置和动作阶段。动作朝向视频1的开场动作发展，不重复前段动作、不定格等待、不从画面另一侧重新入场；不擅自切镜或重新居中。", CLOSEUP_TRANSITION = "镜头衔接建议（仅在本段未明确指定运镜或切镜安排时采用）：在完整台词结束处自然切到下一位说话人的近景或听话人的反应近景，再继续本段剧情。保持轴线、视线方向、左右人物关系、服装和音色，不交换角色；只改变景别，不新增场景。", CONTENT_REJECTION_HINT = "参考视频被上游内容审核拒绝，延长已停止。Seedance 含人脸续拍需使用同一上游账号的受信原始视频或授权素材；请确认中转站透传了原始 video_url 与 reference_video，且前后请求使用同一上游账号。不会自动去掉参考视频生成，以免人物不一致。";
   }
 });
 
@@ -1171,33 +966,29 @@ function resolveApiKey(config) {
 }
 function resolveBaseUrl(config) {
   if (isVolcengine(config)) return VOLCENGINE.baseUrl;
-  const preset = relayPreset();
+  let preset = relayPreset();
   return (String(ref(config, "baseUrl", "")).trim() || envValue(preset.baseEnv) || preset.baseUrl).replace(/\/+$/, "");
 }
 function resolveSubmitPath(config) {
-  if (isVolcengine(config)) return VOLCENGINE.submitPath;
-  return String(ref(config, "submitPath", "")).trim() || relayPreset().submitPath;
+  return isVolcengine(config) ? VOLCENGINE.submitPath : String(ref(config, "submitPath", "")).trim() || relayPreset().submitPath;
 }
 function resolveQueryPath(config, taskId) {
-  if (isVolcengine(config)) return VOLCENGINE.queryPath.replace("{task_id}", encodeURIComponent(taskId));
-  const path26 = String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
-  return path26.replace("{task_id}", encodeURIComponent(taskId));
+  return isVolcengine(config) ? VOLCENGINE.queryPath.replace("{task_id}", encodeURIComponent(taskId)) : (String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath).replace("{task_id}", encodeURIComponent(taskId));
 }
 function resolveModel(config) {
-  const preset = relayPreset();
+  let preset = relayPreset();
   return String(ref(config, "model", "")).trim() || envValue(preset.modelEnv) || preset.model;
 }
 function resolveTextModel(config) {
-  const preset = relayPreset();
-  const model = String(ref(config, "textModel", "")).trim() || envValue(preset.textModelEnv) || TEXT_MODEL;
+  let preset = relayPreset(), model = String(ref(config, "textModel", "")).trim() || envValue(preset.textModelEnv) || TEXT_MODEL;
   return normalizeTextModel(model);
 }
 function isOmniExtendModel(model) {
-  const lowered = String(model).toLowerCase();
+  let lowered = String(model).toLowerCase();
   return lowered.includes("seedance-2-5") || lowered.includes("seedance-2.5");
 }
 function parseExtraParams(config) {
-  const raw = String(ref(config, "extraParams", "")).trim();
+  let raw = String(ref(config, "extraParams", "")).trim();
   if (!raw) return {};
   let value;
   try {
@@ -1205,9 +996,8 @@ function parseExtraParams(config) {
   } catch {
     throw new Error("配置 extraParams 不是合法 JSON 对象字符串。");
   }
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!value || typeof value != "object" || Array.isArray(value))
     throw new Error("配置 extraParams 必须是 JSON 对象。");
-  }
   return value;
 }
 function assertConfigured(config, apiKey) {
@@ -1223,32 +1013,24 @@ function assertConfigured(config, apiKey) {
 }
 function snapshotConfig(config) {
   if (!isManualKey(config)) throw new Error("请在设置页选择有效接入方式并保存。");
-  const snapshot2 = {};
-  for (const key of Object.keys(config || {})) snapshot2[key] = ref(config, key, void 0);
-  snapshot2.connectionMode = isVolcengine(config) ? "volcengine" : "metaontic";
-  snapshot2.baseUrl = resolveBaseUrl(config);
-  snapshot2.model = resolveModel(config);
-  snapshot2.imageModel = resolveImageModel(ref(config, "imageModel", IMAGE_MODEL));
-  snapshot2.textModel = resolveTextModel(config);
-  snapshot2.submitPath = resolveSubmitPath(config);
-  snapshot2.queryPath = isVolcengine(config) ? "/api/v3/contents/generations/tasks/{task_id}" : String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath;
-  return Object.freeze(snapshot2);
+  let snapshot2 = {};
+  for (let key of Object.keys(config || {})) snapshot2[key] = ref(config, key, void 0);
+  return snapshot2.connectionMode = isVolcengine(config) ? "volcengine" : "metaontic", snapshot2.baseUrl = resolveBaseUrl(config), snapshot2.model = resolveModel(config), snapshot2.imageModel = resolveImageModel(ref(config, "imageModel", IMAGE_MODEL)), snapshot2.textModel = resolveTextModel(config), snapshot2.submitPath = resolveSubmitPath(config), snapshot2.queryPath = isVolcengine(config) ? "/api/v3/contents/generations/tasks/{task_id}" : String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath, Object.freeze(snapshot2);
 }
 function resolveTextApiKey(config) {
-  if (!isMetaontic(config) || ref(config, "imageUseVideoKey", true) !== false) return resolveApiKey(config);
-  return String(ref(config, "textApiKey", "")).trim();
+  return !isMetaontic(config) || ref(config, "imageUseVideoKey", !0) !== !1 ? resolveApiKey(config) : String(ref(config, "textApiKey", "")).trim();
 }
 function textConfig(config) {
-  const snapshot2 = snapshotConfig(config);
-  if (!isMetaontic(snapshot2) || ref(snapshot2, "imageUseVideoKey", true) !== false) return snapshot2;
-  const key = String(ref(snapshot2, "textApiKey", "")).trim();
+  let snapshot2 = snapshotConfig(config);
+  if (!isMetaontic(snapshot2) || ref(snapshot2, "imageUseVideoKey", !0) !== !1) return snapshot2;
+  let key = String(ref(snapshot2, "textApiKey", "")).trim();
   if (!key) throw new Error("已关闭模型共用 API密钥，请单独填写文本模型 API密钥。");
   return Object.freeze({ ...snapshot2, metaonticApiKey: key });
 }
 function imageConfig(config) {
-  const snapshot2 = snapshotConfig(config);
-  if (!isMetaontic(snapshot2) || ref(snapshot2, "imageUseVideoKey", true) !== false) return snapshot2;
-  const key = String(ref(snapshot2, "imageApiKey", "")).trim();
+  let snapshot2 = snapshotConfig(config);
+  if (!isMetaontic(snapshot2) || ref(snapshot2, "imageUseVideoKey", !0) !== !1) return snapshot2;
+  let key = String(ref(snapshot2, "imageApiKey", "")).trim();
   if (!key) throw new Error("已关闭图片与视频共用 API密钥，请单独填写图片模型 API密钥。");
   return Object.freeze({ ...snapshot2, [isMetaontic(snapshot2) ? "metaonticApiKey" : "apiKey"]: key });
 }
@@ -1262,8 +1044,7 @@ var init_connection = __esm({
 
 // src/businesses/video-generation/providers/capabilities.ts
 function videoCapabilities(model) {
-  const known = /^(?:doubao-)?seedance-2[-.](0|5)(?:-|$)/i.test(model);
-  const omni = /seedance-2[-.]5(?:-|$)/i.test(model);
+  let known = /^(?:doubao-)?seedance-2[-.](0|5)(?:-|$)/i.test(model), omni = /seedance-2[-.]5(?:-|$)/i.test(model);
   return {
     model_name: model,
     profile_revision: "adapter-1",
@@ -1271,9 +1052,9 @@ function videoCapabilities(model) {
     generation_modes: known ? ["TEXT_TO_VIDEO", "IMAGE_TO_VIDEO"] : null,
     supported_durations_ms: known ? { min: 4e3, max: omni ? 3e4 : 15e3, step: 1e3 } : null,
     supported_aspect_ratios: known ? ["16:9", "9:16", "4:3", "3:4", "1:1"] : null,
-    native_audio_supported: known ? true : null,
-    reference_image_supported: known ? true : null,
-    reference_video_supported: known ? true : null,
+    native_audio_supported: known ? !0 : null,
+    reference_image_supported: known ? !0 : null,
+    reference_video_supported: known ? !0 : null,
     reference_image_limit: known ? omni ? 30 : 9 : null,
     prompt_length_limit: null,
     verified_at: null,
@@ -1297,24 +1078,14 @@ import path2 from "node:path";
 import os from "node:os";
 import path from "node:path";
 function dshHome() {
-  const fromEnv = String(typeof process !== "undefined" && process.env?.DSH_HOME || "").trim();
-  return fromEnv || path.join(os.homedir(), ".dsh");
+  return String(typeof process < "u" && process.env?.DSH_HOME || "").trim() || path.join(os.homedir(), ".dsh");
 }
 
 // src/shared/utils/logging.ts
 init_version();
 init_plugin();
 import { mkdir, appendFile, readdir, lstat, unlink, rmdir } from "node:fs/promises";
-var requestLogContext = new AsyncLocalStorage();
-var LOG_POLICY = { retentionDays: 30, totalBytes: 50 * 1024 * 1024, dailyBytes: 5 * 1024 * 1024, queueLimit: 256 };
-var fields = new Set("event callId sessionId projectId jobId taskId tool stage spanId parentSpanId startedAt finishedAt elapsedMs outcome errorCode errorCategory httpStatus upstreamRequestId requestId operation method provider model duration resolution imageCount videoCount taskStatus completionTokens index actualSeconds plannedCumulative mode segmentCount sourceCount segmentSeconds done resuming paused cancelled truncated characters chunks bytes responseBytes turn version closedSpanId closedElapsedMs coverage action status source reason".split(" "));
-var pathFields = new Set("path sourcePath videoPath previewPath resumeDir segmentsDir".split(" "));
-var listFields = /* @__PURE__ */ new Set(["files", "inputPaths"]);
-var preparedDirs = /* @__PURE__ */ new Set();
-var health = { written: 0, dropped: 0, failures: 0, cleanupFailures: 0, lastErrorCode: "", lastFailureAt: "", lastSuccessAt: "" };
-var pending = 0;
-var queue = Promise.resolve();
-var maintenance = /* @__PURE__ */ new Map();
+var requestLogContext = new AsyncLocalStorage(), LOG_POLICY = { retentionDays: 30, totalBytes: 50 * 1024 * 1024, dailyBytes: 5 * 1024 * 1024, queueLimit: 256 }, fields = new Set("event callId sessionId projectId jobId taskId tool stage spanId parentSpanId startedAt finishedAt elapsedMs outcome errorCode errorCategory httpStatus upstreamRequestId requestId operation method provider model duration resolution imageCount videoCount taskStatus completionTokens index actualSeconds plannedCumulative mode segmentCount sourceCount segmentSeconds done resuming paused cancelled truncated characters chunks bytes responseBytes turn version closedSpanId closedElapsedMs coverage action status source reason".split(" ")), pathFields = new Set("path sourcePath videoPath previewPath resumeDir segmentsDir".split(" ")), listFields = /* @__PURE__ */ new Set(["files", "inputPaths"]), preparedDirs = /* @__PURE__ */ new Set(), health = { written: 0, dropped: 0, failures: 0, cleanupFailures: 0, lastErrorCode: "", lastFailureAt: "", lastSuccessAt: "" }, pending = 0, queue = Promise.resolve(), maintenance = /* @__PURE__ */ new Map();
 function logDiagnostics() {
   return { ...health, pending, policy: { ...LOG_POLICY } };
 }
@@ -1322,157 +1093,121 @@ function safeString(value) {
   return value.replace(/https?:\/\/[^\s<>]+/gi, "[url]").replace(/\b(?:Bearer\s+[^\s,;]+|sk-[a-z0-9_-]+)\b/gi, "[redacted]").replace(/((?:api[_-]?key|access[_-]?token|authorization|password|secret)\s*[:=]\s*)[^\s,;]+/gi, "$1[redacted]").replace(/[\r\n\x00-\x1f]/g, " ").slice(0, 256);
 }
 function sanitizeLogRecord(record) {
-  const clean = {};
-  for (const [key, value] of Object.entries(record || {})) {
-    if (key === "cuts" && Array.isArray(value)) {
-      clean.cuts = value.slice(0, 100).map((item) => Object.fromEntries(["index", "seconds", "tailSeconds"].filter((k) => typeof item?.[k] === "number" && Number.isFinite(item[k])).map((k) => [k, item[k]])));
-    } else if (pathFields.has(key) && typeof value === "string") {
+  let clean = {};
+  for (let [key, value] of Object.entries(record || {}))
+    if (key === "cuts" && Array.isArray(value))
+      clean.cuts = value.slice(0, 100).map((item) => Object.fromEntries(["index", "seconds", "tailSeconds"].filter((k) => typeof item?.[k] == "number" && Number.isFinite(item[k])).map((k) => [k, item[k]])));
+    else if (pathFields.has(key) && typeof value == "string")
       clean[key] = safeString(value.split(/[?#]/)[0].split(/[\\/]/).pop() || "");
-    } else if (listFields.has(key) && Array.isArray(value)) {
-      clean[key] = value.slice(0, 20).filter((v) => typeof v === "string").map((v) => safeString(v.split(/[?#]/)[0].split(/[\\/]/).pop() || ""));
-    } else if (fields.has(key)) {
-      if (typeof value === "number" && Number.isFinite(value) || typeof value === "boolean") clean[key] = value;
-      else if (typeof value === "string") {
+    else if (listFields.has(key) && Array.isArray(value))
+      clean[key] = value.slice(0, 20).filter((v) => typeof v == "string").map((v) => safeString(v.split(/[?#]/)[0].split(/[\\/]/).pop() || ""));
+    else if (fields.has(key)) {
+      if (typeof value == "number" && Number.isFinite(value) || typeof value == "boolean") clean[key] = value;
+      else if (typeof value == "string") {
         if (key === "reason" && !/^[a-z][a-z0-9_]{0,79}$/.test(value)) continue;
         clean[key] = safeString(value);
       }
     }
-  }
   return clean;
 }
 function requestLogPath() {
-  const now = /* @__PURE__ */ new Date();
-  const date2 = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  let now = /* @__PURE__ */ new Date(), date2 = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
   return path2.join(dshHome(), "logs", DATA_DIR, date2, "requests.jsonl");
 }
 async function pruneRequestLogs(root, current, now = Date.now()) {
-  const files = [];
-  for (const entry2 of await readdir(root, { withFileTypes: true })) {
+  let files = [];
+  for (let entry2 of await readdir(root, { withFileTypes: !0 })) {
     if (!/^\d{8}$/.test(entry2.name) || !entry2.isDirectory() || entry2.isSymbolicLink()) continue;
-    const dir = path2.join(root, entry2.name);
-    const file = path2.join(dir, "requests.jsonl");
+    let dir = path2.join(root, entry2.name), file = path2.join(dir, "requests.jsonl");
     try {
-      const info = await lstat(file);
+      let info = await lstat(file);
       if (!info.isFile() || info.isSymbolicLink()) continue;
-      const day = (/* @__PURE__ */ new Date(`${entry2.name.slice(0, 4)}-${entry2.name.slice(4, 6)}-${entry2.name.slice(6, 8)}T00:00:00`)).getTime();
-      if (Number.isFinite(day)) files.push({ file, dir, size: info.size, day });
+      let day = (/* @__PURE__ */ new Date(`${entry2.name.slice(0, 4)}-${entry2.name.slice(4, 6)}-${entry2.name.slice(6, 8)}T00:00:00`)).getTime();
+      Number.isFinite(day) && files.push({ file, dir, size: info.size, day });
     } catch (error) {
       if (error?.code !== "ENOENT") throw error;
     }
   }
   files.sort((a, b) => a.day - b.day);
   let total = files.reduce((sum, item) => sum + item.size, 0);
-  for (const item of files) {
-    if (item.file === current) continue;
-    if (item.day >= now - LOG_POLICY.retentionDays * 864e5 && total <= LOG_POLICY.totalBytes) continue;
-    await unlink(item.file);
-    total -= item.size;
-    preparedDirs.delete(item.dir);
-    try {
-      await rmdir(item.dir);
-    } catch (error) {
-      if (!["ENOTEMPTY", "EEXIST", "ENOENT"].includes(error?.code)) throw error;
+  for (let item of files)
+    if (item.file !== current && !(item.day >= now - LOG_POLICY.retentionDays * 864e5 && total <= LOG_POLICY.totalBytes)) {
+      await unlink(item.file), total -= item.size, preparedDirs.delete(item.dir);
+      try {
+        await rmdir(item.dir);
+      } catch (error) {
+        if (!["ENOTEMPTY", "EEXIST", "ENOENT"].includes(error?.code)) throw error;
+      }
     }
-  }
 }
 async function appendRequestLog(record) {
-  if (typeof process !== "undefined" && process.env?.NODE_TEST_CONTEXT && !process.env?.DSH_HOME) return;
+  if (typeof process < "u" && process.env?.NODE_TEST_CONTEXT && !process.env?.DSH_HOME) return;
   if (pending >= LOG_POLICY.queueLimit) {
     health.dropped++;
     return;
   }
-  const file = requestLogPath();
-  let payload;
+  let file = requestLogPath(), payload;
   try {
     payload = { ...sanitizeLogRecord(requestLogContext.getStore() || {}), ...sanitizeLogRecord(record), time: (/* @__PURE__ */ new Date()).toISOString(), pluginVersion: PLUGIN_VERSION, logSchemaVersion: 1 };
   } catch {
-    health.failures++;
-    health.lastErrorCode = "INVALID_LOG_RECORD";
-    health.lastFailureAt = (/* @__PURE__ */ new Date()).toISOString();
+    health.failures++, health.lastErrorCode = "INVALID_LOG_RECORD", health.lastFailureAt = (/* @__PURE__ */ new Date()).toISOString();
     return;
   }
-  pending++;
-  const write2 = queue.then(async () => {
+  pending++, queue = queue.then(async () => {
     try {
-      const dir = path2.dirname(file), root = path2.dirname(dir);
+      let dir = path2.dirname(file), root = path2.dirname(dir);
       if (!preparedDirs.has(dir)) {
-        await mkdir(dir, { recursive: true, mode: 448 });
-        for (const target of [root, dir]) {
-          const info = await lstat(target);
+        await mkdir(dir, { recursive: !0, mode: 448 });
+        for (let target of [root, dir]) {
+          let info = await lstat(target);
           if (!info.isDirectory() || info.isSymbolicLink()) throw Object.assign(Error(), { code: "UNSAFE_LOG_FILE" });
         }
-        if (preparedDirs.size > 32) preparedDirs.clear();
-        preparedDirs.add(dir);
+        preparedDirs.size > 32 && preparedDirs.clear(), preparedDirs.add(dir);
       }
-      if (Date.now() - (maintenance.get(root) || 0) > 36e5) {
+      if (Date.now() - (maintenance.get(root) || 0) > 36e5)
         try {
-          await pruneRequestLogs(root, file);
-          if (maintenance.size > 32) maintenance.clear();
-          maintenance.set(root, Date.now());
+          await pruneRequestLogs(root, file), maintenance.size > 32 && maintenance.clear(), maintenance.set(root, Date.now());
         } catch {
-          health.cleanupFailures++;
-          maintenance.set(root, Date.now() - 354e4);
+          health.cleanupFailures++, maintenance.set(root, Date.now() - 354e4);
         }
-      }
       let size = 0;
       try {
-        const info = await lstat(file);
+        let info = await lstat(file);
         if (!info.isFile() || info.isSymbolicLink()) throw Object.assign(Error(), { code: "UNSAFE_LOG_FILE" });
         size = info.size;
       } catch (error) {
         if (error?.code !== "ENOENT") throw error;
       }
-      const text = JSON.stringify(payload) + "\n";
+      let text = JSON.stringify(payload) + `
+`;
       if (size + new TextEncoder().encode(text).length > LOG_POLICY.dailyBytes) {
-        health.dropped++;
-        health.lastErrorCode = "DAILY_LIMIT";
+        health.dropped++, health.lastErrorCode = "DAILY_LIMIT";
         return;
       }
-      await appendFile(file, text, { mode: 384 });
-      health.written++;
-      health.lastSuccessAt = (/* @__PURE__ */ new Date()).toISOString();
+      await appendFile(file, text, { mode: 384 }), health.written++, health.lastSuccessAt = (/* @__PURE__ */ new Date()).toISOString();
     } catch (error) {
-      preparedDirs.delete(path2.dirname(file));
-      health.failures++;
-      health.lastFailureAt = (/* @__PURE__ */ new Date()).toISOString();
-      health.lastErrorCode = ["ENOENT", "EACCES", "EPERM", "ENOSPC", "UNSAFE_LOG_FILE"].includes(error?.code) ? error.code : "LOG_WRITE_FAILED";
+      preparedDirs.delete(path2.dirname(file)), health.failures++, health.lastFailureAt = (/* @__PURE__ */ new Date()).toISOString(), health.lastErrorCode = ["ENOENT", "EACCES", "EPERM", "ENOSPC", "UNSAFE_LOG_FILE"].includes(error?.code) ? error.code : "LOG_WRITE_FAILED";
     } finally {
       pending--;
     }
-  });
-  queue = write2.catch(() => {
-  });
-  await queue;
+  }).catch(() => {
+  }), await queue;
 }
 
 // src/shared/utils/timing.ts
 function diagnosticError(error) {
-  const message = String(error?.message || "");
-  const raw = typeof error?.code === "string" ? error.code : message.split(":")[0];
-  const known = /^(?:provider_[a-z_]+|INVALID_[A-Z_]+|[A-Z_]+_CONFLICT|ABORTED|EACCES|EPERM|ENOSPC|ENOENT|ETIMEDOUT|ECONNRESET|resume_locked|submission_unknown|MODEL_NOT_FOUND|CONFIG_MISSING|TIMEOUT)$/;
-  const inferred = /model not found|unknown model|模型不存在/i.test(message) ? "MODEL_NOT_FOUND" : /未配置|请.*填写.*(?:模型|密钥)|关闭模型共用/.test(message) ? "CONFIG_MISSING" : /没有输出|timeout|timed out/i.test(message) ? "TIMEOUT" : "";
-  const errorCode = known.test(raw) ? raw : inferred || (error?.name === "AbortError" ? "ABORTED" : error?.name === "SyntaxError" ? "INVALID_JSON" : "INTERNAL_ERROR");
-  const errorCategory = /ABORT/.test(errorCode) ? "cancelled" : /auth/.test(errorCode) ? "authentication" : /network|TIMEOUT|TIMEDOUT|CONN/.test(errorCode) ? "network" : /INVALID|CONFIG_MISSING|Syntax/.test(errorCode) ? "validation" : /CONFLICT|locked/.test(errorCode) ? "conflict" : /provider_|MODEL_NOT_FOUND/.test(errorCode) ? "provider" : /EACCES|EPERM|ENOSPC|ENOENT/.test(errorCode) ? "filesystem" : "internal";
+  let message = String(error?.message || ""), raw = typeof error?.code == "string" ? error.code : message.split(":")[0], known = /^(?:provider_[a-z_]+|INVALID_[A-Z_]+|[A-Z_]+_CONFLICT|ABORTED|EACCES|EPERM|ENOSPC|ENOENT|ETIMEDOUT|ECONNRESET|resume_locked|submission_unknown|MODEL_NOT_FOUND|CONFIG_MISSING|TIMEOUT)$/, inferred = /model not found|unknown model|模型不存在/i.test(message) ? "MODEL_NOT_FOUND" : /未配置|请.*填写.*(?:模型|密钥)|关闭模型共用/.test(message) ? "CONFIG_MISSING" : /没有输出|timeout|timed out/i.test(message) ? "TIMEOUT" : "", errorCode = known.test(raw) ? raw : inferred || (error?.name === "AbortError" ? "ABORTED" : error?.name === "SyntaxError" ? "INVALID_JSON" : "INTERNAL_ERROR"), errorCategory = /ABORT/.test(errorCode) ? "cancelled" : /auth/.test(errorCode) ? "authentication" : /network|TIMEOUT|TIMEDOUT|CONN/.test(errorCode) ? "network" : /INVALID|CONFIG_MISSING|Syntax/.test(errorCode) ? "validation" : /CONFLICT|locked/.test(errorCode) ? "conflict" : /provider_|MODEL_NOT_FOUND/.test(errorCode) ? "provider" : /EACCES|EPERM|ENOSPC|ENOENT/.test(errorCode) ? "filesystem" : "internal";
   return { errorCode, errorCategory };
 }
 async function timedStage(stage, operation) {
-  const spanId = randomUUID();
-  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
-  const start = performance.now();
+  let spanId = randomUUID(), startedAt = (/* @__PURE__ */ new Date()).toISOString(), start = performance.now();
   await appendRequestLog({ event: "stage_started", stage, spanId, startedAt });
-  let outcome = "error";
-  let failure = {};
+  let outcome = "error", failure = {};
   try {
-    const result = await requestLogContext.run({ ...requestLogContext.getStore(), parentSpanId: spanId }, operation);
-    const metadata = result;
-    outcome = ["failed", "unknown", "timeout", "cancelled", "pending", "review_required", "blocked", "submission_unknown", "partial", "paused"].includes(metadata?.status) ? metadata.status : "success";
-    if (metadata?.errorCode) failure = diagnosticError({ code: metadata.errorCode });
-    else if (["blocked", "review_required"].includes(outcome)) failure = { errorCategory: "approval" };
-    return result;
+    let result = await requestLogContext.run({ ...requestLogContext.getStore(), parentSpanId: spanId }, operation), metadata = result;
+    return outcome = ["failed", "unknown", "timeout", "cancelled", "pending", "review_required", "blocked", "submission_unknown", "partial", "paused"].includes(metadata?.status) ? metadata.status : "success", metadata?.errorCode ? failure = diagnosticError({ code: metadata.errorCode }) : ["blocked", "review_required"].includes(outcome) && (failure = { errorCategory: "approval" }), result;
   } catch (error) {
-    failure = diagnosticError(error);
-    outcome = error?.name === "AbortError" || error?.code === "ABORTED" ? "cancelled" : "error";
-    throw error;
+    throw failure = diagnosticError(error), outcome = error?.name === "AbortError" || error?.code === "ABORTED" ? "cancelled" : "error", error;
   } finally {
     await appendRequestLog({
       event: "stage_finished",
@@ -1488,7 +1223,7 @@ async function timedStage(stage, operation) {
 }
 function withStageTiming(tool) {
   return { ...tool, async execute(args, exec) {
-    const context = {
+    let context = {
       ...requestLogContext.getStore(),
       callId: exec?.callId || requestLogContext.getStore()?.callId || randomUUID(),
       tool: tool.name,
@@ -1502,11 +1237,10 @@ function withStageTiming(tool) {
 }
 
 // src/businesses/film-production/validation/budget.validator.ts
-var ACTIONS = ["create", "read", "validate", "submit", "approve", "export", "next", "compile", "revise", "schedule", "task_result", "route", "verify_issue", "configure_profile", "diagnose", "recover_lock"];
-var STAGES = ["creative", "script", "assets", "shots", "prompts", "review"];
+var ACTIONS = ["create", "read", "validate", "submit", "approve", "export", "next", "compile", "revise", "schedule", "task_result", "route", "verify_issue", "configure_profile", "diagnose", "recover_lock"], STAGES = ["creative", "script", "assets", "shots", "prompts", "review"];
 function filmOutput(value) {
-  const text = JSON.stringify(value, (_key, item) => {
-    if (typeof item === "number" && !Number.isFinite(item)) throw Error("INVALID_FILM_OUTPUT:nonfinite_number");
+  let text = JSON.stringify(value, (_key, item) => {
+    if (typeof item == "number" && !Number.isFinite(item)) throw Error("INVALID_FILM_OUTPUT:nonfinite_number");
     return item;
   });
   if (text === void 0) throw Error("INVALID_FILM_OUTPUT:empty_result");
@@ -1514,20 +1248,12 @@ function filmOutput(value) {
 }
 function withFilmDiagnostics(tool) {
   return { ...tool, async execute(args, exec) {
-    const started = performance2.now();
-    let result;
-    let outcome = "failed";
-    let category = "INTERNAL_ERROR";
-    let errorCategory = "internal";
+    let started = performance2.now(), result, outcome = "failed", category = "INTERNAL_ERROR", errorCategory = "internal";
     try {
-      result = filmOutput(await tool.execute(args, exec));
-      outcome = ["failed", "blocked", "review_required", "partial"].includes(result?.status) ? result.status : "success";
-      return result;
+      return result = filmOutput(await tool.execute(args, exec)), outcome = ["failed", "blocked", "review_required", "partial"].includes(result?.status) ? result.status : "success", result;
     } catch (e) {
-      const code = String(e?.message || "").split(":")[0];
-      category = /^[A-Z_]{1,70}$/.test(code) ? code : diagnosticError(e).errorCode;
-      errorCategory = diagnosticError({ code: category }).errorCategory;
-      throw e;
+      let code = String(e?.message || "").split(":")[0];
+      throw category = /^[A-Z_]{1,70}$/.test(code) ? code : diagnosticError(e).errorCode, errorCategory = diagnosticError({ code: category }).errorCategory, e;
     } finally {
       await appendRequestLog({ event: "film_stage_finished", action: ACTIONS.includes(args.action) ? args.action : "unknown", stage: STAGES.includes(args.stage) ? args.stage : null, projectId: args.projectId || result?.project_id, callId: exec?.callId, sessionId: exec?.agent?.session?.id, elapsedMs: Math.round(performance2.now() - started), outcome, errorCode: outcome === "failed" ? category : void 0, errorCategory: outcome === "failed" ? errorCategory : void 0, responseBytes: result ? Buffer.byteLength(JSON.stringify(result)) : 0 });
     }
@@ -1544,7 +1270,7 @@ function assertCompiledProduction(project, source, spec, actualModel) {
   if (!project.filmSource) return;
   if (actualModel && project.filmSource.model_name && project.filmSource.model_name !== actualModel) throw Error("COMPILED_MODEL_MISMATCH:制作模型已改变，请修订项目模型并重新编译审核。");
   if (source.revision !== project.filmSource.revision) throw Error("创作项目已改稿，请重新编译制作计划并审核。");
-  const expected = source.production;
+  let expected = source.production;
   if (!expected || expected.videoProjectId !== project.id || expected.source_revision !== source.revision || !project.filmSource.plan_digest || productionDigest(expected.specification) !== project.filmSource.plan_digest) throw Error("COMPILED_PLAN_REQUIRED:请重新编译专业制作方案。");
   if (productionDigest(spec) !== project.filmSource.plan_digest) throw Error("COMPILED_PLAN_MISMATCH:提示词、分段或规格与批准的编译方案不一致，请回到专业项目修订并重审。");
 }
@@ -1628,17 +1354,18 @@ var PROFILE_REGISTRY = {
 
 // src/businesses/film-production/profiles/profile.composer.ts
 function dimensionInstructions(spec, role2) {
-  const r = resolveDimensions(spec);
-  if (!Object.keys(r.profiles).length && !r.conflicts.length) return "";
-  const rules = Object.entries(r.profiles).map(([dim, p]) => {
-    const own = PROFILE_REGISTRY[dim][p.id].rules[role2];
-    const common = role2 === "director" ? `按${p.label}策略组织任务与类型审核。` : role2 === "character" ? "只细化批准角色的身份、服装、声音与可变状态。" : role2 === "scene" ? "只细化批准地点的空间、材质、光照与道具连续性。" : role2 === "prompt-engineer" ? "忠实转换已批准镜头的风格与动作，不新增剧情或台词。" : "";
+  let r = resolveDimensions(spec);
+  return !Object.keys(r.profiles).length && !r.conflicts.length ? "" : `
+【四维 Profile】${Object.entries(r.profiles).map(([dim, p]) => {
+    let own = PROFILE_REGISTRY[dim][p.id].rules[role2], common = role2 === "director" ? `按${p.label}策略组织任务与类型审核。` : role2 === "character" ? "只细化批准角色的身份、服装、声音与可变状态。" : role2 === "scene" ? "只细化批准地点的空间、材质、光照与道具连续性。" : role2 === "prompt-engineer" ? "忠实转换已批准镜头的风格与动作，不新增剧情或台词。" : "";
     return `${dim}=${p.id}（${p.label} · ${p.revision}）：${own || common}`;
-  }).join("\n");
-  return `
-【四维 Profile】${rules}
+  }).join(`
+`)}
 情绪基调：${r.tone || "未指定"}；自由视觉风格：${r.visual_style || "未指定"}。未选维度保持未知，不从其他维度自动推断。用户约束与批准内容高于类型建议。
-${r.fact_provenance_required ? "事实门禁：陈述标 VERIFIED_FACT/USER_PROVIDED/UNVERIFIED/DRAMATIZATION 并提供来源；未经核实的采访、事件和产品数据不能作为已核实事实。\n" : ""}${r.conflicts.length ? "PROFILE_CONFLICT：" + r.conflicts.join("；") + " 暂停创作并交 Director 处理。\n" : ""}${role2 === "reviewer" ? '最终报告增加 dimension_review，含 profile_revision="1"、checks 数组；逐一覆盖已选维度，记录 dimension、profile_id、status(PASS/CONCERN/NOT_EVALUATED)、evidence。CONCERN 关联 issues 中可定位建议或错误；NOT_EVALUATED 不可通过终审。\n' : ""}`;
+${r.fact_provenance_required ? `事实门禁：陈述标 VERIFIED_FACT/USER_PROVIDED/UNVERIFIED/DRAMATIZATION 并提供来源；未经核实的采访、事件和产品数据不能作为已核实事实。
+` : ""}${r.conflicts.length ? "PROFILE_CONFLICT：" + r.conflicts.join("；") + ` 暂停创作并交 Director 处理。
+` : ""}${role2 === "reviewer" ? `最终报告增加 dimension_review，含 profile_revision="1"、checks 数组；逐一覆盖已选维度，记录 dimension、profile_id、status(PASS/CONCERN/NOT_EVALUATED)、evidence。CONCERN 关联 issues 中可定位建议或错误；NOT_EVALUATED 不可通过终审。
+` : ""}`;
 }
 
 // src/businesses/film-production/profiles/profile.resolver.ts
@@ -1647,13 +1374,12 @@ function availableDimensions() {
   return Object.fromEntries(Object.entries(PROFILE_REGISTRY).map(([dim, items]) => [dim, Object.entries(items).map(([id, v]) => ({ id, label: v.label, revision: "1" }))]));
 }
 function resolveDimensions(spec = {}) {
-  const profiles = {};
-  const warnings = [];
+  let profiles = {}, warnings = [];
   if (spec.dimension_profile_revision != null && spec.dimension_profile_revision !== "1") throw Error("UNSUPPORTED_DIMENSION_PROFILE_REVISION");
-  for (const dim of Object.keys(PROFILE_REGISTRY)) {
-    const id = spec[dim];
+  for (let dim of Object.keys(PROFILE_REGISTRY)) {
+    let id = spec[dim];
     if (id == null) continue;
-    if (typeof id !== "string" || !id.trim()) throw Error(`INVALID_PROFILE_DIMENSION:${dim}`);
+    if (typeof id != "string" || !id.trim()) throw Error(`INVALID_PROFILE_DIMENSION:${dim}`);
     if (!Object.hasOwn(PROFILE_REGISTRY[dim], id)) {
       if (dim === "genre" && !spec.dimension_profile_revision) {
         warnings.push("LEGACY_GENRE_UNRESOLVED");
@@ -1661,35 +1387,31 @@ function resolveDimensions(spec = {}) {
       }
       throw Error(`UNKNOWN_PROFILE_DIMENSION:${dim}`);
     }
-    const selected = PROFILE_REGISTRY[dim][id];
+    let selected = PROFILE_REGISTRY[dim][id];
     profiles[dim] = { id, revision: "1", label: selected.label, criterion: selected.criterion };
   }
-  const conflicts = [];
-  const fact = profiles.genre?.id === "documentary" || profiles.format?.id === "interview" || spec.work_type === "DOCUMENTARY";
-  if (fact && spec.narrative_mode === "FICTION") conflicts.push("纪录或真实访谈不能将虚构材料标为真实事实；重现请明确标注并选择 MIXED。");
-  if (profiles.style_profile?.id === "stylized_animation" && profiles.genre?.id === "documentary") warnings.push("动画重现必须标 DRAMATIZATION，不能声称为真实拍摄。");
-  return { status: conflicts.length ? "PROFILE_CONFLICT" : Object.keys(profiles).length ? "RESOLVED" : "UNSELECTED", revision: "1", profiles, tone: spec.tone || null, visual_style: spec.visual_style || null, warnings, conflicts, fact_provenance_required: fact, available_profiles: availableDimensions() };
+  let conflicts = [], fact = profiles.genre?.id === "documentary" || profiles.format?.id === "interview" || spec.work_type === "DOCUMENTARY";
+  return fact && spec.narrative_mode === "FICTION" && conflicts.push("纪录或真实访谈不能将虚构材料标为真实事实；重现请明确标注并选择 MIXED。"), profiles.style_profile?.id === "stylized_animation" && profiles.genre?.id === "documentary" && warnings.push("动画重现必须标 DRAMATIZATION，不能声称为真实拍摄。"), { status: conflicts.length ? "PROFILE_CONFLICT" : Object.keys(profiles).length ? "RESOLVED" : "UNSELECTED", revision: "1", profiles, tone: spec.tone || null, visual_style: spec.visual_style || null, warnings, conflicts, fact_provenance_required: fact, available_profiles: availableDimensions() };
 }
 function assertDimensions(spec) {
-  const resolved = resolveDimensions(spec);
+  let resolved = resolveDimensions(spec);
   if (resolved.conflicts.length) throw Error("PROFILE_CONFLICT:" + resolved.conflicts.join("；"));
   return resolved;
 }
 function hasContentProfile(spec) {
-  const r = assertDimensions(spec);
+  let r = assertDimensions(spec);
   return !!spec?.work_type || ["genre", "format", "purpose"].some((k) => r.profiles[k]);
 }
 function validateDimensionReview(value, spec) {
-  const r = assertDimensions(spec);
-  const selected = Object.entries(r.profiles);
+  let r = assertDimensions(spec), selected = Object.entries(r.profiles);
   if (!selected.length) return;
-  const review = value.dimension_review;
+  let review = value.dimension_review;
   if (!review || review.profile_revision !== "1" || !Array.isArray(review.checks)) throw Error("DIMENSION_REVIEW_REQUIRED");
   if (review.checks.length !== selected.length) throw Error("DIMENSION_REVIEW_COVERAGE");
-  for (const [dim, p] of selected) {
-    const checks = review.checks.filter((c) => c.dimension === dim && c.profile_id === p.id);
-    if (checks.length !== 1 || !["PASS", "CONCERN", "NOT_EVALUATED"].includes(checks[0].status) || typeof checks[0].evidence !== "string" || !checks[0].evidence.trim()) throw Error("DIMENSION_REVIEW_COVERAGE");
-    const check = checks[0];
+  for (let [dim, p] of selected) {
+    let checks = review.checks.filter((c) => c.dimension === dim && c.profile_id === p.id);
+    if (checks.length !== 1 || !["PASS", "CONCERN", "NOT_EVALUATED"].includes(checks[0].status) || typeof checks[0].evidence != "string" || !checks[0].evidence.trim()) throw Error("DIMENSION_REVIEW_COVERAGE");
+    let check = checks[0];
     if (check.status === "CONCERN" && !value.issues?.some((i) => i.issue_id === check.issue_id)) throw Error("DIMENSION_REVIEW_ISSUE_REQUIRED");
     if (check.status === "NOT_EVALUATED" && ["PASS", "PASS_WITH_WARNINGS"].includes(value.review_status)) throw Error("DIMENSION_REVIEW_NOT_EVALUATED");
   }
@@ -1789,26 +1511,27 @@ var LABELS = {
   reversal_or_emotional_landing: "转折或情绪落点",
   visualizable_details: "可视化细节",
   audience_memory_point: "观众记忆点"
-};
-var META = /* @__PURE__ */ new Set(["schema_version", "project_id", "task_id", "agent_id", "input_revision", "input_revisions", "source_revisions", "revision", "output_revision", "approved_creative_revision", "based_on_creative_revision", "approval_required", "creative_id", "script_id"]);
+}, META = /* @__PURE__ */ new Set(["schema_version", "project_id", "task_id", "agent_id", "input_revision", "input_revisions", "source_revisions", "revision", "output_revision", "approved_creative_revision", "based_on_creative_revision", "approval_required", "creative_id", "script_id"]);
 function readable(value, depth = 0) {
-  if (value == null) return "未提供";
-  if (typeof value === "boolean") return value ? "是" : "否";
-  if (typeof value !== "object") return String(value);
-  if (Array.isArray(value)) return value.length ? value.map((v, i) => typeof v === "object" && v !== null ? `${i + 1}. ${readable(v, depth + 1)}` : `- ${readable(v, depth + 1)}`).join("\n\n") : "无";
-  return Object.entries(value).filter(([key]) => !META.has(key)).map(([key, v]) => {
-    const label = LABELS[key] || key;
-    const content = key.endsWith("duration_ms") && typeof v === "number" ? `${v / 1e3} 秒` : readable(v, depth + 1);
-    return `${depth === 0 ? "### " : ""}${label}${typeof v === "object" && v !== null ? "\n" : "："}${content}`;
-  }).join("\n\n");
+  return value == null ? "未提供" : typeof value == "boolean" ? value ? "是" : "否" : typeof value != "object" ? String(value) : Array.isArray(value) ? value.length ? value.map((v, i) => typeof v == "object" && v !== null ? `${i + 1}. ${readable(v, depth + 1)}` : `- ${readable(v, depth + 1)}`).join(`
+
+`) : "无" : Object.entries(value).filter(([key]) => !META.has(key)).map(([key, v]) => {
+    let label = LABELS[key] || key, content = key.endsWith("duration_ms") && typeof v == "number" ? `${v / 1e3} 秒` : readable(v, depth + 1);
+    return `${depth === 0 ? "### " : ""}${label}${typeof v == "object" && v !== null ? `
+` : "："}${content}`;
+  }).join(`
+
+`);
 }
 function approvalPreview(stage, artifact) {
-  const data = artifact.data || {};
-  const title = stage === "creative" ? "创意方案" : "正式剧本";
-  let content = readable(data);
-  if (stage === "script" && typeof data.screenplay === "string" && data.screenplay.trim()) {
-    const { screenplay, ...details } = data;
-    content = screenplay + "\n\n### 剧本核对资料\n\n" + readable(details);
+  let data = artifact.data || {}, title = stage === "creative" ? "创意方案" : "正式剧本", content = readable(data);
+  if (stage === "script" && typeof data.screenplay == "string" && data.screenplay.trim()) {
+    let { screenplay, ...details } = data;
+    content = screenplay + `
+
+### 剧本核对资料
+
+` + readable(details);
   }
   return `${title}（修订 ${artifact.revision}）
 
@@ -1819,12 +1542,10 @@ ${content}
 
 // src/businesses/film-production/validation/timeline.validator.ts
 function validateTimeline(shots, duration) {
-  let end = 0;
-  const ids = /* @__PURE__ */ new Set();
-  for (const shot of shots) {
+  let end = 0, ids = /* @__PURE__ */ new Set();
+  for (let shot of shots) {
     if (!shot.shot_id || ids.has(shot.shot_id)) throw Error("DUPLICATE_OR_MISSING_ID");
-    ids.add(shot.shot_id);
-    if (shot.duration_ms !== void 0 && shot.duration_ms !== shot.end_ms - shot.start_ms) throw Error("SHOT_DURATION_MISMATCH");
+    if (ids.add(shot.shot_id), shot.duration_ms !== void 0 && shot.duration_ms !== shot.end_ms - shot.start_ms) throw Error("SHOT_DURATION_MISMATCH");
     if (!Number.isSafeInteger(shot.start_ms) || !Number.isSafeInteger(shot.end_ms) || shot.start_ms !== end || shot.end_ms <= end) throw Error("GAP_OR_OVERLAP");
     end = shot.end_ms;
   }
@@ -1834,27 +1555,27 @@ function validateTimeline(shots, duration) {
 // src/businesses/film-production/validation/content.validator.ts
 function narrativeDiagnostics(script) {
   return (script?.scenes || []).flatMap((scene) => {
-    const lines = (script.dialogue || []).filter((d) => d.scene_id === scene.scene_id);
-    const chars = lines.reduce((n, d) => n + Array.from(String(d.exact_text || "").replace(/[\s，。！？、；：,.!?]/g, "")).length, 0);
-    const estimate = Math.ceil(chars / 4 * 1e3);
+    let chars = (script.dialogue || []).filter((d) => d.scene_id === scene.scene_id).reduce((n, d) => n + Array.from(String(d.exact_text || "").replace(/[\s，。！？、；：,.!?]/g, "")).length, 0), estimate = Math.ceil(chars / 4 * 1e3);
     return estimate > scene.duration_ms ? [{ category: "SPEECH_BUDGET_RISK", scene_id: scene.scene_id, speech_estimate_ms: estimate, duration_ms: scene.duration_ms, kind: "WARNING", reason: "按每秒约4字初估已超过场次预算，需结合语速、动作与停顿人工复核。" }] : [];
   });
 }
 function validateContentEvidence(stage, value, state) {
   if (state.quality_policy !== "evidence_v1") return;
-  const text = (v) => typeof v === "string" && !!v.trim();
-  if (stage === "creative") for (const section of value.structure || []) {
-    if (!text(section.purpose) || !(text(section.visual_evidence) || Array.isArray(section.visual_evidence) && section.visual_evidence.some(text))) throw Error("CREATIVE_VISIBLE_EVIDENCE_REQUIRED");
+  let text = (v) => typeof v == "string" && !!v.trim();
+  if (stage === "creative") {
+    for (let section of value.structure || [])
+      if (!text(section.purpose) || !(text(section.visual_evidence) || Array.isArray(section.visual_evidence) && section.visual_evidence.some(text))) throw Error("CREATIVE_VISIBLE_EVIDENCE_REQUIRED");
   }
-  if (stage === "script") for (const scene of value.scenes || []) {
-    if (!["scene_goal", "entry_state", "exit_state"].every((k) => text(scene[k])) || !Array.isArray(scene.key_actions) || !scene.key_actions.length || !scene.key_actions.every(text)) throw Error("SCENE_ACTION_EVIDENCE_REQUIRED");
+  if (stage === "script") {
+    for (let scene of value.scenes || [])
+      if (!["scene_goal", "entry_state", "exit_state"].every((k) => text(scene[k])) || !Array.isArray(scene.key_actions) || !scene.key_actions.length || !scene.key_actions.every(text)) throw Error("SCENE_ACTION_EVIDENCE_REQUIRED");
   }
   if (stage === "review" && ["PASS", "PASS_WITH_WARNINGS"].includes(value.review_status)) {
-    for (const [key, score] of Object.entries(value.scores || {})) if (score !== null && !text(value.score_evidence?.[key])) throw Error("REVIEW_SCORE_EVIDENCE_REQUIRED:" + key);
-    const scenes = state.artifacts.script.data.scenes;
+    for (let [key, score] of Object.entries(value.scores || {})) if (score !== null && !text(value.score_evidence?.[key])) throw Error("REVIEW_SCORE_EVIDENCE_REQUIRED:" + key);
+    let scenes = state.artifacts.script.data.scenes;
     if (!Array.isArray(value.theme_evidence) || !value.theme_evidence.length || value.theme_evidence.some((e) => !scenes.some((s) => s.scene_id === e.scene_id) || !text(e.evidence))) throw Error("THEME_EVIDENCE_REQUIRED");
-    const warnings = narrativeDiagnostics(state.artifacts.script.data);
-    for (const warning of warnings) if (!value.budget_checks?.some((c) => c.scene_id === warning.scene_id && ["ACCEPTED_WITH_REASON", "REVISED"].includes(c.status) && text(c.evidence))) throw Error("SPEECH_BUDGET_REVIEW_REQUIRED:" + warning.scene_id);
+    let warnings = narrativeDiagnostics(state.artifacts.script.data);
+    for (let warning of warnings) if (!value.budget_checks?.some((c) => c.scene_id === warning.scene_id && ["ACCEPTED_WITH_REASON", "REVISED"].includes(c.status) && text(c.evidence))) throw Error("SPEECH_BUDGET_REVIEW_REQUIRED:" + warning.scene_id);
   }
 }
 
@@ -1891,8 +1612,7 @@ var COMMON_CONTRACT = `# COMMON_CONTRACT V4.0
 四维 Profile 已由运行时解析：genre、format、purpose、style_profile 独立选择，tone 与自由文本 visual_style 独立保存；同时兼容 work_type/profile_revision/narrative_mode。只使用 resolved_profiles 和 work_profile 中真实注册的策略与版本，未注册选项报告冲突，不伪造配置路径或工具能力。
 运行时门禁始终有效：两个创作审批绑定具体版本，不通过修改自然语言策略绕过；创作批准不替代实际视频费用授权与结果审核。时长必须严格闭合，不以 Director 文字批准偏差绕过校验。状态与时间戳由工具提供，不虚构已保存、已调度或已验证。
 提交 film_project 产物时，使用当前阶段的平铺 data 对象，不能把 V4.0 示例外壳当成工具参数。Markdown 与 JSON 同源；input_revisions 映射 source_revisions（使用工具返回的依赖阶段版本），output_revision 不替代工具 expectedRevision；后者必须用项目当前 revision。未知信息用 null；未提供的输入不假装存在。具体字段映射见本角色“当前工具数据适配”。
-`;
-var STAGE_DEPS = { creative: [], script: ["creative"], assets: ["script"], shots: ["script", "assets"], prompts: ["script", "assets", "shots"], review: ["creative", "script", "assets", "shots", "prompts"] };
+`, STAGE_DEPS = { creative: [], script: ["creative"], assets: ["script"], shots: ["script", "assets"], prompts: ["script", "assets", "shots"], review: ["creative", "script", "assets", "shots", "prompts"] };
 function sourceRevisions(state, stage) {
   return Object.fromEntries((STAGE_DEPS[stage] || []).filter((s) => state.artifacts[s]).map((s) => [s, state.artifacts[s].revision]));
 }
@@ -1900,7 +1620,7 @@ function projectContext(state) {
   return { resolved_profiles: resolveDimensions(state.project_spec), project_id: state.project_id, original_idea: state.source_brief || "", target_duration_ms: state.duration_ms, project_spec: state.project_spec || { title: state.title, target_duration_ms: state.duration_ms, aspect_ratio: null, language: null, visual_style: null, target_model: null, hard_constraints: [], provenance: "LEGACY_UNKNOWN" }, quality_policy: state.quality_policy || "legacy", approved_revisions: { ...state.approvals } };
 }
 function revisionsEqual(a, b) {
-  return !!a && !!b && typeof a === "object" && typeof b === "object" && Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => Object.hasOwn(b, k) && b[k] === v);
+  return !!a && !!b && typeof a == "object" && typeof b == "object" && Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => Object.hasOwn(b, k) && b[k] === v);
 }
 function modelProfile(state) {
   return videoCapabilities(state.project_spec?.target_model || "generic");
@@ -1909,19 +1629,15 @@ function modelProfile(state) {
 // src/businesses/film-production/reviews/issue.service.ts
 function validateIssueLifecycle(report, state) {
   if (state.schema_version !== "3.1.0") return;
-  const registry2 = state.issue_registry || {};
-  const incoming = new Map((report.issues || []).map((i) => [i.issue_id, i]));
-  for (const previous of Object.values(registry2)) {
+  let registry2 = state.issue_registry || {}, incoming = new Map((report.issues || []).map((i) => [i.issue_id, i]));
+  for (let previous of Object.values(registry2))
     if (["CRITICAL", "MAJOR"].includes(previous.severity) && (previous.status !== "VERIFIED" || !revisionsEqual(previous.verification?.source_revisions, sourceRevisions(state, "review"))) && !incoming.has(previous.issue_id)) throw Error("UNRESOLVED_ISSUE_OMITTED");
-  }
-  for (const issue of report.issues || []) {
-    const previous = Object.hasOwn(registry2, issue.issue_id) ? registry2[issue.issue_id] : void 0;
+  for (let issue of report.issues || []) {
+    let previous = Object.hasOwn(registry2, issue.issue_id) ? registry2[issue.issue_id] : void 0;
     if (previous && previous.responsible_agent !== issue.responsible_agent) throw Error("ISSUE_OWNER_CHANGE_REQUIRES_DIRECTOR");
     if (!previous && ["RESOLVED", "VERIFIED"].includes(issue.status)) throw Error("ISSUE_INITIAL_STATUS_REQUIRED");
     if (issue.status === "RESOLVED") {
-      const ownerStage = { creative: "creative", screenwriter: "script", character: "assets", scene: "assets", storyboard: "shots", "prompt-engineer": "prompts" }[issue.responsible_agent];
-      const origin = previous?.reported_source_revisions;
-      const current = sourceRevisions(state, "review");
+      let ownerStage = { creative: "creative", screenwriter: "script", character: "assets", scene: "assets", storyboard: "shots", "prompt-engineer": "prompts" }[issue.responsible_agent], origin = previous?.reported_source_revisions, current = sourceRevisions(state, "review");
       if (!origin || (ownerStage ? origin[ownerStage] === current[ownerStage] : revisionsEqual(origin, current))) throw Error("ISSUE_REPAIR_ARTIFACT_REQUIRED");
     }
     if (issue.status === "VERIFIED" && (!previous?.verification || previous.status !== "VERIFIED" || !revisionsEqual(previous.verification.source_revisions, sourceRevisions(state, "review")))) throw Error("ISSUE_RECHECK_REQUIRED");
@@ -1930,20 +1646,16 @@ function validateIssueLifecycle(report, state) {
 }
 function updateIssueRegistry(state, report) {
   state.issue_registry ||= {};
-  for (const issue of report.issues || []) {
-    const previous = state.issue_registry[issue.issue_id];
-    Object.defineProperty(state.issue_registry, issue.issue_id, { enumerable: true, configurable: true, writable: true, value: { ...structuredClone(issue), reported_source_revisions: previous?.reported_source_revisions || sourceRevisions(state, "review"), first_seen_revision: previous?.first_seen_revision || state.revision, last_report_revision: state.revision, ...previous?.verification ? { verification: previous.verification } : {} } });
+  for (let issue of report.issues || []) {
+    let previous = state.issue_registry[issue.issue_id];
+    Object.defineProperty(state.issue_registry, issue.issue_id, { enumerable: !0, configurable: !0, writable: !0, value: { ...structuredClone(issue), reported_source_revisions: previous?.reported_source_revisions || sourceRevisions(state, "review"), first_seen_revision: previous?.first_seen_revision || state.revision, last_report_revision: state.revision, ...previous?.verification ? { verification: previous.verification } : {} } });
   }
 }
 function verifyIssue(state, id, evidence) {
-  const issue = state.issue_registry?.[id];
-  const review = state.artifacts.review;
+  let issue = state.issue_registry?.[id], review = state.artifacts.review;
   if (!issue || issue.status !== "RESOLVED" || !review || review.stale) throw Error("ISSUE_NOT_RESOLVED");
-  if (!evidence || typeof evidence.evidence !== "string" || !evidence.evidence.trim() || evidence.review_revision !== review.revision || !revisionsEqual(evidence.source_revisions, sourceRevisions(state, "review"))) throw Error("INVALID_RECHECK_EVIDENCE");
-  issue.status = "VERIFIED";
-  issue.verification = { evidence: evidence.evidence, review_revision: review.revision, source_revisions: sourceRevisions(state, "review"), verified_at: (/* @__PURE__ */ new Date()).toISOString() };
-  state.revision++;
-  return issue;
+  if (!evidence || typeof evidence.evidence != "string" || !evidence.evidence.trim() || evidence.review_revision !== review.revision || !revisionsEqual(evidence.source_revisions, sourceRevisions(state, "review"))) throw Error("INVALID_RECHECK_EVIDENCE");
+  return issue.status = "VERIFIED", issue.verification = { evidence: evidence.evidence, review_revision: review.revision, source_revisions: sourceRevisions(state, "review"), verified_at: (/* @__PURE__ */ new Date()).toISOString() }, state.revision++, issue;
 }
 
 // src/businesses/film-production/contracts/fields.ts
@@ -1954,8 +1666,7 @@ var STAGE_ARRAYS = {
   shots: ["shots"],
   prompts: ["prompts"],
   review: ["issues", "review_scope", "unverified_items"]
-};
-var ITEM_ARRAYS = {
+}, ITEM_ARRAYS = {
   shots: { shots: ["character_ids", "prop_ids", "costume_ids", "dialogue_refs"] },
   prompts: { prompts: ["dialogue_refs"] }
 };
@@ -1966,69 +1677,46 @@ function submissionContract(stage) {
 // src/businesses/film-production/validation/schema.validator.ts
 function validateV31(stage, value, state) {
   if (state.schema_version !== "3.1.0") return;
-  const array = (object2, key) => {
+  let array = (object2, key) => {
     if (!Array.isArray(object2[key])) throw Error(`SCHEMA_REQUIRED_ARRAY:${key}`);
-  };
-  const text = (object2, key) => {
-    if (typeof object2[key] !== "string" || !object2[key].trim()) throw Error(`SCHEMA_REQUIRED_TEXT:${key}`);
-  };
-  const positive = (object2, key) => {
+  }, text = (object2, key) => {
+    if (typeof object2[key] != "string" || !object2[key].trim()) throw Error(`SCHEMA_REQUIRED_TEXT:${key}`);
+  }, positive = (object2, key) => {
     if (!Number.isSafeInteger(object2[key]) || object2[key] <= 0) throw Error(`SCHEMA_REQUIRED_DURATION:${key}`);
   };
-  if (stage === "creative") {
-    array(value, "structure");
-    array(value, "must_preserve");
-    array(value, "assumptions");
-  }
-  if (stage === "script") {
-    array(value, "scenes");
-    array(value, "characters");
-    array(value, "dialogue");
-    for (const line of value.dialogue) {
-      text(line, "dialogue_id");
-      text(line, "exact_text");
-      text(line, "speaker_id");
-      text(line, "scene_id");
-    }
+  if (stage === "creative" && (array(value, "structure"), array(value, "must_preserve"), array(value, "assumptions")), stage === "script") {
+    array(value, "scenes"), array(value, "characters"), array(value, "dialogue");
+    for (let line of value.dialogue)
+      text(line, "dialogue_id"), text(line, "exact_text"), text(line, "speaker_id"), text(line, "scene_id");
   }
   if (stage === "assets") {
-    for (const key of STAGE_ARRAYS.assets) array(value, key);
-    for (const scene of value.scenes) {
-      text(scene, "location_id");
-      text(scene, "scene_state_id");
-    }
-    for (const current of value.scene_states) text(current, "location_id");
+    for (let key of STAGE_ARRAYS.assets) array(value, key);
+    for (let scene of value.scenes)
+      text(scene, "location_id"), text(scene, "scene_state_id");
+    for (let current of value.scene_states) text(current, "location_id");
   }
-  if (stage === "shots") for (const shot of value.shots || []) {
-    for (const key of ["chapter_id", "scene_id", "location_id", "scene_state_id", "narrative_purpose"]) text(shot, key);
+  if (stage === "shots") for (let shot of value.shots || []) {
+    for (let key of ["chapter_id", "scene_id", "location_id", "scene_state_id", "narrative_purpose"]) text(shot, key);
     positive(shot, "duration_ms");
-    for (const key of ITEM_ARRAYS.shots.shots) array(shot, key);
+    for (let key of ITEM_ARRAYS.shots.shots) array(shot, key);
   }
-  if (stage === "prompts") for (const prompt of value.prompts || []) {
-    for (const key of ["location_id", "scene_state_id", "generation_mode"]) text(prompt, key);
+  if (stage === "prompts") for (let prompt of value.prompts || []) {
+    for (let key of ["location_id", "scene_state_id", "generation_mode"]) text(prompt, key);
     positive(prompt, "duration_ms");
-    for (const key of ITEM_ARRAYS.prompts.prompts) array(prompt, key);
+    for (let key of ITEM_ARRAYS.prompts.prompts) array(prompt, key);
   }
   if (stage === "review") {
-    text(value, "review_status");
-    text(value, "review_id");
-    text(value, "review_stage");
-    array(value, "review_scope");
-    array(value, "unverified_items");
-    if (!value.reviewed_revisions || typeof value.reviewed_revisions !== "object") throw Error("MISSING_REVIEWED_REVISIONS");
-    for (const stage2 of ["creative", "script", "assets", "shots", "prompts"]) if (value.reviewed_revisions[stage2] !== state.artifacts[stage2]?.revision) throw Error(`REVIEW_REVISION_MISMATCH:${stage2}`);
-    const final = value.review_status === "PASS" || value.review_status === "PASS_WITH_WARNINGS";
-    if (final) {
+    if (text(value, "review_status"), text(value, "review_id"), text(value, "review_stage"), array(value, "review_scope"), array(value, "unverified_items"), !value.reviewed_revisions || typeof value.reviewed_revisions != "object") throw Error("MISSING_REVIEWED_REVISIONS");
+    for (let stage2 of ["creative", "script", "assets", "shots", "prompts"]) if (value.reviewed_revisions[stage2] !== state.artifacts[stage2]?.revision) throw Error(`REVIEW_REVISION_MISMATCH:${stage2}`);
+    if (value.review_status === "PASS" || value.review_status === "PASS_WITH_WARNINGS") {
       if (value.review_stage !== "FINAL_REVIEW") throw Error("FINAL_REVIEW_REQUIRED");
       if (["creative", "script", "assets", "shots", "prompts"].some((s) => !value.review_scope.includes(s))) throw Error("FINAL_REVIEW_SCOPE_INCOMPLETE");
-      const required = ["requirement_fidelity", "narrative_quality", "cinematic_quality", "temporal_consistency", "prompt_executability", "structural_completeness"];
-      if (state.artifacts.assets?.data.characters?.length) required.push("character_consistency");
-      if (state.artifacts.assets?.data.scenes?.length) required.push("scene_consistency");
-      if (required.some((k) => typeof value.scores?.[k] !== "number")) throw Error("FINAL_REVIEW_SCORE_NOT_EVALUATED");
+      let required = ["requirement_fidelity", "narrative_quality", "cinematic_quality", "temporal_consistency", "prompt_executability", "structural_completeness"];
+      if (state.artifacts.assets?.data.characters?.length && required.push("character_consistency"), state.artifacts.assets?.data.scenes?.length && required.push("scene_consistency"), required.some((k) => typeof value.scores?.[k] != "number")) throw Error("FINAL_REVIEW_SCORE_NOT_EVALUATED");
     }
-    const ids = /* @__PURE__ */ new Set();
-    for (const issue of value.issues || []) {
-      for (const key of ["issue_id", "description", "evidence", "location", "responsible_agent", "recheck_criteria"]) text(issue, key);
+    let ids = /* @__PURE__ */ new Set();
+    for (let issue of value.issues || []) {
+      for (let key of ["issue_id", "description", "evidence", "location", "responsible_agent", "recheck_criteria"]) text(issue, key);
       if (!["director", "creative", "screenwriter", "character", "scene", "storyboard", "prompt-engineer", "reviewer"].includes(issue.responsible_agent)) throw Error("INVALID_ISSUE_OWNER");
       if (ids.has(issue.issue_id)) throw Error("DUPLICATE_ISSUE_ID");
       ids.add(issue.issue_id);
@@ -2039,88 +1727,75 @@ function validateV31(stage, value, state) {
 // src/businesses/film-production/validation/continuity.validator.ts
 function registry(items, key) {
   if (!Array.isArray(items)) throw Error(`INVALID_REGISTRY:${key}`);
-  const ids = items.map((v) => v?.[key]);
-  if (ids.some((id) => typeof id !== "string" || !id.trim()) || new Set(ids).size !== ids.length) throw Error(`INVALID_REGISTRY_ID:${key}`);
+  let ids = items.map((v) => v?.[key]);
+  if (ids.some((id) => typeof id != "string" || !id.trim()) || new Set(ids).size !== ids.length) throw Error(`INVALID_REGISTRY_ID:${key}`);
   return new Map(items.map((v) => [v[key], v]));
 }
 function refs(ids, map, kind) {
   if (!Array.isArray(ids) || new Set(ids).size !== ids.length || ids.some((id) => !map.has(id))) throw Error(`INVALID_REFERENCE:${kind}`);
 }
 function validateReferences(stage, value, state) {
-  const expected = sourceRevisions(state, stage);
+  let expected = sourceRevisions(state, stage);
   if (value.source_revisions !== void 0) {
-    if (!value.source_revisions || typeof value.source_revisions !== "object" || Array.isArray(value.source_revisions)) throw Error("INVALID_SOURCE_REVISIONS");
-    for (const [key, rev] of Object.entries(value.source_revisions)) if (expected[key] !== rev) throw Error(`SOURCE_REVISION_MISMATCH:${key}`);
+    if (!value.source_revisions || typeof value.source_revisions != "object" || Array.isArray(value.source_revisions)) throw Error("INVALID_SOURCE_REVISIONS");
+    for (let [key, rev] of Object.entries(value.source_revisions)) if (expected[key] !== rev) throw Error(`SOURCE_REVISION_MISMATCH:${key}`);
     if (state.schema_version === "3.1.0" && Object.keys(expected).some((k) => value.source_revisions[k] !== expected[k])) throw Error("INCOMPLETE_SOURCE_REVISIONS");
   }
-  const script = stage === "script" ? value : state.artifacts.script?.data;
-  const lines = script?.dialogue_lines || script?.dialogue || [];
-  const dialogue = lines.some((d) => d.dialogue_id !== void 0) ? registry(lines, "dialogue_id") : /* @__PURE__ */ new Map();
+  let script = stage === "script" ? value : state.artifacts.script?.data, lines = script?.dialogue_lines || script?.dialogue || [], dialogue = lines.some((d) => d.dialogue_id !== void 0) ? registry(lines, "dialogue_id") : /* @__PURE__ */ new Map();
   if (stage === "script" && dialogue.size) {
-    for (const line of lines) if (typeof line.exact_text !== "string" || !line.exact_text.trim()) throw Error("INVALID_DIALOGUE_TEXT");
+    for (let line of lines) if (typeof line.exact_text != "string" || !line.exact_text.trim()) throw Error("INVALID_DIALOGUE_TEXT");
   }
   if (stage === "script" || stage === "creative") return;
-  const assets = stage === "assets" ? value : state.artifacts.assets?.data;
+  let assets = stage === "assets" ? value : state.artifacts.assets?.data;
   if (!assets) return;
-  const characters = registry(assets.characters, "character_id");
-  const scenes = registry(assets.scenes, "scene_id");
-  const locations = assets.locations === void 0 ? null : registry(assets.locations, "location_id");
-  const states = assets.scene_states === void 0 ? null : registry(assets.scene_states, "scene_state_id");
-  const props = assets.props === void 0 ? null : registry(assets.props, "prop_id");
-  const costumes = registry(assets.characters.flatMap((c) => c.costumes || []), "costume_id");
-  const check = (item) => {
-    if (item.character_ids !== void 0) refs(item.character_ids, characters, "character");
-    if (item.location_id !== void 0 && (!locations || !locations.has(item.location_id))) throw Error("INVALID_REFERENCE:location");
+  let characters = registry(assets.characters, "character_id"), scenes = registry(assets.scenes, "scene_id"), locations = assets.locations === void 0 ? null : registry(assets.locations, "location_id"), states = assets.scene_states === void 0 ? null : registry(assets.scene_states, "scene_state_id"), props = assets.props === void 0 ? null : registry(assets.props, "prop_id"), costumes = registry(assets.characters.flatMap((c) => c.costumes || []), "costume_id"), check = (item) => {
+    if (item.character_ids !== void 0 && refs(item.character_ids, characters, "character"), item.location_id !== void 0 && (!locations || !locations.has(item.location_id))) throw Error("INVALID_REFERENCE:location");
     if (item.scene_state_id !== void 0) {
-      const current = states?.get(item.scene_state_id);
+      let current = states?.get(item.scene_state_id);
       if (!current || item.location_id !== void 0 && current.location_id !== item.location_id) throw Error("INVALID_REFERENCE:scene_state");
     }
-    if (item.prop_ids !== void 0) refs(item.prop_ids, props || /* @__PURE__ */ new Map(), "prop");
-    if (item.costume_ids !== void 0) refs(item.costume_ids, costumes, "costume");
+    item.prop_ids !== void 0 && refs(item.prop_ids, props || /* @__PURE__ */ new Map(), "prop"), item.costume_ids !== void 0 && refs(item.costume_ids, costumes, "costume");
   };
   if (stage === "assets") {
-    for (const scene of assets.scenes) {
-      check(scene);
-      if (script?.scenes && !script.scenes.some((s) => s.scene_id === scene.scene_id)) throw Error("SCRIPT_SCENE_REF_MISMATCH");
-    }
+    for (let scene of assets.scenes)
+      if (check(scene), script?.scenes && !script.scenes.some((s) => s.scene_id === scene.scene_id)) throw Error("SCRIPT_SCENE_REF_MISMATCH");
     if (script?.scenes?.some((s) => !scenes.has(s.scene_id))) throw Error("MISSING_SCRIPT_SCENE");
-    for (const current of assets.scene_states || []) check(current);
-    for (const costume of costumes.values()) if (costume.character_id !== void 0 && !characters.has(costume.character_id)) throw Error("INVALID_REFERENCE:costume_owner");
+    for (let current of assets.scene_states || []) check(current);
+    for (let costume of costumes.values()) if (costume.character_id !== void 0 && !characters.has(costume.character_id)) throw Error("INVALID_REFERENCE:costume_owner");
     if (script?.characters) {
-      const cast = registry(script.characters, "character_id");
+      let cast = registry(script.characters, "character_id");
       if ([...cast.keys()].some((id) => !characters.has(id)) || [...characters.keys()].some((id) => !cast.has(id))) throw Error("SCRIPT_CHARACTER_COVERAGE");
     }
-    for (const line of lines) if (!characters.has(line.speaker_id)) throw Error("INVALID_REFERENCE:speaker");
+    for (let line of lines) if (!characters.has(line.speaker_id)) throw Error("INVALID_REFERENCE:speaker");
   }
   if (stage === "shots" || stage === "prompts") {
-    const shots = stage === "shots" ? value.shots : state.artifacts.shots.data.shots;
-    const shotMap = new Map(shots.map((s) => [s.shot_id, s]));
-    for (const item of stage === "shots" ? shots : value.prompts) {
+    let shots = stage === "shots" ? value.shots : state.artifacts.shots.data.shots, shotMap = new Map(shots.map((s) => [s.shot_id, s]));
+    for (let item of stage === "shots" ? shots : value.prompts) {
       check(item);
-      const shot = stage === "shots" ? item : shotMap.get(item.shot_id);
+      let shot = stage === "shots" ? item : shotMap.get(item.shot_id);
       if (!shot) throw Error("INVALID_REFERENCE:shot");
       if (stage === "shots") {
-        const scene = scenes.get(shot.scene_id);
+        let scene = scenes.get(shot.scene_id);
         if (!scene) throw Error("INVALID_REFERENCE:scene");
         if (shot.location_id !== void 0 && scene.location_id !== shot.location_id) throw Error("SHOT_LOCATION_MISMATCH");
         if (shot.chapter_id !== void 0 && script?.scenes && !script.scenes.some((s) => s.scene_id === shot.scene_id && s.chapter_id === shot.chapter_id)) throw Error("SHOT_CHAPTER_MISMATCH");
-        for (const id of shot.costume_ids || []) if (!shot.character_ids.includes(costumes.get(id)?.character_id)) throw Error("COSTUME_CHARACTER_MISMATCH");
+        for (let id of shot.costume_ids || []) if (!shot.character_ids.includes(costumes.get(id)?.character_id)) throw Error("COSTUME_CHARACTER_MISMATCH");
       }
       if (item.dialogue_refs !== void 0) {
         refs(item.dialogue_refs, dialogue, "dialogue");
-        for (const id of item.dialogue_refs) {
-          const line = dialogue.get(id);
+        for (let id of item.dialogue_refs) {
+          let line = dialogue.get(id);
           if (line.scene_id !== shot.scene_id || !shot.character_ids.includes(line.speaker_id)) throw Error("DIALOGUE_CONTEXT_MISMATCH");
           if (stage === "prompts" && !(shot.dialogue_refs || []).includes(id)) throw Error("DIALOGUE_NOT_IN_SHOT");
         }
       }
       if (stage === "prompts") {
-        for (const id of shot.dialogue_refs || []) if (!item.prompt.includes(dialogue.get(id)?.exact_text)) throw Error("DIALOGUE_TEXT_MISMATCH");
-        for (const key of ["location_id", "scene_state_id", "duration_ms"]) if (item[key] !== void 0 && item[key] !== shot[key]) throw Error(`PROMPT_SHOT_MISMATCH:${key}`);
+        for (let id of shot.dialogue_refs || []) if (!item.prompt.includes(dialogue.get(id)?.exact_text)) throw Error("DIALOGUE_TEXT_MISMATCH");
+        for (let key of ["location_id", "scene_state_id", "duration_ms"]) if (item[key] !== void 0 && item[key] !== shot[key]) throw Error(`PROMPT_SHOT_MISMATCH:${key}`);
       }
     }
     if (stage === "shots" && dialogue.size) {
-      const covered = new Set(shots.flatMap((s) => s.dialogue_refs || []));
+      let covered = new Set(shots.flatMap((s) => s.dialogue_refs || []));
       if ([...dialogue.keys()].some((id) => !covered.has(id))) throw Error("DIALOGUE_COVERAGE_GAP");
     }
   }
@@ -2131,17 +1806,16 @@ var WEIGHTS = { requirement_fidelity: 20, narrative_quality: 15, character_consi
 function evaluateReview(report) {
   if (!["PASS", "PASS_WITH_WARNINGS", "REVISE_REQUIRED", "BLOCKED", "NOT_EVALUATED"].includes(report.review_status) || !report.scores || !Array.isArray(report.issues)) throw Error("INVALID_REVIEW_REPORT");
   let sum = 0, weight = 0;
-  for (const [key, w] of Object.entries(WEIGHTS)) {
-    const value = report.scores[key];
-    if (value === null) continue;
-    if (!Number.isFinite(value) || value < 0 || value > 100) throw Error("INVALID_REVIEW_SCORE");
-    sum += value * w;
-    weight += w;
+  for (let [key, w] of Object.entries(WEIGHTS)) {
+    let value = report.scores[key];
+    if (value !== null) {
+      if (!Number.isFinite(value) || value < 0 || value > 100) throw Error("INVALID_REVIEW_SCORE");
+      sum += value * w, weight += w;
+    }
   }
-  const score = weight ? Math.round(sum / weight * 100) / 100 : null;
-  for (const issue of report.issues) if (!issue || !["CRITICAL", "MAJOR", "MINOR", "INFO"].includes(issue.severity) || !["OPEN", "IN_PROGRESS", "RESOLVED", "VERIFIED", "WONT_FIX"].includes(issue.status)) throw Error("INVALID_REVIEW_ISSUE");
-  const blockers = report.issues.filter((i) => ["CRITICAL", "MAJOR"].includes(i.severity) && i.status !== "VERIFIED").length;
-  const passed = ["PASS", "PASS_WITH_WARNINGS"].includes(report.review_status) && score !== null && score >= 80 && blockers === 0;
+  let score = weight ? Math.round(sum / weight * 100) / 100 : null;
+  for (let issue of report.issues) if (!issue || !["CRITICAL", "MAJOR", "MINOR", "INFO"].includes(issue.severity) || !["OPEN", "IN_PROGRESS", "RESOLVED", "VERIFIED", "WONT_FIX"].includes(issue.status)) throw Error("INVALID_REVIEW_ISSUE");
+  let blockers = report.issues.filter((i) => ["CRITICAL", "MAJOR"].includes(i.severity) && i.status !== "VERIFIED").length, passed = ["PASS", "PASS_WITH_WARNINGS"].includes(report.review_status) && score !== null && score >= 80 && blockers === 0;
   if (report.delivery_allowed !== passed || report.passed !== void 0 && report.passed !== passed || report.blocking_issue_count !== void 0 && report.blocking_issue_count !== blockers) throw Error("REVIEW_DECISION_MISMATCH");
   if (["PASS", "PASS_WITH_WARNINGS"].includes(report.review_status) && !passed) throw Error("REVIEW_BLOCKED");
   if (report.weighted_score !== void 0 && report.weighted_score !== score) throw Error("REVIEW_SCORE_MISMATCH");
@@ -2150,201 +1824,199 @@ function evaluateReview(report) {
 
 // src/businesses/film-production/profiles/legacy/drama.ts
 var drama_default2 = {
-  "id": "DRAMA",
-  "revision": "1",
-  "label": "剧情短片",
-  "strategy": "人物目标→阻碍→选择→可见后果",
-  "boundary": "允许克制的日常矛盾，不机械添加悲情或反转。",
-  "creative_fields": {
-    "character_goal": "人物此刻的具体目标",
-    "choice_and_consequence": "关键选择与后果"
+  id: "DRAMA",
+  revision: "1",
+  label: "剧情短片",
+  strategy: "人物目标→阻碍→选择→可见后果",
+  boundary: "允许克制的日常矛盾，不机械添加悲情或反转。",
+  creative_fields: {
+    character_goal: "人物此刻的具体目标",
+    choice_and_consequence: "关键选择与后果"
   },
-  "script_fields": {
-    "causal_progression": "事件之间的因果推进",
-    "character_change": "人物或关系的变化"
+  script_fields: {
+    causal_progression: "事件之间的因果推进",
+    character_change: "人物或关系的变化"
   },
-  "review_criteria": [
+  review_criteria: [
     {
-      "id": "drama_1",
-      "description": "动机是否由行动体现"
+      id: "drama_1",
+      description: "动机是否由行动体现"
     },
     {
-      "id": "drama_2",
-      "description": "选择和结果是否有因果依据"
+      id: "drama_2",
+      description: "选择和结果是否有因果依据"
     }
   ],
-  "role_rules": {
-    "screenwriter": "围绕人物选择写场景，配角有自身理由，不用机械误会制造阻碍。",
-    "storyboard": "让观众看清选择发生的瞬间与后果，反应镜头承担关系变化。"
+  role_rules: {
+    screenwriter: "围绕人物选择写场景，配角有自身理由，不用机械误会制造阻碍。",
+    storyboard: "让观众看清选择发生的瞬间与后果，反应镜头承担关系变化。"
   }
 };
 
 // src/businesses/film-production/profiles/legacy/comedy.ts
 var comedy_default2 = {
-  "id": "COMEDY",
-  "revision": "1",
-  "label": "情景喜剧",
-  "strategy": "预期→升级→反差→回收",
-  "boundary": "笑点来自人物与情境，不依赖刻板印象、夸张表情或音效。",
-  "creative_fields": {
-    "comic_premise": "观众预期与喜剧前提",
-    "payoff": "反差落点与回收"
+  id: "COMEDY",
+  revision: "1",
+  label: "情景喜剧",
+  strategy: "预期→升级→反差→回收",
+  boundary: "笑点来自人物与情境，不依赖刻板印象、夸张表情或音效。",
+  creative_fields: {
+    comic_premise: "观众预期与喜剧前提",
+    payoff: "反差落点与回收"
   },
-  "script_fields": {
-    "setup_payoff": "铺垫与笑点的对应",
-    "reaction_budget": "笑点前后反应与停顿的时间安排"
+  script_fields: {
+    setup_payoff: "铺垫与笑点的对应",
+    reaction_budget: "笑点前后反应与停顿的时间安排"
   },
-  "review_criteria": [
+  review_criteria: [
     {
-      "id": "comedy_1",
-      "description": "笑点是否有可辨识的铺垫"
+      id: "comedy_1",
+      description: "笑点是否有可辨识的铺垫"
     },
     {
-      "id": "comedy_2",
-      "description": "反差是否由人物行为引发且有反应时间"
+      id: "comedy_2",
+      description: "反差是否由人物行为引发且有反应时间"
     }
   ],
-  "role_rules": {
-    "screenwriter": "先让预期成立再偏离，避免角色为笑话突然失去常识。",
-    "storyboard": "关键笑点信息不可被运镜遮住，给观众读懂反差和人物反应的时间。"
+  role_rules: {
+    screenwriter: "先让预期成立再偏离，避免角色为笑话突然失去常识。",
+    storyboard: "关键笑点信息不可被运镜遮住，给观众读懂反差和人物反应的时间。"
   }
 };
 
 // src/businesses/film-production/profiles/legacy/lifestyle.ts
 var lifestyle_default = {
-  "id": "LIFESTYLE",
-  "revision": "1",
-  "label": "生活Vlog／氛围片",
-  "strategy": "体验起点→细节发现→感受变化",
-  "boundary": "可以无冲突、无对白、无人像；生活质感与观察顺序成立即可，不强造戏剧。",
-  "creative_fields": {
-    "experience_line": "本片体验或观察主线",
-    "detail_discovery": "值得观看的具体细节发现"
+  id: "LIFESTYLE",
+  revision: "1",
+  label: "生活Vlog／氛围片",
+  strategy: "体验起点→细节发现→感受变化",
+  boundary: "可以无冲突、无对白、无人像；生活质感与观察顺序成立即可，不强造戏剧。",
+  creative_fields: {
+    experience_line: "本片体验或观察主线",
+    detail_discovery: "值得观看的具体细节发现"
   },
-  "script_fields": {
-    "observation_progression": "细节如何逐步被发现",
-    "sensory_rhythm": "生活动作、环境声及留白的节奏"
+  script_fields: {
+    observation_progression: "细节如何逐步被发现",
+    sensory_rhythm: "生活动作、环境声及留白的节奏"
   },
-  "review_criteria": [
+  review_criteria: [
     {
-      "id": "lifestyle_1",
-      "description": "观察是否有推进而非重复风景"
+      id: "lifestyle_1",
+      description: "观察是否有推进而非重复风景"
     },
     {
-      "id": "lifestyle_2",
-      "description": "生活动作和声音是否可信且符合用户氛围"
+      id: "lifestyle_2",
+      description: "生活动作和声音是否可信且符合用户氛围"
     }
   ],
-  "role_rules": {
-    "screenwriter": "以生活动作和感官发现组织内容，允许留白，不虚构苦难或硬加反转。",
-    "storyboard": "构图让观众发现细节，空间光线与环境声音参与叙事，固定机位可以成立。"
+  role_rules: {
+    screenwriter: "以生活动作和感官发现组织内容，允许留白，不虚构苦难或硬加反转。",
+    storyboard: "构图让观众发现细节，空间光线与环境声音参与叙事，固定机位可以成立。"
   }
 };
 
 // src/businesses/film-production/profiles/legacy/documentary.ts
 var documentary_default2 = {
-  "id": "DOCUMENTARY",
-  "revision": "1",
-  "label": "纪录／知识片",
-  "strategy": "核心问题→证据与例子→解释→回应",
-  "boundary": "区分已核实事实、用户材料、待核实内容与戏剧化重现；不编造采访和真实经历。",
-  "creative_fields": {
-    "central_question": "要回应的具体问题",
-    "evidence_plan": "已有来源与待补证据计划"
+  id: "DOCUMENTARY",
+  revision: "1",
+  label: "纪录／知识片",
+  strategy: "核心问题→证据与例子→解释→回应",
+  boundary: "区分已核实事实、用户材料、待核实内容与戏剧化重现；不编造采访和真实经历。",
+  creative_fields: {
+    central_question: "要回应的具体问题",
+    evidence_plan: "已有来源与待补证据计划"
   },
-  "script_fields": {
-    "evidence_sources": "论据与对应来源，缺失标待核实",
-    "fact_fiction_boundary": "事实、解释和重现的边界"
+  script_fields: {
+    evidence_sources: "论据与对应来源，缺失标待核实",
+    fact_fiction_boundary: "事实、解释和重现的边界"
   },
-  "review_criteria": [
+  review_criteria: [
     {
-      "id": "documentary_1",
-      "description": "关键陈述是否有来源或明确待核实"
+      id: "documentary_1",
+      description: "关键陈述是否有来源或明确待核实"
     },
     {
-      "id": "documentary_2",
-      "description": "事实与虚构重现是否清楚区分"
+      id: "documentary_2",
+      description: "事实与虚构重现是否清楚区分"
     }
   ],
-  "role_rules": {
-    "screenwriter": "用可核实材料支撑说明，不为制造冲突编造真实人物心理。",
-    "storyboard": "证据画面与解释对应，重现须明确标识，画面不能暗示未经证实的因果。"
+  role_rules: {
+    screenwriter: "用可核实材料支撑说明，不为制造冲突编造真实人物心理。",
+    storyboard: "证据画面与解释对应，重现须明确标识，画面不能暗示未经证实的因果。"
   }
 };
 
 // src/businesses/film-production/profiles/legacy/commercial.ts
 var commercial_default2 = {
-  "id": "COMMERCIAL",
-  "revision": "1",
-  "label": "产品广告",
-  "strategy": "需求→使用过程→价值证据→行动",
-  "boundary": "产品外观、功效、数据与认证须有依据，不通过画面暗示未证实效果。",
-  "creative_fields": {
-    "user_need": "具体用户需求",
-    "supported_benefit": "有资料支持的产品利益"
+  id: "COMMERCIAL",
+  revision: "1",
+  label: "产品广告",
+  strategy: "需求→使用过程→价值证据→行动",
+  boundary: "产品外观、功效、数据与认证须有依据，不通过画面暗示未证实效果。",
+  creative_fields: {
+    user_need: "具体用户需求",
+    supported_benefit: "有资料支持的产品利益"
   },
-  "script_fields": {
-    "claims_and_evidence": "卖点及对应依据，缺失标待核实",
-    "usage_and_action": "可观察使用过程与行动引导"
+  script_fields: {
+    claims_and_evidence: "卖点及对应依据，缺失标待核实",
+    usage_and_action: "可观察使用过程与行动引导"
   },
-  "review_criteria": [
+  review_criteria: [
     {
-      "id": "commercial_1",
-      "description": "卖点是否由材料支持"
+      id: "commercial_1",
+      description: "卖点是否由材料支持"
     },
     {
-      "id": "commercial_2",
-      "description": "使用过程是否清楚且产品身份准确"
+      id: "commercial_2",
+      description: "使用过程是否清楚且产品身份准确"
     }
   ],
-  "role_rules": {
-    "screenwriter": "展示真实需求与使用过程，避免堆卖点及无依据前后效果。",
-    "storyboard": "关键产品细节和使用步骤清楚可见，品牌文字与Logo依赖授权素材及后期能力。"
+  role_rules: {
+    screenwriter: "展示真实需求与使用过程，避免堆卖点及无依据前后效果。",
+    storyboard: "关键产品细节和使用步骤清楚可见，品牌文字与Logo依赖授权素材及后期能力。"
   }
 };
 
 // src/businesses/film-production/profiles/legacy/promotional.ts
 var promotional_default = {
-  "id": "PROMOTIONAL",
-  "revision": "1",
-  "label": "品牌／地域宣传",
-  "strategy": "识别特征→具体生活→人物或观察对象→情绪落点",
-  "boundary": "地域和品牌特征具体可信，不用空泛赞美替代内容；不强制增加人物。",
-  "creative_fields": {
-    "recognizable_identity": "品牌或地域的可辨识特征",
-    "emotional_anchor": "情绪落点及其具体载体"
+  id: "PROMOTIONAL",
+  revision: "1",
+  label: "品牌／地域宣传",
+  strategy: "识别特征→具体生活→人物或观察对象→情绪落点",
+  boundary: "地域和品牌特征具体可信，不用空泛赞美替代内容；不强制增加人物。",
+  creative_fields: {
+    recognizable_identity: "品牌或地域的可辨识特征",
+    emotional_anchor: "情绪落点及其具体载体"
   },
-  "script_fields": {
-    "distinctive_details": "具有辨识度的生活或品牌细节",
-    "identity_progression": "细节如何共同呈现主题"
+  script_fields: {
+    distinctive_details: "具有辨识度的生活或品牌细节",
+    identity_progression: "细节如何共同呈现主题"
   },
-  "review_criteria": [
+  review_criteria: [
     {
-      "id": "promotional_1",
-      "description": "画面是否具有当地或品牌辨识度"
+      id: "promotional_1",
+      description: "画面是否具有当地或品牌辨识度"
     },
     {
-      "id": "promotional_2",
-      "description": "情绪是否由具体细节而非口号支撑"
+      id: "promotional_2",
+      description: "情绪是否由具体细节而非口号支撑"
     }
   ],
-  "role_rules": {
-    "screenwriter": "把身份特征落在具体使用或生活细节，真实地点资料不足标待核实。",
-    "storyboard": "空间、人物或物件关系体现地域品牌特征，不用通用航拍和素材堆砌替代。"
+  role_rules: {
+    screenwriter: "把身份特征落在具体使用或生活细节，真实地点资料不足标待核实。",
+    storyboard: "空间、人物或物件关系体现地域品牌特征，不用通用航拍和素材堆砌替代。"
   }
 };
 
 // src/businesses/film-production/profiles/index.ts
-var REGISTRY = Object.fromEntries([drama_default2, comedy_default2, lifestyle_default, documentary_default2, commercial_default2, promotional_default].map((p) => [p.id, p]));
-var WORK_TYPES = Object.keys(REGISTRY);
-var NARRATIVE_MODES = ["FICTION", "OBSERVATIONAL", "EXPLANATORY", "DEMONSTRATION", "POETIC", "MIXED"];
+var REGISTRY = Object.fromEntries([drama_default2, comedy_default2, lifestyle_default, documentary_default2, commercial_default2, promotional_default].map((p) => [p.id, p])), WORK_TYPES = Object.keys(REGISTRY), NARRATIVE_MODES = ["FICTION", "OBSERVATIONAL", "EXPLANATORY", "DEMONSTRATION", "POETIC", "MIXED"];
 function availableProfiles() {
   return Object.values(REGISTRY).map((p) => ({ work_type: p.id, label: p.label, profile_revision: p.revision, strategy: p.strategy }));
 }
 function resolveProfile(spec) {
   if (!spec?.work_type) return null;
   if (!Object.hasOwn(REGISTRY, spec.work_type)) throw Error("UNKNOWN_WORK_TYPE");
-  const profile = REGISTRY[spec.work_type];
+  let profile = REGISTRY[spec.work_type];
   if (spec.profile_revision !== profile.revision) throw Error("UNSUPPORTED_PROFILE_REVISION");
   return structuredClone(profile);
 }
@@ -2354,25 +2026,26 @@ function profileRevision(workType) {
 }
 function writingProfileInstructions(workType) {
   if (!workType) return "作品类型未指定：尊重想法中的内容形式，不默认剧情、强加人物冲突或反转。";
-  const p = resolveProfile({ work_type: workType, profile_revision: profileRevision(workType) });
+  let p = resolveProfile({ work_type: workType, profile_revision: profileRevision(workType) });
   return `【作品类型 ${p.id}】${p.label}：${p.strategy}。${p.boundary}
 ${p.role_rules.screenwriter}
 ${p.role_rules.storyboard}
 制作说明中简洁说明本类型要点：${Object.values(p.script_fields).join("；")}。仍按当前入口的Markdown格式交稿，不输出type_details或审核JSON，不调用项目工具。`;
 }
 function profileContext(state) {
-  const profile = resolveProfile(state.project_spec);
+  let profile = resolveProfile(state.project_spec);
   return { resolved_profiles: resolveDimensions(state.project_spec), status: hasContentProfile(state.project_spec) ? "SELECTED" : state.project_spec && Object.hasOwn(state.project_spec, "work_type") ? "UNSELECTED" : "LEGACY_GENERIC", profile, available_profiles: profile ? [] : availableProfiles() };
 }
 function profileInstructions(state, role2) {
   return legacyProfileInstructions(state, role2) + dimensionInstructions(state.project_spec, role2);
 }
 function legacyProfileInstructions(state, role2) {
-  const p = resolveProfile(state.project_spec);
-  if (!p && hasContentProfile(state.project_spec)) return "\n【组合类型】以已解析的四维 Profile 为创作和审核依据，不强制另选旧作品类型。";
-  if (!p) return "\n【作品类型待确认】不得默认所有作品都是剧情片；根据原意推荐一个作品类型，明确后用configure_profile保存。旧项目允许沿用已有通用流程，不擅自迁移。风格、叙事方式与生成模式不是作品类型。";
-  const fields2 = role2 === "creative" ? p.creative_fields : role2 === "screenwriter" ? p.script_fields : null;
-  const roleRule = p.role_rules[role2] || ({ director: "按本类型组织角色与审批，类型变更使原创意及下游失效，需重新审批。", creative: "将策略转为可审批的内容蓝图，不提前写正式剧本。", character: "只设计已批准主体；无人像内容允许characters为空，不强加人物。", scene: "环境和道具服务本类型的内容推进，不更改已批准地点与事件。", "prompt-engineer": "将本类型的已批准镜头忠实转为独立提示词，未知能力标待验证，不新添情节。", reviewer: "共同时间轴、引用、版本、对白和硬约束检查始终适用；艺术判断按本类型评估，不以缺少冲突、反转或对白判所有作品失败。" }[role2] || "按当前阶段职责执行。");
+  let p = resolveProfile(state.project_spec);
+  if (!p && hasContentProfile(state.project_spec)) return `
+【组合类型】以已解析的四维 Profile 为创作和审核依据，不强制另选旧作品类型。`;
+  if (!p) return `
+【作品类型待确认】不得默认所有作品都是剧情片；根据原意推荐一个作品类型，明确后用configure_profile保存。旧项目允许沿用已有通用流程，不擅自迁移。风格、叙事方式与生成模式不是作品类型。`;
+  let fields2 = role2 === "creative" ? p.creative_fields : role2 === "screenwriter" ? p.script_fields : null, roleRule = p.role_rules[role2] || { director: "按本类型组织角色与审批，类型变更使原创意及下游失效，需重新审批。", creative: "将策略转为可审批的内容蓝图，不提前写正式剧本。", character: "只设计已批准主体；无人像内容允许characters为空，不强加人物。", scene: "环境和道具服务本类型的内容推进，不更改已批准地点与事件。", "prompt-engineer": "将本类型的已批准镜头忠实转为独立提示词，未知能力标待验证，不新添情节。", reviewer: "共同时间轴、引用、版本、对白和硬约束检查始终适用；艺术判断按本类型评估，不以缺少冲突、反转或对白判所有作品失败。" }[role2] || "按当前阶段职责执行。";
   return `
 【作品类型 ${p.id} · 配置 ${p.revision}】${p.label}
 内容结构：${p.strategy}。${p.boundary}
@@ -2383,21 +2056,20 @@ function legacyProfileInstructions(state, role2) {
 ` : "") + "用户硬约束和批准内容优先。类型策略只在本类型适用，不强制每片都有冲突、对白、笑点或反转；新增关键内容仍需创意审批。";
 }
 function validateProfileArtifact(stage, value, state) {
-  assertDimensions(state.project_spec);
-  if (stage === "review") validateDimensionReview(value, state.project_spec);
-  const p = resolveProfile(state.project_spec);
+  assertDimensions(state.project_spec), stage === "review" && validateDimensionReview(value, state.project_spec);
+  let p = resolveProfile(state.project_spec);
   if (!p) return;
-  const fields2 = stage === "creative" ? p.creative_fields : stage === "script" ? p.script_fields : null;
+  let fields2 = stage === "creative" ? p.creative_fields : stage === "script" ? p.script_fields : null;
   if (fields2) {
-    for (const key of Object.keys(fields2)) if (typeof value.type_details?.[key] !== "string" || !value.type_details[key].trim()) throw Error(`TYPE_DETAIL_REQUIRED:${key}`);
+    for (let key of Object.keys(fields2)) if (typeof value.type_details?.[key] != "string" || !value.type_details[key].trim()) throw Error(`TYPE_DETAIL_REQUIRED:${key}`);
   }
   if (stage !== "review") return;
-  const r = value.type_review;
+  let r = value.type_review;
   if (r?.work_type !== p.id || r?.profile_revision !== p.revision || !Array.isArray(r.checks)) throw Error("TYPE_REVIEW_REQUIRED");
-  const ids = r.checks.map((c) => c?.criterion_id);
+  let ids = r.checks.map((c) => c?.criterion_id);
   if (ids.length !== p.review_criteria.length || new Set(ids).size !== ids.length || p.review_criteria.some((c) => !ids.includes(c.id))) throw Error("TYPE_REVIEW_COVERAGE");
-  for (const check of r.checks) {
-    if (!["PASS", "CONCERN", "NOT_EVALUATED"].includes(check.status) || typeof check.evidence !== "string" || !check.evidence.trim()) throw Error("INVALID_TYPE_REVIEW_CHECK");
+  for (let check of r.checks) {
+    if (!["PASS", "CONCERN", "NOT_EVALUATED"].includes(check.status) || typeof check.evidence != "string" || !check.evidence.trim()) throw Error("INVALID_TYPE_REVIEW_CHECK");
     if (check.status === "CONCERN" && (!check.issue_id || !value.issues?.some((i) => i.issue_id === check.issue_id))) throw Error("TYPE_REVIEW_ISSUE_REQUIRED");
   }
   if (["PASS", "PASS_WITH_WARNINGS"].includes(value.review_status) && r.checks.some((c) => c.status === "NOT_EVALUATED")) throw Error("TYPE_REVIEW_NOT_EVALUATED");
@@ -2406,90 +2078,78 @@ function validateProfileArtifact(stage, value, state) {
 // src/businesses/film-production/artifacts/artifact.service.ts
 var STAGES2 = ["creative", "script", "assets", "shots", "prompts", "review"];
 function validateArtifact(stage, value, state) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("INVALID_ARTIFACT");
-  const nonempty = (key) => {
-    if (typeof value[key] !== "string" || !value[key].trim()) throw Error(`MISSING_FIELD:${key}`);
+  if (!value || typeof value != "object" || Array.isArray(value)) throw Error("INVALID_ARTIFACT");
+  let nonempty = (key) => {
+    if (typeof value[key] != "string" || !value[key].trim()) throw Error(`MISSING_FIELD:${key}`);
   };
-  validateV31(stage, value, state);
-  validateReferences(stage, value, state);
-  validateProfileArtifact(stage, value, state);
-  validateContentEvidence(stage, value, state);
-  if (stage === "creative") {
-    nonempty("theme");
-    nonempty("logline");
-    if (value.structure !== void 0) {
+  if (validateV31(stage, value, state), validateReferences(stage, value, state), validateProfileArtifact(stage, value, state), validateContentEvidence(stage, value, state), stage === "creative") {
+    if (nonempty("theme"), nonempty("logline"), value.structure !== void 0) {
       if (!Array.isArray(value.structure) || !value.structure.length) throw Error("INVALID_CREATIVE_STRUCTURE");
-      const ids = value.structure.map((s) => s?.section_id);
-      if (ids.some((id) => typeof id !== "string" || !id.trim()) || new Set(ids).size !== ids.length) throw Error("INVALID_SECTION_ID");
+      let ids = value.structure.map((s) => s?.section_id);
+      if (ids.some((id) => typeof id != "string" || !id.trim()) || new Set(ids).size !== ids.length) throw Error("INVALID_SECTION_ID");
       if (value.structure.some((s) => !Number.isSafeInteger(s.duration_ms) || s.duration_ms <= 0) || value.structure.reduce((n, s) => n + s.duration_ms, 0) !== state.duration_ms) throw Error("CREATIVE_DURATION_MISMATCH");
     }
     if (value.approval_questions !== void 0 && (!Array.isArray(value.approval_questions) || value.approval_questions.length > 3)) throw Error("TOO_MANY_CREATIVE_QUESTIONS");
   }
-  if (stage === "script") {
-    nonempty("screenplay");
-    if (!Array.isArray(value.chapters) || !value.chapters.length || value.chapters.some((c) => !Number.isSafeInteger(c.duration_ms) || c.duration_ms <= 0) || value.chapters.reduce((n, c) => n + c.duration_ms, 0) !== state.duration_ms) throw Error("CHAPTER_DURATION_MISMATCH");
-  }
+  if (stage === "script" && (nonempty("screenplay"), !Array.isArray(value.chapters) || !value.chapters.length || value.chapters.some((c) => !Number.isSafeInteger(c.duration_ms) || c.duration_ms <= 0) || value.chapters.reduce((n, c) => n + c.duration_ms, 0) !== state.duration_ms))
+    throw Error("CHAPTER_DURATION_MISMATCH");
   if (stage === "script") {
     if (value.approved_creative_revision !== void 0 && value.approved_creative_revision !== state.approvals.creative) throw Error("CREATIVE_REVISION_MISMATCH");
     if (value.scenes !== void 0) {
       if (!Array.isArray(value.scenes) || !value.scenes.length) throw Error("INVALID_SCRIPT_SCENES");
-      const ids = value.scenes.map((s) => s?.scene_id);
-      if (ids.some((id) => typeof id !== "string" || !id.trim()) || new Set(ids).size !== ids.length) throw Error("INVALID_SCENE_ID");
-      const chapterIds = value.chapters.map((c) => c.chapter_id);
-      if (chapterIds.some((id) => typeof id !== "string" || !id.trim()) || new Set(chapterIds).size !== chapterIds.length) throw Error("INVALID_CHAPTER_ID");
+      let ids = value.scenes.map((s) => s?.scene_id);
+      if (ids.some((id) => typeof id != "string" || !id.trim()) || new Set(ids).size !== ids.length) throw Error("INVALID_SCENE_ID");
+      let chapterIds = value.chapters.map((c) => c.chapter_id);
+      if (chapterIds.some((id) => typeof id != "string" || !id.trim()) || new Set(chapterIds).size !== chapterIds.length) throw Error("INVALID_CHAPTER_ID");
       if (value.scenes.some((s) => !chapterIds.includes(s.chapter_id) || !Number.isSafeInteger(s.duration_ms) || s.duration_ms <= 0)) throw Error("INVALID_SCENE_BUDGET");
-      for (const chapter of value.chapters) {
-        const scenes = value.scenes.filter((s) => s.chapter_id === chapter.chapter_id);
+      for (let chapter of value.chapters) {
+        let scenes = value.scenes.filter((s) => s.chapter_id === chapter.chapter_id);
         if (!scenes.length || scenes.reduce((n, s) => n + s.duration_ms, 0) !== chapter.duration_ms) throw Error("SCENE_DURATION_MISMATCH");
         if (chapter.scene_ids !== void 0 && (!Array.isArray(chapter.scene_ids) || chapter.scene_ids.length !== scenes.length || new Set(chapter.scene_ids).size !== scenes.length || chapter.scene_ids.some((id) => !scenes.some((s) => s.scene_id === id)))) throw Error("SCRIPT_SCENE_REF_MISMATCH");
       }
-      if (value.dialogue !== void 0 && (!Array.isArray(value.dialogue) || value.dialogue.some((d) => !d || typeof d.speaker_id !== "string" || !d.speaker_id.trim() || !ids.includes(d.scene_id)))) throw Error("INVALID_DIALOGUE_REF");
+      if (value.dialogue !== void 0 && (!Array.isArray(value.dialogue) || value.dialogue.some((d) => !d || typeof d.speaker_id != "string" || !d.speaker_id.trim() || !ids.includes(d.scene_id)))) throw Error("INVALID_DIALOGUE_REF");
     }
   }
-  if (stage === "assets") for (const key of ["characters", "scenes"]) {
+  if (stage === "assets") for (let key of ["characters", "scenes"]) {
     if (!Array.isArray(value[key])) throw Error(`MISSING_FIELD:${key}`);
-    const ids = value[key].map((v) => v[key === "characters" ? "character_id" : "scene_id"]);
-    if (ids.some((id) => typeof id !== "string" || !id) || new Set(ids).size !== ids.length) throw Error("INVALID_ASSET_ID");
+    let ids = value[key].map((v) => v[key === "characters" ? "character_id" : "scene_id"]);
+    if (ids.some((id) => typeof id != "string" || !id) || new Set(ids).size !== ids.length) throw Error("INVALID_ASSET_ID");
   }
   if (stage === "shots") {
     if (!Array.isArray(value.shots)) throw Error("MISSING_SHOTS");
     validateTimeline(value.shots, state.duration_ms);
-    const assets = state.artifacts.assets.data;
-    for (const shot of value.shots) if (!assets.scenes.some((s) => s.scene_id === shot.scene_id) || !Array.isArray(shot.character_ids) || shot.character_ids.some((id) => !assets.characters.some((c) => c.character_id === id))) throw Error("MISSING_REF");
+    let assets = state.artifacts.assets.data;
+    for (let shot of value.shots) if (!assets.scenes.some((s) => s.scene_id === shot.scene_id) || !Array.isArray(shot.character_ids) || shot.character_ids.some((id) => !assets.characters.some((c) => c.character_id === id))) throw Error("MISSING_REF");
   }
   if (stage === "prompts") {
     if (!Array.isArray(value.prompts)) throw Error("MISSING_PROMPTS");
-    const shots = state.artifacts.shots.data.shots;
-    const ids = value.prompts.map((p) => p.shot_id);
-    if (new Set(ids).size !== ids.length || ids.length !== shots.length || shots.some((s) => !ids.includes(s.shot_id)) || value.prompts.some((p) => typeof p.prompt !== "string" || !p.prompt.trim())) throw Error("PROMPT_COVERAGE");
+    let shots = state.artifacts.shots.data.shots, ids = value.prompts.map((p) => p.shot_id);
+    if (new Set(ids).size !== ids.length || ids.length !== shots.length || shots.some((s) => !ids.includes(s.shot_id)) || value.prompts.some((p) => typeof p.prompt != "string" || !p.prompt.trim())) throw Error("PROMPT_COVERAGE");
   }
   if (stage === "review" && value.review_status !== void 0) {
-    evaluateReview(value);
-    validateIssueLifecycle(value, state);
+    evaluateReview(value), validateIssueLifecycle(value, state);
     return;
   }
   if (stage === "review" && Array.isArray(value.issues) && value.issues.some((i) => !i || !["blocker", "major", "minor", "info"].includes(String(i.severity).toLowerCase()))) throw Error("INVALID_SEVERITY");
-  if (stage === "review" && (!Number.isInteger(value.score) || value.score < 85 || value.score > 100 || !Array.isArray(value.issues) || value.issues.some((i) => String(i.severity).toLowerCase() === "blocker") || value.passed !== true)) throw Error("REVIEW_BLOCKED");
+  if (stage === "review" && (!Number.isInteger(value.score) || value.score < 85 || value.score > 100 || !Array.isArray(value.issues) || value.issues.some((i) => String(i.severity).toLowerCase() === "blocker") || value.passed !== !0)) throw Error("REVIEW_BLOCKED");
 }
 function commitArtifact(state, stage, value, expected) {
   if (state.revision !== expected) throw Error("REVISION_CONFLICT");
   if (state.status === "STOPPED") throw Error("PROJECT_STOPPED");
-  const index = STAGES2.indexOf(stage);
+  let index = STAGES2.indexOf(stage);
   if (index < 0) throw Error("INVALID_STAGE");
-  for (const upstream of STAGES2.slice(0, index)) {
+  for (let upstream of STAGES2.slice(0, index)) {
     if (!state.artifacts[upstream] || state.artifacts[upstream].stale) throw Error("UPSTREAM_REQUIRED");
     if (["creative", "script"].includes(upstream) && state.approvals[upstream] !== state.artifacts[upstream].revision) throw Error("APPROVAL_REQUIRED");
   }
   validateArtifact(stage, value, state);
-  const next = structuredClone(state);
-  next.revision++;
-  if (stage === "review" && state.schema_version === "3.1.0") updateIssueRegistry(next, value);
-  const dimensions = resolveDimensions(state.project_spec);
-  next.artifacts[stage] = { dimension_profile_ref: { revision: dimensions.revision, profiles: Object.fromEntries(Object.entries(dimensions.profiles).map(([k, p]) => [k, { id: p.id, revision: p.revision }])) }, revision: next.revision, source_revisions: sourceRevisions(state, stage), ...state.project_spec?.work_type ? { profile_ref: { work_type: state.project_spec.work_type, profile_revision: state.project_spec.profile_revision } } : {}, data: value, stale: false };
-  for (const downstream of STAGES2.slice(index + 1)) if (next.artifacts[downstream]) next.artifacts[downstream].stale = true;
-  for (const approved of ["creative", "script"]) if (STAGES2.indexOf(approved) >= index) delete next.approvals[approved];
-  next.status = ["creative", "script"].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === "review" ? value.review_status && !evaluateReview(value).passed ? value.review_status : "FINAL_DELIVERY" : `${stage.toUpperCase()}_READY`;
-  return next;
+  let next = structuredClone(state);
+  next.revision++, stage === "review" && state.schema_version === "3.1.0" && updateIssueRegistry(next, value);
+  let dimensions = resolveDimensions(state.project_spec);
+  next.artifacts[stage] = { dimension_profile_ref: { revision: dimensions.revision, profiles: Object.fromEntries(Object.entries(dimensions.profiles).map(([k, p]) => [k, { id: p.id, revision: p.revision }])) }, revision: next.revision, source_revisions: sourceRevisions(state, stage), ...state.project_spec?.work_type ? { profile_ref: { work_type: state.project_spec.work_type, profile_revision: state.project_spec.profile_revision } } : {}, data: value, stale: !1 };
+  for (let downstream of STAGES2.slice(index + 1)) next.artifacts[downstream] && (next.artifacts[downstream].stale = !0);
+  for (let approved of ["creative", "script"]) STAGES2.indexOf(approved) >= index && delete next.approvals[approved];
+  return next.status = ["creative", "script"].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === "review" ? value.review_status && !evaluateReview(value).passed ? value.review_status : "FINAL_DELIVERY" : `${stage.toUpperCase()}_READY`, next;
 }
 
 // src/businesses/film-production/contracts/submission.ts
@@ -2498,35 +2158,32 @@ function checkSubmission(state, stage, content) {
   try {
     data = JSON.parse(content);
   } catch {
-    return { valid: false, error_code: "INVALID_ARTIFACT_JSON", issues: [{ path: "content", message: "材料不是合法 JSON。检查多余字符、逗号、引号或代码围栏；保留原内容，只修正格式后重新校验。" }], expectedRevision: state.revision };
+    return { valid: !1, error_code: "INVALID_ARTIFACT_JSON", issues: [{ path: "content", message: "材料不是合法 JSON。检查多余字符、逗号、引号或代码围栏；保留原内容，只修正格式后重新校验。" }], expectedRevision: state.revision };
   }
-  const arrays = STAGE_ARRAYS[stage] || [];
-  if (!data || typeof data !== "object" || Array.isArray(data)) return { valid: false, error_code: "INVALID_ARTIFACT", issues: [{ path: "content", message: "材料顶层必须是 JSON 对象。" }], expectedRevision: state.revision };
-  const issues = arrays.filter((k) => !Array.isArray(data[k])).map((k) => ({ path: k, message: `顶层 ${k} 必须是数组。无适用内容时显式提供 []；如有已批准内容，须完整保留，不得为通过校验清空。` }));
-  for (const [collection, fields2] of Object.entries(ITEM_ARRAYS[stage] || {})) {
-    if (!Array.isArray(data[collection])) continue;
-    data[collection].forEach((item, index) => {
-      if (!item || typeof item !== "object" || Array.isArray(item)) {
+  let arrays = STAGE_ARRAYS[stage] || [];
+  if (!data || typeof data != "object" || Array.isArray(data)) return { valid: !1, error_code: "INVALID_ARTIFACT", issues: [{ path: "content", message: "材料顶层必须是 JSON 对象。" }], expectedRevision: state.revision };
+  let issues = arrays.filter((k) => !Array.isArray(data[k])).map((k) => ({ path: k, message: `顶层 ${k} 必须是数组。无适用内容时显式提供 []；如有已批准内容，须完整保留，不得为通过校验清空。` }));
+  for (let [collection, fields2] of Object.entries(ITEM_ARRAYS[stage] || {}))
+    Array.isArray(data[collection]) && data[collection].forEach((item, index) => {
+      if (!item || typeof item != "object" || Array.isArray(item)) {
         issues.push({ path: `${collection}[${index}]`, message: "必须是对象。" });
         return;
       }
-      for (const key of fields2) if (!Array.isArray(item[key])) issues.push({ path: `${collection}[${index}].${key}`, message: `${key} 必须是数组；从已批准登记表填写本镜引用，无对应内容才使用 []。` });
+      for (let key of fields2) Array.isArray(item[key]) || issues.push({ path: `${collection}[${index}].${key}`, message: `${key} 必须是数组；从已批准登记表填写本镜引用，无对应内容才使用 []。` });
     });
-  }
-  if (issues.length) return { valid: false, error_code: "REQUIRED_ARTIFACT_ARRAYS", issues, expectedRevision: state.revision };
+  if (issues.length) return { valid: !1, error_code: "REQUIRED_ARTIFACT_ARRAYS", issues, expectedRevision: state.revision };
   try {
     validateArtifact(stage, data, state);
   } catch (error) {
-    return { valid: false, error_code: "ARTIFACT_VALIDATION_FAILED", issues: [{ path: stage, message: String(error?.message || "材料未通过校验") }], expectedRevision: state.revision };
+    return { valid: !1, error_code: "ARTIFACT_VALIDATION_FAILED", issues: [{ path: stage, message: String(error?.message || "材料未通过校验") }], expectedRevision: state.revision };
   }
-  return { valid: true, stage, expectedRevision: state.revision, next_action: "submit", note: "仅候选材料校验通过，尚未保存或批准；submit 仍校验依赖、审批和当前修订。" };
+  return { valid: !0, stage, expectedRevision: state.revision, next_action: "submit", note: "仅候选材料校验通过，尚未保存或批准；submit 仍校验依赖、审批和当前修订。" };
 }
 
 // src/businesses/film-production/production.responses.ts
 function projectResponse(state, nextTask2, mode = "full", extra2 = {}) {
-  const continuation = nextTask2?.action === "submit" && nextTask2?.stage === "script" ? { project_id: state.project_id, expected_revision: state.revision, action: "WRITE_AND_SUBMIT_SCRIPT", instructions: "创意已批准，完整输入见nextTask。现在完成并展示剧本，使用本project_id和expected_revision提交script；不重复创意审批，不新建项目，不以准备开始结束本轮。中断恢复时沿用此状态。" } : nextTask2?.action === "approve" ? { project_id: state.project_id, expected_revision: state.revision, action: "REQUEST_NATIVE_APPROVAL", instructions: "展示当前保存稿后直接调用film_project approve，由工具发起唯一人工审批；不要先用ask_user_question重复询问是否批准。" } : void 0;
-  if (mode !== "compact") return { ...state, ...extra2, ...continuation ? { continuation } : {}, nextTask: nextTask2 };
-  return {
+  let continuation = nextTask2?.action === "submit" && nextTask2?.stage === "script" ? { project_id: state.project_id, expected_revision: state.revision, action: "WRITE_AND_SUBMIT_SCRIPT", instructions: "创意已批准，完整输入见nextTask。现在完成并展示剧本，使用本project_id和expected_revision提交script；不重复创意审批，不新建项目，不以准备开始结束本轮。中断恢复时沿用此状态。" } : nextTask2?.action === "approve" ? { project_id: state.project_id, expected_revision: state.revision, action: "REQUEST_NATIVE_APPROVAL", instructions: "展示当前保存稿后直接调用film_project approve，由工具发起唯一人工审批；不要先用ask_user_question重复询问是否批准。" } : void 0;
+  return mode !== "compact" ? { ...state, ...extra2, ...continuation ? { continuation } : {}, nextTask: nextTask2 } : {
     response_mode: "compact",
     project_id: state.project_id,
     title: state.title,
@@ -2540,7 +2197,7 @@ function projectResponse(state, nextTask2, mode = "full", extra2 = {}) {
     artifact_summary: Object.fromEntries(Object.entries(state.artifacts || {}).map(([stage, a]) => [stage, {
       artifact_ref: `project.json#/artifacts/${stage}`,
       revision: a.revision,
-      stale: a.stale === true,
+      stale: a.stale === !0,
       source_revisions: a.source_revisions
     }])),
     task_summary: (state.tasks || []).map((t) => ({ key: t.key, task_id: t.task_id, stage: t.stage, status: t.status, attempts: t.attempts, error_code: t.error_code })),
@@ -2558,66 +2215,46 @@ init_connection();
 // src/businesses/film-production/projects/project.service.ts
 var FIELDS = ["production_strategy", "genre", "aspect_ratio", "resolution", "language", "visual_style", "target_audience", "distribution_channel", "target_model", "work_type", "narrative_mode", "format", "purpose", "style_profile", "tone"];
 function validateTargetModel(value) {
-  if (value == null) return;
-  if (typeof value !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/.test(value) || /^(placeholder|unknown|tbd|todo|example|model_id|target_model)$/i.test(value)) throw Error("INVALID_TARGET_MODEL:请使用工具 execution_plan.model_name 返回的实际模型ID；未指定时省略，不能填写占位文字。");
+  if (value != null && (typeof value != "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/.test(value) || /^(placeholder|unknown|tbd|todo|example|model_id|target_model)$/i.test(value)))
+    throw Error("INVALID_TARGET_MODEL:请使用工具 execution_plan.model_name 返回的实际模型ID；未指定时省略，不能填写占位文字。");
 }
 function createProjectSpec(title, idea, duration, input = {}) {
-  if (!input || typeof input !== "object" || Array.isArray(input)) throw Error("INVALID_PROJECT_SPEC");
+  if (!input || typeof input != "object" || Array.isArray(input)) throw Error("INVALID_PROJECT_SPEC");
   if (Object.keys(input).some((k) => !FIELDS.includes(k) && !["hard_constraints", "soft_preferences", "references"].includes(k))) throw Error("UNKNOWN_PROJECT_SPEC_FIELD");
-  for (const key of FIELDS) if (input[key] !== void 0 && (typeof input[key] !== "string" || !input[key].trim())) throw Error(`INVALID_PROJECT_SPEC:${key}`);
+  for (let key of FIELDS) if (input[key] !== void 0 && (typeof input[key] != "string" || !input[key].trim())) throw Error(`INVALID_PROJECT_SPEC:${key}`);
   if (input.aspect_ratio && !["16:9", "9:16"].includes(input.aspect_ratio)) throw Error("INVALID_PROJECT_SPEC:aspect_ratio");
   if (input.resolution && !["480p", "720p"].includes(input.resolution)) throw Error("INVALID_PROJECT_SPEC:resolution");
   if (input.production_strategy && !["continuous_segments", "independent_shots"].includes(input.production_strategy)) throw Error("INVALID_PRODUCTION_STRATEGY");
-  validateTargetModel(input.target_model);
-  if (input.work_type && !WORK_TYPES.includes(input.work_type)) throw Error("UNKNOWN_WORK_TYPE");
+  if (validateTargetModel(input.target_model), input.work_type && !WORK_TYPES.includes(input.work_type)) throw Error("UNKNOWN_WORK_TYPE");
   if (input.narrative_mode && !NARRATIVE_MODES.includes(input.narrative_mode)) throw Error("UNKNOWN_NARRATIVE_MODE");
-  for (const key of ["hard_constraints", "soft_preferences", "references"]) if (input[key] !== void 0 && (!Array.isArray(input[key]) || input[key].some((v) => typeof v !== "string" || !v.trim()))) throw Error(`INVALID_PROJECT_SPEC:${key}`);
-  const dimensionSelected = ["genre", "format", "purpose", "style_profile"].some((k) => input[k] !== void 0);
-  assertDimensions({ ...input, dimension_profile_revision: dimensionSelected ? "1" : null });
-  return { dimension_profile_revision: dimensionSelected ? "1" : null, title, original_idea: idea, target_duration_ms: duration, ...Object.fromEntries(FIELDS.map((k) => [k, input[k] || null])), profile_revision: input.work_type ? profileRevision(input.work_type) : null, hard_constraints: input.hard_constraints || [], soft_preferences: input.soft_preferences || [], references: input.references || [], provenance: { title: "USER_SPECIFIED", original_idea: "USER_SPECIFIED", target_duration_ms: "USER_SPECIFIED", ...Object.fromEntries(FIELDS.map((k) => [k, input[k] ? "USER_SPECIFIED" : "UNKNOWN"])) } };
+  for (let key of ["hard_constraints", "soft_preferences", "references"]) if (input[key] !== void 0 && (!Array.isArray(input[key]) || input[key].some((v) => typeof v != "string" || !v.trim()))) throw Error(`INVALID_PROJECT_SPEC:${key}`);
+  let dimensionSelected = ["genre", "format", "purpose", "style_profile"].some((k) => input[k] !== void 0);
+  return assertDimensions({ ...input, dimension_profile_revision: dimensionSelected ? "1" : null }), { dimension_profile_revision: dimensionSelected ? "1" : null, title, original_idea: idea, target_duration_ms: duration, ...Object.fromEntries(FIELDS.map((k) => [k, input[k] || null])), profile_revision: input.work_type ? profileRevision(input.work_type) : null, hard_constraints: input.hard_constraints || [], soft_preferences: input.soft_preferences || [], references: input.references || [], provenance: { title: "USER_SPECIFIED", original_idea: "USER_SPECIFIED", target_duration_ms: "USER_SPECIFIED", ...Object.fromEntries(FIELDS.map((k) => [k, input[k] ? "USER_SPECIFIED" : "UNKNOWN"])) } };
 }
 function configureProfile(state, input, expected) {
   if (state.revision !== expected) throw Error("REVISION_CONFLICT");
   if (state.status === "STOPPED") throw Error("PROJECT_STOPPED");
-  const scope = input?.change_scope;
+  let scope = input?.change_scope;
   if (scope !== void 0 && !["visual_only", "story"].includes(scope)) throw Error("INVALID_CHANGE_SCOPE");
-  if (input && typeof input === "object" && !Array.isArray(input)) {
-    input = { ...input };
-    delete input.change_scope;
-  }
-  if (scope === "visual_only" && Object.keys(input || {}).some((k) => !["visual_style", "style_profile", "tone"].includes(k))) throw Error("VISUAL_SCOPE_CONFLICT");
-  const allowed = ["production_strategy", "work_type", "narrative_mode", "visual_style", "target_model", ...DIMENSION_FIELDS];
-  if (!input || typeof input !== "object" || Array.isArray(input) || !Object.keys(input).length || Object.keys(input).some((k) => !allowed.includes(k))) throw Error("INVALID_PROFILE_SELECTION");
-  if (input.work_type !== void 0 && !WORK_TYPES.includes(input.work_type)) throw Error("INVALID_PROFILE_SELECTION");
+  if (input && typeof input == "object" && !Array.isArray(input) && (input = { ...input }, delete input.change_scope), scope === "visual_only" && Object.keys(input || {}).some((k) => !["visual_style", "style_profile", "tone"].includes(k))) throw Error("VISUAL_SCOPE_CONFLICT");
+  let allowed = ["production_strategy", "work_type", "narrative_mode", "visual_style", "target_model", ...DIMENSION_FIELDS];
+  if (!input || typeof input != "object" || Array.isArray(input) || !Object.keys(input).length || Object.keys(input).some((k) => !allowed.includes(k)) || input.work_type !== void 0 && !WORK_TYPES.includes(input.work_type)) throw Error("INVALID_PROFILE_SELECTION");
   if (input.narrative_mode !== void 0 && !NARRATIVE_MODES.includes(input.narrative_mode)) throw Error("UNKNOWN_NARRATIVE_MODE");
-  for (const [key, value] of Object.entries(input)) if (!(value === null && [...DIMENSION_FIELDS, "visual_style", "target_model"].includes(key)) && (typeof value !== "string" || !value.trim())) throw Error(`INVALID_PROJECT_SPEC:${key}`);
+  for (let [key, value] of Object.entries(input)) if (!(value === null && [...DIMENSION_FIELDS, "visual_style", "target_model"].includes(key)) && (typeof value != "string" || !value.trim())) throw Error(`INVALID_PROJECT_SPEC:${key}`);
   if (input.production_strategy && !["continuous_segments", "independent_shots"].includes(input.production_strategy)) throw Error("INVALID_PRODUCTION_STRATEGY");
   validateTargetModel(input.target_model);
-  const old = state.project_spec || {};
-  const spec = { ...old, ...input };
-  spec.profile_revision = spec.work_type ? profileRevision(spec.work_type) : null;
-  if (DIMENSION_FIELDS.some((k) => Object.hasOwn(input, k) && k !== "tone")) spec.dimension_profile_revision = "1";
-  resolveProfile(spec);
-  assertDimensions(spec);
-  const changed = Object.keys(input).filter((k) => old[k] !== spec[k]);
-  if ((old.profile_revision ?? null) !== spec.profile_revision) changed.push("profile_revision");
-  if ((old.dimension_profile_revision ?? null) !== (spec.dimension_profile_revision ?? null)) changed.push("dimension_profile_revision");
-  if (!changed.length) return structuredClone(state);
-  const next = structuredClone(state);
-  next.project_spec = { ...spec, provenance: { ...old.provenance, ...Object.fromEntries(Object.keys(input).map((k) => [k, "USER_SPECIFIED"])) } };
-  next.revision++;
-  if (scope !== "story" && changed.every((k) => ["target_model", "production_strategy", "visual_style", "style_profile", "dimension_profile_revision", ...scope === "visual_only" ? ["tone"] : []].includes(k))) {
-    const affected = ["assets", "shots", "prompts", "review"].filter((k) => next.artifacts[k]);
-    for (const stage of affected) next.artifacts[stage].stale = true;
-    next.status = "ASSET_DESIGN";
-    next.last_change = { stage: "project_spec", changed_fields: changed, previous_target_model: old.target_model || null, affected_artifacts: affected, approval_impact: changed.some((k) => ["visual_style", "style_profile", "tone"].includes(k)) ? "PRESERVE_STORY_RECHECK_VISUAL_ARTIFACTS" : changed.includes("production_strategy") ? "PRESERVE_STORY_RECHECK_PRODUCTION_PLAN" : "PRESERVE_CREATIVE_AND_SCRIPT_RECHECK_MODEL_DEPENDENT_ARTIFACTS" };
-    return next;
+  let old = state.project_spec || {}, spec = { ...old, ...input };
+  spec.profile_revision = spec.work_type ? profileRevision(spec.work_type) : null, DIMENSION_FIELDS.some((k) => Object.hasOwn(input, k) && k !== "tone") && (spec.dimension_profile_revision = "1"), resolveProfile(spec), assertDimensions(spec);
+  let changed = Object.keys(input).filter((k) => old[k] !== spec[k]);
+  if ((old.profile_revision ?? null) !== spec.profile_revision && changed.push("profile_revision"), (old.dimension_profile_revision ?? null) !== (spec.dimension_profile_revision ?? null) && changed.push("dimension_profile_revision"), !changed.length) return structuredClone(state);
+  let next = structuredClone(state);
+  if (next.project_spec = { ...spec, provenance: { ...old.provenance, ...Object.fromEntries(Object.keys(input).map((k) => [k, "USER_SPECIFIED"])) } }, next.revision++, scope !== "story" && changed.every((k) => ["target_model", "production_strategy", "visual_style", "style_profile", "dimension_profile_revision", ...scope === "visual_only" ? ["tone"] : []].includes(k))) {
+    let affected = ["assets", "shots", "prompts", "review"].filter((k) => next.artifacts[k]);
+    for (let stage of affected) next.artifacts[stage].stale = !0;
+    return next.status = "ASSET_DESIGN", next.last_change = { stage: "project_spec", changed_fields: changed, previous_target_model: old.target_model || null, affected_artifacts: affected, approval_impact: changed.some((k) => ["visual_style", "style_profile", "tone"].includes(k)) ? "PRESERVE_STORY_RECHECK_VISUAL_ARTIFACTS" : changed.includes("production_strategy") ? "PRESERVE_STORY_RECHECK_PRODUCTION_PLAN" : "PRESERVE_CREATIVE_AND_SCRIPT_RECHECK_MODEL_DEPENDENT_ARTIFACTS" }, next;
   }
-  for (const artifact of Object.values(next.artifacts)) artifact.stale = true;
-  next.approvals = {};
-  next.status = "REQUIREMENT_ANALYSIS";
-  next.last_change = { stage: "project_spec", changed_fields: changed, previous_profile: { work_type: old.work_type || null, profile_revision: old.profile_revision || null }, affected_artifacts: Object.keys(next.artifacts), approval_impact: "REAPPROVE_CREATIVE_AND_SCRIPT" };
-  return next;
+  for (let artifact of Object.values(next.artifacts)) artifact.stale = !0;
+  return next.approvals = {}, next.status = "REQUIREMENT_ANALYSIS", next.last_change = { stage: "project_spec", changed_fields: changed, previous_profile: { work_type: old.work_type || null, profile_revision: old.profile_revision || null }, affected_artifacts: Object.keys(next.artifacts), approval_impact: "REAPPROVE_CREATIVE_AND_SCRIPT" }, next;
 }
 
 // src/businesses/film-production/projects/project.repository.ts
@@ -2633,20 +2270,19 @@ async function inspectFileLock(file) {
   try {
     raw = await readFile(file, "utf8");
   } catch (e) {
-    if (e.code === "ENOENT") return { status: "unlocked", recoverable: false };
+    if (e.code === "ENOENT") return { status: "unlocked", recoverable: !1 };
     throw e;
   }
   let record;
   try {
     record = JSON.parse(raw);
   } catch {
-    return { status: "unknown", recoverable: false };
+    return { status: "unknown", recoverable: !1 };
   }
-  if (!record?.host || record.host !== os2.hostname()) return { status: "foreign_host", recoverable: false };
-  if (!Number.isSafeInteger(record?.pid) || record.pid <= 0) return { status: "unknown", recoverable: false };
+  if (!record?.host || record.host !== os2.hostname()) return { status: "foreign_host", recoverable: !1 };
+  if (!Number.isSafeInteger(record?.pid) || record.pid <= 0) return { status: "unknown", recoverable: !1 };
   try {
-    process.kill(record.pid, 0);
-    return { status: "active", recoverable: false };
+    return process.kill(record.pid, 0), { status: "active", recoverable: !1 };
   } catch (e) {
     return { status: e.code === "ESRCH" ? "interrupted" : "unknown", recoverable: e.code === "ESRCH", record };
   }
@@ -2662,34 +2298,28 @@ async function removeOwned(file, token) {
     if (e.code === "ENOENT") return;
     throw e;
   }
-  if (record.token === token) await unlink2(file);
+  record.token === token && await unlink2(file);
 }
 async function publishLock(file, token, metadata = {}) {
-  const prepared = `${file}.${token}.tmp`;
-  const handle = await open(prepared, "wx", 384);
+  let prepared = `${file}.${token}.tmp`, handle = await open(prepared, "wx", 384);
   try {
-    await handle.writeFile(JSON.stringify({ ...metadata, ...lockRecord(token) }));
-    await handle.close();
-    await link(prepared, file);
+    await handle.writeFile(JSON.stringify({ ...metadata, ...lockRecord(token) })), await handle.close(), await link(prepared, file);
   } finally {
     await handle.close().catch(() => {
-    });
-    await unlink2(prepared).catch(() => {
+    }), await unlink2(prepared).catch(() => {
     });
   }
 }
 async function reclaimDeadLock(file, depth = 0) {
-  const check = await inspectFileLock(file);
+  let check = await inspectFileLock(file);
   if (check.status === "unlocked") return;
   if (depth > 32 || !check.recoverable || !/^[a-f0-9-]{36}$/.test(check.record?.token || "")) throw Error("RECOVERY_LOCK_UNSAFE:恢复锁活跃或无法确定所属进程，保留原锁。");
-  const claim = `${file}.reclaim-${check.record.token}`;
-  const token = randomUUID2();
+  let claim = `${file}.reclaim-${check.record.token}`, token = randomUUID2();
   try {
     await publishLock(claim, token);
   } catch (e) {
     if (e.code !== "EEXIST") throw e;
-    await reclaimDeadLock(claim, depth + 1);
-    await publishLock(claim, token);
+    await reclaimDeadLock(claim, depth + 1), await publishLock(claim, token);
   }
   try {
     let current;
@@ -2699,39 +2329,36 @@ async function reclaimDeadLock(file, depth = 0) {
       if (e.code === "ENOENT") return;
       throw e;
     }
-    if (current.token === check.record.token) await unlink2(file);
+    current.token === check.record.token && await unlink2(file);
   } finally {
     await removeOwned(claim, token);
   }
 }
 async function recoverFileLock(file, guardFile = `${file}.recovery`) {
-  const token = randomUUID2();
+  let token = randomUUID2();
   try {
     await publishLock(guardFile, token);
   } catch (e) {
     if (e.code !== "EEXIST") throw e;
-    await reclaimDeadLock(guardFile);
-    await publishLock(guardFile, token);
+    await reclaimDeadLock(guardFile), await publishLock(guardFile, token);
   }
   try {
-    const check = await inspectFileLock(file);
-    if (check.status === "unlocked") return { status: "unlocked", recoverable: false };
+    let check = await inspectFileLock(file);
+    if (check.status === "unlocked") return { status: "unlocked", recoverable: !1 };
     if (!check.recoverable) throw Error("LOCK_RECOVERY_UNSAFE:锁仍活跃或无法确认所属进程，保留原锁。");
-    await unlink2(file);
-    return { status: "recovered", recoverable: false };
+    return await unlink2(file), { status: "recovered", recoverable: !1 };
   } finally {
     await removeOwned(guardFile, token);
   }
 }
-async function acquireFileLock(file, { recoverDead = false, metadata = {} } = {}) {
-  const token = randomUUID2();
+async function acquireFileLock(file, { recoverDead = !1, metadata = {} } = {}) {
+  let token = randomUUID2();
   try {
     await publishLock(file, token, metadata);
   } catch (e) {
     if (e.code !== "EEXIST") throw e;
     if (!recoverDead) throw Error("PROJECT_LOCKED:使用diagnose检查，明确中断后recover_lock恢复。");
-    await recoverFileLock(file);
-    await publishLock(file, token, metadata);
+    await recoverFileLock(file), await publishLock(file, token, metadata);
   }
   return async () => {
     await removeOwned(file, token);
@@ -2749,81 +2376,68 @@ async function acquireProjectLock(dir) {
   return acquireFileLock(path3.join(dir, ".write.lock"));
 }
 async function pruneProjectSnapshots(dir, state, keep = 30) {
-  const folder = path3.join(dir, "snapshots");
-  const protectedRevisions = /* @__PURE__ */ new Set([state.revision, ...Object.values(state.approvals || {}), ...(state.decisions || []).map((d) => d.artifact_revision), ...Object.values(state.artifacts || {}).flatMap((a) => [a.revision, ...Object.values(a.source_revisions || {})])]);
-  const files = [];
-  for (const name of await readdir2(folder)) {
+  let folder = path3.join(dir, "snapshots"), protectedRevisions = /* @__PURE__ */ new Set([state.revision, ...Object.values(state.approvals || {}), ...(state.decisions || []).map((d) => d.artifact_revision), ...Object.values(state.artifacts || {}).flatMap((a) => [a.revision, ...Object.values(a.source_revisions || {})])]), files = [];
+  for (let name of await readdir2(folder)) {
     if (!/^\d+-[a-f0-9-]+\.json$/.test(name)) continue;
-    const revision = Number(name.split("-")[0]);
-    if (revision > state.revision) continue;
-    files.push({ name, revision, mtime: (await stat(path3.join(folder, name))).mtimeMs });
+    let revision = Number(name.split("-")[0]);
+    revision > state.revision || files.push({ name, revision, mtime: (await stat(path3.join(folder, name))).mtimeMs });
   }
   files.sort((a, b) => b.mtime - a.mtime);
-  for (const item of files.slice(keep)) {
+  for (let item of files.slice(keep)) {
     if (protectedRevisions.has(item.revision)) continue;
-    const file = path3.join(folder, item.name);
-    let saved;
+    let file = path3.join(folder, item.name), saved;
     try {
       saved = JSON.parse(await readFile2(file, "utf8"));
     } catch {
       continue;
     }
-    if (saved.revision === item.revision) await unlink3(file);
+    saved.revision === item.revision && await unlink3(file);
   }
 }
 
 // src/businesses/film-production/approvals/approval.service.ts
 function recordApprovalDecision(state, stage, decision, expected) {
-  const artifact = state.artifacts[stage];
+  let artifact = state.artifacts[stage];
   if (!["creative", "script"].includes(stage) || !artifact || artifact.stale || state.revision !== expected) throw Error("INVALID_APPROVAL_REVISION");
   if (!["APPROVED", "REVISE", "REJECTED"].includes(decision)) throw Error("INVALID_APPROVAL_DECISION");
   if (decision === "APPROVED" && stage === "creative" && state.project_spec && Object.hasOwn(state.project_spec, "work_type") && !hasContentProfile(state.project_spec)) throw Error("WORK_TYPE_REQUIRED_BEFORE_APPROVAL");
-  const next = structuredClone(state);
-  next.decisions ||= [];
-  next.decisions.push({ approval_id: `APPROVAL_${next.decisions.length + 1}`, project_id: state.project_id, gate: stage.toUpperCase(), stage, artifact_ref: `project.json#/artifacts/${stage}`, artifact_revision: artifact.revision, revision: artifact.revision, work_type: state.project_spec?.work_type || null, profile_revision: state.project_spec?.profile_revision || null, decision, decided_by: "USER", decision_time: (/* @__PURE__ */ new Date()).toISOString() });
-  next.decisions[next.decisions.length - 1].resolved_profiles = resolveDimensions(state.project_spec);
-  next.revision++;
-  if (decision === "APPROVED") {
-    next.approvals[stage] = artifact.revision;
-    next.status = stage === "creative" ? "SCRIPT_WRITING" : "ASSET_DESIGN";
-  } else {
-    delete next.approvals[stage];
-    next.status = decision === "REJECTED" ? "STOPPED" : `${stage.toUpperCase()}_REVISE`;
-  }
-  return next;
+  let next = structuredClone(state);
+  return next.decisions ||= [], next.decisions.push({ approval_id: `APPROVAL_${next.decisions.length + 1}`, project_id: state.project_id, gate: stage.toUpperCase(), stage, artifact_ref: `project.json#/artifacts/${stage}`, artifact_revision: artifact.revision, revision: artifact.revision, work_type: state.project_spec?.work_type || null, profile_revision: state.project_spec?.profile_revision || null, decision, decided_by: "USER", decision_time: (/* @__PURE__ */ new Date()).toISOString() }), next.decisions[next.decisions.length - 1].resolved_profiles = resolveDimensions(state.project_spec), next.revision++, decision === "APPROVED" ? (next.approvals[stage] = artifact.revision, next.status = stage === "creative" ? "SCRIPT_WRITING" : "ASSET_DESIGN") : (delete next.approvals[stage], next.status = decision === "REJECTED" ? "STOPPED" : `${stage.toUpperCase()}_REVISE`), next;
 }
 
 // src/businesses/film-production/artifacts/artifact.repository.ts
 import { createHash as createHash2 } from "node:crypto";
 function artifactManifest(state) {
   return STAGES2.filter((s) => state.artifacts[s]).map((stage) => {
-    const artifact = state.artifacts[stage];
+    let artifact = state.artifacts[stage];
     return { stage, artifact_ref: `project.json#/artifacts/${stage}`, revision: artifact.revision, source_revisions: artifact.source_revisions || {}, ...artifact.profile_ref ? { profile_ref: artifact.profile_ref } : {}, ...artifact.dimension_profile_ref ? { dimension_profile_ref: artifact.dimension_profile_ref } : {}, stale: artifact.stale, sha256: createHash2("sha256").update(JSON.stringify(artifact.data)).digest("hex") };
   });
 }
 function printable(value) {
-  if (value === null || value === void 0) return "—";
-  if (typeof value !== "object") return String(value);
-  if (Array.isArray(value)) return value.length ? value.map((v) => typeof v === "object" ? printable(v) : `- ${v}`).join("\n\n") : "无";
-  return Object.entries(value).map(([key, v]) => typeof v === "object" ? `**${key}**
+  return value == null ? "—" : typeof value != "object" ? String(value) : Array.isArray(value) ? value.length ? value.map((v) => typeof v == "object" ? printable(v) : `- ${v}`).join(`
 
-${printable(v)}` : `**${key}**：${printable(v)}`).join("\n\n");
+`) : "无" : Object.entries(value).map(([key, v]) => typeof v == "object" ? `**${key}**
+
+${printable(v)}` : `**${key}**：${printable(v)}`).join(`
+
+`);
 }
 function renderDeliverables(state) {
-  const names = { creative: "创意提案", script: "正式剧本", assets: "人物与场景档案", shots: "导演分镜", prompts: "视频生成提示词", review: "质量审核" };
+  let names = { creative: "创意提案", script: "正式剧本", assets: "人物与场景档案", shots: "导演分镜", prompts: "视频生成提示词", review: "质量审核" };
   return `# ${state.title}
 
 项目：${state.project_id} · 修订：${state.revision}
 
 ` + STAGES2.filter((s) => state.artifacts[s]).map((stage) => {
-    const a = state.artifacts[stage];
-    const data = { ...a.data };
-    const screenplay = stage === "script" && typeof data.screenplay === "string" ? data.screenplay : "";
-    if (screenplay) delete data.screenplay;
-    return `## ${names[stage]}（修订 ${a.revision}${a.stale ? "，已失效，待更新" : ""}）
+    let a = state.artifacts[stage], data = { ...a.data }, screenplay = stage === "script" && typeof data.screenplay == "string" ? data.screenplay : "";
+    return screenplay && delete data.screenplay, `## ${names[stage]}（修订 ${a.revision}${a.stale ? "，已失效，待更新" : ""}）
 
-${screenplay ? screenplay + "\n\n" : ""}${printable(data)}`;
-  }).join("\n\n");
+${screenplay ? screenplay + `
+
+` : ""}${printable(data)}`;
+  }).join(`
+
+`);
 }
 
 // src/agents/director/prompt.ts
@@ -3212,7 +2826,13 @@ var ADAPTERS = {
   reviewer: "review 阶段提交平铺报告，不包 review_report。包含 review_id、review_stage、review_scope、reviewed_revisions、unverified_items、scores、issues、review_status、blocking_issue_count、delivery_allowed。终审使用 FINAL_REVIEW，scope 和 reviewed_revisions 覆盖 creative/script/assets/shots/prompts。scores 使用 requirement_fidelity/narrative_quality/character_consistency/scene_consistency/cinematic_quality/temporal_consistency/prompt_executability/structural_completeness，未评估填 null；当前权重由运行时代码复算，不虚构动态权重配置。issue 提供 description、location、evidence、responsible_agent、recheck_criteria、severity、status 等字段；expected/actual 映射 expected_behavior/actual_behavior。责任角色用注册 id，未复审不能 VERIFIED。"
 };
 function runtimeContract(role2) {
-  return "\n\n## 当前工具数据适配\n" + ADAPTERS[role2] + (role2 === "storyboard" || role2 === "director" ? '\n【分镜脚本与分镜示意图区分】shots JSON、镜头列表、时间轴或 Markdown 表格都是文字分镜，不能称为已经交付分镜示意图。用户要求看图，或进入 video_project 实际制作脚本审核前，调用 video_project(action:"storyboard",captureScript:true,scriptPath)，由插件根据当前制作脚本分镜表免费渲染本地构图示意图；脚本正文只生成一次，使用返回markdown内嵌图片并附原图链接，再review。不得手写SVG或绘图程序，也不调用付费出图模型。文字清单不能替代图片，不调用present登记过程图。创意和剧本阶段不提前要求最终图，不增加审批节点。' : "") + '\n新项目quality_policy=evidence_v1：正式剧本每场含scene_goal、key_actions、entry_state、exit_state（可观察状态）；Creative structure每段含purpose和visual_evidence。终审scores每个适用维度须在score_evidence中提供非空依据，并提供theme_evidence数组，每项scene_id及可见行动或声音evidence；narrative_diagnostics只作为风险提示，艺术判断不伪装为硬错误。\n正常推进使用 responseMode="compact"，直接 submit 一次即可；submit 内置校验，失败时一次返回全部缺失数组。validate 仅用于需要单独检查的草稿，不强制每稿调用、不在校验成功后重新生成整稿。content 为合法 JSON 字符串，不带 Markdown 围栏、注释或多余字符。assets 顶层必须同时包含 characters/scenes/locations/scene_states/props 五个数组，道具属于 props，不是仅写在场景描述中；没有道具时显式 props:[]。校验失败只修复报告中的格式或字段，不重写已批准内容、不把真实道具清空、不编造道具。submit 使用最近工具返回的当前 revision；返回 nextTask 已含下一阶段完整输入，直接继续，不再为相同版本重复 next/read。需要补查单阶段用 read(stage)，全部历史才用 responseMode="full"。validate 不代表保存、批准或视频成功。内部格式修复无需让用户处理 JSON，只在影响创意或已批准内容时请求决策。';
+  return `
+
+## 当前工具数据适配
+` + ADAPTERS[role2] + (role2 === "storyboard" || role2 === "director" ? `
+【分镜脚本与分镜示意图区分】shots JSON、镜头列表、时间轴或 Markdown 表格都是文字分镜，不能称为已经交付分镜示意图。用户要求看图，或进入 video_project 实际制作脚本审核前，调用 video_project(action:"storyboard",captureScript:true,scriptPath)，由插件根据当前制作脚本分镜表免费渲染本地构图示意图；脚本正文只生成一次，使用返回markdown内嵌图片并附原图链接，再review。不得手写SVG或绘图程序，也不调用付费出图模型。文字清单不能替代图片，不调用present登记过程图。创意和剧本阶段不提前要求最终图，不增加审批节点。` : "") + `
+新项目quality_policy=evidence_v1：正式剧本每场含scene_goal、key_actions、entry_state、exit_state（可观察状态）；Creative structure每段含purpose和visual_evidence。终审scores每个适用维度须在score_evidence中提供非空依据，并提供theme_evidence数组，每项scene_id及可见行动或声音evidence；narrative_diagnostics只作为风险提示，艺术判断不伪装为硬错误。
+正常推进使用 responseMode="compact"，直接 submit 一次即可；submit 内置校验，失败时一次返回全部缺失数组。validate 仅用于需要单独检查的草稿，不强制每稿调用、不在校验成功后重新生成整稿。content 为合法 JSON 字符串，不带 Markdown 围栏、注释或多余字符。assets 顶层必须同时包含 characters/scenes/locations/scene_states/props 五个数组，道具属于 props，不是仅写在场景描述中；没有道具时显式 props:[]。校验失败只修复报告中的格式或字段，不重写已批准内容、不把真实道具清空、不编造道具。submit 使用最近工具返回的当前 revision；返回 nextTask 已含下一阶段完整输入，直接继续，不再为相同版本重复 next/read。需要补查单阶段用 read(stage)，全部历史才用 responseMode="full"。validate 不代表保存、批准或视频成功。内部格式修复无需让用户处理 JSON，只在影响创意或已批准内容时请求决策。`;
 }
 
 // src/businesses/film-production/prompts/short-video.ts
@@ -3224,26 +2844,27 @@ var SHORT_VIDEO_COMMON = `【短视频交付基准】
 表演节拍：关键选择用“看见/听见什么→短暂反应→采取行动→物件或对方反馈”建立可读过程，不让所有眼神、手势、台词同时开始。只对叙事关键处细化，普通动作简写；反应可以克制，不统一添加皱眉、叹气、微笑或停顿。人物先看向确切对象，再完成已有动作，接触、承重、松手和物件归位有先后，避免动作密集而没有因果。
 分段交接：按真实生成边界设计，不按每个镜头另加调用。非末段在完整句、可识别动作落点或反应处结束，记录人物位置/朝向、持物手与道具落点、未完成动作阶段、视线对象和环境声；下一段只推进新事件，不复述上一句或重做拿放。关键台词、接触瞬间和唯一证据不挤在边界几帧，为现有接缝裁剪留可理解余地，但不机械加固定时长空等、不补拍付费过渡。末段兑现结尾，单段作品同样应完整收束。续拍前预览上一段实际结果，偏离关键剧情时先报告并修订或由用户决定重做，不能假装文字描述可以修复素材。
 声音按叙事交接：画内对白、画外声音与环境底分别写清；景别切换不自动换声场或重启音乐，不要求人物每个动作都配音效。安静段落保留必要环境声；声音能力未知时标待实测，不承诺跨次生成保持同一配乐。
-优先级：用户明确要求与已批准内容→可见事件和对白→主体/空间连续性→摄影与风格。矛盾要求先提出取舍，不把安静自然的表演写成夸张情绪，不让对焦搜索、手持晃动遮盖关键动作。`;
-var SHORT_VIDEO_ROLE = {
-  director: `【总导演专项】先判断作品要让谁在什么情境下获得什么感受或信息。把“专业”转成可审核目标：主题清楚、动作可读、声画统一、节奏有起伏、结尾有回响；不等同昂贵器材或多切镜。整理创作简报与一份连续性基准，按意图分派角色；逐段验收内容是否在推进。用户给参考时提炼可迁移的风格维度，不照抄场景剧情。只问阻断项，与现有缺失规格合并，不增加无意义确认。`,
-  creative: `【创意专项】用一句可辨识的核心表达加一个具体生活事件或观察线，而不是“温暖治愈”标签。设计吸引注意的细节、发展中的新发现和结尾回收；开头兑现片种与情绪承诺，不能用不相干悬念骗观看。15秒聚焦一个小变化，30–60秒围绕同一主线递进，时间更长才按需求展开。每段写叙事作用和可见载体，风景可由声音、光线或空间发现推进，不强造冲突。`,
-  screenwriter: `【编剧专项】先写具体发生的事，再润色对白与描述。场景有进入状态、行动动机、事件反馈和离开状态；留给观众理解与人物反应的时间。对白区分原文、发声方式与必要发音文本：谁说、对谁说、轻声/正常音量、语气、停顿，嘴部可见时记录口型目标；不默认低声或嘶吼。安静钓鱼可从浮漂轻动、手停住、侧耳听声等已授权细节产生进展，不能整片重复“坐着看水”。将必要背景融入动作，不长篇设定后才开始演。`,
-  character: `【人物专项】给每位主体一份精简且可重复的视觉锚点：年龄范围、脸部可见特征、发型发色、体态、服装颜色材质、饰物与持物状态。主角有当下目标、情绪基线、可见小习惯与反应尺度；特征服务表现，不推断敏感身份。每镜引用同一套锚点和服装状态，说明变化依据；画外角色不强加面部细节。参考图身份一致性是执行目标，不能靠“全程固定五官”保证成功；不自动调用出图。`,
-  scene: `【美术专项】先画清空间关系再加氛围：主体在哪、视线朝哪、可活动区域和主要背景、光源方向、道具相对位置。写2–4个与主题相关的环境细节，如垂柳投影、青草被风压低、水波对亮点的扰动；不要每镜重新堆满所有景物。统一时间、天气、色温与环境声底；镜头推进时景物随位置变化，不能瞬移。自然光场景说明软硬及方向，不混写多个互斥日照条件。`,
-  storyboard: `【分镜专项】把用户示例的“0–5s｜中景”写到能排演：主体站坐位置、手与道具、目光落点、主动作和可见反馈、风/光/声音变化、机位相对主体的位置与结束构图。特写只承载能看见的细节，远景不要求读出细微眼神；手持晃动、焦点转移有明确幅度与目的。允许一个安静镜头，但整片应有状态或认知变化。时间为剪辑意图，不承诺模型逐帧执行；不把每个切镜变成单独调用。`,
-  "prompt-engineer": `【执行提示词专项】交付“风格基准＋人物/空间锚点＋按顺序的本段镜头节拍＋对白/声音＋必要约束”。将编剧的抽象动机转为已审核的动作，不新增剧情。按实际模型能力选局部时间轴或“先/随后/最后”；单个执行提示词自包含，角色引用展开必要描述，避免同上。每节拍保留关键动作、环境反馈和结束状态，删掉创作分析、评分、审查说明及重复约束。冲突如一镜到底又强制切镜、固定机位又手持环绕须先解决；不把8K/UES/negative_prompt凭空加入API。续拍从上一段实际结果接起，保留初始角色素材。`,
-  reviewer: `【监制专项】先不看风格形容词，概括片子实际发生什么、表达什么；若只能概括为“人在景里发呆/多个漂亮地方”，检查是否符合用户明确的静态创作意图，否则定位缺少推进之处。逐镜核对动作可执行、声画互补、对白时长、空间与道具连续性、视觉锚点、技术参数真实性。检查详细描述是否有用，删除重复标签而非删除关键动作。评分须有证据，问题给出镜号、影响及最小修复；未看成片不能声称表演和口型验收通过。`
+优先级：用户明确要求与已批准内容→可见事件和对白→主体/空间连续性→摄影与风格。矛盾要求先提出取舍，不把安静自然的表演写成夸张情绪，不让对焦搜索、手持晃动遮盖关键动作。`, SHORT_VIDEO_ROLE = {
+  director: "【总导演专项】先判断作品要让谁在什么情境下获得什么感受或信息。把“专业”转成可审核目标：主题清楚、动作可读、声画统一、节奏有起伏、结尾有回响；不等同昂贵器材或多切镜。整理创作简报与一份连续性基准，按意图分派角色；逐段验收内容是否在推进。用户给参考时提炼可迁移的风格维度，不照抄场景剧情。只问阻断项，与现有缺失规格合并，不增加无意义确认。",
+  creative: "【创意专项】用一句可辨识的核心表达加一个具体生活事件或观察线，而不是“温暖治愈”标签。设计吸引注意的细节、发展中的新发现和结尾回收；开头兑现片种与情绪承诺，不能用不相干悬念骗观看。15秒聚焦一个小变化，30–60秒围绕同一主线递进，时间更长才按需求展开。每段写叙事作用和可见载体，风景可由声音、光线或空间发现推进，不强造冲突。",
+  screenwriter: "【编剧专项】先写具体发生的事，再润色对白与描述。场景有进入状态、行动动机、事件反馈和离开状态；留给观众理解与人物反应的时间。对白区分原文、发声方式与必要发音文本：谁说、对谁说、轻声/正常音量、语气、停顿，嘴部可见时记录口型目标；不默认低声或嘶吼。安静钓鱼可从浮漂轻动、手停住、侧耳听声等已授权细节产生进展，不能整片重复“坐着看水”。将必要背景融入动作，不长篇设定后才开始演。",
+  character: "【人物专项】给每位主体一份精简且可重复的视觉锚点：年龄范围、脸部可见特征、发型发色、体态、服装颜色材质、饰物与持物状态。主角有当下目标、情绪基线、可见小习惯与反应尺度；特征服务表现，不推断敏感身份。每镜引用同一套锚点和服装状态，说明变化依据；画外角色不强加面部细节。参考图身份一致性是执行目标，不能靠“全程固定五官”保证成功；不自动调用出图。",
+  scene: "【美术专项】先画清空间关系再加氛围：主体在哪、视线朝哪、可活动区域和主要背景、光源方向、道具相对位置。写2–4个与主题相关的环境细节，如垂柳投影、青草被风压低、水波对亮点的扰动；不要每镜重新堆满所有景物。统一时间、天气、色温与环境声底；镜头推进时景物随位置变化，不能瞬移。自然光场景说明软硬及方向，不混写多个互斥日照条件。",
+  storyboard: "【分镜专项】把用户示例的“0–5s｜中景”写到能排演：主体站坐位置、手与道具、目光落点、主动作和可见反馈、风/光/声音变化、机位相对主体的位置与结束构图。特写只承载能看见的细节，远景不要求读出细微眼神；手持晃动、焦点转移有明确幅度与目的。允许一个安静镜头，但整片应有状态或认知变化。时间为剪辑意图，不承诺模型逐帧执行；不把每个切镜变成单独调用。",
+  "prompt-engineer": "【执行提示词专项】交付“风格基准＋人物/空间锚点＋按顺序的本段镜头节拍＋对白/声音＋必要约束”。将编剧的抽象动机转为已审核的动作，不新增剧情。按实际模型能力选局部时间轴或“先/随后/最后”；单个执行提示词自包含，角色引用展开必要描述，避免同上。每节拍保留关键动作、环境反馈和结束状态，删掉创作分析、评分、审查说明及重复约束。冲突如一镜到底又强制切镜、固定机位又手持环绕须先解决；不把8K/UES/negative_prompt凭空加入API。续拍从上一段实际结果接起，保留初始角色素材。",
+  reviewer: "【监制专项】先不看风格形容词，概括片子实际发生什么、表达什么；若只能概括为“人在景里发呆/多个漂亮地方”，检查是否符合用户明确的静态创作意图，否则定位缺少推进之处。逐镜核对动作可执行、声画互补、对白时长、空间与道具连续性、视觉锚点、技术参数真实性。检查详细描述是否有用，删除重复标签而非删除关键动作。评分须有证据，问题给出镜号、影响及最小修复；未看成片不能声称表演和口型验收通过。"
 };
 
 // src/businesses/film-production/roles/index.ts
-var ROLE_TEXTS = { director: prompt_default, creative: prompt_default2, screenwriter: prompt_default3, character: prompt_default4, scene: prompt_default5, storyboard: prompt_default6, "prompt-engineer": prompt_default7, reviewer: prompt_default8 };
-var ROLE_PROMPTS = Object.fromEntries(Object.entries(ROLE_TEXTS).map(([key, text]) => [key, text + "\n" + COMMON_CONTRACT + runtimeContract(key)]));
+var ROLE_TEXTS = { director: prompt_default, creative: prompt_default2, screenwriter: prompt_default3, character: prompt_default4, scene: prompt_default5, storyboard: prompt_default6, "prompt-engineer": prompt_default7, reviewer: prompt_default8 }, ROLE_PROMPTS = Object.fromEntries(Object.entries(ROLE_TEXTS).map(([key, text]) => [key, text + `
+` + COMMON_CONTRACT + runtimeContract(key)]));
 function roleInstructions(state, role2) {
-  return ROLE_PROMPTS[role2] + "\n" + profileInstructions(state, role2) + (state.duration_ms > 0 && state.duration_ms <= 6e4 ? "\n" + SHORT_VIDEO_COMMON + "\n" + (SHORT_VIDEO_ROLE[role2] || "") : "");
+  return ROLE_PROMPTS[role2] + `
+` + profileInstructions(state, role2) + (state.duration_ms > 0 && state.duration_ms <= 6e4 ? `
+` + SHORT_VIDEO_COMMON + `
+` + (SHORT_VIDEO_ROLE[role2] || "") : "");
 }
-var INTENTS = ["new_project", "develop_idea", "write_script", "revise_dialogue", "revise_story", "design_character", "revise_character", "design_scene", "revise_scene", "design_shots", "revise_camera", "revise_timing", "write_prompts", "adapt_model", "review", "verify_facts", "resume", "produce", "clarify"];
-var ROUTES = {
+var INTENTS = ["new_project", "develop_idea", "write_script", "revise_dialogue", "revise_story", "design_character", "revise_character", "design_scene", "revise_scene", "design_shots", "revise_camera", "revise_timing", "write_prompts", "adapt_model", "review", "verify_facts", "resume", "produce", "clarify"], ROUTES = {
   new_project: ["director", null],
   develop_idea: ["creative", "creative"],
   write_script: ["screenwriter", "script"],
@@ -3263,20 +2884,13 @@ var ROUTES = {
   resume: ["director", null],
   produce: ["director", null],
   clarify: ["director", null]
-};
-var DEPS = STAGE_DEPS;
+}, DEPS = STAGE_DEPS;
 function routeIntent(state, intent, entityIds = []) {
   if (!Object.hasOwn(ROUTES, intent)) throw Error("UNKNOWN_INTENT");
-  if (!Array.isArray(entityIds) || entityIds.some((id) => typeof id !== "string" || !id.trim())) throw Error("INVALID_SCOPE");
-  const [role2, stage] = ROUTES[intent];
-  const dependencies = stage ? DEPS[stage] : [];
-  const missing = dependencies.filter((s) => !state.artifacts[s] || state.artifacts[s].stale);
-  const approvals = dependencies.filter((s) => ["creative", "script"].includes(s) && state.approvals[s] !== state.artifacts[s]?.revision);
-  const local = ["revise_dialogue", "revise_character", "revise_scene", "revise_camera", "revise_timing"].includes(intent);
-  const scopeRequired = local && !entityIds.length;
-  const ids = stage === "assets" ? role2 === "character" ? state.artifacts.assets?.data.characters?.map((v) => v.character_id) : ["scenes", "locations", "scene_states", "props"].flatMap((k) => (state.artifacts.assets?.data[k] || []).map((v) => v[{ scenes: "scene_id", locations: "location_id", scene_states: "scene_state_id", props: "prop_id" }[k]])) : stage === "shots" || stage === "prompts" ? state.artifacts.shots?.data.shots?.map((v) => v.shot_id) : void 0;
+  if (!Array.isArray(entityIds) || entityIds.some((id) => typeof id != "string" || !id.trim())) throw Error("INVALID_SCOPE");
+  let [role2, stage] = ROUTES[intent], dependencies = stage ? DEPS[stage] : [], missing = dependencies.filter((s) => !state.artifacts[s] || state.artifacts[s].stale), approvals = dependencies.filter((s) => ["creative", "script"].includes(s) && state.approvals[s] !== state.artifacts[s]?.revision), scopeRequired = ["revise_dialogue", "revise_character", "revise_scene", "revise_camera", "revise_timing"].includes(intent) && !entityIds.length, ids = stage === "assets" ? role2 === "character" ? state.artifacts.assets?.data.characters?.map((v) => v.character_id) : ["scenes", "locations", "scene_states", "props"].flatMap((k) => (state.artifacts.assets?.data[k] || []).map((v) => v[{ scenes: "scene_id", locations: "location_id", scene_states: "scene_state_id", props: "prop_id" }[k]])) : stage === "shots" || stage === "prompts" ? state.artifacts.shots?.data.shots?.map((v) => v.shot_id) : void 0;
   if (ids && entityIds.some((id) => !ids.includes(id))) throw Error("UNKNOWN_ENTITY");
-  const inputs = Object.fromEntries([.../* @__PURE__ */ new Set([...dependencies, ...stage ? [stage] : []])].filter((s) => state.artifacts[s]).map((s) => [s, state.artifacts[s]]));
+  let inputs = Object.fromEntries([.../* @__PURE__ */ new Set([...dependencies, ...stage ? [stage] : []])].filter((s) => state.artifacts[s]).map((s) => [s, state.artifacts[s]]));
   return {
     submission_contract: stage ? submissionContract(stage) : null,
     intent,
@@ -3300,122 +2914,96 @@ function routeIntent(state, intent, entityIds = []) {
 
 // src/businesses/film-production/artifacts/artifact.version.ts
 function reviseEntities(state, stage, replacements, expected) {
-  const fields2 = { assets: ["characters", "scenes", "locations", "scene_states", "props"], shots: ["shots"], prompts: ["prompts"] };
-  const keys = { characters: "character_id", scenes: "scene_id", locations: "location_id", scene_states: "scene_state_id", props: "prop_id", shots: "shot_id", prompts: "shot_id" };
+  let fields2 = { assets: ["characters", "scenes", "locations", "scene_states", "props"], shots: ["shots"], prompts: ["prompts"] }, keys = { characters: "character_id", scenes: "scene_id", locations: "location_id", scene_states: "scene_state_id", props: "prop_id", shots: "shot_id", prompts: "shot_id" };
   if (!fields2[stage] || !Array.isArray(replacements) || !replacements.length) throw Error("INVALID_REVISION_SCOPE");
-  const artifact = state.artifacts[stage];
+  let artifact = state.artifacts[stage];
   if (!artifact || artifact.stale) throw Error("UPSTREAM_REQUIRED");
-  const data = structuredClone(artifact.data);
-  const changed = /* @__PURE__ */ new Set();
-  for (const replacement of replacements) {
+  let data = structuredClone(artifact.data), changed = /* @__PURE__ */ new Set();
+  for (let replacement of replacements) {
     if (!fields2[stage].includes(replacement.collection)) throw Error("INVALID_COLLECTION");
-    const key = keys[replacement.collection];
-    const id = replacement.entity?.[key];
-    const index = data[replacement.collection].findIndex((v) => v[key] === id);
+    let key = keys[replacement.collection], id = replacement.entity?.[key], index = data[replacement.collection].findIndex((v) => v[key] === id);
     if (index < 0 || changed.has(`${replacement.collection}:${id}`)) throw Error("UNKNOWN_OR_DUPLICATE_ENTITY");
-    data[replacement.collection][index] = replacement.entity;
-    changed.add(`${replacement.collection}:${id}`);
+    data[replacement.collection][index] = replacement.entity, changed.add(`${replacement.collection}:${id}`);
   }
-  const next = commitArtifact(state, stage, data, expected);
-  const affected = stage === "assets" ? state.artifacts.shots?.data.shots.filter((s) => changed.has(`scenes:${s.scene_id}`) || changed.has(`locations:${s.location_id}`) || changed.has(`scene_states:${s.scene_state_id}`) || s.character_ids.some((id) => changed.has(`characters:${id}`)) || (s.prop_ids || []).some((id) => changed.has(`props:${id}`))).map((s) => s.shot_id) || [] : replacements.map((r) => r.entity[keys[r.collection]]);
-  for (const downstream of STAGES2.slice(STAGES2.indexOf(stage) + 1)) {
-    if (next.artifacts[downstream]) next.artifacts[downstream].stale_entity_ids = affected;
-  }
-  next.last_change = { stage, entity_ids: replacements.map((r) => r.entity[keys[r.collection]]), changed_entities: [...changed], affected_shot_ids: affected };
-  return next;
+  let next = commitArtifact(state, stage, data, expected), affected = stage === "assets" ? state.artifacts.shots?.data.shots.filter((s) => changed.has(`scenes:${s.scene_id}`) || changed.has(`locations:${s.location_id}`) || changed.has(`scene_states:${s.scene_state_id}`) || s.character_ids.some((id) => changed.has(`characters:${id}`)) || (s.prop_ids || []).some((id) => changed.has(`props:${id}`))).map((s) => s.shot_id) || [] : replacements.map((r) => r.entity[keys[r.collection]]);
+  for (let downstream of STAGES2.slice(STAGES2.indexOf(stage) + 1))
+    next.artifacts[downstream] && (next.artifacts[downstream].stale_entity_ids = affected);
+  return next.last_change = { stage, entity_ids: replacements.map((r) => r.entity[keys[r.collection]]), changed_entities: [...changed], affected_shot_ids: affected }, next;
 }
 function scheduleTask(state, task) {
-  const key = `${task.action}:${task.stage || "production"}:${state.revision}`;
-  const tasks = state.tasks || [];
-  const existing = tasks.find((t) => t.key === key);
+  let key = `${task.action}:${task.stage || "production"}:${state.revision}`, tasks = state.tasks || [], existing = tasks.find((t) => t.key === key);
   if (existing) return existing;
-  const result = { ...task, key, task_id: `TASK_${String(tasks.length + 1).padStart(3, "0")}`, project_id: state.project_id, status: "ready", attempts: 0, source_revision: state.revision, input_revisions: sourceRevisions(state, task.stage), revision_scope: task.scope || [], expected_outputs: task.stage ? [`project.json#/artifacts/${task.stage}`] : [] };
-  state.tasks = [...tasks, result];
-  return result;
+  let result = { ...task, key, task_id: `TASK_${String(tasks.length + 1).padStart(3, "0")}`, project_id: state.project_id, status: "ready", attempts: 0, source_revision: state.revision, input_revisions: sourceRevisions(state, task.stage), revision_scope: task.scope || [], expected_outputs: task.stage ? [`project.json#/artifacts/${task.stage}`] : [] };
+  return state.tasks = [...tasks, result], result;
 }
 function taskResult(state, key, status, errorCode) {
-  const task = state.tasks?.find((t) => t.key === key);
+  let task = state.tasks?.find((t) => t.key === key);
   if (!task) throw Error("UNKNOWN_TASK");
   if (task.source_revision !== state.revision && status !== "completed") throw Error("STALE_TASK");
   if (!["running", "completed", "failed"].includes(status)) throw Error("INVALID_TASK_STATUS");
   if (task.status === "completed") return task;
   if (status === "completed") {
-    const artifact = state.artifacts[task.stage];
+    let artifact = state.artifacts[task.stage];
     if (task.action !== "submit" || !artifact || artifact.stale || artifact.revision <= task.source_revision) throw Error("TASK_OUTPUT_REQUIRED");
-    const inputs = sourceRevisions(state, task.stage);
+    let inputs = sourceRevisions(state, task.stage);
     if (JSON.stringify(inputs) !== JSON.stringify(task.input_revisions)) throw Error("STALE_TASK_INPUTS");
-    validateArtifact(task.stage, artifact.data, state);
-    task.output_refs = [{ artifact_ref: `project.json#/artifacts/${task.stage}`, revision: artifact.revision }];
-    task.validation = { status: "PASS", validated_at: (/* @__PURE__ */ new Date()).toISOString() };
+    validateArtifact(task.stage, artifact.data, state), task.output_refs = [{ artifact_ref: `project.json#/artifacts/${task.stage}`, revision: artifact.revision }], task.validation = { status: "PASS", validated_at: (/* @__PURE__ */ new Date()).toISOString() };
   }
   if (status === "running") {
     if (task.attempts >= 3) throw Error("RETRY_EXHAUSTED");
     task.attempts++;
   }
-  task.status = status;
-  task.error_code = errorCode || null;
-  return task;
+  return task.status = status, task.error_code = errorCode || null, task;
 }
 
 // src/businesses/film-production/workflows/workflow.engine.ts
 init_config();
 function nextTask(state) {
   if (state.status === "STOPPED") return { action: "stop", status: "STOPPED", expectedRevision: state.revision };
-  for (const stage of STAGES2) {
-    const artifact = state.artifacts[stage];
+  for (let stage of STAGES2) {
+    let artifact = state.artifacts[stage];
     if (!artifact || artifact.stale || state.status === `${stage.toUpperCase()}_REVISE`) {
-      const roles = { creative: "creative", script: "screenwriter", assets: "character + scene", shots: "storyboard", prompts: "prompt-engineer", review: "reviewer" };
-      const dependencies = STAGE_DEPS;
-      const roleIds = { creative: ["creative"], script: ["screenwriter"], assets: ["character", "scene"], shots: ["storyboard"], prompts: ["prompt-engineer"], review: ["reviewer"] };
-      return { action: "submit", narrative_diagnostics: narrativeDiagnostics(state.artifacts.script?.data), submission_contract: submissionContract(stage), ...projectContext(state), work_profile: profileContext(state), input_revisions: sourceRevisions(state, stage), revision_scope: artifact?.stale_entity_ids || [], model_profile: modelProfile(state), stage, role: roles[stage], inputs: Object.fromEntries(dependencies[stage].map((s) => [s, state.artifacts[s]])), instructions: roleIds[stage].map((role2) => roleInstructions(state, role2)).join("\n\n"), expectedRevision: state.revision };
+      let roles = { creative: "creative", script: "screenwriter", assets: "character + scene", shots: "storyboard", prompts: "prompt-engineer", review: "reviewer" }, dependencies = STAGE_DEPS, roleIds = { creative: ["creative"], script: ["screenwriter"], assets: ["character", "scene"], shots: ["storyboard"], prompts: ["prompt-engineer"], review: ["reviewer"] };
+      return { action: "submit", narrative_diagnostics: narrativeDiagnostics(state.artifacts.script?.data), submission_contract: submissionContract(stage), ...projectContext(state), work_profile: profileContext(state), input_revisions: sourceRevisions(state, stage), revision_scope: artifact?.stale_entity_ids || [], model_profile: modelProfile(state), stage, role: roles[stage], inputs: Object.fromEntries(dependencies[stage].map((s) => [s, state.artifacts[s]])), instructions: roleIds[stage].map((role2) => roleInstructions(state, role2)).join(`
+
+`), expectedRevision: state.revision };
     }
-    if (["creative", "script"].includes(stage) && state.approvals[stage] !== artifact.revision) {
-      if (stage === "creative" && profileContext(state).status === "UNSELECTED") return { action: "configure_profile", role: "director", ...projectContext(state), work_profile: profileContext(state), expectedRevision: state.revision, instructions: "创意批准前确认作品类型，用configure_profile保存选择；保存会使当前草稿失效，需按类型更新后重新提交。不得把未回答当作同意。" };
-      return { action: "approve", stage, work_profile: profileContext(state), expectedRevision: state.revision };
-    }
+    if (["creative", "script"].includes(stage) && state.approvals[stage] !== artifact.revision)
+      return stage === "creative" && profileContext(state).status === "UNSELECTED" ? { action: "configure_profile", role: "director", ...projectContext(state), work_profile: profileContext(state), expectedRevision: state.revision, instructions: "创意批准前确认作品类型，用configure_profile保存选择；保存会使当前草稿失效，需按类型更新后重新提交。不得把未回答当作同意。" } : { action: "approve", stage, work_profile: profileContext(state), expectedRevision: state.revision };
   }
-  const report = state.artifacts.review.data;
-  if (report.review_status && !evaluateReview(report).passed && Object.values(state.issue_registry || {}).some((i) => i.status === "RESOLVED")) return { action: "recheck", role: "reviewer", stage: "review", ...projectContext(state), work_profile: profileContext(state), issues: Object.values(state.issue_registry).filter((i) => i.status === "RESOLVED"), input_revisions: sourceRevisions(state, "review"), review_revision: state.artifacts.review.revision, expectedRevision: state.revision, instructions: roleInstructions(state, "reviewer") + "\n逐项按recheck_criteria对照当前版本实际复审；通过后调用verify_issue登记证据，不通过返回责任角色。登记后重新提交完整最终审核报告，禁止仅靠自称VERIFIED。" };
-  if (report.review_status && !evaluateReview(report).passed) return { action: "repair", stage: "review", role: "director", issues: report.issues, expectedRevision: state.revision };
-  return { action: "compile", ...projectContext(state), expectedRevision: state.revision };
+  let report = state.artifacts.review.data;
+  return report.review_status && !evaluateReview(report).passed && Object.values(state.issue_registry || {}).some((i) => i.status === "RESOLVED") ? { action: "recheck", role: "reviewer", stage: "review", ...projectContext(state), work_profile: profileContext(state), issues: Object.values(state.issue_registry).filter((i) => i.status === "RESOLVED"), input_revisions: sourceRevisions(state, "review"), review_revision: state.artifacts.review.revision, expectedRevision: state.revision, instructions: roleInstructions(state, "reviewer") + `
+逐项按recheck_criteria对照当前版本实际复审；通过后调用verify_issue登记证据，不通过返回责任角色。登记后重新提交完整最终审核报告，禁止仅靠自称VERIFIED。` } : report.review_status && !evaluateReview(report).passed ? { action: "repair", stage: "review", role: "director", issues: report.issues, expectedRevision: state.revision } : { action: "compile", ...projectContext(state), expectedRevision: state.revision };
 }
 function validateCurrent(state) {
   if (state.status === "STOPPED") throw Error("PROJECT_STOPPED");
-  for (const stage of STAGES2) {
-    const artifact = state.artifacts[stage];
+  for (let stage of STAGES2) {
+    let artifact = state.artifacts[stage];
     if (!artifact || artifact.stale) throw Error(`STALE_OR_MISSING:${stage}`);
     if (["creative", "script"].includes(stage) && state.approvals[stage] !== artifact.revision) throw Error("APPROVAL_REQUIRED");
-    validateArtifact(stage, artifact.data, state);
-    if (stage === "review" && artifact.data.review_status && !evaluateReview(artifact.data).passed) throw Error("REVIEW_BLOCKED");
+    if (validateArtifact(stage, artifact.data, state), stage === "review" && artifact.data.review_status && !evaluateReview(artifact.data).passed) throw Error("REVIEW_BLOCKED");
   }
 }
 function compileProduction(state, plan, ratio, resolution, capabilities = modelProfile(state)) {
-  validateCurrent(state);
-  if (!["16:9", "9:16"].includes(ratio) || !["480p", "720p"].includes(resolution)) throw Error("CONFIRMED_SPEC_REQUIRED");
+  if (validateCurrent(state), !["16:9", "9:16"].includes(ratio) || !["480p", "720p"].includes(resolution)) throw Error("CONFIRMED_SPEC_REQUIRED");
   if (!Number.isSafeInteger(state.duration_ms) || state.duration_ms < 15e3 || state.duration_ms > 36e5) throw Error("INVALID_PROJECT_DURATION");
-  const spec = state.project_spec;
+  let spec = state.project_spec;
   if (spec?.aspect_ratio && spec.aspect_ratio !== ratio) throw Error("PROJECT_SPEC_MISMATCH:aspect_ratio");
   if (spec?.resolution && spec.resolution !== resolution) throw Error("PROJECT_SPEC_MISMATCH:resolution");
-  const shots = state.artifacts.shots.data.shots;
-  const prompts = state.artifacts.prompts.data.prompts;
-  const independent = spec?.production_strategy === "independent_shots";
+  let shots = state.artifacts.shots.data.shots, prompts = state.artifacts.prompts.data.prompts, independent = spec?.production_strategy === "independent_shots";
   if (independent) {
-    const capability = capabilities.supported_durations_ms;
+    let capability = capabilities.supported_durations_ms;
     if (!capability) throw Error("MODEL_CAPABILITY_UNVERIFIED");
     if (shots.some((s) => s.duration_ms % 1e3 || s.duration_ms < capability.min || s.duration_ms > capability.max)) throw Error("INDEPENDENT_SHOT_DURATION_REQUIRES_REVISION");
-    plan = shots.map((s) => ({ kind: "generate", seconds: s.duration_ms / 1e3 }));
-    if (plan.length > MAX_SEGMENTS) throw Error("TOO_MANY_INDEPENDENT_SHOTS");
+    if (plan = shots.map((s) => ({ kind: "generate", seconds: s.duration_ms / 1e3 })), plan.length > MAX_SEGMENTS) throw Error("TOO_MANY_INDEPENDENT_SHOTS");
   }
-  let start = 0;
-  const segments = plan.map((part, index) => {
-    const end = start + part.seconds * 1e3;
-    const covered = shots.filter((s) => s.start_ms < end && s.end_ms > start);
+  let start = 0, segments = plan.map((part, index) => {
+    let end = start + part.seconds * 1e3, covered = shots.filter((s) => s.start_ms < end && s.end_ms > start);
     if (state.schema_version === "3.1.0" && covered.some((s) => s.start_ms < start || s.end_ms > end)) throw Error("SHOT_SPLIT_REQUIRES_STORYBOARD_REVISION");
     if (!independent && state.schema_version === "3.1.0" && new Set(covered.map((s) => s.location_id)).size > 1) throw Error("MULTI_LOCATION_SEGMENT_REQUIRES_REPLAN");
-    const prompt = covered.map((s) => `[${Math.max(start, s.start_ms) - start}–${Math.min(end, s.end_ms) - start}ms] ${prompts.find((p) => p.shot_id === s.shot_id).prompt}`).join("\n");
-    const result = { index: index + 1, start_ms: start, end_ms: end, shot_ids: covered.map((s) => s.shot_id), prompt };
-    start = end;
-    return result;
+    let prompt = covered.map((s) => `[${Math.max(start, s.start_ms) - start}–${Math.min(end, s.end_ms) - start}ms] ${prompts.find((p) => p.shot_id === s.shot_id).prompt}`).join(`
+`), result = { index: index + 1, start_ms: start, end_ms: end, shot_ids: covered.map((s) => s.shot_id), prompt };
+    return start = end, result;
   });
   if (start !== state.duration_ms || segments.some((s) => !s.prompt)) throw Error("PRODUCTION_DURATION_MISMATCH");
   return { source_project_id: state.project_id, source_revision: state.revision, ratio, resolution, segments, specification: { prompt: segments[0].prompt, segmentPrompts: segments.map((s) => s.prompt), duration: state.duration_ms / 1e3, ratio, resolution, ...independent ? { productionStrategy: "independent_shots", shotDurations: plan.map((p) => p.seconds) } : {} }, strategy: independent ? "independent_shots" : "continuous_segments" };
@@ -3423,14 +3011,15 @@ function compileProduction(state, plan, ratio, resolution, capabilities = modelP
 
 // src/businesses/video-generation/workflow/shot-materials.ts
 function validateShotFrames(args, count) {
-  if (args.shotFrames === void 0) return;
-  if (args.productionStrategy !== "independent_shots" || !Array.isArray(args.shotFrames) || args.shotFrames.length !== count) throw Error("INVALID_SHOT_FRAMES");
-  for (const frame of args.shotFrames) if (!frame || typeof frame !== "object" || Array.isArray(frame) || Object.keys(frame).some((k) => !["firstFrameUrl", "lastFrameUrl"].includes(k)) || Object.values(frame).some((v) => typeof v !== "string" || !v.trim())) throw Error("INVALID_SHOT_FRAMES");
+  if (args.shotFrames !== void 0) {
+    if (args.productionStrategy !== "independent_shots" || !Array.isArray(args.shotFrames) || args.shotFrames.length !== count) throw Error("INVALID_SHOT_FRAMES");
+    for (let frame of args.shotFrames) if (!frame || typeof frame != "object" || Array.isArray(frame) || Object.keys(frame).some((k) => !["firstFrameUrl", "lastFrameUrl"].includes(k)) || Object.values(frame).some((v) => typeof v != "string" || !v.trim())) throw Error("INVALID_SHOT_FRAMES");
+  }
 }
 function shotMaterials(args, index, count) {
   if (args.productionStrategy !== "independent_shots") return { ...args };
   validateShotFrames(args, count);
-  const selected = args.shotFrames?.[index] || {};
+  let selected = args.shotFrames?.[index] || {};
   return { ...args, firstFrameUrl: selected.firstFrameUrl ?? (index === 0 ? args.firstFrameUrl : void 0), lastFrameUrl: selected.lastFrameUrl ?? (index === count - 1 ? args.lastFrameUrl : void 0) };
 }
 
@@ -3439,12 +3028,11 @@ init_connection();
 
 // src/shared/utils/validation.ts
 function clampInteger(value, min, max, fallback) {
-  const number2 = Number(value);
-  if (!Number.isFinite(number2)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(number2)));
+  let number2 = Number(value);
+  return Number.isFinite(number2) ? Math.min(max, Math.max(min, Math.round(number2))) : fallback;
 }
 function finiteNumber(value) {
-  const number2 = Number(value);
+  let number2 = Number(value);
   return Number.isFinite(number2) ? number2 : null;
 }
 
@@ -3457,7 +3045,7 @@ function resolveSingleMax(config) {
   return modelMaxSeconds(config);
 }
 function resolveSegmentSeconds(config, requested = void 0) {
-  const max = modelMaxSeconds(config);
+  let max = modelMaxSeconds(config);
   return clampInteger(requested, MIN_SEGMENT_SECONDS, max, max);
 }
 function maxTargetSeconds(singleMax, segmentSeconds) {
@@ -3465,27 +3053,18 @@ function maxTargetSeconds(singleMax, segmentSeconds) {
 }
 function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
   if (totalSeconds <= singleMax) return [{ kind: "generate", seconds: totalSeconds }];
-  let base = singleMax;
-  let remaining = totalSeconds - base;
+  let base = singleMax, remaining = totalSeconds - base;
   if (remaining < MIN_SEGMENT_SECONDS) {
-    const trimmed = MIN_SEGMENT_SECONDS - remaining;
-    if (base - trimmed >= MIN_SEGMENT_SECONDS) {
-      base -= trimmed;
-      remaining = totalSeconds - base;
-    }
+    let trimmed = MIN_SEGMENT_SECONDS - remaining;
+    base - trimmed >= MIN_SEGMENT_SECONDS && (base -= trimmed, remaining = totalSeconds - base);
   }
-  const slots = MAX_SEGMENTS - 1;
-  const count = Math.min(slots, Math.max(1, Math.ceil(remaining / segmentSeconds)));
-  const sizes = [];
-  let left = remaining;
+  let slots = MAX_SEGMENTS - 1, count = Math.min(slots, Math.max(1, Math.ceil(remaining / segmentSeconds))), sizes = [], left = remaining;
   for (let index = count; index > 0 && left > 0; index -= 1) {
     let size = Math.min(segmentSeconds, Math.ceil(left / index));
-    if (size < MIN_SEGMENT_SECONDS) size = Math.min(segmentSeconds, MIN_SEGMENT_SECONDS);
-    sizes.push(size);
-    left -= size;
+    size < MIN_SEGMENT_SECONDS && (size = Math.min(segmentSeconds, MIN_SEGMENT_SECONDS)), sizes.push(size), left -= size;
   }
-  const plan = [{ kind: "generate", seconds: base }];
-  for (const seconds of sizes) {
+  let plan = [{ kind: "generate", seconds: base }];
+  for (let seconds of sizes) {
     if (plan.length >= MAX_SEGMENTS) break;
     plan.push({ kind: "extend", seconds });
   }
@@ -3493,30 +3072,25 @@ function planVideoSegments(totalSeconds, singleMax, segmentSeconds) {
 }
 function resolveSegmentPrompts(prompts, planLength) {
   if (prompts === void 0 && planLength === 1) return null;
-  if (!Array.isArray(prompts) || prompts.length !== planLength || prompts.some((value) => typeof value !== "string" || !value.trim())) {
+  if (!Array.isArray(prompts) || prompts.length !== planLength || prompts.some((value) => typeof value != "string" || !value.trim()))
     throw new Error(`请按完整生成计划提供 segmentPrompts：${planLength} 条非空的逐段提示词，每条仅含本段动作与对白。先补齐提示词再提交，不要重新生成已完成分段。`);
-  }
   return prompts.map((value) => value.trim());
 }
 function resolveTargetPlan(config, args) {
-  const singleMax = resolveSingleMax(config);
+  let singleMax = resolveSingleMax(config);
   if (args?.productionStrategy && !["continuous_segments", "independent_shots"].includes(args.productionStrategy)) throw Error("INVALID_PRODUCTION_STRATEGY");
   if (args?.productionStrategy === "independent_shots") {
-    const durations = args.shotDurations;
+    let durations = args.shotDurations;
     if (!Array.isArray(durations) || !durations.length || durations.length > MAX_SEGMENTS || durations.some((s) => !Number.isInteger(s) || s < MIN_SECONDS || s > singleMax) || durations.reduce((a, b) => a + b, 0) !== args.duration || args.duration > MAX_TOTAL_SECONDS) throw Error("INVALID_INDEPENDENT_SHOT_PLAN");
-    validateShotFrames(args, durations.length);
-    return { plan: durations.map((seconds) => ({ kind: "generate", seconds })), singleMax, segmentSeconds: singleMax, cap: MAX_TOTAL_SECONDS, asked: args.duration, total: args.duration };
+    return validateShotFrames(args, durations.length), { plan: durations.map((seconds) => ({ kind: "generate", seconds })), singleMax, segmentSeconds: singleMax, cap: MAX_TOTAL_SECONDS, asked: args.duration, total: args.duration };
   }
-  if (args?.shotFrames !== void 0) validateShotFrames(args, 0);
-  const segmentSeconds = resolveSegmentSeconds(config, args?.segmentSeconds);
-  const cap = maxTargetSeconds(singleMax, segmentSeconds);
-  const asked = clampInteger(
+  args?.shotFrames !== void 0 && validateShotFrames(args, 0);
+  let segmentSeconds = resolveSegmentSeconds(config, args?.segmentSeconds), cap = maxTargetSeconds(singleMax, segmentSeconds), asked = clampInteger(
     args?.duration ?? singleMax,
     MIN_SECONDS,
     Number.MAX_SAFE_INTEGER,
     singleMax
-  );
-  const total = Math.min(asked, cap);
+  ), total = Math.min(asked, cap);
   return {
     plan: planVideoSegments(total, singleMax, segmentSeconds),
     singleMax,
@@ -3530,13 +3104,11 @@ function sumStepSeconds(steps) {
   return (steps || []).reduce((sum, step) => sum + (Number(step?.seconds) || 0), 0);
 }
 function validateExtensionDuration(config, args) {
-  const value = args?.duration;
-  if (value !== void 0 && (!Number.isInteger(value) || value < MIN_SECONDS || value > modelMaxSeconds(config))) {
+  let value = args?.duration;
+  if (value !== void 0 && (!Number.isInteger(value) || value < MIN_SECONDS || value > modelMaxSeconds(config)))
     throw new Error(`续拍duration是每段新增秒数，须为${MIN_SECONDS}–${modelMaxSeconds(config)}秒整数；更长时请用segments安排多段并重新审核，不会自动缩短。`);
-  }
-  if (args?.segments !== void 0 && (!Number.isInteger(args.segments) || args.segments < 1 || args.segments > MAX_SEGMENTS)) {
+  if (args?.segments !== void 0 && (!Number.isInteger(args.segments) || args.segments < 1 || args.segments > MAX_SEGMENTS))
     throw new Error(`续拍segments须为1–${MAX_SEGMENTS}整数，请先确认完整分段计划。`);
-  }
 }
 
 // src/businesses/video-generation/workflow/costs.ts
@@ -3545,9 +3117,7 @@ init_connection();
 function estimatePlan(config, toolName, args) {
   if (toolName === "video_extend") {
     validateExtensionDuration(config, args);
-    const count = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
-    const fallback = modelMaxSeconds(config);
-    const seconds = clampInteger(
+    let count = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1), fallback = modelMaxSeconds(config), seconds = clampInteger(
       args?.duration ?? fallback,
       MIN_SECONDS,
       modelMaxSeconds(config),
@@ -3566,57 +3136,18 @@ import { randomUUID as randomUUID3 } from "node:crypto";
 // src/businesses/video-generation/workflow/result-state.ts
 function videoResultState(value = {}) {
   value ??= {};
-  const segments = Array.isArray(value.segments) ? value.segments : [];
-  const completed = segments.filter((s) => s?.status === "succeeded" && (s.localPath || s.videoUrl));
-  const multi = segments.length > 1 || Boolean(value.paused && value.remainingSeconds > 0);
-  const local = Boolean(value.videoPath || completed.some((s) => s.localPath));
-  const delivery = value.merged && value.videoPath ? multi ? "merged" : "single" : value.videoPath && !multi ? "single" : local ? multi ? "segments" : "single" : value.videoUrl || completed.length ? "remote" : "none";
-  let phase;
-  if (value.status === "review_required")
-    phase = "reference_review";
-  else if (value.pendingTaskId || ["unknown", "timeout"].includes(value.status) || segments.some((s) => ["unknown", "timeout", "running", "queued"].includes(s?.status)))
-    phase = "task_pending";
-  else if (value.deliveryError || value.ffmpegMissing)
-    phase = "delivery_pending";
-  else if (value.paused)
-    phase = "segment_review";
-  else if (value.partial)
-    phase = "partial";
-  else if (["failed", "cancelled", "canceled"].includes(value.status) || segments.some((s) => ["failed", "cancelled", "canceled"].includes(s?.status)))
-    phase = completed.length ? "partial" : "failed";
-  else if (value.status !== "succeeded" || delivery === "none")
-    phase = "unknown";
-  else
-    phase = ["merged", "single"].includes(delivery) ? "complete" : "generated";
-  const details = { delivery, completedCount: completed.length };
-  if (phase === "complete")
-    return { ...details, phase, isFinal: true, canPresent: true };
-  if (phase === "generated")
-    return { ...details, phase, isFinal: true, canPresent: false };
-  return { ...details, phase, isFinal: false, canPresent: false };
+  let segments = Array.isArray(value.segments) ? value.segments : [], completed = segments.filter((s) => s?.status === "succeeded" && (s.localPath || s.videoUrl)), multi = segments.length > 1 || !!(value.paused && value.remainingSeconds > 0), local = !!(value.videoPath || completed.some((s) => s.localPath)), delivery = value.merged && value.videoPath ? multi ? "merged" : "single" : value.videoPath && !multi ? "single" : local ? multi ? "segments" : "single" : value.videoUrl || completed.length ? "remote" : "none", phase;
+  value.status === "review_required" ? phase = "reference_review" : value.pendingTaskId || ["unknown", "timeout"].includes(value.status) || segments.some((s) => ["unknown", "timeout", "running", "queued"].includes(s?.status)) ? phase = "task_pending" : value.deliveryError || value.ffmpegMissing ? phase = "delivery_pending" : value.paused ? phase = "segment_review" : value.partial ? phase = "partial" : ["failed", "cancelled", "canceled"].includes(value.status) || segments.some((s) => ["failed", "cancelled", "canceled"].includes(s?.status)) ? phase = completed.length ? "partial" : "failed" : value.status !== "succeeded" || delivery === "none" ? phase = "unknown" : phase = ["merged", "single"].includes(delivery) ? "complete" : "generated";
+  let details = { delivery, completedCount: completed.length };
+  return phase === "complete" ? { ...details, phase, isFinal: !0, canPresent: !0 } : phase === "generated" ? { ...details, phase, isFinal: !0, canPresent: !1 } : { ...details, phase, isFinal: !1, canPresent: !1 };
 }
 function validatePauseRecord(data, file = "paused-plan.json") {
-  const invalid = () => {
+  let invalid = () => {
     throw new Error(`暂停记录内容不对：${file}。请保留原文件并核对原任务，不要重新提交。`);
   };
-  if (!data || data.plugin !== "metaontic-video" || data.version != null && data.version !== 1 || !Array.isArray(data.plan) || !data.plan.length)
-    invalid();
-  if (data.plan.some((step) => !step || !["generate", "extend"].includes(step.kind) || !Number.isFinite(step.seconds) || step.seconds <= 0))
-    invalid();
-  const done = data.done ?? 0;
-  if (!Number.isInteger(done) || done < 0 || done > data.plan.length)
-    invalid();
-  if (data.cursor != null && !Number.isFinite(data.cursor))
-    invalid();
-  if (data.steps != null && (!Array.isArray(data.steps) || data.steps.length !== done))
-    invalid();
-  if (done > 0 && !Array.isArray(data.steps))
-    invalid();
-  if (data.steps?.some((step, index) => !step || step.index !== index + 1 || !["generate", "extend"].includes(step.kind) || step.seconds != null && (!Number.isFinite(step.seconds) || step.seconds <= 0) || !step.taskId || !step.videoUrl))
-    invalid();
-  if (data.pendingTask && (!data.pendingTask.taskId || data.pendingTask.index != null && data.pendingTask.index !== done + 1 || done >= data.plan.length))
-    invalid();
-  return data;
+  (!data || data.plugin !== "metaontic-video" || data.version != null && data.version !== 1 || !Array.isArray(data.plan) || !data.plan.length) && invalid(), data.plan.some((step) => !step || !["generate", "extend"].includes(step.kind) || !Number.isFinite(step.seconds) || step.seconds <= 0) && invalid();
+  let done = data.done ?? 0;
+  return (!Number.isInteger(done) || done < 0 || done > data.plan.length) && invalid(), data.cursor != null && !Number.isFinite(data.cursor) && invalid(), data.steps != null && (!Array.isArray(data.steps) || data.steps.length !== done) && invalid(), done > 0 && !Array.isArray(data.steps) && invalid(), data.steps?.some((step, index) => !step || step.index !== index + 1 || !["generate", "extend"].includes(step.kind) || step.seconds != null && (!Number.isFinite(step.seconds) || step.seconds <= 0) || !step.taskId || !step.videoUrl) && invalid(), data.pendingTask && (!data.pendingTask.taskId || data.pendingTask.index != null && data.pendingTask.index !== done + 1 || done >= data.plan.length) && invalid(), data;
 }
 
 // src/businesses/video-generation/workflow/resume.ts
@@ -3630,32 +3161,28 @@ init_value();
 import path4 from "node:path";
 import { mkdir as mkdir2, stat as stat2 } from "node:fs/promises";
 function tail(text, limit = 600) {
-  const clean = String(text || "").trim();
+  let clean = String(text || "").trim();
   return clean.length > limit ? `…${clean.slice(-limit)}` : clean;
 }
 function formatSeconds(value) {
-  const number2 = Number(value);
-  if (!Number.isFinite(number2)) return String(value ?? "");
-  return Number.isInteger(number2) ? String(number2) : number2.toFixed(1);
+  let number2 = Number(value);
+  return Number.isFinite(number2) ? Number.isInteger(number2) ? String(number2) : number2.toFixed(1) : String(value ?? "");
 }
 var tempSequence = 0;
 function uniqueSuffix(prefix = "tmp") {
-  tempSequence = (tempSequence + 1) % 1e9;
-  return `${prefix}-${process.pid}-${tempSequence}-${Math.random().toString(36).slice(2, 8)}`;
+  return tempSequence = (tempSequence + 1) % 1e9, `${prefix}-${process.pid}-${tempSequence}-${Math.random().toString(36).slice(2, 8)}`;
 }
 function fileStamp(date2 = /* @__PURE__ */ new Date()) {
-  const pad = (value) => String(value).padStart(2, "0");
+  let pad = (value) => String(value).padStart(2, "0");
   return `${date2.getFullYear()}${pad(date2.getMonth() + 1)}${pad(date2.getDate())}-${pad(date2.getHours())}${pad(date2.getMinutes())}${pad(date2.getSeconds())}`;
 }
 async function allocateStamp(outDir, base) {
-  const parent = path4.join(outDir, "segments");
-  await mkdir2(parent, { recursive: true });
+  let parent = path4.join(outDir, "segments");
+  await mkdir2(parent, { recursive: !0 });
   for (let attempt = 1; attempt <= 100; attempt += 1) {
-    const stamp = attempt === 1 ? base : `${base}-${attempt}`;
-    const dir = path4.join(parent, stamp);
+    let stamp = attempt === 1 ? base : `${base}-${attempt}`, dir = path4.join(parent, stamp);
     try {
-      await mkdir2(dir);
-      return { stamp, segmentsDir: dir };
+      return await mkdir2(dir), { stamp, segmentsDir: dir };
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
     }
@@ -3664,23 +3191,21 @@ async function allocateStamp(outDir, base) {
 }
 async function exists(file) {
   try {
-    await stat2(file);
-    return true;
+    return await stat2(file), !0;
   } catch {
-    return false;
+    return !1;
   }
 }
 async function resolveOutputDir(config, exec, deps) {
-  const configured = String(ref(config, "outputDir", "")).trim();
+  let configured = String(ref(config, "outputDir", "")).trim();
   if (configured) return path4.resolve(configured);
   let cwd = "";
-  if (deps?.workdir && exec?.agent) {
+  if (deps?.workdir && exec?.agent)
     try {
       cwd = await deps.workdir.ensure(exec.agent, exec.signal) || "";
     } catch {
       cwd = "";
     }
-  }
   return path4.join(cwd || process.cwd(), DEFAULT_OUTPUT_DIR);
 }
 
@@ -3688,13 +3213,11 @@ async function resolveOutputDir(config, exec, deps) {
 init_connection();
 var PAUSE_FILE = "paused-plan.json";
 function resumeDirOf(value) {
-  const raw = typeof value === "string" ? value : value?.dir ?? value?.path ?? value?.resumeDir ?? value?.token ?? "";
-  const dir = String(raw ?? "").trim();
+  let raw = typeof value == "string" ? value : value?.dir ?? value?.path ?? value?.resumeDir ?? value?.token ?? "", dir = String(raw ?? "").trim();
   return dir ? path5.resolve(dir) : "";
 }
 async function readPauseFile(dir) {
-  const file = path5.join(dir, PAUSE_FILE);
-  let text;
+  let file = path5.join(dir, PAUSE_FILE), text;
   try {
     text = await readFile3(file, "utf8");
   } catch {
@@ -3712,9 +3235,9 @@ async function readPauseFile(dir) {
 }
 var RESUME_LOCK = "resume.lock";
 async function acquireResumeLock(dir, { toolName, callId }) {
-  const file = path5.join(dir, RESUME_LOCK);
+  let file = path5.join(dir, RESUME_LOCK);
   try {
-    const release = await acquireFileLock(file, { recoverDead: true, metadata: { tool: toolName, callId: callId || null } });
+    let release = await acquireFileLock(file, { recoverDead: !0, metadata: { tool: toolName, callId: callId || null } });
     return { file, release };
   } catch (error) {
     if (error?.code === "ENOENT") return { file: null, async release() {
@@ -3727,30 +3250,24 @@ function withResumeLock(tool, toolName, config) {
     ...tool,
     async execute(args, exec) {
       return requestLogContext.run({ ...requestLogContext.getStore(), callId: exec?.callId || requestLogContext.getStore()?.callId || uniqueSuffix("call"), tool: toolName }, async () => {
-        const started = Date.now();
-        const dir = resumeDirOf(args?.resume);
-        let lock;
+        let started = Date.now(), dir = resumeDirOf(args?.resume), lock;
         await appendRequestLog({
           event: "tool_started",
           provider: isVolcengine(config) ? "volcengine" : "metaontic",
           model: resolveModel(config),
           duration: args?.duration,
           segmentSeconds: args?.segmentSeconds,
-          resuming: Boolean(dir),
+          resuming: !!dir,
           resumeDir: dir || void 0
         });
         try {
-          if (dir) {
-            lock = await acquireResumeLock(dir, { toolName, callId: exec?.callId });
-            await appendRequestLog({ event: "resume_lock_acquired", resumeDir: dir });
+          dir && (lock = await acquireResumeLock(dir, { toolName, callId: exec?.callId }), await appendRequestLog({ event: "resume_lock_acquired", resumeDir: dir }));
+          let result = await tool.execute(args, exec);
+          if (result?.resumeDir && args?.cumulativePreview !== !0) {
+            let record = await readPauseFile(result.resumeDir);
+            record.deliveryPending = !!(result.deliveryError || result.ffmpegMissing), await writePauseFile(result.resumeDir, record);
           }
-          const result = await tool.execute(args, exec);
-          if (result?.resumeDir && args?.cumulativePreview !== true) {
-            const record = await readPauseFile(result.resumeDir);
-            record.deliveryPending = Boolean(result.deliveryError || result.ffmpegMissing);
-            await writePauseFile(result.resumeDir, record);
-          }
-          await appendRequestLog({
+          return await appendRequestLog({
             event: "tool_completed",
             elapsedMs: Date.now() - started,
             status: result?.status,
@@ -3760,54 +3277,38 @@ function withResumeLock(tool, toolName, config) {
             segmentCount: result?.segments?.length,
             actualSeconds: result?.actualSeconds,
             errorCode: result?.errorCode
-          });
-          return result;
+          }), result;
         } catch (error) {
-          await appendRequestLog({ event: "tool_failed", elapsedMs: Date.now() - started, errorCode: String(error?.code || "tool_error") });
-          throw error;
+          throw await appendRequestLog({ event: "tool_failed", elapsedMs: Date.now() - started, errorCode: String(error?.code || "tool_error") }), error;
         } finally {
-          if (lock) {
-            await lock.release();
-            await appendRequestLog({ event: "resume_lock_released", resumeDir: dir });
-          }
+          lock && (await lock.release(), await appendRequestLog({ event: "resume_lock_released", resumeDir: dir }));
         }
       });
     }
   };
 }
 async function writePauseFile(dir, data) {
-  await mkdir3(dir, { recursive: true, mode: 448 });
-  const file = path5.join(dir, PAUSE_FILE);
-  const temp = `${file}.${uniqueSuffix("part")}`;
+  await mkdir3(dir, { recursive: !0, mode: 448 });
+  let file = path5.join(dir, PAUSE_FILE), temp = `${file}.${uniqueSuffix("part")}`;
   try {
     await writeFile(temp, `${JSON.stringify(data, null, 2)}
-`, { encoding: "utf8", mode: 384 });
-    await rename(temp, file);
+`, { encoding: "utf8", mode: 384 }), await rename(temp, file);
   } catch (failure) {
-    await rm(temp, { force: true }).catch(() => {
-    });
-    throw failure;
+    throw await rm(temp, { force: !0 }).catch(() => {
+    }), failure;
   }
 }
 function resumePlanFrom(data, { askedTotal, segmentSeconds }) {
   if (data.options?.productionStrategy === "independent_shots" && askedTotal != null && askedTotal !== sumStepSeconds(data.plan || [])) throw Error("INDEPENDENT_PLAN_CHANGE_REQUIRES_NEW_REVIEW");
-  const done = Number(data.done) || 0;
-  const cursor = Number(data.cursor) || 0;
-  const fullPlan = (data.plan || []).map((step) => ({ ...step }));
-  const remaining = fullPlan.slice(done).map((step) => ({ ...step }));
-  const wanted = Number.isFinite(askedTotal) ? Math.min(askedTotal, MAX_TOTAL_SECONDS) : 0;
-  const cap = segmentSeconds > 0 ? segmentSeconds : MAX_SEGMENT_SECONDS;
-  let total = cursor + sumStepSeconds(remaining);
-  while (wanted > total && fullPlan.length < MAX_SEGMENTS && total + MIN_SECONDS <= wanted) {
-    const seconds = Math.max(MIN_SECONDS, Math.min(cap, wanted - total));
-    fullPlan.push({ kind: "extend", seconds });
-    remaining.push({ kind: "extend", seconds });
-    total += seconds;
+  let done = Number(data.done) || 0, cursor = Number(data.cursor) || 0, fullPlan = (data.plan || []).map((step) => ({ ...step })), remaining = fullPlan.slice(done).map((step) => ({ ...step })), wanted = Number.isFinite(askedTotal) ? Math.min(askedTotal, MAX_TOTAL_SECONDS) : 0, cap = segmentSeconds > 0 ? segmentSeconds : MAX_SEGMENT_SECONDS, total = cursor + sumStepSeconds(remaining);
+  for (; wanted > total && fullPlan.length < MAX_SEGMENTS && total + MIN_SECONDS <= wanted; ) {
+    let seconds = Math.max(MIN_SECONDS, Math.min(cap, wanted - total));
+    fullPlan.push({ kind: "extend", seconds }), remaining.push({ kind: "extend", seconds }), total += seconds;
   }
   return { fullPlan, plan: remaining, cursor, total };
 }
 function pickResumeOptions(args) {
-  const keys = [
+  let keys = [
     "projectId",
     "productionStrategy",
     "shotDurations",
@@ -3832,11 +3333,9 @@ function pickResumeOptions(args) {
     "seed",
     "user",
     "returnLastFrame"
-  ];
-  const options = {};
-  for (const key of keys) {
-    if (args?.[key] !== void 0) options[key] = args[key];
-  }
+  ], options = {};
+  for (let key of keys)
+    args?.[key] !== void 0 && (options[key] = args[key]);
   return options;
 }
 function pauseRecordAt({ stamp, prompt, fullPlan, done, cursor, lastVideoUrl, options, segments }) {
@@ -3874,20 +3373,18 @@ function progressConnection(config) {
   };
 }
 function assertResumeConnection(data, config, args) {
-  if (!data?.connection) return;
-  if (JSON.stringify(data.connection) === JSON.stringify(progressConnection(config))) return;
-  if (data.pendingTask || Object.values(data.operationState || {}).some((state) => state.phase === "converting" || state.phase === "review" || state.retryUsed && !state.retryResult)) throw new Error("这份进度还有已提交的任务，请恢复原模型和接入渠道后查询，不能切换渠道重复提交。");
-  if (args?.resumeWithCurrentConfig === true) {
-    if (data.plan.slice(Number(data.done) || 0).some((step) => step.seconds > modelMaxSeconds(config))) {
-      throw new Error("原进度中的分段超过当前模型单段上限，请恢复原模型后继续，不自动缩短已审核分段。");
+  if (data?.connection && JSON.stringify(data.connection) !== JSON.stringify(progressConnection(config))) {
+    if (data.pendingTask || Object.values(data.operationState || {}).some((state) => state.phase === "converting" || state.phase === "review" || state.retryUsed && !state.retryResult)) throw new Error("这份进度还有已提交的任务，请恢复原模型和接入渠道后查询，不能切换渠道重复提交。");
+    if (args?.resumeWithCurrentConfig === !0) {
+      if (data.plan.slice(Number(data.done) || 0).some((step) => step.seconds > modelMaxSeconds(config)))
+        throw new Error("原进度中的分段超过当前模型单段上限，请恢复原模型后继续，不自动缩短已审核分段。");
+      return;
     }
-    return;
+    throw new Error("当前模型或接入渠道与原进度不一致。请恢复原配置；如需更换，先向用户说明变化并确认，再传 resumeWithCurrentConfig:true。");
   }
-  throw new Error("当前模型或接入渠道与原进度不一致。请恢复原配置；如需更换，先向用户说明变化并确认，再传 resumeWithCurrentConfig:true。");
 }
 async function saveProgress(dir, { config, toolName, stamp, prompt, fullPlan, cursor, referenceUrl, options, segments, pendingTask, operationState = {}, characterReferences = void 0 }) {
-  const completed = segments.filter((step) => step.status === "succeeded" && step.videoUrl);
-  const record = pauseRecordAt({
+  let completed = segments.filter((step) => step.status === "succeeded" && step.videoUrl), record = pauseRecordAt({
     stamp,
     prompt,
     fullPlan,
@@ -3905,15 +3402,12 @@ async function saveProgress(dir, { config, toolName, stamp, prompt, fullPlan, cu
     pendingTask: pendingTask || null,
     operationState,
     ...characterReferences !== void 0 ? { characterReferences } : {}
-  });
-  await writePauseFile(dir, record);
+  }), await writePauseFile(dir, record);
 }
 
 // src/businesses/video-generation/workflow/segment-review.ts
 async function segmentSnapshot(dir) {
-  const saved = await readPauseFile(dir);
-  const done = Number(saved.done) || 0;
-  const last = saved.steps?.at(-1);
+  let saved = await readPauseFile(dir), done = Number(saved.done) || 0, last = saved.steps?.at(-1);
   if (!done || !last?.taskId) throw new Error("这份进度没有可审核的已完成分段，请先查询原任务。");
   return {
     saved,
@@ -3926,36 +3420,31 @@ async function segmentSnapshot(dir) {
 var reviewFile = (dir) => path6.join(dir, "segment-review.json");
 async function accepted(dir, key, exec) {
   try {
-    const data = JSON.parse(await readFile4(reviewFile(dir), "utf8"));
-    return data.version === 1 && data.owner === sessionOwner(exec) && data.key === key && data.approved === true;
+    let data = JSON.parse(await readFile4(reviewFile(dir), "utf8"));
+    return data.version === 1 && data.owner === sessionOwner(exec) && data.key === key && data.approved === !0;
   } catch {
-    return false;
+    return !1;
   }
 }
 async function assertSegmentReviewed(exec, args) {
-  const dir = resumeDirOf(args?.resume);
-  if (!dir || args.cumulativePreview === true) return;
-  const saved = await readPauseFile(dir);
+  let dir = resumeDirOf(args?.resume);
+  if (!dir || args.cumulativePreview === !0) return;
+  let saved = await readPauseFile(dir);
   if (saved.pendingTask || saved.deliveryPending || !(Number(saved.done) > 0)) return;
-  const done = Number(saved.done);
-  const appending = Number(args.duration) > Number(saved.cursor) || args.segments != null;
+  let done = Number(saved.done), appending = Number(args.duration) > Number(saved.cursor) || args.segments != null;
   if (done >= saved.plan.length && !appending) return;
-  const snap = await segmentSnapshot(dir);
+  let snap = await segmentSnapshot(dir);
   if (!await accepted(dir, snap.key, exec)) throw new Error("上一段视频尚未通过结果审核，未提交下一段。请先在正文展示本段视频的可点击链接，再调用video_project(action:review_segment,resume:原resumeDir)弹出结果确认窗；不能用文字问句或制作费用审批替代。");
 }
 function createSegmentReview(ctx) {
-  const shown = /* @__PURE__ */ new WeakMap();
+  let shown = /* @__PURE__ */ new WeakMap();
   function observe(session, event) {
     if (!session || event?.type !== "assistant/message") return;
-    const content = event.data?.message?.content;
-    const text = (Array.isArray(content) ? content : []).filter((x) => x.type === "text").map((x) => x.text || "").join("\n");
-    let links = shown.get(session);
-    if (!links) {
-      links = /* @__PURE__ */ new Set();
-      shown.set(session, links);
-    }
-    for (const match of text.matchAll(/\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))\s*\)/g)) {
-      const target = match[1] || match[2];
+    let content = event.data?.message?.content, text = (Array.isArray(content) ? content : []).filter((x) => x.type === "text").map((x) => x.text || "").join(`
+`), links = shown.get(session);
+    links || (links = /* @__PURE__ */ new Set(), shown.set(session, links));
+    for (let match of text.matchAll(/\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))\s*\)/g)) {
+      let target = match[1] || match[2];
       try {
         links.add(/^https?:\/\//i.test(target) ? target : path6.resolve(session.header?.cwd || process.cwd(), decodeURI(target)));
       } catch {
@@ -3963,37 +3452,30 @@ function createSegmentReview(ctx) {
     }
   }
   async function review(args, exec) {
-    const dir = resumeDirOf(args?.resume);
+    let dir = resumeDirOf(args?.resume);
     if (!dir) throw new Error("分段审核需要原resumeDir，不重新生成。");
     return lockProject(`segment:${dir}`, async () => {
-      const snap = await segmentSnapshot(dir);
-      const owner = sessionOwner(exec);
-      if (await accepted(dir, snap.key, exec)) return { status: "approved", done: snap.done, resumeDir: dir, reused: true };
-      const links = shown.get(exec?.agent?.session);
-      let localReady = false;
+      let snap = await segmentSnapshot(dir), owner = sessionOwner(exec);
+      if (await accepted(dir, snap.key, exec)) return { status: "approved", done: snap.done, resumeDir: dir, reused: !0 };
+      let links = shown.get(exec?.agent?.session), localReady = !1;
       try {
         localReady = (await stat3(snap.file)).isFile();
       } catch {
       }
       if (!(localReady && links?.has(snap.file)) && !links?.has(snap.last.videoUrl)) return { status: "blocked", resumeDir: dir, reason: "请先在用户可见正文用可点击链接展示刚完成的分段，再调用review_segment；文件登记、工具看视频或纯文字路径不算展示。", videoPath: localReady ? snap.file : void 0, videoUrl: snap.last.videoUrl };
-      const service = exec.agent?.ctx?.get?.("userQuestions") || ctx.get?.("userQuestions");
-      if (typeof service?.ask !== "function") return { status: "pending", resumeDir: dir, reason: "结果确认弹窗不可用，未授权下一段，请恢复交互能力后重试审核。" };
-      const id = "segment_result_review";
-      const result = await service.ask({ agent: exec.agent, signal: exec.signal, ...exec.callId ? { wait: { callId: exec.callId } } : {}, questions: [{ id, header: "分段结果确认", question: `请先看第${snap.done}段视频，效果是否可以？通过后才能进入下一段的费用确认。`, multiSelect: false, options: [{ label: "效果可以，继续下一段", description: "认可这段效果，随后单独确认下一段费用。" }, { label: "先暂停，暂不继续", description: "保留现有视频，不提交新任务；不满意可说明修改要求。" }] }] });
-      const answer = result?.answers?.find((a) => a.id === id);
-      const approved = !exec.signal?.aborted && !answer?.custom && answer?.selected?.length === 1 && answer.selected[0] === "效果可以，继续下一段";
-      if (!approved) return { status: "paused", resumeDir: dir, reason: "未通过本段结果审核，不提交下一段，不自动重做已完成视频。" };
+      let service = exec.agent?.ctx?.get?.("userQuestions") || ctx.get?.("userQuestions");
+      if (typeof service?.ask != "function") return { status: "pending", resumeDir: dir, reason: "结果确认弹窗不可用，未授权下一段，请恢复交互能力后重试审核。" };
+      let id = "segment_result_review", answer = (await service.ask({ agent: exec.agent, signal: exec.signal, ...exec.callId ? { wait: { callId: exec.callId } } : {}, questions: [{ id, header: "分段结果确认", question: `请先看第${snap.done}段视频，效果是否可以？通过后才能进入下一段的费用确认。`, multiSelect: !1, options: [{ label: "效果可以，继续下一段", description: "认可这段效果，随后单独确认下一段费用。" }, { label: "先暂停，暂不继续", description: "保留现有视频，不提交新任务；不满意可说明修改要求。" }] }] }))?.answers?.find((a) => a.id === id);
+      if (!(!exec.signal?.aborted && !answer?.custom && answer?.selected?.length === 1 && answer.selected[0] === "效果可以，继续下一段")) return { status: "paused", resumeDir: dir, reason: "未通过本段结果审核，不提交下一段，不自动重做已完成视频。" };
       if ((await segmentSnapshot(dir)).key !== snap.key) throw new Error("等待审核期间分段进度已改变，请展示最新一段并重新确认。");
-      const temp = `${reviewFile(dir)}.${randomUUID3()}.tmp`;
+      let temp = `${reviewFile(dir)}.${randomUUID3()}.tmp`;
       try {
-        await writeFile2(temp, JSON.stringify({ version: 1, owner, key: snap.key, approved: true, reviewedAt: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" });
-        await rename2(temp, reviewFile(dir));
+        await writeFile2(temp, JSON.stringify({ version: 1, owner, key: snap.key, approved: !0, reviewedAt: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" }), await rename2(temp, reviewFile(dir));
       } finally {
-        await rm2(temp, { force: true }).catch(() => {
+        await rm2(temp, { force: !0 }).catch(() => {
         });
       }
-      await appendRequestLog({ event: "segment_review_approved", sessionId: exec?.agent?.session?.id, callId: exec?.callId, done: snap.done, resumeDir: dir });
-      return { status: "approved", done: snap.done, resumeDir: dir, nextAction: `使用${snap.saved.toolName || "video_generate"}的原resume继续；下一段仍需费用审批，不重复生成首段。` };
+      return await appendRequestLog({ event: "segment_review_approved", sessionId: exec?.agent?.session?.id, callId: exec?.callId, done: snap.done, resumeDir: dir }), { status: "approved", done: snap.done, resumeDir: dir, nextAction: `使用${snap.saved.toolName || "video_generate"}的原resume继续；下一段仍需费用审批，不重复生成首段。` };
     });
   }
   return { observe, review };
@@ -4008,7 +3490,7 @@ import path8 from "node:path";
 init_plugin();
 import path7 from "node:path";
 import os3 from "node:os";
-import { stat as stat4, mkdir as mkdir4, rename as rename3, rm as rm3, open as open3, readdir as readdir3, readFile as readFile5 } from "node:fs/promises";
+import { stat as stat4, mkdir as mkdir4, rename as rename3, rm as rm3, open as open2, readdir as readdir3, readFile as readFile5 } from "node:fs/promises";
 
 // src/businesses/video-generation/media/ffmpeg.ts
 init_config();
@@ -4017,77 +3499,50 @@ import { spawn } from "node:child_process";
 // src/businesses/video-generation/utils/errors.ts
 init_config();
 function upstreamMessage(data) {
-  if (data && typeof data === "object") {
-    const error = data.error;
-    if (error && typeof error === "object") {
-      const message = String(error.message || "").trim();
-      const code = String(error.code || "").trim();
+  if (data && typeof data == "object") {
+    let error = data.error;
+    if (error && typeof error == "object") {
+      let message = String(error.message || "").trim(), code = String(error.code || "").trim();
       if (message) return code ? `${message}（${code}）` : message;
-    } else if (typeof error === "string" && error.trim()) {
+    } else if (typeof error == "string" && error.trim())
       return error.trim();
-    }
-    for (const key of ["message", "detail", "msg", "fail_reason"]) {
-      const value = data[key];
-      if (typeof value === "string" && value.trim()) return data.code ? `${value.trim()}（${data.code}）` : value.trim();
+    for (let key of ["message", "detail", "msg", "fail_reason"]) {
+      let value = data[key];
+      if (typeof value == "string" && value.trim()) return data.code ? `${value.trim()}（${data.code}）` : value.trim();
     }
   }
-  const text = typeof data === "string" ? data : JSON.stringify(data ?? {});
-  return text || "上游未返回错误详情";
+  return (typeof data == "string" ? data : JSON.stringify(data ?? {})) || "上游未返回错误详情";
 }
 function quotaDetail(text) {
-  const parts = [];
-  const remain = /(?:remain(?:ing)? quota|剩余额度)\D{0,6}([¥$]?\d[\d.,]*)/i.exec(text);
-  const need = /(?:need quota|需要预扣费额度|需要额度)\D{0,6}([¥$]?\d[\d.,]*)/i.exec(text);
-  if (remain) parts.push(`剩余 ${remain[1]}`);
-  if (need) parts.push(`需要 ${need[1]}`);
-  return parts.length ? `（${parts.join("，")}）` : "";
+  let parts = [], remain = /(?:remain(?:ing)? quota|剩余额度)\D{0,6}([¥$]?\d[\d.,]*)/i.exec(text), need = /(?:need quota|需要预扣费额度|需要额度)\D{0,6}([¥$]?\d[\d.,]*)/i.exec(text);
+  return remain && parts.push(`剩余 ${remain[1]}`), need && parts.push(`需要 ${need[1]}`), parts.length ? `（${parts.join("，")}）` : "";
 }
 function isRealPersonRejection(value) {
-  const text = String(value || "");
+  let text = String(value || "");
   return /真人|real[ _-]?person|real[ _-]?human|photorealistic[ _-]?(?:person|human)|human[ _.-]?face|realperson|humanface/i.test(text);
 }
 function classifyError(statusCode, data) {
-  const raw = upstreamMessage(data);
-  const lowered = raw.toLowerCase();
-  if (statusCode === 401 || statusCode === 403) {
-    return { code: "provider_auth", message: `服务鉴权未通过（${statusCode}）。请打开插件设置，检查当前接入的 API密钥是否填写正确并已保存；若配置无误，请联系客服核查。` };
-  }
-  if (statusCode === 402 || QUOTA_HINTS.some((hint) => lowered.includes(hint)) || lowered.includes("quota_exceeded")) {
-    return {
-      code: "provider_quota_exceeded",
-      message: `中转站额度不足${quotaDetail(raw)}，请充值后再试：${raw}`
-    };
-  }
-  if (statusCode === 429) {
-    return { code: "provider_rate_limited", message: `中转站限流（429）：${raw}` };
-  }
-  if (isRealPersonRejection(raw)) return { code: "real_person_rejected", message: raw };
-  if (CONTENT_HINTS.some((hint) => lowered.includes(hint))) {
-    return { code: "content_rejected", message: raw };
-  }
-  if (PRICE_HINTS.some((hint) => lowered.includes(hint))) {
-    return {
-      code: "provider_price_config_error",
-      message: `中转站该模型的计价配置异常，与本次请求参数无关，重试也不会成功：${raw}。请在插件 config 里换用其它可用模型。`
-    };
-  }
-  return { code: "provider_failed", message: raw };
+  let raw = upstreamMessage(data), lowered = raw.toLowerCase();
+  return statusCode === 401 || statusCode === 403 ? { code: "provider_auth", message: `服务鉴权未通过（${statusCode}）。请打开插件设置，检查当前接入的 API密钥是否填写正确并已保存；若配置无误，请联系客服核查。` } : statusCode === 402 || QUOTA_HINTS.some((hint) => lowered.includes(hint)) || lowered.includes("quota_exceeded") ? {
+    code: "provider_quota_exceeded",
+    message: `中转站额度不足${quotaDetail(raw)}，请充值后再试：${raw}`
+  } : statusCode === 429 ? { code: "provider_rate_limited", message: `中转站限流（429）：${raw}` } : isRealPersonRejection(raw) ? { code: "real_person_rejected", message: raw } : CONTENT_HINTS.some((hint) => lowered.includes(hint)) ? { code: "content_rejected", message: raw } : PRICE_HINTS.some((hint) => lowered.includes(hint)) ? {
+    code: "provider_price_config_error",
+    message: `中转站该模型的计价配置异常，与本次请求参数无关，重试也不会成功：${raw}。请在插件 config 里换用其它可用模型。`
+  } : { code: "provider_failed", message: raw };
 }
 function isContentRejection(text) {
-  const lowered = String(text || "").toLowerCase();
+  let lowered = String(text || "").toLowerCase();
   return CONTENT_HINTS.some((hint) => lowered.includes(hint));
 }
 function abortError() {
-  const error = new Error("已取消");
-  error.code = "ABORTED";
-  return error;
+  let error = new Error("已取消");
+  return error.code = "ABORTED", error;
 }
 function isRetryablePollError(failure) {
-  if (!failure || failure.code === "ABORTED") return false;
-  const status = Number(failure.status);
-  if (!Number.isFinite(status)) return true;
-  if (status >= 500) return true;
-  return status === 401 || status === 403 || status === 408 || status === 429;
+  if (!failure || failure.code === "ABORTED") return !1;
+  let status = Number(failure.status);
+  return !Number.isFinite(status) || status >= 500 ? !0 : status === 401 || status === 403 || status === 408 || status === 429;
 }
 
 // src/businesses/video-generation/media/ffmpeg.ts
@@ -4095,100 +3550,81 @@ init_plugin();
 function resolveBinary(config, key, fallback) {
   return String(ref(config, key, "")).trim() || fallback;
 }
-async function runProcess(binary, args, { signal, timeoutMs = 18e5, shell = false } = {}) {
+async function runProcess(binary, args, { signal, timeoutMs = 18e5, shell = !1 } = {}) {
   return new Promise((resolve3, reject) => {
     let child;
     try {
-      child = spawn(binary, args, { stdio: ["ignore", "pipe", "pipe"], ...shell ? { shell: true } : {} });
+      child = spawn(binary, args, { stdio: ["ignore", "pipe", "pipe"], ...shell ? { shell: !0 } : {} });
     } catch (error) {
       reject(Object.assign(new Error(`${binary} 无法启动：${error?.message || error}`), {
         code: "ffmpeg_missing"
       }));
       return;
     }
-    let stdout = "";
-    let stderr = "";
-    let done = false;
+    let stdout = "", stderr = "", done = !1;
     function cleanup() {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", onAbort);
+      clearTimeout(timer), signal?.removeEventListener("abort", onAbort);
     }
     function settle(error = null, value = void 0) {
-      if (done) return;
-      done = true;
-      cleanup();
-      if (error) reject(error);
-      else resolve3(value);
+      done || (done = !0, cleanup(), error ? reject(error) : resolve3(value));
     }
     function onAbort() {
-      child.kill("SIGKILL");
-      settle(abortError());
+      child.kill("SIGKILL"), settle(abortError());
     }
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      settle(Object.assign(new Error(`${binary} 执行超时。`), { code: "ffmpeg_timeout" }));
+    let timer = setTimeout(() => {
+      child.kill("SIGKILL"), settle(Object.assign(new Error(`${binary} 执行超时。`), { code: "ffmpeg_timeout" }));
     }, timeoutMs);
     if (signal?.aborted) {
       onAbort();
       return;
     }
-    signal?.addEventListener("abort", onAbort, { once: true });
-    child.on("error", (error) => settle(Object.assign(
+    signal?.addEventListener("abort", onAbort, { once: !0 }), child.on("error", (error) => settle(Object.assign(
       new Error(`${binary} 无法启动：${error.message}`),
       { code: error.code === "ENOENT" ? "ffmpeg_missing" : "ffmpeg_failed" }
-    )));
-    child.stdout?.on("data", (chunk) => {
+    ))), child.stdout?.on("data", (chunk) => {
       stdout += chunk;
-    });
-    child.stderr?.on("data", (chunk) => {
+    }), child.stderr?.on("data", (chunk) => {
       stderr += chunk;
-    });
-    child.on("close", (code) => settle(null, { code, stdout, stderr }));
+    }), child.on("close", (code) => settle(null, { code, stdout, stderr }));
   });
 }
 async function hasFfmpeg(config, signal) {
-  const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
+  let binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
   try {
-    const { code } = await runProcess(binary, ["-version"], { signal, timeoutMs: 2e4 });
+    let { code } = await runProcess(binary, ["-version"], { signal, timeoutMs: 2e4 });
     return code === 0;
   } catch {
-    return false;
+    return !1;
   }
 }
 function currentPlatform() {
   try {
-    return typeof process !== "undefined" && process.platform || "linux";
+    return typeof process < "u" && process.platform || "linux";
   } catch {
     return "linux";
   }
 }
 var HOMEBREW_BOOTSTRAP = FFMPEG_INSTALLS.macosBootstrap.command;
 function ffmpegInstallOptions(platform = currentPlatform()) {
-  if (platform === "darwin") {
-    return {
-      os: "macOS",
-      installs: [
-        FFMPEG_INSTALLS.macos,
-        {
-          label: "macOS（还没装 Homebrew 就先装它）",
-          command: HOMEBREW_BOOTSTRAP
-        }
-      ],
-      // 连包管理器都没有时的前置步骤（macOS 才有）
-      bootstrap: { label: "macOS（先装 Homebrew）", command: HOMEBREW_BOOTSTRAP }
-    };
-  }
-  if (platform === "win32") {
-    return {
-      os: "Windows",
-      installs: [
-        FFMPEG_INSTALLS.windows,
-        FFMPEG_INSTALLS.windowsChoco
-      ],
-      bootstrap: null
-    };
-  }
-  return {
+  return platform === "darwin" ? {
+    os: "macOS",
+    installs: [
+      FFMPEG_INSTALLS.macos,
+      {
+        label: "macOS（还没装 Homebrew 就先装它）",
+        command: HOMEBREW_BOOTSTRAP
+      }
+    ],
+    // 连包管理器都没有时的前置步骤（macOS 才有）
+    bootstrap: { label: "macOS（先装 Homebrew）", command: HOMEBREW_BOOTSTRAP }
+  } : platform === "win32" ? {
+    os: "Windows",
+    installs: [
+      FFMPEG_INSTALLS.windows,
+      FFMPEG_INSTALLS.windowsChoco
+    ],
+    bootstrap: null
+  } : {
     os: "Linux",
     installs: [
       FFMPEG_INSTALLS.linux,
@@ -4198,30 +3634,24 @@ function ffmpegInstallOptions(platform = currentPlatform()) {
   };
 }
 function commonFfmpegPaths(platform = currentPlatform()) {
-  if (platform === "darwin") return ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"];
-  if (platform === "win32") return [];
-  return ["/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/snap/bin/ffmpeg"];
+  return platform === "darwin" ? ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"] : platform === "win32" ? [] : ["/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/snap/bin/ffmpeg"];
 }
 async function probeBinaryVersion(binary, signal) {
   try {
-    const { code, stdout, stderr } = await runProcess(binary, ["-version"], { signal, timeoutMs: 2e4 });
-    if (code !== 0) return null;
-    const line = String(stdout || stderr).split("\n").map((item) => item.trim()).filter(Boolean)[0];
-    return line || "ok";
+    let { code, stdout, stderr } = await runProcess(binary, ["-version"], { signal, timeoutMs: 2e4 });
+    return code !== 0 ? null : String(stdout || stderr).split(`
+`).map((item) => item.trim()).filter(Boolean)[0] || "ok";
   } catch {
     return null;
   }
 }
 async function findInstalledFfmpeg(signal) {
-  for (const candidate of commonFfmpegPaths()) {
+  for (let candidate of commonFfmpegPaths())
     if (await probeBinaryVersion(candidate, signal)) return candidate;
-  }
   return null;
 }
 function ffmpegInstallHint(config) {
-  const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  const { os: os5, installs } = ffmpegInstallOptions();
-  const lines = [
+  let binary = resolveBinary(config, "ffmpegBinary", "ffmpeg"), { os: os5, installs } = ffmpegInstallOptions(), lines = [
     `本机没有找到可用的 ffmpeg（${binary}），所以「把多段合并成一条」这步暂时没做，已生成结果以返回的分段列表为准；本地文件是否齐全请核对各段路径。`,
     `装一下 ffmpeg 就能合并（你当前是 ${os5}）：`,
     ...installs.map((item) => `  · ${item.label}：${item.command}`),
@@ -4229,11 +3659,12 @@ function ffmpegInstallHint(config) {
     "ffmpeg 的安装包里自带 ffprobe，装完分段探测也一起好了。",
     "想让我来装就说一声 —— 我会用 video_setup 执行安装（执行前宿主会先让你确认命令）。"
   ];
-  return { binary, os: os5, installs, hint: lines.join("\n") };
+  return { binary, os: os5, installs, hint: lines.join(`
+`) };
 }
 async function probeMedia(file, config, signal) {
   try {
-    const { code, stdout } = await runProcess(resolveBinary(config, "ffprobeBinary", "ffprobe"), [
+    let { code, stdout } = await runProcess(resolveBinary(config, "ffprobeBinary", "ffprobe"), [
       "-v",
       "error",
       "-show_entries",
@@ -4243,14 +3674,7 @@ async function probeMedia(file, config, signal) {
       file
     ], { signal, timeoutMs: 6e4 });
     if (code !== 0) return null;
-    const parsed = JSON.parse(stdout);
-    const streams = Array.isArray(parsed?.streams) ? parsed.streams : [];
-    const video = streams.find((stream) => stream.codec_type === "video") || {};
-    const audio = streams.find((stream) => stream.codec_type === "audio") || {};
-    const [num, den] = String(video.r_frame_rate || "").split("/").map(Number);
-    const duration = Number(parsed?.format?.duration);
-    const videoDuration = Number(video.duration);
-    const audioDuration = Number(audio.duration);
+    let parsed = JSON.parse(stdout), streams = Array.isArray(parsed?.streams) ? parsed.streams : [], video = streams.find((stream) => stream.codec_type === "video") || {}, audio = streams.find((stream) => stream.codec_type === "audio") || {}, [num, den] = String(video.r_frame_rate || "").split("/").map(Number), duration = Number(parsed?.format?.duration), videoDuration = Number(video.duration), audioDuration = Number(audio.duration);
     return {
       durationSeconds: Number.isFinite(duration) && duration > 0 ? duration : 0,
       videoDurationSeconds: Number.isFinite(videoDuration) && videoDuration > 0 ? videoDuration : 0,
@@ -4276,16 +3700,9 @@ var IMAGE_EXT_TO_MIME = {
   ".gif": "image/gif",
   ".tif": "image/tiff",
   ".tiff": "image/tiff"
-};
-var MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+}, MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 function sniffImageMime(buffer) {
-  if (buffer.length >= 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) return "image/jpeg";
-  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "image/png";
-  if (buffer.length >= 6 && (buffer.subarray(0, 6).toString("latin1") === "GIF87a" || buffer.subarray(0, 6).toString("latin1") === "GIF89a")) return "image/gif";
-  if (buffer.length >= 2 && buffer[0] === 66 && buffer[1] === 77) return "image/bmp";
-  if (buffer.length >= 12 && buffer.subarray(0, 4).toString("latin1") === "RIFF" && buffer.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
-  if (buffer.length >= 4 && (buffer[0] === 73 && buffer[1] === 73 && buffer[2] === 42 || buffer[0] === 77 && buffer[1] === 77 && buffer[2] === 0)) return "image/tiff";
-  return null;
+  return buffer.length >= 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255 ? "image/jpeg" : buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ? "image/png" : buffer.length >= 6 && (buffer.subarray(0, 6).toString("latin1") === "GIF87a" || buffer.subarray(0, 6).toString("latin1") === "GIF89a") ? "image/gif" : buffer.length >= 2 && buffer[0] === 66 && buffer[1] === 77 ? "image/bmp" : buffer.length >= 12 && buffer.subarray(0, 4).toString("latin1") === "RIFF" && buffer.subarray(8, 12).toString("latin1") === "WEBP" ? "image/webp" : buffer.length >= 4 && (buffer[0] === 73 && buffer[1] === 73 && buffer[2] === 42 || buffer[0] === 77 && buffer[1] === 77 && buffer[2] === 0) ? "image/tiff" : null;
 }
 var CANVAS_SIZES = {
   "16:9": [1280, 720],
@@ -4301,63 +3718,48 @@ function referenceCacheDir() {
   return path7.join(os3.tmpdir(), REFERENCE_TMP_DIR);
 }
 async function isUsableFit(dest, width, height, config, signal) {
-  const info = await stat4(dest).catch(() => null);
-  if (!info?.isFile() || info.size <= 0) return false;
-  const media = await probeMedia(dest, config, signal);
-  if (!media?.width || !media?.height) return true;
-  return media.width === width && media.height === height;
+  let info = await stat4(dest).catch(() => null);
+  if (!info?.isFile() || info.size <= 0) return !1;
+  let media = await probeMedia(dest, config, signal);
+  return !media?.width || !media?.height ? !0 : media.width === width && media.height === height;
 }
-var REFERENCE_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1e3;
-var REFERENCE_CACHE_MAX_FILES = 200;
-var REFERENCE_CACHE_FRESH_MS = 5 * 60 * 1e3;
-var lastCachePruneAt = 0;
-async function pruneReferenceCache(dir, { now = Date.now(), force = false } = {}) {
-  if (!force && now - lastCachePruneAt < 60 * 60 * 1e3) return;
+var REFERENCE_CACHE_MAX_AGE_MS = 10080 * 60 * 1e3, REFERENCE_CACHE_MAX_FILES = 200, REFERENCE_CACHE_FRESH_MS = 300 * 1e3, lastCachePruneAt = 0;
+async function pruneReferenceCache(dir, { now = Date.now(), force = !1 } = {}) {
+  if (!force && now - lastCachePruneAt < 3600 * 1e3) return;
   lastCachePruneAt = now;
-  const entries = await readdir3(dir, { withFileTypes: true }).catch(() => []);
-  const files = [];
-  for (const entry2 of entries) {
+  let entries = await readdir3(dir, { withFileTypes: !0 }).catch(() => []), files = [];
+  for (let entry2 of entries) {
     if (!entry2.isFile()) continue;
-    const file = path7.join(dir, entry2.name);
-    const info = await stat4(file).catch(() => null);
-    if (!info) continue;
-    const inFlight = entry2.name.includes(".fit-") && now - info.mtimeMs < REFERENCE_CACHE_FRESH_MS;
-    if (inFlight) continue;
-    files.push({ file, mtimeMs: info.mtimeMs, stale: now - info.mtimeMs > REFERENCE_CACHE_MAX_AGE_MS });
+    let file = path7.join(dir, entry2.name), info = await stat4(file).catch(() => null);
+    !info || entry2.name.includes(".fit-") && now - info.mtimeMs < REFERENCE_CACHE_FRESH_MS || files.push({ file, mtimeMs: info.mtimeMs, stale: now - info.mtimeMs > REFERENCE_CACHE_MAX_AGE_MS });
   }
-  for (const item of files) if (item.stale) await rm3(item.file, { force: true }).catch(() => {
+  for (let item of files) item.stale && await rm3(item.file, { force: !0 }).catch(() => {
   });
-  const rest = files.filter((item) => !item.stale);
-  if (rest.length <= REFERENCE_CACHE_MAX_FILES) return;
-  rest.sort((a, b) => a.mtimeMs - b.mtimeMs);
-  for (const item of rest.slice(0, rest.length - REFERENCE_CACHE_MAX_FILES)) {
-    if (now - item.mtimeMs <= REFERENCE_CACHE_FRESH_MS) continue;
-    await rm3(item.file, { force: true }).catch(() => {
-    });
+  let rest = files.filter((item) => !item.stale);
+  if (!(rest.length <= REFERENCE_CACHE_MAX_FILES)) {
+    rest.sort((a, b) => a.mtimeMs - b.mtimeMs);
+    for (let item of rest.slice(0, rest.length - REFERENCE_CACHE_MAX_FILES))
+      now - item.mtimeMs <= REFERENCE_CACHE_FRESH_MS || await rm3(item.file, { force: !0 }).catch(() => {
+      });
   }
 }
 var fitInFlight = /* @__PURE__ */ new Map();
 async function fitImageToCanvas(absPath, size, config, signal) {
-  const [width, height] = size;
-  const media = await probeMedia(absPath, config, signal);
+  let [width, height] = size, media = await probeMedia(absPath, config, signal);
   if (media?.width === width && media?.height === height) return absPath;
-  const info = await stat4(absPath).catch(() => null);
-  const key = `${path7.basename(absPath, path7.extname(absPath))}-${info?.size ?? 0}-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`;
-  const dest = path7.join(referenceCacheDir(), key);
+  let info = await stat4(absPath).catch(() => null), key = `${path7.basename(absPath, path7.extname(absPath))}-${info?.size ?? 0}-${Math.round(info?.mtimeMs ?? 0)}-${width}x${height}.jpg`, dest = path7.join(referenceCacheDir(), key);
   if (await isUsableFit(dest, width, height, config, signal)) return dest;
-  const running = fitInFlight.get(dest);
+  let running = fitInFlight.get(dest);
   if (running) {
-    await running.catch(() => {
-    });
-    if (await isUsableFit(dest, width, height, config, signal)) return dest;
+    if (await running.catch(() => {
+    }), await isUsableFit(dest, width, height, config, signal)) return dest;
     if (signal?.aborted) return absPath;
   }
-  const task = (async () => {
-    await mkdir4(referenceCacheDir(), { recursive: true });
-    const graph = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},gblur=sigma=24[bg];[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1`;
-    const temp = `${dest.replace(/\.jpg$/, "")}.${uniqueSuffix("fit")}.jpg`;
+  let task = (async () => {
+    await mkdir4(referenceCacheDir(), { recursive: !0 });
+    let graph = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},gblur=sigma=24[bg];[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1`, temp = `${dest.replace(/\.jpg$/, "")}.${uniqueSuffix("fit")}.jpg`;
     try {
-      const { code } = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
+      let { code } = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
         "-y",
         "-i",
         absPath,
@@ -4370,14 +3772,11 @@ async function fitImageToCanvas(absPath, size, config, signal) {
         temp
       ], { signal, timeoutMs: 12e4 });
       if (code !== 0) return;
-      const fitted = await probeMedia(temp, config, signal);
-      if (fitted?.width === width && fitted?.height === height) {
-        await rename3(temp, dest);
-        await pruneReferenceCache(referenceCacheDir());
-      }
+      let fitted = await probeMedia(temp, config, signal);
+      fitted?.width === width && fitted?.height === height && (await rename3(temp, dest), await pruneReferenceCache(referenceCacheDir()));
     } catch {
     } finally {
-      await rm3(temp, { force: true }).catch(() => {
+      await rm3(temp, { force: !0 }).catch(() => {
       });
     }
   })();
@@ -4389,17 +3788,15 @@ async function fitImageToCanvas(absPath, size, config, signal) {
   }
   return await isUsableFit(dest, width, height, config, signal) ? dest : absPath;
 }
-var UPLOAD_ALIAS_PATTERN = /^(?:latest|newest|recent|最近上传(?:的图片)?|最新上传(?:的图片)?|刚上传(?:的图片)?|最新图片|刚拖进来的图片)$/i;
-var UPLOAD_WINDOW_MS = 2 * 60 * 60 * 1e3;
+var UPLOAD_ALIAS_PATTERN = /^(?:latest|newest|recent|最近上传(?:的图片)?|最新上传(?:的图片)?|刚上传(?:的图片)?|最新图片|刚拖进来的图片)$/i, UPLOAD_WINDOW_MS = 7200 * 1e3;
 function attachmentObjectsDir() {
   return path7.join(dshHome(), "attachments", "v1", "objects");
 }
 async function sniffFileImage(file) {
   let handle;
   try {
-    handle = await open3(file, "r");
-    const head = Buffer.alloc(32);
-    const { bytesRead } = await handle.read(head, 0, head.length, 0);
+    handle = await open2(file, "r");
+    let head = Buffer.alloc(32), { bytesRead } = await handle.read(head, 0, head.length, 0);
     return sniffImageMime(head.subarray(0, bytesRead));
   } catch {
     return null;
@@ -4409,126 +3806,98 @@ async function sniffFileImage(file) {
   }
 }
 async function findRecentUploadedImages(windowMs = UPLOAD_WINDOW_MS) {
-  const root = attachmentObjectsDir();
-  const shards = await readdir3(root, { withFileTypes: true }).catch(() => []);
-  const cutoff = Date.now() - windowMs;
-  const found = [];
-  for (const shard of shards) {
+  let root = attachmentObjectsDir(), shards = await readdir3(root, { withFileTypes: !0 }).catch(() => []), cutoff = Date.now() - windowMs, found = [];
+  for (let shard of shards) {
     if (!shard.isDirectory()) continue;
-    const dir = path7.join(root, shard.name);
-    const entries = await readdir3(dir, { withFileTypes: true }).catch(() => []);
-    for (const entry2 of entries) {
+    let dir = path7.join(root, shard.name), entries = await readdir3(dir, { withFileTypes: !0 }).catch(() => []);
+    for (let entry2 of entries) {
       if (!entry2.isFile()) continue;
-      const abs = path7.join(dir, entry2.name);
-      const info = await stat4(abs).catch(() => null);
+      let abs = path7.join(dir, entry2.name), info = await stat4(abs).catch(() => null);
       if (!info || info.mtimeMs < cutoff) continue;
-      const mime = await sniffFileImage(abs);
-      if (mime) found.push({ abs, mime, bytes: info.size, mtimeMs: info.mtimeMs });
+      let mime = await sniffFileImage(abs);
+      mime && found.push({ abs, mime, bytes: info.size, mtimeMs: info.mtimeMs });
     }
   }
   return found.sort((a, b) => b.mtimeMs - a.mtimeMs);
 }
 function brief(value, limit = 80) {
-  const text = String(value ?? "");
+  let text = String(value ?? "");
   return text.length > limit ? `${text.slice(0, limit)}…（共 ${text.length} 字符）` : text;
 }
 function inlineBase64Image(raw, label) {
-  const compact = String(raw ?? "").replace(/\s+/g, "");
+  let compact = String(raw ?? "").replace(/\s+/g, "");
   if (compact.length < 64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return null;
-  const buffer = Buffer.from(compact, "base64");
-  if (buffer.length > MAX_IMAGE_BYTES) {
+  let buffer = Buffer.from(compact, "base64");
+  if (buffer.length > MAX_IMAGE_BYTES)
     throw new Error(
       `${label} 解出来有 ${(buffer.length / 1048576).toFixed(1)} MB，请压到 ${MAX_IMAGE_BYTES / 1048576} MB 以内再传。`
     );
-  }
-  const mime = sniffImageMime(buffer);
+  let mime = sniffImageMime(buffer);
   if (mime) return { url: `data:${mime};base64,${compact}`, source: "inline", bytes: buffer.length };
-  if (compact.length >= 256) {
+  if (compact.length >= 256)
     throw new Error(
       `${label} 看着是 base64，但解出来的内容不是图片（只认 jpg/png/webp/bmp/gif/tiff 的文件头）。`
     );
-  }
   return null;
 }
 async function resolveImageInput(value, label, fit = null) {
-  const raw = String(value ?? "").trim().replace(/^@/, "");
+  let raw = String(value ?? "").trim().replace(/^@/, "");
   if (!raw) throw new Error(`${label} 不能为空。`);
   if (/^https?:\/\//i.test(raw)) return { url: raw, source: "url" };
   if (/^data:image\//i.test(raw)) return { url: raw, source: "inline" };
-  const inlined = inlineBase64Image(raw, label);
+  let inlined = inlineBase64Image(raw, label);
   if (inlined) return inlined;
-  let abs;
-  let info;
-  let upload = null;
-  const aliasParts = /^([^\s:]+)(?::(\d+))?$/.exec(raw);
-  const aliasName = aliasParts ? aliasParts[1] : "";
-  const uploadIndex = aliasParts && aliasParts[2] ? Math.max(1, Number(aliasParts[2])) : 1;
+  let abs, info, upload = null, aliasParts = /^([^\s:]+)(?::(\d+))?$/.exec(raw), aliasName = aliasParts ? aliasParts[1] : "", uploadIndex = aliasParts && aliasParts[2] ? Math.max(1, Number(aliasParts[2])) : 1;
   if (UPLOAD_ALIAS_PATTERN.test(aliasName)) {
-    const index = uploadIndex;
-    const uploads = await findRecentUploadedImages();
-    const picked = uploads[index - 1];
-    if (!picked) {
+    let index = uploadIndex, uploads = await findRecentUploadedImages(), picked = uploads[index - 1];
+    if (!picked)
       throw new Error(
         `${label} 写的是「最近上传的图片」${index > 1 ? `（第 ${index} 新）` : ""}，但 Harness 附件库里最近 ${UPLOAD_WINDOW_MS / 36e5} 小时只有 ${uploads.length} 张图片，取不到。请直接把图片路径或公网 URL 发过来。`
       );
-    }
-    abs = picked.abs;
-    info = { size: picked.bytes };
-    upload = {
+    abs = picked.abs, info = { size: picked.bytes }, upload = {
       uploadedAt: new Date(picked.mtimeMs).toISOString(),
       recentUploads: uploads.length,
       uploadIndex: index
     };
   } else {
     abs = path7.resolve(raw.startsWith("~/") || raw === "~" ? path7.join(os3.homedir(), raw.slice(1)) : raw);
-    const ext = path7.extname(abs).toLowerCase();
-    if (!IMAGE_EXT_TO_MIME[ext]) {
+    let ext = path7.extname(abs).toLowerCase();
+    if (!IMAGE_EXT_TO_MIME[ext])
       throw new Error(
         `${label} 既不是 http(s) 链接、base64，也不是支持的图片文件：${brief(raw)}。本机图片请用 ${Object.keys(IMAGE_EXT_TO_MIME).join(" / ")} 之一，用户刚在对话里上传的图直接写 latest。`
       );
-    }
-    info = await stat4(abs).catch(() => null);
-    if (!info?.isFile()) {
+    if (info = await stat4(abs).catch(() => null), !info?.isFile())
       throw new Error(`${label} 找不到文件：${abs}（用户刚在对话里上传的图可以直接写 latest）`);
-    }
   }
-  const submitPath = fit?.size ? await fitImageToCanvas(abs, fit.size, fit.config, fit.signal) : abs;
-  let size = info.size;
+  let submitPath = fit?.size ? await fitImageToCanvas(abs, fit.size, fit.config, fit.signal) : abs, size = info.size;
   if (submitPath !== abs) {
-    const fittedInfo = await stat4(submitPath).catch(() => null);
+    let fittedInfo = await stat4(submitPath).catch(() => null);
     if (!fittedInfo?.isFile()) throw new Error(`${label} 读不出来：${abs}`);
     size = fittedInfo.size;
   }
-  if (size > MAX_IMAGE_BYTES) {
+  if (size > MAX_IMAGE_BYTES)
     throw new Error(
       `${label} 太大（${(size / 1048576).toFixed(1)} MB），请压到 ${MAX_IMAGE_BYTES / 1048576} MB 以内再传：${abs}`
     );
-  }
-  const buffer = await readFile5(submitPath);
-  const mime = sniffImageMime(buffer);
+  let buffer = await readFile5(submitPath), mime = sniffImageMime(buffer);
   if (!mime) throw new Error(`${label} 不是有效的图片文件（读到的内容不是 jpg/png/webp/bmp/gif/tiff）：${abs}`);
-  const resolved = {
+  let resolved = {
     url: `data:${mime};base64,${buffer.toString("base64")}`,
     source: upload ? "upload" : "file",
     localPath: submitPath,
     bytes: buffer.length,
     ...upload || {}
   };
-  if (submitPath !== abs) {
-    resolved.originalPath = abs;
-    resolved.fittedTo = `${fit.size[0]}x${fit.size[1]}`;
-  }
-  return resolved;
+  return submitPath !== abs && (resolved.originalPath = abs, resolved.fittedTo = `${fit.size[0]}x${fit.size[1]}`), resolved;
 }
 function validateImageRoles(args, model) {
-  const refs2 = Array.isArray(args.referenceImages) ? args.referenceImages : args.referenceImages ? [args.referenceImages] : [];
+  let refs2 = Array.isArray(args.referenceImages) ? args.referenceImages : args.referenceImages ? [args.referenceImages] : [];
   if (args.lastFrameUrl && !args.firstFrameUrl) throw new Error("尾帧必须与首帧一起传入。");
-  if (refs2.length && (args.firstFrameUrl || args.lastFrameUrl)) {
+  if (refs2.length && (args.firstFrameUrl || args.lastFrameUrl))
     throw new Error("首尾帧与参考图模式互斥，请选择一种；如需组合，用参考图模式并在提示词指定首尾画面。");
-  }
-  const limit = isOmniExtendModel(model) ? 30 : 9;
+  let limit = isOmniExtendModel(model) ? 30 : 9;
   if (refs2.length > limit) throw new Error(`当前模型最多支持 ${limit} 张参考图。`);
-  if (refs2.some((value) => typeof value !== "string" || !value.trim())) throw new Error("每张参考图必须是非空字符串。");
+  if (refs2.some((value) => typeof value != "string" || !value.trim())) throw new Error("每张参考图必须是非空字符串。");
   return { refs: refs2, limit };
 }
 
@@ -4536,59 +3905,32 @@ function validateImageRoles(args, model) {
 init_plugin();
 init_config();
 init_connection();
-var locks = /* @__PURE__ */ new Set();
-var hash = (value) => createHash3("sha256").update(value).digest("hex");
+var locks = /* @__PURE__ */ new Set(), hash = (value) => createHash3("sha256").update(value).digest("hex");
 function stable(value) {
-  if (Array.isArray(value)) return value.map(stable);
-  if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().filter((k) => value[k] !== void 0).map((k) => [k, stable(value[k])]));
-  return value;
+  return Array.isArray(value) ? value.map(stable) : value && typeof value == "object" ? Object.fromEntries(Object.keys(value).sort().filter((k) => value[k] !== void 0).map((k) => [k, stable(value[k])])) : value;
 }
 function sessionOwner(exec) {
-  const session = exec?.agent?.session;
-  const id = session?.id || session?.header?.id;
-  if (typeof id !== "string" || !id) throw new Error("项目操作需要可识别的会话，尚未提交视频。");
+  let session = exec?.agent?.session, id = session?.id || session?.header?.id;
+  if (typeof id != "string" || !id) throw new Error("项目操作需要可识别的会话，尚未提交视频。");
   return hash(id);
-}
-async function allProjects() {
-  const dir = path8.join(dshHome(), DATA_DIR, "projects");
-  const names = await readdir4(dir).catch(() => []);
-  const found = [];
-  for (const name of names) {
-    if (!name.endsWith(".json")) continue;
-    try {
-      found.push(JSON.parse(await readFile6(path8.join(dir, name), "utf8")));
-    } catch {
-    }
-  }
-  return found;
-}
-async function projectsOfSession(session) {
-  let owner;
-  try {
-    owner = sessionOwner({ agent: { session } });
-  } catch {
-    return [];
-  }
-  return (await allProjects()).filter((project) => project?.owner === owner);
 }
 function projectFile(id) {
   if (!/^[a-f0-9-]{36}$/.test(String(id || ""))) throw new Error("缺少有效 projectId，请先调用 video_project(action:prepare)。");
   return path8.join(dshHome(), DATA_DIR, "projects", `${id}.json`);
 }
 async function readProject(id, exec) {
-  const data = JSON.parse(await readFile6(projectFile(id), "utf8"));
+  let data = JSON.parse(await readFile6(projectFile(id), "utf8"));
   if (data.version !== 1 || data.owner !== sessionOwner(exec)) throw new Error("此项目不属于当前会话。");
   return data;
 }
 async function writeProject(data) {
-  const file = projectFile(data.id);
-  await mkdir5(path8.dirname(file), { recursive: true, mode: 448 });
-  const temp = `${file}.${randomUUID4()}.tmp`;
+  let file = projectFile(data.id);
+  await mkdir5(path8.dirname(file), { recursive: !0, mode: 448 });
+  let temp = `${file}.${randomUUID4()}.tmp`;
   try {
-    await writeFile3(temp, JSON.stringify(data), { mode: 384, flag: "wx" });
-    await rename4(temp, file);
+    await writeFile3(temp, JSON.stringify(data), { mode: 384, flag: "wx" }), await rename4(temp, file);
   } finally {
-    await rm4(temp, { force: true }).catch(() => {
+    await rm4(temp, { force: !0 }).catch(() => {
     });
   }
 }
@@ -4602,16 +3944,14 @@ async function lockProject(id, fn) {
   }
 }
 async function createProject(exec, subjectType) {
-  const data = { version: 1, id: randomUUID4(), owner: sessionOwner(exec), subjectType, choice: "", approved: null };
-  await writeProject(data);
-  return data;
+  let data = { version: 1, id: randomUUID4(), owner: sessionOwner(exec), subjectType, choice: "", approved: null };
+  return await writeProject(data), data;
 }
 function hasProjectImages(args) {
-  return [args?.firstFrameUrl, args?.lastFrameUrl, ...args?.productionStrategy === "independent_shots" && Array.isArray(args.shotFrames) ? args.shotFrames.flatMap((frame) => [frame?.firstFrameUrl, frame?.lastFrameUrl]) : [], ...Array.isArray(args?.referenceImages) ? args.referenceImages : [args?.referenceImages], ...args?.characterReferenceImages || []].some((v) => typeof v === "string" && v.trim());
+  return [args?.firstFrameUrl, args?.lastFrameUrl, ...args?.productionStrategy === "independent_shots" && Array.isArray(args.shotFrames) ? args.shotFrames.flatMap((frame) => [frame?.firstFrameUrl, frame?.lastFrameUrl]) : [], ...Array.isArray(args?.referenceImages) ? args.referenceImages : [args?.referenceImages], ...args?.characterReferenceImages || []].some((v) => typeof v == "string" && v.trim());
 }
 function legacyProductionFingerprint(config, name, args) {
-  const ignore = /* @__PURE__ */ new Set(["projectId", "resume", "merge", "cumulativePreview", "outputDir", "keepSegments", "resetCharacterChoice", "resumeWithCurrentConfig", "referenceImagesReviewed", "inputVideoSeconds"]);
-  const parameters = Object.fromEntries(Object.entries(args || {}).filter(([k]) => !ignore.has(k)));
+  let ignore = /* @__PURE__ */ new Set(["projectId", "resume", "merge", "cumulativePreview", "outputDir", "keepSegments", "resetCharacterChoice", "resumeWithCurrentConfig", "referenceImagesReviewed", "inputVideoSeconds"]), parameters = Object.fromEntries(Object.entries(args || {}).filter(([k]) => !ignore.has(k)));
   return hash(JSON.stringify(stable({
     name,
     parameters,
@@ -4621,8 +3961,8 @@ function legacyProductionFingerprint(config, name, args) {
     mode: ref(config, "connectionMode", "metaontic"),
     ratio: args.ratio ?? ref(config, "ratio", "9:16"),
     resolution: resolveResolution(config, args),
-    audio: args.generateAudio ?? ref(config, "generateAudio", true),
-    watermark: args.watermark ?? ref(config, "watermark", false),
+    audio: args.generateAudio ?? ref(config, "generateAudio", !0),
+    watermark: args.watermark ?? ref(config, "watermark", !1),
     extra: ref(config, "extraParams", "")
   })));
 }
@@ -4631,8 +3971,8 @@ function normalizeProductionSpec(config, name, args) {
     ...args,
     ratio: args?.ratio ?? ref(config, "ratio", "9:16"),
     resolution: resolveResolution(config, args || {}),
-    generateAudio: args?.generateAudio ?? ref(config, "generateAudio", true),
-    watermark: args?.watermark ?? ref(config, "watermark", false),
+    generateAudio: args?.generateAudio ?? ref(config, "generateAudio", !0),
+    watermark: args?.watermark ?? ref(config, "watermark", !1),
     ...name === "video_generate" ? { productionStrategy: args?.productionStrategy ?? "continuous_segments", mode: args?.mode ?? "continuous" } : { mode: args?.mode ?? ref(config, "mode", "continuous") }
   };
 }
@@ -4640,7 +3980,7 @@ function productionFingerprint(config, name, args) {
   return legacyProductionFingerprint(config, name, normalizeProductionSpec(config, name, args));
 }
 function matchesProductionApproval(config, approval, name, args) {
-  const actual = productionFingerprint(config, name, args);
+  let actual = productionFingerprint(config, name, args);
   return actual === approval.fingerprint || legacyProductionFingerprint(config, name, approval.specification) === approval.fingerprint && actual === productionFingerprint(config, name, approval.specification);
 }
 async function scriptDigest(file) {
@@ -4649,44 +3989,40 @@ async function scriptDigest(file) {
 async function assertProjectApproved(config, exec, args) {
   let candidate = args;
   if (resumeDirOf(args?.resume)) {
-    const saved = await readPauseFile(resumeDirOf(args.resume));
-    if (args.cumulativePreview === true) {
+    let saved = await readPauseFile(resumeDirOf(args.resume));
+    if (args.cumulativePreview === !0) {
       if (Object.keys(args).some((k) => !["resume", "cumulativePreview"].includes(k))) throw new Error("累计预览只传resume和cumulativePreview，不改变生成参数。");
       return;
     }
     if (saved.pendingTask || saved.deliveryPending) return;
     if (!saved.options?.projectId) {
-      const changed = Object.keys(args).some((k) => !["resume", "cumulativePreview", "merge", "outputDir", "referenceImagesReviewed"].includes(k));
-      if (changed) throw new Error("旧进度只可沿原参数续做；变更方案请新建项目并审核。");
+      if (Object.keys(args).some((k) => !["resume", "cumulativePreview", "merge", "outputDir", "referenceImagesReviewed"].includes(k))) throw new Error("旧进度只可沿原参数续做；变更方案请新建项目并审核。");
       return;
     }
     candidate = { ...saved.options, prompt: saved.prompt, ...args };
   }
-  const data = await readProject(candidate.projectId, exec);
+  let data = await readProject(candidate.projectId, exec);
   if (!resumeDirOf(args?.resume) && args.duration == null) throw new Error("生成前必须传入用户已确认的视频时长duration，不得使用默认15秒。");
   if (data.approved?.resumeDir && resumeDirOf(args.resume) !== data.approved.resumeDir) throw new Error("此次审核绑定了原续做目录，请使用原resume。");
   if (data.filmSource) {
     if (exec.name !== "video_generate") throw Error("COMPILED_TOOL_MISMATCH:专业编译方案必须使用video_generate。");
-    const source = JSON.parse(await readFile6(data.filmSource.path, "utf8"));
+    let source = JSON.parse(await readFile6(data.filmSource.path, "utf8"));
     assertCompiledProduction(data, source, args.resume ? { ...data.approved?.specification, ...candidate } : candidate, resolveModel(config));
   }
   if (!data.approved) throw new Error("本项目脚本尚未审核通过，请先展示脚本和分镜，再调用 video_project(action:review)。");
   if (await scriptDigest(data.approved.scriptPath) !== data.approved.scriptHash) throw new Error("脚本已修改，请重新审核当前版本。");
-  const parameters = args.resume ? { ...data.approved.specification, ...args } : candidate;
+  let parameters = args.resume ? { ...data.approved.specification, ...args } : candidate;
   if (!matchesProductionApproval(config, data.approved, exec.name, parameters)) throw new Error("制作参数或接入配置已变化，请重新审核脚本和本次完整 specification。");
   if (data.choice === "generate_first" && !hasProjectImages(parameters)) throw new Error("请先生成或提供角色图、展示审核后再制作。");
 }
-async function projectCharacterGate(config, exec, args) {
+async function projectCharacterGate(_config, exec, args) {
   if (!args?.projectId || args.resume) return null;
-  const data = await readProject(args.projectId, exec);
-  if (data.subjectType === "scenery" || data.choice === "text_only" || hasProjectImages(args)) return null;
-  return { kind: "deny", reason: "本项目需要先完成角色图选择及图片审核，请在需求阶段调用 video_project(action:prepare)，再展示最终脚本审核。" };
+  let data = await readProject(args.projectId, exec);
+  return data.subjectType === "scenery" || data.choice === "text_only" || hasProjectImages(args) ? null : { kind: "deny", reason: "本项目需要先完成角色图选择及图片审核，请在需求阶段调用 video_project(action:prepare)，再展示最终脚本审核。" };
 }
 function withProjectApproval(tool, config) {
   return { ...tool, async execute(args, exec) {
-    await assertSegmentReviewed(exec, args || {});
-    await assertProjectApproved(config, { ...exec, name: tool.name }, args || {});
-    return tool.execute(args, exec);
+    return await assertSegmentReviewed(exec, args || {}), await assertProjectApproved(config, { ...exec, name: tool.name }, args || {}), tool.execute(args, exec);
   } };
 }
 
@@ -4721,8 +4057,7 @@ var BASE_CONTENT_QUALITY = `【内容密度与专业脚本标准】
 每镜写清主体、主动作、入点/出点、可见变化及声音；同一时刻优先一个主动作，给复杂动作、对白、反应和停顿留足时间。空间方位、持物手、视线、光线与人物目标连续。对白只保留画面不能独立传达的必要信息，不复述画面，不用连续口播填满时长。
 镜头先问“为什么在此刻给观众看这个”，再决定景别与运动。远景交代关系，近景捕捉选择或反应，特写揭示关键证据；不得机械轮换景别或每段相同推近。声音可铺垫画外事件、形成反差或留白；无声/无配乐等用户限制优先。
 按已确认时长控制信息量：短片聚焦一件事和一个核心变化，长片各章有不同问题与阶段进展，不能把短片重复拉长。超载先精简事件或对白，涉及删改用户关键内容先说明并确认，不加速表演或拆更多付费调用凑丰富。
-交稿前做删除检查、因果检查、时长检查和结尾回收检查；如发现纯氛围形容、重复展示、无动机行为、连续解释台词或无法执行的动作，先局部修订。改稿保留用户满意部分，已批准范围变动重审，不自动付费重做。`;
-var THEME_AND_VISUAL_DEPTH = `【中心表达先行】
+交稿前做删除检查、因果检查、时长检查和结尾回收检查；如发现纯氛围形容、重复展示、无动机行为、连续解释台词或无法执行的动作，先局部修订。改稿保留用户满意部分，已批准范围变动重审，不自动付费重做。`, THEME_AND_VISUAL_DEPTH = `【中心表达先行】
 先确定一句具体的“核心表达”，它应说明本片要呈现的关系、价值、问题或感受，以及用什么可见变化让观众理解。不能只写“亲情”“梦想”“城市之美”“高级感”等题目词，也不能把编剧推演或空泛说教当成作品。已有用户主题必须保留，不能为了深刻另换立意。
 在交付脚本开头简洁列出“核心表达”“内容主线”“结尾变化”：核心表达一句话，内容主线说明围绕哪件事/哪条观察线推进，结尾变化说明人物、关系、认知或观看感受如何与开头不同。用户只改对白等局部需求时沿用已有主题，不重做全片。缺乏关键依据时标候选或待确认，不把推断当用户要求。
 【让内涵来自内容】
@@ -4733,8 +4068,8 @@ var THEME_AND_VISUAL_DEPTH = `【中心表达先行】
 用主体和动词写可演动作，不只写“他很感动”“两人深情对视”“城市充满活力”。在已授权完善范围内，可把“父亲关心女儿”落成：父亲把保温饭盒往女儿面前推，手停在盒盖边等她坐下；她掀盖看见热气，瞥见对面空碗，分出半份推回去。例子只示范具体程度，禁止给所有故事套饭盒或父爱主题。
 画面细节必须承担信息或情绪：破损、摆放、动作迟疑、前后变化等有依据才写，不靠堆道具制造深刻。复杂动作按可生成的节拍拆开，给对白、反应和声音留时间；不能在几秒内同时完成多个场景、复杂交互和长台词。长片逐章围绕不同子问题推进同一中心，不做风景或口播堆积。
 【主题与画面交稿检查】
-先核对：核心表达是否具体？是否有两处可见行动/细节或证据支撑（极短片可由一个完整变化承担）？每段是否增加新内容？结尾是否回应开头？画面是否能明确回答“谁/什么，在何处，如何行动，发生什么改变”？如只能看到镜头术语、情绪标签和赞美词，先局部重写再交稿。不得为满足检查擅自改已批准剧情，必要变更先说明并重审。`;
-var CONTENT_QUALITY = BASE_CONTENT_QUALITY + "\n" + THEME_AND_VISUAL_DEPTH;
+先核对：核心表达是否具体？是否有两处可见行动/细节或证据支撑（极短片可由一个完整变化承担）？每段是否增加新内容？结尾是否回应开头？画面是否能明确回答“谁/什么，在何处，如何行动，发生什么改变”？如只能看到镜头术语、情绪标签和赞美词，先局部重写再交稿。不得为满足检查擅自改已批准剧情，必要变更先说明并重审。`, CONTENT_QUALITY = BASE_CONTENT_QUALITY + `
+` + THEME_AND_VISUAL_DEPTH;
 
 // src/businesses/film-production/prompts/narrative-enhancement.ts
 var CREATIVE_ENHANCEMENT = `## 创意内容增强规则
@@ -4750,15 +4085,13 @@ var CREATIVE_ENHANCEMENT = `## 创意内容增强规则
 禁止通过无意义增加人物、地点、事件数量来制造虚假的内容丰富度。
 创意提案必须包含：核心看点、人物冲突、情节推进、反转或情绪落点、可视化细节、观众记忆点。无人物或非剧情作品以核心问题、观察推进与情绪落点对应，不硬造人物冲突或反转；适用项写具体内容，不适用项说明原因。
 以上为提案展示维度：在现有hook、central_conflict_or_question、structure.beats/visual_evidence、audience_experience等字段中承载，保持既有JSON协议，不另建冲突副本。创意阶段只完成创意职责，不提前编写正式剧本或分镜；已批准后才进入下游阶段。
-`;
-var SCREENWRITER_ENHANCEMENT = `## 剧情密度与细节增强规则
+`, SCREENWRITER_ENHANCEMENT = `## 剧情密度与细节增强规则
 每场戏应尽可能包含：人物明确的行动目标、具有意义的动作、推动剧情的对白、人物对事件的真实反应、与故事有关的环境或道具、可观察的情绪变化、明确的场景结果。
 每一句对白都应至少承担一种功能：推进剧情、展示人物、制造冲突、传递必要信息、铺垫或完成笑点。
 优先使用“动作 + 对白 + 反应”，而不是连续大段对白。无对白、观察或静态风景内容按创作意图表达，不为凑清单强加人声或人物。
 短视频严格控制事件数量，确保动作、对白、停顿能够在目标时长内完成；音画并行时不重复累计时长，不靠异常语速赶对白。
 长视频通过人物关系、次要冲突、伏笔与场景细节丰富故事，不得使用重复剧情凑时长；新增支线须服务主线并处于已批准范围，重要新增先返回创意审批。
-`;
-var STORYBOARD_ENHANCEMENT = `## 视觉叙事增强规则
+`, STORYBOARD_ENHANCEMENT = `## 视觉叙事增强规则
 不得简单地将剧本对白转换为人物正面说话镜头。寻找能够通过画面表达的信息：人物正在做什么、人物如何回应对方、手部与道具的互动、表情的细微变化、环境对人物的影响、关键动作的视觉重点。
 每个镜头应具有明确的叙事功能；优先通过人物动作、构图和反应提升画面信息量，不以多切镜代替内容。
 不得擅自新增重要剧情；从已批准行为中选择可见细节，不用新道具、新事件或未经批准的反应改变人物动机与结果。若用户要求正面口播或固定机位，保留其意图，通过已有动作、构图与反应丰富表达。
@@ -4777,8 +4110,7 @@ var CREATIVE_GUIDANCE = SHORT_VIDEO_COMMON + CONTENT_QUALITY + SCRIPT_CRAFT + CR
 【提示词工程】先形成模型无关镜头描述，再按当前已知模型能力适配。每镜独立可读，不写“同上”“继续刚才”。顺序为规格→主体视觉锚点与服装→场景→动作起点/过程/终点→表情→镜头→光色→声音→约束。对白保留原文、说话人、语言，旁白与口型要求分开。不擅加字幕、水印或新人物。模型能力未知时标generic与待适配，不编造音频、参考图、负面提示词或时长支持；不支持项提出待确认替代方案，不静默删除需求。
 镜头不等于付费生成单元；先规划shot到clip/实际段的映射，不按镜头数增加调用。复杂多人互动、手部、文字、长对白和连续性列风险，不承诺百分百一致。
 【质量审核】先核对程序校验结果，再评主题、因果、动机、对白、连续性、音画和可生成性。专业项目按Reviewer V3.1八维权重评分，不适用项归一化；总分≥80且无未VERIFIED的CRITICAL/MAJOR才建议交付，分数不能掩盖阻断项。问题记录entity_id、rule_id、evidence、owner、minimal_fix、downstream_impact；不得只说“更有电影感”。未执行的程序检查列unverified_checks，不能自称机器校验通过。
-【修订与交付】只修改指定范围，保留满意内容与稳定ID，上游变化标记下游失效。自动业务修复最多2轮，仍失败交用户处理，不假称程序已实现自动循环。已有成果不删除、不自动付费重做。只报告工具实际返回的保存、审核和生成状态；未观看/试听的媒体标待人工验收。`;
-var FILM_WORKFLOW_GUIDANCE = `【专业分阶段创作工具契约】
+【修订与交付】只修改指定范围，保留满意内容与稳定ID，上游变化标记下游失效。自动业务修复最多2轮，仍失败交用户处理，不假称程序已实现自动循环。已有成果不删除、不自动付费重做。只报告工具实际返回的保存、审核和生成状态；未观看/试听的媒体标待人工验收。`, FILM_WORKFLOW_GUIDANCE = `【专业分阶段创作工具契约】
 【四维创作配置】支持独立 genre（题材）、format（作品形式）、purpose（目的）、style_profile（注册视觉策略），tone 与 visual_style（自由文本）独立。create/configure_profile 用 projectSpec JSON 设置；read/next/route 返回 resolved_profiles 及 available_profiles，只用真实注册 id，不假设配置文件存在。可只选内容维度而不额外选旧 work_type；仅选风格不代表选定内容方向。修改内容维度或叙事tone会失效材料与批准，必须重新审批；仅visual_style/style_profile调整保留创意和剧本批准，重检资产及下游；仅改变视觉光色或演绎基调的tone，configure_profile显式传change_scope:"visual_only"，不得用于改变故事情绪或结局；不明确时默认重审。PROFILE_CONFLICT 先解决，不静默覆盖。终审 dimension_review 逐一覆盖已选维度，提供证据，NOT_EVALUATED 不能通过。保留旧作品类型兼容：先区分作品类型work_type、视觉风格visual_style、叙事方式narrative_mode和生成模式。work_type支持DRAMA剧情、COMEDY喜剧、LIFESTYLE生活Vlog/氛围、DOCUMENTARY纪录/知识、COMMERCIAL产品广告、PROMOTIONAL品牌/地域宣传。用户已明确类型直接采用；不明确时推荐一个方向，与现有缺失创意问题合并确认，不把推断冒充用户确认。create的projectSpec可保存类型与叙事方式；next/route动态加载配置及各角色规则。类型未选的新项目须在创意批准前configure_profile(projectSpec为work_type/narrative_mode或四维字段的JSON字符串,expectedRevision)。修改已批准项目类型会保留全部材料但标失效并清除原批准，重新走创意/剧本审批；不自动付费重做。旧项目没有类型字段时沿原流程，不强制迁移。profile_revision由系统绑定，未知版本停止而非静默换策略。creative/script增加配置要求的type_details，终审增加type_review并逐项给证据；不得把未检查写成通过。
 对话中新写完整视频脚本、重构故事或专业分阶段创作，目标15–3600秒时优先使用film_project，不等用户说“专业模式”才启用。先read/next续作，按创意批准→编剧→剧本批准→资产→分镜→提示词→审核推进。已有普通video_project继续沿其已审核版本改稿，不强制迁移或丢失状态；4–14秒及用户明确只需快速草案时走原流程，仍采用相同编剧方法并标草案。实际视频制作仍用video_project。时长、画幅、清晰度已确认则沿用，缺失规格按现有规则合并询问，不把建议当用户确认。规划不自动调用视频。
 先create(title,sourceBrief原文,durationSeconds,projectSpec)，projectSpec为已知规格JSON（aspect_ratio/resolution/language/visual_style/genre/target_audience/distribution_channel/target_model/hard_constraints/soft_preferences/references），target_model只用execution_plan.model_name或用户明确提供的真实模型ID，未指定时省略，不写待定或占位文字。旧项目占位值通过configure_profile修改target_model；仅模型变化保留创意剧本批准，重检资产与下游。未指定字段留空，工具标UNKNOWN，不得冒充用户确认，续作或改稿先read(projectId)。以工具返回的状态和revision为准，不假设存在progress/manifest读取、回滚、章节自动调度或独立子Agent。
@@ -4795,14 +4127,10 @@ prompts：{prompts:[{shot_id,prompt,target_model,location_id,scene_state_id,dura
 review：新版Reviewer V3.1提交review_status、scores八维（不适用null）、issues、delivery_allowed、blocking_issue_count和真实reviewed_revisions（creative/script/assets/shots/prompts对应实际修订号）、review_id/review_stage/review_scope/unverified_items等完整报告。CRITICAL/MAJOR未VERIFIED阻断；加权分由程序复算，失败报告也可保存但禁止编译。最终通过只接受FINAL_REVIEW及完整review_scope，适用维度不得用null跳过。重大问题不得删除或降级；首次问题OPEN，责任产物真实改版后才标RESOLVED。Reviewer按当前版本复审后用verify_issue(issueId,content:{evidence,review_revision,source_revisions},expectedRevision)登记，再提交含VERIFIED的终审；问题台账与复审时间由运行时维护，不能自填验证通过。旧报告score/passed协议兼容。
 创意和剧本的批准分别绑定材料版本，沉默/取消/修改意见不算批准。改稿后按工具stale状态更新下游，不假称已实现实体级自动修订。超过180秒按章规划，600秒以上维护全片摘要和章间状态，分批创作但按当前工具提交完整阶段聚合对象；超出上下文能力时停在可恢复草稿，不截断冒充完整。
 工具报错先区分参数/产物校验失败与宿主输出协议失败。INVALID_TOOL_OUTPUT或“value is not lossless JSON”不代表写入失败、工具不可用或已获准降级；create返回结果不明时禁止重复create，先诊断并恢复已保存项目。不得仅因重试次数达到两次就宣布专业通道不可用、改走video_project或跳过创意/剧本批准。只有用户明确改选流程才切换；错误未解决则保留材料并报告具体阻断。
-export返回JSON和Markdown内容，不是已写入导出文件；没有实际文件不得编造下载链接。Markdown应为同版本JSON的可读投影。实际视频仍须走video_project脚本审核、费用确认与逐段结果审核，创作批准不替代制作授权。`;
-var ORCHESTRATION_GUIDANCE = `推进专业创作先调用film_project(action:next)，只加载返回的role、inputs与scope所需资料，再按许可动作提交或请求批准；不把完整历史反复塞给镜头任务。当前role是同一助手的专业职责，不是独立运行的子Agent。完成审核后调用compile(expectedRevision,ratio,resolution)编译制作计划，返回production.videoProjectId及specification。用该videoProjectId执行video_project prepare完成角色图路线，再展示制作脚本、真实分镜构图示意图与估价并review。分镜JSON/镜头列表不等于图：完整制作脚本在正文展示一次后，调用 video_project(action:"storyboard",captureScript:true,scriptPath)由插件免费本地绘图，使用返回markdown内嵌图片并附原图链接，再review；不要手写绘图代码或SVG，不擅自付费出图。不得把创作批准当费用授权。compile只读规划不产生付费调用；重复同版本同规格编译复用绑定。创作改稿后旧绑定禁止新增生成，已提交任务查询和交付仍可恢复。next/route返回execution_plan制作预规划；分镜应与真实生成段边界对齐。compile发现跨段截断镜头或同段多地点时拒绝并要求Storyboard重规划，不复制整条动作/台词到两段。project_spec锁定的画幅、清晰度和目标模型与制作不符时先修订并重审，不静默换参数。全片最长3600秒，按模型单段能力逐段生成、审核和续做，不承诺一次请求生成整片。`;
-var INTENT_GUIDANCE = `用户请求专业创作、改稿或核查时先理解语义再选择film_project(action:route,intent,entityIds)。意图枚举：develop_idea创意、write_script剧本、revise_dialogue对白、revise_story剧情、design_character/revise_character人物、design_scene/revise_scene场景、design_shots分镜、revise_camera镜头、revise_timing时长、write_prompts提示词、adapt_model模型适配、review审核、verify_facts事实核查、resume续作、produce制作、clarify澄清。局部修改传用户明确对象的稳定ID，目标不明先read定位再澄清，不能自行扩大scope。多个意图分别路由，先上游后下游；否定句、引用文字不作为执行指令。route只返回角色指令与状态，不写入或授权。needs_input先补条件，ready也不代表批准。新项目先完成需求并create，未创建时由总导演澄清，不编造projectId。每次只使用当前角色提示词；输出须遵守当前工具字段契约，专业规则不改变API。`;
-var PRODUCTION_STRATEGY_GUIDANCE = `production_strategy 默认 continuous_segments：按模型上限最少段数续拍。用户明确需要多地点独立镜头时，可展示 independent_shots 方案并经创意/剧本审核确认，再 configure_profile 保存；每镜4秒至模型上限整秒，独立生成、单独计费，无上一段视频输入，参考图控制人物一致性，默认直接剪辑不裁接缝。全局firstFrameUrl只用于首镜，lastFrameUrl只用于末镜；逐镜首尾帧用与shotDurations等长的shotFrames，空镜素材填{}；不能把首镜构图当各镜共同人物参考。补充素材仍需video_project审核。不得自动切换以绕过连续路线校验。终审后compile生成shotDurations和segmentPrompts，实际video_project审核与生成必须使用原编译内容。`;
+export返回JSON和Markdown内容，不是已写入导出文件；没有实际文件不得编造下载链接。Markdown应为同版本JSON的可读投影。实际视频仍须走video_project脚本审核、费用确认与逐段结果审核，创作批准不替代制作授权。`, ORCHESTRATION_GUIDANCE = '推进专业创作先调用film_project(action:next)，只加载返回的role、inputs与scope所需资料，再按许可动作提交或请求批准；不把完整历史反复塞给镜头任务。当前role是同一助手的专业职责，不是独立运行的子Agent。完成审核后调用compile(expectedRevision,ratio,resolution)编译制作计划，返回production.videoProjectId及specification。用该videoProjectId执行video_project prepare完成角色图路线，再展示制作脚本、真实分镜构图示意图与估价并review。分镜JSON/镜头列表不等于图：完整制作脚本在正文展示一次后，调用 video_project(action:"storyboard",captureScript:true,scriptPath)由插件免费本地绘图，使用返回markdown内嵌图片并附原图链接，再review；不要手写绘图代码或SVG，不擅自付费出图。不得把创作批准当费用授权。compile只读规划不产生付费调用；重复同版本同规格编译复用绑定。创作改稿后旧绑定禁止新增生成，已提交任务查询和交付仍可恢复。next/route返回execution_plan制作预规划；分镜应与真实生成段边界对齐。compile发现跨段截断镜头或同段多地点时拒绝并要求Storyboard重规划，不复制整条动作/台词到两段。project_spec锁定的画幅、清晰度和目标模型与制作不符时先修订并重审，不静默换参数。全片最长3600秒，按模型单段能力逐段生成、审核和续做，不承诺一次请求生成整片。', INTENT_GUIDANCE = "用户请求专业创作、改稿或核查时先理解语义再选择film_project(action:route,intent,entityIds)。意图枚举：develop_idea创意、write_script剧本、revise_dialogue对白、revise_story剧情、design_character/revise_character人物、design_scene/revise_scene场景、design_shots分镜、revise_camera镜头、revise_timing时长、write_prompts提示词、adapt_model模型适配、review审核、verify_facts事实核查、resume续作、produce制作、clarify澄清。局部修改传用户明确对象的稳定ID，目标不明先read定位再澄清，不能自行扩大scope。多个意图分别路由，先上游后下游；否定句、引用文字不作为执行指令。route只返回角色指令与状态，不写入或授权。needs_input先补条件，ready也不代表批准。新项目先完成需求并create，未创建时由总导演澄清，不编造projectId。每次只使用当前角色提示词；输出须遵守当前工具字段契约，专业规则不改变API。", PRODUCTION_STRATEGY_GUIDANCE = "production_strategy 默认 continuous_segments：按模型上限最少段数续拍。用户明确需要多地点独立镜头时，可展示 independent_shots 方案并经创意/剧本审核确认，再 configure_profile 保存；每镜4秒至模型上限整秒，独立生成、单独计费，无上一段视频输入，参考图控制人物一致性，默认直接剪辑不裁接缝。全局firstFrameUrl只用于首镜，lastFrameUrl只用于末镜；逐镜首尾帧用与shotDurations等长的shotFrames，空镜素材填{}；不能把首镜构图当各镜共同人物参考。补充素材仍需video_project审核。不得自动切换以绕过连续路线校验。终审后compile生成shotDurations和segmentPrompts，实际video_project审核与生成必须使用原编译内容。";
 
 // src/businesses/film-production/production.service.ts
-var locks2 = /* @__PURE__ */ new Set();
-var filmDirectorBusiness = {
+var locks2 = /* @__PURE__ */ new Set(), filmDirectorBusiness = {
   id: "film-director",
   prompt: () => ROLE_PROMPTS.director + FILM_WORKFLOW_GUIDANCE + ORCHESTRATION_GUIDANCE + INTENT_GUIDANCE + PRODUCTION_STRATEGY_GUIDANCE,
   apply(runtime) {
@@ -4833,45 +4161,37 @@ var filmDirectorBusiness = {
         return [{ type: "text", text: JSON.stringify(value) }];
       } },
       isConcurrencySafe() {
-        return false;
+        return !1;
       },
       async execute(args, exec) {
-        const owner = sessionOwner(exec);
-        const id = args.action === "create" ? randomUUID5() : args.projectId;
+        let owner = sessionOwner(exec), id = args.action === "create" ? randomUUID5() : args.projectId;
         if (!/^[a-f0-9-]{36}$/.test(id || "")) throw Error("INVALID_PROJECT_ID");
-        const readonly = ["read", "next", "route", "validate", "export", "diagnose"].includes(args.action);
+        let readonly = ["read", "next", "route", "validate", "export", "diagnose"].includes(args.action);
         if (!readonly && locks2.has(id)) throw Error("PROJECT_BUSY");
-        if (!readonly) locks2.add(id);
+        readonly || locks2.add(id);
         let release;
         try {
-          const dir = path9.join(dshHome(), DATA_DIR, "film-projects", owner, id);
-          const file = path9.join(dir, "project.json");
-          await mkdir6(dir, { recursive: true, mode: 448 });
-          if (args.action === "diagnose") return { lock: await inspectProjectLock(dir), instructions: "活跃锁不恢复；仅明确死亡的同机进程可recover_lock。read不取写锁，可读取最后完整提交。" };
+          let dir = path9.join(dshHome(), DATA_DIR, "film-projects", owner, id), file = path9.join(dir, "project.json");
+          if (await mkdir6(dir, { recursive: !0, mode: 448 }), args.action === "diagnose") return { lock: await inspectProjectLock(dir), instructions: "活跃锁不恢复；仅明确死亡的同机进程可recover_lock。read不取写锁，可读取最后完整提交。" };
           if (args.action === "recover_lock") return recoverProjectLock(dir);
-          if (!["read", "next", "route", "validate", "export"].includes(args.action)) release = await acquireProjectLock(dir);
+          ["read", "next", "route", "validate", "export"].includes(args.action) || (release = await acquireProjectLock(dir));
           let state;
           if (args.action === "create") {
             if (!Number.isInteger(args.durationSeconds) || args.durationSeconds < 15 || args.durationSeconds > 3600 || !args.title?.trim() || !args.sourceBrief?.trim()) throw Error("INVALID_REQUIREMENTS");
             state = { quality_policy: "evidence_v1", schema_version: "3.1.0", project_id: id, title: args.title, source_brief: args.sourceBrief, duration_ms: args.durationSeconds * 1e3, project_spec: createProjectSpec(args.title, args.sourceBrief, args.durationSeconds * 1e3, args.projectSpec ? JSON.parse(args.projectSpec) : { ...args.ratio ? { aspect_ratio: args.ratio } : {}, ...args.resolution ? { resolution: args.resolution } : {} }), revision: 0, status: "REQUIREMENT_ANALYSIS", artifacts: {}, approvals: {}, decisions: [] };
           } else state = JSON.parse(await readFile7(file, "utf8"));
-          const originalState = JSON.stringify(state);
-          const executionContext = () => {
+          let originalState = JSON.stringify(state), executionContext = () => {
             try {
-              let cursor = 0;
-              const independent = state.project_spec?.production_strategy === "independent_shots";
-              const segments = independent ? (state.artifacts.shots?.data.shots || []).map((s) => ({ kind: "generate", start_ms: s.start_ms, end_ms: s.end_ms, duration_ms: s.duration_ms })) : estimatePlan(runtime.config, "video_generate", { duration: state.duration_ms / 1e3 }).map((part) => {
-                const start = cursor;
-                cursor += part.seconds * 1e3;
-                return { kind: part.kind, start_ms: start, end_ms: cursor, duration_ms: part.seconds * 1e3 };
+              let cursor = 0, independent = state.project_spec?.production_strategy === "independent_shots", segments = independent ? (state.artifacts.shots?.data.shots || []).map((s) => ({ kind: "generate", start_ms: s.start_ms, end_ms: s.end_ms, duration_ms: s.duration_ms })) : estimatePlan(runtime.config, "video_generate", { duration: state.duration_ms / 1e3 }).map((part) => {
+                let start = cursor;
+                return cursor += part.seconds * 1e3, { kind: part.kind, start_ms: start, end_ms: cursor, duration_ms: part.seconds * 1e3 };
               });
               return { model_name: resolveModel(runtime.config), strategy: state.project_spec?.production_strategy || "continuous_segments", segments, instructions: independent ? "独立镜头：每镜独立生成与计费，每镜4秒至模型上限的整秒；可跨地点剪辑，不要求连续分段边界。人物一致性依赖参考图，未提交分镜时segments为空。" : "连续续拍预规划：分镜不得跨生成段截断动作与对白，同一生成段多地点需重新规划；这不是付费调用或画面效果验证。" };
             } catch {
               return { capability_status: "UNVERIFIED", instructions: "当前执行分段无法预规划；可继续创意与剧本，分镜提交前须确认实际制作模型和分段边界。" };
             }
-          };
-          const taskFor = () => {
-            const task = nextTask(state);
+          }, taskFor = () => {
+            let task = nextTask(state);
             return { ...task, ...task.model_profile ? { model_profile: videoCapabilities(state.project_spec?.target_model || resolveModel(runtime.config)) } : {}, execution_plan: executionContext() };
           };
           if (args.action === "read") {
@@ -4888,22 +4208,14 @@ var filmDirectorBusiness = {
           if (args.action === "next") return taskFor();
           if (args.action === "route") return { ...routeIntent(state, args.intent, args.entityIds), model_profile: videoCapabilities(state.project_spec?.target_model || resolveModel(runtime.config)), execution_plan: executionContext() };
           if (["revise", "schedule", "task_result", "verify_issue", "configure_profile"].includes(args.action) && state.revision !== args.expectedRevision) throw Error("REVISION_CONFLICT");
-          if (args.action === "configure_profile") state = configureProfile(state, JSON.parse(args.projectSpec), args.expectedRevision);
-          if (args.action === "revise") state = reviseEntities(state, args.stage, JSON.parse(args.content), args.expectedRevision);
-          if (args.action === "schedule") scheduleTask(state, taskFor());
-          if (args.action === "verify_issue") verifyIssue(state, args.issueId, JSON.parse(args.content));
-          if (args.action === "task_result") taskResult(state, args.taskKey, args.taskStatus, args.errorCode);
-          if (args.action === "compile") {
+          if (args.action === "configure_profile" && (state = configureProfile(state, JSON.parse(args.projectSpec), args.expectedRevision)), args.action === "revise" && (state = reviseEntities(state, args.stage, JSON.parse(args.content), args.expectedRevision)), args.action === "schedule" && scheduleTask(state, taskFor()), args.action === "verify_issue" && verifyIssue(state, args.issueId, JSON.parse(args.content)), args.action === "task_result" && taskResult(state, args.taskKey, args.taskStatus, args.errorCode), args.action === "compile") {
             if (state.revision !== args.expectedRevision) throw Error("REVISION_CONFLICT");
             if (state.project_spec?.target_model && state.project_spec.target_model !== "generic" && state.project_spec.target_model !== resolveModel(runtime.config)) throw Error("PROJECT_SPEC_MISMATCH:target_model。项目模型与当前制作配置不同；先 read 查看 execution_plan.model_name，再用 configure_profile 的 projectSpec.target_model 更新项目并重审模型相关材料；若要改实际调用模型，请到插件设置。不要填写占位文字或直接修改项目文件。");
-            const plan = compileProduction(state, estimatePlan(runtime.config, "video_generate", { duration: state.duration_ms / 1e3 }), args.ratio, args.resolution, videoCapabilities(resolveModel(runtime.config)));
+            let plan = compileProduction(state, estimatePlan(runtime.config, "video_generate", { duration: state.duration_ms / 1e3 }), args.ratio, args.resolution, videoCapabilities(resolveModel(runtime.config)));
             if (state.production?.source_revision === state.revision && state.production.model_name && state.production.model_name !== resolveModel(runtime.config)) throw Error("MODEL_CHANGED_RECOMPILE:请configure_profile明确当前target_model并重审模型相关材料。");
             if (!state.production || state.production.source_revision !== state.revision || state.production.ratio !== args.ratio || state.production.resolution !== args.resolution || !state.production.plan_digest) {
-              const project = await createProject(exec, state.artifacts.assets.data.characters.length ? "fixed_subject" : "scenery");
-              project.duration = state.duration_ms / 1e3;
-              project.filmSource = { path: file, revision: state.revision, plan_digest: productionDigest(plan.specification), model_name: resolveModel(runtime.config) };
-              await writeProject(project);
-              state.production = { ...plan, model_name: resolveModel(runtime.config), plan_digest: productionDigest(plan.specification), videoProjectId: project.id };
+              let project = await createProject(exec, state.artifacts.assets.data.characters.length ? "fixed_subject" : "scenery");
+              project.duration = state.duration_ms / 1e3, project.filmSource = { path: file, revision: state.revision, plan_digest: productionDigest(plan.specification), model_name: resolveModel(runtime.config) }, await writeProject(project), state.production = { ...plan, model_name: resolveModel(runtime.config), plan_digest: productionDigest(plan.specification), videoProjectId: project.id };
             }
           }
           if (args.action === "export") return { project: state, markdown: renderDeliverables(state), manifest: artifactManifest(state), status: state.status };
@@ -4913,44 +4225,40 @@ var filmDirectorBusiness = {
             try {
               state = commitArtifact(state, args.stage, JSON.parse(args.content), args.expectedRevision);
             } catch (error) {
-              const check = checkSubmission(state, args.stage, args.content);
-              if (!check.valid) throw Error(`${check.error_code}: ${check.issues.map((i) => `${i.path}：${i.message}`).join("；")}`);
-              throw error;
+              let check = checkSubmission(state, args.stage, args.content);
+              throw check.valid ? error : Error(`${check.error_code}: ${check.issues.map((i) => `${i.path}：${i.message}`).join("；")}`);
             }
           }
           if (args.action === "approve") {
-            const artifact = state.artifacts[args.stage];
+            let artifact = state.artifacts[args.stage];
             if (!["creative", "script"].includes(args.stage) || !artifact || artifact.stale || state.revision !== args.expectedRevision) throw Error("INVALID_APPROVAL_REVISION");
             if (state.approvals?.[args.stage] === artifact.revision) return projectResponse(state, taskFor(), args.responseMode || "compact");
             if (args.stage === "creative" && state.project_spec && Object.hasOwn(state.project_spec, "work_type") && !hasContentProfile(state.project_spec)) throw Error("WORK_TYPE_REQUIRED_BEFORE_APPROVAL");
-            const service = runtime.ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
+            let service = runtime.ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
             if (!service?.ask) return { status: "needs_input", reason: "人工确认服务不可用" };
-            const answer = await service.ask({ agent: exec.agent, signal: exec.signal, questions: [{ id: "film_approval", header: "创作审核", question: approvalPreview(args.stage, artifact), multiSelect: false, options: [{ label: "批准本版", description: "继续下一创作阶段" }, { label: "需要修改", description: "保留草稿并修改" }, { label: "拒绝当前方案", description: "停止当前创作流程，保留已有资料" }] }] });
-            const decision = answer?.answers?.find((a) => a.id === "film_approval");
+            let decision = (await service.ask({ agent: exec.agent, signal: exec.signal, questions: [{ id: "film_approval", header: "创作审核", question: approvalPreview(args.stage, artifact), multiSelect: !1, options: [{ label: "批准本版", description: "继续下一创作阶段" }, { label: "需要修改", description: "保留草稿并修改" }, { label: "拒绝当前方案", description: "停止当前创作流程，保留已有资料" }] }] }))?.answers?.find((a) => a.id === "film_approval");
             if (exec.signal?.aborted || decision?.custom || decision?.selected?.length !== 1 || !["批准本版", "需要修改", "拒绝当前方案"].includes(decision.selected[0])) return { status: "needs_input", projectId: id };
-            state = recordApprovalDecision(state, args.stage, { "批准本版": "APPROVED", "需要修改": "REVISE", "拒绝当前方案": "REJECTED" }[decision.selected[0]], args.expectedRevision);
+            state = recordApprovalDecision(state, args.stage, { 批准本版: "APPROVED", 需要修改: "REVISE", 拒绝当前方案: "REJECTED" }[decision.selected[0]], args.expectedRevision);
           }
           if (!["create", "submit", "approve", "compile", "revise", "schedule", "task_result", "verify_issue", "configure_profile"].includes(args.action)) throw Error("INVALID_ACTION");
           if (args.action !== "create" && originalState === JSON.stringify(state)) return projectResponse(state, taskFor(), args.responseMode || "compact");
-          await mkdir6(path9.join(dir, "snapshots"), { recursive: true, mode: 448 });
-          const body = JSON.stringify(state, null, 2);
+          await mkdir6(path9.join(dir, "snapshots"), { recursive: !0, mode: 448 });
+          let body = JSON.stringify(state, null, 2);
           await writeFile4(path9.join(dir, "snapshots", `${state.revision}-${randomUUID5()}.json`), body, { mode: 384, flag: "wx" });
-          const temp = path9.join(dir, `${randomUUID5()}.tmp`);
+          let temp = path9.join(dir, `${randomUUID5()}.tmp`);
           try {
-            await writeFile4(temp, body, { mode: 384, flag: "wx" });
-            await rename5(temp, file);
+            await writeFile4(temp, body, { mode: 384, flag: "wx" }), await rename5(temp, file);
           } finally {
-            await rm5(temp, { force: true }).catch(() => {
+            await rm5(temp, { force: !0 }).catch(() => {
             });
           }
-          await pruneProjectSnapshots(dir, state).catch(() => {
-          });
-          return projectResponse(state, taskFor(), args.responseMode || "compact", { sha256: createHash4("sha256").update(body).digest("hex") });
+          return await pruneProjectSnapshots(dir, state).catch(() => {
+          }), projectResponse(state, taskFor(), args.responseMode || "compact", { sha256: createHash4("sha256").update(body).digest("hex") });
         } finally {
           try {
-            if (release) await release();
+            release && await release();
           } finally {
-            if (!readonly) locks2.delete(id);
+            readonly || locks2.delete(id);
           }
         }
       }
@@ -4970,31 +4278,21 @@ function assertMigrationActive(options) {
   if (options.signal?.aborted) throw new BundleInventoryError("aborted");
 }
 function readBundleInventory(manager, options = {}) {
-  assertMigrationActive(options);
-  return new Promise((resolve3, reject) => {
-    let settled = false;
-    const finish = (error, rows) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      options.signal?.removeEventListener("abort", abort);
-      error ? reject(error) : resolve3(rows);
-    };
-    const abort = () => finish(new BundleInventoryError("aborted"));
-    const timer = setTimeout(() => finish(new BundleInventoryError("timeout")), options.timeoutMs ?? 8e3);
-    options.signal?.addEventListener("abort", abort, { once: true });
+  return assertMigrationActive(options), new Promise((resolve3, reject) => {
+    let settled = !1, finish = (error, rows) => {
+      settled || (settled = !0, clearTimeout(timer), options.signal?.removeEventListener("abort", abort), error ? reject(error) : resolve3(rows));
+    }, abort = () => finish(new BundleInventoryError("aborted")), timer = setTimeout(() => finish(new BundleInventoryError("timeout")), options.timeoutMs ?? 8e3);
+    options.signal?.addEventListener("abort", abort, { once: !0 });
     let request;
     try {
-      assertMigrationActive(options);
-      request = manager.listBundles();
+      assertMigrationActive(options), request = manager.listBundles();
     } catch {
       finish(new BundleInventoryError(options.signal?.aborted ? "aborted" : "unavailable"));
       return;
     }
     Promise.resolve(request).then((result) => {
-      const rows = Array.isArray(result) ? result : result?.ok === true ? result.value : null;
-      if (!Array.isArray(rows)) finish(new BundleInventoryError("unavailable"));
-      else finish(void 0, rows);
+      let rows = Array.isArray(result) ? result : result?.ok === !0 ? result.value : null;
+      Array.isArray(rows) ? finish(void 0, rows) : finish(new BundleInventoryError("unavailable"));
     }, () => finish(new BundleInventoryError(options.signal?.aborted ? "aborted" : "unavailable")));
   });
 }
@@ -5002,7 +4300,7 @@ function readBundleInventory(manager, options = {}) {
 // src/platform/migration/bundle-identity.ts
 init_plugin();
 function hasLegacyBundleConflict(rows) {
-  return rows.some((row) => row.name === PLUGIN_ID && row.installed === true && row.enabled === true) && rows.some((row) => row.name === PLUGIN_PACKAGE && row.installed === true && row.enabled === true);
+  return rows.some((row) => row.name === PLUGIN_ID && row.installed === !0 && row.enabled === !0) && rows.some((row) => row.name === PLUGIN_PACKAGE && row.installed === !0 && row.enabled === !0);
 }
 
 // src/platform/migration/bundle-host.ts
@@ -5012,24 +4310,18 @@ function mountBundleAwareHost(ctx, mount2, options = {}) {
     manager = ctx.get?.("pluginManager");
   } catch {
   }
-  if (!manager || typeof manager.listBundles !== "function") return mount2();
-  const abort = new AbortController();
-  let alive = true, mounted = false, dispose, timer;
-  let delay = options.retryMs ?? 1e3, diagnostic = "";
-  const report = (code) => {
+  if (!manager || typeof manager.listBundles != "function") return mount2();
+  let abort = new AbortController(), alive = !0, mounted = !1, dispose, timer, delay = options.retryMs ?? 1e3, diagnostic = "", report = (code) => {
     if (!alive || diagnostic === code) return;
     diagnostic = code;
-    const message = code === "conflict" ? "检测到新旧视频插件同时启用，请在新版设置中完成迁移；等待期间不会重复注册工具。" : code === "timeout" ? "视频插件安装状态查询超时，正在退避重试；可在新版设置中重新检查。" : "视频插件安装状态暂不可用，正在退避重试；请检查宿主插件管理服务。";
+    let message = code === "conflict" ? "检测到新旧视频插件同时启用，请在新版设置中完成迁移；等待期间不会重复注册工具。" : code === "timeout" ? "视频插件安装状态查询超时，正在退避重试；可在新版设置中重新检查。" : "视频插件安装状态暂不可用，正在退避重试；请检查宿主插件管理服务。";
     ctx.logger?.warn?.(message);
-  };
-  const check = async () => {
+  }, check = async () => {
     try {
-      const rows = await readBundleInventory(manager, { signal: abort.signal, timeoutMs: options.timeoutMs });
+      let rows = await readBundleInventory(manager, { signal: abort.signal, timeoutMs: options.timeoutMs });
       if (!alive) return;
       if (!hasLegacyBundleConflict(rows)) {
-        mounted = true;
-        dispose = mount2();
-        if (diagnostic) ctx.logger?.info?.("视频插件安装状态已恢复，新版工具已加载。");
+        mounted = !0, dispose = mount2(), diagnostic && ctx.logger?.info?.("视频插件安装状态已恢复，新版工具已加载。");
         return;
       }
       report("conflict");
@@ -5041,48 +4333,38 @@ function mountBundleAwareHost(ctx, mount2, options = {}) {
       }
       report(error instanceof BundleInventoryError ? error.code : "unavailable");
     }
-    if (alive) {
-      timer = setTimeout(check, delay);
-      timer.unref?.();
-      delay = Math.min(delay * 2, options.maxRetryMs ?? 3e4);
-    }
+    alive && (timer = setTimeout(check, delay), timer.unref?.(), delay = Math.min(delay * 2, options.maxRetryMs ?? 3e4));
   };
-  void check();
-  return () => {
-    alive = false;
-    abort.abort();
-    if (timer) clearTimeout(timer);
-    dispose?.();
+  return check(), () => {
+    alive = !1, abort.abort(), timer && clearTimeout(timer), dispose?.();
   };
 }
 
 // src/app/registry/agent.registry.ts
 function selectedAgentId(context, ctx) {
-  const agent = context?.agent;
-  const session = agent?.session;
+  let agent = context?.agent, session = agent?.session;
   if (!session) return null;
-  for (const owner of [agent?.ctx, ctx]) {
+  for (let owner of [agent?.ctx, ctx])
     try {
-      const registry2 = owner?.get?.("agentPresets");
-      if (typeof registry2?.presetForSession === "function") return registry2.presetForSession(session) ?? null;
+      let registry2 = owner?.get?.("agentPresets");
+      if (typeof registry2?.presetForSession == "function") return registry2.presetForSession(session) ?? null;
     } catch {
       return null;
     }
-  }
   return session.header?.agentPreset ?? null;
 }
 function createAgentRegistry(definitions) {
-  const agents2 = /* @__PURE__ */ new Map();
-  for (const definition of definitions) {
+  let agents2 = /* @__PURE__ */ new Map();
+  for (let definition of definitions) {
     if (!definition.id || agents2.has(definition.id)) throw new Error(`重复或无效的 Agent：${definition.id}`);
     agents2.set(definition.id, Object.freeze({ ...definition, businesses: Object.freeze([...definition.businesses]), skills: Object.freeze([...definition.skills]) }));
   }
-  const resolve3 = (context, ctx) => agents2.get(selectedAgentId(context, ctx)) ?? null;
+  let resolve3 = (context, ctx) => agents2.get(selectedAgentId(context, ctx)) ?? null;
   return Object.freeze({
     list: () => [...agents2.values()],
     get: (id) => agents2.get(id) ?? null,
     resolve: resolve3,
-    hasBusiness: (context, ctx, business) => resolve3(context, ctx)?.businesses.includes(business) ?? false
+    hasBusiness: (context, ctx, business) => resolve3(context, ctx)?.businesses.includes(business) ?? !1
   });
 }
 var active = /* @__PURE__ */ new WeakMap();
@@ -5090,14 +4372,10 @@ function registryForContext(ctx, fallback) {
   return ctx && active.get(ctx)?.at(-1)?.registry || fallback;
 }
 function bindAgentRegistry(ctx, registry2) {
-  const stack = active.get(ctx) || [];
-  const entry2 = { registry: registry2 };
-  stack.push(entry2);
-  active.set(ctx, stack);
-  return () => {
-    const index = stack.indexOf(entry2);
-    if (index >= 0) stack.splice(index, 1);
-    if (!stack.length && active.get(ctx) === stack) active.delete(ctx);
+  let stack = active.get(ctx) || [], entry2 = { registry: registry2 };
+  return stack.push(entry2), active.set(ctx, stack), () => {
+    let index = stack.indexOf(entry2);
+    index >= 0 && stack.splice(index, 1), !stack.length && active.get(ctx) === stack && active.delete(ctx);
   };
 }
 
@@ -5110,60 +4388,51 @@ init_version();
 init_value();
 init_plugin();
 init_plugin();
-var STATE = /* @__PURE__ */ Symbol.for(`${PLUGIN_ID}.analytics.process`);
-var EVENTS = /* @__PURE__ */ new Set(["plugin_started", "tool_started", "tool_finished", "video_task_created", "video_task_finished"]);
-var TOOLS = /* @__PURE__ */ new Set(["video_generate", "video_extend", "video_status", "video_project", "video_prepare_image", "video_estimate", "video_config", "video_setup", "video_stage", "media_submission", "video_canvas", "video_hyperframes"]);
-var STATUSES = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled", "unknown", "timeout", "approved", "pending", "paused", "prepared", "draft", "blocked", "review_required", "submission_unknown", "ok"]);
-var ERRORS = /* @__PURE__ */ new Set(["provider_auth", "provider_failed", "provider_network_error", "provider_rate_limited", "provider_quota_exceeded", "provider_price_config_error", "provider_bad_response", "content_rejected", "real_person_rejected", "submission_unknown", "waiting_stopped", "ABORTED"]);
+var STATE = /* @__PURE__ */ Symbol.for(`${PLUGIN_ID}.analytics.process`), EVENTS = /* @__PURE__ */ new Set(["plugin_started", "tool_started", "tool_finished", "video_task_created", "video_task_finished"]), TOOLS = /* @__PURE__ */ new Set(["video_generate", "video_extend", "video_status", "video_project", "video_prepare_image", "video_estimate", "video_config", "video_setup", "video_stage", "media_submission", "video_canvas", "video_hyperframes"]), STATUSES = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled", "unknown", "timeout", "approved", "pending", "paused", "prepared", "draft", "blocked", "review_required", "submission_unknown", "ok"]), ERRORS = /* @__PURE__ */ new Set(["provider_auth", "provider_failed", "provider_network_error", "provider_rate_limited", "provider_quota_exceeded", "provider_price_config_error", "provider_bad_response", "content_rejected", "real_person_rejected", "submission_unknown", "waiting_stopped", "ABORTED"]);
 function processState() {
-  const owner = globalThis;
+  let owner = globalThis;
   return owner[STATE] ||= { identities: /* @__PURE__ */ new Map(), started: /* @__PURE__ */ new Set() };
 }
 function identityFiles() {
-  const dir = path10.join(dshHome(), "state", DATA_DIR);
+  let dir = path10.join(dshHome(), "state", DATA_DIR);
   return { dir, files: [path10.join(dir, "analytics-id.json"), path10.join(dir, "analytics-anchor.json")] };
 }
 async function analyticsIdentity() {
-  const { dir, files } = identityFiles();
-  const state = processState();
-  if (!state.identities.has(dir)) state.identities.set(dir, (async () => {
-    const parse = (raw) => {
+  let { dir, files } = identityFiles(), state = processState();
+  return state.identities.has(dir) || state.identities.set(dir, (async () => {
+    let parse = (raw) => {
       try {
-        const id = JSON.parse(raw).installationId;
+        let id = JSON.parse(raw).installationId;
         return /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id) ? id : null;
       } catch {
         return null;
       }
     };
-    await mkdir7(dir, { recursive: true, mode: 448 });
+    await mkdir7(dir, { recursive: !0, mode: 448 });
     let release;
-    for (let attempt = 0; attempt < 40; attempt++) {
+    for (let attempt = 0; attempt < 40; attempt++)
       try {
-        release = await acquireFileLock(path10.join(dir, "analytics-identity.lock"), { recoverDead: true });
+        release = await acquireFileLock(path10.join(dir, "analytics-identity.lock"), { recoverDead: !0 });
         break;
       } catch (error) {
-        if (error?.code !== "EEXIST" && !/^(?:PROJECT_LOCKED|LOCK_RECOVERY_UNSAFE|RECOVERY_LOCK_UNSAFE):/.test(String(error?.message || ""))) throw error;
-        if (attempt === 39) throw error;
+        if (error?.code !== "EEXIST" && !/^(?:PROJECT_LOCKED|LOCK_RECOVERY_UNSAFE|RECOVERY_LOCK_UNSAFE):/.test(String(error?.message || "")) || attempt === 39) throw error;
         await new Promise((resolve3) => setTimeout(resolve3, 25));
       }
-    }
     try {
-      const present = [];
-      for (const file of files) {
+      let present = [];
+      for (let file of files)
         try {
           present.push(parse(await readFile8(file, "utf8")));
         } catch (error) {
           if (error?.code !== "ENOENT") throw error;
           present.push(null);
         }
-      }
-      const id = present[0] || present[1] || randomUUID6();
-      for (const [index, file] of files.entries()) {
+      let id = present[0] || present[1] || randomUUID6();
+      for (let [index, file] of files.entries()) {
         if (present[index] === id) continue;
-        const temporary = `${file}.${randomUUID6()}.tmp`;
+        let temporary = `${file}.${randomUUID6()}.tmp`;
         try {
-          await writeFile5(temporary, JSON.stringify({ installationId: id }), { mode: 384, flag: "wx" });
-          await rename6(temporary, file);
+          await writeFile5(temporary, JSON.stringify({ installationId: id }), { mode: 384, flag: "wx" }), await rename6(temporary, file);
         } finally {
           await unlink4(temporary).catch(() => {
           });
@@ -5173,20 +4442,11 @@ async function analyticsIdentity() {
     } finally {
       await release?.();
     }
-  })().catch(() => {
-    state.identities.delete(dir);
-    return null;
-  }));
-  return state.identities.get(dir);
+  })().catch(() => (state.identities.delete(dir), null))), state.identities.get(dir);
 }
 function analyticsFields(input = {}) {
-  const value = {};
-  if (TOOLS.has(input.tool)) value.tool = input.tool;
-  if (["video-director", "promo-video", "standard"].includes(input.mode)) value.mode = input.mode;
-  if (STATUSES.has(input.status)) value.status = input.status;
-  if (typeof input.durationMs === "number" && Number.isFinite(input.durationMs)) value.durationMs = Math.round(Math.max(0, Math.min(864e5, input.durationMs)));
-  if (typeof input.errorCode === "string") value.errorCode = ERRORS.has(input.errorCode) ? input.errorCode : "other";
-  return value;
+  let value = {};
+  return TOOLS.has(input.tool) && (value.tool = input.tool), ["video-director", "promo-video", "standard"].includes(input.mode) && (value.mode = input.mode), STATUSES.has(input.status) && (value.status = input.status), typeof input.durationMs == "number" && Number.isFinite(input.durationMs) && (value.durationMs = Math.round(Math.max(0, Math.min(864e5, input.durationMs)))), typeof input.errorCode == "string" && (value.errorCode = ERRORS.has(input.errorCode) ? input.errorCode : "other"), value;
 }
 function deviceText(value, allowSpace) {
   return String(value ?? "").replace(allowSpace ? /[^a-zA-Z0-9.+_ -]/g : /[^a-zA-Z0-9.+_-]/g, "").slice(0, 64) || "unknown";
@@ -5195,40 +4455,27 @@ function isReleaseVersion(version) {
   return /^\d+\.\d+\.\d+$/.test(String(version ?? "").trim().replace(/^v/i, ""));
 }
 function createAnalyticsReporter(config, options = {}) {
-  const releaseBuild = options.releaseBuild || (() => isReleaseVersion(PLUGIN_VERSION));
-  if (!releaseBuild()) return { record() {
+  if (!(options.releaseBuild || (() => isReleaseVersion(PLUGIN_VERSION)))()) return { record() {
   }, start() {
   }, dispose() {
   }, flush: async () => {
   }, pending: () => 0 };
-  const enabled = options.enabled || (() => process.env.METAONTIC_VIDEO_ANALYTICS_DISABLED !== "1" && ref(config, "usageStatsEnabled", true) !== false);
-  const request = options.request || ((...args) => globalThis.fetch(...args));
-  const identity = options.identity || analyticsIdentity;
-  const device = options.device || (() => ({
+  let enabled = options.enabled || (() => process.env.METAONTIC_VIDEO_ANALYTICS_DISABLED !== "1" && ref(config, "usageStatsEnabled", !0) !== !1), request = options.request || ((...args) => globalThis.fetch(...args)), identity = options.identity || analyticsIdentity, device = options.device || (() => ({
     arch: ["arm64", "x64", "ia32", "arm"].includes(os4.arch()) ? os4.arch() : "other",
-    osRelease: deviceText(os4.release(), true),
+    osRelease: deviceText(os4.release(), !0),
     memoryGb: Math.max(1, Math.min(4096, Math.round(os4.totalmem() / 1024 ** 3))),
-    harnessVersion: deviceText(process.env.DSH_CLIENT_VERSION || process.env.DSH_APP_VERSION, false)
-  }));
-  const delay = options.delayMs ?? 1e3;
-  const timeout = options.timeoutMs ?? 1500;
-  const maxQueue = options.maxQueue ?? 200;
-  let queue2 = [], timer, controller = null;
-  let disposed = false, sending = false;
-  const allowed = () => {
+    harnessVersion: deviceText(process.env.DSH_CLIENT_VERSION || process.env.DSH_APP_VERSION, !1)
+  })), delay = options.delayMs ?? 1e3, timeout = options.timeoutMs ?? 1500, maxQueue = options.maxQueue ?? 200, queue2 = [], timer, controller = null, disposed = !1, sending = !1, allowed = () => {
     try {
       return !disposed && enabled();
     } catch {
-      return false;
+      return !1;
     }
   };
   function schedule(ms = delay) {
-    if (!allowed() || timer || sending || !queue2.length) return;
-    timer = setTimeout(() => {
-      timer = null;
-      void flush();
-    }, ms);
-    timer.unref?.();
+    !allowed() || timer || sending || !queue2.length || (timer = setTimeout(() => {
+      timer = null, flush();
+    }, ms), timer.unref?.());
   }
   async function flush() {
     if (!allowed()) {
@@ -5236,21 +4483,17 @@ function createAnalyticsReporter(config, options = {}) {
       return;
     }
     if (sending || !queue2.length) return;
-    sending = true;
-    const batch = queue2.splice(0, 20);
-    let watchdog;
+    sending = !0;
+    let batch = queue2.splice(0, 20), watchdog;
     try {
-      const installationId = await identity();
+      let installationId = await identity();
       if (!installationId || !allowed()) return;
       controller = new AbortController();
-      const abort = new Promise((_, reject) => {
+      let abort = new Promise((_, reject) => {
         watchdog = setTimeout(() => {
-          controller?.abort();
-          reject(new Error("analytics timeout"));
-        }, timeout);
-        watchdog.unref?.();
-      });
-      const response = await Promise.race([Promise.resolve().then(() => request(ANALYTICS_URL, {
+          controller?.abort(), reject(new Error("analytics timeout"));
+        }, timeout), watchdog.unref?.();
+      }), response = await Promise.race([Promise.resolve().then(() => request(ANALYTICS_URL, {
         method: "POST",
         redirect: "error",
         credentials: "omit",
@@ -5259,21 +4502,15 @@ function createAnalyticsReporter(config, options = {}) {
         body: JSON.stringify({ installationId, device: device(), events: batch.map(({ attempts, ...event }) => event) })
       })), abort]);
       try {
-        void response?.body?.cancel()?.catch(() => {
+        response?.body?.cancel()?.catch(() => {
         });
       } catch {
       }
       if (!response?.ok) throw new Error("analytics rejected");
     } catch {
-      if (allowed()) {
-        const retry = batch.map((event) => ({ ...event, attempts: event.attempts + 1 })).filter((event) => event.attempts < 3);
-        queue2 = [...retry, ...queue2].slice(-maxQueue);
-      }
+      allowed() && (queue2 = [...batch.map((event) => ({ ...event, attempts: event.attempts + 1 })).filter((event) => event.attempts < 3), ...queue2].slice(-maxQueue));
     } finally {
-      clearTimeout(watchdog);
-      controller = null;
-      sending = false;
-      if (allowed() && queue2.length) schedule(queue2[0].attempts ? Math.min(3e4, 1e3 * 5 ** queue2[0].attempts) : delay);
+      clearTimeout(watchdog), controller = null, sending = !1, allowed() && queue2.length && schedule(queue2[0].attempts ? Math.min(3e4, 1e3 * 5 ** queue2[0].attempts) : delay);
     }
   }
   function record(name, input = {}, dedupeKey = "") {
@@ -5283,9 +4520,9 @@ function createAnalyticsReporter(config, options = {}) {
         return;
       }
       if (!EVENTS.has(name)) return;
-      const fields2 = analyticsFields(input);
+      let fields2 = analyticsFields(input);
       if (name !== "plugin_started" && !fields2.tool) return;
-      const event = {
+      let event = {
         eventId: randomUUID6(),
         name,
         occurredAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -5294,39 +4531,23 @@ function createAnalyticsReporter(config, options = {}) {
         ...fields2,
         attempts: 0
       };
-      if (dedupeKey) {
-        void Promise.resolve().then(() => identity()).then((id) => {
-          if (!id || !allowed()) return;
-          event.eventId = createHash5("sha256").update(`${id}:${name}:${dedupeKey}`).digest("hex");
-          queue2.push(event);
-          queue2 = queue2.slice(-maxQueue);
-          schedule();
-        }).catch(() => {
-        });
-      } else {
-        queue2.push(event);
-        queue2 = queue2.slice(-maxQueue);
-        schedule();
-      }
+      dedupeKey ? Promise.resolve().then(() => identity()).then((id) => {
+        !id || !allowed() || (event.eventId = createHash5("sha256").update(`${id}:${name}:${dedupeKey}`).digest("hex"), queue2.push(event), queue2 = queue2.slice(-maxQueue), schedule());
+      }).catch(() => {
+      }) : (queue2.push(event), queue2 = queue2.slice(-maxQueue), schedule());
     } catch {
     }
   }
   function start() {
-    void Promise.resolve().then(() => allowed() ? identity() : null).then((id) => {
+    Promise.resolve().then(() => allowed() ? identity() : null).then((id) => {
       if (!id || !allowed()) return;
-      const starts = options.started || processState().started;
-      if (!starts.has(id)) {
-        starts.add(id);
-        record("plugin_started");
-      }
+      let starts = options.started || processState().started;
+      starts.has(id) || (starts.add(id), record("plugin_started"));
     }).catch(() => {
     });
   }
   function dispose() {
-    disposed = true;
-    queue2 = [];
-    clearTimeout(timer);
-    controller?.abort();
+    disposed = !0, queue2 = [], clearTimeout(timer), controller?.abort();
   }
   return { record, start, dispose, flush, pending: () => queue2.length };
 }
@@ -5338,8 +4559,7 @@ function reportUsage(exec, name, fields2, key = "") {
 }
 function withUsageAnalytics(tool, reporter, mode = (_exec) => "standard") {
   return { ...tool, async execute(args, exec) {
-    const started = Date.now();
-    let selected = "standard";
+    let started = Date.now(), selected = "standard";
     try {
       selected = mode(exec);
     } catch {
@@ -5349,7 +4569,7 @@ function withUsageAnalytics(tool, reporter, mode = (_exec) => "standard") {
     } catch {
     }
     try {
-      const result = await tool.execute(args, { ...exec, name: tool.name, metaonticAnalytics: reporter, metaonticMode: selected });
+      let result = await tool.execute(args, { ...exec, name: tool.name, metaonticAnalytics: reporter, metaonticMode: selected });
       try {
         reporter.record("tool_finished", { tool: tool.name, mode: selected, status: result?.status || "ok", durationMs: Date.now() - started, errorCode: result?.errorCode });
       } catch {
@@ -5368,19 +4588,18 @@ function withUsageAnalytics(tool, reporter, mode = (_exec) => "standard") {
 // src/platform/dsh/tool.adapter.ts
 function createToolRegistry(ctx, agents2, analytics, defer = () => {
 }) {
-  const owners = /* @__PURE__ */ new Map();
+  let owners = /* @__PURE__ */ new Map();
   function allowed(business, exec) {
-    const agent = agents2.resolve({ agent: exec?.agent }, ctx);
+    let agent = agents2.resolve({ agent: exec?.agent }, ctx);
     return !agent || agent.businesses.includes(business);
   }
   function register(business, tool, registrationContext = ctx) {
     if (owners.has(tool.name)) throw new Error(`工具名称重复：${tool.name}`);
     owners.set(tool.name, business);
-    const guarded = { ...tool, async execute(args, exec) {
+    let guarded = { ...tool, async execute(args, exec) {
       if (!allowed(business, exec)) throw new Error("当前助手未启用此业务，请切换到对应助手后重试。");
       return tool.execute(args, exec);
-    } };
-    let dispose;
+    } }, dispose;
     try {
       dispose = registrationContext.tools.register(withStageTiming(withUsageAnalytics(
         guarded,
@@ -5388,18 +4607,12 @@ function createToolRegistry(ctx, agents2, analytics, defer = () => {
         (exec) => agents2.resolve({ agent: exec?.agent }, ctx)?.id || "standard"
       )));
     } catch (error) {
-      owners.delete(tool.name);
-      throw error;
+      throw owners.delete(tool.name), error;
     }
-    let disposed = false;
-    const cleanup = () => {
-      if (disposed) return;
-      disposed = true;
-      owners.delete(tool.name);
-      if (typeof dispose === "function") dispose();
+    let disposed = !1, cleanup = () => {
+      disposed || (disposed = !0, owners.delete(tool.name), typeof dispose == "function" && dispose());
     };
-    defer(cleanup);
-    return cleanup;
+    return defer(cleanup), cleanup;
   }
   return { register, allowed, owner: (name) => owners.get(name) };
 }
@@ -5412,24 +4625,19 @@ init_plugin();
 import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path11 from "node:path";
 import { fileURLToPath } from "node:url";
-var PACKAGE_NAMES = /* @__PURE__ */ new Set([PLUGIN_PACKAGE, PLUGIN_ID]);
-var LOCKFILE = "pnpm-lock.yaml";
-var RELEASE_HOSTS = [GITEE, GITHUB].map(({ web }) => web.replace(/^https?:\/\//, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-var RELEASE_URL = new RegExp(`^https?://(?:${RELEASE_HOSTS.join("|")})/releases/download/`, "i");
-var SHA = /^sha\d+-[A-Za-z0-9+/=]+$/;
-var indentOf = (line) => line.length - line.trimStart().length;
+var PACKAGE_NAMES = /* @__PURE__ */ new Set([PLUGIN_PACKAGE, PLUGIN_ID]), LOCKFILE = "pnpm-lock.yaml", RELEASE_HOSTS = [GITEE, GITHUB].map(({ web }) => web.replace(/^https?:\/\//, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), RELEASE_URL = new RegExp(`^https?://(?:${RELEASE_HOSTS.join("|")})/releases/download/`, "i"), SHA = /^sha\d+-[A-Za-z0-9+/=]+$/, indentOf = (line) => line.length - line.trimStart().length;
 function integrityOf(block) {
-  const match = /integrity:\s*([^,\s}]+)/.exec(block);
+  let match = /integrity:\s*([^,\s}]+)/.exec(block);
   return match ? match[1] : "";
 }
 function remoteEntry(line) {
-  const match = /^ {2}(\S+)@(https?:\/\/\S+?):(?:\s.*)?$/.exec(line);
+  let match = /^ {2}(\S+)@(https?:\/\/\S+?):(?:\s.*)?$/.exec(line);
   return match ? { name: match[1], url: match[2] } : null;
 }
 function blockEnd(lines, start, indent) {
   let end = start + 1;
-  while (end < lines.length) {
-    const line = lines[end];
+  for (; end < lines.length; ) {
+    let line = lines[end];
     if (!line.trim()) {
       end += 1;
       continue;
@@ -5440,37 +4648,30 @@ function blockEnd(lines, start, indent) {
   return end;
 }
 function stripUnverifiableEntries(text) {
-  const newline = text.includes("\r\n") ? "\r\n" : "\n";
-  const lines = text.split(/\r?\n/);
-  const ours = /* @__PURE__ */ new Set();
-  const verified = /* @__PURE__ */ new Set();
+  let newline = text.includes(`\r
+`) ? `\r
+` : `
+`, lines = text.split(/\r?\n/), ours = /* @__PURE__ */ new Set(), verified = /* @__PURE__ */ new Set();
   for (let index = 0; index < lines.length; index += 1) {
-    const entry2 = remoteEntry(lines[index]);
+    let entry2 = remoteEntry(lines[index]);
     if (!entry2 || !PACKAGE_NAMES.has(entry2.name)) continue;
-    const end = blockEnd(lines, index, 2);
-    const block = lines.slice(index, end).join("\n");
-    if (!RELEASE_URL.test(entry2.url) && !/tarball:\s*https?:\/\//.test(block)) continue;
-    ours.add(entry2.name + "@" + entry2.url);
-    if (SHA.test(integrityOf(block))) verified.add(entry2.name + "@" + entry2.url);
+    let end = blockEnd(lines, index, 2), block = lines.slice(index, end).join(`
+`);
+    !RELEASE_URL.test(entry2.url) && !/tarball:\s*https?:\/\//.test(block) || (ours.add(entry2.name + "@" + entry2.url), SHA.test(integrityOf(block)) && verified.add(entry2.name + "@" + entry2.url));
   }
-  const poisoned = new Set([...ours].filter((url) => !verified.has(url)));
+  let poisoned = new Set([...ours].filter((url) => !verified.has(url)));
   if (!poisoned.size) return { text, removed: [] };
-  const removed = /* @__PURE__ */ new Set();
+  let removed = /* @__PURE__ */ new Set();
   for (let index = 0; index < lines.length; index += 1) {
-    const entry2 = remoteEntry(lines[index]);
+    let entry2 = remoteEntry(lines[index]);
     if (!entry2 || !PACKAGE_NAMES.has(entry2.name) || !poisoned.has(entry2.name + "@" + entry2.url)) continue;
-    const end = blockEnd(lines, index, 2);
-    removed.add(entry2.name + "@" + entry2.url);
-    lines.splice(index, end - index);
-    index -= 1;
+    let end = blockEnd(lines, index, 2);
+    removed.add(entry2.name + "@" + entry2.url), lines.splice(index, end - index), index -= 1;
   }
   for (let index = 0; index < lines.length; index += 1) {
     if (!/^ {6}(?:dsh-)?metaontic-video:\s*$/.test(lines[index])) continue;
-    const specifier = (/^\s+specifier:\s*(\S+)\s*$/.exec(lines[index + 1] || "") || [])[1] || (/^\s+version:\s*(\S+)\s*$/.exec(lines[index + 2] || "") || [])[1] || "";
-    const dependencyName = lines[index].trim().slice(0, -1);
-    if (!poisoned.has(dependencyName + "@" + specifier)) continue;
-    lines.splice(index, blockEnd(lines, index, 6) - index);
-    index -= 1;
+    let specifier = (/^\s+specifier:\s*(\S+)\s*$/.exec(lines[index + 1] || "") || [])[1] || (/^\s+version:\s*(\S+)\s*$/.exec(lines[index + 2] || "") || [])[1] || "", dependencyName = lines[index].trim().slice(0, -1);
+    poisoned.has(dependencyName + "@" + specifier) && (lines.splice(index, blockEnd(lines, index, 6) - index), index -= 1);
   }
   return { text: lines.join(newline), removed: [...removed] };
 }
@@ -5488,61 +4689,51 @@ function repairLockfileAt(lockfile, log = () => {
   } catch {
     return { status: "unavailable" };
   }
-  const { text, removed } = stripUnverifiableEntries(before);
+  let { text, removed } = stripUnverifiableEntries(before);
   if (!removed.length) return { status: "clean", lockfile };
-  const backup = lockfile + ".metaontic-backup-" + (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-  const temporary = lockfile + ".metaontic-" + process.pid + ".tmp";
+  let backup = lockfile + ".metaontic-backup-" + (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-"), temporary = lockfile + ".metaontic-" + process.pid + ".tmp";
   try {
-    writeFileSync(backup, before);
-    writeFileSync(temporary, text);
-    renameSync(temporary, lockfile);
+    writeFileSync(backup, before), writeFileSync(temporary, text), renameSync(temporary, lockfile);
   } catch (error) {
     try {
-      if (existsSync(temporary)) unlinkSync(temporary);
+      existsSync(temporary) && unlinkSync(temporary);
     } catch {
     }
     return { status: "failed", message: error && error.message || String(error) };
   }
-  log("已清理 " + removed.length + " 条缺少 integrity 的锁文件记录（" + removed.join("、") + "），备份在 " + path11.basename(backup) + "；之后可以在线更新。");
-  return { status: "repaired", lockfile, backup, removed };
+  return log("已清理 " + removed.length + " 条缺少 integrity 的锁文件记录（" + removed.join("、") + "），备份在 " + path11.basename(backup) + "；之后可以在线更新。"), { status: "repaired", lockfile, backup, removed };
 }
 function locateLockfiles(dir, depth = 2) {
-  const found = [];
-  const walk = (current, level) => {
-    const candidate = path11.join(current, LOCKFILE);
+  let found = [], walk = (current, level) => {
+    let candidate = path11.join(current, LOCKFILE);
     try {
-      if (existsSync(candidate)) found.push(candidate);
+      existsSync(candidate) && found.push(candidate);
     } catch {
     }
     if (level <= 0) return;
     let entries = [];
     try {
-      entries = readdirSync(current, { withFileTypes: true });
+      entries = readdirSync(current, { withFileTypes: !0 });
     } catch {
       return;
     }
-    for (const entry2 of entries) {
-      if (!entry2.isDirectory() || entry2.name === "node_modules") continue;
-      walk(path11.join(current, entry2.name), level - 1);
-    }
+    for (let entry2 of entries)
+      !entry2.isDirectory() || entry2.name === "node_modules" || walk(path11.join(current, entry2.name), level - 1);
   };
-  walk(dir, depth);
-  return found;
+  return walk(dir, depth), found;
 }
 function locateStagingLockfiles(profileDir) {
-  const parent = path11.dirname(profileDir);
-  let entries = [];
+  let parent = path11.dirname(profileDir), entries = [];
   try {
-    entries = readdirSync(parent, { withFileTypes: true });
+    entries = readdirSync(parent, { withFileTypes: !0 });
   } catch {
     return [];
   }
-  const found = [];
-  for (const entry2 of entries) {
+  let found = [];
+  for (let entry2 of entries) {
     if (!entry2.isDirectory() || !/staging/i.test(entry2.name)) continue;
-    const dir = path11.join(parent, entry2.name);
-    if (dir === profileDir) continue;
-    found.push(...locateLockfiles(dir, 1));
+    let dir = path11.join(parent, entry2.name);
+    dir !== profileDir && found.push(...locateLockfiles(dir, 1));
   }
   return found;
 }
@@ -5550,81 +4741,66 @@ function updateLockfilesToWatch(profileDir) {
   return [.../* @__PURE__ */ new Set([...locateLockfiles(profileDir), ...locateStagingLockfiles(profileDir)])];
 }
 function startUpdateLockfileRepair(moduleUrl, intervalMs = 2e3, log) {
-  let stopped = false;
-  const stamps = /* @__PURE__ */ new Map();
-  const check = () => {
-    if (stopped) return;
-    try {
-      const dir = locateProfileDir(moduleUrl);
-      if (!existsSync(path11.join(dir, "package.json"))) return;
-      for (const lockfile of updateLockfilesToWatch(dir)) {
-        let stamp = "";
-        try {
-          const info = statSync(lockfile);
-          stamp = info.mtimeMs + ":" + info.size;
-        } catch {
-          continue;
+  let stopped = !1, stamps = /* @__PURE__ */ new Map(), check = () => {
+    if (!stopped)
+      try {
+        let dir = locateProfileDir(moduleUrl);
+        if (!existsSync(path11.join(dir, "package.json"))) return;
+        for (let lockfile of updateLockfilesToWatch(dir)) {
+          let stamp = "";
+          try {
+            let info = statSync(lockfile);
+            stamp = info.mtimeMs + ":" + info.size;
+          } catch {
+            continue;
+          }
+          stamps.get(lockfile) !== stamp && (stamps.set(lockfile, stamp), repairLockfileAt(lockfile, log));
         }
-        if (stamps.get(lockfile) === stamp) continue;
-        stamps.set(lockfile, stamp);
-        repairLockfileAt(lockfile, log);
+      } catch {
       }
-    } catch {
-    }
   };
   check();
-  const timer = setInterval(check, intervalMs);
-  if (timer.unref) timer.unref();
-  return () => {
-    stopped = true;
-    clearInterval(timer);
+  let timer = setInterval(check, intervalMs);
+  return timer.unref && timer.unref(), () => {
+    stopped = !0, clearInterval(timer);
   };
 }
 
 // src/app/bootstrap.ts
 function createPluginRuntime(definitions) {
-  const agents2 = createAgentRegistry(definitions.agents);
-  const businesses = /* @__PURE__ */ new Map();
-  for (const module of definitions.businesses) {
+  let agents2 = createAgentRegistry(definitions.agents), businesses = /* @__PURE__ */ new Map();
+  for (let module of definitions.businesses) {
     if (!module.id || businesses.has(module.id)) throw new Error(`重复或无效的业务：${module.id}`);
     businesses.set(module.id, module);
   }
-  for (const agent of agents2.list()) for (const id of agent.businesses) {
+  for (let agent of agents2.list()) for (let id of agent.businesses)
     if (!businesses.has(id)) throw new Error(`Agent ${agent.id} 缺少业务模块：${id}`);
-  }
-  return function apply2(ctx, config = {}) {
-    const disposers = [];
-    let disposed = false;
-    const defer = (value) => {
-      if (typeof value !== "function") return;
-      if (disposed) value();
-      else disposers.push(value);
-    };
-    const dispose = () => {
-      if (disposed) return;
-      disposed = true;
-      for (const cleanup of disposers.reverse()) {
-        try {
-          cleanup();
-        } catch {
-          ctx.logger?.warn?.("插件模块清理失败，已继续清理其余模块。");
-        }
+  return function(ctx, config = {}) {
+    let disposers = [], disposed = !1, defer = (value) => {
+      typeof value == "function" && (disposed ? value() : disposers.push(value));
+    }, dispose = () => {
+      if (!disposed) {
+        disposed = !0;
+        for (let cleanup of disposers.reverse())
+          try {
+            cleanup();
+          } catch {
+            ctx.logger?.warn?.("插件模块清理失败，已继续清理其余模块。");
+          }
       }
-    };
-    const analytics = createAnalyticsReporter(config);
-    defer(() => analytics.dispose());
-    defer(bindAgentRegistry(ctx, agents2));
-    const tools = createToolRegistry(ctx, agents2, analytics, defer);
-    const runtime = { ctx, config, agents: agents2, tools, defer };
+    }, analytics = createAnalyticsReporter(config);
+    defer(() => analytics.dispose()), defer(bindAgentRegistry(ctx, agents2));
+    let tools = createToolRegistry(ctx, agents2, analytics, defer), runtime = { ctx, config, agents: agents2, tools, defer };
     try {
-      for (const business of businesses.values()) defer(business.apply(runtime));
+      for (let business of businesses.values()) defer(business.apply(runtime));
       defer(ctx.inject(["systemPrompt"], (promptCtx) => promptCtx.systemPrompt.section({
         name: `plugin:${PLUGIN_ID}`,
         order: 5200,
         text: (context) => {
-          const agent = agents2.resolve(context, ctx);
-          if (!agent) return "";
-          return [...agent.businesses.map((id) => businesses.get(id)?.prompt?.(config) || ""), agent.prompt?.(config) || ""].filter(Boolean).join("\n\n");
+          let agent = agents2.resolve(context, ctx);
+          return agent ? [...agent.businesses.map((id) => businesses.get(id)?.prompt?.(config) || ""), agent.prompt?.(config) || ""].filter(Boolean).join(`
+
+`) : "";
         }
       })));
       try {
@@ -5632,11 +4808,9 @@ function createPluginRuntime(definitions) {
       } catch {
         ctx.logger?.warn?.("metaontic-video: 安装目录锁文件自愈未启用。");
       }
-      analytics.start();
-      return dispose;
+      return analytics.start(), dispose;
     } catch (error) {
-      dispose();
-      throw error;
+      throw dispose(), error;
     }
   };
 }
@@ -5659,7 +4833,8 @@ function promoVideoGuidance() {
     "按内容选择开场看点、价值展示、产品或活动演示、结尾行动；不强制真人口播、不硬加冲突反转。宣传分镜不等于付费任务，单段上限内的切镜写进同一次生成；额外独立镜头、图片或其他付费调用须明确方案与费用。",
     "真实Logo、产品外观、界面及品牌文字以用户素材为准，缺失时询问或明确标为示意；不承诺视频模型准确生成文字或真实界面。未要求字幕不擅自添加；用户要求准确文案时先确认制作方式。",
     "完整展示宣传脚本、分镜和费用预估，再用video_project审核。视频工具付费审批就是制作确认；逐段展示视频并审核结果后才续做，失败查原任务、不重复提交。标准模式不应用本专题规则。"
-  ].join("\n");
+  ].join(`
+`);
 }
 
 // src/agents/promo-video/index.ts
@@ -5673,8 +4848,7 @@ var promoVideo = {
 };
 
 // src/agents/index.ts
-var agents = [videoDirector, promoVideo];
-var agentRegistry = createAgentRegistry(agents);
+var agents = [videoDirector, promoVideo], agentRegistry = createAgentRegistry(agents);
 
 // src/businesses/video-generation/generation.service.ts
 init_plugin();
@@ -5683,35 +4857,29 @@ init_plugin();
 init_connection();
 var CONNECTION_CHECK_TIMEOUT_MS = 12e3;
 async function checkConnections(liveConfig, options = {}) {
-  const config = snapshotConfig(liveConfig);
-  const fetcher = options.fetcher || fetch;
-  const cache = /* @__PURE__ */ new Map();
-  const probe = (cfg) => {
-    const key = resolveApiKey(cfg);
+  let config = snapshotConfig(liveConfig), fetcher = options.fetcher || fetch, cache = /* @__PURE__ */ new Map(), probe = (cfg) => {
+    let key = resolveApiKey(cfg);
     if (!key) return Promise.resolve({ code: "key_missing", level: "error" });
-    const base = resolveBaseUrl(cfg);
-    let url;
+    let base = resolveBaseUrl(cfg), url;
     try {
-      url = new URL(isVolcengine(cfg) ? base + resolveQueryPath(cfg, "00000000-0000-0000-0000-000000000000") : /\/v\d+$/.test(base) ? base + "/models" : base + "/v1/models");
-      if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw Error();
+      if (url = new URL(isVolcengine(cfg) ? base + resolveQueryPath(cfg, "00000000-0000-0000-0000-000000000000") : /\/v\d+$/.test(base) ? base + "/models" : base + "/v1/models"), !["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw Error();
     } catch {
       return Promise.resolve({ code: "invalid_address", level: "error" });
     }
-    const identity = JSON.stringify([url.href, key]);
-    if (!cache.has(identity)) cache.set(identity, (async () => {
-      const timeout = AbortSignal.timeout(options.timeoutMs || CONNECTION_CHECK_TIMEOUT_MS);
-      const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+    let identity = JSON.stringify([url.href, key]);
+    return cache.has(identity) || cache.set(identity, (async () => {
+      let timeout = AbortSignal.timeout(options.timeoutMs || CONNECTION_CHECK_TIMEOUT_MS), signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
       try {
-        const response = await fetcher(url.href, { method: "GET", redirect: "error", headers: { accept: "application/json", Authorization: `Bearer ${key}` }, signal });
+        let response = await fetcher(url.href, { method: "GET", redirect: "error", headers: { accept: "application/json", Authorization: `Bearer ${key}` }, signal });
         if (response.status === 401) return { code: "auth_failed", level: "error", http_status: 401 };
         if (response.status === 403) {
           if (!isVolcengine(cfg)) {
-            const authUrl = new URL("/api/log/token", url);
+            let authUrl = new URL("/api/log/token", url);
             try {
-              const auth = await fetcher(authUrl.href, { method: "GET", redirect: "error", headers: { accept: "application/json", Authorization: `Bearer ${key}` }, signal });
+              let auth = await fetcher(authUrl.href, { method: "GET", redirect: "error", headers: { accept: "application/json", Authorization: `Bearer ${key}` }, signal });
               if (auth.ok) {
-                const body2 = await auth.json();
-                if (body2?.success === true && Array.isArray(body2?.data)) return { code: "auth_reachable", level: "warning", http_status: 403 };
+                let body2 = await auth.json();
+                if (body2?.success === !0 && Array.isArray(body2?.data)) return { code: "auth_reachable", level: "warning", http_status: 403 };
               }
             } catch {
             }
@@ -5728,76 +4896,61 @@ async function checkConnections(liveConfig, options = {}) {
         } catch {
           return { code: "invalid_response", level: "error" };
         }
-        if (body?.error || body?.success === false) return { code: "api_rejected", level: "error" };
-        if (!Array.isArray(body?.data) || body.data.some((row) => typeof row?.id !== "string")) return { code: "invalid_response", level: "error" };
-        return { code: "ok", level: "success", ids: new Set(body.data.map((row) => row.id)) };
+        return body?.error || body?.success === !1 ? { code: "api_rejected", level: "error" } : !Array.isArray(body?.data) || body.data.some((row) => typeof row?.id != "string") ? { code: "invalid_response", level: "error" } : { code: "ok", level: "success", ids: new Set(body.data.map((row) => row.id)) };
       } catch {
         return { code: signal.aborted ? "timeout" : "network_error", level: "error" };
       }
-    })());
-    return cache.get(identity);
-  };
-  const targets = isVolcengine(config) ? ["video"] : ["video", "image", "text"];
-  const checks = await Promise.all(targets.map(async (target) => {
+    })()), cache.get(identity);
+  }, targets = isVolcengine(config) ? ["video"] : ["video", "image", "text"];
+  return { checks: await Promise.all(targets.map(async (target) => {
     let cfg;
     try {
       cfg = target === "image" ? imageConfig(config) : target === "text" ? textConfig(config) : config;
     } catch {
       return { target, code: "key_missing", level: "error" };
     }
-    const model = target === "image" ? cfg.imageModel : target === "text" ? resolveTextModel(cfg) : resolveModel(cfg);
-    const result = await probe(cfg);
-    const { ids, ...safe } = result;
+    let model = target === "image" ? cfg.imageModel : target === "text" ? resolveTextModel(cfg) : resolveModel(cfg), result = await probe(cfg), { ids, ...safe } = result;
     return { target, model, ...safe, ...ids && !ids.has(model) ? { code: "model_not_listed", level: "warning" } : {} };
-  }));
-  return { checks, scope: "read_only", generation_tested: false };
+  })), scope: "read_only", generation_tested: !1 };
 }
 
 // src/businesses/video-generation/integrations/connection-check.ts
 function registerConnectionCheck(ctx, config) {
   return ctx.inject(["webServer"], (scope) => {
-    if (typeof scope.webServer?.register !== "function") return;
-    let running = false;
-    const remove = scope.webServer.register({ kind: "exact", path: "/metaontic-video/check-connection", async handler(req, res) {
-      res.setHeader("content-type", "application/json; charset=utf-8");
-      res.setHeader("cache-control", "no-store");
+    if (typeof scope.webServer?.register != "function") return;
+    let running = !1, remove = scope.webServer.register({ kind: "exact", path: "/metaontic-video/check-connection", async handler(req, res) {
+      res.setHeader("content-type", "application/json; charset=utf-8"), res.setHeader("cache-control", "no-store");
       try {
         if (req.method !== "POST") {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: "method_not_allowed" }));
+          res.statusCode = 405, res.end(JSON.stringify({ error: "method_not_allowed" }));
           return;
         }
         if (req.headers["sec-fetch-site"] === "cross-site" || req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) {
-          res.statusCode = 403;
-          res.end(JSON.stringify({ error: "invalid_origin" }));
+          res.statusCode = 403, res.end(JSON.stringify({ error: "invalid_origin" }));
           return;
         }
         if (!String(req.headers["content-type"] || "").startsWith("application/json")) throw Error("invalid_request");
         let raw = "";
-        for await (const chunk of req) {
-          raw += chunk;
-          if (raw.length > 1024) throw Error("invalid_request");
-        }
-        const body = JSON.parse(raw || "{}");
-        if (!body || Array.isArray(body) || typeof body !== "object" || Object.keys(body).length) throw Error("invalid_request");
+        for await (let chunk of req)
+          if (raw += chunk, raw.length > 1024) throw Error("invalid_request");
+        let body = JSON.parse(raw || "{}");
+        if (!body || Array.isArray(body) || typeof body != "object" || Object.keys(body).length) throw Error("invalid_request");
         if (running) {
-          res.statusCode = 409;
-          res.end(JSON.stringify({ error: "busy" }));
+          res.statusCode = 409, res.end(JSON.stringify({ error: "busy" }));
           return;
         }
-        running = true;
+        running = !0;
         try {
           res.end(JSON.stringify(await checkConnections(config)));
         } finally {
-          running = false;
+          running = !1;
         }
       } catch {
-        res.statusCode = 400;
-        res.end(JSON.stringify({ error: "check_failed" }));
+        res.statusCode = 400, res.end(JSON.stringify({ error: "check_failed" }));
       }
     } });
     return () => {
-      if (typeof remove === "function") remove();
+      typeof remove == "function" && remove();
     };
   });
 }
@@ -5805,39 +4958,34 @@ function registerConnectionCheck(ctx, config) {
 // src/businesses/video-generation/workflow/media-preview.ts
 var PREVIEW_TOOLS = /* @__PURE__ */ new Set(["video_generate", "video_extend", "video_status", "video_prepare_image"]);
 function mediaPreviewMeta(value, toolName) {
-  const media = [];
-  const seen = /* @__PURE__ */ new Set();
+  let media = [], seen = /* @__PURE__ */ new Set();
   function add(kind, label, localPath, url) {
-    const file = typeof localPath === "string" && /^(?:\/(?!\/)|[a-z]:[/\\])/i.test(localPath) && !/[\u0000-\u001f]/.test(localPath) ? localPath : "";
-    let remote = "";
+    let file = typeof localPath == "string" && /^(?:\/(?!\/)|[a-z]:[/\\])/i.test(localPath) && !/[\u0000-\u001f]/.test(localPath) ? localPath : "", remote = "";
     try {
-      const parsed = new URL(String(url || ""));
-      if (["https:", "http:"].includes(parsed.protocol) && !parsed.username && !parsed.password) remote = parsed.href;
+      let parsed = new URL(String(url || ""));
+      ["https:", "http:"].includes(parsed.protocol) && !parsed.username && !parsed.password && (remote = parsed.href);
     } catch {
     }
-    const key = file || remote;
-    if (!key || seen.has(key) || media.length >= 40) return;
-    seen.add(key);
-    media.push({ kind, label, ...file ? { localPath: file } : {}, ...remote ? { url: remote } : {} });
+    let key = file || remote;
+    !key || seen.has(key) || media.length >= 40 || (seen.add(key), media.push({ kind, label, ...file ? { localPath: file } : {}, ...remote ? { url: remote } : {} }));
   }
   if (toolName === "video_prepare_image") add("image", "角色参考图", value?.localPath, value?.imageUrl);
   else {
-    if (value?.videoPath && value?.merged) add("video", videoResultState(value).isFinal ? "完整视频" : "已完成部分合并视频", value.videoPath, "");
-    const segments = (value?.segments || []).filter((s) => s.status === "succeeded");
-    for (const segment of segments) add("video", `第${segment.index}段`, segment.localPath, segment.videoUrl);
-    if (!segments.length && value?.status === "succeeded") add("video", value.paused ? "本段视频" : "视频", value.previewPath || value.videoPath, value.videoUrl);
-    for (const [i, item] of (value?.convertedReferences || []).entries()) add("image", `转换参考图${i + 1}`, item.localPath, item.imageUrl);
+    value?.videoPath && value?.merged && add("video", videoResultState(value).isFinal ? "完整视频" : "已完成部分合并视频", value.videoPath, "");
+    let segments = (value?.segments || []).filter((s) => s.status === "succeeded");
+    for (let segment of segments) add("video", `第${segment.index}段`, segment.localPath, segment.videoUrl);
+    !segments.length && value?.status === "succeeded" && add("video", value.paused ? "本段视频" : "视频", value.previewPath || value.videoPath, value.videoUrl);
+    for (let [i, item] of (value?.convertedReferences || []).entries()) add("image", `转换参考图${i + 1}`, item.localPath, item.imageUrl);
   }
   return { version: 1, media };
 }
 function withMediaPreview(tool) {
-  if (!PREVIEW_TOOLS.has(tool.name)) return tool;
-  return { ...tool, output: {
+  return PREVIEW_TOOLS.has(tool.name) ? { ...tool, output: {
     ...tool.output,
     presentationMeta(args, value) {
       return { ...tool.output.presentationMeta?.(args, value) || {}, metaonticMedia: mediaPreviewMeta(value, tool.name) };
     }
-  } };
+  } } : tool;
 }
 
 // src/businesses/video-generation/prompts/scope.ts
@@ -5850,64 +4998,52 @@ init_connection();
 
 // src/businesses/video-generation/workflow/duration-choice.ts
 init_config();
-var DURATION_OPTIONS = [15, 30, 45, 60];
-var CUSTOM = "自定义时长";
+var DURATION_OPTIONS = [15, 30, 45, 60], CUSTOM = "自定义时长";
 function parseVideoDuration(value) {
-  if (typeof value === "number") return Number.isInteger(value) && value >= MIN_SECONDS && value <= MAX_TOTAL_SECONDS ? value : null;
-  if (typeof value !== "string") return null;
-  const match = /^\s*(\d+)\s*(?:秒|s|seconds?)?\s*$/i.exec(value);
+  if (typeof value == "number") return Number.isInteger(value) && value >= MIN_SECONDS && value <= MAX_TOTAL_SECONDS ? value : null;
+  if (typeof value != "string") return null;
+  let match = /^\s*(\d+)\s*(?:秒|s|seconds?)?\s*$/i.exec(value);
   return match ? parseVideoDuration(Number(match[1])) : null;
 }
 async function ensureProjectDuration(ctx, exec, project, requested, save2) {
-  const pending2 = (reason) => ({ status: "pending", reason });
+  let pending2 = (reason) => ({ status: "pending", reason });
   if (exec.signal?.aborted) return pending2("已取消时长确认，未继续制作。");
-  const approvedSpec = project.approved?.specification;
-  const approvedDuration = approvedSpec ? parseVideoDuration(Number(approvedSpec.duration) * (project.approved.name === "video_extend" ? Number(approvedSpec.segments || 1) : 1)) : null;
-  const persist = async (duration) => {
-    const next = { ...project, duration, approved: (project.duration ?? approvedDuration) !== duration ? null : project.approved };
-    delete next.durationCustom;
-    await save2(next);
-    Object.assign(project, next);
-    delete project.durationCustom;
-    return { status: "confirmed", duration };
+  let approvedSpec = project.approved?.specification, approvedDuration = approvedSpec ? parseVideoDuration(Number(approvedSpec.duration) * (project.approved.name === "video_extend" ? Number(approvedSpec.segments || 1) : 1)) : null, persist = async (duration) => {
+    let next = { ...project, duration, approved: (project.duration ?? approvedDuration) !== duration ? null : project.approved };
+    return delete next.durationCustom, await save2(next), Object.assign(project, next), delete project.durationCustom, { status: "confirmed", duration };
   };
   if (requested !== void 0) {
-    const duration = parseVideoDuration(requested);
+    let duration = parseVideoDuration(requested);
     if (duration === null) throw new Error(`视频时长需为${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒的整数，请先向用户确认。`);
     return await persist(duration);
   }
   if (parseVideoDuration(project.duration) !== null) return { status: "confirmed", duration: project.duration };
   if (approvedDuration !== null) return await persist(approvedDuration);
-  const service = exec.agent?.ctx?.get?.("userQuestions") || ctx.get?.("userQuestions");
-  if (typeof service?.ask !== "function") return pending2("时长尚未确认，请恢复提问能力后让用户选择，不得默认15秒。");
-  const ask = async (id, question, options = void 0) => {
-    const result = await service.ask({
+  let service = exec.agent?.ctx?.get?.("userQuestions") || ctx.get?.("userQuestions");
+  if (typeof service?.ask != "function") return pending2("时长尚未确认，请恢复提问能力后让用户选择，不得默认15秒。");
+  let ask = async (id, question, options = void 0) => {
+    let result = await service.ask({
       agent: exec.agent,
       signal: exec.signal,
       ...exec.callId ? { wait: { callId: exec.callId } } : {},
-      questions: [{ id, header: "视频长度", question, multiSelect: false, ...options ? { options } : {} }]
+      questions: [{ id, header: "视频长度", question, multiSelect: !1, ...options ? { options } : {} }]
     });
-    if (exec.signal?.aborted) return null;
-    return result?.answers?.find((answer) => answer.id === id);
+    return exec.signal?.aborted ? null : result?.answers?.find((answer) => answer.id === id);
   };
   try {
     if (!project.durationCustom) {
-      const answer2 = await ask("video_duration", "你希望视频总长度是多少？请选择建议长度，或选择自定义时长后输入秒数。超过模型单段上限会分段续拍，新增分段单独计费。", [
+      let answer2 = await ask("video_duration", "你希望视频总长度是多少？请选择建议长度，或选择自定义时长后输入秒数。超过模型单段上限会分段续拍，新增分段单独计费。", [
         ...DURATION_OPTIONS.map((seconds) => ({ label: `${seconds} 秒`, description: seconds === 15 ? "适合简短展示或一个小情节。" : seconds === 30 ? "适合一段简短故事或产品介绍。" : seconds === 45 ? "适合有起承转合的内容。" : "适合较完整的故事或展示。" })),
         { label: CUSTOM, description: `自己输入${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒的整数。` }
       ]);
       if (!answer2) return pending2("时长尚未确认，未继续制作。");
-      const text = answer2.custom?.trim() || (answer2.selected?.length === 1 ? answer2.selected[0] : "");
-      const duration2 = parseVideoDuration(text);
+      let text = answer2.custom?.trim() || (answer2.selected?.length === 1 ? answer2.selected[0] : ""), duration2 = parseVideoDuration(text);
       if (duration2 !== null) return await persist(duration2);
       if (text !== CUSTOM) return pending2(`请选择视频长度或输入${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒的整数，未继续制作。`);
-      project.durationCustom = true;
-      await save2(project);
+      project.durationCustom = !0, await save2(project);
     }
-    const answer = await ask("video_duration_custom", `请输入希望的视频总长度（${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒，整数，例如20秒）。`);
-    const duration = parseVideoDuration(answer?.custom);
-    if (duration === null) return pending2(`自定义时长尚未确认，请输入${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒的整数，未继续制作。`);
-    return await persist(duration);
+    let answer = await ask("video_duration_custom", `请输入希望的视频总长度（${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒，整数，例如20秒）。`), duration = parseVideoDuration(answer?.custom);
+    return duration === null ? pending2(`自定义时长尚未确认，请输入${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒的整数，未继续制作。`) : await persist(duration);
   } catch {
     return pending2("时长确认或记录保存未完成，未继续制作；请恢复提问和记录能力后重试。");
   }
@@ -5922,37 +5058,28 @@ import { createHash as createHash6 } from "node:crypto";
 import { mkdir as mkdir8, readFile as readFile9, writeFile as writeFile6, rename as rename7, rm as rm6 } from "node:fs/promises";
 import path12 from "node:path";
 init_connection();
-var waiting = /* @__PURE__ */ new Map();
-var localIds = /* @__PURE__ */ new WeakMap();
-var nextId = 0;
-var IMAGE = "先生成角色图（单独计费）";
-var TEXT = "直接文生视频";
+var waiting = /* @__PURE__ */ new Map(), localIds = /* @__PURE__ */ new WeakMap(), nextId = 0, IMAGE = "先生成角色图（单独计费）", TEXT = "直接文生视频";
 async function characterChoiceGate(ctx, config, exec, args) {
   if (exec.name !== "video_generate" || String(args?.resume || "").trim() || hasProjectImages(args)) return null;
   if (args?.projectId && !args.preparation) return projectCharacterGate(config, exec, args);
-  const project = args?.projectId ? await readProject(args.projectId, exec) : null;
-  const session = exec.agent?.session;
-  const deny = (reason) => ({ kind: "deny", reason });
-  if (!session || typeof session !== "object") return deny("提交已停止：纯文生视频须先询问是否生成角色参考图，当前缺少可交互会话。");
-  const stableId = typeof session.id === "string" ? session.id : typeof session.header?.id === "string" ? session.header.id : null;
-  if (!localIds.has(session)) localIds.set(session, `live-${++nextId}`);
-  const key = createHash6("sha256").update(JSON.stringify(project ? [project.id] : [stableId || localIds.get(session), args?.prompt || "", args?.duration, args?.resolution, args?.ratio])).digest("hex");
-  const file = path12.join(dshHome(), "metaontic-video", "character-choices", key + ".json");
+  let project = args?.projectId ? await readProject(args.projectId, exec) : null, session = exec.agent?.session, deny = (reason) => ({ kind: "deny", reason });
+  if (!session || typeof session != "object") return deny("提交已停止：纯文生视频须先询问是否生成角色参考图，当前缺少可交互会话。");
+  let stableId = typeof session.id == "string" ? session.id : typeof session.header?.id == "string" ? session.header.id : null;
+  localIds.has(session) || localIds.set(session, `live-${++nextId}`);
+  let key = createHash6("sha256").update(JSON.stringify(project ? [project.id] : [stableId || localIds.get(session), args?.prompt || "", args?.duration, args?.resolution, args?.ratio])).digest("hex"), file = path12.join(dshHome(), "metaontic-video", "character-choices", key + ".json");
   try {
     async function choose() {
-      if (project?.choice && args?.resetCharacterChoice !== true) return project.choice;
-      if (!project && stableId && args?.resetCharacterChoice !== true) {
+      if (project?.choice && args?.resetCharacterChoice !== !0) return project.choice;
+      if (!project && stableId && args?.resetCharacterChoice !== !0)
         try {
-          const saved = JSON.parse(await readFile9(file, "utf8"));
+          let saved = JSON.parse(await readFile9(file, "utf8"));
           if (saved.version === 1 && ["text_only", "generate_first"].includes(saved.choice)) return saved.choice;
         } catch (error) {
           if (error?.code !== "ENOENT") return null;
         }
-      }
-      const service = ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
-      if (typeof service?.ask !== "function") return null;
-      const first = isVolcengine(config) ? "使用我提供的角色图" : IMAGE;
-      const result = await timedStage("character_choice_wait", () => service.ask({
+      let service = ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
+      if (typeof service?.ask != "function") return null;
+      let first = isVolcengine(config) ? "使用我提供的角色图" : IMAGE, result = await timedStage("character_choice_wait", () => service.ask({
         agent: exec.agent,
         signal: exec.signal,
         ...exec.callId ? { wait: { callId: exec.callId } } : {},
@@ -5960,46 +5087,36 @@ async function characterChoiceGate(ctx, config, exec, args) {
           id: "metaontic_character_reference",
           header: "角色参考图",
           question: isVolcengine(config) ? "是否先准备角色参考图？当前火山直连不提供代生成图片通道，可使用你提供的角色图，或直接文生视频。" : "是否先生成角色参考图？图片调用单独计费，生成后先看图确认，再用于视频和后续续拍。",
-          multiSelect: false,
+          multiSelect: !1,
           options: [{ label: TEXT, description: "不生成角色图，按纯文生方案制作视频。" }, { label: first, description: isVolcengine(config) ? "提供角色图并确认后再生成视频。" : "先生成并审核角色图，图片费用与视频分开。" }]
         }]
       }));
       if (exec.signal?.aborted) return null;
-      const answer = result?.answers?.find((item) => item.id === "metaontic_character_reference");
-      const selected = answer?.custom ? answer.custom.trim() : answer?.selected?.length === 1 ? answer.selected[0] : "";
-      const choice2 = selected === first ? "generate_first" : selected === TEXT ? "text_only" : null;
+      let answer = result?.answers?.find((item) => item.id === "metaontic_character_reference"), selected = answer?.custom ? answer.custom.trim() : answer?.selected?.length === 1 ? answer.selected[0] : "", choice2 = selected === first ? "generate_first" : selected === TEXT ? "text_only" : null;
       if (!choice2) return null;
-      if (project) {
-        project.choice = choice2;
-        project.approved = null;
-        await writeProject(project);
-      } else if (stableId) {
-        await mkdir8(path12.dirname(file), { recursive: true, mode: 448 });
-        const temp = file + "." + Date.now() + ".tmp";
+      if (project)
+        project.choice = choice2, project.approved = null, await writeProject(project);
+      else if (stableId) {
+        await mkdir8(path12.dirname(file), { recursive: !0, mode: 448 });
+        let temp = file + "." + Date.now() + ".tmp";
         try {
-          await writeFile6(temp, JSON.stringify({ version: 1, choice: choice2, time: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" });
-          await rename7(temp, file);
+          await writeFile6(temp, JSON.stringify({ version: 1, choice: choice2, time: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" }), await rename7(temp, file);
         } finally {
-          await rm6(temp, { force: true }).catch(() => {
+          await rm6(temp, { force: !0 }).catch(() => {
           });
         }
       }
       return choice2;
     }
     let pending2 = waiting.get(key);
-    if (!pending2) {
-      pending2 = choose();
-      waiting.set(key, pending2);
-    }
+    pending2 || (pending2 = choose(), waiting.set(key, pending2));
     let choice;
     try {
       choice = await pending2;
     } finally {
-      if (waiting.get(key) === pending2) waiting.delete(key);
+      waiting.get(key) === pending2 && waiting.delete(key);
     }
-    if (choice === "text_only") return null;
-    if (choice === "generate_first") return deny(isVolcengine(config) ? "用户选择先使用角色图，已停止纯文生视频提交。请先取得并审核用户提供的角色图，再传referenceImages/characterReferenceImages；不要重复询问或直接生成视频。" : "用户已明确选择先生成角色图，已停止纯文生视频提交。请先用video_prepare_image(operation:create_character)按已确认设定出图，图片单独计费；展示审核后将图片传入referenceImages和characterReferenceImages，再单独确认视频费用与制作。不要重复询问此选择，不要直接重提纯文生视频；用户明确改变方案时，传resetCharacterChoice:true重新取得选择。");
-    return deny("角色图选择尚未取得明确答复，已停止提交。取消、跳过、pending、交互不可用或记录失败都不等于选择直接文生视频；恢复询问能力后再继续，不得默认跳过。");
+    return choice === "text_only" ? null : deny(choice === "generate_first" ? isVolcengine(config) ? "用户选择先使用角色图，已停止纯文生视频提交。请先取得并审核用户提供的角色图，再传referenceImages/characterReferenceImages；不要重复询问或直接生成视频。" : "用户已明确选择先生成角色图，已停止纯文生视频提交。请先用video_prepare_image(operation:create_character)按已确认设定出图，图片单独计费；展示审核后将图片传入referenceImages和characterReferenceImages，再单独确认视频费用与制作。不要重复询问此选择，不要直接重提纯文生视频；用户明确改变方案时，传resetCharacterChoice:true重新取得选择。" : "角色图选择尚未取得明确答复，已停止提交。取消、跳过、pending、交互不可用或记录失败都不等于选择直接文生视频；恢复询问能力后再继续，不得默认跳过。");
   } catch {
     return deny("角色图选择未完成，未提交视频。请恢复询问与选择记录能力后再继续，不要自动跳过或重提。");
   }
@@ -6013,33 +5130,25 @@ var RATES = [
   ["doubao-seedance-2-0-fast", [37, 22]],
   ["doubao-seedance-2-0", [46, 28]],
   ["doubao-seedance-2-5", [70, 42]]
-];
-var PRICE_DATE = "2026-11-07";
+], PRICE_DATE = "2026-11-07";
 function compareVideoCosts(config, args) {
-  const duration = args?.duration;
+  let duration = args?.duration;
   if (!Number.isInteger(duration) || duration < 4 || duration > 3600) throw new Error("目标时长须为4–3600秒整数。");
-  const resolution = normalizeResolution(args?.resolution);
+  let resolution = normalizeResolution(args?.resolution);
   if (!resolution) throw new Error("请先由用户确认480P或720P，再试算。");
-  const ratio = args?.ratio ?? ref(config, "ratio", "9:16");
+  let ratio = args?.ratio ?? ref(config, "ratio", "9:16");
   if (!["16:9", "9:16"].includes(ratio)) throw new Error("当前仅有16:9和9:16的像素计费依据，其他画幅需核对实际宽高后试算，不能套用横屏价格。");
-  const model = resolveModel(config);
-  const rates = RATES.find(([prefix]) => model.startsWith(prefix));
+  let model = resolveModel(config), rates = RATES.find(([prefix]) => model.startsWith(prefix));
   if (!rates) throw new Error(`尚无${model}的可靠价目，不能套用其他模型报价。`);
-  const planned = resolveTargetPlan(config, args);
+  let planned = resolveTargetPlan(config, args);
   if (planned.total !== duration) throw new Error("该时长超出当前分段方案能力，请先调整分段计划。");
-  const groupRatio = args?.groupRatio ?? (isVolcengine(config) || isMetaontic(config) ? 1 : ref(config, "estimateGroupRatio", 0.8));
+  let groupRatio = args?.groupRatio ?? (isVolcengine(config) || isMetaontic(config) ? 1 : ref(config, "estimateGroupRatio", 0.8));
   if (!Number.isFinite(groupRatio) || groupRatio < 0 || groupRatio > 10) throw new Error("分组倍率须为0–10的有效数字。");
   if (isVolcengine(config) && groupRatio !== 1) throw new Error("火山直连不适用中转分组折扣。");
-  const officialModel = "doubao-seedance-2-5";
-  const officialRates = RATES.find(([prefix]) => officialModel.startsWith(prefix))[1];
-  const officialPlan = args.productionStrategy === "independent_shots" ? planned.plan : planVideoSegments(duration, 30, 30);
+  let officialModel = "doubao-seedance-2-5", officialRates = RATES.find(([prefix]) => officialModel.startsWith(prefix))[1], officialPlan = args.productionStrategy === "independent_shots" ? planned.plan : planVideoSegments(duration, 30, 30);
   function calculate(id, plan, price, multiplier) {
-    const pixels = resolution === "720p" ? [1280, 720] : id.startsWith("doubao-seedance-2-5") ? [854, 480] : [864, 496];
-    const dimensions = ratio === "9:16" ? [...pixels].reverse() : pixels;
-    const segments = plan.map((step, index) => {
-      const inputSeconds = step.kind === "extend" && index ? plan[index - 1].seconds : 0;
-      const tokens = (inputSeconds + step.seconds) * pixels[0] * pixels[1] * 24 / 1024;
-      const rateCnyPerMillion = price[inputSeconds ? 1 : 0] * multiplier;
+    let pixels = resolution === "720p" ? [1280, 720] : id.startsWith("doubao-seedance-2-5") ? [854, 480] : [864, 496], dimensions = ratio === "9:16" ? [...pixels].reverse() : pixels, segments = plan.map((step, index) => {
+      let inputSeconds = step.kind === "extend" && index ? plan[index - 1].seconds : 0, tokens = (inputSeconds + step.seconds) * pixels[0] * pixels[1] * 24 / 1024, rateCnyPerMillion = price[inputSeconds ? 1 : 0] * multiplier;
       return { index: index + 1, kind: step.kind, seconds: step.seconds, inputSeconds, billingMode: inputSeconds ? "with_video_input" : "without_video_input", tokens, rateCnyPerMillion, cny: tokens * rateCnyPerMillion / 1e6 };
     });
     return { model: id, dimensions, groupRatio: multiplier, segments, cny: Math.round(segments.reduce((sum, s) => sum + s.cny, 0) * 1e4) / 1e4 };
@@ -6074,12 +5183,12 @@ function estimateTool(config) {
       groupRatio: { type: "number", minimum: 0, maximum: 10, description: "仅在已核对 API密钥分组权限和实际倍率时传入；不得为了显示低价假设0.8" }
     }, required: ["duration", "resolution"] },
     output: { schema: { type: "object" }, render(_args, value) {
-      const detail = (name, item) => item.segments.map((s) => `${name}第${s.index}段：${s.inputSeconds ? "有视频输入" : "无视频输入"}；输入${s.inputSeconds}秒 + 输出${s.seconds}秒；单价¥${s.rateCnyPerMillion}/百万token；约¥${s.cny.toFixed(4)}`);
-      const line = (name, item) => `${name}：约¥${item.cny.toFixed(2)}；${item.model}；${item.segments.map((s) => s.seconds).join("+")}秒；倍率${item.groupRatio}`;
-      return [{ type: "text", text: [`${value.duration}秒 / ${value.resolution.toUpperCase()} / ${value.ratio}（${value.estimateType}；${value.productionStrategy === "independent_shots" ? "独立镜头逐镜计费" : "连续续拍"}）`, line("火山官方方案", value.official), line("MetaOnticVideo插件方案", value.plugin), ...detail("火山官方", value.official), ...detail("插件", value.plugin), `价格核对日期：${value.priceDate}`, ...value.notes].join("\n") }];
+      let detail = (name, item) => item.segments.map((s) => `${name}第${s.index}段：${s.inputSeconds ? "有视频输入" : "无视频输入"}；输入${s.inputSeconds}秒 + 输出${s.seconds}秒；单价¥${s.rateCnyPerMillion}/百万token；约¥${s.cny.toFixed(4)}`), line = (name, item) => `${name}：约¥${item.cny.toFixed(2)}；${item.model}；${item.segments.map((s) => s.seconds).join("+")}秒；倍率${item.groupRatio}`;
+      return [{ type: "text", text: [`${value.duration}秒 / ${value.resolution.toUpperCase()} / ${value.ratio}（${value.estimateType}；${value.productionStrategy === "independent_shots" ? "独立镜头逐镜计费" : "连续续拍"}）`, line("火山官方方案", value.official), line("MetaOnticVideo插件方案", value.plugin), ...detail("火山官方", value.official), ...detail("插件", value.plugin), `价格核对日期：${value.priceDate}`, ...value.notes].join(`
+`) }];
     } },
     isConcurrencySafe() {
-      return true;
+      return !0;
     },
     async execute(args) {
       return compareVideoCosts(config, args);
@@ -6087,18 +5196,16 @@ function estimateTool(config) {
   };
 }
 function estimateSegmentCosts(config, args, plan) {
-  const model = resolveModel(config);
-  const entry2 = RATES.find(([prefix]) => model.startsWith(prefix));
+  let model = resolveModel(config), entry2 = RATES.find(([prefix]) => model.startsWith(prefix));
   if (!entry2) throw new Error(`尚无${model}的可靠价目`);
-  const ratio = args.ratio ?? ref(config, "ratio", "9:16");
+  let ratio = args.ratio ?? ref(config, "ratio", "9:16");
   if (!["16:9", "9:16"].includes(ratio)) throw new Error("此画幅缺少可靠像素计费依据");
-  const resolution = normalizeResolution(args.resolution);
+  let resolution = normalizeResolution(args.resolution);
   if (!resolution) throw new Error("未明确480P或720P");
-  const pixels = resolution === "720p" ? [1280, 720] : model.startsWith("doubao-seedance-2-5") ? [854, 480] : [864, 496];
-  const segments = plan.map((step, index) => {
-    const input = step.kind === "extend" || step.usesVideoInput === true ? Number(step.inputSeconds ?? (index ? plan[index - 1].seconds : args.inputVideoSeconds)) : 0;
+  let pixels = resolution === "720p" ? [1280, 720] : model.startsWith("doubao-seedance-2-5") ? [854, 480] : [864, 496], segments = plan.map((step, index) => {
+    let input = step.kind === "extend" || step.usesVideoInput === !0 ? Number(step.inputSeconds ?? (index ? plan[index - 1].seconds : args.inputVideoSeconds)) : 0;
     if (!Number.isFinite(input) || input < 0 || step.kind === "extend" && input <= 0) throw new Error("缺少已核实的输入视频时长");
-    const tokens = (input + step.seconds) * pixels[0] * pixels[1] * 24 / 1024;
+    let tokens = (input + step.seconds) * pixels[0] * pixels[1] * 24 / 1024;
     return { seconds: step.seconds, inputSeconds: input, cny: tokens * entry2[1][input ? 1 : 0] / 1e6 };
   });
   return { segments, cny: segments.reduce((sum, item) => sum + item.cny, 0), priceDate: PRICE_DATE };
@@ -6109,43 +5216,36 @@ init_connection();
 init_config();
 async function remainingCostText(config, exec, remainingSteps, inputVideoSeconds = void 0) {
   try {
-    const estimate = estimateSegmentCosts(config, { ...exec?.arguments || {}, resolution: resolveResolution(config, exec?.arguments || {}), inputVideoSeconds }, remainingSteps);
-    return { cost: `剩余计划基础估价约¥${estimate.cny.toFixed(4)}`, remain: "" };
+    return { cost: `剩余计划基础估价约¥${estimateSegmentCosts(config, { ...exec?.arguments || {}, resolution: resolveResolution(config, exec?.arguments || {}), inputVideoSeconds }, remainingSteps).cny.toFixed(4)}`, remain: "" };
   } catch (error) {
     return { cost: `剩余计划无法可靠估价（${error?.message || error}）`, remain: "" };
   }
 }
 function segmentContinueLine({ toolName = "video_generate", done, lastSeconds, nextSeconds }) {
-  const action = toolName === "video_extend" ? "延长" : "生成";
-  const finished = done > 0 ? `第 ${done} 段（${lastSeconds} 秒）已经生成好` : "还没有生成任何分段";
+  let action = toolName === "video_extend" ? "延长" : "生成";
   return {
-    zh: `${finished}。接下来${action}第 ${done + 1} 段（${nextSeconds} 秒）`,
+    zh: `${done > 0 ? `第 ${done} 段（${lastSeconds} 秒）已经生成好` : "还没有生成任何分段"}。接下来${action}第 ${done + 1} 段（${nextSeconds} 秒）`,
     en: `${done > 0 ? `Segment ${done} (${lastSeconds}s) is done. ` : ""}Next up: ${toolName === "video_extend" ? "extend" : "generate"} segment ${done + 1} (${nextSeconds}s)`
   };
 }
 function approvalPolicy(ctx, exec) {
   try {
-    const approval = ctx.get("approval");
+    let approval = ctx.get("approval");
     if (!approval) return "missing";
-    const session = exec?.agent?.session;
-    const override = session && typeof approval.overrideOf === "function" ? approval.overrideOf(session) : void 0;
-    return override || approval.config?.policy || "ask";
+    let session = exec?.agent?.session;
+    return (session && typeof approval.overrideOf == "function" ? approval.overrideOf(session) : void 0) || approval.config?.policy || "ask";
   } catch {
     return "ask";
   }
 }
 function setupGate(ctx, exec) {
-  const args = exec.arguments && typeof exec.arguments === "object" ? exec.arguments : {};
-  if (args?.install !== true) return { kind: "allow" };
-  const { os: os5, installs, bootstrap } = ffmpegInstallOptions();
-  const command = String(args?.target || "ffmpeg") === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
-  if (approvalPolicy(ctx, exec) === "never") {
-    return {
-      kind: "deny",
-      reason: `当前权限模式关闭了审批提示（完全访问），装环境这种会在本机跑命令的操作没法确认，已停止。把权限切到「工作区写入」或「只读」后再让我装；也可以照着这条命令自己在终端执行：${command}（${os5}）。`
-    };
-  }
-  return {
+  let args = exec.arguments && typeof exec.arguments == "object" ? exec.arguments : {};
+  if (args?.install !== !0) return { kind: "allow" };
+  let { os: os5, installs, bootstrap } = ffmpegInstallOptions(), command = String(args?.target || "ffmpeg") === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
+  return approvalPolicy(ctx, exec) === "never" ? {
+    kind: "deny",
+    reason: `当前权限模式关闭了审批提示（完全访问），装环境这种会在本机跑命令的操作没法确认，已停止。把权限切到「工作区写入」或「只读」后再让我装；也可以照着这条命令自己在终端执行：${command}（${os5}）。`
+  } : {
     kind: "ask",
     reason: `人工确认：在 ${os5} 上执行安装命令「${command}」。`,
     displayReason: {
@@ -6155,66 +5255,55 @@ function setupGate(ctx, exec) {
   };
 }
 async function ffmpegConsentGate(config, exec, args) {
-  if (exec.name !== "video_generate" && exec.name !== "video_extend") return null;
-  if (args?.merge === false) return null;
-  let plan = null;
-  let doneSteps = [];
+  if (exec.name !== "video_generate" && exec.name !== "video_extend" || args?.merge === !1) return null;
+  let plan = null, doneSteps = [];
   try {
-    const gateArgs = await estimateArgsFor(config, exec.name, args);
-    if (gateArgs?.merge === false) return null;
+    let gateArgs = await estimateArgsFor(config, exec.name, args);
+    if (gateArgs?.merge === !1) return null;
     plan = gateArgs.remainingPlan ?? estimatePlan(config, exec.name, gateArgs);
-    const dir = resumeDirOf(args?.resume);
-    if (dir) {
-      const data = await readPauseFile(dir);
-      doneSteps = (data.steps || []).map((step) => ({ kind: step.kind, seconds: step.seconds }));
-    }
+    let dir = resumeDirOf(args?.resume);
+    dir && (doneSteps = ((await readPauseFile(dir)).steps || []).map((step) => ({ kind: step.kind, seconds: step.seconds })));
   } catch {
     plan = null;
   }
-  const allSteps = [...doneSteps, ...plan || []];
-  if (!plan || allSteps.length < 2) return null;
-  if (await hasFfmpeg(config, exec.signal)) return null;
-  const { os: os5, installs } = ffmpegInstallOptions();
-  const command = installs[0].command;
-  const sizes = allSteps.map((step) => `${step.seconds}s`).join(" + ");
-  const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  const lines = [
-    `本机没有 ${binary}，本次计划总时长是 ${allSteps.reduce((sum, step) => sum + step.seconds, 0)} 秒（会拆成 ${allSteps.length} 段：${sizes}），没有 ffmpeg 就没法合并成一条，所以先停下来了，还没有调用模型、没有产生费用。`,
-    "请在对话框里先和用户确认，不要自己绕过这一步：",
-    `1) 问用户要不要现在装 ffmpeg —— 说清他的系统（${os5}）和命令：${command}`,
-    "   （装好后，已有任务用原resume重试下载或合并；尚未提交的新任务再确认生成费用）。",
-    '2) 用户同意安装：调用 video_setup（install:true）——插件会执行上面的命令，宿主会先把这条命令拿给用户确认；装完它会自己验证，成功后你按原 duration 重新调用 video_generate 继续生成即可（一般是先装包管理器：本机连 brew 都没有时，video_setup 会返回 nextStep，用 target:"package-manager" 再装一次）。',
-    "3) 用户不想装、或者装不了：带 `merge:false` 重新调用 video_generate，插件就只生成并返回分段列表（每段上游链接，不下载本地文件），这次不会再拦。",
-    "已经装过但不在默认位置的话，把绝对路径填进插件设置里的「ffmpeg 路径」也一样管用；安装包自带 ffprobe，分段时长探测会一起解决。"
-  ];
+  let allSteps = [...doneSteps, ...plan || []];
+  if (!plan || allSteps.length < 2 || await hasFfmpeg(config, exec.signal)) return null;
+  let { os: os5, installs } = ffmpegInstallOptions(), command = installs[0].command, sizes = allSteps.map((step) => `${step.seconds}s`).join(" + ");
   return {
     kind: "deny",
-    reason: lines.join("\n"),
-    info: { ffmpegMissing: true, os: os5, command, segments: allSteps.length }
+    reason: [
+      `本机没有 ${resolveBinary(config, "ffmpegBinary", "ffmpeg")}，本次计划总时长是 ${allSteps.reduce((sum, step) => sum + step.seconds, 0)} 秒（会拆成 ${allSteps.length} 段：${sizes}），没有 ffmpeg 就没法合并成一条，所以先停下来了，还没有调用模型、没有产生费用。`,
+      "请在对话框里先和用户确认，不要自己绕过这一步：",
+      `1) 问用户要不要现在装 ffmpeg —— 说清他的系统（${os5}）和命令：${command}`,
+      "   （装好后，已有任务用原resume重试下载或合并；尚未提交的新任务再确认生成费用）。",
+      '2) 用户同意安装：调用 video_setup（install:true）——插件会执行上面的命令，宿主会先把这条命令拿给用户确认；装完它会自己验证，成功后你按原 duration 重新调用 video_generate 继续生成即可（一般是先装包管理器：本机连 brew 都没有时，video_setup 会返回 nextStep，用 target:"package-manager" 再装一次）。',
+      "3) 用户不想装、或者装不了：带 `merge:false` 重新调用 video_generate，插件就只生成并返回分段列表（每段上游链接，不下载本地文件），这次不会再拦。",
+      "已经装过但不在默认位置的话，把绝对路径填进插件设置里的「ffmpeg 路径」也一样管用；安装包自带 ffprobe，分段时长探测会一起解决。"
+    ].join(`
+`),
+    info: { ffmpegMissing: !0, os: os5, command, segments: allSteps.length }
   };
 }
 async function estimateArgsFor(config, toolName, args) {
-  const dir = resumeDirOf(args?.resume);
+  let dir = resumeDirOf(args?.resume);
   if (!dir) return args;
-  const data = await readPauseFile(dir);
+  let data = await readPauseFile(dir);
   assertResumeConnection(data, config, args);
-  const merged = { ...data.options || {}, ...args };
-  let plan;
-  if (toolName === "video_generate") {
+  let merged = { ...data.options || {}, ...args }, plan;
+  if (toolName === "video_generate")
     plan = resumePlanFrom(data, {
       askedTotal: args?.duration == null ? null : clampInteger(args.duration, MIN_SECONDS, Number.MAX_SAFE_INTEGER, 0),
       segmentSeconds: resolveSegmentSeconds(config, args?.segmentSeconds)
     }).plan;
-  } else {
-    const fullPlan = data.plan.map((step) => ({ ...step }));
+  else {
+    let fullPlan = data.plan.map((step) => ({ ...step }));
     if (args?.segments != null) {
-      const count = clampInteger(args.segments, 1, MAX_SEGMENTS, 1);
-      const seconds = clampInteger(args.duration, MIN_SECONDS, modelMaxSeconds(config), modelMaxSeconds(config));
+      let count = clampInteger(args.segments, 1, MAX_SEGMENTS, 1), seconds = clampInteger(args.duration, MIN_SECONDS, modelMaxSeconds(config), modelMaxSeconds(config));
       for (let n = 0; n < count && fullPlan.length < MAX_SEGMENTS; n++) fullPlan.push({ kind: "extend", seconds });
     }
     plan = fullPlan.slice(Number(data.done) || 0);
   }
-  const previous = (data.steps || []).at(-1);
+  let previous = (data.steps || []).at(-1);
   return {
     ...merged,
     inputVideoSeconds: previous?.durationSeconds ?? previous?.seconds ?? merged.inputVideoSeconds,
@@ -6224,36 +5313,27 @@ async function estimateArgsFor(config, toolName, args) {
 }
 async function preflightGate(ctx, config, exec) {
   if (exec.name === "video_setup") return setupGate(ctx, exec);
-  if (exec.name === "media_submission") {
-    if (exec.arguments?.action === "get") return { kind: "allow" };
-    if (approvalPolicy(ctx, exec) === "never") return { kind: "deny", reason: "需要用户确认原提交的核对结果。" };
-    return { kind: "ask", reason: exec.arguments?.taskId ? "确认将防重记录关联到渠道侧核对出的原任务 ID，不重新生成。" : "请确认已经在渠道侧核对：原请求没有创建任务。解锁后再生成会产生新费用；若原任务实际存在，可能重复扣费。" };
-  }
+  if (exec.name === "media_submission")
+    return exec.arguments?.action === "get" ? { kind: "allow" } : approvalPolicy(ctx, exec) === "never" ? { kind: "deny", reason: "需要用户确认原提交的核对结果。" } : { kind: "ask", reason: exec.arguments?.taskId ? "确认将防重记录关联到渠道侧核对出的原任务 ID，不重新生成。" : "请确认已经在渠道侧核对：原请求没有创建任务。解锁后再生成会产生新费用；若原任务实际存在，可能重复扣费。" };
   if (exec.name === "video_prepare_image") {
-    const creating = exec.arguments?.operation === "create_character";
+    let creating = exec.arguments?.operation === "create_character";
     if (String(exec.arguments?.taskId || "").trim()) return { kind: "allow" };
     if (approvalPolicy(ctx, exec) === "never") return { kind: "deny", reason: "当前权限模式无法进行图片调用确认。" };
     if (!creating && exec.arguments?.characterType === "realistic") return { kind: "deny", reason: "真人限制转换必须使用非真人风格，不能转换为真人写实。" };
-    const characterLabel = exec.arguments?.characterType === "realistic" ? "真人写实" : "非真人";
-    if (creating) return { kind: "ask", reason: "调用Seedream按文字生成角色参考图，图片单独计费。完成后先展示并核对角色和风格，确认后才用于视频；视频生成另行确认和计费。", displayReason: { zh: `先生成一张${characterLabel}角色参考图，图片调用单独计费。生成后先看图确认，再用于视频；现在不会生成视频。是否同意？`, en: `Generate one ${exec.arguments?.characterType === "realistic" ? "photorealistic" : "stylized"} character reference image, billed separately. Review it before any separately confirmed video generation.` } };
-    return { kind: "ask", reason: "调用 Seedream 将真人参考图转为非真人风格；图片生成单独按实际调用计费，视频费用另计。", displayReason: { zh: `将调用 Seedream 处理参考图，图片调用单独计费，视频费用另计。确认后开始处理。`, en: `Use Seedream to stylize the reference. Image calls are billed separately from video. Confirm to proceed.` } };
+    let characterLabel = exec.arguments?.characterType === "realistic" ? "真人写实" : "非真人";
+    return creating ? { kind: "ask", reason: "调用Seedream按文字生成角色参考图，图片单独计费。完成后先展示并核对角色和风格，确认后才用于视频；视频生成另行确认和计费。", displayReason: { zh: `先生成一张${characterLabel}角色参考图，图片调用单独计费。生成后先看图确认，再用于视频；现在不会生成视频。是否同意？`, en: `Generate one ${exec.arguments?.characterType === "realistic" ? "photorealistic" : "stylized"} character reference image, billed separately. Review it before any separately confirmed video generation.` } } : { kind: "ask", reason: "调用 Seedream 将真人参考图转为非真人风格；图片生成单独按实际调用计费，视频费用另计。", displayReason: { zh: "将调用 Seedream 处理参考图，图片调用单独计费，视频费用另计。确认后开始处理。", en: "Use Seedream to stylize the reference. Image calls are billed separately from video. Confirm to proceed." } };
   }
-  if (exec.arguments?.resume && exec.arguments?.cumulativePreview === true) return { kind: "allow" };
-  const rawArgs = exec.arguments && typeof exec.arguments === "object" ? exec.arguments : {};
-  let effectiveArgs = rawArgs;
-  let resumeSegment = null;
-  if (resumeDirOf(rawArgs.resume)) {
+  if (exec.arguments?.resume && exec.arguments?.cumulativePreview === !0) return { kind: "allow" };
+  let rawArgs = exec.arguments && typeof exec.arguments == "object" ? exec.arguments : {}, effectiveArgs = rawArgs, resumeSegment = null;
+  if (resumeDirOf(rawArgs.resume))
     try {
-      const saved = await readPauseFile(resumeDirOf(rawArgs.resume));
-      if (Object.values(saved.operationState || {}).some((state) => state.phase === "review")) {
-        if (rawArgs.referenceImagesReviewed !== true) return { kind: "allow" };
-        if (approvalPolicy(ctx, exec) === "never") return { kind: "deny", reason: "需要确认转换图片效果与视频重试。" };
-        return { kind: "ask", reason: "请确认已看过转换后的全部图片，图片已呈现非真人风格且符合要求，并同意使用这些图片重试视频一次。视频重试按实际调用计费；图片不合适请拒绝，插件不会自动重画。" };
-      }
+      let saved = await readPauseFile(resumeDirOf(rawArgs.resume));
+      if (Object.values(saved.operationState || {}).some((state) => state.phase === "review"))
+        return rawArgs.referenceImagesReviewed !== !0 ? { kind: "allow" } : approvalPolicy(ctx, exec) === "never" ? { kind: "deny", reason: "需要确认转换图片效果与视频重试。" } : { kind: "ask", reason: "请确认已看过转换后的全部图片，图片已呈现非真人风格且符合要求，并同意使用这些图片重试视频一次。视频重试按实际调用计费；图片不合适请拒绝，插件不会自动重画。" };
       effectiveArgs = await estimateArgsFor(config, exec.name, rawArgs);
-      const remaining = effectiveArgs.remainingPlan;
+      let remaining = effectiveArgs.remainingPlan;
       if (remaining?.length === 0) return { kind: "allow" };
-      const lastStep = (saved.steps || []).at(-1);
+      let lastStep = (saved.steps || []).at(-1);
       resumeSegment = {
         toolName: exec.name,
         done: Number(saved.done) || 0,
@@ -6266,13 +5346,11 @@ async function preflightGate(ctx, config, exec) {
     } catch (error) {
       return { kind: "deny", reason: error?.message || String(error) };
     }
-  }
   let resumeLead = null;
   if (resumeSegment) {
-    const line = segmentContinueLine(resumeSegment);
-    let rest = `整条还差 ${resumeSegment.remainingSeconds} 秒`;
+    let line = segmentContinueLine(resumeSegment), rest = `整条还差 ${resumeSegment.remainingSeconds} 秒`;
     try {
-      const measured = await remainingCostText(config, { ...exec, arguments: effectiveArgs }, resumeSegment.remainingSteps, resumeSegment.inputVideoSeconds);
+      let measured = await remainingCostText(config, { ...exec, arguments: effectiveArgs }, resumeSegment.remainingSteps, resumeSegment.inputVideoSeconds);
       rest += `（${measured.cost}${measured.remain ? `；${measured.remain}` : ""}）`;
     } catch {
     }
@@ -6283,33 +5361,25 @@ async function preflightGate(ctx, config, exec) {
       tailEn: " Allow to continue; reject to stop here — the segments already generated are kept and you can resume saved progress later if the local files or upstream results remain available."
     };
   }
-  if (approvalPolicy(ctx, exec) === "never") {
+  if (approvalPolicy(ctx, exec) === "never")
     return {
       kind: "deny",
       reason: "当前权限模式关闭了审批提示（完全访问），无法做人工确认，已停止调用。把权限切到「工作区写入」或「只读」后再生成视频。"
     };
-  }
-  const args = exec.arguments && typeof exec.arguments === "object" ? exec.arguments : {};
-  const characterChoice = await characterChoiceGate(ctx, config, exec, args);
+  let args = exec.arguments && typeof exec.arguments == "object" ? exec.arguments : {}, characterChoice = await characterChoiceGate(ctx, config, exec, args);
   if (characterChoice) return characterChoice;
-  const consent = await ffmpegConsentGate(config, exec, args);
+  let consent = await ffmpegConsentGate(config, exec, args);
   if (consent) return consent;
   if (isManualKey(config)) {
     assertConfigured(config, resolveApiKey(config));
-    const plan = effectiveArgs.remainingPlan ?? estimatePlan(config, exec.name, effectiveArgs);
-    const ratio = effectiveArgs.ratio ?? ref(config, "ratio", "9:16");
-    const resolution = resolveResolution(config, effectiveArgs);
-    const audio = effectiveArgs.generateAudio ?? ref(config, "generateAudio", true);
-    let costZh, costEn;
+    let plan = effectiveArgs.remainingPlan ?? estimatePlan(config, exec.name, effectiveArgs), ratio = effectiveArgs.ratio ?? ref(config, "ratio", "9:16"), resolution = resolveResolution(config, effectiveArgs), audio = effectiveArgs.generateAudio ?? ref(config, "generateAudio", !0), costZh, costEn;
     try {
-      const measured = estimateSegmentCosts(config, { ...effectiveArgs, ratio, resolution }, plan);
-      costZh = `本段基础估价约¥${measured.segments[0].cny.toFixed(4)}，剩余计划${plan.length}段合计约¥${measured.cny.toFixed(4)}（价目日期${measured.priceDate}，倍率1，最低用量补足未计入）`;
-      costEn = `This segment ~CNY ${measured.segments[0].cny.toFixed(4)}; remaining ${plan.length} segments ~CNY ${measured.cny.toFixed(4)} (base estimate, multiplier 1; minimum billing excluded)`;
+      let measured = estimateSegmentCosts(config, { ...effectiveArgs, ratio, resolution }, plan);
+      costZh = `本段基础估价约¥${measured.segments[0].cny.toFixed(4)}，剩余计划${plan.length}段合计约¥${measured.cny.toFixed(4)}（价目日期${measured.priceDate}，倍率1，最低用量补足未计入）`, costEn = `This segment ~CNY ${measured.segments[0].cny.toFixed(4)}; remaining ${plan.length} segments ~CNY ${measured.cny.toFixed(4)} (base estimate, multiplier 1; minimum billing excluded)`;
     } catch (error) {
-      costZh = `无法可靠估价（${error?.message || error}）`;
-      costEn = "A reliable cost estimate is unavailable";
+      costZh = `无法可靠估价（${error?.message || error}）`, costEn = "A reliable cost estimate is unavailable";
     }
-    const summary = `${effectiveArgs.productionStrategy === "independent_shots" ? "独立镜头生成，每镜计费、人物一致性需参考图；" : "连续续拍；"}${resolveModel(config)} · ${ratio} · ${resolution} · ${audio ? "有音频" : "无音频"} · 本段${plan[0]?.seconds ?? "未知"}秒 · 剩余${plan.map((s) => s.seconds).join("+")}秒`;
+    let summary = `${effectiveArgs.productionStrategy === "independent_shots" ? "独立镜头生成，每镜计费、人物一致性需参考图；" : "连续续拍；"}${resolveModel(config)} · ${ratio} · ${resolution} · ${audio ? "有音频" : "无音频"} · 本段${plan[0]?.seconds ?? "未知"}秒 · 剩余${plan.map((s) => s.seconds).join("+")}秒`;
     return {
       kind: "ask",
       reason: `${resumeLead?.zh || ""}制作确认：${connectionLabel(config)} ${summary}；${costZh}。按当前 API密钥在渠道的实际用量计费。`,
@@ -6325,27 +5395,17 @@ async function preflightGate(ctx, config, exec) {
 // src/businesses/video-generation/workflow/script-questions.ts
 import { createHash as createHash7 } from "node:crypto";
 function pendingScriptQuestions(script) {
-  const result = [];
-  let active2 = false, depth = 0;
-  const headingTitle = (text) => text.replace(/[*`]/g, "").replace(/^[一二三四五六七八九十\d]+[、.．）)]\s*/, "").trim();
-  const isPending = (text) => /^(?:用户)?(?:待(?:用户)?确认(?:的)?(?:问题|事项)?|确认事项)(?:\s*[（(:：]|\s*$)/.test(text);
-  for (const raw of script.split(/\r?\n/)) {
-    const line = raw.trim();
-    const heading = /^(#{1,6})\s+(.+)$/.exec(line);
-    const bold = /^\*\*(.+?)\*\*[:：]?$/.exec(line);
+  let result = [], active2 = !1, depth = 0, headingTitle = (text) => text.replace(/[*`]/g, "").replace(/^[一二三四五六七八九十\d]+[、.．）)]\s*/, "").trim(), isPending = (text) => /^(?:用户)?(?:待(?:用户)?确认(?:的)?(?:问题|事项)?|确认事项)(?:\s*[（(:：]|\s*$)/.test(text);
+  for (let raw of script.split(/\r?\n/)) {
+    let line = raw.trim(), heading = /^(#{1,6})\s+(.+)$/.exec(line), bold = /^\*\*(.+?)\*\*[:：]?$/.exec(line);
     if (heading || bold) {
-      const level = heading ? heading[1].length : 2, title = headingTitle(heading ? heading[2] : bold[1]);
-      if (active2 && level <= depth) active2 = false;
-      if (isPending(title)) {
-        active2 = true;
-        depth = level;
-      }
+      let level = heading ? heading[1].length : 2, title = headingTitle(heading ? heading[2] : bold[1]);
+      active2 && level <= depth && (active2 = !1), isPending(title) && (active2 = !0, depth = level);
       continue;
     }
     if (!active2) continue;
-    const value = line.replace(/^(?:[-*+]\s+(?:\[[ xX]\]\s*)?|\d+[.、）)]\s*)/, "").trim();
-    if (!value || /^[-*_\s]+$/.test(value) || /^(?:无|暂无|无待确认(?:事项|问题)?|无需确认|均已确认|已全部确认)[。.!！]?$/.test(value)) continue;
-    result.push(value);
+    let value = line.replace(/^(?:[-*+]\s+(?:\[[ xX]\]\s*)?|\d+[.、）)]\s*)/, "").trim();
+    !value || /^[-*_\s]+$/.test(value) || /^(?:无|暂无|无待确认(?:事项|问题)?|无需确认|均已确认|已全部确认)[。.!！]?$/.test(value) || result.push(value);
   }
   return [...new Set(result)];
 }
@@ -6353,69 +5413,59 @@ function questionId(question) {
   return "script_pending_" + createHash7("sha256").update(question.replace(/\s/g, "")).digest("hex").slice(0, 20);
 }
 function syncScriptQuestions(project, questions, scriptHash) {
-  const records = project.clarifications ||= [];
-  for (const question of questions) {
-    const id = questionId(question);
-    if (!records.some((item) => item.id === id)) records.push({ id, question, status: "PENDING", introducedScriptHash: scriptHash });
+  let records = project.clarifications ||= [];
+  for (let question of questions) {
+    let id = questionId(question);
+    records.some((item) => item.id === id) || records.push({ id, question, status: "PENDING", introducedScriptHash: scriptHash });
   }
-  const current = new Set(questions.map(questionId));
-  for (const item of records) {
-    if (current.has(item.id) && item.status === "APPLIED") item.status = "ANSWERED";
-    if (item.status === "ANSWERED" && !current.has(item.id) && item.answeredScriptHash !== scriptHash) {
-      item.status = "APPLIED";
-      item.appliedScriptHash = scriptHash;
-    }
-  }
+  let current = new Set(questions.map(questionId));
+  for (let item of records)
+    current.has(item.id) && item.status === "APPLIED" && (item.status = "ANSWERED"), item.status === "ANSWERED" && !current.has(item.id) && item.answeredScriptHash !== scriptHash && (item.status = "APPLIED", item.appliedScriptHash = scriptHash);
   return records.filter((item) => item.status !== "APPLIED");
 }
 function recordQuestionAnswers(records, asked, result, scriptHash, aborted) {
-  if (aborted) return;
-  for (const item of asked) {
-    const answer = result?.answers?.find((value) => value.id === item.id);
-    const text = typeof answer?.custom === "string" ? answer.custom.trim() : "";
-    if (!text) continue;
-    const record = records.find((value) => value.id === item.id);
-    record.answer = text;
-    record.status = "ANSWERED";
-    record.answeredScriptHash = scriptHash;
-    record.answeredAt = (/* @__PURE__ */ new Date()).toISOString();
-  }
+  if (!aborted)
+    for (let item of asked) {
+      let answer = result?.answers?.find((value) => value.id === item.id), text = typeof answer?.custom == "string" ? answer.custom.trim() : "";
+      if (!text) continue;
+      let record = records.find((value) => value.id === item.id);
+      record.answer = text, record.status = "ANSWERED", record.answeredScriptHash = scriptHash, record.answeredAt = (/* @__PURE__ */ new Date()).toISOString();
+    }
 }
 
 // src/businesses/video-generation/workflow/script-capture.ts
-var IMAGE_OR_LINK = /^!?\[[^\]]*\]\([^)]*\)$/;
-var ONLY_TARGET = /^<[^>]+>$/;
-var RULE = /^([-*_]\s*){3,}$/;
+var IMAGE_OR_LINK = /^!?\[[^\]]*\]\([^)]*\)$/, ONLY_TARGET = /^<[^>]+>$/, RULE = /^([-*_]\s*){3,}$/;
 function captureScriptBody(text) {
-  const lines = String(text ?? "").replace(/\r\n?/g, "\n").split("\n");
-  const start = lines.findIndex((line) => /^#\s+\S/.test(line));
+  let lines = String(text ?? "").replace(/\r\n?/g, `
+`).split(`
+`), start = lines.findIndex((line) => /^#\s+\S/.test(line));
   if (start < 0) return "";
-  const kept = lines.slice(start);
-  while (kept.length) {
-    const line = kept[kept.length - 1].trim();
+  let kept = lines.slice(start);
+  for (; kept.length; ) {
+    let line = kept[kept.length - 1].trim();
     if (!line || RULE.test(line) || IMAGE_OR_LINK.test(line) || ONLY_TARGET.test(line)) {
       kept.pop();
       continue;
     }
     break;
   }
-  const body = kept.join("\n").trim();
+  let body = kept.join(`
+`).trim();
   return body.length >= 200 ? body : "";
 }
 
 // src/businesses/video-generation/tools/video-stage.ts
 import { randomUUID as randomUUID7 } from "node:crypto";
 import { performance as performance3 } from "node:perf_hooks";
-var STAGES3 = ["script_design", "storyboard_design", "script_present", "script_review_wait", "production_confirm_wait", "reference_review_wait", "segment_review_wait", "result_present"];
-var pendingStages = /* @__PURE__ */ new Map();
+var STAGES3 = ["script_design", "storyboard_design", "script_present", "script_review_wait", "production_confirm_wait", "reference_review_wait", "segment_review_wait", "result_present"], pendingStages = /* @__PURE__ */ new Map();
 async function closePendingStage(stage, source) {
   let target;
-  for (const [spanId, entry3] of pendingStages) if (entry3.stage === stage) target = spanId;
+  for (let [spanId, entry3] of pendingStages) entry3.stage === stage && (target = spanId);
   if (!target) return null;
-  const entry2 = pendingStages.get(target);
+  let entry2 = pendingStages.get(target);
   pendingStages.delete(target);
-  const elapsedMs = Math.round((performance3.now() - entry2.start) * 1e3) / 1e3;
-  await appendRequestLog({
+  let elapsedMs = Math.round((performance3.now() - entry2.start) * 1e3) / 1e3;
+  return await appendRequestLog({
     ...entry2.context,
     event: "stage_finished",
     stage: entry2.stage,
@@ -6425,8 +5475,7 @@ async function closePendingStage(stage, source) {
     elapsedMs,
     outcome: "success",
     source
-  });
-  return { spanId: target, elapsedMs };
+  }), { spanId: target, elapsedMs };
 }
 function stageTool() {
   return {
@@ -6438,34 +5487,27 @@ function stageTool() {
     } },
     timeoutMs: 1e4,
     isConcurrencySafe() {
-      return true;
+      return !0;
     },
     async execute(args) {
       if (!STAGES3.includes(args?.stage)) throw new Error("未知计时阶段");
       if (args.action === "start") {
         if (pendingStages.size >= 512) return { status: "unavailable" };
-        const spanId = randomUUID7(), startedAt = (/* @__PURE__ */ new Date()).toISOString();
-        const context = typeof requestLogContext !== "undefined" ? requestLogContext.getStore() : void 0;
-        pendingStages.set(spanId, { stage: args.stage, startedAt, start: performance3.now(), context });
-        await appendRequestLog({ event: "stage_started", stage: args.stage, spanId, startedAt, source: "assistant_marker" });
-        return { status: "started", spanId };
+        let spanId = randomUUID7(), startedAt = (/* @__PURE__ */ new Date()).toISOString(), context = typeof requestLogContext < "u" ? requestLogContext.getStore() : void 0;
+        return pendingStages.set(spanId, { stage: args.stage, startedAt, start: performance3.now(), context }), await appendRequestLog({ event: "stage_started", stage: args.stage, spanId, startedAt, source: "assistant_marker" }), { status: "started", spanId };
       }
       if (args.action !== "finish") throw new Error("未知计时动作");
-      const entry2 = pendingStages.get(args.spanId);
+      let entry2 = pendingStages.get(args.spanId);
       if (!entry2 || entry2.stage !== args.stage) return { status: "unavailable" };
       pendingStages.delete(args.spanId);
-      const elapsedMs = Math.round((performance3.now() - entry2.start) * 1e3) / 1e3;
-      const outcome = ["success", "cancelled", "error"].includes(args.outcome) ? args.outcome : "success";
-      await appendRequestLog({ ...entry2.context, event: "stage_finished", stage: entry2.stage, spanId: args.spanId, startedAt: entry2.startedAt, finishedAt: (/* @__PURE__ */ new Date()).toISOString(), elapsedMs, outcome, source: "assistant_marker" });
-      return { status: "finished", spanId: args.spanId, elapsedMs };
+      let elapsedMs = Math.round((performance3.now() - entry2.start) * 1e3) / 1e3, outcome = ["success", "cancelled", "error"].includes(args.outcome) ? args.outcome : "success";
+      return await appendRequestLog({ ...entry2.context, event: "stage_finished", stage: entry2.stage, spanId: args.spanId, startedAt: entry2.startedAt, finishedAt: (/* @__PURE__ */ new Date()).toISOString(), elapsedMs, outcome, source: "assistant_marker" }), { status: "finished", spanId: args.spanId, elapsedMs };
     }
   };
 }
 
 // src/businesses/video-generation/workflow/script-tracking.ts
-var SCRIPT_FILE = /^script(?:[-_]?v?\d+)?\.md$/i;
-var WRITE_TOOLS = /* @__PURE__ */ new Set(["write", "edit", "multi_edit", "multiedit", "apply_patch"]);
-var PATCH_FILE_LINE = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gim;
+var SCRIPT_FILE = /^script(?:[-_]?v?\d+)?\.md$/i, WRITE_TOOLS = /* @__PURE__ */ new Set(["write", "edit", "multi_edit", "multiedit", "apply_patch"]), PATCH_FILE_LINE = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gim;
 function fileBaseName(target) {
   return String(target ?? "").split(/[\\/]/).pop() || "";
 }
@@ -6473,8 +5515,8 @@ function isScriptPath(target) {
   return SCRIPT_FILE.test(fileBaseName(target));
 }
 function toolArguments(value) {
-  if (value && typeof value === "object") return value;
-  if (typeof value !== "string") return {};
+  if (value && typeof value == "object") return value;
+  if (typeof value != "string") return {};
   try {
     return JSON.parse(value);
   } catch {
@@ -6483,84 +5525,69 @@ function toolArguments(value) {
 }
 function scriptSaveOf(event) {
   if (event?.type !== "tool/call") return null;
-  const data = event.data || {};
-  const name = String(data.name || "");
+  let data = event.data || {}, name = String(data.name || "");
   if (!WRITE_TOOLS.has(name)) return null;
-  const args = toolArguments(data.arguments);
-  const direct = args.file_path || args.path || args.filePath;
+  let args = toolArguments(data.arguments), direct = args.file_path || args.path || args.filePath;
   if (isScriptPath(direct)) return { path: String(direct), tool: name, mode: name === "write" ? "create" : "update" };
   if (name !== "apply_patch") return null;
-  const text = String(args.patch ?? args.input ?? "");
-  for (const match of text.matchAll(PATCH_FILE_LINE)) {
+  let text = String(args.patch ?? args.input ?? "");
+  for (let match of text.matchAll(PATCH_FILE_LINE))
     if (isScriptPath(match[1])) return { path: match[1].trim(), tool: name, mode: "update" };
-  }
   return null;
 }
 function scriptVersion(content) {
-  const match = /版本[:：]\s*(第?\s*\d+\s*版)/.exec(String(content ?? ""));
+  let match = /版本[:：]\s*(第?\s*\d+\s*版)/.exec(String(content ?? ""));
   return match ? match[1].replace(/\s+/g, "") : void 0;
 }
 function createScriptTracker({ closeStage = closePendingStage, log = appendRequestLog } = {}) {
   async function observe(session, event) {
-    if (!session || typeof session !== "object") return;
-    const save2 = scriptSaveOf(event);
-    if (!save2) return;
-    try {
-      const content = toolArguments((event.data || {}).arguments).content;
-      const text = typeof content === "string" ? content : "";
-      const closed = await closeStage("script_design", "script_saved");
-      await log({
-        event: "script_saved",
-        sessionId: session.id,
-        callId: event.data?.callId,
-        path: save2.path,
-        tool: save2.tool,
-        mode: save2.mode,
-        bytes: text ? Buffer.byteLength(text, "utf8") : void 0,
-        characters: text ? text.length : void 0,
-        version: scriptVersion(text),
-        turn: (event.data || {}).turn,
-        closedSpanId: closed?.spanId,
-        closedElapsedMs: closed?.elapsedMs
-      });
-    } catch {
-    }
+    if (!session || typeof session != "object") return;
+    let save2 = scriptSaveOf(event);
+    if (save2)
+      try {
+        let content = toolArguments((event.data || {}).arguments).content, text = typeof content == "string" ? content : "", closed = await closeStage("script_design", "script_saved");
+        await log({
+          event: "script_saved",
+          sessionId: session.id,
+          callId: event.data?.callId,
+          path: save2.path,
+          tool: save2.tool,
+          mode: save2.mode,
+          bytes: text ? Buffer.byteLength(text, "utf8") : void 0,
+          characters: text ? text.length : void 0,
+          version: scriptVersion(text),
+          turn: (event.data || {}).turn,
+          closedSpanId: closed?.spanId,
+          closedElapsedMs: closed?.elapsedMs
+        });
+      } catch {
+      }
   }
   return { observe };
 }
 
 // src/businesses/video-generation/workflow/storyboard-shots.ts
 function scriptStoryboardShots(script) {
-  const lines = script.split(/\r?\n/), shots = [];
-  const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split(/(?<!\\)\|/).map((s) => s.trim().replace(/\\\|/g, "|"));
-  let fenced = false;
+  let lines = script.split(/\r?\n/), shots = [], cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split(/(?<!\\)\|/).map((s) => s.trim().replace(/\\\|/g, "|")), fenced = !1;
   for (let i = 0; i < lines.length - 1; i++) {
     if (/^\s*(```|~~~)/.test(lines[i])) {
       fenced = !fenced;
       continue;
     }
     if (fenced || !lines[i].includes("|")) continue;
-    const header = cells(lines[i]), separator = cells(lines[i + 1]);
+    let header = cells(lines[i]), separator = cells(lines[i + 1]);
     if (separator.length !== header.length || !separator.every((x) => /^:?-{3,}:?$/.test(x))) continue;
-    const titleAt = header.findIndex((x) => /镜号|镜头|shot/i.test(x));
-    const visualAt = header.findIndex((x) => /画面|visual|详情|描述/i.test(x));
+    let titleAt = header.findIndex((x) => /镜号|镜头|shot/i.test(x)), visualAt = header.findIndex((x) => /画面|visual|详情|描述/i.test(x));
     if (titleAt < 0 || visualAt < 0 || titleAt === visualAt) continue;
-    const timeAt = header.findIndex((x) => /时间|时长|time|duration/i.test(x));
-    const framingAt = header.findIndex((x) => /景别|镜别|shot\s*size/i.test(x));
-    const viewAt = header.findIndex((x) => /视角|机位角度|view\s*angle|angle|perspective/i.test(x));
-    const moveAt = header.findIndex((x) => /运镜|camera|movement/i.test(x));
-    const cameraAt = [...new Set([framingAt, viewAt, moveAt].filter((j) => j >= 0))].sort((a, b) => a - b);
-    const soundAt = header.findIndex((x) => /声音|音效|sound|sfx/i.test(x));
-    const dialogueAt = header.findIndex((x) => /台词|对白|dialogue/i.test(x));
+    let timeAt = header.findIndex((x) => /时间|时长|time|duration/i.test(x)), framingAt = header.findIndex((x) => /景别|镜别|shot\s*size/i.test(x)), viewAt = header.findIndex((x) => /视角|机位角度|view\s*angle|angle|perspective/i.test(x)), moveAt = header.findIndex((x) => /运镜|camera|movement/i.test(x)), cameraAt = [...new Set([framingAt, viewAt, moveAt].filter((j) => j >= 0))].sort((a, b) => a - b), soundAt = header.findIndex((x) => /声音|音效|sound|sfx/i.test(x)), dialogueAt = header.findIndex((x) => /台词|对白|dialogue/i.test(x));
     for (i += 2; i < lines.length && lines[i].includes("|") && lines[i].trim(); i++) {
-      const row = cells(lines[i]);
+      let row = cells(lines[i]);
       if (row.length !== header.length || !row[visualAt]) continue;
-      const time = row[timeAt] || "", range = time.match(/(\d+(?:\.\d+)?)\s*(?:秒|s)?\s*[–—~～至-]\s*(\d+(?:\.\d+)?)/i);
-      const explicit = time.match(/^(\d+(?:\.\d+)?)\s*(?:秒|s)$/i);
-      const duration = range ? Number(range[2]) - Number(range[1]) : explicit ? Number(explicit[1]) : null;
+      let time = row[timeAt] || "", range = time.match(/(\d+(?:\.\d+)?)\s*(?:秒|s)?\s*[–—~～至-]\s*(\d+(?:\.\d+)?)/i), explicit = time.match(/^(\d+(?:\.\d+)?)\s*(?:秒|s)$/i), duration = range ? Number(range[2]) - Number(range[1]) : explicit ? Number(explicit[1]) : null;
       shots.push({
         title: row[titleAt],
-        visual: header.map((h, j) => `${h}：${row[j]}`).join("\n"),
+        visual: header.map((h, j) => `${h}：${row[j]}`).join(`
+`),
         camera: cameraAt.map((j) => row[j]).filter(Boolean).join(" · "),
         sfx: row[soundAt] || "",
         dialogue: row[dialogueAt] ? [{ role: "剧本对白", line: row[dialogueAt] }] : [],
@@ -6574,52 +5601,40 @@ function scriptStoryboardShots(script) {
 }
 
 // src/businesses/video-generation/workflow/storyboard-image.ts
-var FONT = "-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
-var ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" };
-var escapeXml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ESCAPES[char]);
-var STORYBOARD_PREFIX = "storyboard-v";
-var storyboardFileName = (version) => `${STORYBOARD_PREFIX}${version}.svg`;
+var FONT = "-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif", ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }, escapeXml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ESCAPES[char]), STORYBOARD_PREFIX = "storyboard-v", storyboardFileName = (version) => `${STORYBOARD_PREFIX}${version}.svg`;
 function nextStoryboardVersion(entries = []) {
   let max = 0;
-  for (const entry2 of entries || []) {
-    const matched = /^storyboard[-_]?v?(\d+)\.[a-z0-9]+$/i.exec(String(entry2 || ""));
-    if (matched) max = Math.max(max, Number(matched[1]));
+  for (let entry2 of entries || []) {
+    let matched = /^storyboard[-_]?v?(\d+)\.[a-z0-9]+$/i.exec(String(entry2 || ""));
+    matched && (max = Math.max(max, Number(matched[1])));
   }
   return max + 1;
 }
 function displayWidth(value) {
   let width = 0;
-  for (const char of String(value ?? "")) width += /[\u2e80-\uffff]/.test(char) ? 1 : 0.55;
+  for (let char of String(value ?? "")) width += /[\u2e80-\uffff]/.test(char) ? 1 : 0.55;
   return width;
 }
 function wrapText(value, maxUnits, maxLines = 4) {
-  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  let text = String(value ?? "").replace(/\s+/g, " ").trim();
   if (!text) return [];
-  const lines = [];
-  let current = "";
-  for (const char of text) {
+  let lines = [], current = "";
+  for (let char of text) {
     if (current && displayWidth(current + char) > maxUnits) {
-      lines.push(current);
-      current = char;
-      if (lines.length >= maxLines) break;
+      if (lines.push(current), current = char, lines.length >= maxLines) break;
       continue;
     }
     current += char;
   }
-  if (lines.length < maxLines && current) lines.push(current);
-  if (lines.join("").length < text.length && lines.length) lines[lines.length - 1] = `${lines[lines.length - 1].slice(0, -1)}…`;
-  return lines;
+  return lines.length < maxLines && current && lines.push(current), lines.join("").length < text.length && lines.length && (lines[lines.length - 1] = `${lines[lines.length - 1].slice(0, -1)}…`), lines;
 }
 function visualOf(shot) {
-  const fields2 = String(shot?.visual || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const wanted = /^(?:画面|视觉|visual|详情|描述)\s*[:：]/i;
-  const hit = fields2.find((line) => wanted.test(line));
-  const body = (hit ? hit.replace(wanted, "") : fields2.join(" ")).trim();
-  return body || String(shot?.visual || "").replace(/^[^：:]*[：:]\s*/, "").trim();
+  let fields2 = String(shot?.visual || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean), wanted = /^(?:画面|视觉|visual|详情|描述)\s*[:：]/i, hit = fields2.find((line) => wanted.test(line));
+  return (hit ? hit.replace(wanted, "") : fields2.join(" ")).trim() || String(shot?.visual || "").replace(/^[^：:]*[：:]\s*/, "").trim();
 }
 function titleOf(script) {
-  for (const line of String(script ?? "").split(/\r?\n/)) {
-    const matched = /^#\s+(\S.*)$/.exec(line.trim());
+  for (let line of String(script ?? "").split(/\r?\n/)) {
+    let matched = /^#\s+(\S.*)$/.exec(line.trim());
     if (matched) return matched[1].trim();
     if (line.trim()) break;
   }
@@ -6627,19 +5642,8 @@ function titleOf(script) {
 }
 var dialogueOf = (shot) => (Array.isArray(shot?.dialogue) ? shot.dialogue : []).map((line) => String(line?.line || line?.text || "").trim()).filter(Boolean).join(" / ");
 function renderStoryboardSvg(script, options = {}) {
-  const shots = Array.isArray(options.shots) ? options.shots : scriptStoryboardShots(String(script ?? ""));
-  const title = String(options.title || "").trim() || titleOf(script) || "分镜示意图";
-  const version = Number(options.version) || 1;
-  const ratio = String(options.ratio || "").trim();
-  const total = Number(options.seconds) || shots.reduce((sum, shot) => sum + (Number(shot?.duration) || 0), 0);
-  const width = 1560, pad = 44, cardWidth = width - pad * 2, inner = 34;
-  const meta = [ratio, total ? `全片约 ${total} 秒` : "", `${shots.length} 个镜头`, `第 ${version} 版`].filter(Boolean).join(" · ");
-  const headHeight = 132;
-  const cards = shots.map((shot, index) => {
-    const visual = wrapText(visualOf(shot), 74, 4);
-    const dialogue = wrapText(dialogueOf(shot), 74, 1);
-    const sound = wrapText(String(shot?.sfx || "").trim(), 74, 1);
-    const seconds = Number(shot?.duration) > 0 ? `${Number(shot.duration)} 秒` : String(shot?.metaonticTime || "").trim();
+  let shots = Array.isArray(options.shots) ? options.shots : scriptStoryboardShots(String(script ?? "")), title = String(options.title || "").trim() || titleOf(script) || "分镜示意图", version = Number(options.version) || 1, ratio = String(options.ratio || "").trim(), total = Number(options.seconds) || shots.reduce((sum, shot) => sum + (Number(shot?.duration) || 0), 0), width = 1560, pad = 44, cardWidth = width - pad * 2, inner = 34, meta = [ratio, total ? `全片约 ${total} 秒` : "", `${shots.length} 个镜头`, `第 ${version} 版`].filter(Boolean).join(" · "), headHeight = 132, cards = shots.map((shot, index) => {
+    let visual = wrapText(visualOf(shot), 74, 4), dialogue = wrapText(dialogueOf(shot), 74, 1), sound = wrapText(String(shot?.sfx || "").trim(), 74, 1), seconds = Number(shot?.duration) > 0 ? `${Number(shot.duration)} 秒` : String(shot?.metaonticTime || "").trim();
     return {
       index,
       shot,
@@ -6649,56 +5653,37 @@ function renderStoryboardSvg(script, options = {}) {
       seconds,
       height: 44 + visual.length * 30 + (dialogue.length + sound.length) * 26 + 22
     };
-  });
-  const bodyHeight = cards.reduce((sum, card) => sum + card.height + 18, 0);
-  const height = headHeight + bodyHeight + 78;
-  const out = [];
-  out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="${FONT}">`);
-  out.push(`<rect width="${width}" height="${height}" fill="#f7f5f0"/>`);
-  out.push(`<text x="${pad}" y="58" font-size="34" font-weight="600" fill="#2b2b2b">${escapeXml(title)}</text>`);
-  out.push(`<text x="${pad}" y="94" font-size="20" fill="#6e6c68">${escapeXml(meta)}</text>`);
-  out.push(`<text x="${pad}" y="122" font-size="17" fill="#8a8880">分镜示意，非实际生成画面；按脚本分镜表逐镜头对应。</text>`);
-  if (!cards.length) {
-    out.push(`<text x="${pad}" y="${headHeight + 40}" font-size="22" fill="#8a8880">脚本里还没有可分镜的表格：先补一个带「镜号 / 镜别 / 视角 / 运镜 / 画面 / 时长」的分镜表。</text>`);
-  }
+  }), bodyHeight = cards.reduce((sum, card) => sum + card.height + 18, 0), height = headHeight + bodyHeight + 78, out = [];
+  out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="${FONT}">`), out.push(`<rect width="${width}" height="${height}" fill="#f7f5f0"/>`), out.push(`<text x="${pad}" y="58" font-size="34" font-weight="600" fill="#2b2b2b">${escapeXml(title)}</text>`), out.push(`<text x="${pad}" y="94" font-size="20" fill="#6e6c68">${escapeXml(meta)}</text>`), out.push(`<text x="${pad}" y="122" font-size="17" fill="#8a8880">分镜示意，非实际生成画面；按脚本分镜表逐镜头对应。</text>`), cards.length || out.push(`<text x="${pad}" y="${headHeight + 40}" font-size="22" fill="#8a8880">脚本里还没有可分镜的表格：先补一个带「镜号 / 镜别 / 视角 / 运镜 / 画面 / 时长」的分镜表。</text>`);
   let y = headHeight;
-  for (const card of cards) {
-    out.push(`<g><rect x="${pad}" y="${y}" width="${cardWidth}" height="${card.height}" rx="14" fill="#ffffff" stroke="#e2ded6"/>`);
-    out.push(`<rect x="${pad}" y="${y}" width="6" height="${card.height}" rx="3" fill="#c9a26a"/>`);
-    const line = [
+  for (let card of cards) {
+    out.push(`<g><rect x="${pad}" y="${y}" width="${cardWidth}" height="${card.height}" rx="14" fill="#ffffff" stroke="#e2ded6"/>`), out.push(`<rect x="${pad}" y="${y}" width="6" height="${card.height}" rx="3" fill="#c9a26a"/>`);
+    let line = [
       String(card.shot?.title || card.index + 1).trim() ? `镜头 ${String(card.shot?.title || card.index + 1).trim()}` : `镜头 ${card.index + 1}`,
       String(card.shot?.camera || "").trim(),
       card.seconds
     ].filter(Boolean).join("　·　");
     out.push(`<text x="${pad + inner}" y="${y + 34}" font-size="21" font-weight="600" fill="#3a3a38">${escapeXml(line)}</text>`);
     let cursor = y + 62;
-    for (const text of card.visual) {
-      out.push(`<text x="${pad + inner}" y="${cursor}" font-size="20" fill="#2b2b2b">${escapeXml(text)}</text>`);
-      cursor += 30;
-    }
+    for (let text of card.visual)
+      out.push(`<text x="${pad + inner}" y="${cursor}" font-size="20" fill="#2b2b2b">${escapeXml(text)}</text>`), cursor += 30;
     cursor += 4;
-    for (const [label, lines] of [["台词", card.dialogue], ["声音", card.sound]]) {
-      if (!lines.length) continue;
-      out.push(`<text x="${pad + inner}" y="${cursor}" font-size="18" fill="#7d7a72">${escapeXml(`${label}：${lines[0]}`)}</text>`);
-      cursor += 26;
-    }
-    out.push("</g>");
-    y += card.height + 18;
+    for (let [label, lines] of [["台词", card.dialogue], ["声音", card.sound]])
+      lines.length && (out.push(`<text x="${pad + inner}" y="${cursor}" font-size="18" fill="#7d7a72">${escapeXml(`${label}：${lines[0]}`)}</text>`), cursor += 26);
+    out.push("</g>"), y += card.height + 18;
   }
-  out.push(`<text x="${pad}" y="${height - 32}" font-size="17" fill="#8a8880">由 MetaOnticVideo 本地渲染，不调用付费出图模型；实际画面以逐段生成结果为准。</text>`);
-  out.push("</svg>");
-  return out.join("\n");
+  return out.push(`<text x="${pad}" y="${height - 32}" font-size="17" fill="#8a8880">由 MetaOnticVideo 本地渲染，不调用付费出图模型；实际画面以逐段生成结果为准。</text>`), out.push("</svg>"), out.join(`
+`);
 }
 
 // src/businesses/video-generation/tools/video-project.ts
 async function captureScriptFile(scriptPath, text) {
-  const body = captureScriptBody(text);
+  let body = captureScriptBody(text);
   if (!body) return null;
-  await mkdir9(path13.dirname(scriptPath), { recursive: true, mode: 448 });
-  await writeFile7(scriptPath, `${body}
+  await mkdir9(path13.dirname(scriptPath), { recursive: !0, mode: 448 }), await writeFile7(scriptPath, `${body}
 `, { mode: 384 });
-  const closed = await closePendingStage("script_design", "script_saved");
-  await appendRequestLog({
+  let closed = await closePendingStage("script_design", "script_saved");
+  return await appendRequestLog({
     event: "script_saved",
     path: scriptPath,
     tool: "capture",
@@ -6708,8 +5693,7 @@ async function captureScriptFile(scriptPath, text) {
     version: scriptVersion(body),
     closedSpanId: closed?.spanId,
     closedElapsedMs: closed?.elapsedMs
-  });
-  return { body, closed };
+  }), { body, closed };
 }
 function projectTool(config, ctx, reviewGuard, generationProperties, extensionProperties, segmentReview = null, onReviewReady = null) {
   return {
@@ -6732,7 +5716,7 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
     } },
     timeoutMs: 6e5,
     isConcurrencySafe() {
-      return false;
+      return !1;
     },
     async execute(args, exec) {
       if (args.action === "review_segment") {
@@ -6740,41 +5724,27 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         return segmentReview.review(args, exec);
       }
       if (args.action === "status") {
-        const data2 = await readProject(args.projectId, exec);
-        let sourceCurrent = true;
-        let staleReason;
-        if (data2.approved && data2.filmSource) {
+        let data2 = await readProject(args.projectId, exec), sourceCurrent = !0, staleReason;
+        if (data2.approved && data2.filmSource)
           try {
             assertCompiledProduction(data2, JSON.parse(await readFile10(data2.filmSource.path, "utf8")), data2.approved.specification, resolveModel(config));
           } catch {
-            sourceCurrent = false;
-            staleReason = "专业源项目、模型或编译方案已改变或无法读取，请重新编译并审核。";
+            sourceCurrent = !1, staleReason = "专业源项目、模型或编译方案已改变或无法读取，请重新编译并审核。";
           }
-        }
-        const current = sourceCurrent && data2.approved && await scriptDigest(data2.approved.scriptPath).catch(() => "") === data2.approved.scriptHash && matchesProductionApproval(config, data2.approved, data2.approved.name, data2.approved.specification);
-        return { projectId: data2.id, subjectType: data2.subjectType, choice: data2.choice, duration: data2.duration, status: current ? "approved" : "draft", ...staleReason ? { approval_stale: true, reason: staleReason } : {} };
+        let current = sourceCurrent && data2.approved && await scriptDigest(data2.approved.scriptPath).catch(() => "") === data2.approved.scriptHash && matchesProductionApproval(config, data2.approved, data2.approved.name, data2.approved.specification);
+        return { projectId: data2.id, subjectType: data2.subjectType, choice: data2.choice, duration: data2.duration, status: current ? "approved" : "draft", ...staleReason ? { approval_stale: !0, reason: staleReason } : {} };
       }
       if (args.action === "storyboard") {
-        const owner = await readProject(args.projectId, exec);
+        let owner = await readProject(args.projectId, exec);
         return lockProject(owner.id, async () => {
-          const project = await readProject(owner.id, exec);
-          const session = exec.agent?.session;
-          const scriptPath = path13.resolve(session?.header?.cwd || process.cwd(), String(args.scriptPath || ""));
+          let project = await readProject(owner.id, exec), session = exec.agent?.session, scriptPath = path13.resolve(session?.header?.cwd || process.cwd(), String(args.scriptPath || ""));
           if (!/\.md$/i.test(scriptPath)) throw new Error("storyboard需传脚本文件路径scriptPath（.md）。");
-          if (args.captureScript === true && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(session) || "")) {
+          if (args.captureScript === !0 && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(session) || ""))
             throw new Error("正文里没有找到完整脚本：先把本版脚本正文完整贴进用户可见正文（摘要、链接、示意图都不算），再让插件出分镜示意图。");
-          }
-          const script = await readFile10(scriptPath, "utf8").catch(() => "");
+          let script = await readFile10(scriptPath, "utf8").catch(() => "");
           if (!String(script).trim()) throw new Error("还没读到脚本文件：先在正文贴出完整脚本并传captureScript，或先把脚本写到scriptPath。");
-          const version = nextStoryboardVersion(await readdir5(path13.dirname(scriptPath)).catch(() => []));
-          const svg = renderStoryboardSvg(script, { version });
-          const target = path13.join(path13.dirname(scriptPath), storyboardFileName(version));
-          await writeFile7(target, svg, { mode: 384, flag: "wx" });
-          project.storyboard = { projectId: project.id, path: target, scriptPath, scriptHash: await scriptDigest(scriptPath), imageHash: await scriptDigest(target), version };
-          syncScriptQuestions(project, pendingScriptQuestions(script), project.storyboard.scriptHash);
-          project.approved = null;
-          await writeProject(project);
-          return {
+          let version = nextStoryboardVersion(await readdir5(path13.dirname(scriptPath)).catch(() => [])), svg = renderStoryboardSvg(script, { version }), target = path13.join(path13.dirname(scriptPath), storyboardFileName(version));
+          return await writeFile7(target, svg, { mode: 384, flag: "wx" }), project.storyboard = { projectId: project.id, path: target, scriptPath, scriptHash: await scriptDigest(scriptPath), imageHash: await scriptDigest(target), version }, syncScriptQuestions(project, pendingScriptQuestions(script), project.storyboard.scriptHash), project.approved = null, await writeProject(project), {
             path: target,
             version,
             shots: scriptStoryboardShots(script).length,
@@ -6792,66 +5762,46 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
         data = await createProject(exec, args.subjectType);
       }
       return lockProject(data.id, async () => {
-        data = await readProject(data.id, exec);
-        if (args.action === "prepare") {
+        if (data = await readProject(data.id, exec), args.action === "prepare") {
           if (args.subjectType && args.subjectType !== data.subjectType) throw new Error("新主体方案请创建新项目，不覆盖原项目。");
-          const length = await ensureProjectDuration(ctx, exec, data, args.duration, writeProject);
+          let length = await ensureProjectDuration(ctx, exec, data, args.duration, writeProject);
           if (length.status !== "confirmed") return { projectId: data.id, status: "pending", nextAction: length.reason };
-          if (args.resetCharacterChoice) {
-            data.choice = "";
-            data.approved = null;
-            await writeProject(data);
-          }
-          if (data.subjectType === "scenery" || data.subjectType === "provided_images") {
-            data.choice = data.subjectType === "scenery" ? "not_needed" : "provided_images";
-            await writeProject(data);
-            return { projectId: data.id, status: "prepared", duration: data.duration, choice: data.choice };
-          }
-          const gate2 = await characterChoiceGate(ctx, config, { ...exec, name: "video_generate" }, { projectId: data.id, preparation: true, resetCharacterChoice: args.resetCharacterChoice });
-          const saved = await readProject(data.id, exec);
+          if (args.resetCharacterChoice && (data.choice = "", data.approved = null, await writeProject(data)), data.subjectType === "scenery" || data.subjectType === "provided_images")
+            return data.choice = data.subjectType === "scenery" ? "not_needed" : "provided_images", await writeProject(data), { projectId: data.id, status: "prepared", duration: data.duration, choice: data.choice };
+          let gate2 = await characterChoiceGate(ctx, config, { ...exec, name: "video_generate" }, { projectId: data.id, preparation: !0, resetCharacterChoice: args.resetCharacterChoice }), saved = await readProject(data.id, exec);
           return { projectId: data.id, duration: data.duration, choice: saved.choice, status: saved.choice ? "prepared" : "pending", nextAction: gate2?.reason || "编写脚本与分镜，完成后review。" };
         }
-        const spec = args.specification ? normalizeProductionSpec(config, args.toolName || "video_generate", args.specification) : null;
+        let spec = args.specification ? normalizeProductionSpec(config, args.toolName || "video_generate", args.specification) : null;
         if (data.filmSource) {
           if (args.toolName && args.toolName !== "video_generate") throw Error("COMPILED_TOOL_MISMATCH");
-          const source = JSON.parse(await readFile10(data.filmSource.path, "utf8"));
+          let source = JSON.parse(await readFile10(data.filmSource.path, "utf8"));
           assertCompiledProduction(data, source, spec, resolveModel(config));
         }
-        const allowed = new Set(Object.keys(args.toolName === "video_extend" ? extensionProperties : generationProperties));
+        let allowed = new Set(Object.keys(args.toolName === "video_extend" ? extensionProperties : generationProperties));
         if (args.specification && Object.keys(args.specification).some((k) => !allowed.has(k))) throw new Error("specification只能包含对应生成工具的公开参数，禁止凭据或未知字段。");
         if (!spec || !spec.prompt || !spec.duration || !spec.ratio || !spec.resolution || spec.projectId) throw new Error("review需完整specification：prompt、duration、ratio、resolution，不能包含projectId。");
         if (!data.choice) throw new Error("角色图选择未完成，请先prepare。");
         if (["generate_first", "provided_images"].includes(data.choice) && !hasProjectImages(spec)) throw new Error("先提供角色图并展示审核，再提交带图specification。");
-        const name = args.toolName || "video_generate";
+        let name = args.toolName || "video_generate";
         if (!["video_generate", "video_extend"].includes(name)) throw new Error("未知生成工具");
         if (data.duration == null) throw new Error("视频总时长尚未确认，请先prepare询问用户，不得默认15秒。");
-        if (name === "video_extend") validateExtensionDuration(config, spec);
-        const requestedTotal = name === "video_extend" ? Number(spec.duration) * Number(spec.segments || 1) : Number(spec.duration);
-        if (requestedTotal !== data.duration && !spec.resume) throw new Error("脚本时长与用户确认的总时长不一致，请先用prepare确认变更，再重新审核。");
-        const scriptPath = path13.resolve(exec.agent.session.header?.cwd || process.cwd(), String(args.scriptPath || ""));
+        if (name === "video_extend" && validateExtensionDuration(config, spec), (name === "video_extend" ? Number(spec.duration) * Number(spec.segments || 1) : Number(spec.duration)) !== data.duration && !spec.resume) throw new Error("脚本时长与用户确认的总时长不一致，请先用prepare确认变更，再重新审核。");
+        let scriptPath = path13.resolve(exec.agent.session.header?.cwd || process.cwd(), String(args.scriptPath || ""));
         if (!/\.md$/i.test(scriptPath)) throw new Error("scriptPath需为Markdown脚本文件。");
-        if (args.captureScript === true && !await readFile10(scriptPath, "utf8").catch(() => "") && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(exec.agent.session) || "")) {
+        if (args.captureScript === !0 && !await readFile10(scriptPath, "utf8").catch(() => "") && !await captureScriptFile(scriptPath, reviewGuard.visibleText?.(exec.agent.session) || ""))
           throw new Error("正文里没有找到完整脚本：请先把本版脚本正文完整贴进用户可见正文（摘要、链接、示意图都不算），再调用review；脚本只需在正文写这一次，插件会据此落成script.md。");
-        }
-        const scriptHash = await scriptDigest(scriptPath);
-        const scriptBody = (await readFile10(scriptPath, "utf8")).replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
+        let scriptHash = await scriptDigest(scriptPath), scriptBody = (await readFile10(scriptPath, "utf8")).replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
         if (!scriptBody) throw new Error("脚本正文不能为空。");
-        const unresolved = syncScriptQuestions(data, pendingScriptQuestions(scriptBody), scriptHash);
-        await writeProject(data);
-        if (unresolved.length) {
-          data.approved = null;
-          await writeProject(data);
-          const asked = unresolved.filter((item) => item.status === "PENDING").slice(0, 3);
-          const service2 = ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
-          const result2 = asked.length && service2?.ask && approvalPolicy(ctx, exec) !== "never" ? await service2.ask({
+        let unresolved = syncScriptQuestions(data, pendingScriptQuestions(scriptBody), scriptHash);
+        if (await writeProject(data), unresolved.length) {
+          data.approved = null, await writeProject(data);
+          let asked = unresolved.filter((item) => item.status === "PENDING").slice(0, 3), service2 = ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions"), result2 = asked.length && service2?.ask && approvalPolicy(ctx, exec) !== "never" ? await service2.ask({
             agent: exec.agent,
             signal: exec.signal,
             ...exec.callId ? { wait: { callId: exec.callId } } : {},
-            questions: asked.map((item) => ({ id: item.id, header: "待确认事项", question: item.question, multiSelect: false }))
+            questions: asked.map((item) => ({ id: item.id, header: "待确认事项", question: item.question, multiSelect: !1 }))
           }) : null;
-          recordQuestionAnswers(data.clarifications, asked, result2, scriptHash, Boolean(exec.signal?.aborted));
-          await writeProject(data);
-          return {
+          return recordQuestionAnswers(data.clarifications, asked, result2, scriptHash, !!exec.signal?.aborted), await writeProject(data), {
             projectId: data.id,
             status: "blocked",
             pendingQuestions: unresolved.map((item) => item.question),
@@ -6859,10 +5809,9 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
             reason: "待确认事项尚未全部落实。未回答的问题须明确答复；已回答问题无需重复询问，按保存答复修改脚本、移出待确认清单，再展示新版分镜并review。删除问题不能代替答复，答复也不等于脚本批准。"
           };
         }
-        if (name === "video_generate" && !spec.resume) resolveSegmentPrompts(spec.segmentPrompts, estimatePlan(config, name, spec).length);
-        const fingerprint = productionFingerprint(config, name, spec);
-        data.canvasDraft = { scriptPath, specification: spec };
-        await writeProject(data);
+        name === "video_generate" && !spec.resume && resolveSegmentPrompts(spec.segmentPrompts, estimatePlan(config, name, spec).length);
+        let fingerprint = productionFingerprint(config, name, spec);
+        data.canvasDraft = { scriptPath, specification: spec }, await writeProject(data);
         let canvasProject;
         if (onReviewReady) {
           try {
@@ -6872,11 +5821,9 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
           }
           data = await readProject(data.id, exec);
         }
-        const canvasOutput = canvasProject ? { canvasProject } : {};
-        const gate = await reviewGuard.gate({ ...exec, name: "ask_user_question", arguments: { requireStoryboard: true, requiredProjectId: data.id, requiredScriptPath: scriptPath, requiredScriptHash: scriptHash, requiredStoryboard: data.storyboard, requiredScriptText: scriptBody, questions: [{ id: "script_review", question: "审核当前脚本" }] } });
+        let canvasOutput = canvasProject ? { canvasProject } : {}, gate = await reviewGuard.gate({ ...exec, name: "ask_user_question", arguments: { requireStoryboard: !0, requiredProjectId: data.id, requiredScriptPath: scriptPath, requiredScriptHash: scriptHash, requiredStoryboard: data.storyboard, requiredScriptText: scriptBody, questions: [{ id: "script_review", question: "审核当前脚本" }] } });
         if (gate) {
-          const board = data.storyboard;
-          const currentBoard = board?.projectId === data.id && board.scriptHash === scriptHash && path13.resolve(board.scriptPath) === scriptPath && await scriptDigest(board.path).catch(() => "") === board.imageHash;
+          let board = data.storyboard, currentBoard = board?.projectId === data.id && board.scriptHash === scriptHash && path13.resolve(board.scriptPath) === scriptPath && await scriptDigest(board.path).catch(() => "") === board.imageHash;
           return {
             projectId: data.id,
             status: "blocked",
@@ -6895,18 +5842,13 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
             nextAction: currentBoard ? "将presentation.markdown原样放在一条用户可见正文中（不要省略项目行、改写或自行转图），然后沿用同一projectId、scriptPath和specification重试review；不重建项目、不重写文件、不重复捕获脚本。" : "本项目分镜缺失或已过期。沿用本projectId与scriptPath调用storyboard，展示返回的原图后再review；不使用其他项目或自行转换的图片。"
           };
         }
-        const service = ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
+        let service = ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
         if (!service?.ask || approvalPolicy(ctx, exec) === "never") return { projectId: data.id, status: "pending", ...canvasOutput, reason: "无法取得脚本审核答复，未生成。" };
-        data.approved = null;
-        await writeProject(data);
-        const result = await service.ask({ agent: exec.agent, signal: exec.signal, ...exec.callId ? { wait: { callId: exec.callId } } : {}, questions: [{ id: "script_review", header: "脚本审核", question: "请审核刚展示的本版脚本、分镜、角色图及费用预估。是否通过？通过后仍会单独确认视频调用费用。", multiSelect: false, options: [{ label: "脚本通过", description: "使用本版材料，下一步确认视频制作费用。" }, { label: "需要修改", description: "先修改并重新展示审核，不生成。" }] }] });
-        const answer = result?.answers?.find((a) => a.id === "script_review");
+        data.approved = null, await writeProject(data);
+        let answer = (await service.ask({ agent: exec.agent, signal: exec.signal, ...exec.callId ? { wait: { callId: exec.callId } } : {}, questions: [{ id: "script_review", header: "脚本审核", question: "请审核刚展示的本版脚本、分镜、角色图及费用预估。是否通过？通过后仍会单独确认视频调用费用。", multiSelect: !1, options: [{ label: "脚本通过", description: "使用本版材料，下一步确认视频制作费用。" }, { label: "需要修改", description: "先修改并重新展示审核，不生成。" }] }] }))?.answers?.find((a) => a.id === "script_review");
         if (exec.signal?.aborted || answer?.custom || answer?.selected?.length !== 1 || answer.selected[0] !== "脚本通过") return { projectId: data.id, status: "draft", ...canvasOutput, reason: "未取得审核通过，未生成。" };
         if (!data.storyboard || await scriptDigest(data.storyboard.path).catch(() => "") !== data.storyboard.imageHash || await scriptDigest(scriptPath) !== scriptHash || productionFingerprint(config, name, spec) !== fingerprint) throw new Error("等待审核期间材料或配置改变，请重新展示审核。");
-        if (data.filmSource) assertCompiledProduction(data, JSON.parse(await readFile10(data.filmSource.path, "utf8")), spec, resolveModel(config));
-        data.approved = { scriptPath, scriptHash, fingerprint, specification: spec, name, resumeDir: resumeDirOf(spec.resume), reviewedAt: (/* @__PURE__ */ new Date()).toISOString() };
-        await writeProject(data);
-        return { projectId: data.id, status: "approved", ...canvasOutput, nextAction: `直接调用${name}并带projectId和本次specification；工具付费审批承担制作确认，不再另问一次。` };
+        return data.filmSource && assertCompiledProduction(data, JSON.parse(await readFile10(data.filmSource.path, "utf8")), spec, resolveModel(config)), data.approved = { scriptPath, scriptHash, fingerprint, specification: spec, name, resumeDir: resumeDirOf(spec.resume), reviewedAt: (/* @__PURE__ */ new Date()).toISOString() }, await writeProject(data), { projectId: data.id, status: "approved", ...canvasOutput, nextAction: `直接调用${name}并带projectId和本次specification；工具付费审批承担制作确认，不再另问一次。` };
       });
     }
   };
@@ -6916,91 +5858,75 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
 import path14 from "node:path";
 import { createHash as createHash8 } from "node:crypto";
 import { stat as stat5, readdir as readdir6, readFile as readFile11 } from "node:fs/promises";
-var STORYBOARD_FILE = /storyboard|分镜|示意/i;
-var IMAGE_FILE = /\.(png|jpe?g|webp|svg)$/i;
+var STORYBOARD_FILE = /storyboard|分镜|示意/i, IMAGE_FILE = /\.(png|jpe?g|webp|svg)$/i;
 function readableText(value) {
   return String(value || "").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[#*`>|~_\-\s]/g, "");
 }
 function characterPairs(text) {
-  const pairs = /* @__PURE__ */ new Set();
+  let pairs = /* @__PURE__ */ new Set();
   for (let index = 0; index + 2 <= text.length; index += 1) pairs.add(text.slice(index, index + 2));
   return pairs;
 }
 var SCRIPT_COVERAGE_MIN = 0.7;
 function scriptCoverage(script, visible) {
-  const target = readableText(script);
+  let target = readableText(script);
   if (!target) return 1;
   if (target.length < 2) return readableText(visible).includes(target) ? 1 : 0;
-  const shown = characterPairs(readableText(visible));
-  let hit = 0;
-  for (const pair of characterPairs(target)) if (shown.has(pair)) hit += 1;
+  let shown = characterPairs(readableText(visible)), hit = 0;
+  for (let pair of characterPairs(target)) shown.has(pair) && (hit += 1);
   return hit / characterPairs(target).size;
 }
 function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
-  const sessions = /* @__PURE__ */ new WeakMap();
+  let sessions = /* @__PURE__ */ new WeakMap();
   async function reportMissing(state) {
-    state.awaitingReview = false;
-    await log({ event: "storyboard_review_missing", reason: "turn_ended_without_review_ask", sessionId: state.sessionId, turn: state.turn });
+    state.awaitingReview = !1, await log({ event: "storyboard_review_missing", reason: "turn_ended_without_review_ask", sessionId: state.sessionId, turn: state.turn });
   }
   function stateFor(session, turn) {
     let state = sessions.get(session);
-    if (state && Number.isInteger(turn) && turn !== state.turn && state.awaitingReview) void reportMissing(state);
-    if (!state || Number.isInteger(turn) && turn !== state.turn) {
-      state = { sessionId: session.id, turn, active: false, files: [], shown: /* @__PURE__ */ new Set(), awaitingReview: false, text: "", scriptText: "", messages: state?.messages || [], images: state?.images || /* @__PURE__ */ new Map() };
-      sessions.set(session, state);
-    }
-    return state;
+    return state && Number.isInteger(turn) && turn !== state.turn && state.awaitingReview && reportMissing(state), (!state || Number.isInteger(turn) && turn !== state.turn) && (state = { sessionId: session.id, turn, active: !1, files: [], shown: /* @__PURE__ */ new Set(), awaitingReview: !1, text: "", scriptText: "", messages: state?.messages || [], images: state?.images || /* @__PURE__ */ new Map() }, sessions.set(session, state)), state;
   }
   function observe(session, event) {
-    if (!session || typeof session !== "object") return;
-    const data = event?.data || {};
+    if (!session || typeof session != "object") return;
+    let data = event?.data || {};
     if (!Number.isInteger(data.turn)) return;
-    const state = stateFor(session, data.turn);
+    let state = stateFor(session, data.turn);
     if (event.type === "turn/end") {
-      if (state.awaitingReview) void reportMissing(state);
+      state.awaitingReview && reportMissing(state);
       return;
     }
-    if (event.type === "tool/call" && ["video_estimate", "video_stage", "video_project"].includes(data.name)) state.active = true;
-    if (event.type === "deliverables/presented") {
-      const files = (data.files || []).filter((file) => typeof file.path === "string" && IMAGE_FILE.test(file.path) && STORYBOARD_FILE.test(file.path + " " + (file.description || ""))).map((file) => file.path);
-      if (files.length) {
-        state.active = true;
-        state.files = files;
-      }
+    if (event.type === "tool/call" && ["video_estimate", "video_stage", "video_project"].includes(data.name) && (state.active = !0), event.type === "deliverables/presented") {
+      let files = (data.files || []).filter((file) => typeof file.path == "string" && IMAGE_FILE.test(file.path) && STORYBOARD_FILE.test(file.path + " " + (file.description || ""))).map((file) => file.path);
+      files.length && (state.active = !0, state.files = files);
     }
     if (event.type === "assistant/message") {
-      const content = data.message?.content;
-      const text = Array.isArray(content) ? content.filter((block) => block.type === "text").map((block) => block.text || "").join("\n") : "";
-      state.text = (state.text + "\n" + text).slice(-25e4);
-      state.messages.push(text);
-      while (state.messages.length > 1 && state.messages.join("").length > 25e4) state.messages.shift();
-      if (/^#\s+\S/m.test(text) && text.length >= 200) state.scriptText = text;
-      let storyboard = false;
-      for (const match of text.matchAll(/!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))\s*\)/g)) {
-        const target = match[1] || match[2];
+      let content = data.message?.content, text = Array.isArray(content) ? content.filter((block) => block.type === "text").map((block) => block.text || "").join(`
+`) : "";
+      for (state.text = (state.text + `
+` + text).slice(-25e4), state.messages.push(text); state.messages.length > 1 && state.messages.join("").length > 25e4; ) state.messages.shift();
+      /^#\s+\S/m.test(text) && text.length >= 200 && (state.scriptText = text);
+      let storyboard = !1;
+      for (let match of text.matchAll(/!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))\s*\)/g)) {
+        let target = match[1] || match[2];
         try {
-          const full = path14.resolve(session.header?.cwd || process.cwd(), decodeURI(target));
-          state.shown.add(full);
-          state.images.set(full, readFile11(full).then((bytes) => createHash8("sha256").update(bytes).digest("hex")).catch(() => ""));
-          if (STORYBOARD_FILE.test(path14.basename(full))) storyboard = true;
+          let full = path14.resolve(session.header?.cwd || process.cwd(), decodeURI(target));
+          state.shown.add(full), state.images.set(full, readFile11(full).then((bytes) => createHash8("sha256").update(bytes).digest("hex")).catch(() => "")), STORYBOARD_FILE.test(path14.basename(full)) && (storyboard = !0);
         } catch {
         }
       }
-      if (storyboard) state.awaitingReview = true;
+      storyboard && (state.awaitingReview = !0);
     }
   }
   async function newerVersion(embedded) {
-    const fresh = /* @__PURE__ */ new Map();
-    for (const file of embedded) {
+    let fresh = /* @__PURE__ */ new Map();
+    for (let file of embedded)
       try {
-        const info = await stat5(file);
-        if (info.isFile()) fresh.set(file, info.mtimeMs);
+        let info = await stat5(file);
+        info.isFile() && fresh.set(file, info.mtimeMs);
       } catch {
       }
-    }
-    const byDir = /* @__PURE__ */ new Map();
-    for (const [file, time] of fresh) byDir.set(path14.dirname(file), Math.max(byDir.get(path14.dirname(file)) || 0, time));
-    for (const [dir, time] of byDir) {
+    let byDir = /* @__PURE__ */ new Map();
+    for (let [file, time] of fresh) byDir.set(path14.dirname(file), Math.max(byDir.get(path14.dirname(file)) || 0, time));
+    for (let [dir, time] of byDir) {
       let entries;
       try {
         entries = await readdir6(dir);
@@ -7008,76 +5934,62 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
         continue;
       }
       let newest = "";
-      for (const entry2 of entries) {
+      for (let entry2 of entries) {
         if (!IMAGE_FILE.test(entry2) || !STORYBOARD_FILE.test(entry2)) continue;
-        const full = path14.join(dir, entry2);
-        if (fresh.has(full)) continue;
-        try {
-          const info = await stat5(full);
-          if (!info.isFile()) continue;
-          if (info.mtimeMs > time && info.mtimeMs > (newest ? (await stat5(newest)).mtimeMs : 0)) newest = full;
-        } catch {
-        }
+        let full = path14.join(dir, entry2);
+        if (!fresh.has(full))
+          try {
+            let info = await stat5(full);
+            if (!info.isFile()) continue;
+            info.mtimeMs > time && info.mtimeMs > (newest ? (await stat5(newest)).mtimeMs : 0) && (newest = full);
+          } catch {
+          }
       }
       if (newest) return newest;
     }
     return "";
   }
-  const linkHint = (target) => target ? `请先在独立的用户可见正文内嵌 ![分镜示意图](<${target}>) 并附 [打开原图](<${target}>)。` : "请先确认本版分镜图文件存在，再在独立正文内嵌图片并附原图链接。";
+  let linkHint = (target) => target ? `请先在独立的用户可见正文内嵌 ![分镜示意图](<${target}>) 并附 [打开原图](<${target}>)。` : "请先确认本版分镜图文件存在，再在独立正文内嵌图片并附原图链接。";
   async function gate(exec) {
     if (exec?.name !== "ask_user_question" || !exec.agent?.session) return null;
     let args = exec.arguments;
-    if (typeof args === "string") {
+    if (typeof args == "string")
       try {
         args = JSON.parse(args);
       } catch {
         return null;
       }
-    }
-    const questions = args?.questions || [];
-    const review = questions.some((question) => /script[_-]?review|脚本.*(?:审核|可以|通过|确认)|(?:审核|确认).*脚本/i.test([question.id, question.header, question.question].join(" ")));
-    const state = sessions.get(exec.agent.session);
-    if (review && state) state.awaitingReview = false;
-    if (!review || !args.requireStoryboard && !state?.active) return null;
+    let review = (args?.questions || []).some((question) => /script[_-]?review|脚本.*(?:审核|可以|通过|确认)|(?:审核|确认).*脚本/i.test([question.id, question.header, question.question].join(" "))), state = sessions.get(exec.agent.session);
+    if (review && state && (state.awaitingReview = !1), !review || !args.requireStoryboard && !state?.active) return null;
     if (args.requiredScriptText) {
-      const coverage = scriptCoverage(args.requiredScriptText, args.requiredProjectId ? state?.messages.join("\n") : state?.text);
+      let coverage = scriptCoverage(args.requiredScriptText, args.requiredProjectId ? state?.messages.join(`
+`) : state?.text);
       if (coverage < SCRIPT_COVERAGE_MIN) {
-        const percent2 = Math.round(coverage * 100);
-        await appendRequestLog({ event: "storyboard_review_blocked", sessionId: exec?.agent?.session?.id, callId: exec?.callId, reason: "script_text_mismatch", coverage: Math.round(coverage * 1e3) / 1e3 });
-        return { kind: "deny", reason: `脚本审核暂未打开：本版script.md正文只在本轮用户可见正文里出现 ${percent2}%。请把script.md正文原样贴进本轮正文再单独调用review；标题、加粗、表格这类排版差异不算问题，但不要改写措辞、删段，也不要只给文件链接或摘要。` };
+        let percent2 = Math.round(coverage * 100);
+        return await appendRequestLog({ event: "storyboard_review_blocked", sessionId: exec?.agent?.session?.id, callId: exec?.callId, reason: "script_text_mismatch", coverage: Math.round(coverage * 1e3) / 1e3 }), { kind: "deny", reason: `脚本审核暂未打开：本版script.md正文只在本轮用户可见正文里出现 ${percent2}%。请把script.md正文原样贴进本轮正文再单独调用review；标题、加粗、表格这类排版差异不算问题，但不要改写措辞、删段，也不要只给文件链接或摘要。` };
       }
     }
     if (args.requiredProjectId) {
-      const binding = args.requiredStoryboard;
-      if (!binding || binding.projectId !== args.requiredProjectId || binding.scriptHash !== args.requiredScriptHash || path14.resolve(binding.scriptPath) !== path14.resolve(args.requiredScriptPath)) {
+      let binding = args.requiredStoryboard;
+      if (!binding || binding.projectId !== args.requiredProjectId || binding.scriptHash !== args.requiredScriptHash || path14.resolve(binding.scriptPath) !== path14.resolve(args.requiredScriptPath))
         return { kind: "deny", reason: "本项目分镜未绑定当前脚本版本，请先调用storyboard生成并展示本版分镜。" };
-      }
-      if (!state?.messages.some((text) => readableText(text).includes(readableText(args.requiredScriptText)))) {
+      if (!state?.messages.some((text) => readableText(text).includes(readableText(args.requiredScriptText))))
         return { kind: "deny", reason: "当前版本脚本尚未完整展示，不能用旧稿或多条摘要拼接通过。请完整展示当前稿件一次。" };
-      }
-      const shownHash = await state?.images.get(binding.path);
-      const currentHash = await readFile11(binding.path).then((bytes) => createHash8("sha256").update(bytes).digest("hex")).catch(() => "");
-      if (!shownHash || shownHash !== binding.imageHash || currentHash !== binding.imageHash) {
-        return { kind: "deny", reason: "本项目当前版本分镜尚未实际展示，或图片已改变。" + linkHint(binding.path) };
-      }
-      return null;
+      let shownHash = await state?.images.get(binding.path), currentHash = await readFile11(binding.path).then((bytes) => createHash8("sha256").update(bytes).digest("hex")).catch(() => "");
+      return !shownHash || shownHash !== binding.imageHash || currentHash !== binding.imageHash ? { kind: "deny", reason: "本项目当前版本分镜尚未实际展示，或图片已改变。" + linkHint(binding.path) } : null;
     }
-    const embedded = [...state?.shown || []].filter((target2) => STORYBOARD_FILE.test(path14.basename(target2)));
-    let ready = embedded.length > 0;
-    if (ready) {
-      for (const file of embedded) {
+    let embedded = [...state?.shown || []].filter((target2) => STORYBOARD_FILE.test(path14.basename(target2))), ready = embedded.length > 0;
+    if (ready)
+      for (let file of embedded)
         try {
-          if (!(await stat5(file)).isFile()) ready = false;
+          (await stat5(file)).isFile() || (ready = !1);
         } catch {
-          ready = false;
+          ready = !1;
         }
-      }
-    }
-    const stale = ready ? await newerVersion(embedded) : "";
+    let stale = ready ? await newerVersion(embedded) : "";
     if (ready && !stale) return null;
-    const target = stale || state?.files[0] || "";
-    await appendRequestLog({ event: "storyboard_review_blocked", sessionId: exec?.agent?.session?.id, callId: exec?.callId, reason: !ready ? "missing_inline_storyboard" : "stale_storyboard_version" });
-    return { kind: "deny", reason: (!ready ? "脚本审核暂未打开：本版分镜图还没有在用户可见正文里内嵌展示。交付卡片只登记最终成片，分镜图不走卡片，" : `脚本审核暂未打开：改稿后的新版分镜图还没展示（${stale}）。`) + linkHint(target) + "present 与模型看图都不等于用户看到图，只有正文里真实渲染的图片才算；正文发送完成后再单独调用 ask_user_question，不能与展示并行；不要重画或调用付费生成。" };
+    let target = stale || state?.files[0] || "";
+    return await appendRequestLog({ event: "storyboard_review_blocked", sessionId: exec?.agent?.session?.id, callId: exec?.callId, reason: ready ? "stale_storyboard_version" : "missing_inline_storyboard" }), { kind: "deny", reason: (ready ? `脚本审核暂未打开：改稿后的新版分镜图还没展示（${stale}）。` : "脚本审核暂未打开：本版分镜图还没有在用户可见正文里内嵌展示。交付卡片只登记最终成片，分镜图不走卡片，") + linkHint(target) + "present 与模型看图都不等于用户看到图，只有正文里真实渲染的图片才算；正文发送完成后再单独调用 ask_user_question，不能与展示并行；不要重画或调用付费生成。" };
   }
   function visibleText(session) {
     return sessions.get(session)?.scriptText || "";
@@ -7089,17 +6001,13 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
 import path15 from "node:path";
 import { stat as stat6 } from "node:fs/promises";
 function createDeliveryOrderGuard() {
-  const sessions = /* @__PURE__ */ new WeakMap();
+  let sessions = /* @__PURE__ */ new WeakMap();
   function stateFor(session) {
     let state = sessions.get(session);
-    if (!state) {
-      state = { turn: void 0, mergedShownTurn: void 0, groups: [] };
-      sessions.set(session, state);
-    }
-    return state;
+    return state || (state = { turn: void 0, mergedShownTurn: void 0, groups: [] }, sessions.set(session, state)), state;
   }
   function absolute(session, target) {
-    const value = String(target ?? "").trim();
+    let value = String(target ?? "").trim();
     if (!value) return "";
     try {
       return path15.resolve(session?.header?.cwd || process.cwd(), value);
@@ -7107,7 +6015,7 @@ function createDeliveryOrderGuard() {
       return "";
     }
   }
-  const nameOf = (target) => {
+  let nameOf = (target) => {
     try {
       return path15.basename(target).toLowerCase();
     } catch {
@@ -7116,110 +6024,66 @@ function createDeliveryOrderGuard() {
   };
   async function sizeOf(target) {
     try {
-      const info = await stat6(target);
+      let info = await stat6(target);
       return info.isFile() ? info.size : 0;
     } catch {
       return 0;
     }
   }
   async function remember(session, value) {
-    if (!session || typeof session !== "object") return;
-    const segments = (value?.segments || []).filter((segment) => segment?.status === "succeeded" && segment?.localPath).map((segment) => absolute(session, segment.localPath)).filter(Boolean);
-    const film = value?.merged && value?.videoPath ? absolute(session, value.videoPath) : "";
-    const distinct = film && !segments.includes(film) ? film : "";
+    if (!session || typeof session != "object") return;
+    let segments = (value?.segments || []).filter((segment) => segment?.status === "succeeded" && segment?.localPath).map((segment) => absolute(session, segment.localPath)).filter(Boolean), film = value?.merged && value?.videoPath ? absolute(session, value.videoPath) : "", distinct = film && !segments.includes(film) ? film : "";
     if (!distinct && !segments.length) return;
-    const dir = String(value?.segmentsDir || value?.resumeDir || "").trim() || distinct || segments[0];
-    const state = stateFor(session);
-    let group = state.groups.find((item) => item.dir === dir);
-    if (!group) {
-      group = { dir, merges: [], segments: [], finished: false };
-      state.groups.push(group);
-    }
-    for (const target of segments) {
-      if (!group.segments.some((item) => item.path === target)) group.segments.push({ path: target, size: await sizeOf(target) });
-    }
-    if (distinct && !group.merges.some((item) => item.path === distinct)) {
-      group.merges.push({ path: distinct, size: await sizeOf(distinct) });
-    }
-    group.finished = videoResultState(value).canPresent && value?.merged === true;
+    let dir = String(value?.segmentsDir || value?.resumeDir || "").trim() || distinct || segments[0], state = stateFor(session), group = state.groups.find((item) => item.dir === dir);
+    group || (group = { dir, merges: [], segments: [], finished: !1 }, state.groups.push(group));
+    for (let target of segments)
+      group.segments.some((item) => item.path === target) || group.segments.push({ path: target, size: await sizeOf(target) });
+    distinct && !group.merges.some((item) => item.path === distinct) && group.merges.push({ path: distinct, size: await sizeOf(distinct) }), group.finished = videoResultState(value).canPresent && value?.merged === !0;
   }
   function observe(session, event) {
-    if (!session || typeof session !== "object") return;
-    const data = event?.data || {};
-    const state = stateFor(session);
-    if (Number.isInteger(data.turn)) state.turn = data.turn;
-    if (event.type !== "deliverables/presented") return;
-    const shown = (data.files || []).map((file) => absolute(session, file?.path)).filter(Boolean);
-    if (shown.some((target) => state.groups.some((group) => group.merges.some((item) => item.path === target || nameOf(item.path) === nameOf(target))))) {
-      state.mergedShownTurn = data.turn;
-    }
+    if (!session || typeof session != "object") return;
+    let data = event?.data || {}, state = stateFor(session);
+    if (Number.isInteger(data.turn) && (state.turn = data.turn), event.type !== "deliverables/presented") return;
+    (data.files || []).map((file) => absolute(session, file?.path)).filter(Boolean).some((target) => state.groups.some((group) => group.merges.some((item) => item.path === target || nameOf(item.path) === nameOf(target)))) && (state.mergedShownTurn = data.turn);
   }
   function identify(group, target, size) {
-    const name = nameOf(target);
-    const role2 = (item) => ({ role: group.merges.includes(item) ? "film" : "segment", path: item.path });
-    const samePath = (item) => item.path === target || nameOf(item.path) === name;
-    const byPath = group.merges.find(samePath) || group.segments.find(samePath);
+    let name = nameOf(target), role2 = (item) => ({ role: group.merges.includes(item) ? "film" : "segment", path: item.path }), samePath = (item) => item.path === target || nameOf(item.path) === name, byPath = group.merges.find(samePath) || group.segments.find(samePath);
     if (byPath) return role2(byPath);
     if (!size) return null;
-    const bySize = group.merges.find((item) => item.size === size) || group.segments.find((item) => item.size === size);
+    let bySize = group.merges.find((item) => item.size === size) || group.segments.find((item) => item.size === size);
     return bySize ? role2(bySize) : null;
   }
   async function gate(exec) {
     if (exec?.name !== "present" || !exec.agent?.session) return null;
-    const session = exec.agent.session;
-    const state = sessions.get(session);
+    let session = exec.agent.session, state = sessions.get(session);
     if (!state?.groups.length) return null;
     let args = exec.arguments;
-    if (typeof args === "string") {
+    if (typeof args == "string")
       try {
         args = JSON.parse(args);
       } catch {
         return null;
       }
-    }
-    const files = Array.isArray(args?.files) ? args.files : [];
-    const paths = files.map((file) => absolute(session, typeof file === "string" ? file : file?.path)).filter(Boolean);
+    let paths = (Array.isArray(args?.files) ? args.files : []).map((file) => absolute(session, typeof file == "string" ? file : file?.path)).filter(Boolean);
     if (!paths.length) return null;
-    const sizes = /* @__PURE__ */ new Map();
-    for (const target of paths) sizes.set(target, await sizeOf(target));
+    let sizes = /* @__PURE__ */ new Map();
+    for (let target of paths) sizes.set(target, await sizeOf(target));
     let best = null;
-    for (const group2 of state.groups) {
-      const marks2 = paths.map((target) => identify(group2, target, sizes.get(target) || 0));
-      const hit = marks2.filter(Boolean).length;
-      if (hit && hit > (best?.marks.filter(Boolean).length || 0)) best = { group: group2, marks: marks2 };
+    for (let group2 of state.groups) {
+      let marks2 = paths.map((target) => identify(group2, target, sizes.get(target) || 0)), hit = marks2.filter(Boolean).length;
+      hit && hit > (best?.marks.filter(Boolean).length || 0) && (best = { group: group2, marks: marks2 });
     }
     if (!best) return null;
-    const { group, marks } = best;
-    const latest = group.merges[group.merges.length - 1];
+    let { group, marks } = best, latest = group.merges[group.merges.length - 1];
     if (!latest || !latest.path) return null;
-    const isLatest = (mark) => Boolean(mark && mark.role === "film" && mark.path === latest.path);
-    const filmIndex = marks.findIndex(isLatest);
-    const others = marks.map((mark, index) => mark && !isLatest(mark) ? index : -1).filter((index) => index >= 0);
-    const order = () => `正确顺序：1. ${latest.path}
-${group.segments.map((item, index) => `${index + 2}. ${item.path}`).join("\n")}`;
-    const inlineHint = "过程材料（脚本、分镜示意图、参考图、转换图片、单段预览、暂停时的部分合并）只用正文展示：宿主的交付卡片按本轮首次出现顺序排列、超过四个还会折叠，中途登记会把成片挤到后面，事后补发也挪不回来。";
-    if (!group.finished) {
-      await appendRequestLog({ event: "delivery_order_blocked", reason: "run_not_finished", files: paths });
-      return { kind: "deny", reason: `这次还不是最终交付（还在续段、等待查询或暂停），现在登记会占掉卡片里成片的位置。请只用正文内联可点击链接交付本次成果，等整条视频生成结束、成片在本机合并成功后再调用一次 present。
-${inlineHint}` };
-    }
-    if (others.some((index) => marks[index]?.role === "film")) {
-      await appendRequestLog({ event: "delivery_order_blocked", reason: "intermediate_merge_listed", files: paths });
-      return { kind: "deny", reason: `这次登记里带了中间版本的成片（部分合并或上一版），交付卡片只放最终成片。请去掉中间版本，只登记「最终合并成片 + 各分段」，成片放第一个，再按段号依次放第一段、第二段……
-${order()}` };
-    }
-    if (filmIndex > 0 && others.some((index) => index < filmIndex)) {
-      await appendRequestLog({ event: "delivery_order_blocked", reason: "merged_not_first", files: paths });
-      return { kind: "deny", reason: `成片展示顺序不对：合并成片必须排在所有分段之前。请立即重新调用 present，把合并成片放在 files 数组第一个，再按段号依次放第一段、第二段……
-${order()}` };
-    }
-    if (filmIndex === -1) {
-      if (Number.isInteger(state.mergedShownTurn) && state.mergedShownTurn === state.turn) return null;
-      await appendRequestLog({ event: "delivery_order_blocked", reason: "merged_missing", files: paths });
-      return { kind: "deny", reason: `交付卡片里成片必须排在第一个位置，这次却没有登记成片。请立即重新调用 present，files 数组只登记「合并成片 + 各分段」，成片放第一个，再按段号依次放第一段、第二段……
-${order()}` };
-    }
-    return null;
+    let isLatest = (mark) => !!(mark && mark.role === "film" && mark.path === latest.path), filmIndex = marks.findIndex(isLatest), others = marks.map((mark, index) => mark && !isLatest(mark) ? index : -1).filter((index) => index >= 0), order = () => `正确顺序：1. ${latest.path}
+${group.segments.map((item, index) => `${index + 2}. ${item.path}`).join(`
+`)}`, inlineHint = "过程材料（脚本、分镜示意图、参考图、转换图片、单段预览、暂停时的部分合并）只用正文展示：宿主的交付卡片按本轮首次出现顺序排列、超过四个还会折叠，中途登记会把成片挤到后面，事后补发也挪不回来。";
+    return group.finished ? others.some((index) => marks[index]?.role === "film") ? (await appendRequestLog({ event: "delivery_order_blocked", reason: "intermediate_merge_listed", files: paths }), { kind: "deny", reason: `这次登记里带了中间版本的成片（部分合并或上一版），交付卡片只放最终成片。请去掉中间版本，只登记「最终合并成片 + 各分段」，成片放第一个，再按段号依次放第一段、第二段……
+${order()}` }) : filmIndex > 0 && others.some((index) => index < filmIndex) ? (await appendRequestLog({ event: "delivery_order_blocked", reason: "merged_not_first", files: paths }), { kind: "deny", reason: `成片展示顺序不对：合并成片必须排在所有分段之前。请立即重新调用 present，把合并成片放在 files 数组第一个，再按段号依次放第一段、第二段……
+${order()}` }) : filmIndex === -1 ? Number.isInteger(state.mergedShownTurn) && state.mergedShownTurn === state.turn ? null : (await appendRequestLog({ event: "delivery_order_blocked", reason: "merged_missing", files: paths }), { kind: "deny", reason: `交付卡片里成片必须排在第一个位置，这次却没有登记成片。请立即重新调用 present，files 数组只登记「合并成片 + 各分段」，成片放第一个，再按段号依次放第一段、第二段……
+${order()}` }) : null : (await appendRequestLog({ event: "delivery_order_blocked", reason: "run_not_finished", files: paths }), { kind: "deny", reason: `这次还不是最终交付（还在续段、等待查询或暂停），现在登记会占掉卡片里成片的位置。请只用正文内联可点击链接交付本次成果，等整条视频生成结束、成片在本机合并成功后再调用一次 present。
+${inlineHint}` });
   }
   return { remember, observe, gate };
 }
@@ -7227,66 +6091,58 @@ ${order()}` };
 // src/businesses/video-generation/workflow/actual-cost.ts
 init_connection();
 function number(value) {
-  if (typeof value !== "number" && typeof value !== "string" || typeof value === "string" && !value.trim()) return null;
-  const n = Number(value);
+  if (typeof value != "number" && typeof value != "string" || typeof value == "string" && !value.trim()) return null;
+  let n = Number(value);
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 function object(value) {
-  if (value && typeof value === "object" && !Array.isArray(value)) return value;
-  if (typeof value === "string") {
+  if (value && typeof value == "object" && !Array.isArray(value)) return value;
+  if (typeof value == "string")
     try {
       return object(JSON.parse(value));
     } catch {
     }
-  }
   return {};
 }
 function settledTaskCosts(logs, taskIds) {
   return [...new Set(taskIds)].map((taskId) => {
-    const matches = logs.filter((row) => Number(row.type) === 2 && object(row.other).task_id === taskId && number(object(row.other).actual_quota) !== null).sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0) || Number(b.id || 0) - Number(a.id || 0));
-    if (!matches.length) return { taskId, status: "pending", quota: null };
-    return { taskId, status: "settled", quota: number(object(matches[0].other).actual_quota) };
+    let matches = logs.filter((row) => Number(row.type) === 2 && object(row.other).task_id === taskId && number(object(row.other).actual_quota) !== null).sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0) || Number(b.id || 0) - Number(a.id || 0));
+    return matches.length ? { taskId, status: "settled", quota: number(object(matches[0].other).actual_quota) } : { taskId, status: "pending", quota: null };
   });
 }
 async function fetchActualCost(config, taskIds, signal) {
-  if (isVolcengine(config)) return void 0;
-  const tasks = settledTaskCosts([], taskIds);
-  if (!tasks.length) return void 0;
-  const pending2 = (reason) => ({ status: "pending", source: "relay_settlement", tasks, amount: null, currency: null, reason });
+  if (isVolcengine(config)) return;
+  let tasks = settledTaskCosts([], taskIds);
+  if (!tasks.length) return;
+  let pending2 = (reason) => ({ status: "pending", source: "relay_settlement", tasks, amount: null, currency: null, reason });
   if (signal?.aborted) return pending2("费用待查询：本次操作已停止，可稍后用video_status补查。");
-  const key = resolveApiKey(config);
-  const base = resolveBaseUrl(config).replace(/\/v1\/?$/, "");
+  let key = resolveApiKey(config), base = resolveBaseUrl(config).replace(/\/v1\/?$/, "");
   if (!key || !base) return pending2("费用待查询：原调用连接不可用。");
-  const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(8e3)]) : AbortSignal.timeout(8e3);
-  async function get(path26, authenticated) {
-    const response = await fetch(`${base}${path26}`, {
+  let requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(8e3)]) : AbortSignal.timeout(8e3);
+  async function get(path25, authenticated) {
+    let response = await fetch(`${base}${path25}`, {
       method: "GET",
       redirect: "error",
       signal: requestSignal,
       headers: { accept: "application/json", ...authenticated ? { Authorization: `Bearer ${key}` } : {} }
     });
     if (!response.ok) throw Error(`HTTP ${response.status}`);
-    const body = await response.json();
-    if (body.success === false || body.code !== void 0 && body.code !== 0) throw Error("查询不可用");
+    let body = await response.json();
+    if (body.success === !1 || body.code !== void 0 && body.code !== 0) throw Error("查询不可用");
     return body;
   }
   try {
-    const body = await get("/api/log/token", true);
-    const rows = Array.isArray(body.data) ? body.data : body.data?.items;
+    let body = await get("/api/log/token", !0), rows = Array.isArray(body.data) ? body.data : body.data?.items;
     if (!Array.isArray(rows)) return pending2("费用待查询：中转站未返回有效消费日志。");
-    const settled = settledTaskCosts(rows, taskIds);
-    const known = settled.filter((x) => x.status === "settled");
+    let settled = settledTaskCosts(rows, taskIds), known = settled.filter((x) => x.status === "settled");
     if (!known.length) return pending2("待结算：本 API密钥最近日志中尚未找到该任务的最终结算，可用video_status补查。");
     let conversion;
     try {
-      const settings = (await get("/api/status", false)).data;
-      const perUnit = number(settings?.quota_per_unit);
-      const exchange = number(settings?.usd_exchange_rate);
-      if (perUnit && exchange) conversion = { quotaPerUnit: perUnit, usdExchangeRate: exchange, currency: "CNY" };
+      let settings = (await get("/api/status", !1)).data, perUnit = number(settings?.quota_per_unit), exchange = number(settings?.usd_exchange_rate);
+      perUnit && exchange && (conversion = { quotaPerUnit: perUnit, usdExchangeRate: exchange, currency: "CNY" });
     } catch {
     }
-    const quota = known.reduce((sum, task) => sum + task.quota, 0);
-    const taskCosts = settled.map((task) => ({
+    let quota = known.reduce((sum, task) => sum + task.quota, 0), taskCosts = settled.map((task) => ({
       ...task,
       amount: task.quota !== null && conversion ? Math.round(task.quota / conversion.quotaPerUnit * conversion.usdExchangeRate * 1e6) / 1e6 : null
     }));
@@ -7304,15 +6160,13 @@ async function fetchActualCost(config, taskIds, signal) {
     return pending2("费用待查询：中转站消费日志查询失败或无权限；视频结果不受影响，可稍后用video_status补查。");
   }
 }
-function actualCostText(cost, partialVideo = false) {
+function actualCostText(cost, partialVideo = !1) {
   if (!cost) return "";
-  const amount = (value) => `¥${value.toFixed(value >= 1 ? 2 : 4)}`;
+  let amount = (value) => `¥${value.toFixed(value >= 1 ? 2 : 4)}`;
   if (cost.status === "pending") return `实际消耗：${cost.reason}`;
-  const totalLabel = cost.status === "partial" ? "已结算小计" : partialVideo ? "已生成部分实际消耗" : "实际消耗合计";
-  const lines = cost.tasks.map((task) => task.status === "settled" ? `任务 ${task.taskId} 实际消耗：${task.amount !== null ? amount(task.amount) : `${task.quota}额度`}` : `任务 ${task.taskId}：待结算`);
-  lines.push(`${totalLabel}：${cost.amount !== null ? amount(cost.amount) : `${cost.quota}额度`}（中转站实际结算，视频费用）`);
-  if (cost.reason) lines.push(cost.reason);
-  return lines.join("\n");
+  let totalLabel = cost.status === "partial" ? "已结算小计" : partialVideo ? "已生成部分实际消耗" : "实际消耗合计", lines = cost.tasks.map((task) => task.status === "settled" ? `任务 ${task.taskId} 实际消耗：${task.amount !== null ? amount(task.amount) : `${task.quota}额度`}` : `任务 ${task.taskId}：待结算`);
+  return lines.push(`${totalLabel}：${cost.amount !== null ? amount(cost.amount) : `${cost.quota}额度`}（中转站实际结算，视频费用）`), cost.reason && lines.push(cost.reason), lines.join(`
+`);
 }
 var ACTUAL_COST_SCHEMA = { type: "object", properties: {
   status: { type: "string", enum: ["pending", "partial", "settled"] },
@@ -7336,19 +6190,17 @@ function withActualCost(tool, liveConfig) {
       ...tool.output,
       schema: { ...tool.output.schema, properties: { ...tool.output.schema.properties, actualCost: ACTUAL_COST_SCHEMA } },
       render(args, value) {
-        const rendered = tool.output.render(args, value);
-        const text = actualCostText(value?.actualCost, Boolean(value?.paused || value?.status !== "succeeded"));
+        let rendered = tool.output.render(args, value), text = actualCostText(value?.actualCost, !!(value?.paused || value?.status !== "succeeded"));
         return text ? [...rendered, { type: "text", text }] : rendered;
       }
     },
     async execute(args, exec) {
-      const config = snapshotConfig(liveConfig);
-      const result = await tool.execute(args, exec);
+      let config = snapshotConfig(liveConfig), result = await tool.execute(args, exec);
       if (isVolcengine(config)) return result;
-      const ids = result?.segments ? result.segments.filter((s) => s.status === "succeeded" && s.taskId).map((s) => s.taskId) : result?.status === "succeeded" && result?.taskId ? [result.taskId] : [];
+      let ids = result?.segments ? result.segments.filter((s) => s.status === "succeeded" && s.taskId).map((s) => s.taskId) : result?.status === "succeeded" && result?.taskId ? [result.taskId] : [];
       if (!ids.length) return result;
       try {
-        const actualCost = await timedStage("actual_cost_query", () => fetchActualCost(config, ids, exec?.signal));
+        let actualCost = await timedStage("actual_cost_query", () => fetchActualCost(config, ids, exec?.signal));
         return actualCost ? { ...result, actualCost } : result;
       } catch {
         return result;
@@ -7363,17 +6215,16 @@ import path16 from "node:path";
 import { fileURLToPath as fileURLToPath2, pathToFileURL } from "node:url";
 var progressRecordModule;
 async function appendVideoExecution(exec, phase) {
-  if (!exec?.agent?.session || !exec.callId) return;
-  try {
-    const resolver = createRequire(import.meta.url);
-    const modulePath = resolver.resolve("@deepseek-ai/dsh-session", {
-      paths: [path16.dirname(process.argv[1] || process.execPath), path16.dirname(fileURLToPath2(import.meta.url))]
-    });
-    progressRecordModule ??= import(pathToFileURL(modulePath).href);
-    const { appendPluginRecord } = await progressRecordModule;
-    appendPluginRecord(exec.agent.session, "plugin:metaontic-video/execution", { callId: exec.callId, phase });
-  } catch {
-  }
+  if (!(!exec?.agent?.session || !exec.callId))
+    try {
+      let modulePath = createRequire(import.meta.url).resolve("@deepseek-ai/dsh-session", {
+        paths: [path16.dirname(process.argv[1] || process.execPath), path16.dirname(fileURLToPath2(import.meta.url))]
+      });
+      progressRecordModule ??= import(pathToFileURL(modulePath).href);
+      let { appendPluginRecord } = await progressRecordModule;
+      appendPluginRecord(exec.agent.session, "plugin:metaontic-video/execution", { callId: exec.callId, phase });
+    } catch {
+    }
 }
 async function withGenerationProgress(exec, operation, report = appendVideoExecution) {
   await report(exec, "start");
@@ -7405,31 +6256,30 @@ function withVideoExecution(tool, onResult = void 0, report = appendVideoExecuti
 // src/shared/utils/json.ts
 function toJsonSafe(value, seen = /* @__PURE__ */ new Set()) {
   if (value === null) return null;
-  const type = typeof value;
+  let type = typeof value;
   if (type === "string" || type === "boolean") return value;
-  if (type === "number") {
+  if (type === "number")
     return Number.isFinite(value) && !Object.is(value, -0) ? value : String(value);
-  }
   if (type === "bigint") return value.toString();
-  if (type === "undefined" || type === "function" || type === "symbol") return void 0;
-  if (value instanceof Date) return value.toISOString();
-  if (value instanceof Error) return value.message ? `${value.name}: ${value.message}` : value.name;
-  if (seen.has(value)) return "[circular]";
-  seen.add(value);
-  try {
-    if (Array.isArray(value)) {
-      return Array.from(value, (item) => toJsonSafe(item, seen) ?? null);
+  if (!(type === "undefined" || type === "function" || type === "symbol")) {
+    if (value instanceof Date) return value.toISOString();
+    if (value instanceof Error) return value.message ? `${value.name}: ${value.message}` : value.name;
+    if (seen.has(value)) return "[circular]";
+    seen.add(value);
+    try {
+      if (Array.isArray(value))
+        return Array.from(value, (item) => toJsonSafe(item, seen) ?? null);
+      let prototype = Object.getPrototypeOf(value);
+      if (prototype !== Object.prototype && prototype !== null) return String(value);
+      let plain = {};
+      for (let [key, item] of Object.entries(value)) {
+        let safe = toJsonSafe(item, seen);
+        safe !== void 0 && (plain[key] = safe);
+      }
+      return plain;
+    } finally {
+      seen.delete(value);
     }
-    const prototype = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) return String(value);
-    const plain = {};
-    for (const [key, item] of Object.entries(value)) {
-      const safe = toJsonSafe(item, seen);
-      if (safe !== void 0) plain[key] = safe;
-    }
-    return plain;
-  } finally {
-    seen.delete(value);
   }
 }
 function jsonSafeTool(tool) {
@@ -7444,7 +6294,7 @@ function jsonSafeTool(tool) {
 // src/businesses/video-generation/providers/submissions.ts
 import path17 from "node:path";
 import { createHash as createHash9, randomUUID as randomUUID8 } from "node:crypto";
-import { mkdir as mkdir10, readFile as readFile12, writeFile as writeFile8, rename as rename8, rm as rm7, open as open4, readdir as readdir7 } from "node:fs/promises";
+import { mkdir as mkdir10, readFile as readFile12, writeFile as writeFile8, rename as rename8, rm as rm7, open as open3, readdir as readdir7 } from "node:fs/promises";
 init_plugin();
 init_connection();
 
@@ -7453,84 +6303,71 @@ init_connection();
 
 // src/businesses/video-generation/providers/response.ts
 init_config();
-function findKey(payload, keys, depth = Infinity) {
-  if (payload && typeof payload === "object") {
-    if (!Array.isArray(payload)) {
-      for (const key of keys) {
-        const value = payload[key];
-        if (value !== void 0 && value !== null && value !== "") return value;
+function findKey(payload, keys, depth = 1 / 0) {
+  if (payload && typeof payload == "object") {
+    if (!Array.isArray(payload))
+      for (let key of keys) {
+        let value = payload[key];
+        if (value != null && value !== "") return value;
       }
-    }
-    if (depth <= 0) return void 0;
-    for (const value of Array.isArray(payload) ? payload : Object.values(payload)) {
-      const found = findKey(value, keys, depth - 1);
-      if (found !== void 0 && found !== null && found !== "") return found;
+    if (depth <= 0) return;
+    for (let value of Array.isArray(payload) ? payload : Object.values(payload)) {
+      let found = findKey(value, keys, depth - 1);
+      if (found != null && found !== "") return found;
     }
   }
-  return void 0;
 }
-function collectUrls(payload, path26 = [], found = []) {
-  if (typeof payload === "string") {
-    if (/^https?:\/\//i.test(payload)) found.push([path26, payload]);
-  } else if (Array.isArray(payload)) {
-    for (const item of payload) collectUrls(item, path26, found);
-  } else if (payload && typeof payload === "object") {
-    for (const [key, value] of Object.entries(payload)) {
-      collectUrls(value, [...path26, key], found);
-    }
-  }
+function collectUrls(payload, path25 = [], found = []) {
+  if (typeof payload == "string")
+    /^https?:\/\//i.test(payload) && found.push([path25, payload]);
+  else if (Array.isArray(payload))
+    for (let item of payload) collectUrls(item, path25, found);
+  else if (payload && typeof payload == "object")
+    for (let [key, value] of Object.entries(payload))
+      collectUrls(value, [...path25, key], found);
   return found;
 }
 function isImageKey(key) {
-  const lowered = String(key || "").toLowerCase();
+  let lowered = String(key || "").toLowerCase();
   return IMAGE_KEY_TOKENS.some((token) => lowered.includes(token));
 }
 function looksLikeImageUrl(url) {
   return IMAGE_EXTENSIONS.some((ext) => url.split("?")[0].toLowerCase().endsWith(ext));
 }
 function extractTaskId(payload) {
-  const value = findKey(payload, ["id", "task_id", "taskId", "request_id"], 4);
-  return typeof value === "string" && value ? value : void 0;
+  let value = findKey(payload, ["id", "task_id", "taskId", "request_id"], 4);
+  return typeof value == "string" && value ? value : void 0;
 }
 function extractVideoUrl(payload) {
-  const candidates = collectUrls(payload).filter(
-    ([path26, url]) => !looksLikeImageUrl(url) && !path26.some(isImageKey)
+  let candidates = collectUrls(payload).filter(
+    ([path25, url]) => !looksLikeImageUrl(url) && !path25.some(isImageKey)
   );
-  if (!candidates.length) return void 0;
-  for (const wanted of VIDEO_URL_KEYS) {
-    for (const [path26, url] of candidates) {
-      if (path26.length && String(path26.at(-1)).toLowerCase() === wanted) return url;
-    }
+  if (candidates.length) {
+    for (let wanted of VIDEO_URL_KEYS)
+      for (let [path25, url] of candidates)
+        if (path25.length && String(path25.at(-1)).toLowerCase() === wanted) return url;
+    for (let [path25, url] of candidates)
+      if (path25.length && GENERIC_URL_KEYS.has(String(path25.at(-1)).toLowerCase())) return url;
+    return candidates[0][1];
   }
-  for (const [path26, url] of candidates) {
-    if (path26.length && GENERIC_URL_KEYS.has(String(path26.at(-1)).toLowerCase())) return url;
-  }
-  return candidates[0][1];
 }
 function extractImageUrl(payload) {
-  const found = collectUrls(payload).find(
-    ([path26, url]) => looksLikeImageUrl(url) || path26.some(isImageKey)
-  );
-  return found?.[1];
+  return collectUrls(payload).find(
+    ([path25, url]) => looksLikeImageUrl(url) || path25.some(isImageKey)
+  )?.[1];
 }
 function extractStatus(payload) {
-  const value = findKey(payload, ["status", "state", "task_status"]);
-  return typeof value === "string" ? value.toLowerCase() : void 0;
+  let value = findKey(payload, ["status", "state", "task_status"]);
+  return typeof value == "string" ? value.toLowerCase() : void 0;
 }
 
 // src/businesses/video-generation/providers/transport.ts
 init_config();
 var RELAY_TIMEOUT_MS = 12e4;
 async function relayRequest(config, requestPath, options = {}) {
-  const method = options.method || "GET";
-  const requestId = uniqueSuffix("request");
-  const started = Date.now();
-  const trace = {};
-  const body = options.body;
-  const operation = method === "POST" ? "create_task" : "query_task";
-  const info = {
+  let method = options.method || "GET", requestId = uniqueSuffix("request"), started = Date.now(), trace = {}, body = options.body, info = {
     requestId,
-    operation,
+    operation: method === "POST" ? "create_task" : "query_task",
     method,
     provider: isVolcengine(config) ? "volcengine" : "metaontic",
     model: body?.model || resolveModel(config),
@@ -7543,8 +6380,8 @@ async function relayRequest(config, requestPath, options = {}) {
   };
   await appendRequestLog({ ...info, event: "request_started" });
   try {
-    const data = await relayRequestCore(config, requestPath, options, trace);
-    await appendRequestLog({
+    let data = await relayRequestCore(config, requestPath, options, trace);
+    return await appendRequestLog({
       ...info,
       ...trace,
       event: "request_completed",
@@ -7552,30 +6389,23 @@ async function relayRequest(config, requestPath, options = {}) {
       taskId: extractTaskId(data) || info.taskId,
       taskStatus: extractStatus(data),
       completionTokens: finiteNumber(data?.usage?.completion_tokens)
-    });
-    return data;
+    }), data;
   } catch (error) {
-    await appendRequestLog({
+    throw await appendRequestLog({
       ...info,
       ...trace,
       event: "request_failed",
       elapsedMs: Date.now() - started,
       errorCode: String(error?.code || "request_error"),
-      cancelled: Boolean(options.signal?.aborted)
-    });
-    throw error;
+      cancelled: !!options.signal?.aborted
+    }), error;
   }
 }
-async function relayRequestCore(config, path26, { method = "GET", body, signal } = {}, trace = {}) {
-  const url = `${resolveBaseUrl(config)}${path26}`;
-  const timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS);
-  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
-  const serialized = body === void 0 ? void 0 : JSON.stringify(body);
-  if (serialized && Buffer.byteLength(serialized, "utf8") > 64 * 1024 * 1024) {
+async function relayRequestCore(config, path25, { method = "GET", body, signal } = {}, trace = {}) {
+  let url = `${resolveBaseUrl(config)}${path25}`, timeout = AbortSignal.timeout(RELAY_TIMEOUT_MS), requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout, serialized = body === void 0 ? void 0 : JSON.stringify(body);
+  if (serialized && Buffer.byteLength(serialized, "utf8") > 64 * 1024 * 1024)
     throw Object.assign(new Error("视频请求体超过64 MB，请减少内联图片或改用公网 URL；火山直连也可使用 asset:// 素材。"), { code: "request_too_large" });
-  }
-  let response;
-  let text;
+  let response, text;
   try {
     response = await fetch(url, {
       method,
@@ -7585,29 +6415,22 @@ async function relayRequestCore(config, path26, { method = "GET", body, signal }
       },
       ...serialized !== void 0 ? { body: serialized } : {},
       signal: requestSignal
-    });
-    trace.httpStatus = response.status;
-    trace.upstreamRequestId = response.headers.get("x-request-id") || response.headers.get("x-tt-logid") || void 0;
-    text = await response.text();
+    }), trace.httpStatus = response.status, trace.upstreamRequestId = response.headers.get("x-request-id") || response.headers.get("x-tt-logid") || void 0, text = await response.text();
   } catch (error) {
-    if (signal?.aborted) throw abortError();
-    throw Object.assign(new Error(`中转站请求失败：${error?.message || error}`), {
+    throw signal?.aborted ? abortError() : Object.assign(new Error(`中转站请求失败：${error?.message || error}`), {
       code: "provider_network_error"
     });
   }
   let data = {};
-  if (text) {
+  if (text)
     try {
       data = JSON.parse(text);
     } catch {
       data = { raw: text };
     }
-  }
-  const upstreamError = data && typeof data === "object" && data.error;
-  const failedTaskResponse = method === "GET" && FAILED_STATES.has(extractStatus(data));
+  let upstreamError = data && typeof data == "object" && data.error, failedTaskResponse = method === "GET" && FAILED_STATES.has(extractStatus(data));
   if (!response.ok || upstreamError && !failedTaskResponse) {
-    const httpStatus = response.status >= 400 ? response.status : 400;
-    const classified = classifyError(
+    let httpStatus = response.status >= 400 ? response.status : 400, classified = classifyError(
       httpStatus,
       data
     );
@@ -7624,58 +6447,49 @@ function sleep(ms, signal) {
       reject(abortError());
       return;
     }
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve3();
+    let timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort), resolve3();
     }, ms);
     function onAbort() {
-      clearTimeout(timer);
-      reject(abortError());
+      clearTimeout(timer), reject(abortError());
     }
-    signal?.addEventListener("abort", onAbort, { once: true });
+    signal?.addEventListener("abort", onAbort, { once: !0 });
   });
 }
 function getTask(config, taskId, signal) {
   return relayRequest(config, resolveQueryPath(config, taskId), { signal });
 }
 async function waitForCompletion(config, taskId, signal) {
-  const deadline = Date.now() + ref(config, "maxWaitMs", 6e5);
-  const maxPollErrors = Math.max(1, Math.round(ref(config, "pollErrorRetries", 5)));
-  let pollErrors = 0;
+  let deadline = Date.now() + ref(config, "maxWaitMs", 6e5), maxPollErrors = Math.max(1, Math.round(ref(config, "pollErrorRetries", 5))), pollErrors = 0;
   for (; ; ) {
     if (signal?.aborted) throw abortError();
     let task;
     try {
-      task = await getTask(config, taskId, signal);
-      pollErrors = 0;
+      task = await getTask(config, taskId, signal), pollErrors = 0;
     } catch (failure) {
       if (failure?.code === "ABORTED") throw failure;
-      if (!isRetryablePollError(failure)) {
+      if (!isRetryablePollError(failure))
         return {
           taskId,
           status: "unknown",
           errorCode: failure?.code || "provider_poll_error",
           error: `任务已提交（${taskId}），查询返回失败：${failure?.message || failure}。可用 video_status 按这个 ID 复查确认。`
         };
-      }
-      pollErrors += 1;
-      if (pollErrors >= maxPollErrors || Date.now() > deadline) {
+      if (pollErrors += 1, pollErrors >= maxPollErrors || Date.now() > deadline)
         return {
           taskId,
           status: "unknown",
           errorCode: failure?.code || "provider_poll_error",
           error: `任务已提交（${taskId}），但连续 ${pollErrors} 次查询状态失败：${failure?.message || failure}。任务可能仍在生成，可用 video_status 按这个 ID 再查，不要重复提交。`
         };
-      }
       await sleep(ref(config, "pollIntervalMs", 5e3), signal);
       continue;
     }
-    const status = extractStatus(task) || "unknown";
-    const model = findKey(task, ["model"]) || resolveModel(config);
+    let status = extractStatus(task) || "unknown", model = findKey(task, ["model"]) || resolveModel(config);
     if (SUCCESS_STATES.has(status)) {
-      const videoUrl = extractVideoUrl(task);
+      let videoUrl = extractVideoUrl(task);
       if (videoUrl) return { taskId, status: "succeeded", model, videoUrl };
-      const imageUrl = extractImageUrl(task);
+      let imageUrl = extractImageUrl(task);
       return {
         taskId,
         status: "failed",
@@ -7685,8 +6499,7 @@ async function waitForCompletion(config, taskId, signal) {
       };
     }
     if (FAILED_STATES.has(status)) {
-      const data = findKey(task, ["error", "fail_reason", "message", "detail"]);
-      const classified = classifyError(400, typeof data === "string" ? { message: data } : data || task);
+      let data = findKey(task, ["error", "fail_reason", "message", "detail"]), classified = classifyError(400, typeof data == "string" ? { message: data } : data || task);
       return {
         taskId,
         status: CANCEL_STATES.has(status) ? "cancelled" : "failed",
@@ -7695,9 +6508,8 @@ async function waitForCompletion(config, taskId, signal) {
         error: classified.message
       };
     }
-    if (Date.now() > deadline) {
+    if (Date.now() > deadline)
       return { taskId, status: "timeout" };
-    }
     await sleep(ref(config, "pollIntervalMs", 5e3), signal);
   }
 }
@@ -7711,12 +6523,11 @@ function directory() {
   return path17.join(dshHome(), "state", DATA_DIR, "submissions");
 }
 async function save(file, record) {
-  const temporary = `${file}.${randomUUID8()}.tmp`;
+  let temporary = `${file}.${randomUUID8()}.tmp`;
   try {
-    await writeFile8(temporary, JSON.stringify(record), { mode: 384 });
-    await rename8(temporary, file);
+    await writeFile8(temporary, JSON.stringify(record), { mode: 384 }), await rename8(temporary, file);
   } finally {
-    await rm7(temporary, { force: true }).catch(() => {
+    await rm7(temporary, { force: !0 }).catch(() => {
     });
   }
 }
@@ -7725,94 +6536,70 @@ function blocked(record) {
 }
 async function guardedSubmit(config, requestPath, body, signal, scope = "") {
   if (signal?.aborted) throw abortError();
-  const identity = submissionIdentity(config);
-  const id = hash2(JSON.stringify([identity, requestPath, body]));
-  await mkdir10(directory(), { recursive: true, mode: 448 });
-  const file = path17.join(directory(), `${id}.json`);
-  let handle;
+  let identity = submissionIdentity(config), id = hash2(JSON.stringify([identity, requestPath, body]));
+  await mkdir10(directory(), { recursive: !0, mode: 448 });
+  let file = path17.join(directory(), `${id}.json`), handle;
   try {
-    handle = await open4(file, "wx", 384);
+    handle = await open3(file, "wx", 384);
   } catch (error) {
     if (error?.code !== "EEXIST") throw error;
-    const old = await readSubmission(id);
+    let old = await readSubmission(id);
     if (old.taskId && (!scope || old.scope === scope)) return { task_id: old.taskId, id: old.taskId };
     throw blocked(old);
   }
-  const record = { id, identity, requestPath, scope, model: body?.model, status: "submitting", createdAt: (/* @__PURE__ */ new Date()).toISOString() };
+  let record = { id, identity, requestPath, scope, model: body?.model, status: "submitting", createdAt: (/* @__PURE__ */ new Date()).toISOString() };
   try {
     await handle.writeFile(JSON.stringify(record));
   } finally {
     await handle.close();
   }
   try {
-    const result = await relayRequest(config, requestPath, { method: "POST", body, signal });
-    const taskId = extractTaskId(result);
+    let result = await relayRequest(config, requestPath, { method: "POST", body, signal }), taskId = extractTaskId(result);
     if (!taskId) throw new Error("提交响应缺少任务 ID");
-    record.taskId = taskId;
-    record.status = "created";
-    await save(file, record);
-    return result;
+    return record.taskId = taskId, record.status = "created", await save(file, record), result;
   } catch (error) {
-    if (error?.code === "request_too_large") {
-      await rm7(file, { force: true });
-      throw error;
-    }
-    if (error?.status >= 400 && error.status < 500 && error.status !== 408) {
-      await rm7(file, { force: true });
-      throw error;
-    }
-    record.status = "uncertain";
-    await save(file, record).catch(() => {
-    });
-    throw blocked(record);
+    throw error?.code === "request_too_large" ? (await rm7(file, { force: !0 }), error) : error?.status >= 400 && error.status < 500 && error.status !== 408 ? (await rm7(file, { force: !0 }), error) : (record.status = "uncertain", await save(file, record).catch(() => {
+    }), blocked(record));
   }
 }
 async function finishSubmission(config, requestPath, body) {
-  const id = hash2(JSON.stringify([submissionIdentity(config), requestPath, body]));
-  await rm7(path17.join(directory(), `${id}.json`), { force: true });
+  let id = hash2(JSON.stringify([submissionIdentity(config), requestPath, body]));
+  await rm7(path17.join(directory(), `${id}.json`), { force: !0 });
 }
 async function finishKnownTask(config, taskId) {
-  const identity = submissionIdentity(config);
-  for (const name of await readdir7(directory()).catch((error) => {
+  let identity = submissionIdentity(config);
+  for (let name of await readdir7(directory()).catch((error) => {
     if (error.code === "ENOENT") return [];
     throw error;
   })) {
     if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
-    const file = path17.join(directory(), name);
-    const raw = await readFile12(file, "utf8").catch((error) => {
+    let file = path17.join(directory(), name), raw = await readFile12(file, "utf8").catch((error) => {
       if (error.code === "ENOENT") return null;
       throw error;
     });
     if (raw === null) continue;
-    const record = JSON.parse(raw);
-    if (record.identity === identity && record.taskId === taskId && record.status === "created") await rm7(file, { force: true });
+    let record = JSON.parse(raw);
+    record.identity === identity && record.taskId === taskId && record.status === "created" && await rm7(file, { force: !0 });
   }
 }
 async function readSubmission(id) {
   if (!/^[a-f0-9]{64}$/.test(String(id))) throw new Error("提交记录 ID 格式不正确。");
-  const record = JSON.parse(await readFile12(path17.join(directory(), `${id}.json`), "utf8"));
+  let record = JSON.parse(await readFile12(path17.join(directory(), `${id}.json`), "utf8"));
   if (record.id !== id) throw new Error("提交记录损坏，已停止。");
   return record;
 }
 async function reconcileSubmission(config, id, taskId, confirmedNotCreated) {
-  const record = await readSubmission(id);
-  if (/\/tasks\/doubao$/.test(record.requestPath)) config = imageConfig(config);
-  if (record.identity !== submissionIdentity(config)) throw new Error("请恢复原接入方式、地址和 API密钥后核对提交。");
-  const file = path17.join(directory(), `${id}.json`);
+  let record = await readSubmission(id);
+  if (/\/tasks\/doubao$/.test(record.requestPath) && (config = imageConfig(config)), record.identity !== submissionIdentity(config)) throw new Error("请恢复原接入方式、地址和 API密钥后核对提交。");
+  let file = path17.join(directory(), `${id}.json`);
   if (record.status === "submitting" && Date.now() - Date.parse(record.createdAt) < 15e4) throw new Error("原提交仍可能正在执行，请等待其返回后再核对。");
   if (taskId) {
-    const image = /\/tasks\/doubao$/.test(record.requestPath);
-    const queryPath = image ? record.requestPath.replace(/\/doubao$/, "") + "/" + encodeURIComponent(taskId) : (await Promise.resolve().then(() => (init_connection(), connection_exports))).resolveQueryPath(config, taskId);
-    await relayRequest(config, queryPath);
-    record.taskId = taskId;
-    record.status = "created";
-    await save(file, record);
-    return { submissionId: id, taskId, status: "linked" };
+    let queryPath = /\/tasks\/doubao$/.test(record.requestPath) ? record.requestPath.replace(/\/doubao$/, "") + "/" + encodeURIComponent(taskId) : (await Promise.resolve().then(() => (init_connection(), connection_exports))).resolveQueryPath(config, taskId);
+    return await relayRequest(config, queryPath), record.taskId = taskId, record.status = "created", await save(file, record), { submissionId: id, taskId, status: "linked" };
   }
   if (record.taskId) throw new Error("此记录已有明确任务 ID，请先查询原任务，不能按未创建解锁。");
-  if (confirmedNotCreated !== true) throw new Error("必须提供原任务 ID，或由用户在渠道侧核对并明确确认未创建。");
-  await rm7(file);
-  return { submissionId: id, status: "unlocked", note: "仅解除本机防重，未提交新任务；下一次生成仍需费用确认。" };
+  if (confirmedNotCreated !== !0) throw new Error("必须提供原任务 ID，或由用户在渠道侧核对并明确确认未创建。");
+  return await rm7(file), { submissionId: id, status: "unlocked", note: "仅解除本机防重，未提交新任务；下一次生成仍需费用确认。" };
 }
 
 // src/businesses/video-generation/tools/media-submission.ts
@@ -7832,12 +6619,12 @@ function submissionTool(liveConfig) {
     } },
     timeoutMs: 15e4,
     isConcurrencySafe() {
-      return false;
+      return !1;
     },
     async execute(args) {
-      const config = snapshotConfig(liveConfig);
+      let config = snapshotConfig(liveConfig);
       if (args?.action === "get") {
-        const record = await readSubmission(args.submissionId);
+        let record = await readSubmission(args.submissionId);
         if (record.identity !== submissionIdentity(/\/tasks\/doubao$/.test(record.requestPath) ? imageConfig(config) : config)) throw new Error("请恢复原连接和 API密钥后核对。");
         return { submissionId: record.id, status: record.status, taskId: record.taskId, model: record.model, createdAt: record.createdAt };
       }
@@ -7849,7 +6636,7 @@ function submissionTool(liveConfig) {
 
 // src/businesses/video-generation/integrations/canvas.ts
 import { createHash as createHash11, randomUUID as randomUUID10 } from "node:crypto";
-import { mkdir as mkdir13, readFile as readFile14, writeFile as writeFile10, rename as rename11, copyFile, stat as stat8, open as open5 } from "node:fs/promises";
+import { mkdir as mkdir13, readFile as readFile14, writeFile as writeFile10, rename as rename11, copyFile, stat as stat8, open as open4 } from "node:fs/promises";
 import path20 from "node:path";
 init_plugin();
 
@@ -7859,13 +6646,7 @@ import { createReadStream } from "node:fs";
 import { createHash as createHash10, randomUUID as randomUUID9 } from "node:crypto";
 import path18 from "node:path";
 init_plugin();
-var BUILTIN_BACKEND = "builtin";
-var validId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
-var storeDir = () => path18.join(dshHome(), DATA_DIR, "canvas");
-var docsDir = () => path18.join(storeDir(), "projects");
-var dataRootOf = () => path18.join(storeDir(), "data");
-var assetsFile = () => path18.join(storeDir(), "assets.json");
-var docFile = (id) => {
+var BUILTIN_BACKEND = "builtin", validId = (value) => typeof value == "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value), storeDir = () => path18.join(dshHome(), DATA_DIR, "canvas"), docsDir = () => path18.join(storeDir(), "projects"), dataRootOf = () => path18.join(storeDir(), "data"), assetsFile = () => path18.join(storeDir(), "assets.json"), docFile = (id) => {
   if (!validId(id)) throw new Error("画布项目标识无效");
   return path18.join(docsDir(), `${id}.json`);
 };
@@ -7877,14 +6658,12 @@ async function readJson(file, fallback = null) {
   }
 }
 async function writeJson(file, value) {
-  await mkdir11(path18.dirname(file), { recursive: true, mode: 448 });
-  const temp = `${file}.${randomUUID9()}.tmp`;
-  await writeFile9(temp, JSON.stringify(value), { mode: 384, flag: "wx" });
-  await rename9(temp, file);
+  await mkdir11(path18.dirname(file), { recursive: !0, mode: 448 });
+  let temp = `${file}.${randomUUID9()}.tmp`;
+  await writeFile9(temp, JSON.stringify(value), { mode: 384, flag: "wx" }), await rename9(temp, file);
 }
 async function builtinCanvasExists(projectId) {
-  if (!validId(projectId)) return false;
-  return Boolean(await readJson(docFile(projectId)));
+  return validId(projectId) ? !!await readJson(docFile(projectId)) : !1;
 }
 async function readDoc(id) {
   return readJson(docFile(id));
@@ -7893,11 +6672,10 @@ async function writeDoc(id, doc) {
   await writeJson(docFile(id), doc);
 }
 async function allDocs() {
-  const names = await readdir8(docsDir()).catch(() => []);
-  const docs = [];
-  for (const name of names) if (name.endsWith(".json")) {
-    const doc = await readJson(path18.join(docsDir(), name));
-    if (doc?.id && !doc.deleted) docs.push(doc);
+  let names = await readdir8(docsDir()).catch(() => []), docs = [];
+  for (let name of names) if (name.endsWith(".json")) {
+    let doc = await readJson(path18.join(docsDir(), name));
+    doc?.id && !doc.deleted && docs.push(doc);
   }
   return docs.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
@@ -7909,13 +6687,8 @@ async function writeAssets(assets) {
 }
 var newId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 function mergeDoc(id, prev, args) {
-  const incoming = args?.doc || {};
-  const tombstones = [.../* @__PURE__ */ new Set([...prev?.tombstones || [], ...incoming.tombstones || []])];
-  const edgeTombstones = [.../* @__PURE__ */ new Set([...prev?.edgeTombstones || [], ...incoming.edgeTombstones || []])];
-  const nodes = { ...incoming.nodes !== void 0 ? incoming.nodes : prev?.nodes || {} };
-  const edges = [...incoming.edges !== void 0 ? incoming.edges : prev?.edges || []];
-  for (const gone of tombstones) delete nodes[gone];
-  const kept = edges.filter((edge) => edge?.id && !edgeTombstones.includes(edge.id) && nodes[edge.fromNode] && nodes[edge.toNode]);
+  let incoming = args?.doc || {}, tombstones = [.../* @__PURE__ */ new Set([...prev?.tombstones || [], ...incoming.tombstones || []])], edgeTombstones = [.../* @__PURE__ */ new Set([...prev?.edgeTombstones || [], ...incoming.edgeTombstones || []])], nodes = { ...incoming.nodes !== void 0 ? incoming.nodes : prev?.nodes || {} }, edges = [...incoming.edges !== void 0 ? incoming.edges : prev?.edges || []];
+  for (let gone of tombstones) delete nodes[gone];
   return {
     id,
     createdAt: prev?.createdAt || incoming.createdAt || Date.now(),
@@ -7937,166 +6710,122 @@ function mergeDoc(id, prev, args) {
 function builtinRpc() {
   return {
     async projectsGet(args) {
-      const doc = await readDoc(args?.id);
-      if (!doc) return { id: args?.id, nodes: {}, edges: [], missing: true };
-      return { ...doc, nodeIds: Object.keys(doc.nodes || {}) };
+      let doc = await readDoc(args?.id);
+      return doc ? { ...doc, nodeIds: Object.keys(doc.nodes || {}) } : { id: args?.id, nodes: {}, edges: [], missing: !0 };
     },
     async projectsPut(args) {
-      const id = String(args?.id || "");
-      const prev = await readDoc(id);
-      const next = mergeDoc(id, prev, args);
-      next.assets = { ...prev?.assets || {} };
-      await writeDoc(id, next);
-      return { ok: true, id, rev: next.rev };
+      let id = String(args?.id || ""), prev = await readDoc(id), next = mergeDoc(id, prev, args);
+      return next.assets = { ...prev?.assets || {} }, await writeDoc(id, next), { ok: !0, id, rev: next.rev };
     },
     async projectsList() {
       return (await allDocs()).map((doc) => ({ id: doc.id, name: doc.name, updatedAt: doc.updatedAt, nodeIds: Object.keys(doc.nodes || {}), nodeCount: Object.keys(doc.nodes || {}).length }));
     },
     async projectsDelete(args) {
-      await writeDoc(String(args?.id || ""), { id: args?.id, deleted: true, nodes: {}, edges: [], updatedAt: Date.now() });
-      return { ok: true, deleted: true };
+      return await writeDoc(String(args?.id || ""), { id: args?.id, deleted: !0, nodes: {}, edges: [], updatedAt: Date.now() }), { ok: !0, deleted: !0 };
     },
     async assetsGet(args) {
-      const assets = await readAssets();
+      let assets = await readAssets();
       return { items: (args?.ids || []).map((id) => assets[id]).filter(Boolean) };
     },
     async assetCreate(args) {
-      const asset = args?.asset;
+      let asset = args?.asset;
       if (!asset?.id) throw new Error("画布资产标识无效");
-      const assets = await readAssets();
-      assets[asset.id] = { ...asset, projectName: args?.projectName || "" };
-      await writeAssets(assets);
-      const doc = await readDoc(asset.projectId);
-      if (doc) {
-        doc.assets = { ...doc.assets || {}, [asset.id]: assets[asset.id] };
-        await writeDoc(doc.id, doc);
-      }
-      return { ok: true, id: asset.id };
+      let assets = await readAssets();
+      assets[asset.id] = { ...asset, projectName: args?.projectName || "" }, await writeAssets(assets);
+      let doc = await readDoc(asset.projectId);
+      return doc && (doc.assets = { ...doc.assets || {}, [asset.id]: assets[asset.id] }, await writeDoc(doc.id, doc)), { ok: !0, id: asset.id };
     },
     async dataRootGet() {
-      return { dataRoot: dataRootOf(), exists: true, store: "builtin" };
+      return { dataRoot: dataRootOf(), exists: !0, store: "builtin" };
     },
     async projectDirGet(args) {
-      const id = String(args?.projectId || "");
-      if (!validId(id)) return { ok: false };
-      return { ok: true, dataRoot: dataRootOf(), abs: path18.join(dataRootOf(), "projects", id) };
+      let id = String(args?.projectId || "");
+      return validId(id) ? { ok: !0, dataRoot: dataRootOf(), abs: path18.join(dataRootOf(), "projects", id) } : { ok: !1 };
     },
     async canvasCreateProject(args) {
-      const name = String(args?.name || "").trim().slice(0, 80) || "MetaOntic 创作画布";
-      const empty = (await allDocs()).find((doc) => doc.name === name && !Object.keys(doc.nodes || {}).length && !doc.claimedBy);
-      if (empty) return { ok: true, projectId: empty.id, name, reused: true };
-      const id = newId();
-      await writeDoc(id, { id, createdAt: Date.now(), updatedAt: Date.now(), name, nodes: {}, edges: [], view: { x: 60, y: 40, scale: 1 }, rev: 1 });
-      return { ok: true, projectId: id, name };
+      let name = String(args?.name || "").trim().slice(0, 80) || "MetaOntic 创作画布", empty = (await allDocs()).find((doc) => doc.name === name && !Object.keys(doc.nodes || {}).length && !doc.claimedBy);
+      if (empty) return { ok: !0, projectId: empty.id, name, reused: !0 };
+      let id = newId();
+      return await writeDoc(id, { id, createdAt: Date.now(), updatedAt: Date.now(), name, nodes: {}, edges: [], view: { x: 60, y: 40, scale: 1 }, rev: 1 }), { ok: !0, projectId: id, name };
     },
     async canvasRename(args) {
-      const doc = await readDoc(args?.projectId);
-      if (!doc) return { ok: false };
-      doc.name = String(args?.name || doc.name).slice(0, 80);
-      doc.updatedAt = Date.now();
-      doc.rev = (doc.rev || 0) + 1;
-      await writeDoc(doc.id, doc);
-      return { ok: true, id: doc.id, name: doc.name };
+      let doc = await readDoc(args?.projectId);
+      return doc ? (doc.name = String(args?.name || doc.name).slice(0, 80), doc.updatedAt = Date.now(), doc.rev = (doc.rev || 0) + 1, await writeDoc(doc.id, doc), { ok: !0, id: doc.id, name: doc.name }) : { ok: !1 };
     },
     /** 内置画布是插件自己的左侧栏页面，工具没法替用户打开：如实返回未打开，由助手提示用户点入口。 */
     async canvasOpen() {
-      return { ok: false, reason: "内置流程画布需要用户自己从左侧栏「MetaOnticVideo流程画布」打开，工具无法代开。" };
+      return { ok: !1, reason: "内置流程画布需要用户自己从左侧栏「MetaOnticVideo流程画布」打开，工具无法代开。" };
     }
   };
 }
 function createBuiltinConnect() {
   return async (args) => {
-    const id = String(args?.projectId || "");
-    const doc = await readDoc(id);
-    if (!doc?.nodes) return { ok: false };
-    const from2 = String(args?.fromNode || ""), to = String(args?.toNode || "");
-    if (!doc.nodes[from2] || !doc.nodes[to]) return { ok: false };
-    if ((doc.edges || []).some((edge2) => edge2.fromNode === from2 && edge2.toNode === to)) return { ok: true, already: true };
-    const edge = {
+    let id = String(args?.projectId || ""), doc = await readDoc(id);
+    if (!doc?.nodes) return { ok: !1 };
+    let from2 = String(args?.fromNode || ""), to = String(args?.toNode || "");
+    if (!doc.nodes[from2] || !doc.nodes[to]) return { ok: !1 };
+    if ((doc.edges || []).some((edge2) => edge2.fromNode === from2 && edge2.toNode === to)) return { ok: !0, already: !0 };
+    let edge = {
       id: `mov_conn_${randomUUID9().replaceAll("-", "").slice(0, 16)}`,
       fromNode: from2,
       toNode: to,
       ...args?.fromPort ? { fromPort: args.fromPort } : {},
       ...args?.toPort ? { toPort: args.toPort } : {}
     };
-    doc.edges = [...doc.edges || [], edge];
-    doc.updatedAt = Date.now();
-    doc.rev = (doc.rev || 0) + 1;
-    await writeDoc(id, doc);
-    return { ok: true, id: edge.id };
+    return doc.edges = [...doc.edges || [], edge], doc.updatedAt = Date.now(), doc.rev = (doc.rev || 0) + 1, await writeDoc(id, doc), { ok: !0, id: edge.id };
   };
 }
 function builtinCanvasAdapter() {
-  const rpc = builtinRpc();
+  let rpc = builtinRpc();
   return { backend: BUILTIN_BACKEND, rpc, assetPath: (root, asset) => path18.resolve(root, String(asset?.rel || "")), connect: createBuiltinConnect() };
 }
 async function builtinCanvasList() {
   return (await allDocs()).map((doc) => ({ projectId: doc.id, name: doc.name, updatedAt: doc.updatedAt || 0, nodeCount: Object.keys(doc.nodes || {}).length }));
 }
 async function requireDoc(projectId) {
-  const doc = await readDoc(projectId);
+  let doc = await readDoc(projectId);
   if (!doc || doc.deleted) throw new Error("画布不存在或已删除。");
   return doc;
 }
 async function assertCanvasName(name, exceptId) {
-  const label = String(name || "").trim().slice(0, 80);
+  let label = String(name || "").trim().slice(0, 80);
   if (!label) throw new Error("画布名不能为空。");
-  const taken = (await allDocs()).some((doc) => doc.id !== exceptId && String(doc.name || "").trim() === label);
-  if (taken) throw new Error("同名画布已存在，请换一个名称。");
+  if ((await allDocs()).some((doc) => doc.id !== exceptId && String(doc.name || "").trim() === label)) throw new Error("同名画布已存在，请换一个名称。");
   return label;
 }
 async function builtinCanvasCreate(name) {
-  const label = await assertCanvasName(name);
-  const id = newId();
-  const doc = { id, createdAt: Date.now(), updatedAt: Date.now(), name: label, nodes: {}, edges: [], view: { x: 60, y: 40, scale: 1 }, rev: 1 };
-  await writeDoc(id, doc);
-  return { canvas: { projectId: id, name: label, updatedAt: doc.updatedAt, view: doc.view, nodes: {}, edges: [], dataRoot: dataRootOf() } };
+  let label = await assertCanvasName(name), id = newId(), doc = { id, createdAt: Date.now(), updatedAt: Date.now(), name: label, nodes: {}, edges: [], view: { x: 60, y: 40, scale: 1 }, rev: 1 };
+  return await writeDoc(id, doc), { canvas: { projectId: id, name: label, updatedAt: doc.updatedAt, view: doc.view, nodes: {}, edges: [], dataRoot: dataRootOf() } };
 }
-var IMAGE_MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp" };
-var IMPORT_LIMIT_BYTES = 32 * 1024 * 1024;
+var IMAGE_MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp" }, IMPORT_LIMIT_BYTES = 32 * 1024 * 1024;
 function imageExtension(mime, bytes) {
-  const normalized = String(mime || "").toLowerCase().split(";")[0].trim();
-  if (normalized === "image/png") return ".png";
-  if (normalized === "image/jpeg" || normalized === "image/jpg") return ".jpg";
-  if (normalized === "image/webp") return ".webp";
-  if (bytes.length > 8 && bytes.toString("hex", 0, 8) === "89504e470d0a1a0a") return ".png";
-  if (bytes.length > 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return ".jpg";
-  if (bytes.length > 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") return ".webp";
-  return "";
+  let normalized = String(mime || "").toLowerCase().split(";")[0].trim();
+  return normalized === "image/png" ? ".png" : normalized === "image/jpeg" || normalized === "image/jpg" ? ".jpg" : normalized === "image/webp" ? ".webp" : bytes.length > 8 && bytes.toString("hex", 0, 8) === "89504e470d0a1a0a" ? ".png" : bytes.length > 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 ? ".jpg" : bytes.length > 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP" ? ".webp" : "";
 }
 async function builtinCanvasImport(args) {
-  const doc = await requireDoc(args?.projectId);
-  const bytes = Buffer.isBuffer(args?.bytes) ? args.bytes : Buffer.from(args?.bytes || []);
+  let doc = await requireDoc(args?.projectId), bytes = Buffer.isBuffer(args?.bytes) ? args.bytes : Buffer.from(args?.bytes || []);
   if (!bytes.length) throw new Error("导入的图片是空文件。");
   if (bytes.length > IMPORT_LIMIT_BYTES) throw new Error("单张图片不能超过 32MB。");
-  const extension = imageExtension(args?.mime, bytes);
+  let extension = imageExtension(args?.mime, bytes);
   if (!extension) throw new Error("只支持 PNG、JPEG、WebP 图片。");
-  const id = `mov_img_${createHash10("sha256").update(bytes).digest("hex").slice(0, 24)}`;
-  const label = String(args?.name || "").trim().slice(0, 80) || `导入图片${extension}`;
-  const rel = `projects/${doc.id}/image/${id}${extension}`;
-  const dest = path18.join(dataRootOf(), rel);
-  await mkdir11(path18.dirname(dest), { recursive: true, mode: 448 });
-  if (!(await stat7(dest).catch(() => null))?.isFile()) {
-    const temp = `${dest}.${randomUUID9()}.tmp`;
-    await writeFile9(temp, bytes, { mode: 384, flag: "wx" });
-    await rename9(temp, dest);
+  let id = `mov_img_${createHash10("sha256").update(bytes).digest("hex").slice(0, 24)}`, label = String(args?.name || "").trim().slice(0, 80) || `导入图片${extension}`, rel = `projects/${doc.id}/image/${id}${extension}`, dest = path18.join(dataRootOf(), rel);
+  if (await mkdir11(path18.dirname(dest), { recursive: !0, mode: 448 }), !(await stat7(dest).catch(() => null))?.isFile()) {
+    let temp = `${dest}.${randomUUID9()}.tmp`;
+    await writeFile9(temp, bytes, { mode: 384, flag: "wx" }), await rename9(temp, dest);
   }
-  const mime = IMAGE_MIME[extension];
-  await builtinRpc().assetCreate({ projectName: doc.name || "", asset: { id, projectId: doc.id, kind: "image", mime, name: label, rel, size: bytes.length, createdAt: Date.now(), stored: "disk", source: "metaontic-video" } });
-  return { ok: true, assetId: id, name: label, rel, size: bytes.length, mime };
+  let mime = IMAGE_MIME[extension];
+  return await builtinRpc().assetCreate({ projectName: doc.name || "", asset: { id, projectId: doc.id, kind: "image", mime, name: label, rel, size: bytes.length, createdAt: Date.now(), stored: "disk", source: "metaontic-video" } }), { ok: !0, assetId: id, name: label, rel, size: bytes.length, mime };
 }
 async function builtinCanvasHandle(args) {
-  const method = String(args?.method || "");
-  const params = args?.args || {};
+  let method = String(args?.method || ""), params = args?.args || {};
   if (method === "list") return { canvases: await builtinCanvasList() };
   if (method === "create") return await builtinCanvasCreate(params.name);
   if (method === "delete") {
-    const doc = await requireDoc(params.projectId);
-    await writeDoc(doc.id, { id: doc.id, name: doc.name, deleted: true, nodes: {}, edges: [], createdAt: doc.createdAt, updatedAt: Date.now() });
-    return { canvas: { projectId: doc.id, name: doc.name, deleted: true } };
+    let doc = await requireDoc(params.projectId);
+    return await writeDoc(doc.id, { id: doc.id, name: doc.name, deleted: !0, nodes: {}, edges: [], createdAt: doc.createdAt, updatedAt: Date.now() }), { canvas: { projectId: doc.id, name: doc.name, deleted: !0 } };
   }
   if (method === "get") {
-    const doc = await readDoc(params.projectId);
+    let doc = await readDoc(params.projectId);
     if (!doc || doc.deleted) throw new Error("画布不存在或已删除。");
     return { canvas: {
       projectId: doc.id,
@@ -8110,33 +6839,23 @@ async function builtinCanvasHandle(args) {
     } };
   }
   if (method === "rename") {
-    const doc = await requireDoc(params.projectId);
-    const name = await assertCanvasName(params.name, doc.id);
-    if (name === doc.name) return { canvas: { projectId: doc.id, name: doc.name } };
-    doc.name = name;
-    doc.updatedAt = Date.now();
-    doc.rev = (doc.rev || 0) + 1;
-    await writeDoc(doc.id, doc);
-    return { canvas: { projectId: doc.id, name: doc.name } };
+    let doc = await requireDoc(params.projectId), name = await assertCanvasName(params.name, doc.id);
+    return name === doc.name ? { canvas: { projectId: doc.id, name: doc.name } } : (doc.name = name, doc.updatedAt = Date.now(), doc.rev = (doc.rev || 0) + 1, await writeDoc(doc.id, doc), { canvas: { projectId: doc.id, name: doc.name } });
   }
   if (method === "nodeSave") {
-    const doc = await requireDoc(params.projectId);
-    const incoming = params.node || {};
-    const id = String(incoming.id || "");
+    let doc = await requireDoc(params.projectId), incoming = params.node || {}, id = String(incoming.id || "");
     if (!validId(id)) throw new Error("节点标识无效。");
     if (doc.tombstones?.includes(id)) throw new Error("该节点已删除，不自动复活；请新建节点。");
-    const prev = doc.nodes?.[id];
-    const type = String(incoming.type || prev?.type || "text");
+    let prev = doc.nodes?.[id], type = String(incoming.type || prev?.type || "text");
     if (!["text", "script", "storyboard", "shot", "image", "video"].includes(type)) throw new Error("节点类型不支持。");
-    const data = { ...prev?.data || {}, ...incoming.data || {} };
-    for (const key of ["label", "prompt", "text", "output", "script", "requirement", "ratio", "resolution"]) {
-      if (incoming.data && key in incoming.data) data[key] = String(incoming.data[key] ?? "");
-    }
+    let data = { ...prev?.data || {}, ...incoming.data || {} };
+    for (let key of ["label", "prompt", "text", "output", "script", "requirement", "ratio", "resolution"])
+      incoming.data && key in incoming.data && (data[key] = String(incoming.data[key] ?? ""));
     if (incoming.data && "duration" in incoming.data) {
-      const duration = Number(incoming.data.duration);
+      let duration = Number(incoming.data.duration);
       data.duration = Number.isFinite(duration) && duration > 0 ? duration : null;
     }
-    const node = {
+    let node = {
       id,
       type,
       x: Number.isFinite(Number(incoming.x)) ? Number(incoming.x) : Number(prev?.x) || 0,
@@ -8145,166 +6864,104 @@ async function builtinCanvasHandle(args) {
       h: Number(incoming.h) || Number(prev?.h) || 280,
       data
     };
-    doc.nodes = { ...doc.nodes || {}, [id]: node };
-    doc.updatedAt = Date.now();
-    doc.rev = (doc.rev || 0) + 1;
-    await writeDoc(doc.id, doc);
-    return { canvas: { projectId: doc.id, node, rev: doc.rev } };
+    return doc.nodes = { ...doc.nodes || {}, [id]: node }, doc.updatedAt = Date.now(), doc.rev = (doc.rev || 0) + 1, await writeDoc(doc.id, doc), { canvas: { projectId: doc.id, node, rev: doc.rev } };
   }
   if (method === "nodeDelete") {
-    const doc = await requireDoc(params.projectId);
-    const id = String(params.nodeId || "");
+    let doc = await requireDoc(params.projectId), id = String(params.nodeId || "");
     if (!doc.nodes?.[id]) throw new Error("节点不存在或已删除。");
-    const nodes = { ...doc.nodes };
+    let nodes = { ...doc.nodes };
     delete nodes[id];
-    const edges = (doc.edges || []).filter((edge) => edge.fromNode !== id && edge.toNode !== id);
-    const goneEdges = (doc.edges || []).filter((edge) => edge.fromNode === id || edge.toNode === id).map((edge) => edge.id);
-    doc.nodes = nodes;
-    doc.edges = edges;
-    doc.tombstones = [.../* @__PURE__ */ new Set([...doc.tombstones || [], id])];
-    doc.edgeTombstones = [.../* @__PURE__ */ new Set([...doc.edgeTombstones || [], ...goneEdges])];
-    doc.updatedAt = Date.now();
-    doc.rev = (doc.rev || 0) + 1;
-    await writeDoc(doc.id, doc);
-    return { canvas: { projectId: doc.id, removed: id, rev: doc.rev } };
+    let edges = (doc.edges || []).filter((edge) => edge.fromNode !== id && edge.toNode !== id), goneEdges = (doc.edges || []).filter((edge) => edge.fromNode === id || edge.toNode === id).map((edge) => edge.id);
+    return doc.nodes = nodes, doc.edges = edges, doc.tombstones = [.../* @__PURE__ */ new Set([...doc.tombstones || [], id])], doc.edgeTombstones = [.../* @__PURE__ */ new Set([...doc.edgeTombstones || [], ...goneEdges])], doc.updatedAt = Date.now(), doc.rev = (doc.rev || 0) + 1, await writeDoc(doc.id, doc), { canvas: { projectId: doc.id, removed: id, rev: doc.rev } };
   }
   if (method === "edgeAdd") {
-    const doc = await requireDoc(params.projectId);
-    const from2 = String(params.fromNode || ""), to = String(params.toNode || "");
+    let doc = await requireDoc(params.projectId), from2 = String(params.fromNode || ""), to = String(params.toNode || "");
     if (!doc.nodes?.[from2] || !doc.nodes?.[to]) throw new Error("连线两端节点必须在场。");
     if (from2 === to) throw new Error("不能连接同一个节点。");
-    const existing = (doc.edges || []).find((edge2) => edge2.fromNode === from2 && edge2.toNode === to);
-    if (existing) return { canvas: { projectId: doc.id, edge: existing, already: true } };
-    const edge = {
+    let existing = (doc.edges || []).find((edge2) => edge2.fromNode === from2 && edge2.toNode === to);
+    if (existing) return { canvas: { projectId: doc.id, edge: existing, already: !0 } };
+    let edge = {
       id: `mov_connect_${randomUUID9().replaceAll("-", "").slice(0, 16)}`,
       fromNode: from2,
       toNode: to,
       fromPort: String(params.fromPort || "out").slice(0, 24),
       toPort: String(params.toPort || "prompt").slice(0, 24)
     };
-    doc.edges = [...doc.edges || [], edge];
-    if (doc.edgeTombstones?.includes(edge.id)) doc.edgeTombstones = doc.edgeTombstones.filter((x) => x !== edge.id);
-    doc.updatedAt = Date.now();
-    doc.rev = (doc.rev || 0) + 1;
-    await writeDoc(doc.id, doc);
-    return { canvas: { projectId: doc.id, edge, rev: doc.rev } };
+    return doc.edges = [...doc.edges || [], edge], doc.edgeTombstones?.includes(edge.id) && (doc.edgeTombstones = doc.edgeTombstones.filter((x) => x !== edge.id)), doc.updatedAt = Date.now(), doc.rev = (doc.rev || 0) + 1, await writeDoc(doc.id, doc), { canvas: { projectId: doc.id, edge, rev: doc.rev } };
   }
   if (method === "edgeDelete") {
-    const doc = await requireDoc(params.projectId);
-    const id = String(params.edgeId || "");
-    const edge = (doc.edges || []).find((item) => item.id === id);
-    if (!edge) throw new Error("连线不存在或已删除。");
-    doc.edges = (doc.edges || []).filter((item) => item.id !== id);
-    if (id.startsWith("mov_connect_") || id.startsWith("mov_edge_") || id.includes("_edge_")) doc.edgeTombstones = [.../* @__PURE__ */ new Set([...doc.edgeTombstones || [], id])];
-    doc.updatedAt = Date.now();
-    doc.rev = (doc.rev || 0) + 1;
-    await writeDoc(doc.id, doc);
-    return { canvas: { projectId: doc.id, removed: id, rev: doc.rev } };
+    let doc = await requireDoc(params.projectId), id = String(params.edgeId || "");
+    if (!(doc.edges || []).find((item) => item.id === id)) throw new Error("连线不存在或已删除。");
+    return doc.edges = (doc.edges || []).filter((item) => item.id !== id), (id.startsWith("mov_connect_") || id.startsWith("mov_edge_") || id.includes("_edge_")) && (doc.edgeTombstones = [.../* @__PURE__ */ new Set([...doc.edgeTombstones || [], id])]), doc.updatedAt = Date.now(), doc.rev = (doc.rev || 0) + 1, await writeDoc(doc.id, doc), { canvas: { projectId: doc.id, removed: id, rev: doc.rev } };
   }
   throw new Error("未知画布操作。");
 }
 function registerBuiltinCanvas(ctx) {
   return ctx.inject(["webServer"], (scope) => {
-    if (typeof scope.webServer?.register !== "function") return;
-    const removeMedia = scope.webServer.register({ kind: "exact", path: "/metaontic-video/canvas-media", async handler(req, res) {
+    if (typeof scope.webServer?.register != "function") return;
+    let removeMedia = scope.webServer.register({ kind: "exact", path: "/metaontic-video/canvas-media", async handler(req, res) {
       try {
         if (req.method !== "GET") throw new Error("仅接受GET。");
-        const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+        let url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
         if (req.headers["sec-fetch-site"] === "cross-site") throw new Error("请求来源无效。");
-        const assets = await readAssets();
-        const asset = assets[String(url.searchParams.get("assetId") || "")];
-        const root = dataRootOf();
+        let asset = (await readAssets())[String(url.searchParams.get("assetId") || "")], root = dataRootOf();
         if (!asset?.rel) throw new Error("素材不存在。");
-        const file = path18.resolve(root, String(asset.rel));
+        let file = path18.resolve(root, String(asset.rel));
         if (!file.startsWith(root + path18.sep)) throw new Error("素材路径无效。");
-        const info = await stat7(file);
+        let info = await stat7(file);
         if (!info.isFile()) throw new Error("素材不存在。");
-        res.setHeader("content-type", asset.mime || "application/octet-stream");
-        res.setHeader("cache-control", "private, max-age=300");
-        res.setHeader("accept-ranges", "bytes");
-        const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || "").trim());
-        let start = 0, end = info.size - 1, partial = false;
+        res.setHeader("content-type", asset.mime || "application/octet-stream"), res.setHeader("cache-control", "private, max-age=300"), res.setHeader("accept-ranges", "bytes");
+        let range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || "").trim()), start = 0, end = info.size - 1, partial = !1;
         if (range) {
-          const hasStart = range[1] !== "", hasEnd = range[2] !== "";
-          if (hasStart) {
-            start = Number(range[1]);
-            end = hasEnd ? Number(range[2]) : info.size - 1;
-          } else if (hasEnd) {
-            start = Math.max(0, info.size - Number(range[2]));
-            end = info.size - 1;
-          }
-          if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start > end || start >= info.size) {
-            res.statusCode = 416;
-            res.setHeader("content-range", `bytes */${info.size}`);
-            res.end();
+          let hasStart = range[1] !== "", hasEnd = range[2] !== "";
+          if (hasStart ? (start = Number(range[1]), end = hasEnd ? Number(range[2]) : info.size - 1) : hasEnd && (start = Math.max(0, info.size - Number(range[2])), end = info.size - 1), !Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start > end || start >= info.size) {
+            res.statusCode = 416, res.setHeader("content-range", `bytes */${info.size}`), res.end();
             return;
           }
-          end = Math.min(end, info.size - 1);
-          partial = true;
+          end = Math.min(end, info.size - 1), partial = !0;
         }
-        res.setHeader("content-length", String(end - start + 1));
-        if (partial) {
-          res.statusCode = 206;
-          res.setHeader("content-range", `bytes ${start}-${end}/${info.size}`);
-        }
-        createReadStream(file, { start, end }).pipe(res);
-      } catch (e) {
-        res.statusCode = 404;
-        res.end();
+        res.setHeader("content-length", String(end - start + 1)), partial && (res.statusCode = 206, res.setHeader("content-range", `bytes ${start}-${end}/${info.size}`)), createReadStream(file, { start, end }).pipe(res);
+      } catch {
+        res.statusCode = 404, res.end();
       }
-    } });
-    const removeImport = scope.webServer.register({ kind: "exact", path: "/metaontic-video/canvas-import", async handler(req, res) {
-      res.setHeader("content-type", "application/json; charset=utf-8");
-      res.setHeader("cache-control", "no-store");
+    } }), removeImport = scope.webServer.register({ kind: "exact", path: "/metaontic-video/canvas-import", async handler(req, res) {
+      res.setHeader("content-type", "application/json; charset=utf-8"), res.setHeader("cache-control", "no-store");
       try {
         if (req.method !== "POST") throw new Error("仅接受POST。");
         if (req.headers["sec-fetch-site"] === "cross-site" || req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) throw new Error("请求来源无效。");
         if (!String(req.headers["content-type"] || "").startsWith("image/")) throw new Error("请求类型无效，只接受图片。");
-        const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-        const chunks = [];
-        let size = 0;
-        for await (const chunk of req) {
-          size += chunk.length;
-          if (size > IMPORT_LIMIT_BYTES) throw new Error("单张图片不能超过 32MB。");
+        let url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`), chunks = [], size = 0;
+        for await (let chunk of req) {
+          if (size += chunk.length, size > IMPORT_LIMIT_BYTES) throw new Error("单张图片不能超过 32MB。");
           chunks.push(chunk);
         }
-        const result = await builtinCanvasImport({ projectId: url.searchParams.get("projectId"), name: url.searchParams.get("name"), mime: req.headers["content-type"], bytes: Buffer.concat(chunks) });
+        let result = await builtinCanvasImport({ projectId: url.searchParams.get("projectId"), name: url.searchParams.get("name"), mime: req.headers["content-type"], bytes: Buffer.concat(chunks) });
         res.end(JSON.stringify(result));
       } catch (e) {
-        res.statusCode = 400;
-        res.end(JSON.stringify({ error: String(e?.message || "导入图片未完成。") }));
+        res.statusCode = 400, res.end(JSON.stringify({ error: String(e?.message || "导入图片未完成。") }));
       }
-    } });
-    const remove = scope.webServer.register({ kind: "exact", path: "/metaontic-video/canvas", async handler(req, res) {
-      res.setHeader("content-type", "application/json; charset=utf-8");
-      res.setHeader("cache-control", "no-store");
+    } }), remove = scope.webServer.register({ kind: "exact", path: "/metaontic-video/canvas", async handler(req, res) {
+      res.setHeader("content-type", "application/json; charset=utf-8"), res.setHeader("cache-control", "no-store");
       try {
         if (req.method !== "POST") throw new Error("仅接受POST。");
         if (req.headers["sec-fetch-site"] === "cross-site" || req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) throw new Error("请求来源无效。");
         if (!String(req.headers["content-type"] || "").startsWith("application/json")) throw new Error("请求类型无效。");
         let raw = "";
-        for await (const chunk of req) {
-          raw += chunk;
-          if (raw.length > 2e5) throw new Error("请求过大。");
-        }
+        for await (let chunk of req)
+          if (raw += chunk, raw.length > 2e5) throw new Error("请求过大。");
         res.end(JSON.stringify(await builtinCanvasHandle(JSON.parse(raw))));
       } catch (e) {
-        res.statusCode = 400;
-        res.end(JSON.stringify({ error: String(e?.message || "画布操作未完成。") }));
+        res.statusCode = 400, res.end(JSON.stringify({ error: String(e?.message || "画布操作未完成。") }));
       }
     } });
     return () => {
-      if (typeof remove === "function") remove();
-      if (typeof removeMedia === "function") removeMedia();
-      if (typeof removeImport === "function") removeImport();
+      typeof remove == "function" && remove(), typeof removeMedia == "function" && removeMedia(), typeof removeImport == "function" && removeImport();
     };
   });
 }
 
 // src/businesses/video-generation/integrations/canvas-stages.ts
-var STAGE_REV = 2;
-var STAGE_KEYS = ["requirement", "script", "storyboard", "assets", "cost", "segments", "film"];
-var STAGE_LABELS = {
+var STAGE_KEYS = ["requirement", "script", "storyboard", "assets", "cost", "segments", "film"], STAGE_LABELS = {
   requirement: "① 需求确认",
   script: "② 脚本审核",
   storyboard: "③ 分镜确认",
@@ -8313,44 +6970,33 @@ var STAGE_LABELS = {
   segments: "⑥ 逐段制作",
   film: "⑦ 合成成片"
 };
-function stageNodeId(prefix, key) {
-  return `${prefix}_stage_${key}`;
-}
-function stageSpot(index) {
-  return { x: 40 + index * 400, y: -340, w: 340, h: 180 };
-}
 function stageSeal(label, text, state, facts) {
-  const source = JSON.stringify([label, text, state, facts]);
-  let hash4 = 2166136261;
-  for (let i = 0; i < source.length; i++) {
-    hash4 ^= source.charCodeAt(i);
-    hash4 = Math.imul(hash4, 16777619) >>> 0;
-  }
+  let source = JSON.stringify([label, text, state, facts]), hash4 = 2166136261;
+  for (let i = 0; i < source.length; i++)
+    hash4 ^= source.charCodeAt(i), hash4 = Math.imul(hash4, 16777619) >>> 0;
   return hash4.toString(16).padStart(8, "0");
 }
 function sealedStageData(key, state, text, facts) {
-  const label = STAGE_LABELS[key] || key;
+  let label = STAGE_LABELS[key] || key;
   return {
     label,
     text,
     status: state === "done" ? "done" : "idle",
     metaonticStage: key,
     metaonticStageState: state,
-    metaonticStageRev: STAGE_REV,
+    metaonticStageRev: 2,
     metaonticStageFacts: facts || {},
     metaonticStageSeal: stageSeal(label, text, state, facts || {})
   };
 }
 function stageNodeOwned(node) {
-  const data = node?.data;
-  return Boolean(data?.metaonticStage) && Number(data.metaonticStageRev) === STAGE_REV && data.metaonticStageSeal === stageSeal(data.label, data.text, data.metaonticStageState, data.metaonticStageFacts || {});
+  let data = node?.data;
+  return !!data?.metaonticStage && Number(data.metaonticStageRev) === 2 && data.metaonticStageSeal === stageSeal(data.label, data.text, data.metaonticStageState, data.metaonticStageFacts || {});
 }
 function stageNodeRewriteable(node) {
-  if (!node?.data?.metaonticStage) return false;
-  return stageNodeOwned(node) || Number(node.data.metaonticStageRev) !== STAGE_REV;
+  return node?.data?.metaonticStage ? stageNodeOwned(node) || Number(node.data.metaonticStageRev) !== 2 : !1;
 }
-var MATERIAL_MARK = "metaonticMaterial";
-var FRAME_MARK = "metaonticFrameOf";
+var MATERIAL_MARK = "metaonticMaterial", FRAME_MARK = "metaonticFrameOf";
 function flowAuthors(doc) {
   return Object.values(doc?.nodes || {}).filter((node) => ["image", "video"].includes(node?.type) && !node?.metaonticSourceNode && !node?.data?.assetId && !node?.data?.[MATERIAL_MARK]);
 }
@@ -8358,25 +7004,17 @@ function canvasSegments(doc) {
   return flowAuthors(doc).filter((node) => !node?.data?.[FRAME_MARK]);
 }
 function canvasAssets(doc) {
-  return Object.values(doc?.nodes || {}).filter((node) => node?.type === "image" && Boolean(node?.data?.assetId || node?.metaonticSourceNode));
+  return Object.values(doc?.nodes || {}).filter((node) => node?.type === "image" && !!(node?.data?.assetId || node?.metaonticSourceNode));
 }
 function canvasAssetLinks(doc) {
-  const edges = Array.isArray(doc?.edges) ? doc.edges : [];
-  const segments = new Set(canvasSegments(doc).map((node) => String(node.id)));
-  const feeds = (id) => [...new Set(edges.filter((edge) => String(edge?.fromNode || "") === id && segments.has(String(edge?.toNode || ""))).map((edge) => String(edge.toNode)))];
+  let edges = Array.isArray(doc?.edges) ? doc.edges : [], segments = new Set(canvasSegments(doc).map((node) => String(node.id))), feeds = (id) => [...new Set(edges.filter((edge) => String(edge?.fromNode || "") === id && segments.has(String(edge?.toNode || ""))).map((edge) => String(edge.toNode)))];
   return canvasAssets(doc).map((node) => {
-    const explicit = String(node?.data?.metaonticSegmentOf || "");
-    const owner = String(node?.metaonticSourceNode || "");
-    const serving = segments.has(explicit) ? [explicit] : feeds(owner || String(node.id));
+    let explicit = String(node?.data?.metaonticSegmentOf || ""), owner = String(node?.metaonticSourceNode || ""), serving = segments.has(explicit) ? [explicit] : feeds(owner || String(node.id));
     return { nodeId: String(node.id), label: String(node?.data?.label || "素材图"), segments: serving };
   });
 }
 function canvasSegmentStats(doc) {
-  const nodes = Object.values(doc?.nodes || {});
-  const authors = new Set(canvasSegments(doc).map((node) => node.id));
-  const produced = nodes.filter((node) => authors.has(node?.metaonticSourceNode) && (node?.data?.assetId || node?.data?.metaonticVideoUrl)).length;
-  const shots = nodes.filter((node) => node?.type === "storyboard").reduce((sum, node) => sum + (Array.isArray(node?.data?.shots) ? node.data.shots.length : 0), 0);
-  const links = canvasAssetLinks(doc);
+  let nodes = Object.values(doc?.nodes || {}), authors = new Set(canvasSegments(doc).map((node) => node.id)), produced = nodes.filter((node) => authors.has(node?.metaonticSourceNode) && (node?.data?.assetId || node?.data?.metaonticVideoUrl)).length, shots = nodes.filter((node) => node?.type === "storyboard").reduce((sum, node) => sum + (Array.isArray(node?.data?.shots) ? node.data.shots.length : 0), 0), links = canvasAssetLinks(doc);
   return {
     total: authors.size,
     produced,
@@ -8384,7 +7022,7 @@ function canvasSegmentStats(doc) {
     assets: links.length,
     assetsBound: links.filter((link2) => link2.segments.length).length,
     assetsOrphan: links.filter((link2) => !link2.segments.length).length,
-    filmReady: Boolean(doc?.film?.assetId),
+    filmReady: !!doc?.film?.assetId,
     filmCount: Number(doc?.film?.count || 0)
   };
 }
@@ -8395,34 +7033,28 @@ var CHOICE_TEXT = {
   text_only: "纯文本生成"
 };
 function stageSummary(facts = {}, stats = {}) {
-  const duration = Number.isFinite(Number(facts.duration)) && facts.duration !== null && facts.duration !== void 0 ? Number(facts.duration) : null;
-  const produced = Number(stats.produced || 0), total = Math.max(Number(facts.segmentTotal || 0), Number(stats.total || 0));
-  const shots = Number(stats.shots || 0), assets = Number(stats.assets || 0);
-  const choice = CHOICE_TEXT[facts.choice] || facts.choice || "待确认";
-  const requirementText = [
+  let duration = Number.isFinite(Number(facts.duration)) && facts.duration !== null && facts.duration !== void 0 ? Number(facts.duration) : null, produced = Number(stats.produced || 0), total = Math.max(Number(facts.segmentTotal || 0), Number(stats.total || 0)), shots = Number(stats.shots || 0), assets = Number(stats.assets || 0), choice = CHOICE_TEXT[facts.choice] || facts.choice || "待确认", requirementText = [
     `目标时长：${duration === null ? "待确认" : `${duration} 秒`}`,
     `画幅：${facts.ratio || "待确认"}`,
     `清晰度：${String(facts.resolution || "待确认").toUpperCase()}`,
     `角色图路线：${choice}`
-  ].join("\n");
-  const scriptText = [
+  ].join(`
+`), scriptText = [
     `剧本：${facts.scriptDrafted || facts.scriptApproved ? "已同步" : "未开始"}`,
     `审核：${facts.scriptApproved ? "已通过" : facts.scriptDrafted ? "等待用户审核" : "未开始"}`
-  ].join("\n");
-  const storyboardText = shots > 0 ? [`分镜：${shots} 个镜头`, `每段提示词见制作节点`].join("\n") : total > 0 ? [`分镜：按场景与句子切段，共 ${total} 段`, `每段提示词见制作节点`].join("\n") : "还没有分镜：先写脚本并确认审核，再按分镜表或句子切段。";
-  const bound = Number.isFinite(Number(stats.assetsBound)) ? Number(stats.assetsBound) : assets;
-  const assetsText = [
+  ].join(`
+`), storyboardText = shots > 0 ? [`分镜：${shots} 个镜头`, "每段提示词见制作节点"].join(`
+`) : total > 0 ? [`分镜：按场景与句子切段，共 ${total} 段`, "每段提示词见制作节点"].join(`
+`) : "还没有分镜：先写脚本并确认审核，再按分镜表或句子切段。", bound = Number.isFinite(Number(stats.assetsBound)) ? Number(stats.assetsBound) : assets, assetsText = [
     `角色图路线：${choice}`,
     `素材图：${assets} 张（角色图 / 首帧 / 参考图）${assets > bound ? `，其中 ${assets - bound} 张还没接到制作段` : ""}`
-  ].join("\n");
-  const costText = [
+  ].join(`
+`), costText = [
     `制作方案：${facts.specApproved ? "已审核" : "未产出"}`,
     `费用：${produced > 0 ? "已确认（已有生成记录）" : "生成前仍要单独确认"}`
-  ].join("\n");
-  const segmentsText = total > 0 ? [`制作段：${total} 段`, `已完成：${Math.min(produced, total)} 段`].join("\n") : "暂无制作段：先在画布上写脚本、确认脚本审核与制作方案。";
-  const filmText = stats.filmReady ? `已合成成片（${Number(stats.filmCount || 0)} 段）` : total > 0 && produced >= total ? "每段都有成果，可以点「合成成片」" : "等待每段都产出成果";
-  const needsAssets = !["not_needed", "text_only"].includes(String(facts.choice || ""));
-  const state = {
+  ].join(`
+`), segmentsText = total > 0 ? [`制作段：${total} 段`, `已完成：${Math.min(produced, total)} 段`].join(`
+`) : "暂无制作段：先在画布上写脚本、确认脚本审核与制作方案。", filmText = stats.filmReady ? `已合成成片（${Number(stats.filmCount || 0)} 段）` : total > 0 && produced >= total ? "每段都有成果，可以点「合成成片」" : "等待每段都产出成果", needsAssets = !["not_needed", "text_only"].includes(String(facts.choice || "")), state = {
     requirement: { state: facts.requirementSettled ? "done" : "active", text: requirementText },
     script: { state: facts.scriptApproved ? "done" : facts.scriptDrafted ? "review" : "pending", text: scriptText },
     storyboard: { state: shots > 0 || total > 0 ? "done" : facts.scriptApproved ? "active" : "pending", text: storyboardText },
@@ -8433,45 +7065,22 @@ function stageSummary(facts = {}, stats = {}) {
   };
   return STAGE_KEYS.map((key) => ({ key, ...state[key] }));
 }
-function stageFacts(project, specification, drafted, segmentTotal) {
-  const duration = Number(project?.duration);
-  return {
-    requirementSettled: Boolean(project?.subjectType) && Number.isFinite(duration),
-    duration: Number.isFinite(duration) ? duration : null,
-    choice: project?.choice || "",
-    ratio: specification?.ratio || "",
-    resolution: specification?.resolution || "",
-    scriptDrafted: Boolean(drafted),
-    scriptApproved: Boolean(project?.approved),
-    specApproved: Boolean(specification),
-    segmentTotal: Number(segmentTotal || 0)
-  };
-}
 function rewriteStageNodes(doc, patch = {}) {
-  const nodes = { ...doc?.nodes || {} };
-  const ids = Object.keys(nodes).filter((id) => nodes[id]?.data?.metaonticStage);
+  let nodes = { ...doc?.nodes || {} }, ids = Object.keys(nodes).filter((id) => nodes[id]?.data?.metaonticStage);
   if (!ids.length) return { nodes, changed: [] };
-  const stats = canvasSegmentStats({ ...doc, nodes });
-  const changed = [];
-  for (const id of ids) {
-    const node = nodes[id];
+  let stats = canvasSegmentStats({ ...doc, nodes }), changed = [];
+  for (let id of ids) {
+    let node = nodes[id];
     if (!stageNodeRewriteable(node) || !node.data.metaonticStageFacts) continue;
-    const facts = { ...node.data.metaonticStageFacts || {}, ...patch };
-    const key = String(node.data.metaonticStage);
-    const found = stageSummary(facts, stats).find((stage) => stage.key === key);
+    let facts = { ...node.data.metaonticStageFacts || {}, ...patch }, key = String(node.data.metaonticStage), found = stageSummary(facts, stats).find((stage) => stage.key === key);
     if (!found) continue;
-    const data = sealedStageData(key, found.state, found.text, facts);
-    if (JSON.stringify(data) === JSON.stringify(node.data)) continue;
-    nodes[id] = { ...node, data };
-    changed.push(id);
+    let data = sealedStageData(key, found.state, found.text, facts);
+    JSON.stringify(data) !== JSON.stringify(node.data) && (nodes[id] = { ...node, data }, changed.push(id));
   }
   return { nodes, changed };
 }
 function refreshStageNodes(doc) {
   return rewriteStageNodes(doc, {});
-}
-function preserveCanvasConfirmations(prev, next) {
-  return prev?.scriptApproved === true && next?.scriptApproved !== true ? { ...next, scriptApproved: true } : next;
 }
 
 // src/businesses/video-generation/media/download.ts
@@ -8480,33 +7089,24 @@ import path19 from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { createWriteStream } from "node:fs";
-var DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1e3;
+var DOWNLOAD_TIMEOUT_MS = 900 * 1e3;
 async function downloadFile(url, destPath, { signal } = {}) {
-  await mkdir12(path19.dirname(destPath), { recursive: true });
-  const partial = `${destPath}.${uniqueSuffix("part")}`;
-  const timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
-  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  await mkdir12(path19.dirname(destPath), { recursive: !0 });
+  let partial = `${destPath}.${uniqueSuffix("part")}`, timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS), requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   try {
-    const response = await fetch(url, { signal: requestSignal });
-    if (!response.ok) {
+    let response = await fetch(url, { signal: requestSignal });
+    if (!response.ok)
       throw Object.assign(new Error(`下载分段失败（HTTP ${response.status}）：${url}`), {
         code: "download_failed"
       });
-    }
-    if (!response.body) {
+    if (!response.body)
       throw Object.assign(new Error(`下载分段失败：响应没有内容（${url}）。`), {
         code: "download_failed"
       });
-    }
-    await pipeline(Readable.fromWeb(response.body), createWriteStream(partial));
-    await rename10(partial, destPath);
-    return destPath;
+    return await pipeline(Readable.fromWeb(response.body), createWriteStream(partial)), await rename10(partial, destPath), destPath;
   } catch (error) {
-    await rm8(partial, { force: true }).catch(() => {
-    });
-    if (error?.code === "download_failed") throw error;
-    if (signal?.aborted) throw abortError();
-    throw Object.assign(new Error(`下载分段失败：${error?.message || error}（${url}）`), {
+    throw await rm8(partial, { force: !0 }).catch(() => {
+    }), error?.code === "download_failed" ? error : signal?.aborted ? abortError() : Object.assign(new Error(`下载分段失败：${error?.message || error}（${url}）`), {
       code: "download_failed"
     });
   }
@@ -8515,32 +7115,23 @@ async function downloadFile(url, destPath, { signal } = {}) {
 // src/businesses/video-generation/integrations/canvas.ts
 init_config();
 async function markCanvasChanged(adapter, projectId, candidates = []) {
-  const connect = adapter?.connect;
-  if (typeof connect !== "function") return false;
-  for (const edge of candidates) {
-    if (!edge?.fromNode || !edge?.toNode) continue;
-    try {
-      const result = await connect({
-        projectId,
-        fromNode: edge.fromNode,
-        toNode: edge.toNode,
-        ...edge.fromPort ? { fromPort: edge.fromPort } : {},
-        ...edge.toPort ? { toPort: edge.toPort } : {}
-      });
-      if (result?.ok !== false) return true;
-    } catch {
-    }
-  }
-  return false;
+  let connect = adapter?.connect;
+  if (typeof connect != "function") return !1;
+  for (let edge of candidates)
+    if (!(!edge?.fromNode || !edge?.toNode))
+      try {
+        if ((await connect({
+          projectId,
+          fromNode: edge.fromNode,
+          toNode: edge.toNode,
+          ...edge.fromPort ? { fromPort: edge.fromPort } : {},
+          ...edge.toPort ? { toPort: edge.toPort } : {}
+        }))?.ok !== !1) return !0;
+      } catch {
+      }
+  return !1;
 }
-var canvasLinkSchema = { type: "object", properties: {
-  projectId: { type: "string" },
-  canvasId: { type: "string" },
-  nodeId: { type: "string" },
-  fingerprint: { type: "string" }
-}, required: ["projectId", "nodeId", "fingerprint"], description: "video_canvas(action:read)返回的流程画布定位与内容摘要；原样传入，不猜测。" };
-var digest = (value) => createHash11("sha256").update(JSON.stringify(value)).digest("hex");
-var validId2 = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
+var digest = (value) => createHash11("sha256").update(JSON.stringify(value)).digest("hex"), validId2 = (value) => typeof value == "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 function location(link2) {
   if (!validId2(link2?.projectId) || !validId2(link2?.nodeId) || link2.canvasId && !validId2(link2.canvasId)) throw new Error("画布项目或节点标识无效");
   return { id: link2.projectId, ...link2.canvasId ? { canvasId: link2.canvasId } : {} };
@@ -8549,29 +7140,27 @@ async function loadCanvasAdapter() {
   return builtinCanvasAdapter();
 }
 async function resolveCanvasAdapter(projectId, load = loadCanvasAdapter) {
-  if (projectId && await builtinCanvasExists(projectId)) return builtinCanvasAdapter();
-  return load();
+  return projectId && await builtinCanvasExists(projectId) ? builtinCanvasAdapter() : load();
 }
 async function readCanvasInput(adapter, link2) {
-  const doc = await adapter.rpc.projectsGet(location(link2));
+  let doc = await adapter.rpc.projectsGet(location(link2));
   if (!doc?.nodes?.[link2.nodeId]) throw new Error("画布节点不存在，请重新选择。");
-  const ids = /* @__PURE__ */ new Set(), visit = (id) => {
-    if (ids.has(id)) return;
-    ids.add(id);
-    if (ids.size > 100) throw new Error("节点上游超过100项，请缩小制作范围。");
-    for (const e of doc.edges || []) if (e.toNode === id && doc.nodes[e.fromNode]) visit(e.fromNode);
+  let ids = /* @__PURE__ */ new Set(), visit = (id) => {
+    if (!ids.has(id)) {
+      if (ids.add(id), ids.size > 100) throw new Error("节点上游超过100项，请缩小制作范围。");
+      for (let e of doc.edges || []) e.toNode === id && doc.nodes[e.fromNode] && visit(e.fromNode);
+    }
   };
   visit(link2.nodeId);
-  const latest = /* @__PURE__ */ new Map();
-  for (const item of Object.values(doc.nodes || {})) {
-    const owner = String(item?.metaonticSourceNode || ""), assetId = String(item?.data?.assetId || "");
+  let latest = /* @__PURE__ */ new Map();
+  for (let item of Object.values(doc.nodes || {})) {
+    let owner = String(item?.metaonticSourceNode || ""), assetId = String(item?.data?.assetId || "");
     if (!owner || !assetId) continue;
-    const createdAt = Number(item?.metaonticCreatedAt || 0);
-    if (!latest.has(owner) || createdAt >= latest.get(owner).createdAt) latest.set(owner, { assetId, createdAt });
+    let createdAt = Number(item?.metaonticCreatedAt || 0);
+    (!latest.has(owner) || createdAt >= latest.get(owner).createdAt) && latest.set(owner, { assetId, createdAt });
   }
-  const nodes = [...ids].map((id) => {
-    const n = doc.nodes[id], d = n.data || {};
-    const upstreamResult = id === link2.nodeId ? "" : latest.get(id)?.assetId || "";
+  let nodes = [...ids].map((id) => {
+    let n = doc.nodes[id], d = n.data || {}, upstreamResult = id === link2.nodeId ? "" : latest.get(id)?.assetId || "";
     return {
       id,
       type: n.type,
@@ -8598,24 +7187,18 @@ async function readCanvasInput(adapter, link2) {
       metaonticVideoUrl: d.metaonticVideoUrl || "",
       metaonticSeconds: d.metaonticSeconds ?? null
     };
-  });
-  const edges = (doc.edges || []).filter((e) => ids.has(e.fromNode) && ids.has(e.toNode)).map((e) => ({ id: e.id, fromNode: e.fromNode, toNode: e.toNode, fromPort: e.fromPort, toPort: e.toPort, ...e.metaonticResult ? { metaonticResult: true } : {} }));
-  const assets = nodes.filter((n) => n.assetId).map((n) => n.assetId);
-  const records = assets.length ? (await adapter.rpc.assetsGet({ ids: assets })).items || [] : [];
-  const root = (await adapter.rpc.dataRootGet()).dataRoot;
+  }), edges = (doc.edges || []).filter((e) => ids.has(e.fromNode) && ids.has(e.toNode)).map((e) => ({ id: e.id, fromNode: e.fromNode, toNode: e.toNode, fromPort: e.fromPort, toPort: e.toPort, ...e.metaonticResult ? { metaonticResult: !0 } : {} })), assets = nodes.filter((n) => n.assetId).map((n) => n.assetId), records = assets.length ? (await adapter.rpc.assetsGet({ ids: assets })).items || [] : [], root = (await adapter.rpc.dataRootGet()).dataRoot;
   if (!root) throw new Error("画布数据目录不可用，请核对插件数据目录权限，确保参考素材和回填成果可持久保存。");
-  const references = [];
-  for (const node of nodes.filter((n) => n.assetId)) {
-    const a = records.find((a2) => a2.id === node.assetId);
+  let references = [];
+  for (let node of nodes.filter((n) => n.assetId)) {
+    let a = records.find((a2) => a2.id === node.assetId);
     if (!a || !["image", "video"].includes(a.kind) || !a.rel && !a.sha) throw new Error("上游媒体资产未落盘，请先在画布中保存素材。");
-    const file = adapter.assetPath(root, a);
+    let file = adapter.assetPath(root, a);
     if (!(await stat8(file)).isFile()) throw new Error("画布参考素材文件不存在。");
-    const info = await stat8(file);
+    let info = await stat8(file);
     references.push({ nodeId: node.id, assetId: a.id, kind: a.kind, path: file, size: info.size, modified: info.mtimeMs });
   }
-  const b = doc.bible || {};
-  const bible = { world: b.world || "", style: b.style || "", characters: b.characters || [], scenes: b.scenes || [], props: b.props || [] };
-  const fingerprint = digest({ nodes, edges, references, bible });
+  let b = doc.bible || {}, bible = { world: b.world || "", style: b.style || "", characters: b.characters || [], scenes: b.scenes || [], props: b.props || [] }, fingerprint = digest({ nodes, edges, references, bible });
   return {
     canvas: { projectId: link2.projectId, ...link2.canvasId ? { canvasId: link2.canvasId } : {}, nodeId: link2.nodeId, fingerprint },
     nodes,
@@ -8625,59 +7208,37 @@ async function readCanvasInput(adapter, link2) {
     instruction: "按端口、refOrder和原连线核对参考图及首尾帧/参考视频角色，不把所有素材一律当参考图。不得默认时长或清晰度。正文展示脚本/分镜后走video_project审核，生成工具传入canvas。"
   };
 }
-function resultFile(token) {
-  if (!/^[a-f0-9-]{36}$/.test(String(token || ""))) throw new Error("回填记录标识无效");
-  return path20.join(dshHome(), DATA_DIR, "canvas-results", `${token}.json`);
-}
-async function saveRecord(record) {
-  const file = resultFile(record.id);
-  await mkdir13(path20.dirname(file), { recursive: true, mode: 448 });
-  const temp = `${file}.${randomUUID10()}.tmp`;
-  await writeFile10(temp, JSON.stringify(record), { mode: 384, flag: "wx" });
-  await rename11(temp, file);
-}
 async function publishCanvasResult(adapter, record) {
-  const loc = location(record.canvas);
-  let doc = await adapter.rpc.projectsGet(loc);
-  const source = doc.nodes?.[record.canvas.nodeId];
+  let loc = location(record.canvas), doc = await adapter.rpc.projectsGet(loc), source = doc.nodes?.[record.canvas.nodeId];
   if (!source) throw new Error("源节点已删除，成果仍保留在本插件；不会重建已删除节点。");
-  const dir = await adapter.rpc.projectDirGet({ projectId: record.canvas.projectId });
+  let dir = await adapter.rpc.projectDirGet({ projectId: record.canvas.projectId });
   if (!dir?.ok || !dir.abs || !dir.dataRoot) throw new Error("画布数据目录不可用");
-  const publications = [];
-  for (const [index, media] of record.media.entries()) {
-    const id = `mov_${digest({ canvas: record.canvas, media }).slice(0, 24)}`;
-    const extension = media.kind === "image" ? ".png" : ".mp4";
-    let dest = path20.join(dir.abs, media.kind, `${id}${extension}`);
-    let rel = `projects/${record.canvas.projectId}/${media.kind}/${id}${extension}`;
-    if (media.kind === "image") {
-      for (const suffix of [".jpg", ".webp"]) {
-        const existing = dest.replace(/\.png$/, suffix);
+  let publications = [];
+  for (let [index, media] of record.media.entries()) {
+    let id = `mov_${digest({ canvas: record.canvas, media }).slice(0, 24)}`, extension = media.kind === "image" ? ".png" : ".mp4", dest = path20.join(dir.abs, media.kind, `${id}${extension}`), rel = `projects/${record.canvas.projectId}/${media.kind}/${id}${extension}`;
+    if (media.kind === "image")
+      for (let suffix of [".jpg", ".webp"]) {
+        let existing = dest.replace(/\.png$/, suffix);
         if ((await stat8(existing).catch(() => null))?.isFile()) {
-          dest = existing;
-          rel = rel.replace(/\.png$/, suffix);
+          dest = existing, rel = rel.replace(/\.png$/, suffix);
           break;
         }
       }
-    }
-    if (!(await stat8(dest).catch(() => null))?.isFile()) {
-      await mkdir13(path20.dirname(dest), { recursive: true });
-      if (media.localPath) {
-        const tmp = `${dest}.${randomUUID10()}.tmp`;
-        await copyFile(media.localPath, tmp);
-        await rename11(tmp, dest);
+    if (!(await stat8(dest).catch(() => null))?.isFile())
+      if (await mkdir13(path20.dirname(dest), { recursive: !0 }), media.localPath) {
+        let tmp = `${dest}.${randomUUID10()}.tmp`;
+        await copyFile(media.localPath, tmp), await rename11(tmp, dest);
       } else {
-        const url = new URL(media.url);
+        let url = new URL(media.url);
         if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("成果URL格式无效");
         await downloadFile(media.url, dest, { signal: AbortSignal.timeout(6e4) });
       }
-    }
     let mime = media.kind === "image" ? "image/png" : "video/mp4";
     if (media.kind === "image") {
-      const handle = await open5(dest, "r");
+      let handle = await open4(dest, "r");
       try {
-        const head = Buffer.alloc(12);
-        await handle.read(head, 0, 12, 0);
-        if (head[0] === 255 && head[1] === 216) mime = "image/jpeg";
+        let head = Buffer.alloc(12);
+        if (await handle.read(head, 0, 12, 0), head[0] === 255 && head[1] === 216) mime = "image/jpeg";
         else if (head.toString("ascii", 0, 4) === "RIFF" && head.toString("ascii", 8, 12) === "WEBP") mime = "image/webp";
         else if (head.toString("hex", 0, 8) !== "89504e470d0a1a0a") throw new Error("未知图片格式，保留原成果");
       } finally {
@@ -8685,25 +7246,19 @@ async function publishCanvasResult(adapter, record) {
       }
     }
     if (dest.endsWith(".png") && (mime === "image/jpeg" || mime === "image/webp")) {
-      const suffix = mime === "image/jpeg" ? ".jpg" : ".webp";
-      const corrected = dest.replace(/\.png$/, suffix);
-      await rename11(dest, corrected);
-      dest = corrected;
-      rel = rel.replace(/\.png$/, suffix);
+      let suffix = mime === "image/jpeg" ? ".jpg" : ".webp", corrected = dest.replace(/\.png$/, suffix);
+      await rename11(dest, corrected), dest = corrected, rel = rel.replace(/\.png$/, suffix);
     }
-    const created = await adapter.rpc.assetCreate({ projectName: doc.name || "", asset: { id, projectId: record.canvas.projectId, kind: media.kind, mime, name: media.label, rel, size: (await stat8(dest)).size, createdAt: record.createdAt, stored: "disk", source: PLUGIN_ID } });
-    if (created?.ok === false) throw new Error("画布资产登记失败");
+    if ((await adapter.rpc.assetCreate({ projectName: doc.name || "", asset: { id, projectId: record.canvas.projectId, kind: media.kind, mime, name: media.label, rel, size: (await stat8(dest)).size, createdAt: record.createdAt, stored: "disk", source: PLUGIN_ID } }))?.ok === !1) throw new Error("画布资产登记失败");
     publications.push({ id, media, index });
   }
-  doc = await adapter.rpc.projectsGet(loc);
-  if (!doc.nodes?.[record.canvas.nodeId]) throw new Error("源节点已删除，成果不回填");
-  const nodes = { ...doc.nodes }, edges = [...doc.edges || []];
-  for (const { id, media, index } of publications) {
+  if (doc = await adapter.rpc.projectsGet(loc), !doc.nodes?.[record.canvas.nodeId]) throw new Error("源节点已删除，成果不回填");
+  let nodes = { ...doc.nodes }, edges = [...doc.edges || []];
+  for (let { id, media } of publications) {
     if (doc.tombstones?.includes(id)) continue;
-    let resultY = Number(source.y) || 0;
-    const resultX = (Number(source.x) || 0) + (Number(source.w) || 360) + 120;
-    while (Object.values(nodes).some((n) => resultX < n.x + (n.w || 360) + 40 && resultX + 400 > n.x && resultY < n.y + (n.h || 280) + 40 && resultY + 320 > n.y)) resultY += 340;
-    if (!nodes[id]) nodes[id] = {
+    let resultY = Number(source.y) || 0, resultX = (Number(source.x) || 0) + (Number(source.w) || 360) + 120;
+    for (; Object.values(nodes).some((n) => resultX < n.x + (n.w || 360) + 40 && resultX + 400 > n.x && resultY < n.y + (n.h || 280) + 40 && resultY + 320 > n.y); ) resultY += 340;
+    nodes[id] || (nodes[id] = {
       id,
       metaonticSourceNode: source.id,
       metaonticCreatedAt: record.createdAt,
@@ -8718,423 +7273,38 @@ async function publishCanvasResult(adapter, record) {
         assetId: id,
         prompt: "",
         ratio: record.ratio || "16:9",
-        demo: false,
+        demo: !1,
         metaonticPhase: record.phase,
         ...record.native ? { metaonticNativeJob: record.id, metaonticTaskId: record.native.taskId || "", metaonticVideoUrl: record.native.videoUrl || "", metaonticSeconds: record.native.seconds ?? null, duration: record.native.seconds ?? null, resolution: record.native.resolution || "", prompt: record.native.prompt || "" } : {}
       }
-    };
-    const edgeId = `mov_edge_${id}`;
-    if (["text", "script", "storyboard", "shot"].includes(source.type) && !edges.some((e) => e.id === edgeId) && !doc.edgeTombstones?.includes(edgeId)) edges.push({ id: edgeId, fromNode: source.id, fromPort: "out", toNode: id, toPort: "prompt", ...record.native ? { metaonticResult: true } : {} });
+    });
+    let edgeId = `mov_edge_${id}`;
+    ["text", "script", "storyboard", "shot"].includes(source.type) && !edges.some((e) => e.id === edgeId) && !doc.edgeTombstones?.includes(edgeId) && edges.push({ id: edgeId, fromNode: source.id, fromPort: "out", toNode: id, toPort: "prompt", ...record.native ? { metaonticResult: !0 } : {} });
   }
-  const removedEdges = [];
-  for (let i = edges.length - 1; i >= 0; i--) if (edges[i].fromNode === source.id && edges[i].id.startsWith("mov_edge_") && ["image", "video"].includes(source.type)) {
-    removedEdges.push(edges[i].id);
-    edges.splice(i, 1);
-  }
-  const staged = refreshStageNodes({ ...doc, nodes });
-  const saved = await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: {
+  let removedEdges = [];
+  for (let i = edges.length - 1; i >= 0; i--) edges[i].fromNode === source.id && edges[i].id.startsWith("mov_edge_") && ["image", "video"].includes(source.type) && (removedEdges.push(edges[i].id), edges.splice(i, 1));
+  let staged = refreshStageNodes({ ...doc, nodes }), saved = await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: {
     ...doc,
     nodes: staged.nodes,
     edges,
     ts: Date.now(),
     ...removedEdges.length ? { edgeTombstones: [.../* @__PURE__ */ new Set([...doc.edgeTombstones || [], ...removedEdges])] } : {}
   } });
-  if (saved?.ok === false || saved?.deleted) throw new Error("画布已删除或回填失败");
-  await markCanvasChanged(adapter, loc.id, [...edges.filter((e) => e.id.startsWith("mov_edge_")), ...edges]);
-  return { status: "synced", token: record.id, count: publications.length, phase: record.phase };
-}
-function createCanvasBridge(load = loadCanvasAdapter, config = {}) {
-  const busy = /* @__PURE__ */ new Set();
-  async function sync(token, exec) {
-    if (busy.has(token)) throw new Error("此成果正在回填，请稍后查询。");
-    busy.add(token);
-    try {
-      const record = JSON.parse(await readFile14(resultFile(token), "utf8"));
-      if (record.owner !== sessionOwner(exec)) throw new Error("此成果不属于当前会话");
-      return await publishCanvasResult(await resolveCanvasAdapter(record?.canvas?.projectId, load), record);
-    } finally {
-      busy.delete(token);
-    }
-  }
-  function wrap(tool2) {
-    return { ...tool2, output: { ...tool2.output, render(args, value) {
-      const blocks = tool2.output?.render?.(args, value) || [];
-      return value?.canvasSync ? [...blocks, { type: "text", text: `画布回填：${JSON.stringify(value.canvasSync)}` }] : blocks;
-    } }, parameters: { ...tool2.parameters, properties: { ...tool2.parameters.properties, canvas: canvasLinkSchema } }, async execute(args, exec) {
-      let canvas = args.canvas;
-      const resumeDir = resumeDirOf(args.resume);
-      const saved = !canvas && resumeDir ? await readPauseFile(resumeDir) : null;
-      const projectId = args.projectId || saved?.options?.projectId;
-      canvas ||= saved?.options?.canvas;
-      if (!canvas && projectId && ref(config, "canvasEnabled", false) === true && ref(config, "autoCreateCanvas", true) === true) {
-        const project = await readProject(projectId, exec);
-        canvas = project.canvasAuto?.canvas;
-      }
-      if (canvas) {
-        sessionOwner(exec);
-        const input = await readCanvasInput(await resolveCanvasAdapter(canvas?.projectId, load), canvas);
-        if (input.canvas.fingerprint !== canvas.fingerprint) throw new Error("画布内容或参考素材已修改，请重新读取并审核；未提交生成任务。");
-      }
-      const showState = async (text) => {
-        if (!canvas || !["video_generate", "video_extend"].includes(tool2.name)) return;
-        try {
-          const adapter = await resolveCanvasAdapter(canvas?.projectId, load), loc = location(canvas), doc = await adapter.rpc.projectsGet(loc);
-          const source = doc.nodes?.[canvas.nodeId], id = `${canvas.nodeId}_state`;
-          if (!source?.data?.metaonticAssistantManaged || doc.tombstones?.includes(id)) return;
-          const previous = doc.nodes[id];
-          if (previous && previous.data?.text !== previous.metaonticStateText) return;
-          const node = { ...previous || { id, type: "text", x: source.x, y: source.y + (source.h || 280) + 80, w: 360, h: 180 }, metaonticStateText: text, data: { label: "制作状态", text } };
-          await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, nodes: { ...doc.nodes, [id]: node }, ts: Date.now() } });
-          await markCanvasChanged(adapter, loc.id, doc.edges || []);
-        } catch {
-        }
-      };
-      await showState("正在执行制作流程；是否已提交以工具进度为准。");
-      let result;
-      try {
-        result = await tool2.execute(args, exec);
-      } catch (error) {
-        await showState("本次制作流程中断，请查看会话中的工具结果。");
-        throw error;
-      }
-      const phase = videoResultState(result).phase;
-      await showState({ complete: "制作完成", generated: "生成成功", segment_review: "本段完成，等待结果审核", task_pending: "任务状态待确认", delivery_pending: "生成结果待交付", partial: "部分完成", failed: "制作失败", reference_review: "等待参考图审核" }[phase] || "本轮流程已结束，请查看会话结果。");
-      if (!canvas || !result || typeof result !== "object") return result;
-      const media = mediaPreviewMeta(result, tool2.name).media;
-      if (!media.length) return { ...result, canvasSync: { status: "no_media", reason: "尚无成功素材，未回填虚构成果。" } };
-      const record = { id: randomUUID10(), owner: sessionOwner(exec), canvas, media, ratio: args.ratio, phase: tool2.name === "video_prepare_image" ? "reference_review" : videoResultState(result).phase, createdAt: Date.now() };
-      try {
-        await saveRecord(record);
-      } catch {
-        return { ...result, canvasSync: { status: "failed", reason: "回填记录保存失败；生成成果已保留，请勿重新生成。" } };
-      }
-      try {
-        return { ...result, canvasSync: await sync(record.id, exec) };
-      } catch {
-        return { ...result, canvasSync: { status: "pending", token: record.id, reason: "画布回填未完成，成果已保留；调用video_canvas(action:sync,token)补传，不重新生成。" } };
-      }
-    } };
-  }
-  const tool = {
-    name: "video_canvas",
-    description: "与本插件内置流程画布联动（不依赖任何第三方画布插件）。list列出流程画布；read读取指定节点及上游脚本/分镜/素材并返回canvas定位和摘要，不生成不收费。之后按既有video_project审核与生成工具费用审批，video_generate/video_extend/video_prepare_image传canvas即自动回填成果节点。sync只补传此前失败的回填，不新增任务。",
-    parameters: { type: "object", properties: { action: { type: "string", enum: ["list", "read", "sync"] }, projectId: { type: "string" }, canvasId: { type: "string" }, nodeId: { type: "string" }, token: { type: "string" } }, required: ["action"] },
-    output: { schema: { type: "object" }, render(_args, value) {
-      return [{ type: "text", text: JSON.stringify(value) }];
-    } },
-    timeoutMs: 6e5,
-    isConcurrencySafe() {
-      return false;
-    },
-    async execute(args, exec) {
-      if (args.action === "sync") return sync(args.token, exec);
-      if (args.action === "list") return { projects: await builtinCanvasList() };
-      if (args.action === "read") return readCanvasInput(await resolveCanvasAdapter(args.projectId, load), args);
-      throw new Error("未知画布操作");
-    }
-  };
-  return { wrap, tool };
+  if (saved?.ok === !1 || saved?.deleted) throw new Error("画布已删除或回填失败");
+  return await markCanvasChanged(adapter, loc.id, [...edges.filter((e) => e.id.startsWith("mov_edge_")), ...edges]), { status: "synced", token: record.id, count: publications.length, phase: record.phase };
 }
 
 // src/businesses/video-generation/integrations/canvas-project.ts
-import { createHash as createHash12 } from "node:crypto";
-import { readFile as readFile15 } from "node:fs/promises";
-import path21 from "node:path";
 init_config();
-var digest2 = (value) => createHash12("sha256").update(JSON.stringify(value)).digest("hex");
-async function adapterForNewCanvas(binding, load) {
-  if (binding?.projectId) return resolveCanvasAdapter(binding.projectId, load);
-  if (load !== loadCanvasAdapter) return load();
-  return builtinCanvasAdapter();
-}
 function canvasScriptPreview(script) {
-  return script.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").split(/\r?\n/).filter((line) => !/^\s*(```|~~~)/.test(line) && !/^\s*\|?\s*:?-{3,}:?\s*\|/.test(line)).map((line) => line.replace(/^#{1,6}\s+/, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "图片：$1（$2）").replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1（$2）").replace(/`([^`]+)`/g, "$1").replace(/^\s*\|(.+)\|\s*$/, (_, row) => row.split(/(?<!\\)\|/).map((x) => x.trim()).join(" · "))).join("\n").trim();
-}
-function pluginNamedCanvas(binding, current, title = "") {
-  const name = String(current || "").trim(), wanted = String(title || "").trim();
-  if (!name) return false;
-  if (binding?.appliedName) return name === binding.appliedName;
-  return name === binding?.name || name.startsWith("MetaOntic 创作") || Boolean(wanted) && name === wanted;
-}
-function pluginNamedCanvasName(binding, current, title = "") {
-  const name = String(current || "").trim(), wanted = String(title || "").trim();
-  return !name || name === "默认画布" || name === binding?.appliedCanvasName || Boolean(wanted) && name === wanted;
-}
-function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionTitle = null) {
-  async function sync(projectId, exec, draft = {}) {
-    if (ref(config, "canvasEnabled", false) !== true) return { status: "disabled", reason: "未打开流程画布（默认关闭，可在插件设置页打开）；已有画布保留。" };
-    if (ref(config, "autoCreateCanvas", true) !== true) return { status: "disabled", reason: "已关闭自动创建画布；改为在画布内明确选中节点时联动，已有画布保留。" };
-    return lockProject(`canvas:${projectId}`, async () => {
-      const project = await readProject(projectId, exec);
-      draft = { ...project.canvasDraft || { scriptPath: project.approved?.scriptPath, specification: project.approved?.specification }, ...draft };
-      if (draft.specification?.canvas) return { status: "external", projectId: draft.specification.canvas.projectId, reason: "沿用用户选择的原画布，不另建项目。" };
-      let adapter;
-      try {
-        adapter = await adapterForNewCanvas(project.canvasAuto, load);
-      } catch (error) {
-        const reason = String(error?.message || "").trim() || "流程画布目录暂不可用，请核对插件数据目录权限。";
-        return { status: "unavailable", reason: `${reason}创作项目已保留，可查询项目状态重试同步。` };
-      }
-      const rpc = adapter.rpc;
-      let conversationName = "";
-      try {
-        conversationName = String(sessionTitle?.get(exec.agent.session)?.title || "").trim().slice(0, 80);
-      } catch {
-      }
-      if (!rpc.canvasCreateProject) return { status: "unavailable", reason: "流程画布缺少创建接口，未创建替代画布。" };
-      const prefix = `mov_${project.id.replaceAll("-", "")}`;
-      const baseName = conversationName || "MetaOntic 创作画布";
-      if (!project.canvasAuto) {
-        project.canvasAuto = { version: 1, name: baseName, nodes: {}, links: {}, backend: adapter.backend === BUILTIN_BACKEND ? BUILTIN_BACKEND : "original" };
-        await writeProject(project);
-      }
-      const binding = project.canvasAuto;
-      if (!binding.projectId) {
-        const created = await createAutoCanvas(rpc, project, binding, baseName);
-        if (!created?.ok || !/^[A-Za-z0-9_-]{1,100}$/.test(created.projectId || "")) throw new Error("自动画布创建未确认，请重试同步，不重新创建创作项目。");
-        binding.projectId = created.projectId;
-        if (created.name) binding.name = String(created.name);
-        await writeProject(project);
-      }
-      const loc = { id: binding.projectId };
-      const doc = await rpc.projectsGet(loc);
-      if (!doc?.nodes || doc.deleted) throw new Error("自动画布已删除或不可用，不会重新创建已删除的项目。");
-      let script = "";
-      if (draft.scriptPath) {
-        const scriptPath = path21.resolve(exec.agent.session.header?.cwd || process.cwd(), draft.scriptPath);
-        if (!/\.md$/i.test(scriptPath)) throw new Error("自动同步脚本需要Markdown文件。");
-        script = await readFile15(scriptPath, "utf8");
-        if (script.length > 2e5) throw new Error("脚本过大，自动画布未覆盖旧节点。");
-      }
-      const specification = draft.specification || null;
-      const nodes = { ...doc.nodes }, edges = [...doc.edges || []];
-      const ensuredEdges = [], removedEdges = [];
-      const managed = { ...binding.nodes }, managedEdges = { ...binding.links || {} };
-      const deleted = new Set(doc.tombstones || []), edgeDeleted = new Set(doc.edgeTombstones || []);
-      const add = (key, type, label, x, y, data, size = null) => {
-        const id = `${prefix}_${key}`;
-        if (deleted.has(id)) throw new Error("自动节点已被删除，不会自动复活；请在项目中明确选择新的画布绑定。");
-        const previous = nodes[id];
-        if (key === "script" && previous?.type === "script" && previous.data?.output === "" && previous.data?.metaonticProjectId === project.id) {
-          const initial = { label: "完整剧本", idea: "由MetaOnticVideo创作项目同步", output: "", status: "idle", metaonticProjectId: project.id };
-          if (JSON.stringify(previous.data) === JSON.stringify(initial)) managed[id] = digest2({ type: previous.type, data: previous.data });
-        }
-        const pluginOwnedStage = Boolean(previous?.data?.metaonticStage) && stageNodeOwned(previous);
-        if (previous && !pluginOwnedStage && (!managed[id] || digest2({ type: previous.type, data: previous.data }) !== managed[id])) throw new Error("自动节点已在画布中修改，保留你的编辑；请先处理差异再同步。");
-        const next = { ...previous || { id, x, y, w: size?.w ?? (type === "script" ? 420 : 360), h: size?.h ?? 280 }, type, data };
-        const oldX = key === "production" ? 1550 : key.startsWith("segment_") ? 1050 : null;
-        const oldY = key === "production" ? 60 : key.startsWith("segment_") ? 60 + (Number(key.slice(8)) - 1) * 320 : null;
-        if (previous && previous.x === oldX && previous.y === oldY && previous.w === 360 && previous.h === 280) {
-          next.x = x;
-          next.y = y;
-        }
-        nodes[id] = next;
-        managed[id] = digest2({ type, data });
-        return id;
-      };
-      const connect = (from2, to, port = "prompt") => {
-        const id = `${prefix}_edge_${from2.slice(prefix.length + 1)}_${to.slice(prefix.length + 1)}`;
-        if (edgeDeleted.has(id)) throw new Error("自动连线已被删除，保留你的编辑，不重新连回。");
-        const desired = { id, fromNode: from2, toNode: to, fromPort: "out", toPort: port };
-        const existing = edges.find((e) => e.id === id);
-        if (existing && (!managedEdges[id] || digest2(existing) !== managedEdges[id])) throw new Error("自动连线已修改，保留你的编辑。");
-        if (!existing) edges.push(desired);
-        ensuredEdges.push(desired);
-        managedEdges[id] = digest2(desired);
-      };
-      const source = add("script", "script", "完整剧本", 40, 60, { label: "完整剧本", idea: "由MetaOnticVideo创作项目同步", output: canvasScriptPreview(script) || nodes[`${prefix}_script`]?.data?.output || "", status: script || nodes[`${prefix}_script`]?.data?.output ? "done" : "idle", metaonticProjectId: project.id });
-      const overview = add("project", "text", "创作项目", 40, 400, { label: "创作项目", text: `目标时长：${project.duration ?? "待确认"}秒
-角色图路线：${project.choice || "待确认"}
-脚本、费用与分段审核仍按原流程进行；自动建图不产生模型费用。`, metaonticProjectId: project.id });
-      for (let i = edges.length - 1; i >= 0; i--) {
-        const edge = edges[i];
-        if (managedEdges[edge.id] && ["text", "script"].includes(nodes[edge.toNode]?.type)) {
-          if (digest2(edge) !== managedEdges[edge.id]) throw new Error("自动连线已修改，保留你的编辑。");
-          edges.splice(i, 1);
-          removedEdges.push(edge.id);
-          delete managedEdges[edge.id];
-        }
-      }
-      let nodeId = `${prefix}_production`;
-      if (specification) {
-        const prompts = specification.segmentPrompts?.length ? specification.segmentPrompts : [specification.prompt];
-        const wanted = new Set(prompts.map((_, i) => `${prefix}_segment_${i + 1}`));
-        for (const id of Object.keys(managed)) {
-          if (!id.startsWith(`${prefix}_segment_`) || wanted.has(id) || !nodes[id]) continue;
-          if (digest2({ type: nodes[id].type, data: nodes[id].data }) !== managed[id] || edges.some((e) => e.fromNode === id || e.toNode === id))
-            throw new Error("旧制作段已在画布中编辑或连接，保留你的编辑；请先处理差异再同步。");
-          delete nodes[id];
-          delete managed[id];
-        }
-        const shots = scriptStoryboardShots(script);
-        const board = add("storyboard", "storyboard", "镜头分镜", 540, 60, { label: "镜头分镜", shots, script, output: script, status: "done", metaonticProjectId: project.id, metaonticPlanNote: shots.length ? "按剧本分镜表同步，制作段计划另列，不触发生成。" : "未识别到分镜表，完整原文保留在剧本中；制作段计划另列。" });
-        connect(source, board, "script");
-        for (const [index, prompt] of prompts.entries()) {
-          const plan = add(`segment_${index + 1}`, "text", `第${index + 1}段制作内容`, 540, 420 + index * 320, { label: `第${index + 1}段制作内容`, text: String(prompt), metaonticProjectId: project.id });
-        }
-        const results = edges.filter((e) => e.fromNode === `${prefix}_production`).map((e) => nodes[e.toNode]).filter(Boolean);
-        results.push(...Object.values(nodes).filter((n) => n.metaonticSourceNode === `${prefix}_production`));
-        const latest = results.sort((a, b) => (b.metaonticCreatedAt || 0) - (a.metaonticCreatedAt || 0))[0];
-        const phase = latest?.data?.metaonticPhase;
-        const state = phase === "segment_review" ? "分段待审核" : ["complete", "generated"].includes(phase) ? "已有生成成果" : phase ? "已有阶段成果" : "待制作";
-        const production = add("production", "video", "视频制作", 1040, 60, {
-          label: `视频制作 · ${state}`,
-          prompt: specification.prompt,
-          ratio: specification.ratio,
-          resolution: specification.resolution,
-          duration: specification.duration,
-          status: ["complete", "generated"].includes(phase) ? "done" : "idle",
-          metaonticProjectId: project.id,
-          metaonticAssistantManaged: true
-        });
-        nodeId = production;
-        connect(board, production);
-      } else if (!nodes[nodeId]) {
-        nodeId = source;
-      }
-      const facts = preserveCanvasConfirmations(
-        nodes[stageNodeId(prefix, "script")]?.data?.metaonticStageFacts,
-        stageFacts(project, specification, Boolean(draft.scriptPath || script), specification ? Math.max(1, specification.segmentPrompts?.length || 0) : 0)
-      );
-      const stats = canvasSegmentStats({ ...doc, nodes });
-      for (const [index, stage] of stageSummary(facts, stats).entries()) {
-        const id = stageNodeId(prefix, stage.key);
-        if (nodes[id] && !stageNodeRewriteable(nodes[id])) continue;
-        if (deleted.has(id)) continue;
-        const spot = stageSpot(index);
-        add(
-          `stage_${stage.key}`,
-          "text",
-          STAGE_LABELS[stage.key],
-          spot.x,
-          spot.y,
-          { ...sealedStageData(stage.key, stage.state, stage.text, facts), metaonticProjectId: project.id },
-          spot
-        );
-      }
-      const currentName = String(doc.name || "").trim();
-      const canvasName = conversationName && pluginNamedCanvas(binding, currentName, conversationName) ? conversationName : currentName;
-      const currentCanvasName = String(doc.defaultCanvasName || "").trim();
-      const canvasLabel = !doc.defaultCanvasDeleted && conversationName && pluginNamedCanvasName(binding, currentCanvasName, conversationName) ? conversationName : currentCanvasName;
-      const result = await rpc.projectsPut({
-        ...loc,
-        name: canvasName,
-        ...canvasLabel ? { defaultCanvasName: canvasLabel } : {},
-        doc: {
-          ...doc,
-          nodes,
-          edges,
-          ts: Date.now(),
-          ...removedEdges.length ? { edgeTombstones: [.../* @__PURE__ */ new Set([...doc.edgeTombstones || [], ...removedEdges])] } : {}
-        }
-      });
-      if (result?.ok === false || result?.deleted) throw new Error("自动画布保存失败，保留原创作项目。");
-      if (canvasName) binding.appliedName = canvasName;
-      if (canvasLabel) binding.appliedCanvasName = canvasLabel;
-      await markCanvasChanged(adapter, binding.projectId, [...ensuredEdges, ...edges]);
-      binding.nodes = managed;
-      binding.links = managedEdges;
-      binding.nodeId = nodeId;
-      try {
-        binding.canvas = (await readCanvasInput(adapter, { projectId: binding.projectId, nodeId })).canvas;
-      } catch {
-        delete binding.canvas;
-      }
-      await writeProject(project);
-      let opened = false;
-      try {
-        opened = (await rpc.canvasOpen?.({ projectId: binding.projectId }))?.ok === true;
-      } catch {
-      }
-      return {
-        status: "synced",
-        projectId: binding.projectId,
-        nodeId,
-        openRequested: opened,
-        bindingReady: Boolean(binding.canvas),
-        ...!binding.canvas ? { reason: "画布节点已建立；成果会回填到插件自己的画布数据目录。" } : {}
-      };
-    });
-  }
-  async function createAutoCanvas(rpc, project, binding, baseName) {
-    const stored = typeof binding.name === "string" && binding.name.trim() && !binding.name.includes(project.id) ? binding.name : baseName;
-    let created = await rpc.canvasCreateProject({ name: stored });
-    for (let index = 2; index <= 5 && created?.ok && created.reused; index++) {
-      if (await canvasReusable(rpc, created.projectId, project.id)) return created;
-      created = await rpc.canvasCreateProject({ name: `${baseName} ${index}` });
-    }
-    return created;
-  }
-  async function canvasReusable(rpc, projectId, selfProjectId) {
-    const doc = await rpc.projectsGet({ id: projectId });
-    if (!doc?.nodes || Object.keys(doc.nodes).length) return false;
-    for (const other of await allProjects()) {
-      if (other?.id !== selfProjectId && other?.canvasAuto?.projectId === projectId) return false;
-    }
-    return true;
-  }
-  async function followTitle(session, event) {
-    try {
-      if (!session || event?.type !== "session/title") return;
-      const title = String(event.data?.title || "").trim().slice(0, 80);
-      if (!title) return;
-      for (const project of await projectsOfSession(session)) {
-        const binding = project.canvasAuto;
-        if (!binding?.projectId) continue;
-        try {
-          await lockProject(`canvas:${project.id}`, async () => {
-            const adapter = await adapterForNewCanvas(binding, load);
-            const loc = { id: binding.projectId };
-            const doc = await adapter.rpc.projectsGet(loc);
-            if (!doc?.nodes || doc.deleted) return;
-            const current = String(doc.name || "").trim(), currentCanvas = String(doc.defaultCanvasName || "").trim();
-            const ownsName = pluginNamedCanvas(binding, current, title);
-            const ownsCanvasName = !doc.defaultCanvasDeleted && pluginNamedCanvasName(binding, currentCanvas, title);
-            if (!ownsName && !ownsCanvasName) return;
-            const put = { ...loc };
-            if (ownsName && current !== title) put.name = title;
-            if (ownsCanvasName && currentCanvas !== title) put.defaultCanvasName = title;
-            if (put.name || put.defaultCanvasName) {
-              const result = await adapter.rpc.projectsPut(put);
-              if (result?.ok === false || result?.deleted) return;
-            }
-            let recorded = false;
-            if (ownsName && binding.appliedName !== title) {
-              binding.appliedName = title;
-              recorded = true;
-            }
-            if (ownsCanvasName && binding.appliedCanvasName !== title) {
-              binding.appliedCanvasName = title;
-              recorded = true;
-            }
-            if (recorded) await writeProject(project);
-          });
-        } catch {
-        }
-      }
-    } catch {
-    }
-  }
-  function wrapProject(tool) {
-    return { ...tool, async execute(args, exec) {
-      const result = await tool.execute(args, exec);
-      if (result?.canvasProject) return result;
-      if (!result?.projectId || !["prepare", "review", "status"].includes(args.action) || ["pending", "blocked"].includes(result.status)) return result;
-      try {
-        const canvas = await sync(result.projectId, exec, args.action === "review" ? args : {});
-        return { ...result, canvasProject: canvas };
-      } catch (e) {
-        return { ...result, canvasProject: { status: "pending", reason: e.message || "自动画布同步未完成，重试项目同步即可，不需要重生成。" } };
-      }
-    } };
-  }
-  return { sync, wrapProject, followTitle };
+  return script.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").split(/\r?\n/).filter((line) => !/^\s*(```|~~~)/.test(line) && !/^\s*\|?\s*:?-{3,}:?\s*\|/.test(line)).map((line) => line.replace(/^#{1,6}\s+/, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "图片：$1（$2）").replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1（$2）").replace(/`([^`]+)`/g, "$1").replace(/^\s*\|(.+)\|\s*$/, (_, row) => row.split(/(?<!\\)\|/).map((x) => x.trim()).join(" · "))).join(`
+`).trim();
 }
 
 // src/businesses/video-generation/integrations/canvas-native.ts
-import path23 from "node:path";
-import { createHash as createHash14, randomUUID as randomUUID11 } from "node:crypto";
-import { mkdir as mkdir15, readFile as readFile16, writeFile as writeFile12, rename as rename13, stat as stat10 } from "node:fs/promises";
+import path22 from "node:path";
+import { createHash as createHash13, randomUUID as randomUUID11 } from "node:crypto";
+import { mkdir as mkdir15, readFile as readFile15, writeFile as writeFile12, rename as rename13, stat as stat10 } from "node:fs/promises";
 init_plugin();
 init_connection();
 
@@ -9155,16 +7325,9 @@ function buildExtensionPrompt({
   direction = "backward",
   wording = "extend"
 }) {
-  const forward = direction === "forward";
-  if (transitionDescription !== void 0 && typeof transitionDescription !== "string") throw new Error("过渡描述必须是文字。");
-  const embedded = String(prompt || "").match(/【过渡画面】([^\r\n]*)/)?.[1]?.trim();
-  const explicitTransition = embedded || String(transitionDescription || "").trim();
-  const plotPrompt = String(prompt || "").replace(/【过渡画面】[^\r\n]*/g, "").trim();
-  const transitionText = explicitTransition || (forward ? "本段末尾的动作、视线和声音逐步进入视频1开头的状态，保持叙事连续，不复制视频1已发生的内容。" : mode === "closeup" ? "承接视频1末尾的状态，在完整对白或动作结束后按本段脚本切换景别；未指定时切到听者的近景反应，再推进新剧情，保持轴线、人物关系和声音连续。" : "承接视频1末尾人物的动作阶段和视线，同机位顺势进入本段新动作，环境声与配乐自然延续，不重复上一段动作或台词。");
-  const plannedCut = Boolean(explicitTransition) || !forward && mode === "closeup";
-  const head = forward ? "向前延长视频1。" : wording === "after" ? "生成视频1之后的内容：" : "向后延长视频1。";
-  const span = forward ? startAt == null ? `生成 ${seconds} 秒前置画面，接在视频1第一帧之前。` : `生成 ${seconds} 秒前置画面，对应整片第 ${Math.max(0, startAt - seconds)}–${startAt} 秒，紧接在视频1之前。` : startAt == null ? `生成 ${seconds} 秒续拍画面，接在视频1最后一帧之后。` : `生成 ${seconds} 秒续拍画面，对应整片第 ${startAt}–${startAt + seconds} 秒，接在视频1之后。`;
-  const transition = explicitTransition ? "按已审核的过渡画面描述执行接缝；只有描述明确安排切镜、景别或场景变化时才改变，不擅自换人、换装、重新开场或重复已完成动作。" : forward ? FORWARD_TRANSITION : mode === "closeup" ? CLOSEUP_TRANSITION : CONTINUOUS_TRANSITION;
+  let forward = direction === "forward";
+  if (transitionDescription !== void 0 && typeof transitionDescription != "string") throw new Error("过渡描述必须是文字。");
+  let explicitTransition = String(prompt || "").match(/【过渡画面】([^\r\n]*)/)?.[1]?.trim() || String(transitionDescription || "").trim(), plotPrompt = String(prompt || "").replace(/【过渡画面】[^\r\n]*/g, "").trim(), transitionText = explicitTransition || (forward ? "本段末尾的动作、视线和声音逐步进入视频1开头的状态，保持叙事连续，不复制视频1已发生的内容。" : mode === "closeup" ? "承接视频1末尾的状态，在完整对白或动作结束后按本段脚本切换景别；未指定时切到听者的近景反应，再推进新剧情，保持轴线、人物关系和声音连续。" : "承接视频1末尾人物的动作阶段和视线，同机位顺势进入本段新动作，环境声与配乐自然延续，不重复上一段动作或台词。"), plannedCut = !!explicitTransition || !forward && mode === "closeup", head = forward ? "向前延长视频1。" : wording === "after" ? "生成视频1之后的内容：" : "向后延长视频1。", span = forward ? startAt == null ? `生成 ${seconds} 秒前置画面，接在视频1第一帧之前。` : `生成 ${seconds} 秒前置画面，对应整片第 ${Math.max(0, startAt - seconds)}–${startAt} 秒，紧接在视频1之前。` : startAt == null ? `生成 ${seconds} 秒续拍画面，接在视频1最后一帧之后。` : `生成 ${seconds} 秒续拍画面，对应整片第 ${startAt}–${startAt + seconds} 秒，接在视频1之后。`, transition = explicitTransition ? "按已审核的过渡画面描述执行接缝；只有描述明确安排切镜、景别或场景变化时才改变，不擅自换人、换装、重新开场或重复已完成动作。" : forward ? FORWARD_TRANSITION : mode === "closeup" ? CLOSEUP_TRANSITION : CONTINUOUS_TRANSITION;
   return [
     `${head}${span}`,
     `【延长方向】${forward ? "向前延长（前置剧情，放在视频1之前）" : "向后延长（续拍剧情，接在视频1之后）"}。`,
@@ -9179,90 +7342,77 @@ function buildExtensionPrompt({
     SPEECH_EXECUTION,
     transition,
     "本段明确指定的运镜和切镜优先，上面的衔接建议不得覆盖已确认的镜头安排。"
-  ].join("\n");
+  ].join(`
+`);
 }
 function buildSegmentExecutionPrompt({ prompt, kind, index, count }) {
-  const last = index >= count - 1;
-  const boundary = kind === "generate" ? count === 1 ? "这是完整单段作品：按已审核脚本完成开场、发展与结尾，结尾落实本片指定变化和收束，不等待不存在的下一段。" : "这是首段：只演本段事件，结尾停在本段指定状态，不抢演后段剧情，不做整片结束式收尾。" : "这是续拍段：视频1提供上一段结束状态，从其后的新事件继续。不要重演进场、递接物品或已说台词。";
+  let last = index >= count - 1, boundary = kind === "generate" ? count === 1 ? "这是完整单段作品：按已审核脚本完成开场、发展与结尾，结尾落实本片指定变化和收束，不等待不存在的下一段。" : "这是首段：只演本段事件，结尾停在本段指定状态，不抢演后段剧情，不做整片结束式收尾。" : "这是续拍段：视频1提供上一段结束状态，从其后的新事件继续。不要重演进场、递接物品或已说台词。";
   return [
     `【生成段 ${index + 1}/${count}】生成段编号不是切镜指令；镜头是否切换以脚本为准。`,
     "【执行内容】" + String(prompt).trim(),
     boundary,
-    !last ? "在完整句结束、动作完成或自然反应处交接，保留人物位置、视线、持物手和镜头运动状态，不用定格等待填满时长。关键字、首次接触和剧情揭示放在可完整看清的位置，不把唯一关键信息挤在最后几帧；收尾仍按原时长自然表演，不额外增加等待或改写台词。" : "完成本段的故事变化，再用自然反应或画面收束；不重述前情。"
-  ].join("\n");
+    last ? "完成本段的故事变化，再用自然反应或画面收束；不重述前情。" : "在完整句结束、动作完成或自然反应处交接，保留人物位置、视线、持物手和镜头运动状态，不用定格等待填满时长。关键字、首次接触和剧情揭示放在可完整看清的位置，不把唯一关键信息挤在最后几帧；收尾仍按原时长自然表演，不额外增加等待或改写台词。"
+  ].join(`
+`);
 }
 function buildGenerationPrompt({ prompt, seconds, model = "" }) {
-  const timing = isOmniExtendModel(model) ? "按本段事件顺序推进；如有时间区间，以本段0秒为起点，区间连续，不遗漏停顿与反应时间。" : "按本段事件顺序自然推进，以镜头序号或先后阶段组织内容，不依赖精确时间戳，不为追逐秒点压缩动作或对白。";
+  let timing = isOmniExtendModel(model) ? "按本段事件顺序推进；如有时间区间，以本段0秒为起点，区间连续，不遗漏停顿与反应时间。" : "按本段事件顺序自然推进，以镜头序号或先后阶段组织内容，不依赖精确时间戳，不为追逐秒点压缩动作或对白。";
   return [
     `生成 ${seconds} 秒视频。`,
     String(prompt).trim(),
     timing,
     SPEECH_EXECUTION,
     "人物身份、服装、场景与光线保持连贯；每句台词完整说完。未明确要求时不新增字幕、水印、片头片尾或配乐。"
-  ].join("\n");
+  ].join(`
+`);
 }
 function endWithPunctuation(text) {
-  const value = String(text ?? "").trim();
-  if (!value) return "";
-  return /[。．.!！?？;；~～:：,，]$/.test(value) ? value : `${value}。`;
+  let value = String(text ?? "").trim();
+  return value ? /[。．.!！?？;；~～:：,，]$/.test(value) ? value : `${value}。` : "";
 }
 
 // src/businesses/video-generation/workflow/real-person.ts
-import { createHash as createHash13 } from "node:crypto";
+import { createHash as createHash12 } from "node:crypto";
 
 // src/businesses/video-generation/tools/results.ts
 import { resolve as resolve2 } from "node:path";
 function previewInstruction(value) {
-  const latest = (value?.segments || []).filter((segment) => segment.status === "succeeded").at(-1);
-  const target = latest?.localPath || value?.videoPath || latest?.videoUrl || value?.videoUrl;
-  return `【下一步：先展示本段视频，等待用户预览】请立即在用户可见正文用可点击链接展示本次完成的分段：${target || "见本次分段结果"}。正文附上 ${artifactLink("观看本段视频", latest?.localPath || value?.previewPath || value?.videoPath, latest?.videoUrl || value?.videoUrl)}。不要调用 present：交付卡片只登记最终成片，中途登记分段会把成片挤到后面。不能只说“生成成功”或只列任务ID。正文展示后立即单独调用 video_project(action:review_segment,resume:本次resumeDir)，弹出“分段结果确认”窗口；不能只用文字询问后结束回合。未通过不能提交下一段。用户首次授权制作不等于已看过本段，不得自动resume或调用其他生成工具绕过预览；链接不可用时给出可点击视频路径或播放链接，仍须等待明确确认。`;
+  let latest = (value?.segments || []).filter((segment) => segment.status === "succeeded").at(-1);
+  return `【下一步：先展示本段视频，等待用户预览】请立即在用户可见正文用可点击链接展示本次完成的分段：${latest?.localPath || value?.videoPath || latest?.videoUrl || value?.videoUrl || "见本次分段结果"}。正文附上 ${artifactLink("观看本段视频", latest?.localPath || value?.previewPath || value?.videoPath, latest?.videoUrl || value?.videoUrl)}。不要调用 present：交付卡片只登记最终成片，中途登记分段会把成片挤到后面。不能只说“生成成功”或只列任务ID。正文展示后立即单独调用 video_project(action:review_segment,resume:本次resumeDir)，弹出“分段结果确认”窗口；不能只用文字询问后结束回合。未通过不能提交下一段。用户首次授权制作不等于已看过本段，不得自动resume或调用其他生成工具绕过预览；链接不可用时给出可点击视频路径或播放链接，仍须等待明确确认。`;
 }
 function artifactLink(label, localPath, videoUrl) {
-  const target = localPath ? resolve2(localPath) : videoUrl;
-  if (!target) return "";
-  return `[${label}](<${String(target).replace(/</g, "%3C").replace(/>/g, "%3E")}>)`;
+  let target = localPath ? resolve2(localPath) : videoUrl;
+  return target ? `[${label}](<${String(target).replace(/</g, "%3C").replace(/>/g, "%3E")}>)` : "";
 }
 function deliveryInstruction(value) {
-  const segments = value?.segments || [];
-  const completed = segments.filter((segment) => segment.status === "succeeded" && (segment.localPath || segment.videoUrl));
-  const multiPart = segments.length > 1 || value?.paused && (value?.remainingSeconds || 0) > 0;
+  let segments = value?.segments || [], completed = segments.filter((segment) => segment.status === "succeeded" && (segment.localPath || segment.videoUrl)), multiPart = segments.length > 1 || value?.paused && (value?.remainingSeconds || 0) > 0;
   if (!completed.length && !value?.videoPath && !value?.videoUrl) return "";
-  const linkRule = "正文里每项都要有 Markdown 可点击链接：[观看视频](<绝对文件路径或真实播放URL>)。不能用反引号路径或普通文本路径代替链接；卡片未验证时不得声称上方卡片可直接播放。已有文件直接交付，不重新生成。";
-  const cardRule = "交付卡片只登记最终成片：宿主的卡片按本轮首次出现顺序排列、超过四个还会折叠，中途登记脚本、分镜、参考图、分段预览或部分合并会把成片挤到后面，事后补发也挪不回来——这些过程材料只用正文（内嵌图片或链接）交付。";
-  const final = videoResultState(value).isFinal;
+  let linkRule = "正文里每项都要有 Markdown 可点击链接：[观看视频](<绝对文件路径或真实播放URL>)。不能用反引号路径或普通文本路径代替链接；卡片未验证时不得声称上方卡片可直接播放。已有文件直接交付，不重新生成。", cardRule = "交付卡片只登记最终成片：宿主的卡片按本轮首次出现顺序排列、超过四个还会折叠，中途登记脚本、分镜、参考图、分段预览或部分合并会把成片挤到后面，事后补发也挪不回来——这些过程材料只用正文（内嵌图片或链接）交付。", final = videoResultState(value).isFinal;
   if (!multiPart) {
-    const segment = completed[0];
-    const film = value?.videoPath || segment?.localPath || "";
-    const parts = ["【视频交付：正文必须有可点击链接】", artifactLink("观看视频", film, segment?.videoUrl || value?.videoUrl)];
-    parts.push(film && final && videoResultState(value).canPresent ? "正文链接发完后，用 present 登记一次卡片：files 只放这条成片，不登记脚本、分镜、参考图等过程材料。" : film ? "这次还不是最终交付（暂停、部分交付或还没出结果）：不要调用 present，先用正文链接把这条视频交付给用户。" : "只有上游链接、没有本地文件时不要调用 present，正文给可点击播放链接即可。");
-    parts.push(linkRule, cardRule);
-    return parts.join("\n");
+    let segment = completed[0], film = value?.videoPath || segment?.localPath || "", parts = ["【视频交付：正文必须有可点击链接】", artifactLink("观看视频", film, segment?.videoUrl || value?.videoUrl)];
+    return parts.push(film && final && videoResultState(value).canPresent ? "正文链接发完后，用 present 登记一次卡片：files 只放这条成片，不登记脚本、分镜、参考图等过程材料。" : film ? "这次还不是最终交付（暂停、部分交付或还没出结果）：不要调用 present，先用正文链接把这条视频交付给用户。" : "只有上游链接、没有本地文件时不要调用 present，正文给可点击播放链接即可。"), parts.push(linkRule, cardRule), parts.join(`
+`);
   }
-  const labels = ["第一段", "第二段", "第三段"];
-  const items = completed.map((segment, i) => {
-    const index = segment.index || i + 1;
-    const label = labels[index - 1] || `第${index}段`;
+  let labels = ["第一段", "第二段", "第三段"], items = completed.map((segment, i) => {
+    let index = segment.index || i + 1, label = labels[index - 1] || `第${index}段`;
     return `${label}：${segment.localPath || segment.videoUrl}
 ${artifactLink(label, segment.localPath, segment.videoUrl)}`;
-  });
-  const mergedPath = completed.length > 1 && value?.merged && value?.videoPath && !completed.some((segment) => segment.localPath === value.videoPath) ? value.videoPath : "";
-  if (mergedPath) items.unshift(artifactLink("打开合并视频", mergedPath, ""), `${final ? "合并后完整视频" : "已完成部分合并视频"}：${mergedPath}`);
-  else if (completed.length > 1) items.push("合并结果尚未交付：如实说明未合并、合并失败或等待交付，不将最后一段当作完整成片。");
-  const tail2 = !final ? "这次还不是最终交付（还有分段没做完，或成片还没合并）：不要调用 present，交付卡片只登记最终成片。先用正文链接把已完成的部分交付给用户，等整条视频生成结束、成片合并成功后再登记一次卡片。" : mergedPath ? "请实际使用 present/文件展示工具登记交付卡片：files 数组第一个必须是合并成片，其后才按段号放分段；不要登记脚本、分镜、参考图、中间预览或部分合并。顺序不对、漏掉成片或带了中间产物，插件都会拦下这次 present，按提示改好顺序重发即可，不得因此省略成片或分段。" : "没有合并成片时不要调用 present：按段号在正文里交付真实分段即可，等成片合并成功后再登记卡片。";
-  return ["【交付清单：每个分段与合并结果分别展示】", ...items, linkRule, cardRule, tail2].join("\n");
+  }), mergedPath = completed.length > 1 && value?.merged && value?.videoPath && !completed.some((segment) => segment.localPath === value.videoPath) ? value.videoPath : "";
+  mergedPath ? items.unshift(artifactLink("打开合并视频", mergedPath, ""), `${final ? "合并后完整视频" : "已完成部分合并视频"}：${mergedPath}`) : completed.length > 1 && items.push("合并结果尚未交付：如实说明未合并、合并失败或等待交付，不将最后一段当作完整成片。");
+  let tail2 = final ? mergedPath ? "请实际使用 present/文件展示工具登记交付卡片：files 数组第一个必须是合并成片，其后才按段号放分段；不要登记脚本、分镜、参考图、中间预览或部分合并。顺序不对、漏掉成片或带了中间产物，插件都会拦下这次 present，按提示改好顺序重发即可，不得因此省略成片或分段。" : "没有合并成片时不要调用 present：按段号在正文里交付真实分段即可，等成片合并成功后再登记卡片。" : "这次还不是最终交付（还有分段没做完，或成片还没合并）：不要调用 present，交付卡片只登记最终成片。先用正文链接把已完成的部分交付给用户，等整条视频生成结束、成片合并成功后再登记一次卡片。";
+  return ["【交付清单：每个分段与合并结果分别展示】", ...items, linkRule, cardRule, tail2].join(`
+`);
 }
 function recoveryInstruction(value, toolName) {
-  if (!value?.resumeDir) return "";
-  if (value.deliveryError || value.ffmpegMissing) return `生成进度已保存。下载或合并尚未完成${value.deliveryError ? `：${value.deliveryError}` : value.ffmpegMissing ? "：缺少可用的FFmpeg工具" : ""}。请用 ${toolName} 的 resume="${value.resumeDir}" 重试下载或合并，仅重试已有成果的下载或合并，不提交新的生成任务。`;
-  if (value.pendingTaskId) return `任务 ${value.pendingTaskId} 已提交。请用 ${toolName} 的 resume="${value.resumeDir}" 查询并接回原进度，不会重新提交本段。`;
-  return "";
+  return value?.resumeDir ? value.deliveryError || value.ffmpegMissing ? `生成进度已保存。下载或合并尚未完成${value.deliveryError ? `：${value.deliveryError}` : value.ffmpegMissing ? "：缺少可用的FFmpeg工具" : ""}。请用 ${toolName} 的 resume="${value.resumeDir}" 重试下载或合并，仅重试已有成果的下载或合并，不提交新的生成任务。` : value.pendingTaskId ? `任务 ${value.pendingTaskId} 已提交。请用 ${toolName} 的 resume="${value.resumeDir}" 查询并接回原进度，不会重新提交本段。` : "" : "";
 }
 function referenceReview(value, toolName) {
   return [{ type: "text", text: [
     "【下一步：展示转换图片并等待用户确认，尚未重试视频】",
     ...(value.convertedReferences || []).map((item, index) => `图片${index + 1}（${item.role}）：${artifactLink(`打开图片${index + 1}`, item.localPath, item.imageUrl)}`),
     `先逐张在正文内嵌展示并附可点击原图链接；不要调用 present：交付卡片只登记最终成片，转换图片属于过程材料，卡片里多出来的行会把成片挤到后面。确认是非真人且符合风格要求；用户明确同意后再调用 ${toolName}，传 resume="${value.resumeDir}"、referenceImagesReviewed:true。首次转换授权不等于结果确认。图片仍像真人或不满意时停止，不自动再次出图。视频重试另外计费。`
-  ].join("\n") }];
+  ].join(`
+`) }];
 }
 var SEGMENT_OUTPUT_SCHEMA = {
   type: "object",
@@ -9279,11 +7429,7 @@ var SEGMENT_OUTPUT_SCHEMA = {
   }
 };
 function mergeModeLabel(mergeMode) {
-  if (mergeMode === "copy") return "无损拼接";
-  if (mergeMode === "segment") return "这一段暂时按原始分段交付（续做时再和后面的段合并）";
-  if (mergeMode === "single") return "一段直出，无需拼接";
-  if (mergeMode === "seamless") return "直接拼接（旧配置兼容）";
-  return "重编码拼接";
+  return mergeMode === "copy" ? "无损拼接" : mergeMode === "segment" ? "这一段暂时按原始分段交付（续做时再和后面的段合并）" : mergeMode === "single" ? "一段直出，无需拼接" : mergeMode === "seamless" ? "直接拼接（旧配置兼容）" : "重编码拼接";
 }
 var RENDER_WORDING = {
   generate: {
@@ -9292,9 +7438,8 @@ var RENDER_WORDING = {
     pausedHead: "已生成前",
     pausedTail: "请先预览已完成分段并通过结果确认，再确认下一段费用；当前已暂停",
     success: (value) => {
-      const { mode, segments = [] } = value || {};
-      if (mode === "extended") return `视频生成成功：先直出 ${formatSeconds(segments[0]?.seconds)} 秒，再延长 ${segments.length - 1} 段。`;
-      return `视频生成成功：一次直出 ${formatSeconds(segments[0]?.seconds)} 秒，没有超过单段上限，不需要延长。`;
+      let { mode, segments = [] } = value || {};
+      return mode === "extended" ? `视频生成成功：先直出 ${formatSeconds(segments[0]?.seconds)} 秒，再延长 ${segments.length - 1} 段。` : `视频生成成功：一次直出 ${formatSeconds(segments[0]?.seconds)} 秒，没有超过单段上限，不需要延长。`;
     },
     timeout: "本次等待已超时，尚未取得生成结果；任务可能仍在运行。",
     unknown: "没能确认任务状态（查询失败，不能据此判定任务失败）。任务已经提交，可能仍在生成；用 video_status 按下面的任务 ID 复查，不要重新提交。",
@@ -9318,9 +7463,9 @@ var RENDER_WORDING = {
   }
 };
 function renderVideoText(value, variant) {
-  const wording = RENDER_WORDING[variant] || RENDER_WORDING.generate;
+  let wording = RENDER_WORDING[variant] || RENDER_WORDING.generate;
   if (value?.status === "review_required") return referenceReview(value, wording.toolName);
-  const {
+  let {
     status,
     segments = [],
     videoUrl,
@@ -9333,60 +7478,23 @@ function renderVideoText(value, variant) {
     paused,
     resumeDir,
     remainingSeconds
-  } = value || {};
-  const lines = segments.map((segment) => {
-    const head = `第 ${segment.index} 段：${wording.segmentLabel(segment)}（任务 ${segment.taskId}）`;
-    if (segment.status !== "succeeded" || !segment.videoUrl) {
-      return `${head} → ${segment.status}${segment.error ? `：${segment.error}` : ""}`;
-    }
-    return segment.localPath ? `${head} → ${segment.videoUrl}
+  } = value || {}, lines = segments.map((segment) => {
+    let head = `第 ${segment.index} 段：${wording.segmentLabel(segment)}（任务 ${segment.taskId}）`;
+    return segment.status !== "succeeded" || !segment.videoUrl ? `${head} → ${segment.status}${segment.error ? `：${segment.error}` : ""}` : segment.localPath ? `${head} → ${segment.videoUrl}
     本地文件：${segment.localPath}` : `${head} → ${segment.videoUrl}`;
-  });
-  const state = videoResultState(value);
-  const parts = [deliveryInstruction(value), recoveryInstruction(value, wording.toolName), ...state.phase === "segment_review" ? [previewInstruction(value)] : []];
+  }), state = videoResultState(value), parts = [deliveryInstruction(value), recoveryInstruction(value, wording.toolName), ...state.phase === "segment_review" ? [previewInstruction(value)] : []];
   if (state.phase === "segment_review") {
-    const doneSegments = segments.filter((item) => item.status === "succeeded");
-    const totalSeconds = doneSegments.reduce((sum, item) => sum + (item.seconds || 0), 0);
+    let doneSegments = segments.filter((item) => item.status === "succeeded"), totalSeconds = doneSegments.reduce((sum, item) => sum + (item.seconds || 0), 0);
     parts.push(`${wording.pausedHead} ${doneSegments.length} 段（共 ${formatSeconds(totalSeconds)} 秒）：${wording.pausedTail}。`);
-  } else if (state.phase === "task_pending") {
-    parts.push(status === "timeout" ? wording.timeout : wording.unknown);
-  } else if (state.phase === "delivery_pending") {
-    parts.push("已生成分段的下载或合并尚未完成，请保留原任务和进度。");
-  } else if (state.phase === "partial") {
-    parts.push(`已有部分分段生成成功，整条视频尚未完成${error ? `：${error}` : ""}。`);
-    if (status === "cancelled") parts.push(wording.cancelled);
-    else if (status === "failed") parts.push(wording.failed(error));
-  } else if (state.isFinal) {
-    parts.push(wording.success(value));
-  } else if (status === "cancelled") {
-    parts.push(wording.cancelled);
-  } else if (status === "failed") {
-    parts.push(wording.failed(error));
-  } else {
-    parts.push("尚未取得可交付的视频结果。");
-  }
-  if (status === "succeeded") {
-    if (videoPath) {
-      parts.push(`${state.phase === "delivery_pending" ? "已有本地视频（下载或合并尚未完成）" : !state.isFinal ? value?.merged ? "已完成部分合并视频" : "本段视频" : "成片"}（本地文件）：${videoPath}（${mergeModeLabel(mergeMode)}）`);
-    } else if (segmentsDir) {
-      parts.push(`未提供完整合并视频，分段目录：${segmentsDir}；已下载文件以各段的本地路径为准。`);
-    } else if (wording.noMergedFile) {
-      parts.push(wording.noMergedFile);
-    }
-  }
-  parts.push(...lines);
-  if (paused && resumeDir) {
-    parts.push(
-      `还没生成的部分：还剩 ${formatSeconds(remainingSeconds)} 秒。` + wording.leftover(resumeDir)
-    );
-  }
-  if (videoUrl) parts.push(`最后一段上游链接（有效期以上游为准，请及时保存）：${videoUrl}`);
-  if (note) parts.push(note);
-  if (status === "timeout" || status === "unknown") {
-    const taskId = pendingTaskId || segments.at(-1)?.taskId || "（未知）";
+  } else state.phase === "task_pending" ? parts.push(status === "timeout" ? wording.timeout : wording.unknown) : state.phase === "delivery_pending" ? parts.push("已生成分段的下载或合并尚未完成，请保留原任务和进度。") : state.phase === "partial" ? (parts.push(`已有部分分段生成成功，整条视频尚未完成${error ? `：${error}` : ""}。`), status === "cancelled" ? parts.push(wording.cancelled) : status === "failed" && parts.push(wording.failed(error))) : state.isFinal ? parts.push(wording.success(value)) : status === "cancelled" ? parts.push(wording.cancelled) : status === "failed" ? parts.push(wording.failed(error)) : parts.push("尚未取得可交付的视频结果。");
+  if (status === "succeeded" && (videoPath ? parts.push(`${state.phase === "delivery_pending" ? "已有本地视频（下载或合并尚未完成）" : state.isFinal ? "成片" : value?.merged ? "已完成部分合并视频" : "本段视频"}（本地文件）：${videoPath}（${mergeModeLabel(mergeMode)}）`) : segmentsDir ? parts.push(`未提供完整合并视频，分段目录：${segmentsDir}；已下载文件以各段的本地路径为准。`) : wording.noMergedFile && parts.push(wording.noMergedFile)), parts.push(...lines), paused && resumeDir && parts.push(
+    `还没生成的部分：还剩 ${formatSeconds(remainingSeconds)} 秒。` + wording.leftover(resumeDir)
+  ), videoUrl && parts.push(`最后一段上游链接（有效期以上游为准，请及时保存）：${videoUrl}`), note && parts.push(note), status === "timeout" || status === "unknown") {
+    let taskId = pendingTaskId || segments.at(-1)?.taskId || "（未知）";
     parts.push(`可用 video_status 查询任务 ${taskId} 的状态与视频链接。`);
   }
-  return [{ type: "text", text: parts.filter(Boolean).join("\n") }];
+  return [{ type: "text", text: parts.filter(Boolean).join(`
+`) }];
 }
 function renderResult(value) {
   return renderVideoText(value, "extend");
@@ -9404,45 +7512,28 @@ init_config();
 init_connection();
 init_connection();
 async function generateSeedreamImageCore(liveConfig, body, signal, existingTaskId, progress = {}) {
-  const config = imageConfig(liveConfig);
-  const prefix = /\/v1$/i.test(resolveBaseUrl(config)) ? "" : "/v1";
-  let taskId = String(existingTaskId || "").trim();
+  let config = imageConfig(liveConfig), prefix = /\/v1$/i.test(resolveBaseUrl(config)) ? "" : "/v1", taskId = String(existingTaskId || "").trim();
   if (!taskId) {
-    const submitted = await guardedSubmit(config, `${prefix}/tasks/doubao`, body, signal, progress.scope);
-    taskId = String(submitted?.task_id || submitted?.id || "").trim();
-    if (!taskId) throw new Error("图片提交响应缺少 task_id，无法确认是否创建成功；请检查调用记录，不要重复提交。");
+    let submitted = await guardedSubmit(config, `${prefix}/tasks/doubao`, body, signal, progress.scope);
+    if (taskId = String(submitted?.task_id || submitted?.id || "").trim(), !taskId) throw new Error("图片提交响应缺少 task_id，无法确认是否创建成功；请检查调用记录，不要重复提交。");
   }
   await progress.onCreated?.(taskId);
-  const taskPath = `${prefix}/tasks/${encodeURIComponent(taskId)}`;
-  const timeoutMs = Math.max(1e3, Number(ref(config, "imageMaxWaitMs", 3e5)) || 3e5);
-  const deadline = Date.now() + timeoutMs;
-  const budgetSignal = AbortSignal.timeout(timeoutMs);
-  const waitSignal = signal ? AbortSignal.any([signal, budgetSignal]) : budgetSignal;
+  let taskPath = `${prefix}/tasks/${encodeURIComponent(taskId)}`, timeoutMs = Math.max(1e3, Number(ref(config, "imageMaxWaitMs", 3e5)) || 3e5), deadline = Date.now() + timeoutMs, budgetSignal = AbortSignal.timeout(timeoutMs), waitSignal = signal ? AbortSignal.any([signal, budgetSignal]) : budgetSignal;
   try {
     for (; ; ) {
-      const task = await relayRequest(config, taskPath, { signal: waitSignal });
-      const status = String(task?.status || "").toLowerCase();
-      if (FAILED_STATES.has(status)) {
-        if (body) await finishSubmission(config, `${prefix}/tasks/doubao`, body);
-        else await finishKnownTask(config, taskId);
-        throw Object.assign(new Error(`图片生成失败：${task?.fail_reason || task?.error?.message || status}`), { terminal: true });
-      }
+      let task = await relayRequest(config, taskPath, { signal: waitSignal }), status = String(task?.status || "").toLowerCase();
+      if (FAILED_STATES.has(status))
+        throw body ? await finishSubmission(config, `${prefix}/tasks/doubao`, body) : await finishKnownTask(config, taskId), Object.assign(new Error(`图片生成失败：${task?.fail_reason || task?.error?.message || status}`), { terminal: !0 });
       if (SUCCESS_STATES.has(status)) break;
       if (Date.now() >= deadline) throw new Error("图片生成等待超时");
       await sleep(Math.min(3e3, deadline - Date.now()), waitSignal);
     }
-    const result = await relayRequest(config, `${taskPath}/artifacts`, { signal: waitSignal });
-    const item = (result?.artifacts || []).find((item2) => /image/i.test(String(item2?.type || "")) && /^https?:\/\//i.test(String(item2?.content_url || "")));
+    let item = ((await relayRequest(config, `${taskPath}/artifacts`, { signal: waitSignal }))?.artifacts || []).find((item2) => /image/i.test(String(item2?.type || "")) && /^https?:\/\//i.test(String(item2?.content_url || "")));
     if (!item) throw new Error("任务已完成但没有可用图片产物");
-    const completed = { imageUrl: String(item.content_url), taskId };
-    await progress.onCompleted?.(completed);
-    if (progress.onCompleted) {
-      if (body) await finishSubmission(config, `${prefix}/tasks/doubao`, body);
-      else await finishKnownTask(config, taskId);
-    }
-    return completed;
+    let completed = { imageUrl: String(item.content_url), taskId };
+    return await progress.onCompleted?.(completed), progress.onCompleted && (body ? await finishSubmission(config, `${prefix}/tasks/doubao`, body) : await finishKnownTask(config, taskId)), completed;
   } catch (error) {
-    throw Object.assign(new Error(`${error?.message || error}（图片 task_id=${taskId}）。${error?.terminal ? "任务已失败，未重试。" : "已停止等待，不重复提交；可用 video_prepare_image 的 taskId 查询此图片任务。"}`), { taskId, terminal: Boolean(error?.terminal), code: error?.code || "image_task_error" });
+    throw Object.assign(new Error(`${error?.message || error}（图片 task_id=${taskId}）。${error?.terminal ? "任务已失败，未重试。" : "已停止等待，不重复提交；可用 video_prepare_image 的 taskId 查询此图片任务。"}`), { taskId, terminal: !!error?.terminal, code: error?.code || "image_task_error" });
   }
 }
 async function generateSeedreamImage(...args) {
@@ -9479,50 +7570,43 @@ function prepareImageTool(liveConfig, progress = {}) {
     },
     timeoutMs: 48e4,
     isConcurrencySafe() {
-      return true;
+      return !0;
     },
     async execute(args, exec) {
-      const config = imageConfig(liveConfig);
+      let config = imageConfig(liveConfig);
       if (isVolcengine(config)) throw new Error("角色图生成与参考图处理目前支持MetaOntic AI接入；火山直连暂不提供此图片通道，可使用已准备好的角色参考图。");
       assertConfigured(config, resolveApiKey(config));
-      const model = String(ref(config, "imageModel", IMAGE_MODELS[0]));
+      let model = String(ref(config, "imageModel", IMAGE_MODELS[0]));
       if (!IMAGE_MODELS.includes(model)) throw new Error("请选择受支持的 Seedream 图片模型。");
       if (args?.taskId !== void 0 && !String(args.taskId).trim()) throw new Error("图片 taskId 不能为空白。");
-      if (args?.taskId) {
-        const result2 = await generateSeedreamImage(config, void 0, exec?.signal, String(args.taskId).trim(), progress);
-        return { ...result2, model, reviewRequired: true };
-      }
-      const operation = args?.operation || "convert_reference";
+      if (args?.taskId)
+        return { ...await generateSeedreamImage(config, void 0, exec?.signal, String(args.taskId).trim(), progress), model, reviewRequired: !0 };
+      let operation = args?.operation || "convert_reference";
       if (!["convert_reference", "create_character"].includes(operation)) throw new Error("不支持的图片操作。");
-      const style = String(args?.style || "").trim();
+      let style = String(args?.style || "").trim();
       if (!style) throw new Error("请先确定画面风格。");
-      const characterType = args?.characterType ?? "stylized";
+      let characterType = args?.characterType ?? "stylized";
       if (!["realistic", "stylized"].includes(characterType)) throw new Error("不支持的角色风格类型。");
       if (operation === "convert_reference" && characterType !== "stylized") throw new Error("真人限制转换必须使用非真人风格，不能转换为真人写实。");
       if (args?.seed !== void 0 && !Number.isSafeInteger(args.seed)) throw new Error("seed 必须是安全整数。");
-      let input;
-      let prompt;
+      let input, prompt;
       if (operation === "create_character") {
-        const character = String(args?.prompt || "").trim();
+        let character = String(args?.prompt || "").trim();
         if (!character) throw new Error("请先确认角色外形设定，再生成角色参考图。");
         if (args?.image) throw new Error("文生角色图不需要原图；已有图片请使用转换操作。");
-        const appearance = characterType === "realistic" ? "采用真人写实摄影风格，自然的皮肤纹理、真实的人体比例与柔和光影，不使用卡通、插画或动画造型。" : "采用明显的非真人插画或动画造型，不要输出摄影或看起来仍是真人的照片。";
-        prompt = `生成一张角色参考图。角色设定：${character}。已确认风格：${style}。${appearance}清晰呈现角色的脸部、发型、服装及体型特征；画面仅一位对应角色，背景简洁，不画人物多视图拼图、分身或额外人物，不添加文字、字幕、Logo或水印。`;
-      } else {
-        input = await resolveImageInput(args?.image, "真人参考图");
-        prompt = `将参考照片中的真人转换为明显的非真人艺术角色，风格：${style}。保留服装、发型、姿态、构图和场景关系，使用清晰的绘画或动画材质与造型，不要输出摄影、写实皮肤或看起来仍是真人照片的画面。不添加文字。`;
-      }
-      const result = await generateSeedreamImage(config, {
+        prompt = `生成一张角色参考图。角色设定：${character}。已确认风格：${style}。${characterType === "realistic" ? "采用真人写实摄影风格，自然的皮肤纹理、真实的人体比例与柔和光影，不使用卡通、插画或动画造型。" : "采用明显的非真人插画或动画造型，不要输出摄影或看起来仍是真人的照片。"}清晰呈现角色的脸部、发型、服装及体型特征；画面仅一位对应角色，背景简洁，不画人物多视图拼图、分身或额外人物，不添加文字、字幕、Logo或水印。`;
+      } else
+        input = await resolveImageInput(args?.image, "真人参考图"), prompt = `将参考照片中的真人转换为明显的非真人艺术角色，风格：${style}。保留服装、发型、姿态、构图和场景关系，使用清晰的绘画或动画材质与造型，不要输出摄影、写实皮肤或看起来仍是真人照片的画面。不添加文字。`;
+      return { ...await generateSeedreamImage(config, {
         ...args?.seed !== void 0 ? { seed: args.seed } : {},
         model,
         ...input ? { image: [input.url] } : {},
         size: "2048x2048",
         n: 1,
         response_format: "url",
-        watermark: false,
+        watermark: !1,
         prompt
-      }, exec?.signal, void 0, progress);
-      return { ...result, model, reviewRequired: true };
+      }, exec?.signal, void 0, progress), model, reviewRequired: !0 };
     }
   };
 }
@@ -9530,13 +7614,13 @@ function prepareImageTool(liveConfig, progress = {}) {
 // src/businesses/video-generation/workflow/real-person.ts
 async function recoverRealPersonImages(config, body, ctx, exec, final, state = {}, saveState = async () => {
 }) {
-  const images = (body.content || []).filter((item) => item.type === "image_url" && item.image_url?.url);
+  let images = (body.content || []).filter((item) => item.type === "image_url" && item.image_url?.url);
   if (!images.length) {
     final.error = `${final.error || ""}。本次没有可转换的图片参考；若限制来自参考视频，请提供非真人视频素材。`;
     return;
   }
   if (!state.conversionApproved) {
-    const approval = ctx?.get?.("approval");
+    let approval = ctx?.get?.("approval");
     if (!approval?.request || !exec?.agent || approvalPolicy(ctx, exec) === "never") {
       final.error = `${final.error || ""}。当前无法取得转换授权，已停止，未转换或重试。`;
       return;
@@ -9561,178 +7645,114 @@ async function recoverRealPersonImages(config, body, ctx, exec, final, state = {
       final.error = `${final.error || ""}。未取得用户转换同意，已停止，未转换图片或重试视频。`;
       return;
     }
-    state.conversionApproved = true;
-    state.phase = "converting";
-    state.images ||= {};
-    await saveState();
+    state.conversionApproved = !0, state.phase = "converting", state.images ||= {}, await saveState();
   }
-  const replacements = /* @__PURE__ */ new Map();
+  let replacements = /* @__PURE__ */ new Map();
   try {
-    for (const item of images) {
-      const source = String(item.image_url.url);
-      const key = createHash13("sha256").update(source).digest("hex");
-      const entry2 = state.images[key] ||= {};
+    for (let item of images) {
+      let source = String(item.image_url.url), key = createHash12("sha256").update(source).digest("hex"), entry2 = state.images[key] ||= {};
       if (entry2.failed) throw new Error(`图片任务 ${entry2.taskId || ""} 已明确失败：${entry2.failed}。不自动再次出图。`);
       if (!entry2.imageUrl) {
-        const progress = {
+        let progress = {
           onCreated: async (taskId) => {
-            entry2.taskId = taskId;
-            await saveState();
+            entry2.taskId = taskId, await saveState();
           },
           onCompleted: async (result) => {
-            entry2.imageUrl = result.imageUrl;
-            await saveState();
+            entry2.imageUrl = result.imageUrl, await saveState();
           }
         };
         try {
           await prepareImageTool(config, progress).execute(entry2.taskId ? { taskId: entry2.taskId } : { image: source, style: "明显的非真人二维动画角色，保持原构图、服装和动作" }, exec);
         } catch (error) {
-          if (error?.terminal) entry2.failed = error.message;
-          if (error?.submissionId) entry2.submissionId = error.submissionId;
-          await saveState();
-          throw error;
+          throw error?.terminal && (entry2.failed = error.message), error?.submissionId && (entry2.submissionId = error.submissionId), await saveState(), error;
         }
       }
-      const resolved = await resolveImageInput(entry2.imageUrl, "转换后的参考图");
+      let resolved = await resolveImageInput(entry2.imageUrl, "转换后的参考图");
       replacements.set(source, String(resolved.url));
     }
   } catch (error) {
-    final.error = `${final.error || ""}。Seedream 转换未完成：${error?.message || error}。已保存逐张进度；继续时查询已有任务并复用已完成图片，不重新出图。`;
-    final.errorCode = error?.code || "image_conversion_incomplete";
+    final.error = `${final.error || ""}。Seedream 转换未完成：${error?.message || error}。已保存逐张进度；继续时查询已有任务并复用已完成图片，不重新出图。`, final.errorCode = error?.code || "image_conversion_incomplete";
     return;
   }
   state.convertedBody = {
     ...body,
     content: body.content.map((item) => item.type === "image_url" && replacements.has(item.image_url?.url) ? { ...item, image_url: { ...item.image_url, url: replacements.get(item.image_url.url) } } : item)
-  };
-  state.phase = "review";
-  await saveState();
-  setReferenceReview(final, state);
+  }, state.phase = "review", await saveState(), setReferenceReview(final, state);
 }
 function setReferenceReview(final, state) {
-  final.status = "review_required";
-  final.errorCode = "reference_review_required";
-  final.error = "图片已转换。请先展示每张结果，核对为非真人且风格符合要求；用户确认后用原 resume 并传 referenceImagesReviewed:true，才会重试视频一次。若仍像真人或不满意，停止，不自动再转换。";
-  final.convertedReferences = state.convertedBody.content.filter((item) => item.type === "image_url").map((item) => ({ role: item.role, imageUrl: item.image_url.url }));
+  final.status = "review_required", final.errorCode = "reference_review_required", final.error = "图片已转换。请先展示每张结果，核对为非真人且风格符合要求；用户确认后用原 resume 并传 referenceImagesReviewed:true，才会重试视频一次。若仍像真人或不满意，停止，不自动再转换。", final.convertedReferences = state.convertedBody.content.filter((item) => item.type === "image_url").map((item) => ({ role: item.role, imageUrl: item.image_url.url }));
 }
 
 // src/businesses/video-generation/providers/seedance.ts
 function normalizeReferenceUrl(value) {
-  const url = String(value ?? "").trim();
+  let url = String(value ?? "").trim();
   if (!url) throw new Error("参考视频 URL 不能为空。");
   if (/^asset:\/\/[A-Za-z0-9_-]+$/.test(url)) return url;
-  if (!/^https?:\/\//i.test(url)) {
+  if (!/^https?:\/\//i.test(url))
     throw new Error("参考视频必须是 https:// 或 http:// 开头的公网 URL（不能用本地文件路径）。");
-  }
   return url;
 }
 function buildRequestBody(config, args, referenceVideoUrl) {
-  const model = resolveModel(config);
-  const seconds = clampInteger(
+  let model = resolveModel(config), seconds = clampInteger(
     args.duration,
     MIN_SEGMENT_SECONDS,
     modelMaxSeconds(config),
     modelMaxSeconds(config)
-  );
-  const mode = args.mode === "closeup" ? "closeup" : "continuous";
-  const prompt = String(args.prompt ?? "").trim();
-  const startAt = args.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
-  const direction = args.direction === "forward" ? "forward" : "backward";
-  const wording = args.wording === "after" ? "after" : "extend";
-  const content = [
+  ), mode = args.mode === "closeup" ? "closeup" : "continuous", prompt = String(args.prompt ?? "").trim(), startAt = args.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt))), direction = args.direction === "forward" ? "forward" : "backward", wording = args.wording === "after" ? "after" : "extend", content = [
     { type: "text", text: buildExtensionPrompt({ prompt, seconds, startAt, mode, direction, wording, transitionDescription: args.transitionDescription }) },
     { type: "video_url", video_url: { url: referenceVideoUrl }, role: "reference_video" },
     ...(args.characterReferences || []).map((item) => ({ type: "image_url", image_url: { url: item.image_url.url }, role: "reference_image" }))
   ];
-  if (args.characterReferences?.length) {
-    content[0].text = `固定主体外观以图片1至图片${args.characterReferences.length}中的最初角色设定为准，保持对应主体的面部、发型、服饰与体型；图片仅约束主体外观，不重演图片中的动作或强制恢复其背景。视频1负责本段动作、机位与声音衔接。
-${content[0].text}`;
-  }
-  const body = { ...parseExtraParams(config) };
-  body.model = model;
-  body.content = content;
-  body.duration = seconds;
-  body.ratio = args.ratio || ref(config, "ratio", "adaptive");
-  body.resolution = resolveResolution(config, args);
-  const generateAudio = args.generateAudio ?? ref(config, "generateAudio", true);
-  if (typeof generateAudio === "boolean") body.generate_audio = generateAudio;
-  const watermark = args.watermark ?? ref(config, "watermark", false);
-  if (typeof watermark === "boolean") body.watermark = watermark;
-  if (args.user) body.safety_identifier = String(args.user);
-  if (typeof args.returnLastFrame === "boolean") body.return_last_frame = args.returnLastFrame;
-  if (args.seed != null && Number.isFinite(Number(args.seed))) body.seed = Number(args.seed);
-  if (isOmniExtendModel(model)) {
-    body.ratio = "adaptive";
-    body.omni_reference_task_type = "extend";
-  }
-  return { body, seconds };
+  args.characterReferences?.length && (content[0].text = `固定主体外观以图片1至图片${args.characterReferences.length}中的最初角色设定为准，保持对应主体的面部、发型、服饰与体型；图片仅约束主体外观，不重演图片中的动作或强制恢复其背景。视频1负责本段动作、机位与声音衔接。
+${content[0].text}`);
+  let body = { ...parseExtraParams(config) };
+  body.model = model, body.content = content, body.duration = seconds, body.ratio = args.ratio || ref(config, "ratio", "adaptive"), body.resolution = resolveResolution(config, args);
+  let generateAudio = args.generateAudio ?? ref(config, "generateAudio", !0);
+  typeof generateAudio == "boolean" && (body.generate_audio = generateAudio);
+  let watermark = args.watermark ?? ref(config, "watermark", !1);
+  return typeof watermark == "boolean" && (body.watermark = watermark), args.user && (body.safety_identifier = String(args.user)), typeof args.returnLastFrame == "boolean" && (body.return_last_frame = args.returnLastFrame), args.seed != null && Number.isFinite(Number(args.seed)) && (body.seed = Number(args.seed)), isOmniExtendModel(model) && (body.ratio = "adaptive", body.omni_reference_task_type = "extend"), { body, seconds };
 }
 async function buildGenerationBody(config, args, seconds, options = {}) {
-  const { refs: refs2 } = validateImageRoles(args, resolveModel(config));
-  const prompt = String(args.prompt ?? "").trim();
-  const ratio = args.ratio || ref(config, "ratio", "adaptive");
-  const canvas = canvasSize(ratio);
-  const fit = canvas ? { size: canvas, config, signal: options.signal } : null;
-  const content = [
+  let { refs: refs2 } = validateImageRoles(args, resolveModel(config)), prompt = String(args.prompt ?? "").trim(), ratio = args.ratio || ref(config, "ratio", "adaptive"), canvas = canvasSize(ratio), fit = canvas ? { size: canvas, config, signal: options.signal } : null, content = [
     { type: "text", text: buildGenerationPrompt({ prompt, seconds, model: resolveModel(config) }) }
-  ];
-  const images = [];
-  const notes = [];
-  const addImage = async (value, role2, label) => {
-    const resolved = isVolcengine(config) && /^asset:\/\//.test(String(value)) ? { url: String(value), source: "asset" } : await resolveImageInput(value, label, fit);
+  ], images = [], notes = [], addImage = async (value, role2, label) => {
+    let resolved = isVolcengine(config) && /^asset:\/\//.test(String(value)) ? { url: String(value), source: "asset" } : await resolveImageInput(value, label, fit);
     content.push({
       type: "image_url",
       image_url: { url: resolved.url },
       role: role2
-    });
-    images.push({ role: role2, ...resolved });
-  };
-  const firstFrame = String(args.firstFrameUrl ?? "").trim();
-  if (firstFrame) await addImage(firstFrame, "first_frame", "首帧图");
-  const lastFrame = String(args.lastFrameUrl ?? "").trim();
-  if (lastFrame) await addImage(lastFrame, "last_frame", "尾帧图");
-  for (const [index, reference] of refs2.entries()) {
+    }), images.push({ role: role2, ...resolved });
+  }, firstFrame = String(args.firstFrameUrl ?? "").trim();
+  firstFrame && await addImage(firstFrame, "first_frame", "首帧图");
+  let lastFrame = String(args.lastFrameUrl ?? "").trim();
+  lastFrame && await addImage(lastFrame, "last_frame", "尾帧图");
+  for (let [index, reference] of refs2.entries())
     await addImage(reference.trim(), "reference_image", `参考图 ${index + 1}`);
-  }
-  const body = { ...parseExtraParams(config) };
-  body.model = resolveModel(config);
-  body.content = content;
-  body.duration = seconds;
-  body.ratio = isOmniExtendModel(body.model) && content.some((item) => item.role === "first_frame" || item.role === "last_frame") ? "adaptive" : ratio;
-  body.resolution = resolveResolution(config, args);
-  const generateAudio = args.generateAudio ?? ref(config, "generateAudio", true);
-  if (typeof generateAudio === "boolean") body.generate_audio = generateAudio;
-  const watermark = args.watermark ?? ref(config, "watermark", false);
-  if (typeof watermark === "boolean") body.watermark = watermark;
-  if (args.user) body.safety_identifier = String(args.user);
-  if (typeof args.returnLastFrame === "boolean") body.return_last_frame = args.returnLastFrame;
-  if (args.seed != null && Number.isFinite(Number(args.seed))) body.seed = Number(args.seed);
-  return { body, seconds, images, notes };
+  let body = { ...parseExtraParams(config) };
+  body.model = resolveModel(config), body.content = content, body.duration = seconds, body.ratio = isOmniExtendModel(body.model) && content.some((item) => item.role === "first_frame" || item.role === "last_frame") ? "adaptive" : ratio, body.resolution = resolveResolution(config, args);
+  let generateAudio = args.generateAudio ?? ref(config, "generateAudio", !0);
+  typeof generateAudio == "boolean" && (body.generate_audio = generateAudio);
+  let watermark = args.watermark ?? ref(config, "watermark", !1);
+  return typeof watermark == "boolean" && (body.watermark = watermark), args.user && (body.safety_identifier = String(args.user)), typeof args.returnLastFrame == "boolean" && (body.return_last_frame = args.returnLastFrame), args.seed != null && Number.isFinite(Number(args.seed)) && (body.seed = Number(args.seed)), { body, seconds, images, notes };
 }
 async function runTaskOnce(config, body, signal, progress = {}) {
   return withGenerationProgress(progress.exec, async () => {
-    const created = progress.taskId ? null : await guardedSubmit(config, resolveSubmitPath(config), body, signal, progress.scope);
-    const taskId = progress.taskId || extractTaskId(created);
-    await appendRequestLog({ event: "task_created", taskId, model: body?.model, duration: body?.duration });
-    if (!taskId) throw new Error("创建任务失败：响应中缺少任务 ID。");
-    const stats = { tool: progress.exec?.name, mode: progress.exec?.metaonticMode };
-    if (created) reportUsage(progress.exec, "video_task_created", stats, taskId);
-    const began = Date.now();
+    let created = progress.taskId ? null : await guardedSubmit(config, resolveSubmitPath(config), body, signal, progress.scope), taskId = progress.taskId || extractTaskId(created);
+    if (await appendRequestLog({ event: "task_created", taskId, model: body?.model, duration: body?.duration }), !taskId) throw new Error("创建任务失败：响应中缺少任务 ID。");
+    let stats = { tool: progress.exec?.name, mode: progress.exec?.metaonticMode };
+    created && reportUsage(progress.exec, "video_task_created", stats, taskId);
+    let began = Date.now();
     try {
       await progress.onCreated?.(taskId);
-      const final = await timedStage("video_poll_wait", () => waitForCompletion(config, taskId, signal));
-      if (["succeeded", "failed", "cancelled"].includes(final.status)) await finishSubmission(config, resolveSubmitPath(config), body);
-      await appendRequestLog({ event: "task_finished", taskId, status: final.status, errorCode: final.errorCode });
-      if (["succeeded", "failed", "cancelled"].includes(final.status)) reportUsage(progress.exec, "video_task_finished", {
+      let final = await timedStage("video_poll_wait", () => waitForCompletion(config, taskId, signal));
+      return ["succeeded", "failed", "cancelled"].includes(final.status) && await finishSubmission(config, resolveSubmitPath(config), body), await appendRequestLog({ event: "task_finished", taskId, status: final.status, errorCode: final.errorCode }), ["succeeded", "failed", "cancelled"].includes(final.status) && reportUsage(progress.exec, "video_task_finished", {
         ...stats,
         status: final.status,
         durationMs: Date.now() - began,
         errorCode: final.errorCode
-      }, taskId);
-      return { ...final, taskId };
+      }, taskId), { ...final, taskId };
     } catch (failure) {
-      if (failure?.code === "ABORTED") return { taskId, status: "unknown", errorCode: "waiting_stopped", error: `已停止等待，任务 ${taskId} 已提交，可能仍在生成。用 resume 或 video_status 查询已有任务，不要重新提交。` };
-      return {
+      return failure?.code === "ABORTED" ? { taskId, status: "unknown", errorCode: "waiting_stopped", error: `已停止等待，任务 ${taskId} 已提交，可能仍在生成。用 resume 或 video_status 查询已有任务，不要重新提交。` } : {
         taskId,
         status: "unknown",
         errorCode: failure?.code || "provider_poll_error",
@@ -9742,60 +7762,36 @@ async function runTaskOnce(config, body, signal, progress = {}) {
   });
 }
 async function runTask(liveConfig, body, signal, progress = {}) {
-  const config = snapshotConfig(liveConfig);
-  const state = progress.state || {};
-  const save2 = progress.saveState || (async () => {
+  let config = snapshotConfig(liveConfig), state = progress.state || {}, save2 = progress.saveState || (async () => {
   });
-  if (!state.originalBody) {
-    state.originalBody = body;
-    await save2();
-  }
-  body = state.originalBody;
-  const onCreated = (kind) => async (taskId) => {
-    state[kind] = taskId;
-    await save2();
-    await progress.onCreated?.(taskId);
-  };
-  const failed = (error) => ({ status: error?.code === "submission_unknown" ? "submission_unknown" : "failed", submissionId: error?.submissionId, errorCode: error?.code || "provider_failed", error: error?.message || String(error) });
+  state.originalBody || (state.originalBody = body, await save2()), body = state.originalBody;
+  let onCreated = (kind) => async (taskId) => {
+    state[kind] = taskId, await save2(), await progress.onCreated?.(taskId);
+  }, failed = (error) => ({ status: error?.code === "submission_unknown" ? "submission_unknown" : "failed", submissionId: error?.submissionId, errorCode: error?.code || "provider_failed", error: error?.message || String(error) });
   if (state.phase === "review") {
     if (!progress.referenceImagesReviewed) {
-      const result = failed(new Error("等待图片核对"));
-      setReferenceReview(result, state);
-      return result;
+      let result = failed(new Error("等待图片核对"));
+      return setReferenceReview(result, state), result;
     }
     if (!state.convertedBody) throw new Error("缺少转换结果，不能重试视频。");
-    state.phase = "retry";
-    state.retryUsed = true;
-    await save2();
+    state.phase = "retry", state.retryUsed = !0, await save2();
   }
   if (state.retryUsed) {
     if (state.retryResult) return state.retryResult;
     try {
-      const result = await runTaskOnce(config, state.convertedBody, signal, {
+      let result = await runTaskOnce(config, state.convertedBody, signal, {
         taskId: state.retryTaskId,
         scope: progress.scope,
         exec: progress.exec,
         onCreated: onCreated("retryTaskId")
       });
-      if (["succeeded", "failed", "cancelled"].includes(result.status)) {
-        state.retryResult = result;
-        await save2();
-      }
-      return result;
+      return ["succeeded", "failed", "cancelled"].includes(result.status) && (state.retryResult = result, await save2()), result;
     } catch (error) {
-      const result = failed(error);
-      if (error?.code !== "submission_unknown") {
-        state.retryResult = result;
-        await save2();
-      }
-      return result;
+      let result = failed(error);
+      return error?.code !== "submission_unknown" && (state.retryResult = result, await save2()), result;
     }
   }
-  if (state.originalResult?.status === "failed" && state.originalResult.errorCode !== "real_person_rejected") {
-    delete state.originalResult;
-    delete state.originalTaskId;
-    await save2();
-  }
+  state.originalResult?.status === "failed" && state.originalResult.errorCode !== "real_person_rejected" && (delete state.originalResult, delete state.originalTaskId, await save2());
   let final = state.originalResult;
   if (!final) {
     try {
@@ -9809,15 +7805,9 @@ async function runTask(liveConfig, body, signal, progress = {}) {
       if (error?.code === "submission_unknown") return failed(error);
       final = failed(error);
     }
-    if (["succeeded", "failed", "cancelled"].includes(final.status)) {
-      state.originalResult = { ...final };
-      await save2();
-    }
+    ["succeeded", "failed", "cancelled"].includes(final.status) && (state.originalResult = { ...final }, await save2());
   }
-  if (isVolcengine(config) || final.status !== "failed" || final.errorCode !== "real_person_rejected") return final;
-  final = { ...final };
-  await recoverRealPersonImages(config, body, progress.ctx, progress.exec, final, state, save2);
-  return final;
+  return isVolcengine(config) || final.status !== "failed" || final.errorCode !== "real_person_rejected" || (final = { ...final }, await recoverRealPersonImages(config, body, progress.ctx, progress.exec, final, state, save2)), final;
 }
 
 // src/businesses/video-generation/integrations/canvas-native.ts
@@ -9826,10 +7816,7 @@ init_connection_defaults();
 // src/businesses/video-generation/providers/text.ts
 init_connection();
 init_config();
-var TEXT_TIMEOUT_MS = 12e4;
-var TEXT_IDLE_TIMEOUT_MS = 3e4;
-var MAX_BRIEF_CHARS = 4e3;
-var VIEW_ANGLES = {
+var TEXT_TIMEOUT_MS = 12e4, TEXT_IDLE_TIMEOUT_MS = 3e4, MAX_BRIEF_CHARS = 4e3, VIEW_ANGLES = {
   常规: "平视、俯视、仰视",
   主观代入: "第一人称主观（POV）、过肩、窥视（前景遮挡）",
   空间与几何: "低角度仰拍、高角度俯拍、荷兰角（倾斜）、纵深引导线",
@@ -9837,17 +7824,13 @@ var VIEW_ANGLES = {
   特殊表达: "镜像、微观特写、广角贴近"
 };
 function stripFence(text) {
-  const raw = String(text ?? "").trim();
-  const fenced = raw.match(/^```[a-zA-Z]*\r?\n([\s\S]*?)\r?\n?```$/);
+  let raw = String(text ?? "").trim(), fenced = raw.match(/^```[a-zA-Z]*\r?\n([\s\S]*?)\r?\n?```$/);
   return (fenced ? fenced[1] : raw).trim();
 }
 function scriptPrompt(brief2) {
-  const total = Number(brief2?.totalSeconds) || 15, segments = Math.max(1, Number(brief2?.segments) || 1);
-  const segmentSeconds = Number(brief2?.segmentSeconds) || 15;
-  const ratio = String(brief2?.ratio || "16:9");
-  const idea = String(brief2?.idea ?? "").trim().slice(0, MAX_BRIEF_CHARS);
+  let total = Number(brief2?.totalSeconds) || 15, segments = Math.max(1, Number(brief2?.segments) || 1), segmentSeconds = Number(brief2?.segmentSeconds) || 15, ratio = String(brief2?.ratio || "16:9"), idea = String(brief2?.idea ?? "").trim().slice(0, MAX_BRIEF_CHARS);
   if (!idea) throw new Error("请先写下想拍什么，再让文本模型写脚本。");
-  const seconds = Math.min(total, MAX_TOTAL_SECONDS);
+  let seconds = Math.min(total, MAX_TOTAL_SECONDS);
   return [
     CREATIVE_GUIDANCE,
     writingProfileInstructions(brief2?.work_type),
@@ -9867,8 +7850,8 @@ function scriptPrompt(brief2) {
     "画面描述采用参考级细致程度：主体姿态/朝向与持物→主动作过程→环境或物体反馈→表情反应和结束状态，配合必要的光线、构图与声音。共同风格在开头统一，画面列保留本段具体细节；时间分配服务动作和停顿。",
     "内容先于技巧：每段画面列写出本段新事件/发现、人物反应和结束状态，前后具有因果或信息递进。不要把同一主体换景别反复展示当内容。表格格式与行数保持下面约定；段内变化在画面列写清。",
     "要求：",
-    `1. 第一行是「# 」开头的片名，随后简洁写明「核心表达」「内容主线」「结尾变化」与整体基调，表达具体到本片的事件或观察，不仅是题材名称。`,
-    `2. 先输出「## 故事与场景剧本」：按场次写地点与时间、完整动作过程、人物回应、原文对白和必要停顿；没有剧情时写观察过程及事实依据，不能用梗概替代完整正文。之后必须输出一个 Markdown 分镜表，表头固定为 | 镜号 | 镜别 | 视角 | 运镜 | 画面 | 时长 | 台词 |，分割行是 | --- | --- | --- | --- | --- | --- | --- |。`,
+    "1. 第一行是「# 」开头的片名，随后简洁写明「核心表达」「内容主线」「结尾变化」与整体基调，表达具体到本片的事件或观察，不仅是题材名称。",
+    "2. 先输出「## 故事与场景剧本」：按场次写地点与时间、完整动作过程、人物回应、原文对白和必要停顿；没有剧情时写观察过程及事实依据，不能用梗概替代完整正文。之后必须输出一个 Markdown 分镜表，表头固定为 | 镜号 | 镜别 | 视角 | 运镜 | 画面 | 时长 | 台词 |，分割行是 | --- | --- | --- | --- | --- | --- | --- |。",
     `3. 分镜表必须正好 ${segments} 行，每行对应一段：镜号列从 1 顺写，时长列写该段秒数（合计 ${seconds} 秒）。`,
     "4. 镜别列只填一个标准景别词：远景、全景、中景、近景、特写或大特写。",
     `5. 视角列只填一个标准视角词：${Object.entries(VIEW_ANGLES).map(([group, words]) => `${group}用${words}`).join("；")}。`,
@@ -9884,38 +7867,36 @@ function scriptPrompt(brief2) {
     "15. 表后另起一节「## 制作说明」，用 2–4 条短句写清楚段与段之间怎么接、声音与音乐怎么走、拍摄上最需要注意的是哪一点。",
     "16. 不要写：抽象空词（「高级感」「氛围感」这类没法执行的形容）、场景条件不具备的镜头、互不相容的组合、只换景别而没有新事件、信息或细节；也不要虚构价格、销量、评价或用户没给的任何数据。",
     "只输出这份 Markdown，不要解释、不要额外寒暄、不要用代码块包起来。"
-  ].join("\n");
+  ].join(`
+`);
 }
 function textEndpoint(config) {
-  const base = resolveBaseUrl(config).replace(/\/+$/, "");
+  let base = resolveBaseUrl(config).replace(/\/+$/, "");
   return /\/v\d+$/.test(base) ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
 }
 function textMaxTokens(segments) {
-  const count = Math.max(1, Math.min(60, Number(segments) || 1));
+  let count = Math.max(1, Math.min(60, Number(segments) || 1));
   return Math.min(16e3, 4e3 + count * 1e3);
 }
 function tokenUsage(usage) {
   return { promptTokens: Number(usage?.prompt_tokens) || 0, completionTokens: Number(usage?.completion_tokens) || 0 };
 }
 function contentOf(message) {
-  const content = message?.content;
+  let content = message?.content;
   return Array.isArray(content) ? content.map((part) => part?.text || "").join("") : String(content ?? "");
 }
 async function readStream(response, bump, onProgress) {
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "", content = "", usage = null, model = "", truncated = false, failure = "", chunks = 0;
+  let reader = response.body.getReader(), decoder = new TextDecoder(), buffer = "", content = "", usage = null, model = "", truncated = !1, failure = "", chunks = 0;
   for (; ; ) {
-    const { value, done } = await reader.read();
+    let { value, done } = await reader.read();
     if (done) break;
-    bump();
-    buffer += decoder.decode(value, { stream: true });
+    bump(), buffer += decoder.decode(value, { stream: !0 });
     let cut;
-    while ((cut = buffer.indexOf("\n")) >= 0) {
-      const line = buffer.slice(0, cut).replace(/\r$/, "");
-      buffer = buffer.slice(cut + 1);
-      if (!line.startsWith("data:")) continue;
-      const payload = line.slice(5).trim();
+    for (; (cut = buffer.indexOf(`
+`)) >= 0; ) {
+      let line = buffer.slice(0, cut).replace(/\r$/, "");
+      if (buffer = buffer.slice(cut + 1), !line.startsWith("data:")) continue;
+      let payload = line.slice(5).trim();
       if (!payload || payload === "[DONE]") continue;
       let part = null;
       try {
@@ -9927,53 +7908,33 @@ async function readStream(response, bump, onProgress) {
         failure = String(part.error?.message || part.error);
         continue;
       }
-      if (part?.model) model = String(part.model);
-      if (part?.usage) usage = tokenUsage(part.usage);
-      const choice = part?.choices?.[0];
-      const piece = contentOf({ content: choice?.delta?.content ?? choice?.message?.content });
-      if (piece) {
-        content += piece;
-        chunks += 1;
-      }
-      if (choice?.finish_reason === "length") truncated = true;
+      part?.model && (model = String(part.model)), part?.usage && (usage = tokenUsage(part.usage));
+      let choice = part?.choices?.[0], piece = contentOf({ content: choice?.delta?.content ?? choice?.message?.content });
+      piece && (content += piece, chunks += 1), choice?.finish_reason === "length" && (truncated = !0);
     }
-    if (chunks) onProgress?.({ characters: content.length, chunks });
+    chunks && onProgress?.({ characters: content.length, chunks });
   }
   return { content, usage, model, truncated, failure };
 }
 async function writeScript(config, brief2, options = {}) {
-  const cfg = options.textConfig ? options.textConfig(config) : textConfig(config);
-  const apiKey = resolveApiKey(cfg);
+  let cfg = options.textConfig ? options.textConfig(config) : textConfig(config), apiKey = resolveApiKey(cfg);
   assertConfigured(cfg, apiKey);
-  const model = resolveTextModel(cfg);
+  let model = resolveTextModel(cfg);
   if (!model) throw new Error("请在设置页填写文本模型，再让文本模型写脚本。");
-  const fetcher = options.fetcher || fetch;
-  const idleMs = Number(options.idleTimeoutMs) > 0 ? Number(options.idleTimeoutMs) : TEXT_IDLE_TIMEOUT_MS;
-  const idleSeconds = Math.max(1, Math.round(idleMs / 1e3));
-  const controller = new AbortController();
-  const outer = options.signal || AbortSignal.timeout(TEXT_TIMEOUT_MS);
-  let idleAborted = false;
-  let timer = null;
-  const bump = () => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      idleAborted = true;
-      controller.abort(new Error(`文本模型 ${idleSeconds} 秒没有输出`));
+  let fetcher = options.fetcher || fetch, idleMs = Number(options.idleTimeoutMs) > 0 ? Number(options.idleTimeoutMs) : TEXT_IDLE_TIMEOUT_MS, idleSeconds = Math.max(1, Math.round(idleMs / 1e3)), controller = new AbortController(), outer = options.signal || AbortSignal.timeout(TEXT_TIMEOUT_MS), idleAborted = !1, timer = null, bump = () => {
+    timer && clearTimeout(timer), timer = setTimeout(() => {
+      idleAborted = !0, controller.abort(new Error(`文本模型 ${idleSeconds} 秒没有输出`));
     }, idleMs);
-  };
-  const relay = () => {
+  }, relay = () => {
     try {
       controller.abort(outer.reason);
     } catch {
     }
   };
-  if (outer.aborted) relay();
-  else outer.addEventListener?.("abort", relay, { once: true });
-  const stop = () => {
-    if (timer) clearTimeout(timer);
-    outer.removeEventListener?.("abort", relay);
-  };
-  const stream = options.stream !== false;
+  outer.aborted ? relay() : outer.addEventListener?.("abort", relay, { once: !0 });
+  let stop = () => {
+    timer && clearTimeout(timer), outer.removeEventListener?.("abort", relay);
+  }, stream = options.stream !== !1;
   bump();
   let response;
   try {
@@ -9984,7 +7945,7 @@ async function writeScript(config, brief2, options = {}) {
         model,
         temperature: 0.6,
         max_tokens: textMaxTokens(brief2?.segments),
-        ...stream ? { stream: true, stream_options: { include_usage: true } } : {},
+        ...stream ? { stream: !0, stream_options: { include_usage: !0 } } : {},
         messages: [
           { role: "system", content: "你只输出 Markdown 剧本正文，不解释过程，不使用代码块。" },
           { role: "user", content: scriptPrompt(brief2) }
@@ -9993,38 +7954,28 @@ async function writeScript(config, brief2, options = {}) {
       signal: controller.signal
     });
   } catch (error) {
-    stop();
-    if (idleAborted) throw new Error(`文本模型 ${idleSeconds} 秒没有输出，已中止本次写脚本：可以重试，或在设置页换一个文本模型。`);
-    throw new Error(`文本模型没有返回结果：${String(error?.message || "请求失败").slice(0, 120)}`);
+    throw stop(), idleAborted ? new Error(`文本模型 ${idleSeconds} 秒没有输出，已中止本次写脚本：可以重试，或在设置页换一个文本模型。`) : new Error(`文本模型没有返回结果：${String(error?.message || "请求失败").slice(0, 120)}`);
   }
-  const type = String(response.headers?.get?.("content-type") || "");
-  const incremental = Boolean(stream && response.body && typeof response.body.getReader === "function" && (!type || type.includes("event-stream")));
-  let content = "", usage = null, spoken = "", truncated = false;
+  let type = String(response.headers?.get?.("content-type") || ""), incremental = !!(stream && response.body && typeof response.body.getReader == "function" && (!type || type.includes("event-stream"))), content = "", usage = null, spoken = "", truncated = !1;
   try {
     if (incremental) {
-      const read = await readStream(response, bump, options.onProgress);
+      let read = await readStream(response, bump, options.onProgress);
       if (read.failure) throw new Error(`文本模型调用失败：${read.failure.slice(0, 200)}`);
       if (!response.ok) throw new Error(`文本模型调用失败：${response.status}`);
-      content = read.content;
-      usage = read.usage;
-      spoken = read.model;
-      truncated = read.truncated;
+      content = read.content, usage = read.usage, spoken = read.model, truncated = read.truncated;
     } else {
-      const body = await response.json().catch(() => null);
+      let body = await response.json().catch(() => null);
       if (!response.ok || body?.error) throw new Error(`文本模型调用失败：${String(body?.error?.message || body?.error || response.status).slice(0, 200)}`);
-      content = contentOf(body?.choices?.[0]?.message);
-      usage = body?.usage ? tokenUsage(body.usage) : null;
-      spoken = String(body?.model || "");
-      truncated = body?.choices?.[0]?.finish_reason === "length";
+      content = contentOf(body?.choices?.[0]?.message), usage = body?.usage ? tokenUsage(body.usage) : null, spoken = String(body?.model || ""), truncated = body?.choices?.[0]?.finish_reason === "length";
     }
   } catch (error) {
     if (idleAborted) throw new Error(`文本模型 ${idleSeconds} 秒没有输出，已中止本次写脚本：可以重试，或在设置页换一个文本模型。`);
-    const message = String(error?.message || "请求失败");
+    let message = String(error?.message || "请求失败");
     throw new Error(message.startsWith("文本模型") ? message : `文本模型写脚本失败：${message.slice(0, 160)}`);
   } finally {
     stop();
   }
-  const script = stripFence(content);
+  let script = stripFence(content);
   if (!script) throw new Error("文本模型返回了空脚本，请重试或换个文本模型。");
   return { script, model: spoken || model, usage: usage || { promptTokens: 0, completionTokens: 0 }, truncated, characters: script.length };
 }
@@ -10033,32 +7984,23 @@ async function writeScript(config, brief2, options = {}) {
 init_config();
 init_connection();
 import { rm as rm9, mkdir as mkdir14, writeFile as writeFile11, rename as rename12, stat as stat9, copyFile as copyFile2 } from "node:fs/promises";
-import path22 from "node:path";
+import path21 from "node:path";
 function evenNumber(value, fallback) {
-  const number2 = Number(value);
+  let number2 = Number(value);
   if (!Number.isFinite(number2) || number2 <= 0) return fallback;
-  const rounded = Math.round(number2);
-  const even = rounded % 2 === 0 ? rounded : rounded - 1;
+  let rounded = Math.round(number2), even = rounded % 2 === 0 ? rounded : rounded - 1;
   return even >= 2 ? even : 2;
 }
 var AUDIO_PADDING_TOLERANCE_FRAMES = 1;
 async function alignSegmentAudio(config, files, probed, outPath, { signal, binary } = {}) {
-  const temps = [];
-  const trimmed = [];
-  const aligned = [];
-  for (const [index, file] of files.entries()) {
-    const media = probed?.[index];
-    const fps = Math.max(1, Math.round(media?.fps || 30));
-    const videoSeconds = Number(media?.videoDurationSeconds) || 0;
-    const audioSeconds = Number(media?.audioDurationSeconds) || 0;
-    const padding = audioSeconds - videoSeconds;
-    const isLast = index === files.length - 1;
-    if (isLast || !media?.hasAudio || videoSeconds <= 0 || padding <= AUDIO_PADDING_TOLERANCE_FRAMES / fps) {
+  let temps = [], trimmed = [], aligned = [];
+  for (let [index, file] of files.entries()) {
+    let media = probed?.[index], fps = Math.max(1, Math.round(media?.fps || 30)), videoSeconds = Number(media?.videoDurationSeconds) || 0, padding = (Number(media?.audioDurationSeconds) || 0) - videoSeconds;
+    if (index === files.length - 1 || !media?.hasAudio || videoSeconds <= 0 || padding <= AUDIO_PADDING_TOLERANCE_FRAMES / fps) {
       aligned.push(file);
       continue;
     }
-    const temp = `${outPath}.${uniqueSuffix(`align${index + 1}`)}.mp4`;
-    const { code } = await runProcess(
+    let temp = `${outPath}.${uniqueSuffix(`align${index + 1}`)}.mp4`, { code } = await runProcess(
       binary || resolveBinary(config, "ffmpegBinary", "ffmpeg"),
       [
         "-y",
@@ -10080,30 +8022,19 @@ async function alignSegmentAudio(config, files, probed, outPath, { signal, binar
       ],
       { signal }
     );
-    if (code === 0 && await exists(temp)) {
-      temps.push(temp);
-      trimmed.push({ index: index + 1, paddingSeconds: Number(padding.toFixed(3)) });
-      aligned.push(temp);
-    } else {
-      await rm9(temp, { force: true });
-      aligned.push(file);
-    }
+    code === 0 && await exists(temp) ? (temps.push(temp), trimmed.push({ index: index + 1, paddingSeconds: Number(padding.toFixed(3)) }), aligned.push(temp)) : (await rm9(temp, { force: !0 }), aligned.push(file));
   }
   return { files: aligned, temps, trimmed };
 }
 async function cleanupSegmentTemps(temps) {
-  for (const temp of temps || []) await rm9(temp, { force: true });
+  for (let temp of temps || []) await rm9(temp, { force: !0 });
 }
 async function mergeClips(config, files, outPath, { signal } = {}) {
-  const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-  await mkdir14(path22.dirname(outPath), { recursive: true });
-  const work = `${outPath}.${uniqueSuffix("work")}.mp4`;
-  let copyError = "";
-  const probed = [];
-  for (const file of files) probed.push(await probeMedia(file, config, signal));
-  const videos = probed.filter((media) => media && media.width && media.height);
-  const paramsMatch = videos.length !== probed.length || videos.every((media) => media.width === videos[0].width && media.height === videos[0].height);
-  const { files: aligned, temps, trimmed } = await alignSegmentAudio(
+  let binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
+  await mkdir14(path21.dirname(outPath), { recursive: !0 });
+  let work = `${outPath}.${uniqueSuffix("work")}.mp4`, copyError = "", probed = [];
+  for (let file of files) probed.push(await probeMedia(file, config, signal));
+  let videos = probed.filter((media) => media && media.width && media.height), paramsMatch = videos.length !== probed.length || videos.every((media) => media.width === videos[0].width && media.height === videos[0].height), { files: aligned, temps, trimmed } = await alignSegmentAudio(
     config,
     files,
     probed,
@@ -10112,14 +8043,13 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
   );
   files = aligned;
   try {
-    const mergeMode = ref(config, "mergeMode", "copy");
-    if (mergeMode !== "reencode" && paramsMatch && probed.every((m) => typeof m?.hasAudio === "boolean" && m.hasAudio === probed[0]?.hasAudio)) {
-      const listPath = `${work}.concat.txt`;
-      const lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join("\n");
+    if (ref(config, "mergeMode", "copy") !== "reencode" && paramsMatch && probed.every((m) => typeof m?.hasAudio == "boolean" && m.hasAudio === probed[0]?.hasAudio)) {
+      let listPath = `${work}.concat.txt`, lines = files.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join(`
+`);
       await writeFile11(listPath, `${lines}
 `, "utf8");
       try {
-        const { code: code2, stderr: stderr2 } = await runProcess(binary, [
+        let { code: code2, stderr: stderr2 } = await runProcess(binary, [
           "-y",
           "-f",
           "concat",
@@ -10133,90 +8063,59 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
           "+faststart",
           work
         ], { signal });
-        if (code2 === 0 && await exists(work)) {
-          await rename12(work, outPath);
-          return { path: outPath, mode: "copy", trimmed };
-        }
+        if (code2 === 0 && await exists(work))
+          return await rename12(work, outPath), { path: outPath, mode: "copy", trimmed };
         copyError = stderr2.trim().slice(-400);
       } finally {
-        await rm9(listPath, { force: true });
+        await rm9(listPath, { force: !0 });
       }
-    } else if (!paramsMatch) {
-      copyError = "分段分辨率不一致，跳过无损拼接。";
-    }
-    const first = probed.find((media) => media && media.width && media.height) || {};
-    const width = evenNumber(first.width, 1280);
-    const height = evenNumber(first.height, 720);
-    const fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
-    if (probed.some((m) => typeof m?.hasAudio !== "boolean")) throw Object.assign(new Error("无法确认各段音轨，已保留原分段；请恢复ffprobe后重试合并，不重新生成。"), { code: "audio_probe_required" });
-    const withAudio = probed.some((media) => media.hasAudio);
-    const videoParts = files.map((_, index) => `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},setpts=PTS-STARTPTS[v${index}]`);
-    const videoInputs = files.map((_, index) => `[v${index}]`).join("");
+    } else paramsMatch || (copyError = "分段分辨率不一致，跳过无损拼接。");
+    let first = probed.find((media) => media && media.width && media.height) || {}, width = evenNumber(first.width, 1280), height = evenNumber(first.height, 720), fps = Math.min(60, Math.max(24, Math.round(first.fps || 30)));
+    if (probed.some((m) => typeof m?.hasAudio != "boolean")) throw Object.assign(new Error("无法确认各段音轨，已保留原分段；请恢复ffprobe后重试合并，不重新生成。"), { code: "audio_probe_required" });
+    let withAudio = probed.some((media) => media.hasAudio), videoParts = files.map((_, index) => `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},setpts=PTS-STARTPTS[v${index}]`), videoInputs = files.map((_, index) => `[v${index}]`).join("");
     async function encode(filter2, maps, withAudioTrack) {
-      await rm9(work, { force: true });
-      const args = ["-y"];
-      for (const file of files) args.push("-i", file);
-      args.push("-filter_complex", filter2, ...maps, "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p");
-      if (withAudioTrack) args.push("-c:a", "aac", "-b:a", "192k");
-      args.push("-movflags", "+faststart", work);
-      return runProcess(binary, args, { signal });
+      await rm9(work, { force: !0 });
+      let args = ["-y"];
+      for (let file of files) args.push("-i", file);
+      return args.push("-filter_complex", filter2, ...maps, "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p"), withAudioTrack && args.push("-c:a", "aac", "-b:a", "192k"), args.push("-movflags", "+faststart", work), runProcess(binary, args, { signal });
     }
     if (withAudio) {
-      const audioParts = files.map((_, index) => {
-        const duration = Number(probed[index]?.videoDurationSeconds || probed[index]?.durationSeconds);
+      let audioParts = files.map((_, index) => {
+        let duration = Number(probed[index]?.videoDurationSeconds || probed[index]?.durationSeconds);
         if (!Number.isFinite(duration) || duration <= 0) throw Object.assign(new Error("缺少可靠的分段时长，无法安全对齐音频；保留分段，请修复探测后重试合并。"), { code: "audio_duration_required" });
-        const source = probed[index].hasAudio ? `[${index}:a]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,apad` : "anullsrc=r=48000:cl=stereo";
-        return `${source},atrim=duration=${duration},asetpts=PTS-STARTPTS[a${index}]`;
-      });
-      const pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join("");
-      const filter2 = [
+        return `${probed[index].hasAudio ? `[${index}:a]aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,apad` : "anullsrc=r=48000:cl=stereo"},atrim=duration=${duration},asetpts=PTS-STARTPTS[a${index}]`;
+      }), pairedInputs = files.map((_, index) => `[v${index}][a${index}]`).join(""), filter2 = [
         ...videoParts,
         ...audioParts,
         `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`
-      ].join(";");
-      const { code: code2, stderr: stderr2 } = await encode(filter2, ["-map", "[v]", "-map", "[a]"], true);
-      if (code2 === 0 && await exists(work)) {
-        await rename12(work, outPath);
-        return { path: outPath, mode: "reencode", trimmed };
-      }
+      ].join(";"), { code: code2 } = await encode(filter2, ["-map", "[v]", "-map", "[a]"], !0);
+      if (code2 === 0 && await exists(work))
+        return await rename12(work, outPath), { path: outPath, mode: "reencode", trimmed };
       throw Object.assign(new Error("音频合并失败，已保留原分段及已有成片；请重试合并，不会自动输出无声成片。"), { code: "audio_merge_failed" });
     }
-    const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(";");
-    const { code, stderr } = await encode(filter, ["-map", "[v]"], false);
-    if (code === 0 && await exists(work)) {
-      await rename12(work, outPath);
-      return { path: outPath, mode: "reencode", trimmed };
-    }
-    const detail = [copyError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
+    let filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(";"), { code, stderr } = await encode(filter, ["-map", "[v]"], !1);
+    if (code === 0 && await exists(work))
+      return await rename12(work, outPath), { path: outPath, mode: "reencode", trimmed };
+    let detail = [copyError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
     throw Object.assign(new Error(`ffmpeg 合并失败：${detail || "未知错误"}`), { code: "ffmpeg_failed" });
   } finally {
     await cleanupSegmentTemps([...temps, work]);
   }
 }
 async function prepareSeamTrims(config, files, outPath, { signal } = {}) {
-  const requested = ref(config, "seamTrimSeconds", "");
-  const trims = String(requested || "").trim() ? String(requested).split(",").map((value) => Number(value.trim())) : [];
-  if (trims.some((value) => !Number.isFinite(value) || value < 0 || value > 3)) {
+  let requested = ref(config, "seamTrimSeconds", ""), trims = String(requested || "").trim() ? String(requested).split(",").map((value) => Number(value.trim())) : [];
+  if (trims.some((value) => !Number.isFinite(value) || value < 0 || value > 3))
     throw new Error("seamTrimSeconds 必须为逗号分隔的 0–3 秒数值，例如 0.5,0；分别对应第 2、3 段开头。");
-  }
-  const prepared = [...files];
-  const temps = [];
-  const cuts = [];
+  let prepared = [...files], temps = [], cuts = [];
   try {
     for (let index = 0; index < files.length; index++) {
-      const official = !isOmniExtendModel(resolveModel(config)) && files.length > 1 && !trims.length;
-      const secondsRequested = index > 0 ? trims[index - 1] || 0 : 0;
+      let official = !isOmniExtendModel(resolveModel(config)) && files.length > 1 && !trims.length, secondsRequested = index > 0 && trims[index - 1] || 0;
       if (!official && !secondsRequested) continue;
-      const media = await probeMedia(files[index], config, signal);
-      const duration = Number(media?.videoDurationSeconds || media?.durationSeconds);
-      const fps = Number(media?.fps) || 24;
-      const seconds = official ? index > 0 ? 1 / fps : 0 : secondsRequested;
-      const tailSeconds = official && index < files.length - 1 ? 6 / fps : 0;
-      const keptSeconds = duration - seconds - tailSeconds;
+      let media = await probeMedia(files[index], config, signal), duration = Number(media?.videoDurationSeconds || media?.durationSeconds), fps = Number(media?.fps) || 24, seconds = official ? index > 0 ? 1 / fps : 0 : secondsRequested, tailSeconds = official && index < files.length - 1 ? 6 / fps : 0, keptSeconds = duration - seconds - tailSeconds;
       if (!(keptSeconds > 0.5)) throw new Error(`第 ${index + 1} 段裁剪后不足 0.5 秒，已停止合并。`);
-      const temp = `${outPath}.${uniqueSuffix(`cut${index + 1}`)}.mp4`;
+      let temp = `${outPath}.${uniqueSuffix(`cut${index + 1}`)}.mp4`;
       temps.push(temp);
-      const result = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
+      let result = await runProcess(resolveBinary(config, "ffmpegBinary", "ffmpeg"), [
         "-y",
         "-i",
         files[index],
@@ -10241,23 +8140,18 @@ async function prepareSeamTrims(config, files, outPath, { signal } = {}) {
         temp
       ], { signal });
       if (result.code !== 0) throw new Error(`第 ${index + 1} 段接缝裁剪失败：${tail(result.stderr)}`);
-      prepared[index] = temp;
-      cuts.push({ index: index + 1, seconds, tailSeconds });
+      prepared[index] = temp, cuts.push({ index: index + 1, seconds, tailSeconds });
     }
     return { files: prepared, temps, cuts };
   } catch (error) {
-    await cleanupSegmentTemps(temps);
-    throw error;
+    throw await cleanupSegmentTemps(temps), error;
   }
 }
 var SEGMENT_TASK_CONCURRENCY = 4;
 async function mapLimit(items, limit, worker) {
-  const results = new Array(items.length);
-  let cursor = 0;
-  let failure;
-  const runner = async () => {
-    while (cursor < items.length && !failure) {
-      const index = cursor++;
+  let results = new Array(items.length), cursor = 0, failure, runner = async () => {
+    for (; cursor < items.length && !failure; ) {
+      let index = cursor++;
       try {
         results[index] = await worker(items[index], index);
       } catch (error) {
@@ -10265,8 +8159,7 @@ async function mapLimit(items, limit, worker) {
       }
     }
   };
-  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, runner));
-  if (failure) throw failure;
+  if (await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, runner)), failure) throw failure;
   return results;
 }
 async function downloadSegmentsAndMerge(config, {
@@ -10275,112 +8168,83 @@ async function downloadSegmentsAndMerge(config, {
   outDir,
   stamp,
   notes = [],
-  keepSingleFile = false,
+  keepSingleFile = !1,
   signal
 }) {
-  const files = [];
-  const deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0);
-  const ffmpegReady = segments.length > 1 ? await hasFfmpeg(config, signal) : true;
-  let probeWarned = false;
-  const destOf = (segment) => path22.join(
+  let files = [], deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0), ffmpegReady = segments.length > 1 ? await hasFfmpeg(config, signal) : !0, probeWarned = !1, destOf = (segment) => path21.join(
     segmentsDir,
     `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`
-  );
-  const downloaded = await mapLimit(segments, SEGMENT_TASK_CONCURRENCY, async (segment) => {
-    const dest = destOf(segment);
+  ), downloaded = await mapLimit(segments, SEGMENT_TASK_CONCURRENCY, async (segment) => {
+    let dest = destOf(segment);
     try {
-      if (!await exists(dest)) {
-        await timedStage("segment_download", () => downloadFile(segment.videoUrl, dest, { signal }));
-      }
-      return { dest };
+      return await exists(dest) || await timedStage("segment_download", () => downloadFile(segment.videoUrl, dest, { signal })), { dest };
     } catch (failure) {
       if (failure?.code === "ABORTED") throw failure;
       return { failure };
     }
-  });
-  const failed = downloaded.find((item) => item.failure);
+  }), failed = downloaded.find((item) => item.failure);
   if (failed) {
-    for (const [index, item] of downloaded.entries()) {
-      if (!item?.dest) continue;
-      segments[index].localPath = item.dest;
-      files.push(item.dest);
-    }
-    const reason = `分段已生成，但下载失败：${failed.failure?.message || failed.failure}`;
-    notes.push(reason);
-    return { files, segmentsDir, deliveredSeconds, error: reason };
+    for (let [index, item] of downloaded.entries())
+      item?.dest && (segments[index].localPath = item.dest, files.push(item.dest));
+    let reason = `分段已生成，但下载失败：${failed.failure?.message || failed.failure}`;
+    return notes.push(reason), { files, segmentsDir, deliveredSeconds, error: reason };
   }
-  const dests = downloaded.map((item) => item.dest);
-  const probed = await mapLimit(
+  let dests = downloaded.map((item) => item.dest), probed = await mapLimit(
     dests,
     SEGMENT_TASK_CONCURRENCY,
     (dest) => timedStage("segment_probe", () => probeMedia(dest, config, signal))
   );
-  for (const [index, segment] of segments.entries()) {
-    const dest = dests[index];
-    segment.localPath = dest;
-    await appendRequestLog({
+  for (let [index, segment] of segments.entries()) {
+    let dest = dests[index];
+    segment.localPath = dest, await appendRequestLog({
       event: "segment_saved",
       index: segment.index,
       taskId: segment.taskId,
       path: dest,
       bytes: (await stat9(dest)).size
     });
-    const media = probed[index];
+    let media = probed[index];
     if (media?.durationSeconds) {
       segment.durationSeconds = Number(media.durationSeconds.toFixed(2));
-      const cumulative = segments.slice(0, index + 1).reduce((sum, item) => sum + (item.seconds || 0), 0);
-      const tolerance = Math.max(
+      let cumulative = segments.slice(0, index + 1).reduce((sum, item) => sum + (item.seconds || 0), 0), tolerance = Math.max(
         CUMULATIVE_TOLERANCE_MIN_SECONDS,
         cumulative * CUMULATIVE_TOLERANCE_RATIO
       );
-      const looksCumulative = segment.kind === "extend" && files.length > 0 && Math.abs(media.durationSeconds - cumulative) <= tolerance && Math.abs(media.durationSeconds - segment.seconds) > tolerance;
-      if (looksCumulative) {
-        await appendRequestLog({ event: "cumulative_output_detected", index: segment.index, duration: media.durationSeconds, plannedCumulative: cumulative });
-        files.length = 0;
-        notes.push(
-          `第 ${segment.index} 段实测 ${formatSeconds(media.durationSeconds)} 秒，接近累计时长 ${cumulative} 秒，按「上游返回的是累计成片」处理。`
-        );
-      }
-    } else if (!probeWarned) {
-      probeWarned = true;
-      notes.push("没有可用的 ffprobe，无法探测分段时长，按「每段都是增量片段」直接拼接。");
-    }
+      segment.kind === "extend" && files.length > 0 && Math.abs(media.durationSeconds - cumulative) <= tolerance && Math.abs(media.durationSeconds - segment.seconds) > tolerance && (await appendRequestLog({ event: "cumulative_output_detected", index: segment.index, duration: media.durationSeconds, plannedCumulative: cumulative }), files.length = 0, notes.push(
+        `第 ${segment.index} 段实测 ${formatSeconds(media.durationSeconds)} 秒，接近累计时长 ${cumulative} 秒，按「上游返回的是累计成片」处理。`
+      ));
+    } else probeWarned || (probeWarned = !0, notes.push("没有可用的 ffprobe，无法探测分段时长，按「每段都是增量片段」直接拼接。"));
     files.push(dest);
   }
   if (!files.length) return { files, segmentsDir, deliveredSeconds };
   if (!ffmpegReady && files.length > 1) {
-    const guide = ffmpegInstallHint(config);
-    notes.push(`分段文件都已下载到 ${segmentsDir}。`);
-    notes.push(guide.hint);
-    return {
+    let guide = ffmpegInstallHint(config);
+    return notes.push(`分段文件都已下载到 ${segmentsDir}。`), notes.push(guide.hint), {
       files,
       segmentsDir,
       deliveredSeconds,
-      merged: false,
-      ffmpegMissing: true,
+      merged: !1,
+      ffmpegMissing: !0,
       installHint: guide.hint
     };
   }
-  const finalPath = path22.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
+  let finalPath = path21.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
   try {
-    if (files.length === 1 && keepSingleFile) {
-      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "segment", videoPath: files[0] };
-    }
+    if (files.length === 1 && keepSingleFile)
+      return { files, segmentsDir, deliveredSeconds, merged: !0, mergeMode: "segment", videoPath: files[0] };
     if (files.length === 1) {
-      await mkdir14(path22.dirname(finalPath), { recursive: true });
-      const copy = `${finalPath}.${uniqueSuffix("copy")}.mp4`;
+      await mkdir14(path21.dirname(finalPath), { recursive: !0 });
+      let copy = `${finalPath}.${uniqueSuffix("copy")}.mp4`;
       try {
-        await copyFile2(files[0], copy);
-        await rename12(copy, finalPath);
+        await copyFile2(files[0], copy), await rename12(copy, finalPath);
       } finally {
-        await rm9(copy, { force: true }).catch(() => {
+        await rm9(copy, { force: !0 }).catch(() => {
         });
       }
-      await appendRequestLog({ event: "delivery_copied", sourcePath: files[0], videoPath: finalPath });
-      return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: "single", videoPath: finalPath };
+      return await appendRequestLog({ event: "delivery_copied", sourcePath: files[0], videoPath: finalPath }), { files, segmentsDir, deliveredSeconds, merged: !0, mergeMode: "single", videoPath: finalPath };
     }
     await appendRequestLog({ event: "merge_started", inputPaths: files, videoPath: finalPath });
-    const prepared = await timedStage("seam_prepare", () => prepareSeamTrims(config, files, finalPath, { signal }));
+    let prepared = await timedStage("seam_prepare", () => prepareSeamTrims(config, files, finalPath, { signal }));
     await appendRequestLog({ event: "seam_trims_prepared", cuts: prepared.cuts });
     let merged;
     try {
@@ -10388,81 +8252,61 @@ async function downloadSegmentsAndMerge(config, {
     } finally {
       await cleanupSegmentTemps(prepared.temps);
     }
-    if (prepared.cuts.length) {
-      notes.push(`已按${String(ref(config, "seamTrimSeconds", "")).trim() ? "手动设置" : "模型默认策略"}裁剪接缝：${prepared.cuts.map((cut) => `第 ${cut.index} 段：头部 ${cut.seconds.toFixed(3)} 秒、尾部 ${cut.tailSeconds.toFixed(3)} 秒`).join("；")}。原始分段未改动；实际成片会缩短，不补帧凑时长。`);
-    }
-    const actual = await probeMedia(finalPath, config, signal);
-    await appendRequestLog({
+    prepared.cuts.length && notes.push(`已按${String(ref(config, "seamTrimSeconds", "")).trim() ? "手动设置" : "模型默认策略"}裁剪接缝：${prepared.cuts.map((cut) => `第 ${cut.index} 段：头部 ${cut.seconds.toFixed(3)} 秒、尾部 ${cut.tailSeconds.toFixed(3)} 秒`).join("；")}。原始分段未改动；实际成片会缩短，不补帧凑时长。`);
+    let actual = await probeMedia(finalPath, config, signal);
+    return await appendRequestLog({
       event: "merge_completed",
       videoPath: finalPath,
       mode: merged.mode,
       actualSeconds: actual?.durationSeconds,
       sourceCount: segments.length
-    });
-    if (merged.trimmed?.length) {
-      notes.push(
-        `第 ${merged.trimmed.map((item) => item.index).join("、")} 段的音频比视频长（最长 ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} 秒），已裁齐后再拼接，避免接缝处缺一小段画面。`
-      );
-    }
-    return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: merged.mode, videoPath: finalPath, seamCuts: prepared.cuts, actualSeconds: actual?.durationSeconds };
+    }), merged.trimmed?.length && notes.push(
+      `第 ${merged.trimmed.map((item) => item.index).join("、")} 段的音频比视频长（最长 ${Math.max(...merged.trimmed.map((item) => item.paddingSeconds))} 秒），已裁齐后再拼接，避免接缝处缺一小段画面。`
+    ), { files, segmentsDir, deliveredSeconds, merged: !0, mergeMode: merged.mode, videoPath: finalPath, seamCuts: prepared.cuts, actualSeconds: actual?.durationSeconds };
   } catch (failure) {
     if (failure?.code === "ABORTED") throw failure;
-    let reason = `分段已生成，但合并失败：${failure?.message || failure}`;
-    let installHint;
+    let reason = `分段已生成，但合并失败：${failure?.message || failure}`, installHint;
     if (failure?.code === "ffmpeg_missing") {
-      const guide = ffmpegInstallHint(config);
-      installHint = guide.hint;
-      reason = guide.hint;
+      let guide = ffmpegInstallHint(config);
+      installHint = guide.hint, reason = guide.hint;
     }
-    notes.push(reason);
-    await appendRequestLog({ event: "merge_failed", errorCode: String(failure?.code || "merge_error"), segmentsDir });
-    return { files, segmentsDir, deliveredSeconds, error: reason, ffmpegMissing: Boolean(installHint), installHint };
+    return notes.push(reason), await appendRequestLog({ event: "merge_failed", errorCode: String(failure?.code || "merge_error"), segmentsDir }), { files, segmentsDir, deliveredSeconds, error: reason, ffmpegMissing: !!installHint, installHint };
   }
 }
 
 // src/businesses/video-generation/integrations/canvas-native.ts
 init_config();
-var hash3 = (value) => createHash14("sha256").update(JSON.stringify(value)).digest("hex");
-var validToken = (value) => /^[a-f0-9-]{36}$/.test(String(value || ""));
-var terminal = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled"]);
+var hash3 = (value) => createHash13("sha256").update(JSON.stringify(value)).digest("hex"), validToken = (value) => /^[a-f0-9-]{36}$/.test(String(value || "")), terminal = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled"]);
 function splitEvenly(items, count) {
-  const groups = [];
-  const total = items.reduce((sum, item) => sum + item.length, 0);
-  let index = 0, used = 0;
+  let groups = [], total = items.reduce((sum, item) => sum + item.length, 0), index = 0, used = 0;
   for (let group = 0; group < count; group += 1) {
-    const target = total * (group + 1) / count;
-    const current = [];
-    while (index < items.length && items.length - index >= count - group && (current.length === 0 || used < target)) {
-      current.push(items[index]);
-      used += items[index].length;
-      index += 1;
-    }
+    let target = total * (group + 1) / count, current = [];
+    for (; index < items.length && items.length - index >= count - group && (current.length === 0 || used < target); )
+      current.push(items[index]), used += items[index].length, index += 1;
     groups.push(current);
   }
-  while (index < items.length) groups[count - 1].push(items[index++]);
+  for (; index < items.length; ) groups[count - 1].push(items[index++]);
   return groups;
 }
 function latestVideoResult(doc, nodeId) {
-  const made = Object.values(doc?.nodes || {}).filter((node) => node?.type === "video" && String(node?.metaonticSourceNode || "") === String(nodeId) && (node?.data?.assetId || node?.data?.metaonticVideoUrl));
+  let made = Object.values(doc?.nodes || {}).filter((node) => node?.type === "video" && String(node?.metaonticSourceNode || "") === String(nodeId) && (node?.data?.assetId || node?.data?.metaonticVideoUrl));
   made.sort((a, b) => Number(a?.metaonticCreatedAt || 0) - Number(b?.metaonticCreatedAt || 0));
-  const latest = made[made.length - 1];
-  if (!latest) return null;
-  return {
+  let latest = made[made.length - 1];
+  return latest ? {
     id: latest.id,
     assetId: String(latest.data?.assetId || ""),
     url: String(latest.data?.metaonticVideoUrl || ""),
     seconds: Number(latest.data?.metaonticSeconds ?? latest.data?.duration ?? 0) || null
-  };
+  } : null;
 }
 function chainCost(segments) {
-  const billed = (segments || []).filter((segment) => !segment?.skip);
+  let billed = (segments || []).filter((segment) => !segment?.skip);
   return billed.every((segment) => segment.cny !== null) ? billed.reduce((sum, segment) => sum + segment.cny, 0) : null;
 }
 function filmSegments(doc) {
-  const segments = [], missing = [];
-  for (const [index, node] of pendingVideoOrder(doc).entries()) {
-    const label = String(node?.label || `第${index + 1}段`);
-    const latest = latestVideoResult(doc, node.id);
+  let segments = [], missing = [];
+  for (let [index, node] of pendingVideoOrder(doc).entries()) {
+    let label = String(node?.label || `第${index + 1}段`), latest = latestVideoResult(doc, node.id);
     if (!latest) {
       missing.push(label);
       continue;
@@ -10473,49 +8317,44 @@ function filmSegments(doc) {
 }
 var mediaUrl = (assetId) => `/metaontic-video/canvas-media?assetId=${encodeURIComponent(String(assetId || ""))}`;
 function shotPrompt(shot) {
-  const visual = String(shot?.visual || shot?.title || "").trim();
-  const field = (labels) => {
-    for (const part of visual.split(/\r?\n/).map((x) => x.trim())) {
-      const matched = part.match(/^([^：:]+?)[：:]\s*([\s\S]*)$/);
+  let visual = String(shot?.visual || shot?.title || "").trim(), field = (labels) => {
+    for (let part of visual.split(/\r?\n/).map((x) => x.trim())) {
+      let matched = part.match(/^([^：:]+?)[：:]\s*([\s\S]*)$/);
       if (matched && labels.test(matched[1].trim())) return matched[2].trim();
     }
     return "";
-  };
-  const framing = field(/景别|镜别|shot\s*size/i), view = field(/视角|机位角度|view\s*angle|angle|perspective/i), camera = field(/运镜|camera|movement/i), scene = field(/画面|visual|详情|描述/i);
-  if (framing || view || camera) return [framing && `镜别：${framing}`, view && `视角：${view}`, camera && `运镜：${camera}`, scene && `画面：${scene}`].filter(Boolean).join("\n");
-  const line = visual.split(/\r?\n/).map((part) => part.trim()).find((part) => /^(?:画面|visual)[:：]/.test(part));
+  }, framing = field(/景别|镜别|shot\s*size/i), view = field(/视角|机位角度|view\s*angle|angle|perspective/i), camera = field(/运镜|camera|movement/i), scene = field(/画面|visual|详情|描述/i);
+  if (framing || view || camera) return [framing && `镜别：${framing}`, view && `视角：${view}`, camera && `运镜：${camera}`, scene && `画面：${scene}`].filter(Boolean).join(`
+`);
+  let line = visual.split(/\r?\n/).map((part) => part.trim()).find((part) => /^(?:画面|visual)[:：]/.test(part));
   return (line ? line.replace(/^(?:画面|visual)[:：]\s*/, "") : visual).trim();
 }
 function splitScriptPrompts(script, count, shots = []) {
-  const raw = String(script ?? "").trim();
+  let raw = String(script ?? "").trim();
   if (!raw) throw new Error("请先写下脚本内容，再生成制作节点。");
   if (!Number.isInteger(count) || count < 1) throw new Error("分段数量无效。");
-  const visuals = (Array.isArray(shots) ? shots : []).map(shotPrompt).filter(Boolean);
-  if (visuals.length >= count && count > 1) return splitEvenly(visuals, count).map((group) => group.join("\n"));
-  const body = canvasScriptPreview(raw);
+  let visuals = (Array.isArray(shots) ? shots : []).map(shotPrompt).filter(Boolean);
+  if (visuals.length >= count && count > 1) return splitEvenly(visuals, count).map((group) => group.join(`
+`));
+  let body = canvasScriptPreview(raw);
   if (!body) throw new Error("脚本里没有可用于制作的正文，请补充内容。");
   if (count === 1) return [body];
-  const sentences = body.split(/(?<=[。！？!?；;])\s*|\s*\n+/).map((part) => part.trim()).filter(Boolean);
+  let sentences = body.split(/(?<=[。！？!?；;])\s*|\s*\n+/).map((part) => part.trim()).filter(Boolean);
   if (sentences.length < count) throw new Error(`脚本正文只够拆成 ${sentences.length} 段，请补充脚本或缩短目标时长。`);
   return splitEvenly(sentences, count).map((group) => group.join(""));
 }
 function pendingVideoOrder(doc) {
-  const nodes = Object.values(doc?.nodes || {});
-  const author = nodes.filter((n) => n?.type === "video" && !n?.metaonticSourceNode && !n?.data?.assetId);
-  const byId = new Map(author.map((n) => [n.id, n]));
-  const inbound = new Map(author.map((n) => [n.id, []]));
-  for (const edge of doc?.edges || []) {
-    if (edge?.metaonticResult) continue;
-    if (byId.has(edge?.toNode) && byId.has(edge?.fromNode)) inbound.get(edge.toNode).push(edge.fromNode);
-  }
-  const ordered = [], seen = /* @__PURE__ */ new Set();
-  const visit = (node) => {
-    if (!node || seen.has(node.id)) return;
-    seen.add(node.id);
-    for (const up of inbound.get(node.id) || []) visit(byId.get(up));
-    ordered.push(node);
+  let author = Object.values(doc?.nodes || {}).filter((n) => n?.type === "video" && !n?.metaonticSourceNode && !n?.data?.assetId), byId = new Map(author.map((n) => [n.id, n])), inbound = new Map(author.map((n) => [n.id, []]));
+  for (let edge of doc?.edges || [])
+    edge?.metaonticResult || byId.has(edge?.toNode) && byId.has(edge?.fromNode) && inbound.get(edge.toNode).push(edge.fromNode);
+  let ordered = [], seen = /* @__PURE__ */ new Set(), visit = (node) => {
+    if (!(!node || seen.has(node.id))) {
+      seen.add(node.id);
+      for (let up of inbound.get(node.id) || []) visit(byId.get(up));
+      ordered.push(node);
+    }
   };
-  for (const node of author) visit(node);
+  for (let node of author) visit(node);
   return ordered.map((node) => ({
     id: node.id,
     label: String(node?.data?.label || "视频节点"),
@@ -10524,67 +8363,59 @@ function pendingVideoOrder(doc) {
     duration: node?.data?.duration ?? null,
     ratio: String(node?.data?.ratio || ""),
     resolution: String(node?.data?.resolution || "").toLowerCase(),
-    generateAudio: node?.data?.generateAudio === true
+    generateAudio: node?.data?.generateAudio === !0
   }));
 }
 function planCanvasNative(input, config, operation = "generate", draft = {}, carry = null) {
   if (!["generate", "extend"].includes(operation)) throw new Error("不支持的画布制作操作。");
-  const node = input.nodes.find((n) => n.id === input.canvas.nodeId);
+  let node = input.nodes.find((n) => n.id === input.canvas.nodeId);
   if (!node || !["image", "video"].includes(node.type)) throw new Error("直接制作目前支持图片和视频节点。");
   if (node.imgExtra || node.vidExtra) throw new Error("直接制作暂不支持节点扩展参数，请清空后再试；不会静默忽略。");
   if (node.type === "image" && node.imageCount !== 1) throw new Error("当前每次制作一张图片，请将节点张数设为1。");
-  const incoming = input.edges.filter((e) => e.toNode === node.id && !e.metaonticResult);
-  const texts = incoming.filter((e) => e.toPort === "prompt").map((e) => input.nodes.find((n) => n.id === e.fromNode));
+  let incoming = input.edges.filter((e) => e.toNode === node.id && !e.metaonticResult), texts = incoming.filter((e) => e.toPort === "prompt").map((e) => input.nodes.find((n) => n.id === e.fromNode));
   if (texts.some((n) => !n || !["text", "script", "storyboard"].includes(n.type))) throw new Error("提示词端口连接的节点类型暂不支持。");
   let shots = texts.flatMap((n) => n.shots || []);
   if (node.segShotFrom != null || node.segShotTo != null) {
     if (!Number.isInteger(node.segShotFrom) || !Number.isInteger(node.segShotTo) || node.segShotFrom < 0 || node.segShotTo < node.segShotFrom || node.segShotTo >= shots.length) throw new Error("分镜切段范围无效。");
     shots = shots.slice(node.segShotFrom, node.segShotTo + 1);
   }
-  const prompt = String(draft.prompt ?? [node.prompt, ...texts.map((n) => n.type === "storyboard" ? "" : n.text || n.output || n.script || n.requirement), shots.length ? JSON.stringify(shots) : ""].filter(Boolean).join("\n")).trim();
+  let prompt = String(draft.prompt ?? [node.prompt, ...texts.map((n) => n.type === "storyboard" ? "" : n.text || n.output || n.script || n.requirement), shots.length ? JSON.stringify(shots) : ""].filter(Boolean).join(`
+`)).trim();
   if (!prompt) throw new Error("请先在节点填写本次要生成的画面或续拍内容。");
   if (prompt.length > 2e4) throw new Error("提示词过长，请缩小本节点的制作范围。");
   if (/@[^@\n]+@/.test(prompt)) throw new Error("请先把@设定引用展开为明确描述，直接制作暂不自动解析设定引用。");
-  const ratio = draft.ratio ?? node.ratio;
+  let ratio = draft.ratio ?? node.ratio;
   if (!["16:9", "9:16", "1:1", "4:3", "3:4"].includes(ratio)) throw new Error("请在节点明确选择画幅后再制作。");
-  const refs2 = incoming.filter((e) => e.toPort !== "prompt");
-  const order = node.refOrder || [];
+  let refs2 = incoming.filter((e) => e.toPort !== "prompt"), order = node.refOrder || [];
   refs2.sort((a, b) => {
-    const ai = order.indexOf(a.id), bi = order.indexOf(b.id);
+    let ai = order.indexOf(a.id), bi = order.indexOf(b.id);
     return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi);
   });
-  const images = refs2.map((e) => {
+  let images = refs2.map((e) => {
     if (!["ref", "frame"].includes(e.toPort) || e.fromPort !== "out") throw new Error("当前仅支持图片out连接ref/首帧口；尾帧选取等连接请先导出为图片节点。");
-    const media = input.references.find((r) => r.nodeId === e.fromNode);
+    let media = input.references.find((r) => r.nodeId === e.fromNode);
     if (!media || media.kind !== "image") throw new Error("参考端口连的上游节点还没有生成好的图片：先在它自己的「制作」里出一张图，再回来做这一步。");
     return { port: e.toPort, path: media.path, nodeId: e.fromNode };
   });
   if (node.frameMode === "off" && images.some((x) => x.port === "frame")) throw new Error("首帧端口已连接但节点关闭了首帧，请先统一设置。");
   if (images.filter((x) => x.port === "frame").length > 1) throw new Error("一个视频节点只能绑定一张首帧。");
   if (images.some((x) => x.port === "frame") && images.some((x) => x.port === "ref")) throw new Error("当前模型不能同时使用首帧和普通参考图，请调整连接。");
-  const args = { prompt, ratio, generateAudio: draft.generateAudio === true };
+  let args = { prompt, ratio, generateAudio: draft.generateAudio === !0 };
   if (node.type === "image") {
     if (operation !== "generate") throw new Error("图片节点不能续拍。");
     if (isVolcengine(config)) throw new Error("图片直接制作需要在插件设置选择MetaOntic AI。");
     return { kind: "image", operation, args, images, model: IMAGE_MODEL, notes: ["按一次图片调用单独计费，图片为2048×2048；本版图片暂不支持其他画幅。"] };
   }
-  const duration = draft.duration ?? (shots.length ? shots.reduce((sum, s) => sum + Number(s.duration || 0), 0) : node.duration);
+  let duration = draft.duration ?? (shots.length ? shots.reduce((sum, s) => sum + Number(s.duration || 0), 0) : node.duration);
   if (!Number.isInteger(duration) || duration < 4 || duration > modelMaxSeconds(config)) throw new Error(`每个节点本次制作4–${modelMaxSeconds(config)}秒，请调整时长；长视频审核后逐节点续拍。`);
-  args.duration = duration;
-  args.resolution = String(draft.resolution ?? node.resolution).toLowerCase();
-  if (!normalizeResolution(args.resolution)) throw new Error("请在节点明确选择480P或720P。");
+  if (args.duration = duration, args.resolution = String(draft.resolution ?? node.resolution).toLowerCase(), !normalizeResolution(args.resolution)) throw new Error("请在节点明确选择480P或720P。");
   if (operation === "extend") {
-    const from2 = carry?.videoUrl ? { videoUrl: String(carry.videoUrl), seconds: Number(carry.seconds) } : null;
+    let from2 = carry?.videoUrl ? { videoUrl: String(carry.videoUrl), seconds: Number(carry.seconds) } : null;
     if (from2 ? !from2.videoUrl || !Number.isFinite(from2.seconds) || from2.seconds <= 0 : !node.metaonticTaskId || !node.metaonticVideoUrl || !Number.isFinite(node.metaonticSeconds) || node.metaonticSeconds <= 0) throw new Error("续拍需选中本插件直接制作并已审核的视频成果节点。");
-    args.videoUrl = from2 ? from2.videoUrl : node.metaonticVideoUrl;
-    args.inputVideoSeconds = from2 ? from2.seconds : node.metaonticSeconds;
-    args.transitionDescription = String(draft.transitionDescription || "").trim();
-    if (!args.transitionDescription) throw new Error("请填写上一段结尾到本段动作、镜头与声音的衔接描述。");
+    if (args.videoUrl = from2 ? from2.videoUrl : node.metaonticVideoUrl, args.inputVideoSeconds = from2 ? from2.seconds : node.metaonticSeconds, args.transitionDescription = String(draft.transitionDescription || "").trim(), !args.transitionDescription) throw new Error("请填写上一段结尾到本段动作、镜头与声音的衔接描述。");
     if (images.some((x) => x.port === "frame")) throw new Error("续拍以视频为输入，请移除首帧连接。");
-  } else {
-    args.firstFrameUrl = images.find((x) => x.port === "frame")?.path;
-    args.referenceImages = images.filter((x) => x.port === "ref").map((x) => x.path);
-  }
+  } else
+    args.firstFrameUrl = images.find((x) => x.port === "frame")?.path, args.referenceImages = images.filter((x) => x.port === "ref").map((x) => x.path);
   let estimate = null;
   try {
     estimate = estimateSegmentCosts(config, args, [{ kind: operation, seconds: duration, inputSeconds: args.inputVideoSeconds }]);
@@ -10593,41 +8424,29 @@ function planCanvasNative(input, config, operation = "generate", draft = {}, car
   return { kind: "video", operation, args, images, model: resolveModel(config), estimate, notes: ["只执行当前这一段，不自动生成角色图或重做。续拍需要先审核上一段效果。", "估价为基础公式，实际按渠道账单结算；未知价目只确认按实际调用计费。"] };
 }
 function createCanvasNativeService(liveConfig, options = {}) {
-  const load = options.load || loadCanvasAdapter;
-  const adapterFor = (link2) => options.resolve ? options.resolve(link2) : resolveCanvasAdapter(link2?.projectId, load);
-  const directory2 = options.directory || path23.join(dshHome(), DATA_DIR, "canvas-native");
-  const snapshots = /* @__PURE__ */ new Map(), running = /* @__PURE__ */ new Map(), locks3 = /* @__PURE__ */ new Set();
-  const proposals = /* @__PURE__ */ new Map();
-  const chainDirectory = options.chainDirectory || path23.join(directory2, "chains");
-  let disposed = false;
-  const file = (id) => {
+  let load = options.load || loadCanvasAdapter, adapterFor = (link2) => options.resolve ? options.resolve(link2) : resolveCanvasAdapter(link2?.projectId, load), directory2 = options.directory || path22.join(dshHome(), DATA_DIR, "canvas-native"), snapshots = /* @__PURE__ */ new Map(), running = /* @__PURE__ */ new Map(), locks3 = /* @__PURE__ */ new Set(), proposals = /* @__PURE__ */ new Map(), chainDirectory = options.chainDirectory || path22.join(directory2, "chains"), disposed = !1, file = (id) => {
     if (!validToken(id)) throw new Error("制作记录标识无效。");
-    return path23.join(directory2, `${id}.json`);
-  };
-  const pointer = (link2) => path23.join(directory2, `node-${hash3([link2.projectId, link2.canvasId || "", link2.nodeId])}.json`);
+    return path22.join(directory2, `${id}.json`);
+  }, pointer = (link2) => path22.join(directory2, `node-${hash3([link2.projectId, link2.canvasId || "", link2.nodeId])}.json`);
   async function save2(job) {
-    await mkdir15(directory2, { recursive: true, mode: 448 });
-    const dest = file(job.id), temp = `${dest}.${randomUUID11()}.tmp`;
-    await writeFile12(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
-    await rename13(temp, dest);
+    await mkdir15(directory2, { recursive: !0, mode: 448 });
+    let dest = file(job.id), temp = `${dest}.${randomUUID11()}.tmp`;
+    await writeFile12(temp, JSON.stringify(job), { mode: 384, flag: "wx" }), await rename13(temp, dest);
   }
-  const read = async (id) => JSON.parse(await readFile16(file(id), "utf8"));
-  const chainFile = (id) => {
+  let read = async (id) => JSON.parse(await readFile15(file(id), "utf8")), chainFile = (id) => {
     if (!validToken(id)) throw new Error("连拍记录标识无效。");
-    return path23.join(chainDirectory, `${id}.json`);
-  };
-  const chainPointer = (link2) => path23.join(chainDirectory, `canvas-${hash3([link2.projectId, link2.canvasId || ""])}.json`);
+    return path22.join(chainDirectory, `${id}.json`);
+  }, chainPointer = (link2) => path22.join(chainDirectory, `canvas-${hash3([link2.projectId, link2.canvasId || ""])}.json`);
   async function saveChain(chain) {
-    await mkdir15(chainDirectory, { recursive: true, mode: 448 });
-    const dest = chainFile(chain.id), temp = `${dest}.${randomUUID11()}.tmp`;
-    await writeFile12(temp, JSON.stringify(chain), { mode: 384, flag: "wx" });
-    await rename13(temp, dest);
+    await mkdir15(chainDirectory, { recursive: !0, mode: 448 });
+    let dest = chainFile(chain.id), temp = `${dest}.${randomUUID11()}.tmp`;
+    await writeFile12(temp, JSON.stringify(chain), { mode: 384, flag: "wx" }), await rename13(temp, dest);
   }
-  const readChain = async (id) => JSON.parse(await readFile16(chainFile(id), "utf8"));
+  let readChain = async (id) => JSON.parse(await readFile15(chainFile(id), "utf8"));
   async function previousChain(link2) {
     let id;
     try {
-      id = JSON.parse(await readFile16(chainPointer(link2), "utf8")).id;
+      id = JSON.parse(await readFile15(chainPointer(link2), "utf8")).id;
     } catch (e) {
       if (e.code === "ENOENT") return null;
       throw e;
@@ -10637,19 +8456,19 @@ function createCanvasNativeService(liveConfig, options = {}) {
   async function previous(link2) {
     let id;
     try {
-      id = JSON.parse(await readFile16(pointer(link2), "utf8")).id;
+      id = JSON.parse(await readFile15(pointer(link2), "utf8")).id;
     } catch (e) {
       if (e.code === "ENOENT") return null;
       throw e;
     }
     return read(id);
   }
-  const view = (job) => ({
+  let view = (job) => ({
     id: job.id,
     state: job.state === "running" && !running.has(job.id) ? "interrupted" : job.state,
     taskId: job.taskId,
     media: job.media || [],
-    reviewed: job.reviewed === true,
+    reviewed: job.reviewed === !0,
     sync: job.sync,
     message: job.message || "",
     operation: job.plan.operation
@@ -10672,22 +8491,20 @@ function createCanvasNativeService(liveConfig, options = {}) {
     await save2(job);
   }
   async function chainPlan(adapter, projectId, config) {
-    const doc = await adapter.rpc.projectsGet({ id: projectId });
+    let doc = await adapter.rpc.projectsGet({ id: projectId });
     if (!doc?.nodes) throw new Error("画布不存在或已删除。");
-    const order = pendingVideoOrder(doc);
+    let order = pendingVideoOrder(doc);
     if (!order.length) throw new Error("画布上没有待制作的视频节点：点画布空白处打开「创作流程」铺开整条流程，或新建一个视频节点。");
-    const segments = [];
-    let carry = null, carryLabel = "";
-    for (const [index, node] of order.entries()) {
-      const operation = carry ? "extend" : "generate";
-      const made = latestVideoResult(doc, node.id);
+    let segments = [], carry = null, carryLabel = "";
+    for (let [index, node] of order.entries()) {
+      let operation = carry ? "extend" : "generate", made = latestVideoResult(doc, node.id);
       if (made) {
         segments.push({
           index,
           nodeId: node.id,
           label: node.label,
           operation,
-          skip: true,
+          skip: !0,
           prompt: node.prompt,
           transition: node.transition,
           seconds: made.seconds ?? node.duration,
@@ -10697,23 +8514,18 @@ function createCanvasNativeService(liveConfig, options = {}) {
           priceDate: null,
           fingerprint: "",
           snapshot: { prompt: node.prompt, duration: node.duration, ratio: node.ratio, resolution: node.resolution }
-        });
-        carry = { videoUrl: made.url, seconds: made.seconds };
-        carryLabel = node.label;
+        }), carry = { videoUrl: made.url, seconds: made.seconds }, carryLabel = node.label;
         continue;
       }
       if (carry && !carry.videoUrl) throw new Error(`上一段「${carryLabel}」的成果没有可用的视频地址，没法作为本段的续拍输入：请在画布上核对这条成果，或删掉它再重新预览连拍方案。`);
-      const link2 = { projectId, nodeId: node.id };
-      const input = await readCanvasInput(adapter, link2);
-      const draft = { prompt: node.prompt, duration: node.duration, resolution: node.resolution, ratio: node.ratio, generateAudio: node.generateAudio };
-      if (operation === "extend") draft.transitionDescription = node.transition || node.prompt;
-      const plan = planCanvasNative(input, config, operation, draft, carry);
-      const segment = {
+      let link2 = { projectId, nodeId: node.id }, input = await readCanvasInput(adapter, link2), draft = { prompt: node.prompt, duration: node.duration, resolution: node.resolution, ratio: node.ratio, generateAudio: node.generateAudio };
+      operation === "extend" && (draft.transitionDescription = node.transition || node.prompt);
+      let plan = planCanvasNative(input, config, operation, draft, carry), segment = {
         index,
         nodeId: node.id,
         label: node.label,
         operation,
-        skip: false,
+        skip: !1,
         prompt: String(plan.args.prompt),
         transition: String(plan.args.transitionDescription || ""),
         seconds: plan.args.duration,
@@ -10724,91 +8536,61 @@ function createCanvasNativeService(liveConfig, options = {}) {
         fingerprint: input.canvas.fingerprint,
         snapshot: { prompt: node.prompt, duration: node.duration, ratio: node.ratio, resolution: node.resolution }
       };
-      segments.push(segment);
-      carry = { videoUrl: "pending-previous-segment", seconds: plan.args.duration };
-      carryLabel = node.label;
+      segments.push(segment), carry = { videoUrl: "pending-previous-segment", seconds: plan.args.duration }, carryLabel = node.label;
     }
     return segments;
   }
   function assertSegmentMatches(node, segment) {
-    const same = node && node.prompt === segment.snapshot.prompt && (node.duration ?? null) === segment.snapshot.duration && node.ratio === segment.snapshot.ratio && String(node.resolution).toLowerCase() === segment.snapshot.resolution;
-    if (!same) throw new Error(`第 ${segment.index + 1} 段内容或参数已改动，请重新预览连拍方案再开始。`);
+    if (!(node && node.prompt === segment.snapshot.prompt && (node.duration ?? null) === segment.snapshot.duration && node.ratio === segment.snapshot.ratio && String(node.resolution).toLowerCase() === segment.snapshot.resolution)) throw new Error(`第 ${segment.index + 1} 段内容或参数已改动，请重新预览连拍方案再开始。`);
   }
   async function planChainSegment(adapter, projectId, segment, carry, config) {
-    const input = await readCanvasInput(adapter, { projectId, nodeId: segment.nodeId });
-    const node = input.nodes.find((n) => n.id === segment.nodeId);
+    let input = await readCanvasInput(adapter, { projectId, nodeId: segment.nodeId }), node = input.nodes.find((n) => n.id === segment.nodeId);
     assertSegmentMatches(node, segment);
-    const draft = { prompt: segment.prompt, duration: segment.seconds, resolution: segment.resolution, ratio: segment.ratio };
-    if (segment.operation === "extend") draft.transitionDescription = segment.transition || segment.prompt;
-    return { canvas: input.canvas, plan: planCanvasNative(input, config, segment.operation, draft, carry) };
+    let draft = { prompt: segment.prompt, duration: segment.seconds, resolution: segment.resolution, ratio: segment.ratio };
+    return segment.operation === "extend" && (draft.transitionDescription = segment.transition || segment.prompt), { canvas: input.canvas, plan: planCanvasNative(input, config, segment.operation, draft, carry) };
   }
-  async function launchSegment(chain, segment, planned, config) {
-    const { canvas, plan } = planned;
-    const key = pointer(canvas);
+  async function launchSegment(chain, _segment, planned, config) {
+    let { canvas, plan } = planned, key = pointer(canvas);
     if (locks3.has(key)) throw new Error("此节点正在确认制作。");
     locks3.add(key);
     try {
-      const old = await previous(canvas);
+      let old = await previous(canvas);
       if (old && (!terminal.has(old.state) || old.media?.length && !old.reviewed || old.sync?.status === "pending")) return old;
-      const job = { version: 1, id: randomUUID11(), canvas, plan, identity: chain.identity, createdAt: Date.now(), state: "running", reviewed: false, chain: chain.id };
+      let job = { version: 1, id: randomUUID11(), canvas, plan, identity: chain.identity, createdAt: Date.now(), state: "running", reviewed: !1, chain: chain.id };
       await save2(job);
-      const temp = `${key}.${randomUUID11()}.tmp`;
-      await writeFile12(temp, JSON.stringify({ id: job.id }), { mode: 384, flag: "wx" });
-      await rename13(temp, key);
-      snapshots.set(job.id, config);
-      void perform(job, config).catch(() => {
-      });
-      return job;
+      let temp = `${key}.${randomUUID11()}.tmp`;
+      return await writeFile12(temp, JSON.stringify({ id: job.id }), { mode: 384, flag: "wx" }), await rename13(temp, key), snapshots.set(job.id, config), perform(job, config).catch(() => {
+      }), job;
     } finally {
       locks3.delete(key);
     }
   }
   async function runChainSegment(chain, config) {
-    const adapter = await adapterFor({ projectId: chain.projectId, ...chain.canvasId ? { canvasId: chain.canvasId } : {} });
-    let doc = null;
-    while (chain.index < chain.segments.length) {
-      const segment = chain.segments[chain.index];
+    let adapter = await adapterFor({ projectId: chain.projectId, ...chain.canvasId ? { canvasId: chain.canvasId } : {} }), doc = null;
+    for (; chain.index < chain.segments.length; ) {
+      let segment = chain.segments[chain.index];
       if (segment.skip) {
         doc = doc || await adapter.rpc.projectsGet({ id: chain.projectId });
-        const made = latestVideoResult(doc, segment.nodeId);
+        let made = latestVideoResult(doc, segment.nodeId);
         if (!made?.url) throw new Error(`第 ${chain.index + 1} 段「${segment.label}」已有成果，但这条成果没有可用的视频地址，不能作为下一段的续拍输入。`);
-        chain.carry = { videoUrl: made.url, seconds: made.seconds };
-        chain.jobs[chain.index] = null;
-        chain.index += 1;
-        await saveChain(chain);
+        chain.carry = { videoUrl: made.url, seconds: made.seconds }, chain.jobs[chain.index] = null, chain.index += 1, await saveChain(chain);
         continue;
       }
-      const carry = chain.index > 0 ? chain.carry : null;
-      const planned = await planChainSegment(adapter, chain.projectId, segment, carry, config);
-      const job = await launchSegment(chain, segment, planned, config);
-      chain.jobs[chain.index] = job.id;
-      chain.state = "running";
-      chain.message = "";
-      await saveChain(chain);
-      return job;
+      let carry = chain.index > 0 ? chain.carry : null, planned = await planChainSegment(adapter, chain.projectId, segment, carry, config), job = await launchSegment(chain, segment, planned, config);
+      return chain.jobs[chain.index] = job.id, chain.state = "running", chain.message = "", await saveChain(chain), job;
     }
-    chain.state = "done";
-    chain.message = "全部段落都已有成果。";
-    await saveChain(chain);
-    return null;
+    return chain.state = "done", chain.message = "全部段落都已有成果。", await saveChain(chain), null;
   }
   async function currentJob(chain) {
-    const id = chain?.jobs?.[chain.index];
-    if (!id) return null;
-    return read(id).catch(() => null);
+    let id = chain?.jobs?.[chain.index];
+    return id ? read(id).catch(() => null) : null;
   }
   function chainStateOf(chain, job) {
-    if (!chain) return "none";
-    if (chain.state === "done" || chain.state === "stopped" || chain.state === "stale") return chain.state;
-    if (!job) return "running";
-    if (job.state === "running" || job.syncing) return "running";
-    if (job.state === "succeeded" && job.media?.length) return "review";
-    return "stopped";
+    return chain ? chain.state === "done" || chain.state === "stopped" || chain.state === "stale" ? chain.state : !job || job.state === "running" || job.syncing ? "running" : job.state === "succeeded" && job.media?.length ? "review" : "stopped" : "none";
   }
   function chainView(chain, job) {
     if (!chain) return null;
-    const state = chainStateOf(chain, job);
-    const done = chain.segments.slice(0, chain.index).length;
+    let state = chainStateOf(chain, job), done = chain.segments.slice(0, chain.index).length;
     return {
       id: chain.id,
       projectId: chain.projectId,
@@ -10823,7 +8605,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
         label: segment.label,
         nodeId: segment.nodeId,
         operation: segment.operation,
-        skip: segment.skip === true,
+        skip: segment.skip === !0,
         seconds: segment.seconds,
         ratio: segment.ratio,
         resolution: segment.resolution,
@@ -10836,91 +8618,59 @@ function createCanvasNativeService(liveConfig, options = {}) {
     };
   }
   function chainSignature(segments) {
-    return JSON.stringify((segments || []).map((x) => [x.nodeId, x.operation, x.skip === true, x.prompt, x.transition || "", x.seconds, x.ratio, x.resolution, x.fingerprint || ""]));
+    return JSON.stringify((segments || []).map((x) => [x.nodeId, x.operation, x.skip === !0, x.prompt, x.transition || "", x.seconds, x.ratio, x.resolution, x.fingerprint || ""]));
   }
-  async function perform(job, config, query = false) {
-    const ctl = new AbortController();
+  async function perform(job, config, query = !1) {
+    let ctl = new AbortController();
     running.set(job.id, ctl);
     try {
-      const created = async (taskId) => {
-        job.taskId = taskId;
-        await save2(job);
-      };
-      let result;
+      let created = async (taskId) => {
+        job.taskId = taskId, await save2(job);
+      }, result;
       if (job.plan.kind === "image") {
-        const imageCfg = imageConfig(config);
-        const body = { model: IMAGE_MODEL, prompt: job.plan.args.prompt, size: "2048x2048", n: 1, response_format: "url", watermark: false };
-        if (!query && job.plan.images.length) body.image = await Promise.all(job.plan.images.map(async (x) => String((await resolveImageInput(x.path, "画布参考图")).url)));
-        result = await (options.image || generateSeedreamImage)(imageCfg, query ? void 0 : body, ctl.signal, query ? job.taskId : void 0, { scope: job.id, onCreated: created });
-        job.media = [{ kind: "image", label: "图片", url: result.imageUrl }];
-        job.state = "succeeded";
+        let imageCfg = imageConfig(config), body = { model: IMAGE_MODEL, prompt: job.plan.args.prompt, size: "2048x2048", n: 1, response_format: "url", watermark: !1 };
+        !query && job.plan.images.length && (body.image = await Promise.all(job.plan.images.map(async (x) => String((await resolveImageInput(x.path, "画布参考图")).url)))), result = await (options.image || generateSeedreamImage)(imageCfg, query ? void 0 : body, ctl.signal, query ? job.taskId : void 0, { scope: job.id, onCreated: created }), job.media = [{ kind: "image", label: "图片", url: result.imageUrl }], job.state = "succeeded";
       } else {
         let body;
         if (query) body = { model: job.plan.model };
         else if (job.plan.operation === "extend") {
-          const characterReferences = await Promise.all(job.plan.images.map(async (x) => ({ type: "image_url", role: "reference_image", image_url: { url: (await resolveImageInput(x.path, "画布参考图")).url } })));
+          let characterReferences = await Promise.all(job.plan.images.map(async (x) => ({ type: "image_url", role: "reference_image", image_url: { url: (await resolveImageInput(x.path, "画布参考图")).url } })));
           body = buildRequestBody(config, { ...job.plan.args, characterReferences }, job.plan.args.videoUrl).body;
         } else body = (await buildGenerationBody(config, job.plan.args, job.plan.args.duration, { signal: ctl.signal })).body;
-        result = query ? await (options.query || waitForCompletion)(config, job.taskId, ctl.signal) : await (options.video || runTask)(config, body, ctl.signal, { scope: job.id, onCreated: created });
-        if (query && terminal.has(result.status)) await finishKnownTask(config, job.taskId);
-        job.state = result.status;
-        if (result.status === "succeeded" && result.videoUrl) job.media = [{ kind: "video", label: job.plan.operation === "extend" ? "续拍视频" : "视频", url: result.videoUrl }];
-        if (!job.media?.length) job.message = terminal.has(result.status) ? "任务未成功，未自动重试。" : "状态尚未确认；只查询原任务，不重复提交。";
+        result = query ? await (options.query || waitForCompletion)(config, job.taskId, ctl.signal) : await (options.video || runTask)(config, body, ctl.signal, { scope: job.id, onCreated: created }), query && terminal.has(result.status) && await finishKnownTask(config, job.taskId), job.state = result.status, result.status === "succeeded" && result.videoUrl && (job.media = [{ kind: "video", label: job.plan.operation === "extend" ? "续拍视频" : "视频", url: result.videoUrl }]), job.media?.length || (job.message = terminal.has(result.status) ? "任务未成功，未自动重试。" : "状态尚未确认；只查询原任务，不重复提交。");
       }
-      if (job.media?.length) {
-        job.syncing = true;
-        await save2(job);
-        await sync(job);
-        job.syncing = false;
-        await save2(job);
-      } else await save2(job);
+      job.media?.length ? (job.syncing = !0, await save2(job), await sync(job), job.syncing = !1, await save2(job)) : await save2(job);
     } catch (e) {
-      if (e?.taskId) job.taskId = e.taskId;
-      job.state = e?.terminal ? "failed" : job.taskId ? "unknown" : "submission_unknown";
-      job.message = job.taskId ? "已保存原任务，只查询原任务；未重复提交。" : "提交结果未确认，请核对渠道调用记录，不要重新生成。";
-      await save2(job);
+      e?.taskId && (job.taskId = e.taskId), job.state = e?.terminal ? "failed" : job.taskId ? "unknown" : "submission_unknown", job.message = job.taskId ? "已保存原任务，只查询原任务；未重复提交。" : "提交结果未确认，请核对渠道调用记录，不要重新生成。", await save2(job);
     } finally {
       running.delete(job.id);
     }
   }
   async function mergeFilm(link2, config) {
-    const adapter = await adapterFor(link2);
-    const loc = { id: link2.projectId, ...link2.canvasId ? { canvasId: link2.canvasId } : {} };
-    const doc = await adapter.rpc.projectsGet(loc);
+    let adapter = await adapterFor(link2), loc = { id: link2.projectId, ...link2.canvasId ? { canvasId: link2.canvasId } : {} }, doc = await adapter.rpc.projectsGet(loc);
     if (!doc?.nodes) throw new Error("画布不存在或已删除。");
-    const { segments, missing } = filmSegments(doc);
+    let { segments, missing } = filmSegments(doc);
     if (!segments.length) throw new Error("画布上还没有可合成的视频成果：先按流程逐段生成，再合成成片。");
     if (missing.length) throw new Error(`还有 ${missing.length} 段没有成果（${missing.join("、")}），先把每段都生成完再合成成片。`);
-    const ffmpegReady = await (options.hasFfmpeg || hasFfmpeg)(config);
-    if (!ffmpegReady) throw new Error(`本机没有找到可用的 ffmpeg，暂时不能合成成片。${(options.ffmpegInstallHint || ffmpegInstallHint)(config).hint}`);
-    const root = (await adapter.rpc.dataRootGet()).dataRoot;
+    if (!await (options.hasFfmpeg || hasFfmpeg)(config)) throw new Error(`本机没有找到可用的 ffmpeg，暂时不能合成成片。${(options.ffmpegInstallHint || ffmpegInstallHint)(config).hint}`);
+    let root = (await adapter.rpc.dataRootGet()).dataRoot;
     if (!root) throw new Error("画布数据目录不可用，请核对插件数据目录权限。");
-    const records = (await adapter.rpc.assetsGet({ ids: segments.map((x) => x.assetId).filter(Boolean) })).items || [];
-    const work = path23.join(directory2, "film-work");
-    await mkdir15(work, { recursive: true, mode: 448 });
-    const files = [];
-    for (const segment of segments) {
-      const asset = records.find((a) => a.id === segment.assetId);
-      const local = asset?.rel ? path23.resolve(root, String(asset.rel)) : "";
+    let records = (await adapter.rpc.assetsGet({ ids: segments.map((x) => x.assetId).filter(Boolean) })).items || [], work = path22.join(directory2, "film-work");
+    await mkdir15(work, { recursive: !0, mode: 448 });
+    let files = [];
+    for (let segment of segments) {
+      let asset = records.find((a) => a.id === segment.assetId), local = asset?.rel ? path22.resolve(root, String(asset.rel)) : "";
       if (local && (await stat10(local).catch(() => null))?.isFile()) {
-        files.push(local);
-        segment.bytes = (await stat10(local)).size;
+        files.push(local), segment.bytes = (await stat10(local)).size;
         continue;
       }
       if (!segment.url) throw new Error(`第 ${segment.index + 1} 段（${segment.label}）素材不在画布数据目录，也没有可下载的地址。`);
-      const dest2 = path23.join(work, `${String(segment.index + 1).padStart(2, "0")}-segment.mp4`);
-      await downloadFile(segment.url, dest2, {});
-      files.push(dest2);
-      segment.bytes = (await stat10(dest2)).size;
+      let dest2 = path22.join(work, `${String(segment.index + 1).padStart(2, "0")}-segment.mp4`);
+      await downloadFile(segment.url, dest2, {}), files.push(dest2), segment.bytes = (await stat10(dest2)).size;
     }
-    const stamp = hash3(segments.map((x) => [x.resultId, x.assetId, x.url, x.bytes]));
-    const id = `mov_film_${stamp.slice(0, 24)}`;
-    const rel = `projects/${link2.projectId}/final/${id}.mp4`;
-    const dest = path23.join(root, rel);
-    await mkdir15(path23.dirname(dest), { recursive: true });
-    await (options.mergeClips || mergeClips)(config, files, dest, {});
-    const seconds = segments.reduce((sum, x) => sum + (x.seconds || 0), 0) || null;
-    const film = {
+    let id = `mov_film_${hash3(segments.map((x) => [x.resultId, x.assetId, x.url, x.bytes])).slice(0, 24)}`, rel = `projects/${link2.projectId}/final/${id}.mp4`, dest = path22.join(root, rel);
+    await mkdir15(path22.dirname(dest), { recursive: !0 }), await (options.mergeClips || mergeClips)(config, files, dest, {});
+    let seconds = segments.reduce((sum, x) => sum + (x.seconds || 0), 0) || null, film = {
       assetId: id,
       count: segments.length,
       seconds,
@@ -10939,36 +8689,29 @@ function createCanvasNativeService(liveConfig, options = {}) {
       stored: "disk",
       source: "metaontic-video"
     } });
-    const staged = refreshStageNodes({ ...doc, film });
-    await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, film, nodes: staged.nodes, ts: Date.now() } });
-    return { ok: true, film: { ...film, url: mediaUrl(id) } };
+    let staged = refreshStageNodes({ ...doc, film });
+    return await adapter.rpc.projectsPut({ ...loc, name: doc.name, doc: { ...doc, film, nodes: staged.nodes, ts: Date.now() } }), { ok: !0, film: { ...film, url: mediaUrl(id) } };
   }
   async function handle(args) {
     if (disposed) throw new Error("画布制作服务正在卸载，请稍后查询原任务。");
     if (args.action === "info") {
-      const config = snapshotConfig(liveConfig);
-      let imageReady = false;
+      let config = snapshotConfig(liveConfig), imageReady = !1;
       try {
-        const c = imageConfig(config);
-        imageReady = !isVolcengine(c) && Boolean(resolveApiKey(c));
+        let c = imageConfig(config);
+        imageReady = !isVolcengine(c) && !!resolveApiKey(c);
       } catch {
       }
-      let textModel = "", textReady = false;
+      let textModel = "", textReady = !1;
       try {
-        textModel = resolveTextModel(config);
-        textReady = Boolean(resolveTextApiKey(config));
+        textModel = resolveTextModel(config), textReady = !!resolveTextApiKey(config);
       } catch {
       }
-      return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: Boolean(resolveApiKey(config)), imageReady, singleMax: modelMaxSeconds(config), textModel, textReady };
+      return { channel: connectionLabel(config), videoModel: resolveModel(config), imageModel: IMAGE_MODEL, videoReady: !!resolveApiKey(config), imageReady, singleMax: modelMaxSeconds(config), textModel, textReady };
     }
     if (args.action === "chainPlan") {
-      const config = snapshotConfig(liveConfig);
+      let config = snapshotConfig(liveConfig);
       assertConfigured(config, resolveApiKey(config));
-      const adapter = await adapterFor({ projectId: args.projectId });
-      const segments = await chainPlan(adapter, args.projectId, config);
-      const active2 = await previousChain({ projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} }).catch(() => null);
-      const alive = active2 && ["running", "review"].includes(chainStateOf(active2, await currentJob(active2))) ? chainView(active2, await currentJob(active2)) : null;
-      const pending2 = segments.filter((x) => !x.skip);
+      let adapter = await adapterFor({ projectId: args.projectId }), segments = await chainPlan(adapter, args.projectId, config), active2 = await previousChain({ projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} }).catch(() => null), alive = active2 && ["running", "review"].includes(chainStateOf(active2, await currentJob(active2))) ? chainView(active2, await currentJob(active2)) : null, pending2 = segments.filter((x) => !x.skip);
       return {
         segments,
         pending: pending2.length,
@@ -10979,17 +8722,15 @@ function createCanvasNativeService(liveConfig, options = {}) {
       };
     }
     if (args.action === "chainStart") {
-      const config = snapshotConfig(liveConfig);
-      if (args.confirmPlan !== true || args.confirmCost !== true) throw new Error("请先分别确认整条连拍的制作方案与费用。");
+      let config = snapshotConfig(liveConfig);
+      if (args.confirmPlan !== !0 || args.confirmCost !== !0) throw new Error("请先分别确认整条连拍的制作方案与费用。");
       if (args.identity && args.identity !== hash3(config)) throw new Error("插件配置已变，请重新预览连拍方案。");
-      const link2 = { projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} };
-      const adapter = await adapterFor(link2);
-      const existing = await previousChain(link2);
+      let link2 = { projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} }, adapter = await adapterFor(link2), existing = await previousChain(link2);
       if (existing && ["running", "review"].includes(chainStateOf(existing, await currentJob(existing)))) return { chain: chainView(existing, await currentJob(existing)) };
-      const segments = await chainPlan(adapter, args.projectId, config);
+      let segments = await chainPlan(adapter, args.projectId, config);
       if (!segments.some((segment) => !segment.skip)) throw new Error("画布上的视频段都已有成果，不需要再连拍；要重做某一段，点那个节点自己的「制作」。");
       if (existing && chainSignature(existing.segments) === chainSignature(segments)) return { chain: chainView(existing, await currentJob(existing)) };
-      const chain = {
+      let chain = {
         version: 1,
         id: randomUUID11(),
         projectId: args.projectId,
@@ -11003,75 +8744,53 @@ function createCanvasNativeService(liveConfig, options = {}) {
         message: "",
         segments
       };
-      await saveChain(chain);
-      await mkdir15(chainDirectory, { recursive: true, mode: 448 });
-      const temp = `${chainPointer(link2)}.${randomUUID11()}.tmp`;
-      await writeFile12(temp, JSON.stringify({ id: chain.id }), { mode: 384, flag: "wx" });
-      await rename13(temp, chainPointer(link2));
+      await saveChain(chain), await mkdir15(chainDirectory, { recursive: !0, mode: 448 });
+      let temp = `${chainPointer(link2)}.${randomUUID11()}.tmp`;
+      await writeFile12(temp, JSON.stringify({ id: chain.id }), { mode: 384, flag: "wx" }), await rename13(temp, chainPointer(link2));
       try {
         await runChainSegment(chain, config);
       } catch (error) {
-        chain.state = "stale";
-        chain.message = String(error?.message || "连拍未开始。");
-        await saveChain(chain);
-        throw error;
+        throw chain.state = "stale", chain.message = String(error?.message || "连拍未开始。"), await saveChain(chain), error;
       }
       return { chain: chainView(chain, await currentJob(chain)) };
     }
     if (args.action === "chainStatus") {
-      const chain = args.id ? await readChain(args.id) : await previousChain({ projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} });
+      let chain = args.id ? await readChain(args.id) : await previousChain({ projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} });
       if (!chain) return { chain: null };
-      const job2 = await currentJob(chain);
+      let job2 = await currentJob(chain);
       return { chain: chainView(chain, job2), job: job2 ? view(job2) : null };
     }
     if (args.action === "chainNext") {
-      const chain = await readChain(args.id);
-      const job2 = await currentJob(chain);
+      let chain = await readChain(args.id), job2 = await currentJob(chain);
       if (chain.state !== "running" && chain.state !== "review") throw new Error("这条连拍已经结束，请重新预览方案。");
-      if (args.accept !== true) {
-        chain.state = "stopped";
-        chain.message = "已停止连拍；已生成的分段成果保留。";
-        await saveChain(chain);
-        return { chain: chainView(chain, job2) };
-      }
+      if (args.accept !== !0)
+        return chain.state = "stopped", chain.message = "已停止连拍；已生成的分段成果保留。", await saveChain(chain), { chain: chainView(chain, job2) };
       if (!job2) throw new Error("没有正在推进的连拍分段。");
       if (job2.syncing) throw new Error("这一段还在回填画布，稍等片刻再继续下一段。");
       if (job2.state !== "succeeded" || !job2.media?.length) throw new Error("这一段还没有可审核的成果，先查询原任务或重新生成。");
       if (job2.sync?.status === "pending" || !job2.sync) throw new Error("这一段成果还没回填到画布，先点「补回填画布」。");
-      const accepted2 = await read(job2.id).catch(() => null);
-      if (accepted2 && accepted2.reviewed !== true) {
-        accepted2.reviewed = true;
-        await save2(accepted2);
-      }
-      const config = snapshotConfig(liveConfig);
+      let accepted2 = await read(job2.id).catch(() => null);
+      accepted2 && accepted2.reviewed !== !0 && (accepted2.reviewed = !0, await save2(accepted2));
+      let config = snapshotConfig(liveConfig);
       if (hash3(config) !== chain.identity) throw new Error("插件配置已变，请重新预览连拍方案。");
-      chain.carry = { videoUrl: job2.media[0].url, seconds: job2.plan.args.duration };
-      chain.index += 1;
+      chain.carry = { videoUrl: job2.media[0].url, seconds: job2.plan.args.duration }, chain.index += 1;
       try {
         await runChainSegment(chain, config);
       } catch (error) {
-        chain.state = "stale";
-        chain.message = String(error?.message || "下一段未能开始。");
-        await saveChain(chain);
-        throw error;
+        throw chain.state = "stale", chain.message = String(error?.message || "下一段未能开始。"), await saveChain(chain), error;
       }
       return { chain: chainView(chain, await currentJob(chain)) };
     }
     if (args.action === "chainStop") {
-      const chain = await readChain(args.id);
-      chain.state = "stopped";
-      chain.message = "已停止连拍；已提交的那一段仍会跑完并回填。";
-      await saveChain(chain);
-      return { chain: chainView(chain, await currentJob(chain)) };
+      let chain = await readChain(args.id);
+      return chain.state = "stopped", chain.message = "已停止连拍；已提交的那一段仍会跑完并回填。", await saveChain(chain), { chain: chainView(chain, await currentJob(chain)) };
     }
     if (args.action === "film") {
-      const adapter = await adapterFor({ projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} });
-      const doc = await adapter.rpc.projectsGet({ id: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} });
-      const film = doc?.film;
+      let film = (await (await adapterFor({ projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} })).rpc.projectsGet({ id: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} }))?.film;
       return { film: film?.assetId ? { ...film, url: mediaUrl(film.assetId) } : null };
     }
     if (args.action === "mergeFilm") {
-      const config = snapshotConfig(liveConfig);
+      let config = snapshotConfig(liveConfig);
       if (locks3.has(`film:${args.projectId}`)) throw new Error("这条画布正在合成成片，请稍等。");
       locks3.add(`film:${args.projectId}`);
       try {
@@ -11081,26 +8800,17 @@ function createCanvasNativeService(liveConfig, options = {}) {
       }
     }
     if (args.action === "write") {
-      if (args.workType) profileRevision(args.workType);
-      const config = snapshotConfig(liveConfig);
-      const singleMax = modelMaxSeconds(config);
-      const totalSeconds = clampInteger(args.totalSeconds, MIN_SECONDS, MAX_TOTAL_SECONDS, Math.min(15, singleMax));
-      const segmentSeconds = resolveSegmentSeconds(config, args.segmentSeconds);
-      const count = planVideoSegments(totalSeconds, singleMax, segmentSeconds).length;
+      args.workType && profileRevision(args.workType);
+      let config = snapshotConfig(liveConfig), singleMax = modelMaxSeconds(config), totalSeconds = clampInteger(args.totalSeconds, MIN_SECONDS, MAX_TOTAL_SECONDS, Math.min(15, singleMax)), segmentSeconds = resolveSegmentSeconds(config, args.segmentSeconds), count = planVideoSegments(totalSeconds, singleMax, segmentSeconds).length;
       assertConfigured(config, resolveApiKey(config));
-      const writer = options.writeScript || writeScript;
-      const startedAt = Date.now();
-      let last = 0;
-      let result;
+      let writer = options.writeScript || writeScript, startedAt = Date.now(), last = 0, result;
       try {
         result = await writer(
           config,
           { idea: args.idea, totalSeconds, segmentSeconds, segments: count, ratio: args.ratio || "16:9", ...args.workType ? { work_type: args.workType } : {} },
           { onProgress: (progress) => {
-            const at = Date.now();
-            if (at - last < 1e4) return;
-            last = at;
-            void appendRequestLog({
+            let at = Date.now();
+            at - last < 1e4 || (last = at, appendRequestLog({
               event: "text_model_progress",
               action: "write",
               model: resolveTextModel(config),
@@ -11108,42 +8818,33 @@ function createCanvasNativeService(liveConfig, options = {}) {
               chunks: Number(progress?.chunks) || 0,
               elapsedMs: at - startedAt
             }).catch(() => {
-            });
+            }));
           } }
         );
       } catch (error) {
-        await appendRequestLog({
+        throw await appendRequestLog({
           event: "text_model_failed",
           action: "write",
           model: resolveTextModel(config),
           elapsedMs: Date.now() - startedAt,
           ...diagnosticError(error)
         }).catch(() => {
-        });
-        throw error;
+        }), error;
       }
-      await appendRequestLog({
+      return await appendRequestLog({
         event: "text_model_done",
         action: "write",
         model: result.model,
         elapsedMs: Date.now() - startedAt,
         characters: result.characters,
-        truncated: result.truncated === true
+        truncated: result.truncated === !0
       }).catch(() => {
-      });
-      return { script: result.script, model: result.model, usage: result.usage, totalSeconds, segmentSeconds, segments: count, truncated: result.truncated === true };
+      }), { script: result.script, model: result.model, usage: result.usage, totalSeconds, segmentSeconds, segments: count, truncated: result.truncated === !0 };
     }
     if (args.action === "plan") {
-      const config = snapshotConfig(liveConfig);
-      const singleMax = modelMaxSeconds(config);
-      const totalSeconds = clampInteger(args.totalSeconds, MIN_SECONDS, MAX_TOTAL_SECONDS, Math.min(15, singleMax));
-      const segmentSeconds = resolveSegmentSeconds(config, args.segmentSeconds);
-      const steps = planVideoSegments(totalSeconds, singleMax, segmentSeconds);
-      const script = String(args.script ?? "");
-      const shots = scriptStoryboardShots(script);
-      const prompts = splitScriptPrompts(script, steps.length, shots);
+      let config = snapshotConfig(liveConfig), singleMax = modelMaxSeconds(config), totalSeconds = clampInteger(args.totalSeconds, MIN_SECONDS, MAX_TOTAL_SECONDS, Math.min(15, singleMax)), segmentSeconds = resolveSegmentSeconds(config, args.segmentSeconds), steps = planVideoSegments(totalSeconds, singleMax, segmentSeconds), script = String(args.script ?? ""), shots = scriptStoryboardShots(script), prompts = splitScriptPrompts(script, steps.length, shots);
       return {
-        videoReady: Boolean(resolveApiKey(config)),
+        videoReady: !!resolveApiKey(config),
         videoModel: resolveModel(config),
         singleMax,
         totalSeconds,
@@ -11153,28 +8854,24 @@ function createCanvasNativeService(liveConfig, options = {}) {
       };
     }
     if (args.action === "prepare") {
-      const adapter = await adapterFor(args), input = await readCanvasInput(adapter, args);
-      const old = await previous(input.canvas);
+      let adapter = await adapterFor(args), input = await readCanvasInput(adapter, args), old = await previous(input.canvas);
       if (old && (!terminal.has(old.state) || old.media?.length && !old.reviewed || old.sync?.status === "pending")) return { job: view(old) };
       if (args.operation === "extend") {
-        const source = input.nodes.find((n) => n.id === input.canvas.nodeId);
-        const sourceJobs = options.sourceReviewed || (async () => {
-          const doc = await adapter.rpc.projectsGet({ id: input.canvas.projectId, ...input.canvas.canvasId ? { canvasId: input.canvas.canvasId } : {} });
-          const id2 = doc.nodes?.[input.canvas.nodeId]?.data?.metaonticNativeJob;
-          if (!validToken(id2)) return false;
-          const saved = await read(id2);
-          return saved.reviewed === true && saved.canvas.projectId === input.canvas.projectId && (saved.canvas.canvasId || "") === (input.canvas.canvasId || "") && saved.taskId === source.metaonticTaskId && saved.media?.[0]?.url === source.metaonticVideoUrl;
-        });
-        if (!await sourceJobs(input)) throw new Error("请先打开原制作记录审核上一段视频效果，再续拍。");
+        let source = input.nodes.find((n) => n.id === input.canvas.nodeId);
+        if (!await (options.sourceReviewed || (async () => {
+          let id2 = (await adapter.rpc.projectsGet({ id: input.canvas.projectId, ...input.canvas.canvasId ? { canvasId: input.canvas.canvasId } : {} })).nodes?.[input.canvas.nodeId]?.data?.metaonticNativeJob;
+          if (!validToken(id2)) return !1;
+          let saved = await read(id2);
+          return saved.reviewed === !0 && saved.canvas.projectId === input.canvas.projectId && (saved.canvas.canvasId || "") === (input.canvas.canvasId || "") && saved.taskId === source.metaonticTaskId && saved.media?.[0]?.url === source.metaonticVideoUrl;
+        }))(input)) throw new Error("请先打开原制作记录审核上一段视频效果，再续拍。");
       }
-      const config = snapshotConfig(liveConfig), plan = planCanvasNative(input, config, args.operation || "generate", args.draft || {});
+      let config = snapshotConfig(liveConfig), plan = planCanvasNative(input, config, args.operation || "generate", args.draft || {});
       if (plan.kind === "image" && plan.args.ratio !== "1:1") throw new Error("本版图片直接制作仅支持1:1，请先修改节点画幅。");
       assertConfigured(plan.kind === "image" ? imageConfig(config) : config, resolveApiKey(plan.kind === "image" ? imageConfig(config) : config));
-      const id = randomUUID11(), proposal = { id, canvas: input.canvas, plan, config, identity: hash3(config), expires: Date.now() + 10 * 6e4 };
-      for (const [key, p] of proposals) if (p.expires < Date.now()) proposals.delete(key);
+      let id = randomUUID11(), proposal = { id, canvas: input.canvas, plan, config, identity: hash3(config), expires: Date.now() + 10 * 6e4 };
+      for (let [key, p] of proposals) p.expires < Date.now() && proposals.delete(key);
       if (proposals.size >= 100) throw new Error("待确认方案过多，请先处理已有方案。");
-      proposals.set(id, proposal);
-      return { proposal: {
+      return proposals.set(id, proposal), { proposal: {
         id,
         kind: plan.kind,
         operation: plan.operation,
@@ -11190,60 +8887,50 @@ function createCanvasNativeService(liveConfig, options = {}) {
       } };
     }
     if (args.action === "latest") {
-      const input = await readCanvasInput(await resolveCanvasAdapter(args?.projectId, load), args);
-      const job2 = await previous(input.canvas);
+      let input = await readCanvasInput(await resolveCanvasAdapter(args?.projectId, load), args), job2 = await previous(input.canvas);
       return { job: job2 ? view(job2) : null };
     }
     if (args.action === "start") {
-      const existing = await read(args.id).catch((e) => {
+      let existing = await read(args.id).catch((e) => {
         if (e.code === "ENOENT") return null;
         throw e;
       });
       if (existing) return { job: view(existing) };
-      const p = proposals.get(args.id);
+      let p = proposals.get(args.id);
       if (!p || p.expires < Date.now()) throw new Error("制作方案已失效，请重新核对。");
-      const key = pointer(p.canvas);
+      let key = pointer(p.canvas);
       if (locks3.has(key)) throw new Error("此节点正在确认制作。");
       locks3.add(key);
       try {
-        if (args.confirmPlan !== true || args.confirmCost !== true || p.plan.kind === "video" && !p.plan.images.length && p.plan.operation === "generate" && args.textOnly !== true) throw new Error("请分别确认制作方案、费用及纯文生选择。");
+        if (args.confirmPlan !== !0 || args.confirmCost !== !0 || p.plan.kind === "video" && !p.plan.images.length && p.plan.operation === "generate" && args.textOnly !== !0) throw new Error("请分别确认制作方案、费用及纯文生选择。");
         if (hash3(snapshotConfig(liveConfig)) !== p.identity) throw new Error("插件配置已变，请重新确认。");
-        const input = await readCanvasInput(await adapterFor(p.canvas), p.canvas);
-        if (input.canvas.fingerprint !== p.canvas.fingerprint) throw new Error("节点或上游素材已变化，请重新核对方案。");
-        const old = await previous(p.canvas);
+        if ((await readCanvasInput(await adapterFor(p.canvas), p.canvas)).canvas.fingerprint !== p.canvas.fingerprint) throw new Error("节点或上游素材已变化，请重新核对方案。");
+        let old = await previous(p.canvas);
         if (old && (!terminal.has(old.state) || old.media?.length && !old.reviewed || old.sync?.status === "pending")) return { job: view(old) };
-        const job2 = { version: 1, id: p.id, canvas: p.canvas, plan: p.plan, identity: p.identity, createdAt: Date.now(), state: "running", reviewed: false };
+        let job2 = { version: 1, id: p.id, canvas: p.canvas, plan: p.plan, identity: p.identity, createdAt: Date.now(), state: "running", reviewed: !1 };
         await save2(job2);
-        const temp = `${key}.${randomUUID11()}.tmp`;
-        await writeFile12(temp, JSON.stringify({ id: job2.id }), { mode: 384, flag: "wx" });
-        await rename13(temp, key);
-        proposals.delete(p.id);
-        snapshots.set(job2.id, p.config);
-        void perform(job2, p.config).catch(() => {
-        });
-        return { job: view(job2) };
+        let temp = `${key}.${randomUUID11()}.tmp`;
+        return await writeFile12(temp, JSON.stringify({ id: job2.id }), { mode: 384, flag: "wx" }), await rename13(temp, key), proposals.delete(p.id), snapshots.set(job2.id, p.config), perform(job2, p.config).catch(() => {
+        }), { job: view(job2) };
       } finally {
         locks3.delete(key);
       }
     }
-    const job = await read(args.id);
+    let job = await read(args.id);
     if (args.action === "status") return { job: view(job) };
     if (running.has(job.id)) return { job: view(job) };
     if (locks3.has(job.id)) throw new Error("此制作记录正在处理。");
     locks3.add(job.id);
     try {
       if (args.action === "review") {
-        if (!job.media?.length || args.accept !== true) throw new Error("未通过结果审核，已保留成果，不继续制作。");
-        job.reviewed = true;
-        await save2(job);
+        if (!job.media?.length || args.accept !== !0) throw new Error("未通过结果审核，已保留成果，不继续制作。");
+        job.reviewed = !0, await save2(job);
       } else if (args.action === "sync") await sync(job);
       else if (args.action === "query") {
         if (!job.taskId || terminal.has(job.state)) throw new Error("没有需要补查的原任务；不重新生成。");
-        const config = snapshots.get(job.id) || snapshotConfig(liveConfig);
+        let config = snapshots.get(job.id) || snapshotConfig(liveConfig);
         if (hash3(config) !== job.identity) throw new Error("连接配置已改变，请恢复原配置后查询原任务。");
-        job.state = "running";
-        await save2(job);
-        void perform(job, config, true).catch(() => {
+        job.state = "running", await save2(job), perform(job, config, !0).catch(() => {
         });
       } else throw new Error("未知画布制作操作。");
       return { job: view(job) };
@@ -11252,37 +8939,30 @@ function createCanvasNativeService(liveConfig, options = {}) {
     }
   }
   return { handle: (args) => requestLogContext.run({ ...requestLogContext.getStore(), callId: requestLogContext.getStore()?.callId || randomUUID11(), tool: "video_canvas", projectId: args?.projectId, jobId: args?.id }, () => handle(args)), dispose() {
-    disposed = true;
-    for (const ctl of running.values()) ctl.abort();
-    proposals.clear();
-    snapshots.clear();
+    disposed = !0;
+    for (let ctl of running.values()) ctl.abort();
+    proposals.clear(), snapshots.clear();
   } };
 }
 function registerCanvasNative(ctx, config) {
   return ctx.inject(["webServer"], (scope) => {
-    if (typeof scope.webServer?.register !== "function") return;
-    const service = createCanvasNativeService(config);
-    const remove = scope.webServer.register({ kind: "exact", path: "/metaontic-video/canvas-native", async handler(req, res) {
-      res.setHeader("content-type", "application/json; charset=utf-8");
-      res.setHeader("cache-control", "no-store");
+    if (typeof scope.webServer?.register != "function") return;
+    let service = createCanvasNativeService(config), remove = scope.webServer.register({ kind: "exact", path: "/metaontic-video/canvas-native", async handler(req, res) {
+      res.setHeader("content-type", "application/json; charset=utf-8"), res.setHeader("cache-control", "no-store");
       try {
         if (req.method !== "POST") throw new Error("仅接受POST。");
         if (req.headers["sec-fetch-site"] === "cross-site" || req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) throw new Error("请求来源无效。");
         if (!String(req.headers["content-type"] || "").startsWith("application/json")) throw new Error("请求类型无效。");
         let raw = "";
-        for await (const chunk of req) {
-          raw += chunk;
-          if (raw.length > 1e5) throw new Error("请求过大。");
-        }
+        for await (let chunk of req)
+          if (raw += chunk, raw.length > 1e5) throw new Error("请求过大。");
         res.end(JSON.stringify(await service.handle(JSON.parse(raw))));
       } catch (e) {
-        res.statusCode = 400;
-        res.end(JSON.stringify({ error: String(e.message || "画布制作未完成。") }));
+        res.statusCode = 400, res.end(JSON.stringify({ error: String(e.message || "画布制作未完成。") }));
       }
     } });
     return () => {
-      service.dispose();
-      if (typeof remove === "function") remove();
+      service.dispose(), typeof remove == "function" && remove();
     };
   });
 }
@@ -11291,43 +8971,33 @@ function registerCanvasNative(ctx, config) {
 init_connection();
 init_config();
 async function initialCharacterReferences(config, args, saved, signal) {
-  const current = saved?.operationState?.[Number(saved?.done) || 0];
-  const rebuildingFailed = !saved?.pendingTask && current?.originalResult?.status === "failed" && current.originalResult.errorCode !== "real_person_rejected" && !current.retryUsed && !current.phase;
-  if (Array.isArray(saved?.characterReferences) && !rebuildingFailed) {
-    validateImageRoles({ referenceImages: saved.characterReferences.map((item) => item?.image_url?.url) }, resolveModel(config));
-    return saved.characterReferences.map((item) => ({ ...item, image_url: { ...item.image_url } }));
-  }
-  const referenceImages = Array.isArray(args.referenceImages) ? args.referenceImages : args.referenceImages ? [args.referenceImages] : [];
-  const source = args.characterReferenceImages ?? (referenceImages.length ? referenceImages : args.productionStrategy !== "independent_shots" && args.firstFrameUrl ? [args.firstFrameUrl] : []);
-  const { refs: refs2 } = validateImageRoles({ referenceImages: source }, resolveModel(config));
-  const canvas = canvasSize(args.ratio || ref(config, "ratio", "adaptive"));
-  const fit = canvas ? { size: canvas, config, signal } : null;
-  const images = [];
-  for (const value of refs2) {
-    const resolved = isVolcengine(config) && /^asset:\/\//.test(value) ? { url: value } : await resolveImageInput(value, "最初角色参考图", fit);
+  let current = saved?.operationState?.[Number(saved?.done) || 0], rebuildingFailed = !saved?.pendingTask && current?.originalResult?.status === "failed" && current.originalResult.errorCode !== "real_person_rejected" && !current.retryUsed && !current.phase;
+  if (Array.isArray(saved?.characterReferences) && !rebuildingFailed)
+    return validateImageRoles({ referenceImages: saved.characterReferences.map((item) => item?.image_url?.url) }, resolveModel(config)), saved.characterReferences.map((item) => ({ ...item, image_url: { ...item.image_url } }));
+  let referenceImages = Array.isArray(args.referenceImages) ? args.referenceImages : args.referenceImages ? [args.referenceImages] : [], source = args.characterReferenceImages ?? (referenceImages.length ? referenceImages : args.productionStrategy !== "independent_shots" && args.firstFrameUrl ? [args.firstFrameUrl] : []), { refs: refs2 } = validateImageRoles({ referenceImages: source }, resolveModel(config)), canvas = canvasSize(args.ratio || ref(config, "ratio", "adaptive")), fit = canvas ? { size: canvas, config, signal } : null, images = [];
+  for (let value of refs2) {
+    let resolved = isVolcengine(config) && /^asset:\/\//.test(value) ? { url: value } : await resolveImageInput(value, "最初角色参考图", fit);
     images.push({ type: "image_url", image_url: { url: resolved.url }, role: "reference_image" });
   }
   return images;
 }
 function approvedCharacterReferences(images, state) {
   if (!state?.retryUsed || state.retryResult?.status !== "succeeded" || !state.convertedBody) return images;
-  const original = state.originalBody?.content || [];
-  const converted = state.convertedBody.content || [];
+  let original = state.originalBody?.content || [], converted = state.convertedBody.content || [];
   return images.map((image) => {
-    const index = original.findIndex((item) => item.type === "image_url" && item.image_url?.url === image.image_url?.url);
-    const replacement = converted[index];
+    let index = original.findIndex((item) => item.type === "image_url" && item.image_url?.url === image.image_url?.url), replacement = converted[index];
     return index >= 0 && replacement?.type === "image_url" ? { ...image, image_url: { url: replacement.image_url.url } } : image;
   });
 }
 
 // src/businesses/video-generation/workflow/segment-run.ts
 init_config();
-import path24 from "node:path";
+import path23 from "node:path";
 import { stat as stat11 } from "node:fs/promises";
 var SEGMENT_PAUSE_NOTE = "本段已完成：请先展示本次视频成果，让用户预览；正文展示后立即调用video_project(action:review_segment,resume:原resumeDir)弹出分段结果确认窗；通过后才用resume进入下一段费用审批，不以文字问句替代弹窗。";
 function recordSegmentResult({ final, segments, segment, submissionId, convertedReferences }) {
-  const detail = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}上游详情：${final.error || ""}` : final.error;
-  segments.push({
+  let detail = final.errorCode === "content_rejected" ? `${CONTENT_REJECTION_HINT}上游详情：${final.error || ""}` : final.error;
+  return segments.push({
     index: segment.index,
     kind: segment.kind,
     seconds: segment.seconds,
@@ -11335,9 +9005,8 @@ function recordSegmentResult({ final, segments, segment, submissionId, converted
     status: final.status,
     videoUrl: final.videoUrl,
     error: detail
-  });
-  return {
-    ok: final.status === "succeeded" && Boolean(final.videoUrl),
+  }), {
+    ok: final.status === "succeeded" && !!final.videoUrl,
     submissionId: final.submissionId || submissionId,
     convertedReferences: final.convertedReferences || convertedReferences,
     pendingTask: ["unknown", "timeout"].includes(final.status) ? { taskId: final.taskId, index: segment.index, kind: segment.kind, seconds: segment.seconds } : null,
@@ -11347,44 +9016,29 @@ function recordSegmentResult({ final, segments, segment, submissionId, converted
   };
 }
 function absorbSegmentInterruption(failure, { segments, notes, message }) {
-  const doneYet = segments.some((segment) => segment.status === "succeeded" && segment.videoUrl);
+  let doneYet = segments.some((segment) => segment.status === "succeeded" && segment.videoUrl);
   if (failure?.code !== "ABORTED" || !doneYet) throw failure;
   notes.push(message);
 }
 function describeIncompleteRun({ result, status, segments, notes, completed, deliveredSeconds }) {
-  if (status === "succeeded") return false;
-  const last = segments.at(-1) || {};
-  if (status === "unknown" || status === "timeout") {
-    result.pendingTaskId = last.taskId;
-    notes.push(
-      `第 ${last.index ?? segments.length} 段的查询没拿到结果（${status}），但任务已提交：${last.taskId || "（无任务 ID）"}。它可能仍在生成——用 video_status 按这个 ID 复查，取得成功状态和视频链接后可恢复下载，不重新提交该任务。`
-    );
-  } else {
-    notes.push(`第 ${last.index ?? segments.length} 段没有成功（${status}）。`);
-  }
-  if (!completed.length) return true;
-  notes.push(
+  if (status === "succeeded") return !1;
+  let last = segments.at(-1) || {};
+  return status === "unknown" || status === "timeout" ? (result.pendingTaskId = last.taskId, notes.push(
+    `第 ${last.index ?? segments.length} 段的查询没拿到结果（${status}），但任务已提交：${last.taskId || "（无任务 ID）"}。它可能仍在生成——用 video_status 按这个 ID 复查，取得成功状态和视频链接后可恢复下载，不重新提交该任务。`
+  )) : notes.push(`第 ${last.index ?? segments.length} 段没有成功（${status}）。`), completed.length ? (notes.push(
     `已有 ${completed.length} 段生成成功（计划时长共 ${deliveredSeconds} 秒）；下载和合并是否完成，以本次返回的文件路径及交付状态为准。`
-  );
-  result.partial = true;
-  return false;
+  ), result.partial = !0, !1) : !0;
 }
 function skipMergeDelivery({ result, paused, remainingSeconds, notes, segmentsDir, toolName }) {
-  if (paused) {
-    result.paused = true;
-    result.nextAction = "show_video_then_wait_for_user";
-    result.remainingSeconds = remainingSeconds;
-    notes.push(resumeHint(segmentsDir, remainingSeconds, toolName));
-  }
-  result.note = [...notes, "按参数要求只返回上游链接，没有下载合并。"].join("\n");
-  return result;
+  return paused && (result.paused = !0, result.nextAction = "show_video_then_wait_for_user", result.remainingSeconds = remainingSeconds, notes.push(resumeHint(segmentsDir, remainingSeconds, toolName))), result.note = [...notes, "按参数要求只返回上游链接，没有下载合并。"].join(`
+`), result;
 }
 async function runSegmentDelivery({
   config,
   exec,
   interrupted,
   completed,
-  segments,
+  segments: _segments,
   segmentsDir,
   outDir,
   stamp,
@@ -11394,19 +9048,18 @@ async function runSegmentDelivery({
   remainingSeconds,
   pauseNote,
   toolName,
-  cumulativePreview = false
+  cumulativePreview = !1
 }) {
-  const previewOnly = paused && !cumulativePreview;
-  if (previewOnly) {
-    for (const segment of completed.slice(0, -1)) {
-      const file = path24.join(segmentsDir, `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`);
+  let previewOnly = paused && !cumulativePreview;
+  if (previewOnly)
+    for (let segment of completed.slice(0, -1)) {
+      let file = path23.join(segmentsDir, `${String(segment.index).padStart(2, "0")}-${segment.kind}.mp4`);
       try {
-        if ((await stat11(file)).isFile()) segment.localPath = file;
+        (await stat11(file)).isFile() && (segment.localPath = file);
       } catch {
       }
     }
-  }
-  const delivery = await downloadSegmentsAndMerge(config, {
+  let delivery = await downloadSegmentsAndMerge(config, {
     segments: previewOnly ? completed.slice(-1) : completed,
     segmentsDir,
     outDir,
@@ -11417,127 +9070,60 @@ async function runSegmentDelivery({
     // 被中断时请求信号已经 abort：收尾（下载 + 合并）不能被它打断，否则等于白生成。
     signal: interrupted || exec?.signal?.aborted ? void 0 : exec?.signal
   });
-  if (delivery.error) {
-    result.deliveryError = delivery.error;
-    if (delivery.ffmpegMissing) {
-      result.ffmpegMissing = true;
-      result.installHint = delivery.installHint;
-    }
-    result.nextAction = "resume_delivery_without_regeneration";
-    result.segmentsDir = delivery.segmentsDir;
-    result.note = notes.join("\n");
-    return result;
-  }
-  if (delivery.ffmpegMissing) {
-    result.segmentsDir = delivery.segmentsDir;
-    result.merged = false;
-    result.ffmpegMissing = true;
-    result.installHint = delivery.installHint;
-    result.note = notes.join("\n");
-    return result;
-  }
-  if (!delivery.files.length) {
-    if (notes.length) result.note = notes.join("\n");
-    return result;
-  }
-  if (delivery.merged && !previewOnly) {
-    result.merged = true;
-    result.videoPath = delivery.videoPath;
-    result.mergeMode = delivery.mergeMode;
-    if (delivery.actualSeconds) result.actualSeconds = delivery.actualSeconds;
-    if (delivery.seamCuts?.length) result.seamCuts = delivery.seamCuts;
-  }
-  if (paused) {
-    result.segmentsDir = segmentsDir;
-    result.resumeDir = segmentsDir;
-    result.paused = true;
-    result.nextAction = "show_video_then_wait_for_user";
-    result.previewPath = completed.at(-1)?.localPath || result.videoPath;
-    if (previewOnly) {
-      result.merged = false;
-      result.previewOnly = true;
-    }
-    await appendRequestLog({ event: "preview_required", previewPath: result.previewPath, resumeDir: result.resumeDir });
-    result.remainingSeconds = remainingSeconds;
-    notes.push(previewOnly ? "本次只下载并交付新段；最终完成后再合并完整成片。需要累计预览时可用原resume并传cumulativePreview:true，不新增生成费用。" : pauseNote);
-    notes.push(resumeHint(segmentsDir, remainingSeconds, toolName));
-    result.note = notes.join("\n");
-    return result;
-  }
-  result.segmentsDir = segmentsDir;
-  if (notes.length) result.note = notes.join("\n");
-  return result;
+  return delivery.error ? (result.deliveryError = delivery.error, delivery.ffmpegMissing && (result.ffmpegMissing = !0, result.installHint = delivery.installHint), result.nextAction = "resume_delivery_without_regeneration", result.segmentsDir = delivery.segmentsDir, result.note = notes.join(`
+`), result) : delivery.ffmpegMissing ? (result.segmentsDir = delivery.segmentsDir, result.merged = !1, result.ffmpegMissing = !0, result.installHint = delivery.installHint, result.note = notes.join(`
+`), result) : delivery.files.length ? (delivery.merged && !previewOnly && (result.merged = !0, result.videoPath = delivery.videoPath, result.mergeMode = delivery.mergeMode, delivery.actualSeconds && (result.actualSeconds = delivery.actualSeconds), delivery.seamCuts?.length && (result.seamCuts = delivery.seamCuts)), paused ? (result.segmentsDir = segmentsDir, result.resumeDir = segmentsDir, result.paused = !0, result.nextAction = "show_video_then_wait_for_user", result.previewPath = completed.at(-1)?.localPath || result.videoPath, previewOnly && (result.merged = !1, result.previewOnly = !0), await appendRequestLog({ event: "preview_required", previewPath: result.previewPath, resumeDir: result.resumeDir }), result.remainingSeconds = remainingSeconds, notes.push(previewOnly ? "本次只下载并交付新段；最终完成后再合并完整成片。需要累计预览时可用原resume并传cumulativePreview:true，不新增生成费用。" : pauseNote), notes.push(resumeHint(segmentsDir, remainingSeconds, toolName)), result.note = notes.join(`
+`), result) : (result.segmentsDir = segmentsDir, notes.length && (result.note = notes.join(`
+`)), result)) : (notes.length && (result.note = notes.join(`
+`)), result);
 }
 
 // src/businesses/video-generation/workflow/segment-executor.ts
-async function executeSegmentPlan({ config, ctx, exec, args, plan, doneBefore, segments, segmentsDir, operationState, notes, initial, save: save2, buildStep, advanceCursor = (cursor, seconds) => cursor == null ? null : cursor + seconds, persistBeforeRun = false, interruptionMessage }) {
-  const state = {
+async function executeSegmentPlan({ config, ctx, exec, args, plan, doneBefore, segments, segmentsDir, operationState, notes, initial, save: save2, buildStep, advanceCursor = (cursor, seconds) => cursor == null ? null : cursor + seconds, persistBeforeRun = !1, interruptionMessage }) {
+  let state = {
     ...initial,
     status: "succeeded",
-    paused: Boolean(initial.paused),
-    interrupted: false
-  };
-  const checkpoint = () => save2(state);
-  if (persistBeforeRun)
-    await checkpoint();
+    paused: !!initial.paused,
+    interrupted: !1
+  }, checkpoint = () => save2(state);
+  persistBeforeRun && await checkpoint();
   try {
-    for (const [offset, step] of plan.entries()) {
+    for (let [offset, step] of plan.entries()) {
       if (exec?.signal?.aborted)
         throw abortError();
-      const position = doneBefore + offset;
-      let saved = operationState[position] ||= {};
-      if (!state.pendingTask && saved.originalResult?.status === "failed" && saved.originalResult.errorCode !== "real_person_rejected" && !saved.retryUsed && !saved.phase) {
-        saved = operationState[position] = {};
-        await checkpoint();
-      }
-      const { body, seconds } = saved.originalBody ? { body: saved.originalBody, seconds: step.seconds } : await buildStep({ step, position, state });
-      const final = await runTask(config, body, exec?.signal, {
+      let position = doneBefore + offset, saved = operationState[position] ||= {};
+      !state.pendingTask && saved.originalResult?.status === "failed" && saved.originalResult.errorCode !== "real_person_rejected" && !saved.retryUsed && !saved.phase && (saved = operationState[position] = {}, await checkpoint());
+      let { body, seconds } = saved.originalBody ? { body: saved.originalBody, seconds: step.seconds } : await buildStep({ step, position, state }), final = await runTask(config, body, exec?.signal, {
         ctx,
         exec,
         state: saved,
         saveState: checkpoint,
         scope: `${segmentsDir}:${position}`,
-        referenceImagesReviewed: args?.referenceImagesReviewed === true,
+        referenceImagesReviewed: args?.referenceImagesReviewed === !0,
         taskId: state.pendingTask?.taskId,
         onCreated: async (taskId) => {
-          state.pendingTask = { taskId, index: position + 1, kind: step.kind, seconds };
-          await checkpoint();
+          state.pendingTask = { taskId, index: position + 1, kind: step.kind, seconds }, await checkpoint();
         }
       });
-      if (final.status === "succeeded") {
-        state.characterReferences = approvedCharacterReferences(state.characterReferences, saved);
-        await checkpoint();
-      }
-      const outcome = recordSegmentResult({
+      final.status === "succeeded" && (state.characterReferences = approvedCharacterReferences(state.characterReferences, saved), await checkpoint());
+      let outcome = recordSegmentResult({
         final,
         segments,
         segment: { index: position + 1, kind: step.kind, seconds },
         submissionId: state.submissionId,
         convertedReferences: state.convertedReferences
       });
-      state.submissionId = outcome.submissionId;
-      state.convertedReferences = outcome.convertedReferences;
-      state.pendingTask = outcome.pendingTask;
-      if (!outcome.ok) {
-        await checkpoint();
-        state.status = outcome.status;
-        state.errorCode = outcome.errorCode;
-        state.error = outcome.error;
+      if (state.submissionId = outcome.submissionId, state.convertedReferences = outcome.convertedReferences, state.pendingTask = outcome.pendingTask, !outcome.ok) {
+        await checkpoint(), state.status = outcome.status, state.errorCode = outcome.errorCode, state.error = outcome.error;
         break;
       }
-      state.referenceUrl = normalizeReferenceUrl(final.videoUrl);
-      state.cursor = advanceCursor(state.cursor, seconds);
-      await checkpoint();
-      if (plan[offset + 1]) {
-        state.paused = true;
-        notes.push(SEGMENT_PAUSE_NOTE);
+      if (state.referenceUrl = normalizeReferenceUrl(final.videoUrl), state.cursor = advanceCursor(state.cursor, seconds), await checkpoint(), plan[offset + 1]) {
+        state.paused = !0, notes.push(SEGMENT_PAUSE_NOTE);
         break;
       }
     }
   } catch (failure) {
-    absorbSegmentInterruption(failure, { segments, notes, message: interruptionMessage });
-    state.interrupted = true;
-    state.paused = true;
+    absorbSegmentInterruption(failure, { segments, notes, message: interruptionMessage }), state.interrupted = !0, state.paused = !0;
   }
   return state;
 }
@@ -11546,8 +9132,7 @@ async function executeSegmentPlan({ config, ctx, exec, args, plan, doneBefore, s
 init_config();
 init_connection();
 function videoTool(liveConfig, deps, ctx) {
-  const config = liveConfig;
-  const TOOL_NAME = "video_generate";
+  let config = liveConfig, TOOL_NAME = "video_generate";
   return {
     name: "video_generate",
     description: `生成一段完整视频（视频生成的首选工具），duration 是目标总秒数：不超过模型单段上限（2.0 为 15 秒、2.5 为 30 秒）时一次直出；显式选择productionStrategy=independent_shots并完成整条方案审核时，可按shotDurations独立生成再剪辑；此路线每镜单独计费、逐镜审核，人物一致性依赖参考图，不保证无漂移。以下单次直出约束适用于默认连续路线。**硬规则：总时长 ≤ 单段上限的视频必须一次直出，禁止拆成多段 / 多镜 / 多次调用再拼接**（例如「15 秒」不许拆成 8+7）；按故事选择一镜到底或少量有动机的切镜，并写入待审核脚本；叙事切镜不等于拆分生成任务。更长时先直出首段，再把剩余时长按 4 至模型上限（2.0 为 15、2.5 为 30） 秒均分逐段续拍（默认吃满上限、段数最少，最长 ${MAX_TOTAL_SECONDS} 秒）——这是连续剧情的续拍延长，生成分段本身不代表叙事切镜，最后用 ffmpeg 合并成一个本地成片文件，默认落在会话工作目录下的 metaontic-video/，文件名形如 20261027-201530-25s.mp4。20 秒、25 秒这类目标不用手动拆成多个独立生成调用：直接传 duration=20 即可（20 秒 → 15+5，25 秒 → 15+10）。**每段生成完先返回视频供预览**：先展示成果，再询问是否继续；未确认就停下，先把已经生成的部分交付，结果里带 paused=true、resumeDir 和 remainingSeconds；之后通过分段结果审核并确认下一段费用时，把 resumeDir 原样传给 video_generate 的 resume 参数接着做（前面几段不重新生成；新增剩余分段仍需确认费用并计费），不要从头再生成一遍、也不要改用 video_extend 拼。每次调用最多完成当前一段；后续必须使用resume，不重新创建首段任务。返回每段任务 ID、上游链接和成片路径。生成通常需要几分钟（每段单独生成），单次调用返回 timeout、或某段返回 unknown（查询失败、任务其实已提交）时，都用返回的任务 ID 走 video_status 继续等，不要重复提交新任务——重复提交会重复扣费，查询失败不代表没有生成。**调用前必须先完整展示当前版脚本、再让用户审核通过，并确认开始制作**（两道确认缺一不可），不要跳过脚本直接生成。合并需要本机有 ffmpeg。本机没装 ffmpeg 时，插件会**先把这次调用拦回来（不会调用模型、不产生费用）**，返回的说明里带着按系统给的安装命令 ——这时要在对话框里和用户确认：问他要不要现在装 ffmpeg（给出他系统的命令，说明装好后首次生成可按原参数提交；已有进度则用原resume重试下载或合并），同意就调用 video_setup（install:true），宿主确认后安装并自动验证，然后首次生成按原参数提交；已有进度则使用原resume；用户不想装就带 merge:false 重发，插件只返回分段列表（每段上游链接，不下载本地文件）。拿到 ffmpegMissing=true 的结果时也要照 installHint 引导安装，别只丢一句「已跳过合并」。**人物形象 / 参考图**：公网图片 URL、base64（data URI 或纯 base64）、本机图片路径，或简写 \`latest\` 都支持——要固定人物长相、服装、场景时传 referenceImages，按数组顺序逐张提交并以图片1、图片2等指代；首帧 / 尾帧用 firstFrameUrl / lastFrameUrl 传。公网 URL 直接交给中转站取图；本地图片由插件读进来（按 ratio 先适配画幅）内联成 image_url 发给中转站，用户不需要自己找图床。**用户说「就用我刚上传/刚拖进来的那张图」时直接传 \`latest\`**（\`latest:2\` 取第 2 新的）：插件会去 Harness 附件库里找最近 2 小时上传的图片——哪怕当前聊天模型不支持图片、附件被 \`MODEL_DOES_NOT_SUPPORT_IMAGES\` 拦下，图片本身也已经落盘，照样能用。别在这时说「我看不到图片」，也别让用户自己去找路径。`,
@@ -11676,56 +9261,31 @@ function videoTool(liveConfig, deps, ctx) {
     },
     timeoutMs: 36e5,
     isConcurrencySafe() {
-      return true;
+      return !0;
     },
     async execute(args, exec) {
-      const config2 = snapshotConfig(liveConfig);
-      const apiKey = resolveApiKey(config2);
+      let config2 = snapshotConfig(liveConfig), apiKey = resolveApiKey(config2);
       assertConfigured(config2, apiKey);
-      const resumeDir = resumeDirOf(args?.resume);
-      const resume = resumeDir ? await readPauseFile(resumeDir) : null;
-      assertResumeConnection(resume, config2, args);
-      if (resume?.toolName && resume.toolName !== TOOL_NAME)
+      let resumeDir = resumeDirOf(args?.resume), resume = resumeDir ? await readPauseFile(resumeDir) : null;
+      if (assertResumeConnection(resume, config2, args), resume?.toolName && resume.toolName !== TOOL_NAME)
         throw new Error(`这份进度请使用 ${resume.toolName} 继续。`);
-      args = { ...resume?.options || {}, ...args };
-      args.mode = args.mode || "continuous";
-      args.resolution = resolveResolution(config2, args);
-      if (args.transitionDescription !== void 0 && typeof args.transitionDescription !== "string") {
+      if (args = { ...resume?.options || {}, ...args }, args.mode = args.mode || "continuous", args.resolution = resolveResolution(config2, args), args.transitionDescription !== void 0 && typeof args.transitionDescription != "string")
         throw new Error("过渡描述必须是文字。");
-      }
-      const prompt = String(args?.prompt ?? "").trim() || String(resume?.prompt ?? "").trim();
-      if (!prompt) {
+      let prompt = String(args?.prompt ?? "").trim() || String(resume?.prompt ?? "").trim();
+      if (!prompt)
         throw new Error(resumeDir ? "这次是接着上一次暂停的视频继续，但暂停记录里没有提示词：请把 prompt 补上。" : "提示词 prompt 不能为空。");
-      }
       if (resume?.options?.productionStrategy === "independent_shots") {
         if (args.productionStrategy !== resume.options.productionStrategy || JSON.stringify(args.shotDurations) !== JSON.stringify(resume.options.shotDurations)) throw Error("INDEPENDENT_PLAN_CHANGE_REQUIRES_NEW_REVIEW");
         args.duration = args.duration ?? resume.plan.reduce((n, s) => n + s.seconds, 0);
       }
-      const target = resolveTargetPlan(config2, args);
-      const { singleMax, segmentSeconds, cap, asked } = target;
-      const restarted = resume ? resumePlanFrom(resume, {
+      let target = resolveTargetPlan(config2, args), { singleMax, segmentSeconds, cap, asked } = target, restarted = resume ? resumePlanFrom(resume, {
         askedTotal: args?.duration == null ? null : asked,
         segmentSeconds
-      }) : null;
-      const plan = resume?.deliveryPending || resume && args.cumulativePreview === true ? [] : restarted ? restarted.plan : target.plan;
-      const fullPlan = restarted ? restarted.fullPlan : target.plan;
-      const total = restarted ? restarted.total : target.total;
-      const doneBefore = restarted ? Number(resume.done) || 0 : 0;
-      const plannedTotal = plan.reduce((sum, step) => sum + step.seconds, 0);
-      const notes = [];
-      if (restarted) {
-        notes.push(`接着上一次暂停的进度继续：前面 ${doneBefore} 段（${restarted.cursor} 秒）不重新生成，这次还要生成 ${plan.length} 段共 ${plannedTotal} 秒。`);
-      } else if (asked > total) {
-        notes.push(`目标 ${asked} 秒超过单条成片上限 ${cap} 秒（首段最长 ${singleMax} 秒 + 每段最多 ${segmentSeconds} 秒 × ${MAX_SEGMENTS - 1}），本次按 ${total} 秒执行。`);
-      }
-      if (!restarted && plannedTotal < total) {
-        notes.push(`目标 ${total} 秒排不满（每段上限 ${segmentSeconds} 秒 × ${MAX_SEGMENTS} 段），本次按 ${plannedTotal} 秒执行。`);
-      } else if (!restarted && plannedTotal > total) {
-        notes.push(`目标 ${total} 秒拆不出完全等长的分段（每段 4 至模型上限（2.0 为 15、2.5 为 30） 秒），本次按 ${plannedTotal} 秒执行。`);
-      }
-      const segments = [];
-      if (restarted) {
-        for (const step of resume.steps || []) {
+      }) : null, plan = resume?.deliveryPending || resume && args.cumulativePreview === !0 ? [] : restarted ? restarted.plan : target.plan, fullPlan = restarted ? restarted.fullPlan : target.plan, total = restarted ? restarted.total : target.total, doneBefore = restarted && Number(resume.done) || 0, plannedTotal = plan.reduce((sum, step) => sum + step.seconds, 0), notes = [];
+      restarted ? notes.push(`接着上一次暂停的进度继续：前面 ${doneBefore} 段（${restarted.cursor} 秒）不重新生成，这次还要生成 ${plan.length} 段共 ${plannedTotal} 秒。`) : asked > total && notes.push(`目标 ${asked} 秒超过单条成片上限 ${cap} 秒（首段最长 ${singleMax} 秒 + 每段最多 ${segmentSeconds} 秒 × ${MAX_SEGMENTS - 1}），本次按 ${total} 秒执行。`), !restarted && plannedTotal < total ? notes.push(`目标 ${total} 秒排不满（每段上限 ${segmentSeconds} 秒 × ${MAX_SEGMENTS} 段），本次按 ${plannedTotal} 秒执行。`) : !restarted && plannedTotal > total && notes.push(`目标 ${total} 秒拆不出完全等长的分段（每段 4 至模型上限（2.0 为 15、2.5 为 30） 秒），本次按 ${plannedTotal} 秒执行。`);
+      let segments = [];
+      if (restarted)
+        for (let step of resume.steps || [])
           segments.push({
             index: step.index,
             kind: step.kind,
@@ -11734,19 +9294,7 @@ function videoTool(liveConfig, deps, ctx) {
             status: "succeeded",
             videoUrl: step.videoUrl
           });
-        }
-      }
-      const resultImages = [];
-      let referenceUrl = restarted ? String(resume.lastVideoUrl || "") : "";
-      let cursor = restarted ? restarted.cursor : 0;
-      const initiallyPaused = Boolean(resume && args.cumulativePreview === true && fullPlan.length > (Number(resume.done) || 0));
-      const resumeOptions = restarted ? resume.options || {} : {};
-      const suppliedPrompts = resolveSegmentPrompts(args?.segmentPrompts ?? resumeOptions.segmentPrompts, fullPlan.length);
-      const outDir = await resolveOutputDir(config2, exec, deps);
-      const { stamp, segmentsDir } = resume ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir } : await allocateStamp(outDir, fileStamp());
-      const operationState = resume?.operationState || {};
-      const characterReferences = await initialCharacterReferences(config2, args, resume, exec?.signal);
-      const execution = await executeSegmentPlan({
+      let resultImages = [], referenceUrl = restarted ? String(resume.lastVideoUrl || "") : "", cursor = restarted ? restarted.cursor : 0, initiallyPaused = !!(resume && args.cumulativePreview === !0 && fullPlan.length > (Number(resume.done) || 0)), resumeOptions = restarted ? resume.options || {} : {}, suppliedPrompts = resolveSegmentPrompts(args?.segmentPrompts ?? resumeOptions.segmentPrompts, fullPlan.length), outDir = await resolveOutputDir(config2, exec, deps), { stamp, segmentsDir } = resume ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir } : await allocateStamp(outDir, fileStamp()), operationState = resume?.operationState || {}, characterReferences = await initialCharacterReferences(config2, args, resume, exec?.signal), execution = await executeSegmentPlan({
         config: config2,
         ctx,
         exec,
@@ -11758,7 +9306,7 @@ function videoTool(liveConfig, deps, ctx) {
         operationState,
         notes,
         initial: { cursor, referenceUrl, pendingTask: resume?.pendingTask || null, characterReferences, paused: initiallyPaused },
-        persistBeforeRun: Boolean(resume?.deliveryPending),
+        persistBeforeRun: !!resume?.deliveryPending,
         save: (state) => saveProgress(segmentsDir, {
           config: config2,
           toolName: TOOL_NAME,
@@ -11774,9 +9322,8 @@ function videoTool(liveConfig, deps, ctx) {
           characterReferences: state.characterReferences
         }),
         buildStep: async ({ step, position, state }) => {
-          const focusedPrompt = suppliedPrompts ? args.productionStrategy === "independent_shots" ? `【独立镜头 ${position + 1}/${fullPlan.length}】只执行本镜动作与对白，不引用或重演其他镜头，不假设存在视频1。镜头之间以剪辑衔接。
-${suppliedPrompts[position]}` : buildSegmentExecutionPrompt({ prompt: suppliedPrompts[position], kind: step.kind, index: position, count: fullPlan.length }) : prompt;
-          const stepArgs = {
+          let focusedPrompt = suppliedPrompts ? args.productionStrategy === "independent_shots" ? `【独立镜头 ${position + 1}/${fullPlan.length}】只执行本镜动作与对白，不引用或重演其他镜头，不假设存在视频1。镜头之间以剪辑衔接。
+${suppliedPrompts[position]}` : buildSegmentExecutionPrompt({ prompt: suppliedPrompts[position], kind: step.kind, index: position, count: fullPlan.length }) : prompt, stepArgs = {
             ...resumeOptions,
             ...args,
             characterReferences: state.characterReferences,
@@ -11785,38 +9332,20 @@ ${suppliedPrompts[position]}` : buildSegmentExecutionPrompt({ prompt: suppliedPr
             // 这条流程是「先直出再向后续拍」，分段的拼接顺序固定为向后延长。
             direction: "backward",
             startAt: step.kind === "extend" && isOmniExtendModel(resolveModel(config2)) ? state.cursor : void 0
-          };
-          let body;
-          let seconds;
+          }, body, seconds;
           if (step.kind === "generate") {
-            const initialArgs = shotMaterials(stepArgs, position, fullPlan.length);
-            if (state.characterReferences.length) {
-              if (!initialArgs.firstFrameUrl && !initialArgs.lastFrameUrl && (!initialArgs.referenceImages || args.characterReferenceImages === void 0))
-                initialArgs.referenceImages = state.characterReferences.map((item) => item.image_url.url);
-              else if (args.productionStrategy !== "independent_shots" && stepArgs.firstFrameUrl && args.characterReferenceImages === void 0)
-                initialArgs.firstFrameUrl = state.characterReferences[0].image_url.url;
-            }
-            const generated = await buildGenerationBody(config2, initialArgs, step.seconds, {
+            let initialArgs = shotMaterials(stepArgs, position, fullPlan.length);
+            state.characterReferences.length && (!initialArgs.firstFrameUrl && !initialArgs.lastFrameUrl && (!initialArgs.referenceImages || args.characterReferenceImages === void 0) ? initialArgs.referenceImages = state.characterReferences.map((item) => item.image_url.url) : args.productionStrategy !== "independent_shots" && stepArgs.firstFrameUrl && args.characterReferenceImages === void 0 && (initialArgs.firstFrameUrl = state.characterReferences[0].image_url.url));
+            let generated = await buildGenerationBody(config2, initialArgs, step.seconds, {
               signal: exec?.signal
             });
-            body = generated.body;
-            seconds = generated.seconds;
-            if (generated.images?.length)
-              resultImages.push(...generated.images);
-            if (generated.notes?.length)
-              notes.push(...generated.notes);
-          } else {
+            body = generated.body, seconds = generated.seconds, generated.images?.length && resultImages.push(...generated.images), generated.notes?.length && notes.push(...generated.notes);
+          } else
             ({ body, seconds } = buildRequestBody(config2, stepArgs, state.referenceUrl));
-          }
           return { body, seconds };
         },
         interruptionMessage: "这次调用被中断了（用户点了停止，或者等超时了）：已经生成好的部分会尝试下载并交付；是否合并以返回结果为准，剩下的段不用重头再来——用 resume 就能接着做。"
-      });
-      let { paused } = execution;
-      const { status, error, errorCode, submissionId, convertedReferences, pendingTask, interrupted } = execution;
-      const completed = segments.filter((segment) => segment.status === "succeeded" && segment.videoUrl);
-      const deliveredSeconds = completed.reduce((sum, segment) => sum + (segment.seconds || 0), 0);
-      const result = {
+      }), { paused } = execution, { status, error, errorCode, submissionId, convertedReferences, pendingTask, interrupted } = execution, completed = segments.filter((segment) => segment.status === "succeeded" && segment.videoUrl), deliveredSeconds = completed.reduce((sum, segment) => sum + (segment.seconds || 0), 0), result = {
         status,
         mode: args.productionStrategy === "independent_shots" ? "independent_shots" : fullPlan.length > 1 ? "extended" : "direct",
         plannedSeconds: restarted ? total : plannedTotal,
@@ -11829,40 +9358,19 @@ ${suppliedPrompts[position]}` : buildSegmentExecutionPrompt({ prompt: suppliedPr
         convertedReferences,
         ...convertedReferences ? { nextAction: "show_reference_images_then_wait_for_user" } : {}
       };
-      if (resume?.deliveryPending && doneBefore < fullPlan.length)
-        paused = true;
-      const plannedRemainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - deliveredSeconds);
-      const remainingSeconds = Math.max(0, total - deliveredSeconds);
-      if (paused) {
-        result.paused = true;
-        result.remainingSeconds = plannedRemainingSeconds;
-      }
-      result.resumeDir = segmentsDir;
-      result.segmentsDir = segmentsDir;
-      if (pendingTask) {
-        result.pendingTaskId = pendingTask.taskId;
-        result.note = "任务已提交，请用 resume 查询并接回原进度，或用 video_status 查询；不要重复提交。";
-      }
-      if (resultImages.length) {
-        result.images = resultImages.map((item) => ({
-          role: item.role,
-          source: item.source,
-          localPath: item.localPath,
-          bytes: item.bytes,
-          originalPath: item.originalPath,
-          fittedTo: item.fittedTo,
-          uploadedAt: item.uploadedAt,
-          recentUploads: item.recentUploads
-        }));
-      }
-      if (describeIncompleteRun({ result, status, segments, notes, completed, deliveredSeconds })) {
-        result.note = notes.join("\n");
-        return result;
-      }
-      if (args?.merge === false) {
-        return skipMergeDelivery({ result, paused, remainingSeconds, notes, segmentsDir, toolName: TOOL_NAME });
-      }
-      return runSegmentDelivery({
+      resume?.deliveryPending && doneBefore < fullPlan.length && (paused = !0);
+      let plannedRemainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - deliveredSeconds), remainingSeconds = Math.max(0, total - deliveredSeconds);
+      return paused && (result.paused = !0, result.remainingSeconds = plannedRemainingSeconds), result.resumeDir = segmentsDir, result.segmentsDir = segmentsDir, pendingTask && (result.pendingTaskId = pendingTask.taskId, result.note = "任务已提交，请用 resume 查询并接回原进度，或用 video_status 查询；不要重复提交。"), resultImages.length && (result.images = resultImages.map((item) => ({
+        role: item.role,
+        source: item.source,
+        localPath: item.localPath,
+        bytes: item.bytes,
+        originalPath: item.originalPath,
+        fittedTo: item.fittedTo,
+        uploadedAt: item.uploadedAt,
+        recentUploads: item.recentUploads
+      }))), describeIncompleteRun({ result, status, segments, notes, completed, deliveredSeconds }) ? (result.note = notes.join(`
+`), result) : args?.merge === !1 ? skipMergeDelivery({ result, paused, remainingSeconds, notes, segmentsDir, toolName: TOOL_NAME }) : runSegmentDelivery({
         config: args.productionStrategy === "independent_shots" ? { ...config2, seamTrimSeconds: "0" } : config2,
         exec,
         interrupted,
@@ -11873,7 +9381,7 @@ ${suppliedPrompts[position]}` : buildSegmentExecutionPrompt({ prompt: suppliedPr
         stamp,
         notes,
         result,
-        cumulativePreview: args.cumulativePreview === true,
+        cumulativePreview: args.cumulativePreview === !0,
         paused,
         remainingSeconds,
         pauseNote: `已完成从头到第 ${segments.length} 段，分段仍保留在 ${segmentsDir}。`,
@@ -11887,8 +9395,7 @@ ${suppliedPrompts[position]}` : buildSegmentExecutionPrompt({ prompt: suppliedPr
 init_connection();
 init_config();
 function extendTool(liveConfig, deps, ctx) {
-  const config = liveConfig;
-  const TOOL_NAME = "video_extend";
+  let config = liveConfig, TOOL_NAME = "video_extend";
   return {
     name: "video_extend",
     description: "把一段已有的视频向前或向后延长：以公网视频 URL 作为输入素材，调用 Seedance 生成衔接片段，保持人物、服装、场景光线和声音连续；可一次连续延长多段，每段都用上一段的结果继续延长。提示词规则：以「向后延长视频1」或「向前延长视频1」开头（也可写「生成视频1之后的内容：」），全程用「视频1」指代输入素材，不要写成「参考视频1」（会被当成参考生视频，不是延长）；内容写清延长方向、剧情发展、主体状态、镜头运动和声音延续（背景音乐要接着视频1结尾往下走，禁止从头播放/换曲），减少接缝。每段 4 至模型上限（2.0 为 15、2.5 为 30） 秒，默认按所选模型上限拆、段数最少；上游对卡满 15 秒敏感时再调小。返回每段的任务 ID 和最终视频下载链接（有效期以上游为准）；生成通常需要几分钟，单次调用返回 timeout、或某段返回 unknown（查询失败、任务其实已提交）时，都用返回的任务 ID 走 video_status 继续等，不要重复提交同一段。每段延长完先返回成果供展示，用户预览并确认继续后再用resume续做；未确认时停在当前成果，结果里带 paused=true、resumeDir、remainingSeconds；之后用户说「继续」时把 resumeDir 原样传给 video_extend 的 resume 参数接着做（前面几段不重新生成；新增剩余分段仍需确认费用并计费）。多段默认会下载分段并在本机合并成一条成片（需要 ffmpeg）：没有 ffmpeg 时会先拦下来问用户，结果里也会带 ffmpegMissing 与安装引导。中途被停止 / 等超时同理：已经延长好的段先交付，剩下的用 resume 接着做。",
@@ -12009,70 +9516,43 @@ function extendTool(liveConfig, deps, ctx) {
     },
     timeoutMs: 18e5,
     isConcurrencySafe() {
-      return true;
+      return !0;
     },
     async execute(args, exec) {
-      const config2 = snapshotConfig(liveConfig);
-      const apiKey = resolveApiKey(config2);
+      let config2 = snapshotConfig(liveConfig), apiKey = resolveApiKey(config2);
       assertConfigured(config2, apiKey);
-      const resumeDir = resumeDirOf(args?.resume);
-      const resume = resumeDir ? await readPauseFile(resumeDir) : null;
-      assertResumeConnection(resume, config2, args);
-      if (resume?.toolName && resume.toolName !== TOOL_NAME)
+      let resumeDir = resumeDirOf(args?.resume), resume = resumeDir ? await readPauseFile(resumeDir) : null;
+      if (assertResumeConnection(resume, config2, args), resume?.toolName && resume.toolName !== TOOL_NAME)
         throw new Error(`这份进度请使用 ${resume.toolName} 继续。`);
-      args = { ...resume?.options || {}, ...args };
-      args.mode = args.mode || "continuous";
-      args.resolution = resolveResolution(config2, args);
-      if (args.transitionDescription !== void 0 && typeof args.transitionDescription !== "string") {
+      if (args = { ...resume?.options || {}, ...args }, args.mode = args.mode || "continuous", args.resolution = resolveResolution(config2, args), args.transitionDescription !== void 0 && typeof args.transitionDescription != "string")
         throw new Error("过渡描述必须是文字。");
-      }
-      const prompt = String(args?.prompt ?? "").trim() || String(resume?.prompt ?? "").trim();
-      if (!prompt) {
+      let prompt = String(args?.prompt ?? "").trim() || String(resume?.prompt ?? "").trim();
+      if (!prompt)
         throw new Error(resumeDir ? "这次是接着上一次暂停的延长继续，但暂停记录里没有提示词：请把 prompt 补上。" : "提示词 prompt 不能为空。");
-      }
-      const lastOptions = resume ? resume.options || {} : {};
-      const direction = (args?.direction ?? lastOptions.direction) === "forward" ? "forward" : "backward";
-      const wording = (args?.wording ?? lastOptions.wording) === "after" ? "after" : "extend";
+      let lastOptions = resume ? resume.options || {} : {}, direction = (args?.direction ?? lastOptions.direction) === "forward" ? "forward" : "backward", wording = (args?.wording ?? lastOptions.wording) === "after" ? "after" : "extend";
       validateExtensionDuration(config2, args);
-      const requestedSegments = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1);
-      const secondsPerSegment = clampInteger(args?.duration ?? modelMaxSeconds(config2), MIN_SECONDS, modelMaxSeconds(config2), modelMaxSeconds(config2));
-      let referenceUrl = String(args?.videoUrl ?? "").trim();
+      let requestedSegments = clampInteger(args?.segments, 1, MAX_SEGMENTS, 1), secondsPerSegment = clampInteger(args?.duration ?? modelMaxSeconds(config2), MIN_SECONDS, modelMaxSeconds(config2), modelMaxSeconds(config2)), referenceUrl = String(args?.videoUrl ?? "").trim();
       if (!referenceUrl && args?.taskId) {
-        const sourceId = String(args.taskId).trim();
-        let source;
+        let sourceId = String(args.taskId).trim(), source;
         try {
           source = await getTask(config2, sourceId, exec?.signal);
         } catch (failure) {
-          if (failure?.code === "ABORTED")
-            throw failure;
-          throw new Error(`读取参考视频任务 ${sourceId} 失败：${failure?.message || failure}。这不代表该任务没有生成——稍后重试，或直接把成片的公网链接用 videoUrl 传进来。`);
+          throw failure?.code === "ABORTED" ? failure : new Error(`读取参考视频任务 ${sourceId} 失败：${failure?.message || failure}。这不代表该任务没有生成——稍后重试，或直接把成片的公网链接用 videoUrl 传进来。`);
         }
-        referenceUrl = extractVideoUrl(source) || "";
-        if (!referenceUrl) {
+        if (referenceUrl = extractVideoUrl(source) || "", !referenceUrl)
           throw new Error(`任务 ${args.taskId} 没有可用的视频链接（状态：${extractStatus(source) || "未知"}）。`);
-        }
       }
-      if (!referenceUrl && resume)
-        referenceUrl = String(resume.lastVideoUrl ?? "").trim();
-      referenceUrl = normalizeReferenceUrl(referenceUrl);
-      const doneBefore = resume ? Number(resume.done) || 0 : 0;
-      const fullPlan = resume ? (resume.plan || []).map((step) => ({ ...step })) : [];
-      if (!resume) {
-        for (let index = 0; index < requestedSegments; index += 1) {
-          fullPlan.push({ kind: "extend", seconds: secondsPerSegment });
-        }
-      } else if (args?.segments != null) {
-        for (let index = 0; index < requestedSegments && fullPlan.length < MAX_SEGMENTS; index += 1) {
-          fullPlan.push({ kind: "extend", seconds: secondsPerSegment });
-        }
-      }
-      const plan = resume?.deliveryPending || resume && args.cumulativePreview === true ? [] : fullPlan.slice(doneBefore);
-      const plannedSeconds = plan.reduce((sum, step) => sum + step.seconds, 0);
-      let cursor = resume ? resume.cursor ?? null : args?.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt)));
-      const notes = [];
-      const segments = [];
+      !referenceUrl && resume && (referenceUrl = String(resume.lastVideoUrl ?? "").trim()), referenceUrl = normalizeReferenceUrl(referenceUrl);
+      let doneBefore = resume && Number(resume.done) || 0, fullPlan = resume ? (resume.plan || []).map((step) => ({ ...step })) : [];
       if (resume) {
-        for (const step of resume.steps || []) {
+        if (args?.segments != null)
+          for (let index = 0; index < requestedSegments && fullPlan.length < MAX_SEGMENTS; index += 1)
+            fullPlan.push({ kind: "extend", seconds: secondsPerSegment });
+      } else for (let index = 0; index < requestedSegments; index += 1)
+        fullPlan.push({ kind: "extend", seconds: secondsPerSegment });
+      let plan = resume?.deliveryPending || resume && args.cumulativePreview === !0 ? [] : fullPlan.slice(doneBefore), plannedSeconds = plan.reduce((sum, step) => sum + step.seconds, 0), cursor = resume ? resume.cursor ?? null : args?.startAt == null ? null : Math.max(0, Math.round(Number(args.startAt))), notes = [], segments = [];
+      if (resume)
+        for (let step of resume.steps || [])
           segments.push({
             index: step.index,
             kind: "extend",
@@ -12081,14 +9561,7 @@ function extendTool(liveConfig, deps, ctx) {
             status: "succeeded",
             videoUrl: step.videoUrl
           });
-        }
-      }
-      const initiallyPaused = Boolean(resume && args.cumulativePreview === true && fullPlan.length > (Number(resume.done) || 0));
-      const outDir = await resolveOutputDir(config2, exec, deps);
-      const { stamp, segmentsDir } = resume ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir } : await allocateStamp(outDir, fileStamp());
-      const operationState = resume?.operationState || {};
-      const characterReferences = await initialCharacterReferences(config2, args, resume, exec?.signal);
-      const execution = await executeSegmentPlan({
+      let initiallyPaused = !!(resume && args.cumulativePreview === !0 && fullPlan.length > (Number(resume.done) || 0)), outDir = await resolveOutputDir(config2, exec, deps), { stamp, segmentsDir } = resume ? { stamp: String(resume.stamp || fileStamp()), segmentsDir: resumeDir } : await allocateStamp(outDir, fileStamp()), operationState = resume?.operationState || {}, characterReferences = await initialCharacterReferences(config2, args, resume, exec?.signal), execution = await executeSegmentPlan({
         config: config2,
         ctx,
         exec,
@@ -12100,7 +9573,7 @@ function extendTool(liveConfig, deps, ctx) {
         operationState,
         notes,
         initial: { cursor, referenceUrl, pendingTask: resume?.pendingTask || null, characterReferences, paused: initiallyPaused },
-        persistBeforeRun: Boolean(resume?.deliveryPending),
+        persistBeforeRun: !!resume?.deliveryPending,
         save: (state) => saveProgress(segmentsDir, {
           config: config2,
           toolName: TOOL_NAME,
@@ -12115,8 +9588,8 @@ function extendTool(liveConfig, deps, ctx) {
           operationState,
           characterReferences: state.characterReferences
         }),
-        buildStep: async ({ step, position, state }) => {
-          const { body, seconds } = buildRequestBody(config2, {
+        buildStep: async ({ step, state }) => {
+          let { body, seconds } = buildRequestBody(config2, {
             ...lastOptions,
             ...args,
             characterReferences: state.characterReferences,
@@ -12131,16 +9604,11 @@ function extendTool(liveConfig, deps, ctx) {
         advanceCursor: (cursor2, seconds) => {
           if (cursor2 == null)
             return null;
-          const next = direction === "forward" ? cursor2 - seconds : cursor2 + seconds;
+          let next = direction === "forward" ? cursor2 - seconds : cursor2 + seconds;
           return next < 0 ? null : next;
         },
         interruptionMessage: "这次调用被中断了（用户点了停止，或者等超时了）：已经延长好的部分会尝试下载并交付；是否合并以返回结果为准，剩下的段不用重头再来——用 resume 就能接着做。"
-      });
-      let { paused } = execution;
-      const { status, error, errorCode, submissionId, convertedReferences, pendingTask, interrupted } = execution;
-      const completed = segments.filter((segment) => segment.status === "succeeded" && segment.videoUrl);
-      const deliveredSeconds = completed.reduce((sum, segment) => sum + (segment.seconds || 0), 0);
-      const result = {
+      }), { paused } = execution, { status, error, errorCode, submissionId, convertedReferences, pendingTask, interrupted } = execution, completed = segments.filter((segment) => segment.status === "succeeded" && segment.videoUrl), deliveredSeconds = completed.reduce((sum, segment) => sum + (segment.seconds || 0), 0), result = {
         status,
         error,
         errorCode,
@@ -12151,35 +9619,11 @@ function extendTool(liveConfig, deps, ctx) {
         videoUrl: completed.at(-1)?.videoUrl,
         totalSeconds: deliveredSeconds
       };
-      if (resume?.deliveryPending && doneBefore < fullPlan.length)
-        paused = true;
-      const remainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - deliveredSeconds);
-      if (paused) {
-        result.paused = true;
-        result.remainingSeconds = remainingSeconds;
-      }
-      result.resumeDir = segmentsDir;
-      result.segmentsDir = segmentsDir;
-      if (pendingTask) {
-        result.pendingTaskId = pendingTask.taskId;
-        result.note = "任务已提交，请用 resume 查询并接回原进度，或用 video_status 查询；不要重复提交。";
-      }
-      if (!completed.length && status === "succeeded") {
-        if (notes.length)
-          result.note = notes.join("\n");
-        return result;
-      }
-      if (describeIncompleteRun({ result, status, segments, notes, completed, deliveredSeconds })) {
-        result.note = notes.join("\n");
-        return result;
-      }
-      if (resume) {
-        notes.push(`接着上一次暂停的进度继续：前面 ${doneBefore} 段（${formatSeconds(resume.cursor ?? 0)}）不重新生成，这次还要延长 ${plan.length} 段共 ${plannedSeconds} 秒。`);
-      }
-      if (args?.merge === false) {
-        return skipMergeDelivery({ result, paused, remainingSeconds, notes, segmentsDir, toolName: TOOL_NAME });
-      }
-      return runSegmentDelivery({
+      resume?.deliveryPending && doneBefore < fullPlan.length && (paused = !0);
+      let remainingSeconds = Math.max(0, fullPlan.reduce((sum, step) => sum + step.seconds, 0) - deliveredSeconds);
+      return paused && (result.paused = !0, result.remainingSeconds = remainingSeconds), result.resumeDir = segmentsDir, result.segmentsDir = segmentsDir, pendingTask && (result.pendingTaskId = pendingTask.taskId, result.note = "任务已提交，请用 resume 查询并接回原进度，或用 video_status 查询；不要重复提交。"), !completed.length && status === "succeeded" ? (notes.length && (result.note = notes.join(`
+`)), result) : describeIncompleteRun({ result, status, segments, notes, completed, deliveredSeconds }) ? (result.note = notes.join(`
+`), result) : (resume && notes.push(`接着上一次暂停的进度继续：前面 ${doneBefore} 段（${formatSeconds(resume.cursor ?? 0)}）不重新生成，这次还要延长 ${plan.length} 段共 ${plannedSeconds} 秒。`), args?.merge === !1 ? skipMergeDelivery({ result, paused, remainingSeconds, notes, segmentsDir, toolName: TOOL_NAME }) : runSegmentDelivery({
         config: config2,
         exec,
         interrupted,
@@ -12190,12 +9634,12 @@ function extendTool(liveConfig, deps, ctx) {
         stamp,
         notes,
         result,
-        cumulativePreview: args.cumulativePreview === true,
+        cumulativePreview: args.cumulativePreview === !0,
         paused,
         remainingSeconds,
         pauseNote: `本次累计预览包含已完成的 ${segments.length} 段，不是整条最终成片，分段仍保留在 ${segmentsDir}。`,
         toolName: TOOL_NAME
-      });
+      }));
     }
   };
 }
@@ -12230,8 +9674,8 @@ function taskTool(liveConfig) {
         }
       },
       render(_args, value) {
-        const { taskId, status, videoUrl, error, model } = value || {};
-        if (status === "succeeded") {
+        let { taskId, status, videoUrl, error, model } = value || {};
+        if (status === "succeeded")
           return [
             {
               type: "text",
@@ -12241,15 +9685,14 @@ function taskTool(liveConfig) {
                 `模型：${model || "-"}`,
                 `视频链接（有效期以上游为准，请及时保存）：${artifactLink("观看视频", "", videoUrl) || "（无）"}`,
                 "正文须保留上述可点击链接，有卡片也不能省略；查询不会重新生成视频。"
-              ].join("\n")
+              ].join(`
+`)
             }
           ];
-        }
-        if (status === "failed") {
+        if (status === "failed")
           return [{ type: "text", text: `视频任务失败（任务 ${taskId}）：${error || "未知错误"}` }];
-        }
         if (status === "unknown") {
-          const detail = String(error || "查询失败").replace(/。+$/, "");
+          let detail = String(error || "查询失败").replace(/。+$/, "");
           return [
             {
               type: "text",
@@ -12262,13 +9705,12 @@ function taskTool(liveConfig) {
     },
     timeoutMs: 6e4,
     isConcurrencySafe() {
-      return true;
+      return !0;
     },
     async execute(args, exec) {
-      const config = snapshotConfig(liveConfig);
-      const apiKey = resolveApiKey(config);
+      let config = snapshotConfig(liveConfig), apiKey = resolveApiKey(config);
       assertConfigured(config, apiKey);
-      const taskId = String(args?.taskId ?? "").trim();
+      let taskId = String(args?.taskId ?? "").trim();
       if (!taskId) throw new Error("taskId 不能为空。");
       let task;
       try {
@@ -12281,14 +9723,11 @@ function taskTool(liveConfig) {
           error: `查询失败：${failure?.message || failure}`
         };
       }
-      const status = extractStatus(task) || "unknown";
-      const model = findKey(task, ["model"]) || resolveModel(config);
-      const videoUrl = extractVideoUrl(task);
-      if (SUCCESS_STATES.has(status) && videoUrl) {
+      let status = extractStatus(task) || "unknown", model = findKey(task, ["model"]) || resolveModel(config), videoUrl = extractVideoUrl(task);
+      if (SUCCESS_STATES.has(status) && videoUrl)
         return { taskId, status: "succeeded", model, videoUrl };
-      }
       if (SUCCESS_STATES.has(status) && !videoUrl) {
-        const imageUrl = extractImageUrl(task);
+        let imageUrl = extractImageUrl(task);
         return {
           taskId,
           status: "failed",
@@ -12298,15 +9737,13 @@ function taskTool(liveConfig) {
         };
       }
       if (FAILED_STATES.has(status)) {
-        const detail = findKey(task, ["error", "fail_reason", "message", "detail"]);
-        const classified = classifyError(
+        let detail = findKey(task, ["error", "fail_reason", "message", "detail"]), classified = classifyError(
           400,
-          typeof detail === "string" ? { message: detail } : detail || task
+          typeof detail == "string" ? { message: detail } : detail || task
         );
-        const raw = status === "cancelled" || status === "canceled" ? "cancelled" : "failed";
         return {
           taskId,
-          status: raw,
+          status: status === "cancelled" || status === "canceled" ? "cancelled" : "failed",
           model,
           errorCode: classified.code,
           error: isContentRejection(classified.message) ? `${CONTENT_REJECTION_HINT}上游详情：${classified.message}` : classified.message
@@ -12352,7 +9789,7 @@ function setupTool(config) {
         }
       },
       render(_args, value) {
-        const {
+        let {
           status,
           os: os5,
           ffmpegVersion,
@@ -12361,82 +9798,46 @@ function setupTool(config) {
           installCommand,
           output,
           note
-        } = value || {};
-        const lines = [];
-        if (status === "ready") {
-          lines.push("本机环境没问题：ffmpeg 已经能用了，长视频可以直接合并成一条。");
-        } else if (status === "installed") {
-          lines.push("ffmpeg 装好了，长视频现在可以合并成一条。");
-        } else if (status === "missing") {
-          lines.push("本机还没有 ffmpeg：生成超过模型单次上限的视频时只能给分段，没法合并成一条。");
-          lines.push(`装一下就好（${os5 || "当前系统"}）：${installCommand || ""}`);
-          lines.push("用户同意的话，我可以用 video_setup（install=true）直接帮他装。");
-        } else if (status === "failed") {
-          lines.push("ffmpeg 没装成功，得手动装一下。");
-          lines.push(`手动步骤：${note || installCommand || ""}`);
-        } else {
-          lines.push(`环境检查结果：${status || "未知"}。`);
-        }
-        if (ffmpegVersion) lines.push(`ffmpeg：${ffmpegVersion}`);
-        if (ffmpegPath) lines.push(`ffmpeg 路径：${ffmpegPath}（可以填进插件设置里的「ffmpeg 路径」）`);
-        if (ffprobeVersion) lines.push(`ffprobe：${ffprobeVersion}`);
-        if (status !== "ready" && status !== "installed" && installCommand && status === "failed") {
-          lines.push(`命令：${installCommand}`);
-        }
-        if (output) lines.push(`安装输出（末尾）：${output}`);
-        if (note) lines.push(note);
-        return [{ type: "text", text: lines.filter(Boolean).join("\n") }];
+        } = value || {}, lines = [];
+        return status === "ready" ? lines.push("本机环境没问题：ffmpeg 已经能用了，长视频可以直接合并成一条。") : status === "installed" ? lines.push("ffmpeg 装好了，长视频现在可以合并成一条。") : status === "missing" ? (lines.push("本机还没有 ffmpeg：生成超过模型单次上限的视频时只能给分段，没法合并成一条。"), lines.push(`装一下就好（${os5 || "当前系统"}）：${installCommand || ""}`), lines.push("用户同意的话，我可以用 video_setup（install=true）直接帮他装。")) : status === "failed" ? (lines.push("ffmpeg 没装成功，得手动装一下。"), lines.push(`手动步骤：${note || installCommand || ""}`)) : lines.push(`环境检查结果：${status || "未知"}。`), ffmpegVersion && lines.push(`ffmpeg：${ffmpegVersion}`), ffmpegPath && lines.push(`ffmpeg 路径：${ffmpegPath}（可以填进插件设置里的「ffmpeg 路径」）`), ffprobeVersion && lines.push(`ffprobe：${ffprobeVersion}`), status !== "ready" && status !== "installed" && installCommand && status === "failed" && lines.push(`命令：${installCommand}`), output && lines.push(`安装输出（末尾）：${output}`), note && lines.push(note), [{ type: "text", text: lines.filter(Boolean).join(`
+`) }];
       }
     },
     // 装 ffmpeg 可能要下载几十 MB，给足时间；装完还要再验证一次。
-    timeoutMs: 20 * 60 * 1e3,
+    timeoutMs: 1200 * 1e3,
     isConcurrencySafe() {
-      return false;
+      return !1;
     },
     async execute(args, exec) {
-      const signal = exec?.signal;
-      const binary = resolveBinary(config, "ffmpegBinary", "ffmpeg");
-      const probeBinary = resolveBinary(config, "ffprobeBinary", "ffprobe");
-      const { os: os5, installs, bootstrap } = ffmpegInstallOptions();
-      const wantsInstall = args?.install === true;
-      const target = String(args?.target || "ffmpeg");
-      const manualSteps = installs.map((item) => `${item.label}：${item.command}`);
-      const installCommand = target === "package-manager" && bootstrap ? bootstrap.command : installs[0].command;
-      const ffmpegVersion = await probeBinaryVersion(binary, signal);
-      const ffprobeVersion = await probeBinaryVersion(probeBinary, signal);
-      const base = { os: os5, installCommand, manualSteps, ffmpegVersion, ffprobeVersion };
-      if (ffmpegVersion) {
-        const note = ffprobeVersion ? "ffmpeg 与 ffprobe 都可用，长视频会正常合并成一条。" : "ffmpeg 可用；没有 ffprobe，分段时长探测会被跳过（不影响合并）。";
-        return { status: "ready", ...base, ffmpegPath: binary, note };
-      }
-      if (!wantsInstall) {
+      let signal = exec?.signal, binary = resolveBinary(config, "ffmpegBinary", "ffmpeg"), probeBinary = resolveBinary(config, "ffprobeBinary", "ffprobe"), { os: os5, installs, bootstrap } = ffmpegInstallOptions(), wantsInstall = args?.install === !0, target = String(args?.target || "ffmpeg"), manualSteps = installs.map((item) => `${item.label}：${item.command}`), installCommand = target === "package-manager" && bootstrap ? bootstrap.command : installs[0].command, ffmpegVersion = await probeBinaryVersion(binary, signal), ffprobeVersion = await probeBinaryVersion(probeBinary, signal), base = { os: os5, installCommand, manualSteps, ffmpegVersion, ffprobeVersion };
+      if (ffmpegVersion)
+        return { status: "ready", ...base, ffmpegPath: binary, note: ffprobeVersion ? "ffmpeg 与 ffprobe 都可用，长视频会正常合并成一条。" : "ffmpeg 可用；没有 ffprobe，分段时长探测会被跳过（不影响合并）。" };
+      if (!wantsInstall)
         return {
           status: "missing",
           ...base,
           note: `本机 ${binary} 跑不起来。用户同意后可以 install=true 让我来装；也有可能是路径不对：已经装过就把绝对路径填进插件设置里的「ffmpeg 路径」。`
         };
-      }
       let output = "";
       try {
-        const shellCommand = target === "package-manager" && bootstrap ? bootstrap.command : target === "package-manager" && !bootstrap ? null : installs[0].command;
-        if (!shellCommand) {
+        let shellCommand = target === "package-manager" && bootstrap ? bootstrap.command : target === "package-manager" && !bootstrap ? null : installs[0].command;
+        if (!shellCommand)
           return {
             status: "failed",
             ...base,
             note: `${os5} 不需要另外装包管理器，直接用系统自带的包管理器装 ffmpeg 就行。`
           };
-        }
-        const result = await runProcess(shellCommand, [], {
+        let result = await runProcess(shellCommand, [], {
           signal,
-          shell: true,
-          timeoutMs: 18 * 60 * 1e3
+          shell: !0,
+          timeoutMs: 1080 * 1e3
         });
         output = tail(String(result.stdout || "") + String(result.stderr || ""), 800);
       } catch (error) {
         output = tail(error?.message || String(error), 800);
       }
-      const afterVersion = await probeBinaryVersion(binary, signal);
-      if (afterVersion) {
+      let afterVersion = await probeBinaryVersion(binary, signal);
+      if (afterVersion)
         return {
           status: "installed",
           ...base,
@@ -12445,9 +9846,8 @@ function setupTool(config) {
           output,
           note: "已验证ffmpeg可用。已有任务用原resume重试下载或合并；尚未提交的新任务仍需单独确认生成费用。"
         };
-      }
-      const found = await findInstalledFfmpeg(signal);
-      if (found) {
+      let found = await findInstalledFfmpeg(signal);
+      if (found)
         return {
           status: "installed",
           ...base,
@@ -12456,8 +9856,7 @@ function setupTool(config) {
           output,
           note: `装好了，但没进 PATH：把 ${found} 填进插件设置里的「ffmpeg 路径」，保存后用原resume恢复已有任务。`
         };
-      }
-      const needsBootstrap = Boolean(bootstrap) && !ffmpegVersion && /command not found|not found|不是内部或外部命令|未找到/i.test(output);
+      let needsBootstrap = !!bootstrap && !ffmpegVersion && /command not found|not found|不是内部或外部命令|未找到/i.test(output);
       return {
         status: "failed",
         ...base,
@@ -12472,14 +9871,13 @@ function setupTool(config) {
 
 // src/businesses/video-generation/internal/hyperframes.ts
 import { spawn as spawn2 } from "node:child_process";
-import path25 from "node:path";
+import path24 from "node:path";
 import { createRequire as createRequire2 } from "node:module";
 import { stat as stat12, mkdir as mkdir16 } from "node:fs/promises";
 function runHyperframes(cli, args, cwd, config, signal) {
   return new Promise((resolve3, reject) => {
     if (signal?.aborted) return reject(new Error("Hyperframes 已取消。"));
-    let output = "";
-    const child = spawn2(process.execPath, [cli, ...args], {
+    let output = "", child = spawn2(process.execPath, [cli, ...args], {
       cwd,
       env: {
         ...process.env,
@@ -12489,41 +9887,23 @@ function runHyperframes(cli, args, cwd, config, signal) {
         ...Object.fromEntries([
           ["HYPERFRAMES_FFMPEG_PATH", resolveBinary(config, "ffmpegBinary", "ffmpeg")],
           ["HYPERFRAMES_FFPROBE_PATH", resolveBinary(config, "ffprobeBinary", "ffprobe")]
-        ].filter(([, binary]) => path25.isAbsolute(binary)))
+        ].filter(([, binary]) => path24.isAbsolute(binary)))
       },
       stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true
-    });
-    const collect = (data) => {
+      windowsHide: !0
+    }), collect = (data) => {
       output = (output + data.toString()).slice(-24e3);
     };
-    child.stdout.on("data", collect);
-    child.stderr.on("data", collect);
-    let stopped;
-    let forceKill;
-    const stop = (reason) => {
-      if (stopped) return;
-      stopped = new Error(reason);
-      child.kill("SIGTERM");
-      forceKill = setTimeout(() => child.kill("SIGKILL"), 5e3);
-      forceKill.unref();
+    child.stdout.on("data", collect), child.stderr.on("data", collect);
+    let stopped, forceKill, stop = (reason) => {
+      stopped || (stopped = new Error(reason), child.kill("SIGTERM"), forceKill = setTimeout(() => child.kill("SIGKILL"), 5e3), forceKill.unref());
+    }, abort = () => stop("Hyperframes 已取消。"), timer = setTimeout(() => stop("Hyperframes 执行超过 20 分钟，已停止。"), 1200 * 1e3), cleanup = () => {
+      clearTimeout(timer), forceKill && clearTimeout(forceKill), signal?.removeEventListener("abort", abort);
     };
-    const abort = () => stop("Hyperframes 已取消。");
-    const timer = setTimeout(() => stop("Hyperframes 执行超过 20 分钟，已停止。"), 20 * 60 * 1e3);
-    const cleanup = () => {
-      clearTimeout(timer);
-      if (forceKill) clearTimeout(forceKill);
-      signal?.removeEventListener("abort", abort);
-    };
-    signal?.addEventListener("abort", abort, { once: true });
-    child.once("error", (error) => {
-      cleanup();
-      reject(error);
-    });
-    child.once("close", (code) => {
-      cleanup();
-      if (stopped) reject(stopped);
-      else resolve3({ code: code ?? 1, output });
+    signal?.addEventListener("abort", abort, { once: !0 }), child.once("error", (error) => {
+      cleanup(), reject(error);
+    }), child.once("close", (code) => {
+      cleanup(), stopped ? reject(stopped) : resolve3({ code: code ?? 1, output });
     });
   });
 }
@@ -12553,14 +9933,14 @@ function hyperframesTool(config, deps) {
         return [{ type: "text", text: JSON.stringify(value, null, 2) }];
       }
     },
-    timeoutMs: 21 * 60 * 1e3,
+    timeoutMs: 1260 * 1e3,
     isConcurrencySafe() {
-      return false;
+      return !1;
     },
     async execute(args, exec) {
-      const action = args.action || "check";
+      let action = args.action || "check";
       if (!["check", "lint", "render"].includes(action)) throw new Error("不支持的 Hyperframes 操作。");
-      const [major, minor] = process.versions.node.split(".").map(Number);
+      let [major, minor] = process.versions.node.split(".").map(Number);
       if (major < 22 || major === 22 && minor < 12) return {
         status: "runtime_unsupported",
         nodeVersion: process.versions.node,
@@ -12568,39 +9948,34 @@ function hyperframesTool(config, deps) {
       };
       let cli;
       try {
-        const require2 = createRequire2(import.meta.url);
-        cli = path25.join(path25.dirname(require2.resolve("hyperframes/package.json")), "bin/hyperframes.mjs");
+        let require2 = createRequire2(import.meta.url);
+        cli = path24.join(path24.dirname(require2.resolve("hyperframes/package.json")), "bin/hyperframes.mjs");
       } catch {
         return { status: "dependency_missing", note: "Hyperframes 为内部开发能力，公开插件包不包含该依赖；需在开发环境单独准备。" };
       }
       let cwd = process.cwd();
-      if (deps.workdir && exec?.agent) cwd = await deps.workdir.ensure(exec.agent, exec.signal) || cwd;
-      const project = path25.resolve(cwd, args.projectDir || ".");
+      deps.workdir && exec?.agent && (cwd = await deps.workdir.ensure(exec.agent, exec.signal) || cwd);
+      let project = path24.resolve(cwd, args.projectDir || ".");
       if (action !== "check") {
         if (!args.projectDir) throw new Error("lint/render 必须指定 projectDir。");
-        if (!(await stat12(path25.join(project, "index.html"))).isFile()) throw new Error("项目缺少 index.html。");
+        if (!(await stat12(path24.join(project, "index.html"))).isFile()) throw new Error("项目缺少 index.html。");
       }
-      let videoPath;
-      let command = ["doctor", "--json"];
-      if (action === "lint") command = ["lint", project, "--json"];
-      if (action === "render") {
+      let videoPath, command = ["doctor", "--json"];
+      if (action === "lint" && (command = ["lint", project, "--json"]), action === "render") {
         if (args.fps !== void 0 && ![24, 25, 30, 50, 60].includes(args.fps)) throw new Error("不支持的帧率。");
-        const output = args.output || `renders/output-${Date.now()}.mp4`;
-        videoPath = path25.resolve(project, output);
-        const relative = path25.relative(project, videoPath);
-        if (!relative || relative === ".." || relative.startsWith(`..${path25.sep}`) || path25.isAbsolute(relative) || path25.extname(videoPath).toLowerCase() !== ".mp4") {
+        let output = args.output || `renders/output-${Date.now()}.mp4`;
+        videoPath = path24.resolve(project, output);
+        let relative = path24.relative(project, videoPath);
+        if (!relative || relative === ".." || relative.startsWith(`..${path24.sep}`) || path24.isAbsolute(relative) || path24.extname(videoPath).toLowerCase() !== ".mp4")
           throw new Error("输出必须是项目目录内的 .mp4 文件。");
-        }
         try {
-          await stat12(videoPath);
-          throw new Error("输出文件已存在，请换一个文件名。");
+          throw await stat12(videoPath), new Error("输出文件已存在，请换一个文件名。");
         } catch (error) {
           if (error.code !== "ENOENT") throw error;
         }
-        await mkdir16(path25.dirname(videoPath), { recursive: true });
-        command = ["render", project, "--output", videoPath, "--fps", String(args.fps || 30), "--workers", "1", "--strict"];
+        await mkdir16(path24.dirname(videoPath), { recursive: !0 }), command = ["render", project, "--output", videoPath, "--fps", String(args.fps || 30), "--workers", "1", "--strict"];
       }
-      const result = await runHyperframes(cli, command, action === "check" ? cwd : project, config, exec?.signal);
+      let result = await runHyperframes(cli, command, action === "check" ? cwd : project, config, exec?.signal);
       if (result.code !== 0) return { status: "failed", action, output: result.output, note: "检查输出中的环境或项目错误后重试；不会重复提交 Seedance 任务。" };
       if (videoPath && !(await stat12(videoPath)).size) throw new Error("Hyperframes 未生成有效的 MP4 文件。");
       return { status: action === "render" ? "succeeded" : "checked", action, output: result.output, ...videoPath ? { videoPath } : {} };
@@ -12656,22 +10031,22 @@ function maskSecrets(view) {
   };
 }
 function configView(config) {
-  const stored = {};
-  for (const key of CONFIG_FIELDS) stored[key] = ref(config, key, void 0);
+  let stored = {};
+  for (let key of CONFIG_FIELDS) stored[key] = ref(config, key, void 0);
   return {
     stored: maskSecrets(stored),
     effective: {
-      canvasEnabled: FLOW_CANVAS_AVAILABLE && ref(config, "canvasEnabled", false) === true,
-      autoCreateCanvas: FLOW_CANVAS_AVAILABLE && ref(config, "canvasEnabled", false) === true && ref(config, "autoCreateCanvas", true) === true,
+      canvasEnabled: FLOW_CANVAS_AVAILABLE && ref(config, "canvasEnabled", !1) === !0,
+      autoCreateCanvas: FLOW_CANVAS_AVAILABLE && ref(config, "canvasEnabled", !1) === !0 && ref(config, "autoCreateCanvas", !0) === !0,
       connectionMode: isVolcengine(config) ? "volcengine" : "metaontic",
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),
       queryPath: isVolcengine(config) ? "/api/v3/contents/generations/tasks/{task_id}" : String(ref(config, "queryPath", "")).trim() || relayPreset().queryPath,
       model: resolveModel(config),
-      imageUseVideoKey: !isMetaontic(config) || ref(config, "imageUseVideoKey", true),
+      imageUseVideoKey: !isMetaontic(config) || ref(config, "imageUseVideoKey", !0),
       imageModel: resolveImageModel(ref(config, "imageModel", IMAGE_MODEL)),
       textModel: resolveTextModel(config),
-      textApiKeySource: resolveTextApiKey(config) ? ref(config, "imageUseVideoKey", true) !== false ? "shared" : "text" : "missing",
+      textApiKeySource: resolveTextApiKey(config) ? ref(config, "imageUseVideoKey", !0) !== !1 ? "shared" : "text" : "missing",
       apiKeySource: resolveApiKey(config) ? isVolcengine(config) ? "volcengine" : "metaontic" : "missing"
     }
   };
@@ -12757,38 +10132,31 @@ function configTool(config, settings) {
         }
       },
       render(_args, value) {
-        const { stored, effective, patchPath, error } = value || {};
-        if (error) return [{ type: "text", text: error }];
-        const lines = [
+        let { stored, effective, patchPath, error } = value || {};
+        return error ? [{ type: "text", text: error }] : [{ type: "text", text: [
           "当前配置（只读，改配置请在插件设置页）：",
-          ...Object.entries(stored || {}).filter(([, field]) => field !== void 0 && field !== "").map(([key, field]) => `  ${key}: ${typeof field === "object" ? JSON.stringify(field) : field}`),
+          ...Object.entries(stored || {}).filter(([, field]) => field !== void 0 && field !== "").map(([key, field]) => `  ${key}: ${typeof field == "object" ? JSON.stringify(field) : field}`),
           `生效值：baseUrl=${effective?.baseUrl} model=${effective?.model}`,
           `  submitPath=${effective?.submitPath}`,
           `  apiKey 来源：${{
             missing: "未配置——请到设置页填写 API密钥"
           }[effective?.apiKeySource] || effective?.apiKeySource}`,
           patchPath ? `配置文件：${patchPath}` : ""
-        ].filter(Boolean);
-        return [{ type: "text", text: lines.join("\n") }];
+        ].filter(Boolean).join(`
+`) }];
       }
     },
     timeoutMs: 3e4,
     isConcurrencySafe() {
-      return false;
+      return !1;
     },
     async execute(args) {
-      const action = args?.action;
-      const view = configView(config);
-      const patchPath = settings?.documentPath;
-      if (action === "get") {
-        return { action, ...view, patchPath, ...typeof logDiagnostics === "function" ? { logging: logDiagnostics() } : {} };
-      }
-      if (action === "set") {
-        throw new Error(
-          "插件配置不能在对话里改：video_config 是只读的，接入方式、API密钥、模型、地址等任何一项都只能由用户在插件设置页（「插件 → 已安装插件 → MetaOnticVideo → 查看」）修改并保存。请说明要改的是哪一项并引导用户去设置页，不要代改、不要索取或展示 API密钥。"
-        );
-      }
-      throw new Error("action 只能是 get：插件配置只能在设置页修改，本工具不提供写入。");
+      let action = args?.action, view = configView(config), patchPath = settings?.documentPath;
+      if (action === "get")
+        return { action, ...view, patchPath, ...typeof logDiagnostics == "function" ? { logging: logDiagnostics() } : {} };
+      throw action === "set" ? new Error(
+        "插件配置不能在对话里改：video_config 是只读的，接入方式、API密钥、模型、地址等任何一项都只能由用户在插件设置页（「插件 → 已安装插件 → MetaOnticVideo → 查看」）修改并保存。请说明要改的是哪一项并引导用户去设置页，不要代改、不要索取或展示 API密钥。"
+      ) : new Error("action 只能是 get：插件配置只能在设置页修改，本工具不提供写入。");
     }
   };
 }
@@ -12798,17 +10166,14 @@ init_plugin();
 init_connection();
 init_config();
 function buildPromptGuidance(config) {
-  const singleMax = resolveSingleMax(config);
-  const segmentSeconds = resolveSegmentSeconds(config);
-  const canvasOn = FLOW_CANVAS_AVAILABLE && ref(config, "canvasEnabled", false) === true;
-  const autoCreate = canvasOn && ref(config, "autoCreateCanvas", true) === true;
+  let singleMax = resolveSingleMax(config), segmentSeconds = resolveSegmentSeconds(config), canvasOn = FLOW_CANVAS_AVAILABLE && ref(config, "canvasEnabled", !1) === !0, autoCreate = canvasOn && ref(config, "autoCreateCanvas", !0) === !0;
   return [
     "【阶段适用范围】专业film_project当前阶段以next/route返回的角色职责为准。以下全链路方法按阶段应用：Creative不写正式剧本，Screenwriter不提前写最终分镜与模型提示词。关于示意图、制作脚本、两项费用预算、角色图和video_project审核的要求，仅用于普通制作或专业项目编译进入实际制作时，不得提前施加到创意/编剧批准。不要把所有环节压缩成一次填表输出。",
     CREATIVE_GUIDANCE,
     REVIEW_REPAIR_GUIDANCE,
     ...FLOW_CANVAS_AVAILABLE ? [
       `· 当前流程画布：${canvasOn ? `开启；自动创建画布：${autoCreate ? "开启" : "关闭"}` : "关闭（默认关闭，可在插件设置页打开）"}。这两个开关只能在插件设置页修改，video_config可只读核对。`,
-      "· 流程画布是插件自带组件（左侧栏「MetaOnticVideo流程画布」那一行打开独立页面，视频创作面板里不再内嵌），不需要安装任何第三方画布插件；按当前开关决定是否自动投影。" + (!canvasOn ? "当前流程画布关闭：左侧栏没有画布入口，不要自动建图、不要自动同步，也不要对用户说已经建好或打开了流程画布；用户要用画布时先在插件设置页打开「流程画布」，再按下面的画布联动规则手动处理。" : autoCreate ? "普通创作照常调用video_project prepare/review，工具会自动建流程画布项目、同步完整脚本与制作段计划，并提示用户到左侧栏「MetaOnticVideo流程画布」查看；不要要求用户另建项目/节点或另问是否同步。" : "当前流程画布已打开但关闭了自动创建画布：不要自动建图、不要自动同步，也不要对用户说已经自动建好；用户明确选中画布节点时再按下面的画布联动规则手动处理。") + "开启后生成传projectId，续做传原resume，成果回到已绑定的画布节点，不必手工拼自动canvas绑定。canvasProject为disabled表示未开启自动投影，unavailable/pending如实说明，用video_project status重试同步，不重建创作项目或重生成；内置画布只能由用户自己从左侧栏打开，工具无法代开，不要声称已打开。仍保留脚本、费用和分段结果审核。",
+      "· 流程画布是插件自带组件（左侧栏「MetaOnticVideo流程画布」那一行打开独立页面，视频创作面板里不再内嵌），不需要安装任何第三方画布插件；按当前开关决定是否自动投影。" + (canvasOn ? autoCreate ? "普通创作照常调用video_project prepare/review，工具会自动建流程画布项目、同步完整脚本与制作段计划，并提示用户到左侧栏「MetaOnticVideo流程画布」查看；不要要求用户另建项目/节点或另问是否同步。" : "当前流程画布已打开但关闭了自动创建画布：不要自动建图、不要自动同步，也不要对用户说已经自动建好；用户明确选中画布节点时再按下面的画布联动规则手动处理。" : "当前流程画布关闭：左侧栏没有画布入口，不要自动建图、不要自动同步，也不要对用户说已经建好或打开了流程画布；用户要用画布时先在插件设置页打开「流程画布」，再按下面的画布联动规则手动处理。") + "开启后生成传projectId，续做传原resume，成果回到已绑定的画布节点，不必手工拼自动canvas绑定。canvasProject为disabled表示未开启自动投影，unavailable/pending如实说明，用video_project status重试同步，不重建创作项目或重生成；内置画布只能由用户自己从左侧栏打开，工具无法代开，不要声称已打开。仍保留脚本、费用和分段结果审核。",
       "· 流程画布联动（由用户明确选中画布节点触发，与设置里的自动创建画布开关无关）：用户要用MetaOnticVideo制作画布节点时，先video_canvas(action:list/read)读取目标节点、上游剧本/分镜和参考素材。按端口/refOrder保留首帧、尾帧、参考视频角色，明确缺失规格，不猜时长和清晰度。据此完成现有video_project准备、正文展示脚本/内嵌分镜及review；完整specification与随后video_generate/video_extend参数都带read返回的canvas对象。图片走video_prepare_image并带canvas，仍须图片费用审批和结果审核。不复制API密钥。成果自动新增到流程画布，paused仍须先交付并review_segment，回填不代表结果已审核或整片完成。回填pending时用video_canvas(action:sync,token)补传，绝不重新生成。画布按连线顺序执行：工具条有「制作「节点名」」按钮依次驱动下一个未完成节点，未完成节点用虚线框标出，进度显示在工具条上；节点内的「制作」按钮与它都由插件接管方案、费用与结果审核。用户在画布内自行点击生成时同样先确认方案与费用。画布本身就是生成视频的流程：点画布空白处（或左上角「＋ 创作流程」）打开「创作流程」面板，写脚本、铺开制作节点与导入参考素材都在这个面板或节点的制作窗口里；工具条上已经没有建节点按钮，不要指引用户去点不存在的按钮。画布上另有七张可点的流程阶段卡（需求确认／脚本审核／分镜确认／素材准备／费用确认／逐段制作／合成成片），卡间用虚线箭头表示先后；点卡只是进对应确认入口，不代替方案与费用确认。脚本未审核时阶段卡②与剧本节点都带「确认脚本」，用户在画布内点过就算这条画布流程的脚本审核通过（画布内制作不经过 video_project(action:review)），② 标为已完成、不会被助手侧旧状态回退；但用户要你在会话里驱动生成时，仍按现有 video_project(action:review) 完成脚本审核，不得用画布状态替代。画布里的创作流程跟对话顺序一致分两步：先「创建需求」（只建需求节点与阶段卡，不调用模型、不产生视频费用），再点一次「写脚本」按需求写剧本与分镜、先「预览分段」再「生成制作节点」——一次铺好剧本、分镜、每段一个「画面」节点与每段一个视频节点，画面出图后作为这一段首帧接进视频节点（每段先出画面、再做视频）；别让用户以为画布上一步就能从想法直接出视频，也别指引用户去点已经不存在的按钮。画布上的流程步骤与专业画布一致：需求 → 脚本 → 分镜 → 画面（每段一张图，出图后当首帧）→ 素材（角色图/首帧/参考图）→ 费用 → 逐段制作 → 合成，阶段卡会按进度把按钮换成「改需求 / 写脚本 / 确认脚本 / 看剧本 / 生成分镜 / 看分镜 / 准备素材 / 看估价 / 做这一段 / 合成成片」；连拍（批量生成）前会先列「确认镜头 / 准备素材 / 确认费用」，用户要你在会话里批量推进时也按这个顺序先确认这三项，不得跳过脚本审核与逐段费用确认；连拍只生成还没有成果的段，已有成果的段跳过、不重复生成也不重复计费，它的成果作为下一段的续拍输入，整条链路都已有成果时连拍不启动（要重做就点那个节点自己的「制作」）。画布还会做「画布体检」：缺成果的制作段、还没出图的画面节点、还没接到任何制作段的素材图、指到已删除节点的断链、成片段数与现有视频成果对不上，都会在画布提示区给一行摘要，点「连拍」看完整清单与处理建议；体检只读画布内容，不涉及费用与审核，也不会自动改动画布。素材（参考图节点与导入的图片）算资产不算制作段，按脚本自动铺出的「画面」节点跟着流程排队但也不算制作段，都不占用「制作「…」」的推进顺序；画面没出图时视频制作会报缺少首帧，要指引用户先在画面节点出图；用户在画布上补素材时，素材会反绑到它服务的制作段，④ 素材准备卡的文案会写明有几张还没接上，助手侧不要把它算成新的制作段或要求用户重新连线。"
     ] : ["· 流程画布暂隐藏，当前仅通过视频创作助手完成需求、创意、剧本、分镜、审核、费用确认、逐段生成和合并交付。不要引导用户去设置页开启画布、使用画布按钮或调用video_canvas，不创建或同步画布。保留已有项目、素材和任务进度；断点用原resume、任务状态用原taskId继续处理，不重新生成已完成片段。"],
     "· 状态表述必须与证据一致：查询失败或超时只说状态未确认，不能断言成功、失败或仍在生成；仅在收到成功状态及视频链接后说本段生成成功。本地文件存在后才说下载完成，合并成功后才说完整成片已合并，逐项给出链接后才说已交付。暂停默认交付本段，不宣称正在合并。查询曾报401但后来成功时，正常进度只报告当前已确认结果；不得将401称为密钥抖动或猜测原因。视频进度提示仅用于视频生成或续拍等待，不用于脚本、图片、审核、查询、下载、合并或结果展示。",
@@ -12859,7 +10224,8 @@ function buildPromptGuidance(config) {
     "· 视频目标时长可在对话中确认或修改，变更后重新审核脚本；这属于本次制作需求，不是修改插件配置。插件配置（接入方式、API密钥、模型、地址等）只能在插件设置页里改，对话内禁止代改：video_config 只读，只用来核对当前配置。用户要改配置时，说明改的是哪一项，并引导他到「插件 → 已安装插件 → MetaOnticVideo → 查看」的设置里改完保存；不要代改、不要索取或展示 API密钥。长视频要在本机合并，需要 ffmpeg：本机没装时，插件会先把这次生成拦回来（不产生费用），这时要在对话框里问用户「要不要授权我装 ffmpeg」——按返回的说明说清他的系统与命令，用户同意就调用 video_setup（install:true）由插件来装（宿主会先让他确认那条命令），装完它会自己验证，再按原 duration 重发；用户不想装就带 merge:false 重发，插件只返回分段列表（每段上游链接，不下载本地文件），结果里会带 ffmpegMissing=true 与 installHint，照它引导安装即可。",
     `· 当前配置：直出上限 ${singleMax} 秒、每段延长 ${segmentSeconds} 秒。`,
     "· 当前设置页提供的接入方式：MetaOntic AI（手填 API密钥）。火山引擎直连暂不提供选择，已有该配置的安装仍可继续生成；不要主动帮用户切到该方式，也不要在新会话里主动推荐或引导配置未提供的方式。使用记录卡片暂时隐藏，也不要引导用户去看。"
-  ].join("\n");
+  ].join(`
+`);
 }
 var REVIEW_REPAIR_GUIDANCE = "review若返回blocked且带presentation，按nextAction将presentation.markdown原样展示一次，再以同项目同稿件重试review；这是补齐未完整展示，不是改稿。不再自行读取守卫源码、重新编写脚本或转换分镜图片，不把blocked当作工具不可用。repairAction为regenerate_storyboard时仅用原项目与稿件重新storyboard，不能新建项目或跳过审核。";
 
@@ -12867,89 +10233,60 @@ var REVIEW_REPAIR_GUIDANCE = "review若返回blocked且带presentation，按next
 init_config();
 init_connection();
 function asDisposer(value) {
-  return typeof value === "function" ? value : void 0;
+  return typeof value == "function" ? value : void 0;
 }
 function applyVideoBusiness(runtime) {
-  const { ctx, config } = runtime;
-  runtime.defer(registerConnectionCheck(ctx, config));
-  runtime.defer(registerCanvasNative(ctx, config));
-  runtime.defer(registerBuiltinCanvas(ctx));
-  const deps = {};
-  const segmentReview = createSegmentReview(ctx);
-  const segmentObserver = ctx.on("session/event", segmentReview.observe);
+  let { ctx, config } = runtime;
+  runtime.defer(registerConnectionCheck(ctx, config)), runtime.defer(registerCanvasNative(ctx, config)), runtime.defer(registerBuiltinCanvas(ctx));
+  let deps = {}, segmentReview = createSegmentReview(ctx), segmentObserver = ctx.on("session/event", segmentReview.observe);
   runtime.defer(segmentObserver);
-  const storyboardReview = createStoryboardReviewGuard();
-  const deliveryOrder = createDeliveryOrderGuard();
-  const storyboardObserver = ctx.on("session/event", storyboardReview.observe);
+  let storyboardReview = createStoryboardReviewGuard(), deliveryOrder = createDeliveryOrderGuard(), storyboardObserver = ctx.on("session/event", storyboardReview.observe);
   runtime.defer(storyboardObserver);
-  const deliveryObserver = ctx.on("session/event", deliveryOrder.observe);
+  let deliveryObserver = ctx.on("session/event", deliveryOrder.observe);
   runtime.defer(deliveryObserver);
-  const scriptObserver = ctx.on("session/event", createScriptTracker().observe);
+  let scriptObserver = ctx.on("session/event", createScriptTracker().observe);
   runtime.defer(scriptObserver);
-  let confirmationReady = false;
-  const register = (tool) => {
-    const guarded = !GATED_TOOLS.includes(tool.name) ? tool : { ...tool, async execute(args, exec) {
+  let confirmationReady = !1, register = (tool) => {
+    let guarded = GATED_TOOLS.includes(tool.name) ? { ...tool, async execute(args, exec) {
       if (!confirmationReady) throw new Error("人工确认服务未就绪，已停止操作；请恢复插件确认能力后重试，未提交付费任务。");
       return tool.execute(args, exec);
-    } };
+    } } : tool;
     return runtime.tools.register("video", withMediaPreview(guarded));
-  };
-  const canvasBridge = FLOW_CANVAS_AVAILABLE ? createCanvasBridge(void 0, config) : null;
-  const wrapCanvas = (tool) => canvasBridge ? canvasBridge.wrap(tool) : tool;
-  const canvasProjects = FLOW_CANVAS_AVAILABLE ? createCanvasProjectSync(void 0, config, { get: (session) => ctx.get?.("sessionTitle")?.get(session) }) : null;
-  if (canvasProjects) runtime.defer(ctx.on("session/event", canvasProjects.followTitle));
-  const generation = wrapCanvas(videoTool(config, deps, ctx));
-  const extension = wrapCanvas(extendTool(config, deps, ctx));
-  if (canvasBridge) register(jsonSafeTool(canvasBridge.tool));
-  register(jsonSafeTool(stageTool()));
-  const project = projectTool(config, ctx, storyboardReview, generation.parameters.properties, extension.parameters.properties, segmentReview, canvasProjects?.sync);
-  register(jsonSafeTool(canvasProjects ? canvasProjects.wrapProject(project) : project));
-  register(jsonSafeTool(estimateTool(config)));
-  register(jsonSafeTool(submissionTool(config)));
-  register(jsonSafeTool(wrapCanvas(prepareImageTool(config))));
-  register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(generation, config), config)), "video_generate", config), deliveryOrder.remember));
-  register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(extension, config), config)), "video_extend", config), deliveryOrder.remember));
-  register(withVideoExecution(jsonSafeTool(withActualCost(taskTool(config), config))));
-  register(jsonSafeTool(setupTool(config)));
-  if (process.env.METAONTIC_VIDEO_INTERNAL_HYPERFRAMES === "1") {
-    runtime.defer(register(jsonSafeTool(hyperframesTool(config, deps))));
-  }
-  const cleanup = ctx.inject(["settings"], (settingsCtx) => runtime.tools.register("video", jsonSafeTool(configTool(config, settingsCtx.settings)), settingsCtx));
-  for (const dispose of [asDisposer(cleanup)]) if (dispose) runtime.defer(dispose);
-  const workdirCleanup = ctx.inject(["workingDirectory"], (workdirCtx) => {
-    deps.workdir = workdirCtx.workingDirectory;
-    return () => {
-      deps.workdir = void 0;
-    };
-  });
-  for (const dispose of [asDisposer(workdirCleanup)]) if (dispose) runtime.defer(dispose);
+  }, canvasBridge = null, wrapCanvas = (tool) => canvasBridge ? canvasBridge.wrap(tool) : tool, canvasProjects = null;
+  canvasProjects && runtime.defer(ctx.on("session/event", canvasProjects.followTitle));
+  let generation = wrapCanvas(videoTool(config, deps, ctx)), extension = wrapCanvas(extendTool(config, deps, ctx));
+  canvasBridge && register(jsonSafeTool(canvasBridge.tool)), register(jsonSafeTool(stageTool()));
+  let project = projectTool(config, ctx, storyboardReview, generation.parameters.properties, extension.parameters.properties, segmentReview, canvasProjects?.sync);
+  register(jsonSafeTool(canvasProjects ? canvasProjects.wrapProject(project) : project)), register(jsonSafeTool(estimateTool(config))), register(jsonSafeTool(submissionTool(config))), register(jsonSafeTool(wrapCanvas(prepareImageTool(config)))), register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(generation, config), config)), "video_generate", config), deliveryOrder.remember)), register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(extension, config), config)), "video_extend", config), deliveryOrder.remember)), register(withVideoExecution(jsonSafeTool(withActualCost(taskTool(config), config)))), register(jsonSafeTool(setupTool(config))), process.env.METAONTIC_VIDEO_INTERNAL_HYPERFRAMES === "1" && runtime.defer(register(jsonSafeTool(hyperframesTool(config, deps))));
+  let cleanup = ctx.inject(["settings"], (settingsCtx) => runtime.tools.register("video", jsonSafeTool(configTool(config, settingsCtx.settings)), settingsCtx));
+  for (let dispose of [asDisposer(cleanup)]) dispose && runtime.defer(dispose);
+  let workdirCleanup = ctx.inject(["workingDirectory"], (workdirCtx) => (deps.workdir = workdirCtx.workingDirectory, () => {
+    deps.workdir = void 0;
+  }));
+  for (let dispose of [asDisposer(workdirCleanup)]) dispose && runtime.defer(dispose);
   let gateCleanup;
   try {
     gateCleanup = ctx.on("tools/pre-execute", async (exec, next) => {
-      if (!runtime.tools.allowed("video", exec)) {
-        if (runtime.tools.owner(exec.name) === "video") return { kind: "deny", reason: "当前助手未启用视频业务，请切换到视频助手后重试。" };
-        return next();
-      }
-      const storyboardGate = isVideoDirector({ agent: exec.agent }, ctx) ? await storyboardReview.gate(exec) : null;
+      if (!runtime.tools.allowed("video", exec))
+        return runtime.tools.owner(exec.name) === "video" ? { kind: "deny", reason: "当前助手未启用视频业务，请切换到视频助手后重试。" } : next();
+      let storyboardGate = isVideoDirector({ agent: exec.agent }, ctx) ? await storyboardReview.gate(exec) : null;
       if (storyboardGate) return storyboardGate;
-      const orderGate = await deliveryOrder.gate(exec);
+      let orderGate = await deliveryOrder.gate(exec);
       if (orderGate) return orderGate;
       if (!GATED_TOOLS.includes(exec.name)) return next();
-      if (["video_generate", "video_extend"].includes(exec.name)) {
+      if (["video_generate", "video_extend"].includes(exec.name))
         try {
-          await assertSegmentReviewed(exec, exec.arguments || {});
-          await assertProjectApproved(config, exec, exec.arguments || {});
+          await assertSegmentReviewed(exec, exec.arguments || {}), await assertProjectApproved(config, exec, exec.arguments || {});
         } catch (error) {
           return { kind: "deny", reason: error?.message || String(error) };
         }
-      }
       try {
         return await preflightGate(ctx, config, exec);
       } catch (error) {
-        const message = error?.message || String(error);
+        let message = error?.message || String(error);
         if (exec.name === "video_prepare_image") return { kind: "deny", reason: "图片费用确认未能完成，请先恢复确认能力；未取得同意不生成图片。" };
         if (exec.name === "video_setup") {
-          const command = ffmpegInstallOptions().installs[0].command;
+          let command = ffmpegInstallOptions().installs[0].command;
           return {
             kind: "ask",
             reason: `人工确认：准备执行安装命令「${command}」（预检本身出错：${message}）。`,
@@ -12959,12 +10296,11 @@ function applyVideoBusiness(runtime) {
             }
           };
         }
-        if (isManualKey(config)) return {
+        return isManualKey(config) ? {
           kind: "ask",
           reason: `人工确认：调用${connectionLabel(config)}（预检异常：${message}）。`,
           displayReason: { zh: `本次通过${connectionLabel(config)}调用视频模型，按实际调用计费。预检异常：${message}。确认后继续。`, en: `Call the video model with actual usage billing. Preflight error: ${message}. Confirm to continue.` }
-        };
-        return {
+        } : {
           kind: "ask",
           reason: `人工确认：调用视频模型（预估费用没算出来：${message}）。`,
           displayReason: {
@@ -12973,14 +10309,13 @@ function applyVideoBusiness(runtime) {
           }
         };
       }
-    });
-    confirmationReady = true;
+    }), confirmationReady = !0;
   } catch (error) {
     ctx.logger?.warn?.(
       `metaontic-video: 调用前的人工确认卡口注册失败：${error?.message || error}`
     );
   }
-  if (typeof gateCleanup === "function") runtime.defer(gateCleanup);
+  typeof gateCleanup == "function" && runtime.defer(gateCleanup);
 }
 var videoBusiness = { id: "video", apply: applyVideoBusiness, prompt: buildPromptGuidance };
 
@@ -12990,7 +10325,7 @@ init_lib2();
 // src/platform/settings/schema.ts
 init_lib2();
 var commonConfigFields = {
-  usageStatsEnabled: Schema.boolean().default(true).description("匿名使用统计：仅统计版本、系统、工具调用与结果，不包含创作内容或API密钥；可随时关闭").volatile()
+  usageStatsEnabled: Schema.boolean().default(!0).description("匿名使用统计：仅统计版本、系统、工具调用与结果，不包含创作内容或API密钥；可随时关闭").volatile()
 };
 
 // src/app/config/config-composer.ts
@@ -12998,9 +10333,7 @@ init_config();
 var Config = Schema.object({ ...commonConfigFields, ...videoConfigFields });
 
 // src/index.ts
-var inject = ["tools"];
-var mount = createPluginRuntime({ agents, businesses: [videoBusiness, filmDirectorBusiness] });
-var apply = (ctx, config = {}) => mountBundleAwareHost(ctx, () => mount(ctx, config));
+var inject = ["tools"], mount = createPluginRuntime({ agents, businesses: [videoBusiness, filmDirectorBusiness] }), apply = (ctx, config = {}) => mountBundleAwareHost(ctx, () => mount(ctx, config));
 export {
   Config,
   apply,

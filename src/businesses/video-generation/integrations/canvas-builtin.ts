@@ -55,7 +55,6 @@ function mergeDoc(id: string, prev: any, args: any) {
   const nodes: any = { ...(incoming.nodes !== undefined ? incoming.nodes : (prev?.nodes || {})) };
   const edges: any[] = [...(incoming.edges !== undefined ? incoming.edges : (prev?.edges || []))];
   for (const gone of tombstones) delete nodes[gone];
-  const kept = edges.filter(edge => edge?.id && !edgeTombstones.includes(edge.id) && nodes[edge.fromNode] && nodes[edge.toNode]);
   return { id, createdAt: prev?.createdAt || incoming.createdAt || Date.now(), updatedAt: Date.now(),
     name: String(args?.name || prev?.name || id).slice(0, 80),
     ...(args?.defaultCanvasName !== undefined ? { defaultCanvasName: String(args.defaultCanvasName).slice(0, 80) }

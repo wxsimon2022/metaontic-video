@@ -2,7 +2,7 @@ import { FLOW_CANVAS_AVAILABLE } from '../../../shared/constants/plugin.js';
 import { CREATIVE_GUIDANCE } from '../../film-production/prompts/guidance.js';
 /** prompts/guidance：从宿主入口拆出的独立职责模块。 */
 import { resolveSingleMax, resolveSegmentSeconds } from '../workflow/planning.js';
-import { isMetaontic, isVolcengine } from '../providers/connection.js';
+import { isVolcengine } from '../providers/connection.js';
 import { MAX_TOTAL_SECONDS, MAX_SEGMENTS, ref } from '../config.js';
 
 /**

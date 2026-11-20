@@ -44,7 +44,7 @@ export function createSettingsActions(context: any) {
     }
     /** 清除插件配置并恢复默认值，已生成文件保留。 */
     async function reset() {
-        const { connectionBusy, t, setSaveError, setStatus, snapshot, PLUGIN_OWNED_KEYS, persistBatch, form, setDraft, setVisibleKey, flashStatus, settingsError } = context;
+        const { connectionBusy, t, setSaveError, setStatus, PLUGIN_OWNED_KEYS, persistBatch, form, setDraft, setVisibleKey, flashStatus, settingsError } = context;
         if (connectionBusy.current)
             return;
         if (!context.confirm(t('resetConfirm')))

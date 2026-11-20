@@ -1,6 +1,6 @@
 import { narrativeDiagnostics } from '../validation/content.validator.js';
 import { MAX_SEGMENTS } from '../../video-generation/config.js';
-import { sourceRevisions, GENERIC_MODEL_PROFILE, STAGE_DEPS, projectContext, modelProfile } from '../contracts/index.js';
+import { sourceRevisions, STAGE_DEPS, projectContext, modelProfile } from '../contracts/index.js';
 import { evaluateReview } from '../reviews/review.rules.js';
 import { roleInstructions } from '../roles/index.js';
 import { profileContext } from '../profiles/index.js';

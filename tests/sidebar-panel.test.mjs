@@ -175,7 +175,7 @@ test('面板文案不再出现裸露的 Key 字样，样式随组件注入', () 
 test('入口用同一个 id 注册左侧栏图标与 main 面板', () => {
   const source = readFileSync(new URL('../src/businesses/video-generation/client.ts', import.meta.url), 'utf8');
   // id 与会话/配置命名空间同源，统一写在 src/shared/constants/plugin.ts。
-  assert.match(source, /import \{ PLUGIN_PACKAGE, FLOW_CANVAS_AVAILABLE, CANVAS_PANEL_ID, GUIDE_URL, PANEL_ID \} from '\.\.\/\.\.\/shared\/constants\/plugin\.js';/);
+  assert.match(source, /import \{ FLOW_CANVAS_AVAILABLE, CANVAS_PANEL_ID, GUIDE_URL, PANEL_ID \} from '\.\.\/\.\.\/shared\/constants\/plugin\.js';/);
   const shared = readFileSync(new URL('../src/shared/constants/plugin.ts', import.meta.url), 'utf8');
   assert.match(shared, /export const PLUGIN_ID = 'metaontic-video';/);
   assert.match(shared, /export const PANEL_ID = PLUGIN_ID;/);

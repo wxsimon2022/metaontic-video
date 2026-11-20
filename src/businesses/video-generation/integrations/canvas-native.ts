@@ -24,7 +24,7 @@ import { canvasScriptPreview, scriptStoryboardShots } from './canvas-project.js'
 import { refreshStageNodes } from './canvas-stages.js';
 import { appendRequestLog, requestLogContext } from '../../../shared/utils/logging.js';
 import { clampInteger } from '../../../shared/utils/validation.js';
-import { MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_TOTAL_SECONDS, normalizeResolution } from '../config.js';
+import { MIN_SECONDS, MAX_TOTAL_SECONDS, normalizeResolution } from '../config.js';
 
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const validToken = value => /^[a-f0-9-]{36}$/.test(String(value || ''));
@@ -296,7 +296,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
   }
 
   /** 真正提交一段：与单节点「确认并开始」共用同一套落盘、指针与互斥。 */
-  async function launchSegment(chain, segment, planned, config) {
+  async function launchSegment(chain, _segment, planned, config) {
     const { canvas, plan } = planned;
     const key = pointer(canvas);
     if (locks.has(key)) throw new Error('此节点正在确认制作。');

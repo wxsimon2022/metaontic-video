@@ -165,7 +165,7 @@ export async function mergeClips(config, files: string[], outPath: string, { sig
         ...audioParts,
         `${pairedInputs}concat=n=${files.length}:v=1:a=1[v][a]`,
       ].join(';');
-      const { code, stderr } = await encode(filter, ['-map', '[v]', '-map', '[a]'], true);
+      const { code } = await encode(filter, ['-map', '[v]', '-map', '[a]'], true);
       if (code === 0 && await exists(work)) {
         await rename(work, outPath);
         return { path: outPath, mode: 'reencode', trimmed };

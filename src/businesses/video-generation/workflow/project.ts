@@ -125,7 +125,7 @@ export async function assertProjectApproved(config, exec, args) {
   if (!matchesProductionApproval(config,data.approved,exec.name,parameters)) throw new Error('制作参数或接入配置已变化，请重新审核脚本和本次完整 specification。');
   if (data.choice === 'generate_first' && !hasProjectImages(parameters)) throw new Error('请先生成或提供角色图、展示审核后再制作。');
 }
-export async function projectCharacterGate(config, exec, args) {
+export async function projectCharacterGate(_config, exec, args) {
   if (!args?.projectId || args.resume) return null;
   const data = await readProject(args.projectId, exec);
   if (data.subjectType === 'scenery' || data.choice === 'text_only' || hasProjectImages(args)) return null;

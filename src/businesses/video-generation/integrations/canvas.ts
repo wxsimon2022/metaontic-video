@@ -157,7 +157,7 @@ export async function publishCanvasResult(adapter, record) {
   doc = await adapter.rpc.projectsGet(loc);
   if (!doc.nodes?.[record.canvas.nodeId]) throw new Error('源节点已删除，成果不回填');
   const nodes = { ...doc.nodes }, edges = [...(doc.edges || [])];
-  for (const { id, media, index } of publications) {
+  for (const { id, media } of publications) {
     if (doc.tombstones?.includes(id)) continue; // 用户主动删除的成果不复活。
     let resultY = Number(source.y) || 0;
     const resultX = (Number(source.x) || 0) + (Number(source.w) || 360) + 120;

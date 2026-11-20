@@ -40,7 +40,6 @@ export function producedNodeIds(canvas: any) {
 /** 流程执行顺序：图片/视频节点按连线从上游排到下游，成果节点不参与排队。
  *  节点「是否已产出」看画布上有没有它生成的成果节点（metaonticSourceNode 指回本节点）。 */
 export function flowSteps(canvas: any) {
-  const nodes: any[] = Object.values(canvas?.nodes || {});
   const edges: any[] = Array.isArray(canvas?.edges) ? canvas.edges : [];
   const produced = producedNodeIds(canvas);
   // 走流程的节点口径与阶段投影一致：素材节点（参考图）与导入素材不参与「制作「…」」的推进顺序，

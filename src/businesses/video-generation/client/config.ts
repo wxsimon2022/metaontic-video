@@ -78,17 +78,6 @@ export function createClientConfig() {
       'pollErrorRetries',
     ];
 
-    /** 这台机器的系统（浏览器半侧只能这么看）：用来挑默认展示的 ffmpeg 安装命令。 */
-    function currentOs() {
-      const nav: any = window.navigator || {};
-      const raw = String(
-        nav.userAgentData?.platform || nav.platform || nav.userAgent || '',
-      ).toLowerCase();
-      if (/mac|darwin|iphone|ipad/.test(raw)) return 'macos';
-      if (/win/.test(raw)) return 'windows';
-      return 'linux';
-    }
-
     /** 金额显示与中转站一致：|x| ≥ 1 保留 2 位小数，否则保留 4 位，末尾多余的 0 去掉。 */
     function formatMoney(value) {
       const number = Number(value);

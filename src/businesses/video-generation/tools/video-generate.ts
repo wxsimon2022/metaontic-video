@@ -8,9 +8,9 @@ import { SEGMENT_OUTPUT_SCHEMA, renderVideoResult } from './results.js';
 import { snapshotConfig, resolveApiKey, assertConfigured, isOmniExtendModel, resolveModel } from '../providers/connection.js';
 import { assertResumeConnection, saveProgress, resumeDirOf, readPauseFile, resumePlanFrom, pickResumeOptions } from '../workflow/resume.js';
 import { buildSegmentExecutionPrompt } from '../prompts/generation.js';
-import { buildGenerationBody, buildRequestBody, normalizeReferenceUrl } from '../providers/seedance.js';
+import { buildGenerationBody, buildRequestBody } from '../providers/seedance.js';
 import { resolveOutputDir, allocateStamp, fileStamp } from '../utils/files.js';
-import { describeIncompleteRun, runSegmentDelivery, skipMergeDelivery, } from '../workflow/segment-run.js';
+import { describeIncompleteRun, runSegmentDelivery, skipMergeDelivery } from '../workflow/segment-run.js';
 export function videoTool(liveConfig, deps, ctx) {
   const config = liveConfig;
   // 结果里的「接着做要调哪个工具」和确认框里的工具名都用它

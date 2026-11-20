@@ -224,3 +224,5 @@ Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.c
 匿名身份维护：主文件与锚点的初始化/修复统一跨进程锁+原子替换，持锁后重读，失败不缓存null；不得宣称硬件设备唯一或清除整个数据目录仍可识别。真实12进程并发测试见analytics-identity-process.test.mjs。
 
 专业创作断点：先查真实session与project.json，区分user abort和接口失败。创意/剧本只由film_project approve弹窗，不能先通用问卷再审批；同版本已批准的重复approve直接返回下一任务，不重复弹窗，旧expectedRevision仍拒绝。read/approve返回continuation提示继续尚未保存的剧本，不能将规划文字当剧本已交付。
+
+冗余治理：tsconfig启用noUnusedLocals/noUnusedParameters；保留公共函数参数位置，明确未使用参数以_前缀标记。八角色统一从src/agents/<role>/index.ts加载，不增加roles重复包装。build.mjs从真实FLOW_CANVAS_AVAILABLE读构建常量并做语法折叠，隐藏画布界面与自动同步不进入成品，历史画布存储与native恢复接口仍保留。宣传页检查归sync-promo-address独立工具，release不导入。

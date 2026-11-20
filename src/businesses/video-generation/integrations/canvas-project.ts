@@ -100,7 +100,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
       const ensuredEdges: any[] = [], removedEdges: string[] = [];
       const managed = { ...binding.nodes }, managedEdges = { ...(binding.links || {}) };
       const deleted = new Set(doc.tombstones || []), edgeDeleted = new Set(doc.edgeTombstones || []);
-      const add = (key, type, label, x, y, data, size: any = null) => {
+      const add = (key, type, _label, x, y, data, size: any = null) => {
         const id = `${prefix}_${key}`;
         if (deleted.has(id)) throw new Error('自动节点已被删除，不会自动复活；请在项目中明确选择新的画布绑定。');
         const previous = nodes[id];
@@ -133,7 +133,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
         managedEdges[id] = digest(desired);
       };
       const source = add('script', 'script', '完整剧本', 40, 60, { label: '完整剧本', idea: '由MetaOnticVideo创作项目同步', output: canvasScriptPreview(script) || nodes[`${prefix}_script`]?.data?.output || '', status: (script || nodes[`${prefix}_script`]?.data?.output) ? 'done' : 'idle', metaonticProjectId: project.id });
-      const overview = add('project', 'text', '创作项目', 40, 400, { label: '创作项目', text: `目标时长：${project.duration ?? '待确认'}秒\n角色图路线：${project.choice || '待确认'}\n脚本、费用与分段审核仍按原流程进行；自动建图不产生模型费用。`, metaonticProjectId: project.id });
+      add('project', 'text', '创作项目', 40, 400, { label: '创作项目', text: `目标时长：${project.duration ?? '待确认'}秒\n角色图路线：${project.choice || '待确认'}\n脚本、费用与分段审核仍按原流程进行；自动建图不产生模型费用。`, metaonticProjectId: project.id });
       // text/script没有输入端口；清理旧版创建的无效自动连线，保留用户改动。
       for (let i = edges.length - 1; i >= 0; i--) {
         const edge = edges[i];
@@ -157,7 +157,7 @@ export function createCanvasProjectSync(load = loadCanvasAdapter, config: any = 
         const board = add('storyboard', 'storyboard', '镜头分镜', 540, 60, { label: '镜头分镜', shots, script, output: script, status: 'done', metaonticProjectId: project.id, metaonticPlanNote: shots.length ? '按剧本分镜表同步，制作段计划另列，不触发生成。' : '未识别到分镜表，完整原文保留在剧本中；制作段计划另列。' });
         connect(source, board, 'script');
         for (const [index, prompt] of prompts.entries()) {
-          const plan = add(`segment_${index + 1}`, 'text', `第${index + 1}段制作内容`, 540, 420 + index * 320, { label: `第${index + 1}段制作内容`, text: String(prompt), metaonticProjectId: project.id });
+          add(`segment_${index + 1}`, 'text', `第${index + 1}段制作内容`, 540, 420 + index * 320, { label: `第${index + 1}段制作内容`, text: String(prompt), metaonticProjectId: project.id });
           // 制作段是只读文本说明，文本节点没有输入端口。
         }
         const results = edges.filter(e => e.fromNode === `${prefix}_production`).map(e => nodes[e.toNode]).filter(Boolean);

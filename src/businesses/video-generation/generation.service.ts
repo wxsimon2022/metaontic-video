@@ -71,9 +71,9 @@ function applyVideoBusiness(runtime: BusinessRuntime) {
     } };
     return runtime.tools.register('video', withMediaPreview(guarded));
   };
-  const canvasBridge = FLOW_CANVAS_AVAILABLE ? createCanvasBridge(undefined, config) : null;
+  const canvasBridge = (typeof __FLOW_CANVAS_AVAILABLE__ !== 'undefined' ? __FLOW_CANVAS_AVAILABLE__ : FLOW_CANVAS_AVAILABLE) ? createCanvasBridge(undefined, config) : null;
   const wrapCanvas = tool => canvasBridge ? canvasBridge.wrap(tool) : tool;
-  const canvasProjects = FLOW_CANVAS_AVAILABLE ? createCanvasProjectSync(undefined, config, { get: session => (ctx.get?.('sessionTitle'))?.get(session) }) : null;
+  const canvasProjects = (typeof __FLOW_CANVAS_AVAILABLE__ !== 'undefined' ? __FLOW_CANVAS_AVAILABLE__ : FLOW_CANVAS_AVAILABLE) ? createCanvasProjectSync(undefined, config, { get: session => (ctx.get?.('sessionTitle'))?.get(session) }) : null;
   // 会话标题通常首轮之后才生成：标题落定或被改写时，把自动画布的项目名对齐成同一个名字。
   if (canvasProjects) runtime.defer((ctx as any).on('session/event', canvasProjects.followTitle));
   const generation = wrapCanvas(videoTool(config, deps, ctx));
