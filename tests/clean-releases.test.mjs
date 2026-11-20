@@ -227,7 +227,7 @@ test('文档里写死的下载地址对应版本受保护，不会被回收', ()
   assert.deepEqual(plan.remove, []);
 });
 
-test('发行版与标签各保留最近 5 个，取并集', () => {
+test('发行版与标签各保留最近 8 个，取并集', () => {
   const versions = Array.from({ length: 12 }, (_, index) => `v1.0.${index}`);
   const withReleases = versions.slice(-3);
   const plan = planCleanup({
@@ -235,12 +235,12 @@ test('发行版与标签各保留最近 5 个，取并集', () => {
     releases: { github: withReleases.map((tag, index) => release(tag, { id: index + 1 })) },
     currentVersion: '1.0.11',
   });
-  assert.deepEqual(plan.remove.map(item => item.tag), ['v1.0.6', 'v1.0.5', 'v1.0.4', 'v1.0.3', 'v1.0.2', 'v1.0.1', 'v1.0.0'], '只删掉两条保留线之外的版本');
+  assert.deepEqual(plan.remove.map(item => item.tag), ['v1.0.3', 'v1.0.2', 'v1.0.1', 'v1.0.0'], '只删掉两条保留线之外的版本');
   const reasons = Object.fromEntries(plan.keep.map(item => [item.tag, item.reason]));
   assert.ok(reasons['v1.0.11'].includes('发行版'), '有发行版的按发行版保留');
-  assert.ok(reasons['v1.0.7'].includes('标签'), '没有发行版但仍在最近 5 个标签里的也要保留');
+  assert.ok(reasons['v1.0.7'].includes('标签'), '没有发行版但仍在最近 8 个标签里的也要保留');
   const loose = planCleanup({ tags: versions, releases: {}, currentVersion: '1.0.11' });
-  assert.deepEqual(loose.remove.map(item => item.tag), ['v1.0.6', 'v1.0.5', 'v1.0.4', 'v1.0.3', 'v1.0.2', 'v1.0.1', 'v1.0.0']);
+  assert.deepEqual(loose.remove.map(item => item.tag), ['v1.0.3', 'v1.0.2', 'v1.0.1', 'v1.0.0']);
   const tight = planCleanup({
     tags: versions,
     releases: { github: withReleases.map((tag, index) => release(tag, { id: index + 1 })) },
@@ -266,8 +266,8 @@ test('计划统计预计释放的附件体积', () => {
 
 test('命令行参数校验默认值并拒绝危险输入', () => {
   const options = parseArgs([]);
-  assert.equal(options.keep, 5);
-  assert.equal(options.keepTags, 5, '默认与 --keep 保持一致');
+  assert.equal(options.keep, 8);
+  assert.equal(options.keepTags, 8, '默认与 --keep 保持一致');
   assert.equal(options.apply, false);
   assert.deepEqual(options.patterns, ['v*']);
   assert.deepEqual(options.hosts, ['github', 'gitee']);
