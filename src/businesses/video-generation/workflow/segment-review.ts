@@ -68,7 +68,7 @@ export function createSegmentReview(ctx) {
       const temp = `${reviewFile(dir)}.${randomUUID()}.tmp`;
       try { await writeFile(temp, JSON.stringify({ version: 1, owner, key: snap.key, approved: true, reviewedAt: new Date().toISOString() }), { mode: 0o600, flag: 'wx' }); await rename(temp, reviewFile(dir)); }
       finally { await rm(temp, { force: true }).catch(() => {}); }
-      await appendRequestLog({ event: 'segment_review_approved', done: snap.done, resumeDir: dir });
+      await appendRequestLog({ event: 'segment_review_approved', sessionId: exec?.agent?.session?.id, callId: exec?.callId, done: snap.done, resumeDir: dir });
       return { status: 'approved', done: snap.done, resumeDir: dir, nextAction: `使用${snap.saved.toolName || 'video_generate'}的原resume继续；下一段仍需费用审批，不重复生成首段。` };
     });
   }

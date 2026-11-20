@@ -34,17 +34,17 @@ export function scriptCoverage(script, visible) {
 }
 
 export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
-  const sessions = new WeakMap<object, { turn: number; active: boolean; files: string[]; shown: Set<string>; awaitingReview: boolean; text: string; scriptText: string; messages:string[]; images:Map<string,Promise<string>> }>();
+  const sessions = new WeakMap<object, { sessionId?: string; turn: number; active: boolean; files: string[]; shown: Set<string>; awaitingReview: boolean; text: string; scriptText: string; messages:string[]; images:Map<string,Promise<string>> }>();
   /** 上一轮展示过本版脚本却没弹审核窗时留痕：正文单独成一条消息时助手常直接结束回合。 */
   async function reportMissing(state) {
     state.awaitingReview = false;
-    await log({ event: 'storyboard_review_missing', reason: 'turn_ended_without_review_ask', turn: state.turn });
+    await log({ event: 'storyboard_review_missing', reason: 'turn_ended_without_review_ask', sessionId: state.sessionId, turn: state.turn });
   }
   function stateFor(session, turn) {
     let state = sessions.get(session);
     if (state && Number.isInteger(turn) && turn !== state.turn && state.awaitingReview) void reportMissing(state);
     if (!state || (Number.isInteger(turn) && turn !== state.turn)) {
-      state = { turn, active: false, files: [], shown: new Set(), awaitingReview: false, text: '', scriptText: '', messages:state?.messages || [],images:state?.images || new Map() };
+      state = { sessionId: session.id, turn, active: false, files: [], shown: new Set(), awaitingReview: false, text: '', scriptText: '', messages:state?.messages || [],images:state?.images || new Map() };
       sessions.set(session, state);
     }
     return state;
@@ -139,7 +139,7 @@ export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
       const coverage = scriptCoverage(args.requiredScriptText, args.requiredProjectId ? state?.messages.join('\n') : state?.text);
       if (coverage < SCRIPT_COVERAGE_MIN) {
         const percent = Math.round(coverage * 100);
-        await appendRequestLog({ event: 'storyboard_review_blocked', reason: 'script_text_mismatch', coverage: Math.round(coverage * 1000) / 1000 });
+        await appendRequestLog({ event: 'storyboard_review_blocked', sessionId: exec?.agent?.session?.id, callId: exec?.callId, reason: 'script_text_mismatch', coverage: Math.round(coverage * 1000) / 1000 });
         return { kind: 'deny', reason: `脚本审核暂未打开：本版script.md正文只在本轮用户可见正文里出现 ${percent}%。`
           + '请把script.md正文原样贴进本轮正文再单独调用review；标题、加粗、表格这类排版差异不算问题，但不要改写措辞、删段，也不要只给文件链接或摘要。' };
       }
@@ -170,7 +170,7 @@ export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     const stale = ready ? await newerVersion(embedded) : '';
     if (ready && !stale) return null;
     const target = stale || state?.files[0] || '';
-    await appendRequestLog({ event: 'storyboard_review_blocked', reason: !ready ? 'missing_inline_storyboard' : 'stale_storyboard_version' });
+    await appendRequestLog({ event: 'storyboard_review_blocked', sessionId: exec?.agent?.session?.id, callId: exec?.callId, reason: !ready ? 'missing_inline_storyboard' : 'stale_storyboard_version' });
     return { kind: 'deny', reason: (!ready
       ? '脚本审核暂未打开：本版分镜图还没有在用户可见正文里内嵌展示。交付卡片只登记最终成片，分镜图不走卡片，'
       : `脚本审核暂未打开：改稿后的新版分镜图还没展示（${stale}）。`)

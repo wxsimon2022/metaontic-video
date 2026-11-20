@@ -57,7 +57,7 @@ export function createScriptTracker({ closeStage = closePendingStage, log = appe
       const text = typeof content === 'string' ? content : '';
       // 先收口：脚本已经落盘，此后助手做分镜、看图、提问都不该再算进脚本设计耗时。
       const closed = await closeStage('script_design', 'script_saved');
-      await log({ event: 'script_saved', path: save.path, tool: save.tool, mode: save.mode,
+      await log({ event: 'script_saved', sessionId: session.id, callId: event.data?.callId, path: save.path, tool: save.tool, mode: save.mode,
         bytes: text ? Buffer.byteLength(text, 'utf8') : undefined, characters: text ? text.length : undefined,
         version: scriptVersion(text), turn: (event.data || {}).turn,
         closedSpanId: closed?.spanId, closedElapsedMs: closed?.elapsedMs });

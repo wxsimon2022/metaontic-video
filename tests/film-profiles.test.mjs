@@ -128,6 +128,14 @@ test('真实工具创建、审批、改类型及重读保存一致，旧批准�
   assert.deepEqual(saved.artifact.data,data);
   s=await tool.execute({action:'approve',projectId:id,stage:'creative',expectedRevision:s.revision},exec);
   assert.equal(questions,1);assert.equal(s.approvals.creative,1);
+  const approvedRevision=s.revision;
+  const resumed=await tool.execute({action:'read',projectId:id,responseMode:'compact'},exec);
+  assert.equal(resumed.continuation.action,'WRITE_AND_SUBMIT_SCRIPT');
+  assert.equal(resumed.continuation.expected_revision,approvedRevision);
+  const duplicate=await tool.execute({action:'approve',projectId:id,stage:'creative',expectedRevision:approvedRevision},exec);
+  assert.equal(questions,1);assert.equal(duplicate.revision,approvedRevision);
+  assert.equal(duplicate.nextTask.stage,'script');
+  await assert.rejects(()=>tool.execute({action:'approve',projectId:id,stage:'creative',expectedRevision:0},exec),/INVALID_APPROVAL_REVISION/);
   assert.match(approvalText,/创意方案（修订 1）/);
   assert.match(approvalText,/核心表达：细节发现/);
   assert.match(approvalText,/15 秒/);

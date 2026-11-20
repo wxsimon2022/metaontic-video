@@ -1,3 +1,4 @@
+import { diagnosticError } from '../../../shared/utils/timing.js';
 /** 画布内制作入口：独立的方案/费用/结果审核，不创建或伪造助手会话。 */
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -21,7 +22,7 @@ import { hasFfmpeg, ffmpegInstallHint } from '../media/ffmpeg.js';
 import { downloadFile } from '../media/download.js';
 import { canvasScriptPreview, scriptStoryboardShots } from './canvas-project.js';
 import { refreshStageNodes } from './canvas-stages.js';
-import { appendRequestLog } from '../../../shared/utils/logging.js';
+import { appendRequestLog, requestLogContext } from '../../../shared/utils/logging.js';
 import { clampInteger } from '../../../shared/utils/validation.js';
 import { MIN_SECONDS, MIN_SEGMENT_SECONDS, MAX_TOTAL_SECONDS, normalizeResolution } from '../config.js';
 
@@ -577,7 +578,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
           } });
       } catch (error) {
         await appendRequestLog({ event: 'text_model_failed', action: 'write', model: resolveTextModel(config), elapsedMs: Date.now() - startedAt,
-          reason: String(error?.message || '写脚本失败').slice(0, 200) }).catch(() => {});
+          ...diagnosticError(error) }).catch(() => {});
         throw error;
       }
       await appendRequestLog({ event: 'text_model_done', action: 'write', model: result.model, elapsedMs: Date.now() - startedAt,
@@ -668,7 +669,7 @@ export function createCanvasNativeService(liveConfig, options: any = {}) {
       return { job: view(job) };
     } finally { locks.delete(job.id); }
   }
-  return { handle, dispose() { disposed = true; for (const ctl of running.values()) ctl.abort(); proposals.clear(); snapshots.clear(); } };
+  return { handle: args => requestLogContext.run({ ...requestLogContext.getStore(), callId: requestLogContext.getStore()?.callId || randomUUID(), tool: 'video_canvas', projectId: args?.projectId, jobId: args?.id }, () => handle(args)), dispose() { disposed = true; for (const ctl of running.values()) ctl.abort(); proposals.clear(); snapshots.clear(); } };
 }
 
 export function registerCanvasNative(ctx, config) {

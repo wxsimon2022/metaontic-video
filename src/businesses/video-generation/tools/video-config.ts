@@ -1,3 +1,4 @@
+import { logDiagnostics } from '../../../shared/utils/logging.js';
 import { FLOW_CANVAS_AVAILABLE } from '../../../shared/constants/plugin.js';
 import { VOLCENGINE_MODE_AVAILABLE, IMAGE_MODEL, resolveImageModel } from '../connection-defaults.js';
 /** tools/video-config：从宿主入口拆出的独立职责模块。 */
@@ -172,7 +173,7 @@ export function configTool(config, settings) {
       const patchPath = settings?.documentPath;
 
       if (action === 'get') {
-        return { action, ...view, patchPath };
+        return { action, ...view, patchPath, ...(typeof logDiagnostics === 'function' ? { logging: logDiagnostics() } : {}) };
       }
       if (action === 'set') {
         throw new Error(

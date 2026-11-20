@@ -219,3 +219,8 @@ Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.c
 宣传页同步约定：用户明确要求后续发版不更新宣传页。release.mjs 不读取或写入服务端宣传页，仅维护正式版固定安装附件；sync-promo-address.mjs 保留为单独维护工具，用户明确要求更新页面时才执行。
 
 历史发行版清理：用户最新要求每仓仅保留最近8个正式版，清理工具和定时工作流默认保留8个；按平台独立排名，删除发行版必须同步删除对应平台标签，固定名称最新版附件仍保留。
+
+日志维护：appendRequestLog入口固定字段、移除原始错误/请求正文，路径只留文件名；NODE_TEST_CONTEXT且未指定DSH_HOME时不写真实用户目录，真实落盘测试必须使用临时DSH_HOME。每日5MB、历史清理阈值50MB、30天保留，有界队列256；达到上限记dropped，失败记只读健康状态，video_config get返回logging。错误与审批/暂停状态分开，调用/session/project/task/index关联，嵌套阶段保存parentSpanId。不要以日志异常重提付费任务。详情见logging.md。
+匿名身份维护：主文件与锚点的初始化/修复统一跨进程锁+原子替换，持锁后重读，失败不缓存null；不得宣称硬件设备唯一或清除整个数据目录仍可识别。真实12进程并发测试见analytics-identity-process.test.mjs。
+
+专业创作断点：先查真实session与project.json，区分user abort和接口失败。创意/剧本只由film_project approve弹窗，不能先通用问卷再审批；同版本已批准的重复approve直接返回下一任务，不重复弹窗，旧expectedRevision仍拒绝。read/approve返回continuation提示继续尚未保存的剧本，不能将规划文字当剧本已交付。

@@ -16,6 +16,9 @@
  * 本地令牌用 npm run npm:token 保存，文件在 .local/ 下、已被 .gitignore 忽略，不会进仓库或发布包。
  * 账号开启 2FA 后，令牌必须是带 bypass 2FA 的 granular access token，否则 npmjs 返回 E403。
  */
+import { validateNpmBundle } from './npm-bundle.mjs';
+import { syncNpmMirror } from './sync-npm-mirror.mjs';
+import { pathToFileURL } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
@@ -87,12 +90,13 @@ export function parseArgs(argv) {
   return { version, otp, dryRun };
 }
 
-export function main(argv = process.argv.slice(2), env = process.env) {
+export async function main(argv = process.argv.slice(2), env = process.env) {
   const { version: requested, otp, dryRun } = parseArgs(argv);
   const version = requested ?? JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
 
   const archive = join(ROOT, '.local', 'releases', version, `metaontic-video-${version}.tgz`);
   if (!existsSync(archive)) throw new Error(`缺少成品包 ${archive}；先按 README 的发布规范产出该版本`);
+  const manifest = validateNpmBundle(readFileSync(archive), { version });
   const entries = tarEntries(gunzipSync(readFileSync(archive)));
   if (!entries.includes('package/package.json')) throw new Error(`${archive} 里没有 package/package.json，不是可发布的成品包`);
   if (entries.includes('package/README.md')) throw new Error(`${archive} 仍带 package/README.md，宿主插件页会把它当详细介绍渲染；先跑 scripts/strip-package-readme.py`);
@@ -149,9 +153,9 @@ export function main(argv = process.argv.slice(2), env = process.env) {
     return;
   }
   console.log(`\n已将成品包 v${version} 发布到 npmjs。`);
-  console.log('国内镜像会按成品包 package.json 中的实际包名同步。');
+  await syncNpmMirror({name:manifest.name,version});
   console.log('同步完成后，DSH 里 npm 来源的市场条目在大陆会经 registry.npmmirror.com 安装。');
   console.log('记得重跑 npm run market:index，把该版本切换为 npm 来源。');
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${resolve(process.argv[1])}`).href) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().catch(error => { console.error(error.message); process.exitCode = 1; });

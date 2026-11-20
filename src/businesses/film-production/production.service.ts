@@ -32,7 +32,7 @@ export const filmDirectorBusiness: BusinessModule = {
   prompt: () => ROLE_PROMPTS.director + FILM_WORKFLOW_GUIDANCE + ORCHESTRATION_GUIDANCE + INTENT_GUIDANCE + PRODUCTION_STRATEGY_GUIDANCE,
   apply(runtime) {
     runtime.tools.register('film-director', withFilmDiagnostics({
-      name: 'film_project', description: '专业创作项目：create/read/validate/submit/approve/export。正常推进用responseMode:"compact"，submit已内置完整校验，失败集中返回字段问题，无需每稿先validate再submit。validate仅供单独检查，不保存或审批。磁盘保存，创意与剧本独立人工批准，不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets必须含characters/scenes/locations/scene_states/props五个数组（无道具明确props:[]）；shots含shots；prompts含prompts；review含review_status/scores/issues/delivery_allowed；export返回可读Markdown及版本校验清单。',
+      name: 'film_project', description: '专业创作项目：create/read/validate/submit/approve/export。正常推进用responseMode:"compact"，submit已内置完整校验，失败集中返回字段问题，无需每稿先validate再submit。validate仅供单独检查，不保存或审批。磁盘保存，创意与剧本由approve工具直接弹窗人工批准，不要先用ask_user_question重复确认；批准后立即按nextTask继续并提交剧本。中断恢复read原项目，沿用已批准版本。不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets必须含characters/scenes/locations/scene_states/props五个数组（无道具明确props:[]）；shots含shots；prompts含prompts；review含review_status/scores/issues/delivery_allowed；export返回可读Markdown及版本校验清单。',
       parameters: { type:'object', properties: {
         responseMode:{type:'string',enum:['compact','full'],description:'写操作默认compact：仅返回项目摘要与下一阶段完整必要材料，减少重复上下文；read默认full，完整恢复也可显式选full。read配合stage可只读单阶段产物。'},
         intent:{type:'string',enum:[...INTENTS]}, entityIds:{type:'array',items:{type:'string'}},
@@ -119,6 +119,7 @@ export const filmDirectorBusiness: BusinessModule = {
           if (args.action === 'approve') {
             const artifact=state.artifacts[args.stage];
             if (!['creative','script'].includes(args.stage) || !artifact || artifact.stale || state.revision!==args.expectedRevision) throw Error('INVALID_APPROVAL_REVISION');
+            if(state.approvals?.[args.stage]===artifact.revision)return projectResponse(state,taskFor(),args.responseMode||'compact');
             if(args.stage==='creative'&&state.project_spec&&Object.hasOwn(state.project_spec,'work_type')&&!hasContentProfile(state.project_spec))throw Error('WORK_TYPE_REQUIRED_BEFORE_APPROVAL');
             const service=runtime.ctx.get?.('userQuestions') || (exec.agent as any)?.ctx?.get?.('userQuestions');
             if (!service?.ask) return {status:'needs_input',reason:'人工确认服务不可用'};

@@ -1325,7 +1325,7 @@
 
   // src/ui/updates/update.service.ts
   function createUpdates({ h, fetchSource }) {
-    const PLUGIN_VERSION = true ? "4.0.8".trim().replace(/^v/i, "") : "";
+    const PLUGIN_VERSION = true ? "4.0.9".trim().replace(/^v/i, "") : "";
     function isNewerVersion(remote, local) {
       const parse = (text) => {
         const m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1798,7 +1798,7 @@
   // package.json
   var package_default = {
     name: "dsh-metaontic-video",
-    version: "4.0.8",
+    version: "4.0.9",
     description: "面向新手的 AI 视频创作助手：从想法、脚本到视频生成，全程引导；通过分段续拍与本地合并，提供低成本长视频制作方案。",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1913,11 +1913,11 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "4.0.8",
+      version: "4.0.9",
       prerelease: false,
-      publishedAt: "2026-11-20T12:52:52.102Z",
+      publishedAt: "2026-11-20T13:48:48.474Z",
       items: [
-        "优化：在线安装与插件更新统一使用最新版固定地址，后续发版自动同步安装包，并校验成品一致性。"
+        "优化：减少创意重复确认，支持中断后继续编写剧本；完善日志隐私保护、容量控制与故障定位，提升匿名设备标识稳定性。"
       ]
     }
   };

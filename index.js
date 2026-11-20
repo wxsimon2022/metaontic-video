@@ -17,7 +17,7 @@ var __export = (target, all) => {
 var PLUGIN_VERSION;
 var init_version = __esm({
   "src/shared/constants/version.ts"() {
-    PLUGIN_VERSION = true ? "4.0.8".trim().replace(/^v/i, "") : "";
+    PLUGIN_VERSION = true ? "4.0.9".trim().replace(/^v/i, "") : "";
   }
 });
 
@@ -1283,6 +1283,10 @@ function videoCapabilities(model) {
 }
 
 // src/businesses/film-production/validation/budget.validator.ts
+import { performance as performance2 } from "node:perf_hooks";
+
+// src/shared/utils/timing.ts
+import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 
 // src/shared/utils/logging.ts
@@ -1300,27 +1304,201 @@ function dshHome() {
 // src/shared/utils/logging.ts
 init_version();
 init_plugin();
-import { mkdir, appendFile } from "node:fs/promises";
+import { mkdir, appendFile, readdir, lstat, unlink, rmdir } from "node:fs/promises";
 var requestLogContext = new AsyncLocalStorage();
+var LOG_POLICY = { retentionDays: 30, totalBytes: 50 * 1024 * 1024, dailyBytes: 5 * 1024 * 1024, queueLimit: 256 };
+var fields = new Set("event callId sessionId projectId jobId taskId tool stage spanId parentSpanId startedAt finishedAt elapsedMs outcome errorCode errorCategory httpStatus upstreamRequestId requestId operation method provider model duration resolution imageCount videoCount taskStatus completionTokens index actualSeconds plannedCumulative mode segmentCount sourceCount segmentSeconds done resuming paused cancelled truncated characters chunks bytes responseBytes turn version closedSpanId closedElapsedMs coverage action status source reason".split(" "));
+var pathFields = new Set("path sourcePath videoPath previewPath resumeDir segmentsDir".split(" "));
+var listFields = /* @__PURE__ */ new Set(["files", "inputPaths"]);
+var preparedDirs = /* @__PURE__ */ new Set();
+var health = { written: 0, dropped: 0, failures: 0, cleanupFailures: 0, lastErrorCode: "", lastFailureAt: "", lastSuccessAt: "" };
+var pending = 0;
+var queue = Promise.resolve();
+var maintenance = /* @__PURE__ */ new Map();
+function logDiagnostics() {
+  return { ...health, pending, policy: { ...LOG_POLICY } };
+}
+function safeString(value) {
+  return value.replace(/https?:\/\/[^\s<>]+/gi, "[url]").replace(/\b(?:Bearer\s+[^\s,;]+|sk-[a-z0-9_-]+)\b/gi, "[redacted]").replace(/((?:api[_-]?key|access[_-]?token|authorization|password|secret)\s*[:=]\s*)[^\s,;]+/gi, "$1[redacted]").replace(/[\r\n\x00-\x1f]/g, " ").slice(0, 256);
+}
+function sanitizeLogRecord(record) {
+  const clean = {};
+  for (const [key, value] of Object.entries(record || {})) {
+    if (key === "cuts" && Array.isArray(value)) {
+      clean.cuts = value.slice(0, 100).map((item) => Object.fromEntries(["index", "seconds", "tailSeconds"].filter((k) => typeof item?.[k] === "number" && Number.isFinite(item[k])).map((k) => [k, item[k]])));
+    } else if (pathFields.has(key) && typeof value === "string") {
+      clean[key] = safeString(value.split(/[?#]/)[0].split(/[\\/]/).pop() || "");
+    } else if (listFields.has(key) && Array.isArray(value)) {
+      clean[key] = value.slice(0, 20).filter((v) => typeof v === "string").map((v) => safeString(v.split(/[?#]/)[0].split(/[\\/]/).pop() || ""));
+    } else if (fields.has(key)) {
+      if (typeof value === "number" && Number.isFinite(value) || typeof value === "boolean") clean[key] = value;
+      else if (typeof value === "string") {
+        if (key === "reason" && !/^[a-z][a-z0-9_]{0,79}$/.test(value)) continue;
+        clean[key] = safeString(value);
+      }
+    }
+  }
+  return clean;
+}
 function requestLogPath() {
   const now = /* @__PURE__ */ new Date();
   const date2 = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
   return path2.join(dshHome(), "logs", DATA_DIR, date2, "requests.jsonl");
 }
-var preparedDirs = /* @__PURE__ */ new Set();
-async function ensureLogDir(dir) {
-  if (preparedDirs.has(dir)) return;
-  await mkdir(dir, { recursive: true, mode: 448 });
-  if (preparedDirs.size > 32) preparedDirs.clear();
-  preparedDirs.add(dir);
+async function pruneRequestLogs(root, current, now = Date.now()) {
+  const files = [];
+  for (const entry2 of await readdir(root, { withFileTypes: true })) {
+    if (!/^\d{8}$/.test(entry2.name) || !entry2.isDirectory() || entry2.isSymbolicLink()) continue;
+    const dir = path2.join(root, entry2.name);
+    const file = path2.join(dir, "requests.jsonl");
+    try {
+      const info = await lstat(file);
+      if (!info.isFile() || info.isSymbolicLink()) continue;
+      const day = (/* @__PURE__ */ new Date(`${entry2.name.slice(0, 4)}-${entry2.name.slice(4, 6)}-${entry2.name.slice(6, 8)}T00:00:00`)).getTime();
+      if (Number.isFinite(day)) files.push({ file, dir, size: info.size, day });
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+  files.sort((a, b) => a.day - b.day);
+  let total = files.reduce((sum, item) => sum + item.size, 0);
+  for (const item of files) {
+    if (item.file === current) continue;
+    if (item.day >= now - LOG_POLICY.retentionDays * 864e5 && total <= LOG_POLICY.totalBytes) continue;
+    await unlink(item.file);
+    total -= item.size;
+    preparedDirs.delete(item.dir);
+    try {
+      await rmdir(item.dir);
+    } catch (error) {
+      if (!["ENOTEMPTY", "EEXIST", "ENOENT"].includes(error?.code)) throw error;
+    }
+  }
 }
 async function appendRequestLog(record) {
-  try {
-    const file = requestLogPath();
-    await ensureLogDir(path2.dirname(file));
-    await appendFile(file, JSON.stringify({ time: (/* @__PURE__ */ new Date()).toISOString(), pluginVersion: PLUGIN_VERSION, ...requestLogContext.getStore(), ...record }) + "\n", { mode: 384 });
-  } catch {
+  if (typeof process !== "undefined" && process.env?.NODE_TEST_CONTEXT && !process.env?.DSH_HOME) return;
+  if (pending >= LOG_POLICY.queueLimit) {
+    health.dropped++;
+    return;
   }
+  const file = requestLogPath();
+  let payload;
+  try {
+    payload = { ...sanitizeLogRecord(requestLogContext.getStore() || {}), ...sanitizeLogRecord(record), time: (/* @__PURE__ */ new Date()).toISOString(), pluginVersion: PLUGIN_VERSION, logSchemaVersion: 1 };
+  } catch {
+    health.failures++;
+    health.lastErrorCode = "INVALID_LOG_RECORD";
+    health.lastFailureAt = (/* @__PURE__ */ new Date()).toISOString();
+    return;
+  }
+  pending++;
+  const write2 = queue.then(async () => {
+    try {
+      const dir = path2.dirname(file), root = path2.dirname(dir);
+      if (!preparedDirs.has(dir)) {
+        await mkdir(dir, { recursive: true, mode: 448 });
+        for (const target of [root, dir]) {
+          const info = await lstat(target);
+          if (!info.isDirectory() || info.isSymbolicLink()) throw Object.assign(Error(), { code: "UNSAFE_LOG_FILE" });
+        }
+        if (preparedDirs.size > 32) preparedDirs.clear();
+        preparedDirs.add(dir);
+      }
+      if (Date.now() - (maintenance.get(root) || 0) > 36e5) {
+        try {
+          await pruneRequestLogs(root, file);
+          if (maintenance.size > 32) maintenance.clear();
+          maintenance.set(root, Date.now());
+        } catch {
+          health.cleanupFailures++;
+          maintenance.set(root, Date.now() - 354e4);
+        }
+      }
+      let size = 0;
+      try {
+        const info = await lstat(file);
+        if (!info.isFile() || info.isSymbolicLink()) throw Object.assign(Error(), { code: "UNSAFE_LOG_FILE" });
+        size = info.size;
+      } catch (error) {
+        if (error?.code !== "ENOENT") throw error;
+      }
+      const text = JSON.stringify(payload) + "\n";
+      if (size + new TextEncoder().encode(text).length > LOG_POLICY.dailyBytes) {
+        health.dropped++;
+        health.lastErrorCode = "DAILY_LIMIT";
+        return;
+      }
+      await appendFile(file, text, { mode: 384 });
+      health.written++;
+      health.lastSuccessAt = (/* @__PURE__ */ new Date()).toISOString();
+    } catch (error) {
+      preparedDirs.delete(path2.dirname(file));
+      health.failures++;
+      health.lastFailureAt = (/* @__PURE__ */ new Date()).toISOString();
+      health.lastErrorCode = ["ENOENT", "EACCES", "EPERM", "ENOSPC", "UNSAFE_LOG_FILE"].includes(error?.code) ? error.code : "LOG_WRITE_FAILED";
+    } finally {
+      pending--;
+    }
+  });
+  queue = write2.catch(() => {
+  });
+  await queue;
+}
+
+// src/shared/utils/timing.ts
+function diagnosticError(error) {
+  const message = String(error?.message || "");
+  const raw = typeof error?.code === "string" ? error.code : message.split(":")[0];
+  const known = /^(?:provider_[a-z_]+|INVALID_[A-Z_]+|[A-Z_]+_CONFLICT|ABORTED|EACCES|EPERM|ENOSPC|ENOENT|ETIMEDOUT|ECONNRESET|resume_locked|submission_unknown|MODEL_NOT_FOUND|CONFIG_MISSING|TIMEOUT)$/;
+  const inferred = /model not found|unknown model|模型不存在/i.test(message) ? "MODEL_NOT_FOUND" : /未配置|请.*填写.*(?:模型|密钥)|关闭模型共用/.test(message) ? "CONFIG_MISSING" : /没有输出|timeout|timed out/i.test(message) ? "TIMEOUT" : "";
+  const errorCode = known.test(raw) ? raw : inferred || (error?.name === "AbortError" ? "ABORTED" : error?.name === "SyntaxError" ? "INVALID_JSON" : "INTERNAL_ERROR");
+  const errorCategory = /ABORT/.test(errorCode) ? "cancelled" : /auth/.test(errorCode) ? "authentication" : /network|TIMEOUT|TIMEDOUT|CONN/.test(errorCode) ? "network" : /INVALID|CONFIG_MISSING|Syntax/.test(errorCode) ? "validation" : /CONFLICT|locked/.test(errorCode) ? "conflict" : /provider_|MODEL_NOT_FOUND/.test(errorCode) ? "provider" : /EACCES|EPERM|ENOSPC|ENOENT/.test(errorCode) ? "filesystem" : "internal";
+  return { errorCode, errorCategory };
+}
+async function timedStage(stage, operation) {
+  const spanId = randomUUID();
+  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const start = performance.now();
+  await appendRequestLog({ event: "stage_started", stage, spanId, startedAt });
+  let outcome = "error";
+  let failure = {};
+  try {
+    const result = await requestLogContext.run({ ...requestLogContext.getStore(), parentSpanId: spanId }, operation);
+    const metadata = result;
+    outcome = ["failed", "unknown", "timeout", "cancelled", "pending", "review_required", "blocked", "submission_unknown", "partial", "paused"].includes(metadata?.status) ? metadata.status : "success";
+    if (metadata?.errorCode) failure = diagnosticError({ code: metadata.errorCode });
+    else if (["blocked", "review_required"].includes(outcome)) failure = { errorCategory: "approval" };
+    return result;
+  } catch (error) {
+    failure = diagnosticError(error);
+    outcome = error?.name === "AbortError" || error?.code === "ABORTED" ? "cancelled" : "error";
+    throw error;
+  } finally {
+    await appendRequestLog({
+      event: "stage_finished",
+      stage,
+      spanId,
+      startedAt,
+      finishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      elapsedMs: Math.round((performance.now() - start) * 1e3) / 1e3,
+      outcome,
+      ...failure
+    });
+  }
+}
+function withStageTiming(tool) {
+  return { ...tool, async execute(args, exec) {
+    const context = {
+      ...requestLogContext.getStore(),
+      callId: exec?.callId || requestLogContext.getStore()?.callId || randomUUID(),
+      tool: tool.name,
+      sessionId: exec?.agent?.session?.id,
+      projectId: args?.projectId,
+      taskId: args?.taskId,
+      index: args?.index
+    };
+    return requestLogContext.run(context, () => timedStage(`tool:${tool.name}`, () => tool.execute(args, exec)));
+  } };
 }
 
 // src/businesses/film-production/validation/budget.validator.ts
@@ -1336,20 +1514,22 @@ function filmOutput(value) {
 }
 function withFilmDiagnostics(tool) {
   return { ...tool, async execute(args, exec) {
-    const started = performance.now();
+    const started = performance2.now();
     let result;
     let outcome = "failed";
     let category = "INTERNAL_ERROR";
+    let errorCategory = "internal";
     try {
       result = filmOutput(await tool.execute(args, exec));
-      outcome = "success";
+      outcome = ["failed", "blocked", "review_required", "partial"].includes(result?.status) ? result.status : "success";
       return result;
     } catch (e) {
       const code = String(e?.message || "").split(":")[0];
-      category = /^[A-Z_]{1,70}$/.test(code) ? code : "INTERNAL_ERROR";
+      category = /^[A-Z_]{1,70}$/.test(code) ? code : diagnosticError(e).errorCode;
+      errorCategory = diagnosticError({ code: category }).errorCategory;
       throw e;
     } finally {
-      await appendRequestLog({ event: "film_stage_finished", action: ACTIONS.includes(args.action) ? args.action : "unknown", stage: STAGES.includes(args.stage) ? args.stage : null, elapsedMs: Math.round(performance.now() - started), outcome, errorCode: outcome === "failed" ? category : void 0, responseBytes: result ? Buffer.byteLength(JSON.stringify(result)) : 0 });
+      await appendRequestLog({ event: "film_stage_finished", action: ACTIONS.includes(args.action) ? args.action : "unknown", stage: STAGES.includes(args.stage) ? args.stage : null, projectId: args.projectId || result?.project_id, callId: exec?.callId, sessionId: exec?.agent?.session?.id, elapsedMs: Math.round(performance2.now() - started), outcome, errorCode: outcome === "failed" ? category : void 0, errorCategory: outcome === "failed" ? errorCategory : void 0, responseBytes: result ? Buffer.byteLength(JSON.stringify(result)) : 0 });
     }
   } };
 }
@@ -2191,14 +2371,14 @@ function legacyProfileInstructions(state, role2) {
   const p = resolveProfile(state.project_spec);
   if (!p && hasContentProfile(state.project_spec)) return "\n【组合类型】以已解析的四维 Profile 为创作和审核依据，不强制另选旧作品类型。";
   if (!p) return "\n【作品类型待确认】不得默认所有作品都是剧情片；根据原意推荐一个作品类型，明确后用configure_profile保存。旧项目允许沿用已有通用流程，不擅自迁移。风格、叙事方式与生成模式不是作品类型。";
-  const fields = role2 === "creative" ? p.creative_fields : role2 === "screenwriter" ? p.script_fields : null;
+  const fields2 = role2 === "creative" ? p.creative_fields : role2 === "screenwriter" ? p.script_fields : null;
   const roleRule = p.role_rules[role2] || ({ director: "按本类型组织角色与审批，类型变更使原创意及下游失效，需重新审批。", creative: "将策略转为可审批的内容蓝图，不提前写正式剧本。", character: "只设计已批准主体；无人像内容允许characters为空，不强加人物。", scene: "环境和道具服务本类型的内容推进，不更改已批准地点与事件。", "prompt-engineer": "将本类型的已批准镜头忠实转为独立提示词，未知能力标待验证，不新添情节。", reviewer: "共同时间轴、引用、版本、对白和硬约束检查始终适用；艺术判断按本类型评估，不以缺少冲突、反转或对白判所有作品失败。" }[role2] || "按当前阶段职责执行。");
   return `
 【作品类型 ${p.id} · 配置 ${p.revision}】${p.label}
 内容结构：${p.strategy}。${p.boundary}
 当前职责：${roleRule}
 叙事方式：${state.project_spec.narrative_mode || "未指定"}；视觉风格：${state.project_spec.visual_style || "未指定"}。二者独立，不从风格推断类型或生成方式。
-` + (fields ? `本阶段额外输出type_details对象：${JSON.stringify(fields)}。字段为非空文本，记录具体内容而非规则复述。
+` + (fields2 ? `本阶段额外输出type_details对象：${JSON.stringify(fields2)}。字段为非空文本，记录具体内容而非规则复述。
 ` : "") + (role2 === "reviewer" ? `报告增加type_review：work_type=${p.id}、profile_revision=${p.revision}、checks数组。每项含criterion_id、status（PASS/CONCERN/NOT_EVALUATED）、evidence（具体材料位置与依据）。必须覆盖${JSON.stringify(p.review_criteria)}。CONCERN必须关联issues中的MINOR/INFO艺术建议或有客观证据的CRITICAL/MAJOR；NOT_EVALUATED不能通过终审。不能把类型评分当实际媒体效果验证。
 ` : "") + "用户硬约束和批准内容优先。类型策略只在本类型适用，不强制每片都有冲突、对白、笑点或反转；新增关键内容仍需创意审批。";
 }
@@ -2207,9 +2387,9 @@ function validateProfileArtifact(stage, value, state) {
   if (stage === "review") validateDimensionReview(value, state.project_spec);
   const p = resolveProfile(state.project_spec);
   if (!p) return;
-  const fields = stage === "creative" ? p.creative_fields : stage === "script" ? p.script_fields : null;
-  if (fields) {
-    for (const key of Object.keys(fields)) if (typeof value.type_details?.[key] !== "string" || !value.type_details[key].trim()) throw Error(`TYPE_DETAIL_REQUIRED:${key}`);
+  const fields2 = stage === "creative" ? p.creative_fields : stage === "script" ? p.script_fields : null;
+  if (fields2) {
+    for (const key of Object.keys(fields2)) if (typeof value.type_details?.[key] !== "string" || !value.type_details[key].trim()) throw Error(`TYPE_DETAIL_REQUIRED:${key}`);
   }
   if (stage !== "review") return;
   const r = value.type_review;
@@ -2323,14 +2503,14 @@ function checkSubmission(state, stage, content) {
   const arrays = STAGE_ARRAYS[stage] || [];
   if (!data || typeof data !== "object" || Array.isArray(data)) return { valid: false, error_code: "INVALID_ARTIFACT", issues: [{ path: "content", message: "材料顶层必须是 JSON 对象。" }], expectedRevision: state.revision };
   const issues = arrays.filter((k) => !Array.isArray(data[k])).map((k) => ({ path: k, message: `顶层 ${k} 必须是数组。无适用内容时显式提供 []；如有已批准内容，须完整保留，不得为通过校验清空。` }));
-  for (const [collection, fields] of Object.entries(ITEM_ARRAYS[stage] || {})) {
+  for (const [collection, fields2] of Object.entries(ITEM_ARRAYS[stage] || {})) {
     if (!Array.isArray(data[collection])) continue;
     data[collection].forEach((item, index) => {
       if (!item || typeof item !== "object" || Array.isArray(item)) {
         issues.push({ path: `${collection}[${index}]`, message: "必须是对象。" });
         return;
       }
-      for (const key of fields) if (!Array.isArray(item[key])) issues.push({ path: `${collection}[${index}].${key}`, message: `${key} 必须是数组；从已批准登记表填写本镜引用，无对应内容才使用 []。` });
+      for (const key of fields2) if (!Array.isArray(item[key])) issues.push({ path: `${collection}[${index}].${key}`, message: `${key} 必须是数组；从已批准登记表填写本镜引用，无对应内容才使用 []。` });
     });
   }
   if (issues.length) return { valid: false, error_code: "REQUIRED_ARTIFACT_ARRAYS", issues, expectedRevision: state.revision };
@@ -2344,7 +2524,8 @@ function checkSubmission(state, stage, content) {
 
 // src/businesses/film-production/production.responses.ts
 function projectResponse(state, nextTask2, mode = "full", extra2 = {}) {
-  if (mode !== "compact") return { ...state, ...extra2, nextTask: nextTask2 };
+  const continuation = nextTask2?.action === "submit" && nextTask2?.stage === "script" ? { project_id: state.project_id, expected_revision: state.revision, action: "WRITE_AND_SUBMIT_SCRIPT", instructions: "创意已批准，完整输入见nextTask。现在完成并展示剧本，使用本project_id和expected_revision提交script；不重复创意审批，不新建项目，不以准备开始结束本轮。中断恢复时沿用此状态。" } : nextTask2?.action === "approve" ? { project_id: state.project_id, expected_revision: state.revision, action: "REQUEST_NATIVE_APPROVAL", instructions: "展示当前保存稿后直接调用film_project approve，由工具发起唯一人工审批；不要先用ask_user_question重复询问是否批准。" } : void 0;
+  if (mode !== "compact") return { ...state, ...extra2, ...continuation ? { continuation } : {}, nextTask: nextTask2 };
   return {
     response_mode: "compact",
     project_id: state.project_id,
@@ -2364,6 +2545,7 @@ function projectResponse(state, nextTask2, mode = "full", extra2 = {}) {
     }])),
     task_summary: (state.tasks || []).map((t) => ({ key: t.key, task_id: t.task_id, stage: t.stage, status: t.status, attempts: t.attempts, error_code: t.error_code })),
     ...state.production ? { production: state.production, production_stale: state.production.source_revision !== state.revision } : {},
+    ...continuation ? { continuation } : {},
     ...extra2.sha256 ? { sha256: extra2.sha256 } : {},
     nextTask: nextTask2,
     read_hint: '完整材料已保存。nextTask 含本阶段完整所需输入，可直接继续，不必再 next/read。补查单个产物用 read + stage；需要全部历史时用 read + responseMode:"full"。'
@@ -2439,13 +2621,13 @@ function configureProfile(state, input, expected) {
 }
 
 // src/businesses/film-production/projects/project.repository.ts
-import { readFile as readFile2, readdir, stat, unlink as unlink2 } from "node:fs/promises";
+import { readFile as readFile2, readdir as readdir2, stat, unlink as unlink3 } from "node:fs/promises";
 import path3 from "node:path";
 
 // src/shared/utils/file-lock.ts
-import { open, unlink, readFile, link } from "node:fs/promises";
+import { open, unlink as unlink2, readFile, link } from "node:fs/promises";
 import os2 from "node:os";
-import { randomUUID } from "node:crypto";
+import { randomUUID as randomUUID2 } from "node:crypto";
 async function inspectFileLock(file) {
   let raw;
   try {
@@ -2480,7 +2662,7 @@ async function removeOwned(file, token) {
     if (e.code === "ENOENT") return;
     throw e;
   }
-  if (record.token === token) await unlink(file);
+  if (record.token === token) await unlink2(file);
 }
 async function publishLock(file, token, metadata = {}) {
   const prepared = `${file}.${token}.tmp`;
@@ -2492,7 +2674,7 @@ async function publishLock(file, token, metadata = {}) {
   } finally {
     await handle.close().catch(() => {
     });
-    await unlink(prepared).catch(() => {
+    await unlink2(prepared).catch(() => {
     });
   }
 }
@@ -2501,7 +2683,7 @@ async function reclaimDeadLock(file, depth = 0) {
   if (check.status === "unlocked") return;
   if (depth > 32 || !check.recoverable || !/^[a-f0-9-]{36}$/.test(check.record?.token || "")) throw Error("RECOVERY_LOCK_UNSAFE:恢复锁活跃或无法确定所属进程，保留原锁。");
   const claim = `${file}.reclaim-${check.record.token}`;
-  const token = randomUUID();
+  const token = randomUUID2();
   try {
     await publishLock(claim, token);
   } catch (e) {
@@ -2517,13 +2699,13 @@ async function reclaimDeadLock(file, depth = 0) {
       if (e.code === "ENOENT") return;
       throw e;
     }
-    if (current.token === check.record.token) await unlink(file);
+    if (current.token === check.record.token) await unlink2(file);
   } finally {
     await removeOwned(claim, token);
   }
 }
 async function recoverFileLock(file, guardFile = `${file}.recovery`) {
-  const token = randomUUID();
+  const token = randomUUID2();
   try {
     await publishLock(guardFile, token);
   } catch (e) {
@@ -2535,14 +2717,14 @@ async function recoverFileLock(file, guardFile = `${file}.recovery`) {
     const check = await inspectFileLock(file);
     if (check.status === "unlocked") return { status: "unlocked", recoverable: false };
     if (!check.recoverable) throw Error("LOCK_RECOVERY_UNSAFE:锁仍活跃或无法确认所属进程，保留原锁。");
-    await unlink(file);
+    await unlink2(file);
     return { status: "recovered", recoverable: false };
   } finally {
     await removeOwned(guardFile, token);
   }
 }
 async function acquireFileLock(file, { recoverDead = false, metadata = {} } = {}) {
-  const token = randomUUID();
+  const token = randomUUID2();
   try {
     await publishLock(file, token, metadata);
   } catch (e) {
@@ -2570,7 +2752,7 @@ async function pruneProjectSnapshots(dir, state, keep = 30) {
   const folder = path3.join(dir, "snapshots");
   const protectedRevisions = /* @__PURE__ */ new Set([state.revision, ...Object.values(state.approvals || {}), ...(state.decisions || []).map((d) => d.artifact_revision), ...Object.values(state.artifacts || {}).flatMap((a) => [a.revision, ...Object.values(a.source_revisions || {})])]);
   const files = [];
-  for (const name of await readdir(folder)) {
+  for (const name of await readdir2(folder)) {
     if (!/^\d+-[a-f0-9-]+\.json$/.test(name)) continue;
     const revision = Number(name.split("-")[0]);
     if (revision > state.revision) continue;
@@ -2586,7 +2768,7 @@ async function pruneProjectSnapshots(dir, state, keep = 30) {
     } catch {
       continue;
     }
-    if (saved.revision === item.revision) await unlink2(file);
+    if (saved.revision === item.revision) await unlink3(file);
   }
 }
 
@@ -3118,15 +3300,15 @@ function routeIntent(state, intent, entityIds = []) {
 
 // src/businesses/film-production/artifacts/artifact.version.ts
 function reviseEntities(state, stage, replacements, expected) {
-  const fields = { assets: ["characters", "scenes", "locations", "scene_states", "props"], shots: ["shots"], prompts: ["prompts"] };
+  const fields2 = { assets: ["characters", "scenes", "locations", "scene_states", "props"], shots: ["shots"], prompts: ["prompts"] };
   const keys = { characters: "character_id", scenes: "scene_id", locations: "location_id", scene_states: "scene_state_id", props: "prop_id", shots: "shot_id", prompts: "shot_id" };
-  if (!fields[stage] || !Array.isArray(replacements) || !replacements.length) throw Error("INVALID_REVISION_SCOPE");
+  if (!fields2[stage] || !Array.isArray(replacements) || !replacements.length) throw Error("INVALID_REVISION_SCOPE");
   const artifact = state.artifacts[stage];
   if (!artifact || artifact.stale) throw Error("UPSTREAM_REQUIRED");
   const data = structuredClone(artifact.data);
   const changed = /* @__PURE__ */ new Set();
   for (const replacement of replacements) {
-    if (!fields[stage].includes(replacement.collection)) throw Error("INVALID_COLLECTION");
+    if (!fields2[stage].includes(replacement.collection)) throw Error("INVALID_COLLECTION");
     const key = keys[replacement.collection];
     const id = replacement.entity?.[key];
     const index = data[replacement.collection].findIndex((v) => v[key] === id);
@@ -3379,7 +3561,7 @@ function estimatePlan(config, toolName, args) {
 // src/businesses/video-generation/workflow/segment-review.ts
 import path6 from "node:path";
 import { readFile as readFile4, writeFile as writeFile2, rename as rename2, rm as rm2, stat as stat3 } from "node:fs/promises";
-import { randomUUID as randomUUID2 } from "node:crypto";
+import { randomUUID as randomUUID3 } from "node:crypto";
 
 // src/businesses/video-generation/workflow/result-state.ts
 function videoResultState(value = {}) {
@@ -3544,7 +3726,7 @@ function withResumeLock(tool, toolName, config) {
   return {
     ...tool,
     async execute(args, exec) {
-      return requestLogContext.run({ callId: exec?.callId || uniqueSuffix("call"), tool: toolName }, async () => {
+      return requestLogContext.run({ ...requestLogContext.getStore(), callId: exec?.callId || requestLogContext.getStore()?.callId || uniqueSuffix("call"), tool: toolName }, async () => {
         const started = Date.now();
         const dir = resumeDirOf(args?.resume);
         let lock;
@@ -3802,7 +3984,7 @@ function createSegmentReview(ctx) {
       const approved = !exec.signal?.aborted && !answer?.custom && answer?.selected?.length === 1 && answer.selected[0] === "效果可以，继续下一段";
       if (!approved) return { status: "paused", resumeDir: dir, reason: "未通过本段结果审核，不提交下一段，不自动重做已完成视频。" };
       if ((await segmentSnapshot(dir)).key !== snap.key) throw new Error("等待审核期间分段进度已改变，请展示最新一段并重新确认。");
-      const temp = `${reviewFile(dir)}.${randomUUID2()}.tmp`;
+      const temp = `${reviewFile(dir)}.${randomUUID3()}.tmp`;
       try {
         await writeFile2(temp, JSON.stringify({ version: 1, owner, key: snap.key, approved: true, reviewedAt: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" });
         await rename2(temp, reviewFile(dir));
@@ -3810,7 +3992,7 @@ function createSegmentReview(ctx) {
         await rm2(temp, { force: true }).catch(() => {
         });
       }
-      await appendRequestLog({ event: "segment_review_approved", done: snap.done, resumeDir: dir });
+      await appendRequestLog({ event: "segment_review_approved", sessionId: exec?.agent?.session?.id, callId: exec?.callId, done: snap.done, resumeDir: dir });
       return { status: "approved", done: snap.done, resumeDir: dir, nextAction: `使用${snap.saved.toolName || "video_generate"}的原resume继续；下一段仍需费用审批，不重复生成首段。` };
     });
   }
@@ -3818,15 +4000,15 @@ function createSegmentReview(ctx) {
 }
 
 // src/businesses/video-generation/workflow/project.ts
-import { createHash as createHash3, randomUUID as randomUUID3 } from "node:crypto";
-import { mkdir as mkdir5, readdir as readdir3, readFile as readFile6, writeFile as writeFile3, rename as rename4, rm as rm4 } from "node:fs/promises";
+import { createHash as createHash3, randomUUID as randomUUID4 } from "node:crypto";
+import { mkdir as mkdir5, readdir as readdir4, readFile as readFile6, writeFile as writeFile3, rename as rename4, rm as rm4 } from "node:fs/promises";
 import path8 from "node:path";
 
 // src/businesses/video-generation/media/references.ts
 init_plugin();
 import path7 from "node:path";
 import os3 from "node:os";
-import { stat as stat4, mkdir as mkdir4, rename as rename3, rm as rm3, open as open3, readdir as readdir2, readFile as readFile5 } from "node:fs/promises";
+import { stat as stat4, mkdir as mkdir4, rename as rename3, rm as rm3, open as open3, readdir as readdir3, readFile as readFile5 } from "node:fs/promises";
 
 // src/businesses/video-generation/media/ffmpeg.ts
 init_config();
@@ -4132,7 +4314,7 @@ var lastCachePruneAt = 0;
 async function pruneReferenceCache(dir, { now = Date.now(), force = false } = {}) {
   if (!force && now - lastCachePruneAt < 60 * 60 * 1e3) return;
   lastCachePruneAt = now;
-  const entries = await readdir2(dir, { withFileTypes: true }).catch(() => []);
+  const entries = await readdir3(dir, { withFileTypes: true }).catch(() => []);
   const files = [];
   for (const entry2 of entries) {
     if (!entry2.isFile()) continue;
@@ -4228,13 +4410,13 @@ async function sniffFileImage(file) {
 }
 async function findRecentUploadedImages(windowMs = UPLOAD_WINDOW_MS) {
   const root = attachmentObjectsDir();
-  const shards = await readdir2(root, { withFileTypes: true }).catch(() => []);
+  const shards = await readdir3(root, { withFileTypes: true }).catch(() => []);
   const cutoff = Date.now() - windowMs;
   const found = [];
   for (const shard of shards) {
     if (!shard.isDirectory()) continue;
     const dir = path7.join(root, shard.name);
-    const entries = await readdir2(dir, { withFileTypes: true }).catch(() => []);
+    const entries = await readdir3(dir, { withFileTypes: true }).catch(() => []);
     for (const entry2 of entries) {
       if (!entry2.isFile()) continue;
       const abs = path7.join(dir, entry2.name);
@@ -4369,7 +4551,7 @@ function sessionOwner(exec) {
 }
 async function allProjects() {
   const dir = path8.join(dshHome(), DATA_DIR, "projects");
-  const names = await readdir3(dir).catch(() => []);
+  const names = await readdir4(dir).catch(() => []);
   const found = [];
   for (const name of names) {
     if (!name.endsWith(".json")) continue;
@@ -4401,7 +4583,7 @@ async function readProject(id, exec) {
 async function writeProject(data) {
   const file = projectFile(data.id);
   await mkdir5(path8.dirname(file), { recursive: true, mode: 448 });
-  const temp = `${file}.${randomUUID3()}.tmp`;
+  const temp = `${file}.${randomUUID4()}.tmp`;
   try {
     await writeFile3(temp, JSON.stringify(data), { mode: 384, flag: "wx" });
     await rename4(temp, file);
@@ -4420,7 +4602,7 @@ async function lockProject(id, fn) {
   }
 }
 async function createProject(exec, subjectType) {
-  const data = { version: 1, id: randomUUID3(), owner: sessionOwner(exec), subjectType, choice: "", approved: null };
+  const data = { version: 1, id: randomUUID4(), owner: sessionOwner(exec), subjectType, choice: "", approved: null };
   await writeProject(data);
   return data;
 }
@@ -4509,7 +4691,7 @@ function withProjectApproval(tool, config) {
 }
 
 // src/businesses/film-production/production.service.ts
-import { randomUUID as randomUUID4, createHash as createHash4 } from "node:crypto";
+import { randomUUID as randomUUID5, createHash as createHash4 } from "node:crypto";
 import { mkdir as mkdir6, readFile as readFile7, writeFile as writeFile4, rename as rename5, rm as rm5 } from "node:fs/promises";
 import path9 from "node:path";
 init_plugin();
@@ -4603,6 +4785,7 @@ var FILM_WORKFLOW_GUIDANCE = `【专业分阶段创作工具契约】
 正常create/read/submit/approve/configure_profile等推进调用都传responseMode:"compact"，保留完整下一阶段输入但不重复回显全项目。仅完整恢复时read(responseMode:"full")，补查单个产物用read(stage)。返回已有nextTask就直接按它继续，不重复next/read。submit自带校验，不固定先validate再submit；失败按集中问题清单修正，保护原剧情与已批准内容。
 submit传stage、content（合法JSON字符串）、expectedRevision（最近读取/提交返回的项目revision）。JSON字符串里的枚举与文本必须有双引号。正文先展示可读成果，再提交并核对返回；工具成功才称保存。
 新建项目采用3.1严格数据协议；各阶段source_revisions由工具记录，提交时若自带必须匹配真实上游。所有JSON均为规范字段，参考稿别名须先映射，不得同时维护冲突版本。
+创意和剧本的人工审批仅调用film_project(action:"approve",stage,expectedRevision)一次，由该工具弹窗并记录真实批准。禁止先用ask_user_question询问“创意通过/开始写剧本”再调用approve重复询问。真正缺失且影响方案的创作问题先单独澄清并修订，不能把澄清问卷当审批。approve成功后按返回nextTask立即继续撰写、展示和submit剧本，不用“准备开始”结束本轮。若中断后用户要求继续，read原projectId并沿用已保存批准，未保存的剧本继续完成，不重新create或重复审批。
 阶段及content字段：
 creative：新创作按CREATIVE V3.1角色返回的完整字段提交；structure使用beats与visual_evidence，段落正整数毫秒合计等于项目时长，approval_questions最多3项。旧项目保留已有字段，不把兼容读取当新稿完成标准。展示后approve(stage:creative)，只有真实批准才写剧本。
 script：screenplay完整剧本正文、chapters[{chapter_id,title,duration_ms,summary,scene_ids}]必填，章节时长总和等于项目duration_ms；按Screenwriter V3.1在scenes规范列表保留动作和场景预算，characters为稳定character_id清单，dialogue每条含dialogue_id/exact_text/speaker_id/scene_id（参考稿dialogue_lines映射为dialogue），旁白分开；approved_creative_revision绑定实际批准创意。展示后approve(stage:script)，只有真实批准才建资产。
@@ -4625,7 +4808,7 @@ var filmDirectorBusiness = {
   apply(runtime) {
     runtime.tools.register("film-director", withFilmDiagnostics({
       name: "film_project",
-      description: '专业创作项目：create/read/validate/submit/approve/export。正常推进用responseMode:"compact"，submit已内置完整校验，失败集中返回字段问题，无需每稿先validate再submit。validate仅供单独检查，不保存或审批。磁盘保存，创意与剧本独立人工批准，不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets必须含characters/scenes/locations/scene_states/props五个数组（无道具明确props:[]）；shots含shots；prompts含prompts；review含review_status/scores/issues/delivery_allowed；export返回可读Markdown及版本校验清单。',
+      description: '专业创作项目：create/read/validate/submit/approve/export。正常推进用responseMode:"compact"，submit已内置完整校验，失败集中返回字段问题，无需每稿先validate再submit。validate仅供单独检查，不保存或审批。磁盘保存，创意与剧本由approve工具直接弹窗人工批准，不要先用ask_user_question重复确认；批准后立即按nextTask继续并提交剧本。中断恢复read原项目，沿用已批准版本。不提交付费视频。submit的content为JSON字符串：creative含theme/logline；script含screenplay/chapters（duration_ms）；assets必须含characters/scenes/locations/scene_states/props五个数组（无道具明确props:[]）；shots含shots；prompts含prompts；review含review_status/scores/issues/delivery_allowed；export返回可读Markdown及版本校验清单。',
       parameters: { type: "object", properties: {
         responseMode: { type: "string", enum: ["compact", "full"], description: "写操作默认compact：仅返回项目摘要与下一阶段完整必要材料，减少重复上下文；read默认full，完整恢复也可显式选full。read配合stage可只读单阶段产物。" },
         intent: { type: "string", enum: [...INTENTS] },
@@ -4654,7 +4837,7 @@ var filmDirectorBusiness = {
       },
       async execute(args, exec) {
         const owner = sessionOwner(exec);
-        const id = args.action === "create" ? randomUUID4() : args.projectId;
+        const id = args.action === "create" ? randomUUID5() : args.projectId;
         if (!/^[a-f0-9-]{36}$/.test(id || "")) throw Error("INVALID_PROJECT_ID");
         const readonly = ["read", "next", "route", "validate", "export", "diagnose"].includes(args.action);
         if (!readonly && locks2.has(id)) throw Error("PROJECT_BUSY");
@@ -4738,6 +4921,7 @@ var filmDirectorBusiness = {
           if (args.action === "approve") {
             const artifact = state.artifacts[args.stage];
             if (!["creative", "script"].includes(args.stage) || !artifact || artifact.stale || state.revision !== args.expectedRevision) throw Error("INVALID_APPROVAL_REVISION");
+            if (state.approvals?.[args.stage] === artifact.revision) return projectResponse(state, taskFor(), args.responseMode || "compact");
             if (args.stage === "creative" && state.project_spec && Object.hasOwn(state.project_spec, "work_type") && !hasContentProfile(state.project_spec)) throw Error("WORK_TYPE_REQUIRED_BEFORE_APPROVAL");
             const service = runtime.ctx.get?.("userQuestions") || exec.agent?.ctx?.get?.("userQuestions");
             if (!service?.ask) return { status: "needs_input", reason: "人工确认服务不可用" };
@@ -4750,8 +4934,8 @@ var filmDirectorBusiness = {
           if (args.action !== "create" && originalState === JSON.stringify(state)) return projectResponse(state, taskFor(), args.responseMode || "compact");
           await mkdir6(path9.join(dir, "snapshots"), { recursive: true, mode: 448 });
           const body = JSON.stringify(state, null, 2);
-          await writeFile4(path9.join(dir, "snapshots", `${state.revision}-${randomUUID4()}.json`), body, { mode: 384, flag: "wx" });
-          const temp = path9.join(dir, `${randomUUID4()}.tmp`);
+          await writeFile4(path9.join(dir, "snapshots", `${state.revision}-${randomUUID5()}.json`), body, { mode: 384, flag: "wx" });
+          const temp = path9.join(dir, `${randomUUID5()}.tmp`);
           try {
             await writeFile4(temp, body, { mode: 384, flag: "wx" });
             await rename5(temp, file);
@@ -4918,8 +5102,8 @@ function bindAgentRegistry(ctx, registry2) {
 }
 
 // src/platform/telemetry/reporter.ts
-import { randomUUID as randomUUID5, createHash as createHash5 } from "node:crypto";
-import { mkdir as mkdir7, readFile as readFile8, writeFile as writeFile5 } from "node:fs/promises";
+import { randomUUID as randomUUID6, createHash as createHash5 } from "node:crypto";
+import { mkdir as mkdir7, readFile as readFile8, writeFile as writeFile5, rename as rename6, unlink as unlink4 } from "node:fs/promises";
 import path10 from "node:path";
 import os4 from "node:os";
 init_version();
@@ -4945,45 +5129,54 @@ async function analyticsIdentity() {
   if (!state.identities.has(dir)) state.identities.set(dir, (async () => {
     const parse = (raw) => {
       try {
-        const id2 = JSON.parse(raw).installationId;
-        return /^[a-f0-9-]{36}$/i.test(id2) ? id2 : null;
+        const id = JSON.parse(raw).installationId;
+        return /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id) ? id : null;
       } catch {
         return null;
       }
     };
-    const present = [];
-    for (const file of files) {
+    await mkdir7(dir, { recursive: true, mode: 448 });
+    let release;
+    for (let attempt = 0; attempt < 40; attempt++) {
       try {
-        present.push(parse(await readFile8(file, "utf8")));
-      } catch {
-        present.push(null);
+        release = await acquireFileLock(path10.join(dir, "analytics-identity.lock"), { recoverDead: true });
+        break;
+      } catch (error) {
+        if (error?.code !== "EEXIST" && !/^(?:PROJECT_LOCKED|LOCK_RECOVERY_UNSAFE|RECOVERY_LOCK_UNSAFE):/.test(String(error?.message || ""))) throw error;
+        if (attempt === 39) throw error;
+        await new Promise((resolve3) => setTimeout(resolve3, 25));
       }
     }
-    let id = present[0] || present[1];
-    await mkdir7(dir, { recursive: true, mode: 448 });
-    if (!id) {
-      const created = randomUUID5();
-      try {
-        await writeFile5(files[0], JSON.stringify({ installationId: created }), { mode: 384, flag: "wx" });
-        id = created;
-      } catch (error) {
-        if (error.code !== "EEXIST") throw error;
-        id = parse(await readFile8(files[0], "utf8").catch(() => ""));
-        if (!id) {
-          id = created;
-          await writeFile5(files[0], JSON.stringify({ installationId: id }), { mode: 384 });
+    try {
+      const present = [];
+      for (const file of files) {
+        try {
+          present.push(parse(await readFile8(file, "utf8")));
+        } catch (error) {
+          if (error?.code !== "ENOENT") throw error;
+          present.push(null);
         }
       }
-    }
-    for (const [index, file] of files.entries()) {
-      if (present[index] === id) continue;
-      try {
-        await writeFile5(file, JSON.stringify({ installationId: id }), { mode: 384 });
-      } catch {
+      const id = present[0] || present[1] || randomUUID6();
+      for (const [index, file] of files.entries()) {
+        if (present[index] === id) continue;
+        const temporary = `${file}.${randomUUID6()}.tmp`;
+        try {
+          await writeFile5(temporary, JSON.stringify({ installationId: id }), { mode: 384, flag: "wx" });
+          await rename6(temporary, file);
+        } finally {
+          await unlink4(temporary).catch(() => {
+          });
+        }
       }
+      return id;
+    } finally {
+      await release?.();
     }
-    return id;
-  })().catch(() => null));
+  })().catch(() => {
+    state.identities.delete(dir);
+    return null;
+  }));
   return state.identities.get(dir);
 }
 function analyticsFields(input = {}) {
@@ -5020,7 +5213,7 @@ function createAnalyticsReporter(config, options = {}) {
   const delay = options.delayMs ?? 1e3;
   const timeout = options.timeoutMs ?? 1500;
   const maxQueue = options.maxQueue ?? 200;
-  let queue = [], timer, controller = null;
+  let queue2 = [], timer, controller = null;
   let disposed = false, sending = false;
   const allowed = () => {
     try {
@@ -5030,7 +5223,7 @@ function createAnalyticsReporter(config, options = {}) {
     }
   };
   function schedule(ms = delay) {
-    if (!allowed() || timer || sending || !queue.length) return;
+    if (!allowed() || timer || sending || !queue2.length) return;
     timer = setTimeout(() => {
       timer = null;
       void flush();
@@ -5039,12 +5232,12 @@ function createAnalyticsReporter(config, options = {}) {
   }
   async function flush() {
     if (!allowed()) {
-      queue = [];
+      queue2 = [];
       return;
     }
-    if (sending || !queue.length) return;
+    if (sending || !queue2.length) return;
     sending = true;
-    const batch = queue.splice(0, 20);
+    const batch = queue2.splice(0, 20);
     let watchdog;
     try {
       const installationId = await identity();
@@ -5074,45 +5267,45 @@ function createAnalyticsReporter(config, options = {}) {
     } catch {
       if (allowed()) {
         const retry = batch.map((event) => ({ ...event, attempts: event.attempts + 1 })).filter((event) => event.attempts < 3);
-        queue = [...retry, ...queue].slice(-maxQueue);
+        queue2 = [...retry, ...queue2].slice(-maxQueue);
       }
     } finally {
       clearTimeout(watchdog);
       controller = null;
       sending = false;
-      if (allowed() && queue.length) schedule(queue[0].attempts ? Math.min(3e4, 1e3 * 5 ** queue[0].attempts) : delay);
+      if (allowed() && queue2.length) schedule(queue2[0].attempts ? Math.min(3e4, 1e3 * 5 ** queue2[0].attempts) : delay);
     }
   }
   function record(name, input = {}, dedupeKey = "") {
     try {
       if (!allowed()) {
-        queue = [];
+        queue2 = [];
         return;
       }
       if (!EVENTS.has(name)) return;
-      const fields = analyticsFields(input);
-      if (name !== "plugin_started" && !fields.tool) return;
+      const fields2 = analyticsFields(input);
+      if (name !== "plugin_started" && !fields2.tool) return;
       const event = {
-        eventId: randomUUID5(),
+        eventId: randomUUID6(),
         name,
         occurredAt: (/* @__PURE__ */ new Date()).toISOString(),
         version: PLUGIN_VERSION,
         platform: ["darwin", "win32", "linux"].includes(process.platform) ? process.platform : "other",
-        ...fields,
+        ...fields2,
         attempts: 0
       };
       if (dedupeKey) {
         void Promise.resolve().then(() => identity()).then((id) => {
           if (!id || !allowed()) return;
           event.eventId = createHash5("sha256").update(`${id}:${name}:${dedupeKey}`).digest("hex");
-          queue.push(event);
-          queue = queue.slice(-maxQueue);
+          queue2.push(event);
+          queue2 = queue2.slice(-maxQueue);
           schedule();
         }).catch(() => {
         });
       } else {
-        queue.push(event);
-        queue = queue.slice(-maxQueue);
+        queue2.push(event);
+        queue2 = queue2.slice(-maxQueue);
         schedule();
       }
     } catch {
@@ -5131,15 +5324,15 @@ function createAnalyticsReporter(config, options = {}) {
   }
   function dispose() {
     disposed = true;
-    queue = [];
+    queue2 = [];
     clearTimeout(timer);
     controller?.abort();
   }
-  return { record, start, dispose, flush, pending: () => queue.length };
+  return { record, start, dispose, flush, pending: () => queue2.length };
 }
-function reportUsage(exec, name, fields, key = "") {
+function reportUsage(exec, name, fields2, key = "") {
   try {
-    exec?.metaonticAnalytics?.record(name, fields, key);
+    exec?.metaonticAnalytics?.record(name, fields2, key);
   } catch {
   }
 }
@@ -5169,41 +5362,6 @@ function withUsageAnalytics(tool, reporter, mode = (_exec) => "standard") {
       }
       throw error;
     }
-  } };
-}
-
-// src/shared/utils/timing.ts
-import { randomUUID as randomUUID6 } from "node:crypto";
-import { performance as performance2 } from "node:perf_hooks";
-async function timedStage(stage, operation) {
-  const spanId = randomUUID6();
-  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
-  const start = performance2.now();
-  await appendRequestLog({ event: "stage_started", stage, spanId, startedAt });
-  let outcome = "error";
-  try {
-    const result = await operation();
-    outcome = ["failed", "unknown", "timeout", "cancelled", "pending", "review_required"].includes(result?.status) ? result.status : "success";
-    return result;
-  } catch (error) {
-    outcome = error?.name === "AbortError" || error?.code === "ABORTED" ? "cancelled" : "error";
-    throw error;
-  } finally {
-    await appendRequestLog({
-      event: "stage_finished",
-      stage,
-      spanId,
-      startedAt,
-      finishedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      elapsedMs: Math.round((performance2.now() - start) * 1e3) / 1e3,
-      outcome
-    });
-  }
-}
-function withStageTiming(tool) {
-  return { ...tool, async execute(args, exec) {
-    const context = { ...requestLogContext.getStore(), callId: exec?.callId || randomUUID6(), tool: tool.name };
-    return requestLogContext.run(context, () => timedStage(`tool:${tool.name}`, () => tool.execute(args, exec)));
   } };
 }
 
@@ -5701,8 +5859,8 @@ function parseVideoDuration(value) {
   return match ? parseVideoDuration(Number(match[1])) : null;
 }
 async function ensureProjectDuration(ctx, exec, project, requested, save2) {
-  const pending = (reason) => ({ status: "pending", reason });
-  if (exec.signal?.aborted) return pending("已取消时长确认，未继续制作。");
+  const pending2 = (reason) => ({ status: "pending", reason });
+  if (exec.signal?.aborted) return pending2("已取消时长确认，未继续制作。");
   const approvedSpec = project.approved?.specification;
   const approvedDuration = approvedSpec ? parseVideoDuration(Number(approvedSpec.duration) * (project.approved.name === "video_extend" ? Number(approvedSpec.segments || 1) : 1)) : null;
   const persist = async (duration) => {
@@ -5721,7 +5879,7 @@ async function ensureProjectDuration(ctx, exec, project, requested, save2) {
   if (parseVideoDuration(project.duration) !== null) return { status: "confirmed", duration: project.duration };
   if (approvedDuration !== null) return await persist(approvedDuration);
   const service = exec.agent?.ctx?.get?.("userQuestions") || ctx.get?.("userQuestions");
-  if (typeof service?.ask !== "function") return pending("时长尚未确认，请恢复提问能力后让用户选择，不得默认15秒。");
+  if (typeof service?.ask !== "function") return pending2("时长尚未确认，请恢复提问能力后让用户选择，不得默认15秒。");
   const ask = async (id, question, options = void 0) => {
     const result = await service.ask({
       agent: exec.agent,
@@ -5738,30 +5896,30 @@ async function ensureProjectDuration(ctx, exec, project, requested, save2) {
         ...DURATION_OPTIONS.map((seconds) => ({ label: `${seconds} 秒`, description: seconds === 15 ? "适合简短展示或一个小情节。" : seconds === 30 ? "适合一段简短故事或产品介绍。" : seconds === 45 ? "适合有起承转合的内容。" : "适合较完整的故事或展示。" })),
         { label: CUSTOM, description: `自己输入${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒的整数。` }
       ]);
-      if (!answer2) return pending("时长尚未确认，未继续制作。");
+      if (!answer2) return pending2("时长尚未确认，未继续制作。");
       const text = answer2.custom?.trim() || (answer2.selected?.length === 1 ? answer2.selected[0] : "");
       const duration2 = parseVideoDuration(text);
       if (duration2 !== null) return await persist(duration2);
-      if (text !== CUSTOM) return pending(`请选择视频长度或输入${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒的整数，未继续制作。`);
+      if (text !== CUSTOM) return pending2(`请选择视频长度或输入${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒的整数，未继续制作。`);
       project.durationCustom = true;
       await save2(project);
     }
     const answer = await ask("video_duration_custom", `请输入希望的视频总长度（${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒，整数，例如20秒）。`);
     const duration = parseVideoDuration(answer?.custom);
-    if (duration === null) return pending(`自定义时长尚未确认，请输入${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒的整数，未继续制作。`);
+    if (duration === null) return pending2(`自定义时长尚未确认，请输入${MIN_SECONDS}–${MAX_TOTAL_SECONDS}秒的整数，未继续制作。`);
     return await persist(duration);
   } catch {
-    return pending("时长确认或记录保存未完成，未继续制作；请恢复提问和记录能力后重试。");
+    return pending2("时长确认或记录保存未完成，未继续制作；请恢复提问和记录能力后重试。");
   }
 }
 
 // src/businesses/video-generation/tools/video-project.ts
-import { mkdir as mkdir9, readFile as readFile10, readdir as readdir4, writeFile as writeFile7 } from "node:fs/promises";
+import { mkdir as mkdir9, readFile as readFile10, readdir as readdir5, writeFile as writeFile7 } from "node:fs/promises";
 import path13 from "node:path";
 
 // src/businesses/video-generation/workflow/character-choice.ts
 import { createHash as createHash6 } from "node:crypto";
-import { mkdir as mkdir8, readFile as readFile9, writeFile as writeFile6, rename as rename6, rm as rm6 } from "node:fs/promises";
+import { mkdir as mkdir8, readFile as readFile9, writeFile as writeFile6, rename as rename7, rm as rm6 } from "node:fs/promises";
 import path12 from "node:path";
 init_connection();
 var waiting = /* @__PURE__ */ new Map();
@@ -5820,7 +5978,7 @@ async function characterChoiceGate(ctx, config, exec, args) {
         const temp = file + "." + Date.now() + ".tmp";
         try {
           await writeFile6(temp, JSON.stringify({ version: 1, choice: choice2, time: (/* @__PURE__ */ new Date()).toISOString() }), { mode: 384, flag: "wx" });
-          await rename6(temp, file);
+          await rename7(temp, file);
         } finally {
           await rm6(temp, { force: true }).catch(() => {
           });
@@ -5828,16 +5986,16 @@ async function characterChoiceGate(ctx, config, exec, args) {
       }
       return choice2;
     }
-    let pending = waiting.get(key);
-    if (!pending) {
-      pending = choose();
-      waiting.set(key, pending);
+    let pending2 = waiting.get(key);
+    if (!pending2) {
+      pending2 = choose();
+      waiting.set(key, pending2);
     }
     let choice;
     try {
-      choice = await pending;
+      choice = await pending2;
     } finally {
-      if (waiting.get(key) === pending) waiting.delete(key);
+      if (waiting.get(key) === pending2) waiting.delete(key);
     }
     if (choice === "text_only") return null;
     if (choice === "generate_first") return deny(isVolcengine(config) ? "用户选择先使用角色图，已停止纯文生视频提交。请先取得并审核用户提供的角色图，再传referenceImages/characterReferenceImages；不要重复询问或直接生成视频。" : "用户已明确选择先生成角色图，已停止纯文生视频提交。请先用video_prepare_image(operation:create_character)按已确认设定出图，图片单独计费；展示审核后将图片传入referenceImages和characterReferenceImages，再单独确认视频费用与制作。不要重复询问此选择，不要直接重提纯文生视频；用户明确改变方案时，传resetCharacterChoice:true重新取得选择。");
@@ -6258,6 +6416,7 @@ async function closePendingStage(stage, source) {
   pendingStages.delete(target);
   const elapsedMs = Math.round((performance3.now() - entry2.start) * 1e3) / 1e3;
   await appendRequestLog({
+    ...entry2.context,
     event: "stage_finished",
     stage: entry2.stage,
     spanId: target,
@@ -6286,7 +6445,8 @@ function stageTool() {
       if (args.action === "start") {
         if (pendingStages.size >= 512) return { status: "unavailable" };
         const spanId = randomUUID7(), startedAt = (/* @__PURE__ */ new Date()).toISOString();
-        pendingStages.set(spanId, { stage: args.stage, startedAt, start: performance3.now() });
+        const context = typeof requestLogContext !== "undefined" ? requestLogContext.getStore() : void 0;
+        pendingStages.set(spanId, { stage: args.stage, startedAt, start: performance3.now(), context });
         await appendRequestLog({ event: "stage_started", stage: args.stage, spanId, startedAt, source: "assistant_marker" });
         return { status: "started", spanId };
       }
@@ -6296,7 +6456,7 @@ function stageTool() {
       pendingStages.delete(args.spanId);
       const elapsedMs = Math.round((performance3.now() - entry2.start) * 1e3) / 1e3;
       const outcome = ["success", "cancelled", "error"].includes(args.outcome) ? args.outcome : "success";
-      await appendRequestLog({ event: "stage_finished", stage: entry2.stage, spanId: args.spanId, startedAt: entry2.startedAt, finishedAt: (/* @__PURE__ */ new Date()).toISOString(), elapsedMs, outcome, source: "assistant_marker" });
+      await appendRequestLog({ ...entry2.context, event: "stage_finished", stage: entry2.stage, spanId: args.spanId, startedAt: entry2.startedAt, finishedAt: (/* @__PURE__ */ new Date()).toISOString(), elapsedMs, outcome, source: "assistant_marker" });
       return { status: "finished", spanId: args.spanId, elapsedMs };
     }
   };
@@ -6351,6 +6511,8 @@ function createScriptTracker({ closeStage = closePendingStage, log = appendReque
       const closed = await closeStage("script_design", "script_saved");
       await log({
         event: "script_saved",
+        sessionId: session.id,
+        callId: event.data?.callId,
         path: save2.path,
         tool: save2.tool,
         mode: save2.mode,
@@ -6449,10 +6611,10 @@ function wrapText(value, maxUnits, maxLines = 4) {
   return lines;
 }
 function visualOf(shot) {
-  const fields = String(shot?.visual || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const fields2 = String(shot?.visual || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const wanted = /^(?:画面|视觉|visual|详情|描述)\s*[:：]/i;
-  const hit = fields.find((line) => wanted.test(line));
-  const body = (hit ? hit.replace(wanted, "") : fields.join(" ")).trim();
+  const hit = fields2.find((line) => wanted.test(line));
+  const body = (hit ? hit.replace(wanted, "") : fields2.join(" ")).trim();
   return body || String(shot?.visual || "").replace(/^[^：:]*[：:]\s*/, "").trim();
 }
 function titleOf(script) {
@@ -6604,7 +6766,7 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
           }
           const script = await readFile10(scriptPath, "utf8").catch(() => "");
           if (!String(script).trim()) throw new Error("还没读到脚本文件：先在正文贴出完整脚本并传captureScript，或先把脚本写到scriptPath。");
-          const version = nextStoryboardVersion(await readdir4(path13.dirname(scriptPath)).catch(() => []));
+          const version = nextStoryboardVersion(await readdir5(path13.dirname(scriptPath)).catch(() => []));
           const svg = renderStoryboardSvg(script, { version });
           const target = path13.join(path13.dirname(scriptPath), storyboardFileName(version));
           await writeFile7(target, svg, { mode: 384, flag: "wx" });
@@ -6753,7 +6915,7 @@ function projectTool(config, ctx, reviewGuard, generationProperties, extensionPr
 // src/businesses/video-generation/workflow/storyboard-review.ts
 import path14 from "node:path";
 import { createHash as createHash8 } from "node:crypto";
-import { stat as stat5, readdir as readdir5, readFile as readFile11 } from "node:fs/promises";
+import { stat as stat5, readdir as readdir6, readFile as readFile11 } from "node:fs/promises";
 var STORYBOARD_FILE = /storyboard|分镜|示意/i;
 var IMAGE_FILE = /\.(png|jpe?g|webp|svg)$/i;
 function readableText(value) {
@@ -6778,13 +6940,13 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
   const sessions = /* @__PURE__ */ new WeakMap();
   async function reportMissing(state) {
     state.awaitingReview = false;
-    await log({ event: "storyboard_review_missing", reason: "turn_ended_without_review_ask", turn: state.turn });
+    await log({ event: "storyboard_review_missing", reason: "turn_ended_without_review_ask", sessionId: state.sessionId, turn: state.turn });
   }
   function stateFor(session, turn) {
     let state = sessions.get(session);
     if (state && Number.isInteger(turn) && turn !== state.turn && state.awaitingReview) void reportMissing(state);
     if (!state || Number.isInteger(turn) && turn !== state.turn) {
-      state = { turn, active: false, files: [], shown: /* @__PURE__ */ new Set(), awaitingReview: false, text: "", scriptText: "", messages: state?.messages || [], images: state?.images || /* @__PURE__ */ new Map() };
+      state = { sessionId: session.id, turn, active: false, files: [], shown: /* @__PURE__ */ new Set(), awaitingReview: false, text: "", scriptText: "", messages: state?.messages || [], images: state?.images || /* @__PURE__ */ new Map() };
       sessions.set(session, state);
     }
     return state;
@@ -6841,7 +7003,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     for (const [dir, time] of byDir) {
       let entries;
       try {
-        entries = await readdir5(dir);
+        entries = await readdir6(dir);
       } catch {
         continue;
       }
@@ -6881,7 +7043,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
       const coverage = scriptCoverage(args.requiredScriptText, args.requiredProjectId ? state?.messages.join("\n") : state?.text);
       if (coverage < SCRIPT_COVERAGE_MIN) {
         const percent2 = Math.round(coverage * 100);
-        await appendRequestLog({ event: "storyboard_review_blocked", reason: "script_text_mismatch", coverage: Math.round(coverage * 1e3) / 1e3 });
+        await appendRequestLog({ event: "storyboard_review_blocked", sessionId: exec?.agent?.session?.id, callId: exec?.callId, reason: "script_text_mismatch", coverage: Math.round(coverage * 1e3) / 1e3 });
         return { kind: "deny", reason: `脚本审核暂未打开：本版script.md正文只在本轮用户可见正文里出现 ${percent2}%。请把script.md正文原样贴进本轮正文再单独调用review；标题、加粗、表格这类排版差异不算问题，但不要改写措辞、删段，也不要只给文件链接或摘要。` };
       }
     }
@@ -6914,7 +7076,7 @@ function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     const stale = ready ? await newerVersion(embedded) : "";
     if (ready && !stale) return null;
     const target = stale || state?.files[0] || "";
-    await appendRequestLog({ event: "storyboard_review_blocked", reason: !ready ? "missing_inline_storyboard" : "stale_storyboard_version" });
+    await appendRequestLog({ event: "storyboard_review_blocked", sessionId: exec?.agent?.session?.id, callId: exec?.callId, reason: !ready ? "missing_inline_storyboard" : "stale_storyboard_version" });
     return { kind: "deny", reason: (!ready ? "脚本审核暂未打开：本版分镜图还没有在用户可见正文里内嵌展示。交付卡片只登记最终成片，分镜图不走卡片，" : `脚本审核暂未打开：改稿后的新版分镜图还没展示（${stale}）。`) + linkHint(target) + "present 与模型看图都不等于用户看到图，只有正文里真实渲染的图片才算；正文发送完成后再单独调用 ask_user_question，不能与展示并行；不要重画或调用付费生成。" };
   }
   function visibleText(session) {
@@ -7090,11 +7252,11 @@ async function fetchActualCost(config, taskIds, signal) {
   if (isVolcengine(config)) return void 0;
   const tasks = settledTaskCosts([], taskIds);
   if (!tasks.length) return void 0;
-  const pending = (reason) => ({ status: "pending", source: "relay_settlement", tasks, amount: null, currency: null, reason });
-  if (signal?.aborted) return pending("费用待查询：本次操作已停止，可稍后用video_status补查。");
+  const pending2 = (reason) => ({ status: "pending", source: "relay_settlement", tasks, amount: null, currency: null, reason });
+  if (signal?.aborted) return pending2("费用待查询：本次操作已停止，可稍后用video_status补查。");
   const key = resolveApiKey(config);
   const base = resolveBaseUrl(config).replace(/\/v1\/?$/, "");
-  if (!key || !base) return pending("费用待查询：原调用连接不可用。");
+  if (!key || !base) return pending2("费用待查询：原调用连接不可用。");
   const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(8e3)]) : AbortSignal.timeout(8e3);
   async function get(path26, authenticated) {
     const response = await fetch(`${base}${path26}`, {
@@ -7111,10 +7273,10 @@ async function fetchActualCost(config, taskIds, signal) {
   try {
     const body = await get("/api/log/token", true);
     const rows = Array.isArray(body.data) ? body.data : body.data?.items;
-    if (!Array.isArray(rows)) return pending("费用待查询：中转站未返回有效消费日志。");
+    if (!Array.isArray(rows)) return pending2("费用待查询：中转站未返回有效消费日志。");
     const settled = settledTaskCosts(rows, taskIds);
     const known = settled.filter((x) => x.status === "settled");
-    if (!known.length) return pending("待结算：本 API密钥最近日志中尚未找到该任务的最终结算，可用video_status补查。");
+    if (!known.length) return pending2("待结算：本 API密钥最近日志中尚未找到该任务的最终结算，可用video_status补查。");
     let conversion;
     try {
       const settings = (await get("/api/status", false)).data;
@@ -7139,7 +7301,7 @@ async function fetchActualCost(config, taskIds, signal) {
       reason: known.length !== settled.length ? "部分任务待结算；当前金额仅为已结算小计，不是整条视频最终费用。" : conversion ? "" : "已获取实际消耗额度，金额换算设置暂不可用。"
     };
   } catch {
-    return pending("费用待查询：中转站消费日志查询失败或无权限；视频结果不受影响，可稍后用video_status补查。");
+    return pending2("费用待查询：中转站消费日志查询失败或无权限；视频结果不受影响，可稍后用video_status补查。");
   }
 }
 function actualCostText(cost, partialVideo = false) {
@@ -7282,7 +7444,7 @@ function jsonSafeTool(tool) {
 // src/businesses/video-generation/providers/submissions.ts
 import path17 from "node:path";
 import { createHash as createHash9, randomUUID as randomUUID8 } from "node:crypto";
-import { mkdir as mkdir10, readFile as readFile12, writeFile as writeFile8, rename as rename7, rm as rm7, open as open4, readdir as readdir6 } from "node:fs/promises";
+import { mkdir as mkdir10, readFile as readFile12, writeFile as writeFile8, rename as rename8, rm as rm7, open as open4, readdir as readdir7 } from "node:fs/promises";
 init_plugin();
 init_connection();
 
@@ -7552,7 +7714,7 @@ async function save(file, record) {
   const temporary = `${file}.${randomUUID8()}.tmp`;
   try {
     await writeFile8(temporary, JSON.stringify(record), { mode: 384 });
-    await rename7(temporary, file);
+    await rename8(temporary, file);
   } finally {
     await rm7(temporary, { force: true }).catch(() => {
     });
@@ -7611,7 +7773,7 @@ async function finishSubmission(config, requestPath, body) {
 }
 async function finishKnownTask(config, taskId) {
   const identity = submissionIdentity(config);
-  for (const name of await readdir6(directory()).catch((error) => {
+  for (const name of await readdir7(directory()).catch((error) => {
     if (error.code === "ENOENT") return [];
     throw error;
   })) {
@@ -7687,12 +7849,12 @@ function submissionTool(liveConfig) {
 
 // src/businesses/video-generation/integrations/canvas.ts
 import { createHash as createHash11, randomUUID as randomUUID10 } from "node:crypto";
-import { mkdir as mkdir13, readFile as readFile14, writeFile as writeFile10, rename as rename10, copyFile, stat as stat8, open as open5 } from "node:fs/promises";
+import { mkdir as mkdir13, readFile as readFile14, writeFile as writeFile10, rename as rename11, copyFile, stat as stat8, open as open5 } from "node:fs/promises";
 import path20 from "node:path";
 init_plugin();
 
 // src/businesses/video-generation/integrations/canvas-builtin.ts
-import { mkdir as mkdir11, readFile as readFile13, writeFile as writeFile9, rename as rename8, readdir as readdir7, stat as stat7 } from "node:fs/promises";
+import { mkdir as mkdir11, readFile as readFile13, writeFile as writeFile9, rename as rename9, readdir as readdir8, stat as stat7 } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { createHash as createHash10, randomUUID as randomUUID9 } from "node:crypto";
 import path18 from "node:path";
@@ -7718,7 +7880,7 @@ async function writeJson(file, value) {
   await mkdir11(path18.dirname(file), { recursive: true, mode: 448 });
   const temp = `${file}.${randomUUID9()}.tmp`;
   await writeFile9(temp, JSON.stringify(value), { mode: 384, flag: "wx" });
-  await rename8(temp, file);
+  await rename9(temp, file);
 }
 async function builtinCanvasExists(projectId) {
   if (!validId(projectId)) return false;
@@ -7731,7 +7893,7 @@ async function writeDoc(id, doc) {
   await writeJson(docFile(id), doc);
 }
 async function allDocs() {
-  const names = await readdir7(docsDir()).catch(() => []);
+  const names = await readdir8(docsDir()).catch(() => []);
   const docs = [];
   for (const name of names) if (name.endsWith(".json")) {
     const doc = await readJson(path18.join(docsDir(), name));
@@ -7917,7 +8079,7 @@ async function builtinCanvasImport(args) {
   if (!(await stat7(dest).catch(() => null))?.isFile()) {
     const temp = `${dest}.${randomUUID9()}.tmp`;
     await writeFile9(temp, bytes, { mode: 384, flag: "wx" });
-    await rename8(temp, dest);
+    await rename9(temp, dest);
   }
   const mime = IMAGE_MIME[extension];
   await builtinRpc().assetCreate({ projectName: doc.name || "", asset: { id, projectId: doc.id, kind: "image", mime, name: label, rel, size: bytes.length, createdAt: Date.now(), stored: "disk", source: "metaontic-video" } });
@@ -8313,7 +8475,7 @@ function preserveCanvasConfirmations(prev, next) {
 }
 
 // src/businesses/video-generation/media/download.ts
-import { mkdir as mkdir12, rename as rename9, rm as rm8 } from "node:fs/promises";
+import { mkdir as mkdir12, rename as rename10, rm as rm8 } from "node:fs/promises";
 import path19 from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
@@ -8337,7 +8499,7 @@ async function downloadFile(url, destPath, { signal } = {}) {
       });
     }
     await pipeline(Readable.fromWeb(response.body), createWriteStream(partial));
-    await rename9(partial, destPath);
+    await rename10(partial, destPath);
     return destPath;
   } catch (error) {
     await rm8(partial, { force: true }).catch(() => {
@@ -8472,7 +8634,7 @@ async function saveRecord(record) {
   await mkdir13(path20.dirname(file), { recursive: true, mode: 448 });
   const temp = `${file}.${randomUUID10()}.tmp`;
   await writeFile10(temp, JSON.stringify(record), { mode: 384, flag: "wx" });
-  await rename10(temp, file);
+  await rename11(temp, file);
 }
 async function publishCanvasResult(adapter, record) {
   const loc = location(record.canvas);
@@ -8502,7 +8664,7 @@ async function publishCanvasResult(adapter, record) {
       if (media.localPath) {
         const tmp = `${dest}.${randomUUID10()}.tmp`;
         await copyFile(media.localPath, tmp);
-        await rename10(tmp, dest);
+        await rename11(tmp, dest);
       } else {
         const url = new URL(media.url);
         if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("成果URL格式无效");
@@ -8525,7 +8687,7 @@ async function publishCanvasResult(adapter, record) {
     if (dest.endsWith(".png") && (mime === "image/jpeg" || mime === "image/webp")) {
       const suffix = mime === "image/jpeg" ? ".jpg" : ".webp";
       const corrected = dest.replace(/\.png$/, suffix);
-      await rename10(dest, corrected);
+      await rename11(dest, corrected);
       dest = corrected;
       rel = rel.replace(/\.png$/, suffix);
     }
@@ -8972,7 +9134,7 @@ function createCanvasProjectSync(load = loadCanvasAdapter, config = {}, sessionT
 // src/businesses/video-generation/integrations/canvas-native.ts
 import path23 from "node:path";
 import { createHash as createHash14, randomUUID as randomUUID11 } from "node:crypto";
-import { mkdir as mkdir15, readFile as readFile16, writeFile as writeFile12, rename as rename12, stat as stat10 } from "node:fs/promises";
+import { mkdir as mkdir15, readFile as readFile16, writeFile as writeFile12, rename as rename13, stat as stat10 } from "node:fs/promises";
 init_plugin();
 init_connection();
 
@@ -9870,7 +10032,7 @@ async function writeScript(config, brief2, options = {}) {
 // src/businesses/video-generation/media/merge.ts
 init_config();
 init_connection();
-import { rm as rm9, mkdir as mkdir14, writeFile as writeFile11, rename as rename11, stat as stat9, copyFile as copyFile2 } from "node:fs/promises";
+import { rm as rm9, mkdir as mkdir14, writeFile as writeFile11, rename as rename12, stat as stat9, copyFile as copyFile2 } from "node:fs/promises";
 import path22 from "node:path";
 function evenNumber(value, fallback) {
   const number2 = Number(value);
@@ -9972,7 +10134,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
           work
         ], { signal });
         if (code2 === 0 && await exists(work)) {
-          await rename11(work, outPath);
+          await rename12(work, outPath);
           return { path: outPath, mode: "copy", trimmed };
         }
         copyError = stderr2.trim().slice(-400);
@@ -10014,7 +10176,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
       ].join(";");
       const { code: code2, stderr: stderr2 } = await encode(filter2, ["-map", "[v]", "-map", "[a]"], true);
       if (code2 === 0 && await exists(work)) {
-        await rename11(work, outPath);
+        await rename12(work, outPath);
         return { path: outPath, mode: "reencode", trimmed };
       }
       throw Object.assign(new Error("音频合并失败，已保留原分段及已有成片；请重试合并，不会自动输出无声成片。"), { code: "audio_merge_failed" });
@@ -10022,7 +10184,7 @@ async function mergeClips(config, files, outPath, { signal } = {}) {
     const filter = [...videoParts, `${videoInputs}concat=n=${files.length}:v=1:a=0[v]`].join(";");
     const { code, stderr } = await encode(filter, ["-map", "[v]"], false);
     if (code === 0 && await exists(work)) {
-      await rename11(work, outPath);
+      await rename12(work, outPath);
       return { path: outPath, mode: "reencode", trimmed };
     }
     const detail = [copyError, stderr.trim().slice(-400)].filter(Boolean).join(" | ");
@@ -10209,7 +10371,7 @@ async function downloadSegmentsAndMerge(config, {
       const copy = `${finalPath}.${uniqueSuffix("copy")}.mp4`;
       try {
         await copyFile2(files[0], copy);
-        await rename11(copy, finalPath);
+        await rename12(copy, finalPath);
       } finally {
         await rm9(copy, { force: true }).catch(() => {
         });
@@ -10447,7 +10609,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
     await mkdir15(directory2, { recursive: true, mode: 448 });
     const dest = file(job.id), temp = `${dest}.${randomUUID11()}.tmp`;
     await writeFile12(temp, JSON.stringify(job), { mode: 384, flag: "wx" });
-    await rename12(temp, dest);
+    await rename13(temp, dest);
   }
   const read = async (id) => JSON.parse(await readFile16(file(id), "utf8"));
   const chainFile = (id) => {
@@ -10459,7 +10621,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
     await mkdir15(chainDirectory, { recursive: true, mode: 448 });
     const dest = chainFile(chain.id), temp = `${dest}.${randomUUID11()}.tmp`;
     await writeFile12(temp, JSON.stringify(chain), { mode: 384, flag: "wx" });
-    await rename12(temp, dest);
+    await rename13(temp, dest);
   }
   const readChain = async (id) => JSON.parse(await readFile16(chainFile(id), "utf8"));
   async function previousChain(link2) {
@@ -10592,7 +10754,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       await save2(job);
       const temp = `${key}.${randomUUID11()}.tmp`;
       await writeFile12(temp, JSON.stringify({ id: job.id }), { mode: 384, flag: "wx" });
-      await rename12(temp, key);
+      await rename13(temp, key);
       snapshots.set(job.id, config);
       void perform(job, config).catch(() => {
       });
@@ -10806,12 +10968,12 @@ function createCanvasNativeService(liveConfig, options = {}) {
       const segments = await chainPlan(adapter, args.projectId, config);
       const active2 = await previousChain({ projectId: args.projectId, ...args.canvasId ? { canvasId: args.canvasId } : {} }).catch(() => null);
       const alive = active2 && ["running", "review"].includes(chainStateOf(active2, await currentJob(active2))) ? chainView(active2, await currentJob(active2)) : null;
-      const pending = segments.filter((x) => !x.skip);
+      const pending2 = segments.filter((x) => !x.skip);
       return {
         segments,
-        pending: pending.length,
+        pending: pending2.length,
         cny: chainCost(segments),
-        priceDate: (pending[0] || segments[0])?.priceDate || null,
+        priceDate: (pending2[0] || segments[0])?.priceDate || null,
         identity: hash3(config),
         active: alive
       };
@@ -10845,7 +11007,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       await mkdir15(chainDirectory, { recursive: true, mode: 448 });
       const temp = `${chainPointer(link2)}.${randomUUID11()}.tmp`;
       await writeFile12(temp, JSON.stringify({ id: chain.id }), { mode: 384, flag: "wx" });
-      await rename12(temp, chainPointer(link2));
+      await rename13(temp, chainPointer(link2));
       try {
         await runChainSegment(chain, config);
       } catch (error) {
@@ -10955,7 +11117,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
           action: "write",
           model: resolveTextModel(config),
           elapsedMs: Date.now() - startedAt,
-          reason: String(error?.message || "写脚本失败").slice(0, 200)
+          ...diagnosticError(error)
         }).catch(() => {
         });
         throw error;
@@ -11054,7 +11216,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
         await save2(job2);
         const temp = `${key}.${randomUUID11()}.tmp`;
         await writeFile12(temp, JSON.stringify({ id: job2.id }), { mode: 384, flag: "wx" });
-        await rename12(temp, key);
+        await rename13(temp, key);
         proposals.delete(p.id);
         snapshots.set(job2.id, p.config);
         void perform(job2, p.config).catch(() => {
@@ -11089,7 +11251,7 @@ function createCanvasNativeService(liveConfig, options = {}) {
       locks3.delete(job.id);
     }
   }
-  return { handle, dispose() {
+  return { handle: (args) => requestLogContext.run({ ...requestLogContext.getStore(), callId: requestLogContext.getStore()?.callId || randomUUID11(), tool: "video_canvas", projectId: args?.projectId, jobId: args?.id }, () => handle(args)), dispose() {
     disposed = true;
     for (const ctl of running.values()) ctl.abort();
     proposals.clear();
@@ -12619,7 +12781,7 @@ function configTool(config, settings) {
       const view = configView(config);
       const patchPath = settings?.documentPath;
       if (action === "get") {
-        return { action, ...view, patchPath };
+        return { action, ...view, patchPath, ...typeof logDiagnostics === "function" ? { logging: logDiagnostics() } : {} };
       }
       if (action === "set") {
         throw new Error(

@@ -24,6 +24,7 @@ export const FILM_WORKFLOW_GUIDANCE = `【专业分阶段创作工具契约】
 正常create/read/submit/approve/configure_profile等推进调用都传responseMode:"compact"，保留完整下一阶段输入但不重复回显全项目。仅完整恢复时read(responseMode:"full")，补查单个产物用read(stage)。返回已有nextTask就直接按它继续，不重复next/read。submit自带校验，不固定先validate再submit；失败按集中问题清单修正，保护原剧情与已批准内容。
 submit传stage、content（合法JSON字符串）、expectedRevision（最近读取/提交返回的项目revision）。JSON字符串里的枚举与文本必须有双引号。正文先展示可读成果，再提交并核对返回；工具成功才称保存。
 新建项目采用3.1严格数据协议；各阶段source_revisions由工具记录，提交时若自带必须匹配真实上游。所有JSON均为规范字段，参考稿别名须先映射，不得同时维护冲突版本。
+创意和剧本的人工审批仅调用film_project(action:"approve",stage,expectedRevision)一次，由该工具弹窗并记录真实批准。禁止先用ask_user_question询问“创意通过/开始写剧本”再调用approve重复询问。真正缺失且影响方案的创作问题先单独澄清并修订，不能把澄清问卷当审批。approve成功后按返回nextTask立即继续撰写、展示和submit剧本，不用“准备开始”结束本轮。若中断后用户要求继续，read原projectId并沿用已保存批准，未保存的剧本继续完成，不重新create或重复审批。
 阶段及content字段：
 creative：新创作按CREATIVE V3.1角色返回的完整字段提交；structure使用beats与visual_evidence，段落正整数毫秒合计等于项目时长，approval_questions最多3项。旧项目保留已有字段，不把兼容读取当新稿完成标准。展示后approve(stage:creative)，只有真实批准才写剧本。
 script：screenplay完整剧本正文、chapters[{chapter_id,title,duration_ms,summary,scene_ids}]必填，章节时长总和等于项目duration_ms；按Screenwriter V3.1在scenes规范列表保留动作和场景预算，characters为稳定character_id清单，dialogue每条含dialogue_id/exact_text/speaker_id/scene_id（参考稿dialogue_lines映射为dialogue），旁白分开；approved_creative_revision绑定实际批准创意。展示后approve(stage:script)，只有真实批准才建资产。

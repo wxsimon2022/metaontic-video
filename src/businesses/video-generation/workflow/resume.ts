@@ -67,7 +67,7 @@ export function withResumeLock(tool, toolName, config) {
   return {
     ...tool,
     async execute(args, exec) {
-      return requestLogContext.run({ callId: exec?.callId || uniqueSuffix('call'), tool: toolName }, async () => {
+      return requestLogContext.run({ ...requestLogContext.getStore(), callId: exec?.callId || requestLogContext.getStore()?.callId || uniqueSuffix('call'), tool: toolName }, async () => {
         const started = Date.now();
         const dir = resumeDirOf(args?.resume);
         let lock;

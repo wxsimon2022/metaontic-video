@@ -43,3 +43,25 @@ test('unknown or mismatched marker never fabricates an elapsed duration',async()
  const missing=await tool.execute({action:'finish',stage:'script_design',spanId:a.spanId});
  assert.equal(missing.status,'unavailable');assert.equal(missing.elapsedMs,undefined);assert.equal(logs.length,1);
 });
+
+test('固定错误分类不泄露上游消息，也不把模型或配置错误错记为取消',()=>{
+ const {ctx}=harness();
+ for(const [error,code,category] of [
+  [Error('文本模型调用失败：model not found private-token'),'MODEL_NOT_FOUND','provider'],
+  [Error('已关闭模型共用 API密钥，请单独填写文本模型 API密钥。'),'CONFIG_MISSING','validation'],
+  [Object.assign(Error('private'),{code:'provider_auth'}),'provider_auth','authentication'],
+  [Object.assign(Error('private'),{code:'ETIMEDOUT'}),'ETIMEDOUT','network'],
+  [Object.assign(Error('private'),{name:'SyntaxError'}),'INVALID_JSON','validation'],
+  [Error('private'),'INTERNAL_ERROR','internal'],
+ ]){
+  const result=ctx.diagnosticError(error);assert.equal(result.errorCode,code);assert.equal(result.errorCategory,category);
+  assert.doesNotMatch(JSON.stringify(result),/private/);
+ }
+});
+
+test('审批、暂停与提交不明不会记成成功',async()=>{
+ const {ctx,logs}=harness();
+ for(const status of ['blocked','review_required','paused','submission_unknown'])await ctx.timedStage('test',async()=>({status}));
+ assert.deepEqual(logs.filter(x=>x.event==='stage_finished').map(x=>x.outcome),['blocked','review_required','paused','submission_unknown']);
+ assert.equal(logs[1].errorCategory,'approval');
+});

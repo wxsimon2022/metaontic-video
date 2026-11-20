@@ -1,6 +1,7 @@
 /** 旁路匿名统计：调用方不等待网络；队列、超时、重试与退出均有界。 */
 import { randomUUID, createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { acquireFileLock } from '../../shared/utils/file-lock.js';
+import { mkdir, readFile, writeFile, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { dshHome } from '../../shared/paths/index.js';
@@ -30,31 +31,37 @@ export async function analyticsIdentity() {
   const state = processState();
   // 一个进程只解析一次；键用目录而不是单个文件，因为身份现在有两个落盘位置。
   if (!state.identities.has(dir)) state.identities.set(dir, (async () => {
-    const parse = raw => { try { const id = JSON.parse(raw).installationId; return /^[a-f0-9-]{36}$/i.test(id) ? id : null; } catch { return null; } };
-    const present = [];
-    for (const file of files) {
-      try { present.push(parse(await readFile(file, 'utf8'))); } catch { present.push(null); }
-    }
-    // 主文件优先；它不在了才回落到锚点。两条都读不出来才是首次启用。
-    let id = present[0] || present[1];
+    const parse = raw => { try { const id = JSON.parse(raw).installationId; return /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id) ? id : null; } catch { return null; } };
     await mkdir(dir, { recursive: true, mode: 0o700 });
-    if (!id) {
-      const created = randomUUID();
-      try { await writeFile(files[0], JSON.stringify({ installationId: created }), { mode: 0o600, flag: 'wx' }); id = created; }
+    let release;
+    // 初始化在后台进行。只等待有界时间，不抢活跃进程的锁；失败后下次上报再试。
+    for (let attempt = 0; attempt < 40; attempt++) {
+      try { release = await acquireFileLock(path.join(dir, 'analytics-identity.lock'), { recoverDead: true }); break; }
       catch (error) {
-        if (error.code !== 'EEXIST') throw error;
-        // 并发启动：抢输的那个直接采用磁盘上的身份，不再自己发一份；只有文件坏掉才覆盖重写。
-        id = parse(await readFile(files[0], 'utf8').catch(() => ''));
-        if (!id) { id = created; await writeFile(files[0], JSON.stringify({ installationId: id }), { mode: 0o600 }); }
+        if (error?.code !== 'EEXIST' && ! /^(?:PROJECT_LOCKED|LOCK_RECOVERY_UNSAFE|RECOVERY_LOCK_UNSAFE):/.test(String(error?.message || ''))) throw error;
+        if (attempt === 39) throw error;
+        await new Promise(resolve => setTimeout(resolve, 25));
       }
     }
-    // 把两个文件对齐成同一个身份（缺失、被删或损坏的那个补齐）；补写失败不影响本次上报，下次再补。
-    for (const [index, file] of files.entries()) {
-      if (present[index] === id) continue;
-      try { await writeFile(file, JSON.stringify({ installationId: id }), { mode: 0o600 }); } catch { /* 下次再补 */ }
-    }
-    return id;
-  })().catch(() => null));
+    try {
+      // 必须在拿锁后重新读取，避免多个进程各自缓存不同身份。
+      const present = [];
+      for (const file of files) {
+        try { present.push(parse(await readFile(file, 'utf8'))); }
+        catch (error) { if (error?.code !== 'ENOENT') throw error; present.push(null); }
+      }
+      const id = present[0] || present[1] || randomUUID();
+      for (const [index, file] of files.entries()) {
+        if (present[index] === id) continue;
+        const temporary = `${file}.${randomUUID()}.tmp`;
+        try {
+          await writeFile(temporary, JSON.stringify({ installationId: id }), { mode: 0o600, flag: 'wx' });
+          await rename(temporary, file);
+        } finally { await unlink(temporary).catch(() => {}); }
+      }
+      return id;
+    } finally { await release?.(); }
+  })().catch(() => { state.identities.delete(dir); return null; }));
   return state.identities.get(dir);
 }
 /** 上报数据只允许固定枚举和有界数值，禁止透传执行参数/异常/提示词。 */
