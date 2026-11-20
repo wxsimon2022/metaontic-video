@@ -14,16 +14,16 @@ const FIXTURE = [
 
 test('promo page version addresses are rewritten to the release version', () => {
   const { text, results } = syncPromoText(FIXTURE, '3.15.1');
-  assert.match(text, /releases\/download\/v3\.15\.1\/metaontic-video-3\.15\.1\.tgz/);
+  assert.match(text, /releases\/download\/latest\/metaontic-video\.tgz/);
   assert.match(text, /"softwareVersion": "3\.15\.1"/);
   assert.match(text, /而作 · v3\.15\.1</);
   assert.doesNotMatch(text, /3\.13\.13|3\.13\.9/);
-  assert.deepEqual(results.map((item) => item.hit), [true, true, true, true]);
+  assert.deepEqual(results.map((item) => item.hit), [true, true, true]);
 });
 
 test('promo sync reports which places stopped matching instead of failing silently', () => {
   const { results } = syncPromoText('<p>宣传页换了写法，没有版本号</p>', '3.15.1');
-  assert.deepEqual(results.map((item) => item.hit), [false, false, false, false]);
+  assert.deepEqual(results.map((item) => item.hit), [false, false, false]);
 });
 
 test('promo file is only written when the version actually changed', async () => {

@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { publishGitee } from './publish-gitee.mjs';
+import { publishGiteeWithAlias as publishGitee } from './publish-gitee.mjs';
 import { publicReleaseNotes } from './release.mjs';
 
 /** 令牌的候选环境变量名：流水线里叫哪个都能用，未配置时按第一个名字提示。 */

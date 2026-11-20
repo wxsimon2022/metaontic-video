@@ -292,7 +292,7 @@ export async function main(argv) {
     printLinks();return;
   }
   // --local 备用路径：本机成品直接建 Release 并上传，适合流水线不可用时。
-  const {publishGitee}=await import('./publish-gitee.mjs');
+  const {publishGiteeWithAlias:publishGitee}=await import('./publish-gitee.mjs');
   // 续跑也从结构化条目生成，避免旧的本地说明文件夹带验证信息。
   const notesText=publicReleaseNotes(version,plan.items);
   if(!includeGithub) {

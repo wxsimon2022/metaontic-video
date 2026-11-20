@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * 宣传页安装地址同步：发版时把宣传页里写死的插件版本地址改成目标版本。
+ * 宣传页使用 Gitee 最新正式版固定地址，发版仅同步展示版本。
  *
  * 宣传页在服务端仓库（MetaOnticVideoService/frontend/public/promo/index.html），
- * 不在本插件包里；但用户会照它复制安装地址，所以每次发版必须一起更新，
+ * 不在本插件包里；但用户会照它复制安装地址，所以安装链接固定不变，展示版本在发版时更新，
  * 否则宣传页上贴的还是旧版本附件。release.mjs 会在打包前自动调用本脚本。
  *
  * 用法：
@@ -20,8 +20,7 @@ export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url
 
 /** 宣传页里所有写死版本的地方；每条都要能被替换到，否则视为宣传页结构变了。 */
 export const PROMO_RULES = [
-  { name: 'Gitee 附件地址', re: /(releases\/download\/)v\d+\.\d+\.\d+\//g, to: (v) => `$1v${v}/` },
-  { name: 'tgz 附件名', re: /(metaontic-video-)\d+\.\d+\.\d+(\.tgz)/g, to: (v) => `$1${v}$2` },
+  { name: 'Gitee 固定安装地址', re: /https:\/\/gitee\.com\/hackloop\/metaontic-video\/releases\/download\/(?:v\d+\.\d+\.\d+|latest)\/metaontic-video(?:-\d+\.\d+\.\d+)?\.tgz/g, to: () => 'https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz' },
   { name: '结构化数据版本号', re: /("softwareVersion":\s*")\d+\.\d+\.\d+(")/g, to: (v) => `$1${v}$2` },
   { name: '页脚版本号', re: /(MetaOnticVideo · 为 DeepSeek Harness 而作 · )v\d+\.\d+\.\d+/g, to: (v) => `$1v${v}` },
 ];

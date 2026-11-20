@@ -1,3 +1,4 @@
+import { publishGiteeStableAlias } from './publish-gitee-stable-alias.mjs';
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -71,10 +72,16 @@ export async function publishGitee({ token, tag, archive, notes, prerelease = fa
   return `https://gitee.com/hackloop/metaontic-video/releases/tag/${tag}`;
 }
 
+export async function publishGiteeWithAlias(options) {
+  const url = await publishGitee(options);
+  if (!options.prerelease) await publishGiteeStableAlias(options);
+  return url;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [tag, archive, notesFile] = process.argv.slice(2);
   try {
-    const url = await publishGitee({ token: process.env.GITEE_TOKEN, prerelease: process.env.GITEE_PRERELEASE === 'true', tag, archive, notes: await readFile(notesFile, 'utf8'), retry: { attempts: Number(process.env.GITEE_UPLOAD_ATTEMPTS) || 4, delayMs: Number(process.env.GITEE_UPLOAD_DELAY_MS) || 20000 } });
+    const url = await publishGiteeWithAlias({ token: process.env.GITEE_TOKEN, prerelease: process.env.GITEE_PRERELEASE === 'true', tag, archive, notes: await readFile(notesFile, 'utf8'), retry: { attempts: Number(process.env.GITEE_UPLOAD_ATTEMPTS) || 4, delayMs: Number(process.env.GITEE_UPLOAD_DELAY_MS) || 20000 } });
     console.log(`Gitee Release verified: ${url}`);
   } catch (error) {
     console.error(error.message);
