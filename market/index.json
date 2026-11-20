@@ -53,19 +53,26 @@
       "metadata": {
         "category": "video",
         "keywords": [
-          "metaontic-video",
+          "dsh-metaontic-video",
+          "dsh",
           "deepseek-harness",
           "deepseek-harness-plugin",
+          "ai-video-generation",
+          "text-to-video",
+          "image-to-video",
+          "video-script",
+          "video-continuation",
+          "long-video",
+          "AI视频生成",
+          "视频创作助手",
+          "分段续拍",
+          "长视频生成",
+          "metaontic-video",
           "dsh-plugin",
           "ai-video",
-          "ai-video-generation",
           "seedance",
           "seedance-2",
-          "long-video",
           "video-generation",
-          "image-to-video",
-          "text-to-video",
-          "video-continuation",
           "video-extension",
           "storyboard",
           "ffmpeg",
@@ -79,16 +86,26 @@
         "sortKeys": {}
       },
       "dist-tags": {
-        "latest": "4.0.9"
+        "latest": "4.0.10"
       },
       "versions": [
         {
-          "version": "4.0.9",
-          "publishTimestamp": 1795182534,
+          "version": "4.0.10",
+          "publishTimestamp": 1795186350,
           "source": {
             "type": "git",
             "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "15cb6984a3975a9e9b368e2b5544ed0f83b64b2a"
+            "commit": "33e081e573449254efb47faf1f7b4b77429a0699"
+          },
+          "engines": {
+            "dsh": ">=0.2.0"
+          }
+        },
+        {
+          "version": "4.0.9",
+          "publishTimestamp": 1795182742,
+          "source": {
+            "type": "npm"
           },
           "engines": {
             "dsh": ">=0.2.0"
@@ -123,18 +140,6 @@
             "type": "git",
             "url": "https://gitee.com/hackloop/metaontic-video.git",
             "commit": "a4acb3a7b020bf688f0a2f87b60e080e047f77c0"
-          },
-          "engines": {
-            "dsh": ">=0.2.0"
-          }
-        },
-        {
-          "version": "4.0.5",
-          "publishTimestamp": 1795011938,
-          "source": {
-            "type": "git",
-            "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "e1d1c405e0d82f9c318cb90cd2d034a48921895f"
           },
           "engines": {
             "dsh": ">=0.2.0"
