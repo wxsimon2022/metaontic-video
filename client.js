@@ -71,8 +71,7 @@
   var releaseDownloadUrl = (version, channel = "gitee") => `${(channel === "github" ? GITHUB : GITEE).web}/releases/download/v${version}/${releaseArchiveName(version)}`;
   var RELAY = {
     baseUrl: "https://ai.bileego.com",
-    //signupUrl: 'https://ai.bileego.com/sign-up?aff=VzYr',
-    signupUrl: "https://ai.bileego.com",
+    signupUrl: 'https://ai.bileego.com/sign-up?aff=VzYr',
     pricingUrl: "https://ai.bileego.com/pricing",
     submitPath: "/doubao/api/v3/contents/generations/tasks",
     queryPath: "/doubao/api/v3/contents/generations/tasks/{task_id}",
