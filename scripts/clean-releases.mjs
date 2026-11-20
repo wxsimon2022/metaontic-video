@@ -18,7 +18,7 @@ const USAGE = `清理历史标签、发行版及附件（默认演练，加 --ap
   npm run clean:releases                    # 演练：打印保留与待删清单
   npm run clean:releases -- --apply         # 按计划删除
 
-  --keep <n>            保留最近 n 个正式版发行版，默认 5，最小 1
+  --keep <n>            保留最近 n 个正式版发行版，默认 8，最小 1
   --keep-tags <n>       保留最近 n 个标签，默认与 --keep 相同
   --max-age-days <n>    只清理 n 天以前发布的版本，默认 0（不限）
   --patterns <a,b>      参与清理的标签模式，默认 v*
@@ -97,7 +97,7 @@ export function documentedTags(contents) {
  * 当前 package.json 版本和文档引用的版本；其余符合 patterns 的标签连同发行版、附件一起删除，
  * maxAgeDays > 0 时跳过太新的版本。
  */
-function planCleanupSingle({ tags = [], releases = {}, keep = 5, keepTags = keep, keepPrerelease = false, maxAgeDays = 0, patterns = ['v*'], currentVersion = '', protectedTags = [], drafts = true, now = Date.now() } = {}) {
+function planCleanupSingle({ tags = [], releases = {}, keep = 8, keepTags = keep, keepPrerelease = false, maxAgeDays = 0, patterns = ['v*'], currentVersion = '', protectedTags = [], drafts = true, now = Date.now() } = {}) {
   if (!Number.isInteger(keep) || keep < 1) throw new Error('保留数量必须是不小于 1 的整数，避免删掉最新版本。');
   if (!Number.isInteger(keepTags) || keepTags < 1) throw new Error('保留标签数量必须是不小于 1 的整数。');
   if (!Number.isInteger(maxAgeDays) || maxAgeDays < 0) throw new Error('--max-age-days 必须是不小于 0 的整数。');
@@ -473,7 +473,7 @@ export async function collectTags({ github, gitee, remote, run = defaultRun, log
 
 export function parseArgs(argv) {
   const options = {
-    keep: 5, keepTags: null, keepPrerelease: false, maxAgeDays: 0, patterns: ['v*'], hosts: ['github', 'gitee'],
+    keep: 8, keepTags: null, keepPrerelease: false, maxAgeDays: 0, patterns: ['v*'], hosts: ['github', 'gitee'],
     apply: false, pruneAssets: false, keepDrafts: false, json: false, help: false, remote: null,
     github: 'git@github.com:wxsimon2022/metaontic-video.git', gitee: 'git@gitee.com:hackloop/metaontic-video.git',
   };

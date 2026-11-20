@@ -58,7 +58,7 @@ export function releaseVerification(includeGithub, promoLine = '', pipeline = fa
 const help = `一键发布（准备好完整说明与指南后执行）：
 版本号按改动量选：修复、样式/文案/交互微调等小改只升第三位（如 3.29.1），成规模的新增或行为变化才升第二位，别习惯性升第二位。
 说明要求：只写「新增」与「优化」两类（修复并入优化），合计不超过 ${NOTES_LIMIT} 字。
-发版会同时把使用说明书的成品地址与宣传页（服务端仓库，可用 METAONTIC_PROMO_PATH 指定，--no-promo 跳过）同步到本次版本。
+发版同步使用说明书；宣传页使用固定最新版安装地址，后续发版不修改宣传页。
   node scripts/release.mjs 3.13.4 --notes release-plan.json
   node scripts/release.mjs 3.13.4 --notes release-plan.json --dry-run
   node scripts/release.mjs 3.13.4 --resume
@@ -146,8 +146,7 @@ export async function main(argv) {
   console.log(sections.map(x=>x.category+'\n'+x.items.map(i=>'- '+i).join('\n')).join('\n\n'));
   const printLinks=()=>console.log(githubOnly ? `\nGitHub发布页：${github.web}/releases/tag/${tag}\n插件地址：${github.web}/releases/download/${tag}/metaontic-video-${version}.tgz` : `\nGitee发布页：${gitee.web}/releases/tag/${tag}\n插件地址：${gitee.web}/releases/download/${tag}/metaontic-video-${version}.tgz${includeGithub?`\nGitHub发布页：${github.web}/releases/tag/${tag}`:''}\n注意：安装框填写tgz地址，不填写发布页或ZIP地址。`);
   if(opts['dry-run']) {
-    const promo=promoStatus(version);
-    console.log(promo.file?`宣传页：${promo.file}${promo.needsSync?`（待同步到 v${version}）`:`（已是 v${version}）`}`:'宣传页：未找到，发布时需手动同步安装地址');
+    console.log('宣传页使用固定最新版地址，无需随版本同步。');
     const route=pipeline
       ? '提交/标签 → 推送标签 → Gitee Go 流水线按标签构建、测试、打包 → 发布 Gitee Release 并归档制品库'
       : (includeGithub?'打包/核对 → 提交/标签 → 推送 → 等待双平台CI → 核对两处附件':'打包/核对 → 提交/标签 → 推送 → 上传并核对 Gitee Release 附件');
@@ -208,18 +207,8 @@ export async function main(argv) {
       const at=text.search(/^## v\d+\.\d+\.\d+/m);if(at<0)throw Error(`${file}缺少更新区插入位置`);
       writeFileSync(file,text.slice(0,at)+header+'\n\n'+markdown+'\n\n'+text.slice(at));
     }
-    // 宣传页在服务端仓库、不属于这个包，但用户会照它复制安装地址：发版时一并改到目标版本。
-    // 只在这里（真正发版的路径）写文件，--dry-run 不会动宣传页。
-    let promoLine='';
-    if(!opts['no-promo']) {
-      const promo=promoStatus(version);
-      if(promo.file) {
-        const {changed}=syncPromoFile(promo.file,version);
-        console.log(`宣传页${changed?'已同步到':'已是'} v${version}：${promo.file}`);
-        promoLine=`- 宣传页安装地址已同步为 v${version}（${promo.file}，属服务端仓库，需在那里提交并部署）。\n`;
-        if(promo.missing.length)console.warn(`宣传页这些位置没匹配到，请人工核对：${promo.missing.join('、')}`);
-      } else console.warn('未找到宣传页，请在服务端仓库手动同步安装地址（可用 METAONTIC_PROMO_PATH 指定路径）。');
-    }
+    // 固定安装链接由发布附件维护；不修改独立服务端仓库的宣传页。
+    const promoLine='';
     mkdirSync(out,{recursive:true});
     // npm CLI is JavaScript; invoking it through Node avoids .cmd shell quoting on Windows.
     const npm=process.env.npm_execpath||run(process.platform==='win32'?'where.exe':'which',['npm'],{capture:true}).split(/\r?\n/).find(x=>x.endsWith('npm'));

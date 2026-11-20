@@ -215,3 +215,7 @@ GitHub 正式版完成双平台安装检查后，通过 `scripts/publish-stable-
 Harness 拒绝带 undefined 的工具输出，错误为 INVALID_TOOL_OUTPUT / value is not lossless JSON；execute 内部成功不等于宿主接收成功。film_project 在返回边界转换为可无损传输的 JSON，回归覆盖 create/read/next/route/export；非有限数字拒绝返回。发生输出错误时不要重复create或未经用户决定降级，应先核对保存状态。审核守卫拦截若返回presentation，按其markdown补齐同一保存稿和绑定原图，沿原projectId与specification重试；分镜失效才重新storyboard，不自行转图或查源码试错。
 
 Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz`。本机、Gitee Go 与手动同步统一调用 publishGiteeWithAlias，先发布版本包，再从线上版本包复制原字节为固定名称并下载校验，不重复打包、不覆盖已有不同内容。宣传页使用固定地址。内部更新按用户新要求使用固定最新地址，附已确认版本参数隔离缓存，宿主返回版本不一致时不可报告成功；此前“内部更新只用具体版本 URL”的约定由本次明确要求调整。
+
+宣传页同步约定：用户明确要求后续发版不更新宣传页。release.mjs 不读取或写入服务端宣传页，仅维护正式版固定安装附件；sync-promo-address.mjs 保留为单独维护工具，用户明确要求更新页面时才执行。
+
+历史发行版清理：用户最新要求每仓仅保留最近8个正式版，清理工具和定时工作流默认保留8个；按平台独立排名，删除发行版必须同步删除对应平台标签，固定名称最新版附件仍保留。
