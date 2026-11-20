@@ -229,7 +229,7 @@ async function runOnlineUpdate() {
     const worthRetrying = (text) => /429|queue overflowed|timed out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|unable to access|network|fetch/i.test(text);
     /** 安装目录锁文件里留着缺 integrity 的记录：换地址、换版本都没用，必须先清掉那条记录。 */
     const lockfileUnverifiable = (text) => /MISSING_TARBALL_INTEGRITY/i.test(text);
-    // 安装仅使用所选发布版本的成品包，避免 Git 安装引入构建依赖；禁止回退 master。
+    // 使用最新正式版固定成品地址，按已检查版本隔离缓存；禁止回退 master。
     if (!/^\d+\.\d+\.\d+$/.test(context.updateLatest || '')
         || (context.availableVersions && !context.availableVersions.includes(context.updateLatest))) {
         context.setUpdateStatus('failed');
@@ -302,6 +302,12 @@ async function runOnlineUpdate() {
     if (outcome.application === 'cancelled') {
         context.setUpdateStatus('ok');
         context.setUpdateMessage(context.t('versionUpdateCancelled'));
+        return;
+    }
+    if (outcome.version && outcome.version !== context.updateLatest) {
+        forgetUpdateCheck();
+        context.setUpdateStatus('failed');
+        context.setUpdateMessage(`下载包版本为 ${outcome.version}，与已确认的 ${context.updateLatest} 不一致。请重新检查最新版本；配置与任务保留。`);
         return;
     }
     // 装好了：缓存作废，卡片不再是「有新版本」，只报更新结果

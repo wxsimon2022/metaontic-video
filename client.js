@@ -67,8 +67,7 @@
   var UPDATE_CACHE_KEY = `${PLUGIN_ID}.update-check-v3`;
   var UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1e3;
   var UPDATE_ATTEMPTS = 3;
-  var releaseArchiveName = (version) => `${PLUGIN_ID}-${version}.tgz`;
-  var releaseDownloadUrl = (version, channel = "gitee") => `${(channel === "github" ? GITHUB : GITEE).web}/releases/download/v${version}/${releaseArchiveName(version)}`;
+  var releaseDownloadUrl = (version, channel = "gitee") => `${(channel === "github" ? GITHUB : GITEE).web}${channel === "github" ? "/releases/latest/download" : "/releases/download/latest"}/${PLUGIN_ID}.tgz?version=${encodeURIComponent(version)}`;
   var RELAY = {
     baseUrl: "https://ai.bileego.com",
     signupUrl: 'https://ai.bileego.com/sign-up?aff=VzYr',
@@ -1564,6 +1563,12 @@
       if (outcome.application === "cancelled") {
         context.setUpdateStatus("ok");
         context.setUpdateMessage(context.t("versionUpdateCancelled"));
+        return;
+      }
+      if (outcome.version && outcome.version !== context.updateLatest) {
+        forgetUpdateCheck();
+        context.setUpdateStatus("failed");
+        context.setUpdateMessage(`下载包版本为 ${outcome.version}，与已确认的 ${context.updateLatest} 不一致。请重新检查最新版本；配置与任务保留。`);
         return;
       }
       forgetUpdateCheck();

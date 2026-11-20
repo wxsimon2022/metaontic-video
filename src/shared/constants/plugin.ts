@@ -46,7 +46,7 @@ export const UPDATE_ATTEMPTS = 3;
 /** 正式版成品包名与下载地址（安装框只填这个 tgz 地址）。 */
 export const releaseArchiveName = (version) => `${PLUGIN_ID}-${version}.tgz`;
 export const releaseDownloadUrl = (version, channel = 'gitee') =>
-  `${(channel === 'github' ? GITHUB : GITEE).web}/releases/download/v${version}/${releaseArchiveName(version)}`;
+  `${(channel === 'github' ? GITHUB : GITEE).web}${channel === 'github' ? '/releases/latest/download' : '/releases/download/latest'}/${PLUGIN_ID}.tgz?version=${encodeURIComponent(version)}`;
 
 /** 中转站（MetaOntic AI）：留空时按这里的默认值调用。 */
 export const RELAY = {
