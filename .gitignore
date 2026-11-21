@@ -6,6 +6,43 @@ segments/
 node_modules/
 dist/
 
+# 本地任务目录、日志与安装包
+/metaontic-video/
+*.log
+*.tgz
+*.zip
+*.zip.sha256
+*.tsbuildinfo
+coverage/
+.cache/
+__pycache__/
+*.py[cod]
+
+# 操作系统、编辑器临时文件及本地凭据
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.env
+.env.*
+!.env.example
+
+# 构建生成的安装入口：由 npm run build 生成，成品包仍包含
+/index.js
+/client.js
+/locale/en.json
+/locale/zh.json
+/presets/promo-video.js
+/presets/video-director.js
+
+# 可由源文件导出的工程图及旧版品牌设计素材，仅保留本地
+/docs/engineering/plugin-workflow.png
+/docs/engineering/plugin-workflow.pdf
+/assets/branding/metaontic-video-logo-v1.png
+/assets/branding/logo-prompt.txt
+
 # IDE 配置
 .idea/
 

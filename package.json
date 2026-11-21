@@ -107,6 +107,7 @@
     "@deepseek-ai/schemastery": "~3.18.5"
   },
   "scripts": {
+    "check:repo": "node scripts/check-repository.mjs",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.contracts.json",
     "build:locale": "node scripts/build.mjs locale",
     "build:host": "node scripts/build.mjs host",

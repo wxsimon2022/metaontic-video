@@ -20,6 +20,16 @@ Harness 默认启用 HMR 配置重载，但不监听本地插件源码。对于�
 
 源码入口为 `src/index.ts`（宿主装配）和 `src/client.ts`（浏览器装配）。业务模块与 Agent 分离，扩展步骤见 [框架与业务架构](./structure-refactor.md)。
 
+### 仓库内容边界
+
+仓库保留源码、测试、构建与发布脚本、必要静态资源和工程文档。首次检出后执行 `npm ci`、`npm run build`，再运行测试或准备安装包。
+
+根目录 `index.js`、`client.js`、`locale/en.json`、`locale/zh.json` 和 `presets/*.js` 由构建生成，不提交 Git；安装路径与 `package.json.files` 保持不变，正式成品仍包含这些文件。`locale/presets/` 和 `presets/icons/` 是静态资源，继续跟踪。
+
+`.local/`、`metaontic-video/` 任务目录、日志、缓存、安装包、操作系统临时文件与本地凭据不入库。流程图以 Markdown、Mermaid 和 SVG 为维护源，导出的 PNG/PDF 仅留本地。旧版 Logo 草稿和生成提示仅留本地；当前品牌资源继续保留。取消跟踪不删除本地原文件，也不重写历史版本。
+
+提交前执行 `npm run check:repo` 检查是否仍有被忽略但已跟踪的文件；发布仍须遵守单独的发版指令与验证流程。
+
 ```text
 src/
 ├── index.ts / client.ts  # 稳定宿主入口，只组合模块
