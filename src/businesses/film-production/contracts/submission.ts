@@ -1,3 +1,4 @@
+import { normalizeScript } from '../scripts/script.document.js';
 import { validateArtifact } from '../artifacts/artifact.service.js';
 import { STAGE_ARRAYS, ITEM_ARRAYS } from './fields.js';
 /** 仅检查候选，不写材料、不改变修订或批准，更不补造剧情道具。 */
@@ -17,7 +18,7 @@ export function checkSubmission(state:any,stage:string,content:string) {
   });
  }
  if(issues.length)return {valid:false,error_code:'REQUIRED_ARTIFACT_ARRAYS',issues,expectedRevision:state.revision};
- try {validateArtifact(stage,data,state);}catch(error) {
+ try {data=normalizeScript(state,stage,data);validateArtifact(stage,data,state);}catch(error) {
   return {valid:false,error_code:'ARTIFACT_VALIDATION_FAILED',issues:[{path:stage,message:String(error?.message||'材料未通过校验')}],expectedRevision:state.revision};
  }
  return {valid:true,stage,expectedRevision:state.revision,next_action:'submit',note:'仅候选材料校验通过，尚未保存或批准；submit 仍校验依赖、审批和当前修订。'};

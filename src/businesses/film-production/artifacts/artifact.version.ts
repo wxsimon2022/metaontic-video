@@ -2,8 +2,8 @@ import { sourceRevisions } from '../contracts/index.js';
 import { validateArtifact, commitArtifact, STAGES } from './artifact.service.js';
 /** 局部修订保留无关实体；全局时间或结构变化仍使整个相关阶段失效。 */
 export function reviseEntities(state: any, stage: string, replacements: any[], expected: number) {
-  const fields={assets:['characters','scenes','locations','scene_states','props'],shots:['shots'],prompts:['prompts']};
-  const keys={characters:'character_id',scenes:'scene_id',locations:'location_id',scene_states:'scene_state_id',props:'prop_id',shots:'shot_id',prompts:'shot_id'};
+  const fields={script:['scenes','dialogue','characters','chapters'],assets:['characters','scenes','locations','scene_states','props'],shots:['shots'],prompts:['prompts']};
+  const keys={dialogue:'dialogue_id',chapters:'chapter_id',characters:'character_id',scenes:'scene_id',locations:'location_id',scene_states:'scene_state_id',props:'prop_id',shots:'shot_id',prompts:'shot_id'};
   if (!fields[stage] || !Array.isArray(replacements) || !replacements.length) throw Error('INVALID_REVISION_SCOPE');
   const artifact=state.artifacts[stage];
   if (!artifact || artifact.stale) throw Error('UPSTREAM_REQUIRED');
@@ -17,7 +17,7 @@ export function reviseEntities(state: any, stage: string, replacements: any[], e
     data[replacement.collection][index]=replacement.entity;changed.add(`${replacement.collection}:${id}`);
   }
   const next=commitArtifact(state,stage,data,expected);
-  const affected=stage==='assets' ? state.artifacts.shots?.data.shots.filter(s=>changed.has(`scenes:${s.scene_id}`)||changed.has(`locations:${s.location_id}`)||changed.has(`scene_states:${s.scene_state_id}`)||s.character_ids.some(id=>changed.has(`characters:${id}`))||(s.prop_ids||[]).some(id=>changed.has(`props:${id}`))).map(s=>s.shot_id) || [] : replacements.map(r=>r.entity[keys[r.collection]]);
+  const affected=stage==='script' ? (state.artifacts.shots?.data.shots||[]).filter(s=>replacements.some(r=>r.collection==='chapters'||r.collection==='characters'&&s.character_ids?.includes(r.entity.character_id)||r.collection==='scenes'&&s.scene_id===r.entity.scene_id||r.collection==='dialogue'&&s.dialogue_refs?.includes(r.entity.dialogue_id))).map(s=>s.shot_id) : stage==='assets' ? state.artifacts.shots?.data.shots.filter(s=>changed.has(`scenes:${s.scene_id}`)||changed.has(`locations:${s.location_id}`)||changed.has(`scene_states:${s.scene_state_id}`)||s.character_ids.some(id=>changed.has(`characters:${id}`))||(s.prop_ids||[]).some(id=>changed.has(`props:${id}`))).map(s=>s.shot_id) || [] : replacements.map(r=>r.entity[keys[r.collection]]);
   // 仍将阶段标stale以阻止制作，但保留明确的实体集合供定向重写与重审。
   for (const downstream of STAGES.slice(STAGES.indexOf(stage as any)+1)) {
     if (next.artifacts[downstream]) next.artifacts[downstream].stale_entity_ids=affected;

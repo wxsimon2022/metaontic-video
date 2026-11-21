@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "strict": true, "noImplicitAny": true },
+  "include": [
+    "src/businesses/film-production/contracts/types.ts",
+    "src/businesses/film-production/scripts/script.document.ts",
+    "src/businesses/film-production/reviews/review.rules.ts"
+  ]
+}

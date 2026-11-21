@@ -215,6 +215,7 @@ export async function main(argv) {
     if(!npmCli||!existsSync(npmCli))throw Error('未找到npm CLI；建议用npm run release调用');
     if(!existsSync('node_modules/esbuild'))run(process.execPath,[npmCli,'ci']);
     run(process.execPath,[require.resolve('typescript/bin/tsc'),'-p','tsconfig.json']);
+    run(process.execPath,[require.resolve('typescript/bin/tsc'),'-p','tsconfig.contracts.json']);
     run(process.execPath,['scripts/build.mjs']);
     run(process.execPath,['--test',...readdirSync('tests').filter(x=>x.endsWith('.test.mjs')).map(x=>'tests/'+x)]);
     run(process.execPath,['scripts/validate-release.mjs']);

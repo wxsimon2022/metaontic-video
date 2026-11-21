@@ -1231,7 +1231,7 @@
 
   // src/ui/updates/update.service.ts
   function createUpdates({ h, fetchSource }) {
-    let PLUGIN_VERSION = "4.0.11".trim().replace(/^v/i, "");
+    let PLUGIN_VERSION = "4.1.0".trim().replace(/^v/i, "");
     function isNewerVersion(remote, local) {
       let parse = (text) => {
         let m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1617,7 +1617,7 @@
   // package.json
   var package_default = {
     name: "dsh-metaontic-video",
-    version: "4.0.11",
+    version: "4.1.0",
     description: "DeepSeek Harness AI 视频创作插件：新手通过对话完善创意、审核脚本并生成视频；长视频采用分段续拍与本地合并，按实际调用确认费用。",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
@@ -1724,7 +1724,7 @@
       "@deepseek-ai/schemastery": "~3.18.5"
     },
     scripts: {
-      typecheck: "tsc -p tsconfig.json",
+      typecheck: "tsc -p tsconfig.json && tsc -p tsconfig.contracts.json",
       "build:locale": "node scripts/build.mjs locale",
       "build:host": "node scripts/build.mjs host",
       "build:client": "node scripts/build.mjs client",
@@ -1735,16 +1735,18 @@
       "pack:test": "node scripts/pack-test.mjs",
       "market:index": "node scripts/market-index.mjs",
       "npm:publish": "node scripts/publish-npm.mjs",
-      "npm:token": "node scripts/npm-token.mjs"
+      "npm:token": "node scripts/npm-token.mjs",
+      "release:all": "node scripts/release.mjs --interactive --all",
+      "eval:film": "node scripts/evaluate-film.mjs"
     },
     dependencies: {},
     releaseNotes: {
-      version: "4.0.11",
+      version: "4.1.0",
       prerelease: !1,
-      publishedAt: "2026-11-21T00:10:28.830Z",
+      publishedAt: "2026-11-21T01:51:57.688Z",
       items: [
-        "新增：侧栏视频创作助手显示开关，默认开启。",
-        "优化：设置分组与间距，统一滑动开关，画面与声音移入更多设置。"
+        "新增：逐章创作与断点恢复、独立文本复审和六维内容审核。",
+        "优化：剧本与分镜一致性、局部改稿与上下文效率；优先检测中国镜像更新并兼顾仓库新版。"
       ]
     },
     readme: `<img src="https://video.mybfs.cn/promo/share-logo.png" width="160" alt="MetaOnticVideo" />

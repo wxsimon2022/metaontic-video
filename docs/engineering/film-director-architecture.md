@@ -20,7 +20,7 @@
 | projects | 宿主DATA_DIR/film-projects/会话归属/项目UUID | 项目权威状态与快照，源码库不存运行数据 |
 | tests | tests/film-*.test.mjs及视频业务测试 | 阶段、批准、版本、恢复与制作绑定回归 |
 
-未来若拆出YAML配置或JSON Schema，必须由实际加载器读取，并消除代码中的重复定义，不能仅创建目录或无人读取的配置。依赖关系统一从STAGE_DEPS读取。完整JSON Schema声明、独立Agent执行与章节后台调度仍未实现。
+未来若拆出YAML配置或JSON Schema，必须由实际加载器读取，并消除代码中的重复定义，不能仅创建目录或无人读取的配置。依赖关系统一从STAGE_DEPS读取。完整JSON Schema声明、八角色独立执行器与章节后台调度仍未实现。Reviewer现有独立文本请求，章节支持显式逐章提交与恢复；详见[创作质量架构](./creation-quality-architecture.md)。
 
 ## 本轮检查与修正
 

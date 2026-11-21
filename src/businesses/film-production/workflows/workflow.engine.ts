@@ -1,3 +1,5 @@
+import { chapterTask } from '../chapters/chapter.service.js';
+import { promptMetrics } from '../roles/context.composer.js';
 import { narrativeDiagnostics } from '../validation/content.validator.js';
 import { MAX_SEGMENTS } from '../../video-generation/config.js';
 import { sourceRevisions, STAGE_DEPS, projectContext, modelProfile } from '../contracts/index.js';
@@ -15,7 +17,11 @@ export function nextTask(state: any) {
       const roles = {creative:'creative',script:'screenwriter',assets:'character + scene',shots:'storyboard',prompts:'prompt-engineer',review:'reviewer'};
       const dependencies = STAGE_DEPS;
       const roleIds={creative:['creative'],script:['screenwriter'],assets:['character','scene'],shots:['storyboard'],prompts:['prompt-engineer'],review:['reviewer']};
-      return { action:'submit', narrative_diagnostics:narrativeDiagnostics(state.artifacts.script?.data), submission_contract:submissionContract(stage), ...projectContext(state), work_profile:profileContext(state), input_revisions:sourceRevisions(state,stage), revision_scope:artifact?.stale_entity_ids || [], model_profile:modelProfile(state), stage, role:roles[stage], inputs:Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]])), instructions:roleIds[stage].map(role=>roleInstructions(state,role)).join('\n\n'),expectedRevision:state.revision };
+      const inputs=Object.fromEntries(dependencies[stage].map(s => [s,state.artifacts[s]]));
+      const instructions=roleIds[stage].map(role=>roleInstructions(state,role)).join('\n\n');
+      if(stage==='script'&&state.chapter_policy==='chapter_v1'&&state.duration_ms>=600000&&!state.chapter_workbench)return {action:'chapter_plan',stage:'script',inputs:{creative:state.artifacts.creative},...projectContext(state),expectedRevision:state.revision,instructions:'先依据已批准创意提交chapter_plan：完整章节ID/title/duration_ms，时长总和严格等于目标时长；随后逐章写作，整片汇总后再审批。'};
+      if(stage==='review'&&state.review_policy==='isolated_v1')return {action:'independent_review',stage:'review',role:'reviewer',input_revisions:sourceRevisions(state,'review'),expectedRevision:state.revision,instructions:'调用independent_review，由工具确认文本调用费用并在独立上下文审核；未执行不得自称独立审核。'};
+      return chapterTask(state,{ context_metrics:promptMetrics(instructions,inputs), action:'submit', narrative_diagnostics:narrativeDiagnostics(state.artifacts.script?.data), submission_contract:submissionContract(stage), ...projectContext(state), work_profile:profileContext(state), input_revisions:sourceRevisions(state,stage), revision_scope:artifact?.stale_entity_ids || [], model_profile:modelProfile(state), stage, role:roles[stage], inputs, instructions,expectedRevision:state.revision });
     }
     if (['creative','script'].includes(stage) && state.approvals[stage] !== artifact.revision) {
       if(stage==='creative'&&profileContext(state).status==='UNSELECTED')return {action:'configure_profile',role:'director',...projectContext(state),work_profile:profileContext(state),expectedRevision:state.revision,instructions:'创意批准前确认作品类型，用configure_profile保存选择；保存会使当前草稿失效，需按类型更新后重新提交。不得把未回答当作同意。'};

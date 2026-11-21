@@ -1,3 +1,4 @@
+import { recordCapabilityObservation } from './capability-observations.js';
 import { reportUsage } from '../../../platform/telemetry/reporter.js';
 import { withGenerationProgress } from '../workflow/execution.js';
 import { timedStage } from '../../../shared/utils/timing.js';
@@ -151,6 +152,7 @@ async function runTaskOnce(config, body, signal, progress: { taskId?: string; on
       if (['succeeded', 'failed', 'cancelled'].includes(final.status)) reportUsage(progress.exec, 'video_task_finished', {
         ...stats, status: final.status, durationMs: Date.now() - began, errorCode: final.errorCode,
       }, taskId);
+      if(final.status==='succeeded')await recordCapabilityObservation(config,body,{...final,taskId}).catch(()=>{});
       return { ...final, taskId };
     } catch (failure) {
       if (failure?.code === 'ABORTED') return { taskId, status: 'unknown', errorCode: 'waiting_stopped', error: `已停止等待，任务 ${taskId} 已提交，可能仍在生成。用 resume 或 video_status 查询已有任务，不要重新提交。` };

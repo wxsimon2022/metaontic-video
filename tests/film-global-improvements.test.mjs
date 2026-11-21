@@ -132,7 +132,8 @@ test('new professional project completes approved evidence chain and persists co
  const home=await mkdtemp(path.join(dir,'项目 '));const prior=process.env.DSH_HOME;process.env.DSH_HOME=home;
  let tool,unlock,asked;
  const waiting=new Promise(r=>asked=r);
- const runtime={config:{model},tools:{register(_,t){tool=t;}},ctx:{get(){return {ask:async()=>{asked();await new Promise(r=>unlock=r);return {answers:[{id:'film_approval',selected:['批准本版']}]};}};}}};
+ const fetchBefore=globalThis.fetch;
+ const runtime={config:{model,connectionMode:'metaontic',metaonticApiKey:'mock-only',baseUrl:'https://review.invalid'},tools:{register(_,t){tool=t;}},ctx:{get(){return {ask:async()=>{asked();await new Promise(r=>unlock=r);return {answers:[{id:'film_approval',selected:['批准本版']}]};}};}}};
  const exec={agent:{session:{id:'global-project'}}};api.filmDirectorBusiness.apply(runtime);
  try {
   let state=await tool.execute({action:'create',title:'递杯',sourceBrief:'两个地点的一次关照',durationSeconds:15,projectSpec:JSON.stringify({genre:'drama',target_model:model,production_strategy:'independent_shots'})},exec);
@@ -156,7 +157,15 @@ test('new professional project completes approved evidence chain and persists co
   await submit('prompts',{prompts:data.prompts.data.prompts.map((p,i)=>({...p,location_id:shots[i].location_id,scene_state_id:shots[i].scene_state_id,duration_ms:shots[i].duration_ms,generation_mode:'TEXT_TO_VIDEO',dialogue_refs:[]}))});
   const revisions=state.nextTask.input_revisions;
   const scores={requirement_fidelity:90,narrative_quality:90,character_consistency:null,scene_consistency:90,cinematic_quality:90,temporal_consistency:90,prompt_executability:90,structural_completeness:90};
-  await submit('review',{review_id:'r',review_stage:'FINAL_REVIEW',review_scope:Object.keys(revisions),reviewed_revisions:revisions,unverified_items:[],scores,score_evidence:Object.fromEntries(Object.keys(scores).map(k=>[k,'s1递杯，s2接受，关照通过动作呈现'])),theme_evidence:[{scene_id:'s1',evidence:'杯子沿桌面递出'}],issues:[],review_status:'PASS',delivery_allowed:true,dimension_review:{profile_revision:'1',checks:[{dimension:'genre',profile_id:'drama',status:'PASS',evidence:'动作和接受建立因果'}]}});
+  const report={review_id:'r',review_stage:'FINAL_REVIEW',review_scope:Object.keys(revisions),reviewed_revisions:revisions,unverified_items:[],scores,score_evidence:Object.fromEntries(Object.keys(scores).map(k=>[k,'s1递杯，s2接受，关照通过动作呈现'])),theme_evidence:[{scene_id:'s1',evidence:'杯子沿桌面递出'}],issues:[],review_status:'PASS',delivery_allowed:true,dimension_review:{profile_revision:'1',checks:[{dimension:'genre',profile_id:'drama',status:'PASS',evidence:'动作和接受建立因果'}]},story_assessment:{reviewer:'isolated_mock',criteria:['theme_expression','causal_progression','character_credibility','dialogue_function','visual_specificity','ending_payoff'].map(id=>({id,status:'PASS',evidence:[{scene_id:'s1',reason:'杯子移动后被接住，关照通过行为体现'}]}))}};
+  let reviewCalls=0;
+  globalThis.fetch=async (_url,options)=>{reviewCalls++;const body=JSON.parse(options.body);assert.equal(body.messages.length,2);return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({model:'mock-review',choices:[{message:{content:JSON.stringify(report)}}],usage:{prompt_tokens:100,completion_tokens:50}})};};
+  runtime.ctx.get=()=>({ask:async()=>({answers:[{id:'independent_review_cost',selected:['暂不执行']}]})});
+  const denied=await tool.execute({action:'independent_review',projectId,expectedRevision:state.revision},exec);
+  assert.equal(denied.status,'needs_input');assert.equal(reviewCalls,0);
+  runtime.ctx.get=()=>({ask:async()=>({answers:[{id:'independent_review_cost',selected:['执行独立审核']}]})});
+  state=await tool.execute({action:'independent_review',projectId,expectedRevision:state.revision},exec);
+  assert.equal(reviewCalls,1);assert.equal(state.nextTask.action,'compile');
   state=await tool.execute({action:'compile',projectId,expectedRevision:state.revision,ratio:'16:9',resolution:'480p'},exec);
   assert.equal(state.production.strategy,'independent_shots');
   const video=await workflowApi.readProject(state.production.videoProjectId,exec);
@@ -171,7 +180,7 @@ test('new professional project completes approved evidence chain and persists co
   assert.ok(logs.some(l=>l.action==='compile'&&l.responseBytes>0));
   assert.ok(!JSON.stringify(logs).includes('两个地点的一次关照'));
   assert.ok(logs.every(l=>typeof l.elapsedMs==='number'&&!Object.hasOwn(l,'content')));
- }finally{if(prior===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=prior;}
+ }finally{globalThis.fetch=fetchBefore;if(prior===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=prior;}
 });
 
 test('visual-only changes preserve story approvals while narrative tone requires approval',()=>{

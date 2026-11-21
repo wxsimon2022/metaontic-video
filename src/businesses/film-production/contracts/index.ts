@@ -1,4 +1,4 @@
-import { videoCapabilities } from '../../video-generation/providers/capabilities.js';
+import { videoCapabilities, channelCapabilities } from '../../video-generation/providers/capabilities.js';
 import { resolveDimensions } from '../profiles/profile.resolver.js';
 /** 所有角色的共同契约；由构建注入，不依赖宿主识别外部目录。 */
 export const COMMON_CONTRACT = `# COMMON_CONTRACT V4.0
@@ -48,5 +48,5 @@ export function revisionsEqual(a:any,b:any) {
   return !!a&&!!b&&typeof a==='object'&&typeof b==='object'&&Object.keys(a).length===Object.keys(b).length&&Object.entries(a).every(([k,v])=>Object.hasOwn(b,k)&&b[k]===v);
 }
 export function modelProfile(state:any) {
-  return videoCapabilities(state.project_spec?.target_model || 'generic');
+  return state.capability_channel ? channelCapabilities(state.project_spec?.target_model || 'generic',state.capability_channel,state.capability_observations||[]) : videoCapabilities(state.project_spec?.target_model || 'generic');
 }

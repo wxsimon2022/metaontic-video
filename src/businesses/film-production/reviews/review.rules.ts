@@ -1,6 +1,7 @@
+import type { ReviewReport } from '../contracts/types.js';
 /** Reviewer V3.1评分和交付判定由程序复算；旧报告保持原有口径。 */
 const WEIGHTS={requirement_fidelity:20,narrative_quality:15,character_consistency:10,scene_consistency:10,cinematic_quality:15,temporal_consistency:10,prompt_executability:15,structural_completeness:5};
-export function evaluateReview(report: any) {
+export function evaluateReview(report: ReviewReport) {
  if (!['PASS','PASS_WITH_WARNINGS','REVISE_REQUIRED','BLOCKED','NOT_EVALUATED'].includes(report.review_status) || !report.scores || !Array.isArray(report.issues)) throw Error('INVALID_REVIEW_REPORT');
  let sum=0,weight=0;
  for(const [key,w] of Object.entries(WEIGHTS)) {

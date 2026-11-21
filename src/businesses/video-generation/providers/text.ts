@@ -158,8 +158,8 @@ export async function writeScript(config: any, brief: any, options: any = {}) {
     response = await fetcher(textEndpoint(cfg), {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, temperature: 0.6, max_tokens: textMaxTokens(brief?.segments),
-        ...(stream ? { stream: true, stream_options: { include_usage: true } } : {}), messages: [
+      body: JSON.stringify({ model, temperature: 0.6, max_tokens: options.taskMaxTokens ? Math.min(16000, Math.max(1000, options.taskMaxTokens)) : textMaxTokens(brief?.segments),
+        ...(stream ? { stream: true, stream_options: { include_usage: true } } : {}), messages: options.taskMessages || [
         { role: 'system', content: '你只输出 Markdown 剧本正文，不解释过程，不使用代码块。' },
         { role: 'user', content: scriptPrompt(brief) },
       ] }),

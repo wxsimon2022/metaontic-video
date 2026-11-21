@@ -1,6 +1,6 @@
 {
   "name": "dsh-metaontic-video",
-  "version": "4.0.11",
+  "version": "4.1.0",
   "description": "DeepSeek Harness AI 视频创作插件：新手通过对话完善创意、审核脚本并生成视频；长视频采用分段续拍与本地合并，按实际调用确认费用。",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
@@ -107,7 +107,7 @@
     "@deepseek-ai/schemastery": "~3.18.5"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.contracts.json",
     "build:locale": "node scripts/build.mjs locale",
     "build:host": "node scripts/build.mjs host",
     "build:client": "node scripts/build.mjs client",
@@ -119,16 +119,17 @@
     "market:index": "node scripts/market-index.mjs",
     "npm:publish": "node scripts/publish-npm.mjs",
     "npm:token": "node scripts/npm-token.mjs",
-    "release:all": "node scripts/release.mjs --interactive --all"
+    "release:all": "node scripts/release.mjs --interactive --all",
+    "eval:film": "node scripts/evaluate-film.mjs"
   },
   "dependencies": {},
   "releaseNotes": {
-    "version": "4.0.11",
+    "version": "4.1.0",
     "prerelease": false,
-    "publishedAt": "2026-11-21T00:10:28.830Z",
+    "publishedAt": "2026-11-21T01:51:57.688Z",
     "items": [
-      "新增：侧栏视频创作助手显示开关，默认开启。",
-      "优化：设置分组与间距，统一滑动开关，画面与声音移入更多设置。"
+      "新增：逐章创作与断点恢复、独立文本复审和六维内容审核。",
+      "优化：剧本与分镜一致性、局部改稿与上下文效率；优先检测中国镜像更新并兼顾仓库新版。"
     ]
   },
   "readme": "<img src=\"https://video.mybfs.cn/promo/share-logo.png\" width=\"160\" alt=\"MetaOnticVideo\" />\n\n# dsh-metaontic-video · AI 视频创作插件\n\n[English](https://github.com/wxsimon2022/metaontic-video/blob/master/README.en.md)\n\nDeepSeek Harness（DSH）AI 视频生成插件 MetaOnticVideo：**新手快速上手，低成本制作长视频。**\n\n## 能做什么\n\n- **快速创作**：说出想法，助手整理脚本，确认后生成并预览视频。\n- **分段制作长视频**：逐段生成与续拍，保留进度，最后在本机合并。\n\n图片与视频按接入渠道用量计费，生成前需确认费用。\n\n## 中国镜像源安装\n\n在 Harness「插件 → 添加插件」中选择中国镜像源，输入包名并安装：\n\n```text\ndsh-metaontic-video\n```\n\n## 在线安装\n\n在 Harness「插件 → 添加插件」中粘贴链接，Windows 与 macOS 使用同一个安装包。\n\nGitee：\n\n```text\nhttps://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz\n```\n\nGitHub 备用：\n\n```text\nhttps://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaontic-video.tgz\n```\n\n## 开始使用\n\n1. 打开插件设置，选择 **MetaOntic AI**，填写 API密钥并保存。\n2. 在会话中选择 **视频创作助手**；宣传内容可选择 **宣传视频助手**。\n3. 描述需求，审核脚本并确认费用，再逐段预览制作结果。\n\n例如：“制作一条30秒竖屏720P的视频，表现清晨湖面的宁静。”\n\n## 相关链接\n\n[使用说明](https://ai.mybfs.cn) · [问题反馈](https://github.com/wxsimon2022/metaontic-video/issues) · [更新记录](https://github.com/wxsimon2022/metaontic-video/blob/master/CHANGELOG.md) · [开发文档](https://github.com/wxsimon2022/metaontic-video/blob/master/docs/engineering/development.md) · [许可](https://github.com/wxsimon2022/metaontic-video/blob/master/LICENSE)\n"

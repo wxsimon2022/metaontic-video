@@ -8,7 +8,7 @@ import { DATA_DIR } from '../constants/plugin.js';
 
 export const requestLogContext = new AsyncLocalStorage<Record<string, unknown>>();
 export const LOG_POLICY = { retentionDays: 30, totalBytes: 50 * 1024 * 1024, dailyBytes: 5 * 1024 * 1024, queueLimit: 256 };
-const fields = new Set(('event callId sessionId projectId jobId taskId tool stage spanId parentSpanId startedAt finishedAt elapsedMs outcome errorCode errorCategory httpStatus upstreamRequestId requestId operation method provider model duration resolution imageCount videoCount taskStatus completionTokens index actualSeconds plannedCumulative mode segmentCount sourceCount segmentSeconds done resuming paused cancelled truncated characters chunks bytes responseBytes turn version closedSpanId closedElapsedMs coverage action status source reason').split(' '));
+const fields = new Set(('event callId sessionId projectId jobId taskId tool stage spanId parentSpanId startedAt finishedAt elapsedMs outcome errorCode errorCategory httpStatus upstreamRequestId requestId operation method provider model duration resolution imageCount videoCount taskStatus completionTokens index actualSeconds plannedCumulative mode segmentCount sourceCount segmentSeconds done resuming paused cancelled truncated characters chunks bytes responseBytes instructionBytes inputBytes promptTokens turn version closedSpanId closedElapsedMs coverage action status source reason').split(' '));
 const pathFields = new Set('path sourcePath videoPath previewPath resumeDir segmentsDir'.split(' '));
 const listFields = new Set(['files', 'inputPaths']);
 const preparedDirs = new Set<string>();

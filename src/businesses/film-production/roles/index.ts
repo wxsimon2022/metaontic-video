@@ -1,3 +1,4 @@
+import { TASK_CONTRACT, promptMetrics, scopedInputs } from './context.composer.js';
 import { COMMON_CONTRACT, sourceRevisions, STAGE_DEPS, projectContext, modelProfile } from '../contracts/index.js';
 import director from '../../../agents/director/index.js';
 import creative from '../../../agents/creative/index.js';
@@ -13,8 +14,9 @@ import { SHORT_VIDEO_COMMON, SHORT_VIDEO_ROLE } from '../prompts/short-video.js'
 import { submissionContract } from '../contracts/fields.js';
 const ROLE_TEXTS = {director,creative,screenwriter,character,scene,storyboard,'prompt-engineer':promptEngineer,reviewer};
 export const ROLE_PROMPTS = Object.fromEntries(Object.entries(ROLE_TEXTS).map(([key,text])=>[key,text+'\n'+COMMON_CONTRACT+runtimeContract(key)])) as typeof ROLE_TEXTS;
-export function roleInstructions(state:any,role:string) {return ROLE_PROMPTS[role]+'\n'+profileInstructions(state,role)
- + (state.duration_ms > 0 && state.duration_ms <= 60000 ? '\n'+SHORT_VIDEO_COMMON+'\n'+(SHORT_VIDEO_ROLE[role] || '') : '');}
+export function roleInstructions(state:any,role:string) {return ROLE_TEXTS[role]+'\n'+TASK_CONTRACT+runtimeContract(role)+'\n'+profileInstructions(state,role)
+ + (state.duration_ms > 0 && state.duration_ms <= 60000 ? '\n'+SHORT_VIDEO_COMMON+'\n'+(SHORT_VIDEO_ROLE[role] || '') : '')
+ + (state.script_policy==='canonical_v1'&&role==='screenwriter'?'\n当前项目采用canonical_v1：场次、动作节拍beats和对白是唯一剧情来源；正文由工具生成，screenplay可以省略，不能维护另一份剧情。beats按表演顺序列action或dialogue_ref，每句对白须且只须引用一次；局部修改可revise(stage:script)替换scenes/dialogue/characters/chapters并重新审批。':'');}
 export const INTENTS = ['new_project','develop_idea','write_script','revise_dialogue','revise_story','design_character','revise_character','design_scene','revise_scene','design_shots','revise_camera','revise_timing','write_prompts','adapt_model','review','verify_facts','resume','produce','clarify'] as const;
 const ROUTES = {
  new_project:['director',null],develop_idea:['creative','creative'],write_script:['screenwriter','script'],revise_dialogue:['screenwriter','script'],revise_story:['screenwriter','script'],
@@ -35,7 +37,8 @@ export function routeIntent(state: any, intent: string, entityIds: string[] = []
  const scopeRequired=local && !entityIds.length;
  const ids=stage==='assets' ? (role==='character'? state.artifacts.assets?.data.characters?.map(v=>v.character_id):['scenes','locations','scene_states','props'].flatMap(k=>(state.artifacts.assets?.data[k]||[]).map(v=>v[{scenes:'scene_id',locations:'location_id',scene_states:'scene_state_id',props:'prop_id'}[k]]))) : stage==='shots'||stage==='prompts'?state.artifacts.shots?.data.shots?.map(v=>v.shot_id):undefined;
  if(ids && entityIds.some(id=>!ids.includes(id))) throw Error('UNKNOWN_ENTITY');
- const inputs=Object.fromEntries([...new Set([...dependencies,...(stage?[stage]:[])])].filter(s=>state.artifacts[s]).map(s=>[s,state.artifacts[s]]));
- return {submission_contract:stage?submissionContract(stage):null,intent,role,stage,scope:{entity_ids:entityIds},status:missing.length||approvals.length||scopeRequired?'needs_input':'ready',missing,approval_required:approvals,scope_required:scopeRequired,...projectContext(state),work_profile:profileContext(state),input_revisions:sourceRevisions(state,stage),model_profile:modelProfile(state),expectedRevision:state.revision,instructions:roleInstructions(state,role),inputs,
+ const inputs=stage?scopedInputs(state,stage,role,entityIds):{};
+ const instructions=roleInstructions(state,role)+(entityIds.length?'\n本次只修改指定ID；保留其他内容，不重写整片。':'');
+ return {submission_contract:stage?submissionContract(stage):null,intent,role,stage,scope:{entity_ids:entityIds},status:missing.length||approvals.length||scopeRequired?'needs_input':'ready',missing,approval_required:approvals,scope_required:scopeRequired,...projectContext(state),work_profile:profileContext(state),input_revisions:sourceRevisions(state,stage),model_profile:modelProfile(state),expectedRevision:state.revision,instructions,inputs,context_metrics:promptMetrics(instructions,inputs),
    next_action:scopeRequired?'明确修改对象ID；不要猜测或改写全片':missing.length||approvals.length?'完成缺失上游或批准后再修改':'按职责生成候选；提交仍受现有状态机与审批约束'};
 }

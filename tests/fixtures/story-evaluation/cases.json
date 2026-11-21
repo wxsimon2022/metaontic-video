@@ -1,0 +1,8 @@
+[
+ {"id":"comedy_30","genre":"comedy","duration_ms":30000,"brief":"父亲教女儿修椅子，女儿发现松动声来自父亲坐的凳子。两人，不新增人物，不靠摔倒搞笑。","must_preserve":["父女关系","修椅子","发现声音来源"],"review_focus":["声音铺垫能否看见或听见","父亲反应是否符合人物","结尾回收前文"]},
+ {"id":"life_30","genre":"drama","duration_ms":30000,"brief":"河岸钓鱼的女生第一次学会等待。单人、安静口语、MiniDV风格，不增加神奇大鱼。","must_preserve":["单人","河岸","自然小声口语"],"review_focus":["等待由什么具体动作变化表达","是否只有重复风景","结尾变化是否可观察"]},
+ {"id":"commercial_15","genre":"commercial","duration_ms":15000,"brief":"宣传一款普通保温杯，仅已知容量350毫升。通过出门时的具体使用过程表达方便，不编造保温时间。","must_preserve":["350毫升","不得编造性能数据"],"review_focus":["卖点是否有依据","产品使用事件是否清楚","动作与对白能否放入15秒"]},
+ {"id":"promotion_60","genre":"promotional","duration_ms":60000,"brief":"展示一家社区早餐店，从准备到第一位老客入店。无销量、奖项或历史资料。","must_preserve":["社区早餐店","老客到店","不虚构品牌数据"],"review_focus":["具体生活细节","人物与地点识别","避免口号堆砌"]},
+ {"id":"documentary_60","genre":"documentary","duration_ms":60000,"brief":"计划观察一位自行车维修师的一天，尚无真实采访和生平资料。","must_preserve":["无采访原文","经历待核实"],"review_focus":["采访问题与真实原话是否分离","证据来源","不虚构心理活动"]},
+ {"id":"chapter_600","genre":"drama","duration_ms":600000,"brief":"女儿修复祖母留下的旧收音机，三章，人物关系与道具状态连续，不增加生死反转。","must_preserve":["三章","旧收音机","无生死反转"],"review_focus":["跨章因果与线索","维修状态是否重置","最终落点是否回应开篇"]}
+]

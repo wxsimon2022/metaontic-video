@@ -228,3 +228,5 @@ Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.c
 冗余治理：tsconfig启用noUnusedLocals/noUnusedParameters；保留公共函数参数位置，明确未使用参数以_前缀标记。八角色统一从src/agents/<role>/index.ts加载，不增加roles重复包装。build.mjs从真实FLOW_CANVAS_AVAILABLE读构建常量并做语法折叠，隐藏画布界面与自动同步不进入成品，历史画布存储与native恢复接口仍保留。宣传页检查归sync-promo-address独立工具，release不导入。
 
 中国镜像包介绍：成品不含README.md时，npm会回退读取README.en.md，导致中文镜像显示英文。build将中文README写入package.json标准readme元数据，所有图片必须HTTPS绝对地址，文档相对链接转换仓库绝对链接；不得依赖npmmirror unpkg单文件权限。宿主meta.detail继续指向空plugin-detail.md，避免把仓库README重新塞进插件设置页。公开npm同版本成品不可覆盖，修改随下次明确发版生效。
+
+创作质量维护：新专业项目canonical_v1从场次/节拍/对白渲染正文；chapter_v1长片使用chapter_plan/chapter_submit保存连续性，不能把部分章当完成。isolated_v1终审通过independent_review真实文本请求，先确认文本费用，隔离聊天与自评，运行时摘要绑定报告；手工submit不能绕过。大型稿件分章完整审阅，成功报告按输入/模型/地址/提示词断点复用；失败或未知调用不擅自重放。六维艺术结论必须有场次证据，离线自动项不能冒充艺术通过。渠道能力按地址摘要隔离，成功样本不推断上限。新用例film-architecture.test.mjs，具体边界见creation-quality-architecture.md。

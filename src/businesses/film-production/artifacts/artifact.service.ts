@@ -1,3 +1,6 @@
+import { evaluateStory } from '../evaluation/story-evaluation.js';
+import { validateReviewProvenance } from '../reviews/review.provenance.js';
+import { normalizeScript } from '../scripts/script.document.js';
 import { validateTimeline } from '../validation/timeline.validator.js';
 export { validateTimeline } from '../validation/timeline.validator.js';
 import { validateContentEvidence } from '../validation/content.validator.js';
@@ -14,6 +17,14 @@ export const ROLES = ['director', 'creative', 'screenwriter', 'character', 'scen
 export function validateArtifact(stage: string, value: any, state: any) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('INVALID_ARTIFACT');
   const nonempty = (key: string) => { if (typeof value[key] !== 'string' || !value[key].trim()) throw Error(`MISSING_FIELD:${key}`); };
+  if(stage==='review') {
+    validateReviewProvenance(state,value);
+    if(state.review_policy==='isolated_v1'&&['PASS','PASS_WITH_WARNINGS'].includes(value.review_status)) {
+      const quality=evaluateStory(state.artifacts.script.data,value.story_assessment);
+      if(['NOT_EVALUATED','PARTIAL'].includes(quality.artistic_status))throw Error('STORY_QUALITY_NOT_EVALUATED');
+      for(const criterion of value.story_assessment.criteria)if(criterion.status==='CONCERN'&&!value.issues?.some(i=>i.issue_id===criterion.issue_id))throw Error('STORY_CONCERN_ISSUE_REQUIRED');
+    }
+  }
   validateV31(stage,value,state);
   validateReferences(stage,value,state);
   validateProfileArtifact(stage,value,state);
@@ -76,6 +87,7 @@ export function commitArtifact(state: any, stage: string, value: any, expected: 
     if (!state.artifacts[upstream] || state.artifacts[upstream].stale) throw Error('UPSTREAM_REQUIRED');
     if (['creative','script'].includes(upstream) && state.approvals[upstream] !== state.artifacts[upstream].revision) throw Error('APPROVAL_REQUIRED');
   }
+  value=normalizeScript(state,stage,value);
   validateArtifact(stage,value,state);
   const next = structuredClone(state);
   next.revision++;
