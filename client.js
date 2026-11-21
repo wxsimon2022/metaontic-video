@@ -1275,22 +1275,31 @@
         timer && window.clearTimeout(timer);
       }
     }
+    async function fetchMirrorRelease(version) {
+      let target = version || "latest";
+      if (version && !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) throw new Error("invalid stable version");
+      let data = await (await (fetchSource || fetchUpdateSource)(`https://registry.npmmirror.com/${PLUGIN_PACKAGE}/${target}`, 6e3)).json(), actual = String(data?.version || "");
+      if (data?.name !== PLUGIN_PACKAGE || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(actual) || version && actual !== version || data.stub || !data.dsh?.bundle?.patch || data.releaseNotes?.prerelease === !0) throw new Error("invalid mirror release");
+      let expected = `https://registry.npmmirror.com/${PLUGIN_PACKAGE}/-/${PLUGIN_PACKAGE}-${actual}.tgz`;
+      if (data.dist?.tarball !== expected || !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(data.dist?.integrity || "")) throw new Error("invalid mirror archive");
+      return { version: actual, url: expected };
+    }
     async function fetchRecentVersions() {
       let urls = [
         `${GITEE.api}/releases?per_page=100`,
         `${GITHUB.api}/releases?per_page=100`
-      ], results = await Promise.allSettled(urls.map(async (url) => {
+      ], results = await Promise.allSettled([fetchMirrorRelease().then((release) => [release.version]), ...urls.map(async (url) => {
         let body = await (await (fetchSource || fetchUpdateSource)(url, 6e3)).json();
         if (!Array.isArray(body)) throw new Error("invalid releases");
         return body.filter((r) => !r.draft && !r.prerelease).map((r) => String(r.tag_name || "").replace(/^v/, "")).filter((version) => /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version));
-      })), versions = [...new Set(results.flatMap((r) => r.status === "fulfilled" ? r.value : []))].sort((a, b) => isNewerVersion(a, b) ? -1 : isNewerVersion(b, a) ? 1 : 0).slice(0, 3);
+      })]), versions = [...new Set(results.flatMap((r) => r.status === "fulfilled" ? r.value : []))].sort((a, b) => isNewerVersion(a, b) ? -1 : isNewerVersion(b, a) ? 1 : 0).slice(0, 3);
       if (!versions.length) throw new Error("no published stable releases available");
       return versions;
     }
     async function fetchLatestVersion() {
       return (await fetchRecentVersions())[0];
     }
-    return { PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, fetchRecentVersions, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell };
+    return { PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, fetchRecentVersions, fetchMirrorRelease, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell };
   }
   function createUpdateActions(context) {
     function readUpdateCache() {
@@ -1375,7 +1384,13 @@
         context.setUpdateStatus("failed"), context.setUpdateMessage(context.t("versionCheckFirst"));
         return;
       }
+      let mirror = null;
+      try {
+        mirror = await context.fetchMirrorRelease?.(context.updateLatest);
+      } catch {
+      }
       let candidates = [
+        ...mirror ? [mirror.url] : [],
         releaseDownloadUrl(context.updateLatest, "gitee"),
         releaseDownloadUrl(context.updateLatest, "github")
       ], specUnresolvable = (text) => /Could not resolve|No matching version|ERR_PNPM_NO_MATCHING_VERSION|ERR_PNPM_FETCH_40[34]|HTTP[ :]+40[34]|404 Not Found|403 Forbidden/i.test(text), trySpec = async (spec) => {
@@ -1398,7 +1413,7 @@
             context.setUpdateMessage(context.t("versionUpdateRetry", { attempt: round + 1, total: context.UPDATE_ATTEMPTS })), await new Promise((resolve) => window.setTimeout(resolve, round * 1200));
             continue;
           }
-          return { failure: text, next: !transient && specUnresolvable(text) };
+          return { failure: text, next: mirror?.url === spec && transient || !transient && specUnresolvable(text) };
         }
         return { failure: "unknown" };
       }, outcome = null, failure = "";
@@ -1747,6 +1762,14 @@ DeepSeek Harness（DSH）AI 视频生成插件 MetaOnticVideo：**新手快速�
 
 图片与视频按接入渠道用量计费，生成前需确认费用。
 
+## 中国镜像源安装
+
+在 Harness「插件 → 添加插件」中选择中国镜像源，输入包名并安装：
+
+\`\`\`text
+dsh-metaontic-video
+\`\`\`
+
 ## 在线安装
 
 在 Harness「插件 → 添加插件」中粘贴链接，Windows 与 macOS 使用同一个安装包。
@@ -1793,6 +1816,7 @@ https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaonti
       UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2,
       UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2,
       fetchLatestVersion,
+      fetchMirrorRelease,
       SELECTS,
       inputStyle,
       optionLabel,
@@ -1820,6 +1844,7 @@ https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaonti
             return "";
           }
         }), { readUpdateCache, checkForUpdate, runOnlineUpdate, deferUpdate } = createUpdateActions({
+          fetchMirrorRelease,
           get UPDATE_CACHE_KEY() {
             return UPDATE_CACHE_KEY2;
           },
@@ -2869,7 +2894,7 @@ https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaonti
 
   // src/businesses/video-generation/client.ts
   function createVideoClient(require2) {
-    let React = require2("react"), h = React.createElement, { TOKENS, inputStyle, PAGE_CSS } = createTheme(), { MediaPreview } = createMediaPreview({ React, h }), { videoExecutionSource: videoExecutionSource2, VideoTaskProgress, VideoProgressDock } = createVideoProgress({ React, h, TOKENS }), { ToolResultView } = createToolResultView({ h, MediaPreview, VideoTaskProgress }), { PLUGIN_OWNED_KEYS, SELECTS, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, NS, NAMESPACE } = createClientConfig(), { zh, en } = createDictionaries(), { useSnapshot, same, validateSettings, persistConnection, persistBatch } = createSettingsState({ React }), { PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, fetchRecentVersions, PLUGIN_PACKAGE: PLUGIN_PACKAGE2, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell } = createUpdates({ h }), { makePage } = createSettingsPage({ useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS, persistBatch, PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, SELECTS, inputStyle, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE: PLUGIN_PACKAGE2, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell, PAGE_CSS });
+    let React = require2("react"), h = React.createElement, { TOKENS, inputStyle, PAGE_CSS } = createTheme(), { MediaPreview } = createMediaPreview({ React, h }), { videoExecutionSource: videoExecutionSource2, VideoTaskProgress, VideoProgressDock } = createVideoProgress({ React, h, TOKENS }), { ToolResultView } = createToolResultView({ h, MediaPreview, VideoTaskProgress }), { PLUGIN_OWNED_KEYS, SELECTS, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, NS, NAMESPACE } = createClientConfig(), { zh, en } = createDictionaries(), { useSnapshot, same, validateSettings, persistConnection, persistBatch } = createSettingsState({ React }), { PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, fetchRecentVersions, fetchMirrorRelease, PLUGIN_PACKAGE: PLUGIN_PACKAGE2, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell } = createUpdates({ h }), { makePage } = createSettingsPage({ useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS, persistBatch, PLUGIN_VERSION, UPDATE_CACHE_KEY: UPDATE_CACHE_KEY2, UPDATE_MAX_AGE_MS: UPDATE_MAX_AGE_MS2, fetchLatestVersion, fetchMirrorRelease, SELECTS, inputStyle, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE: PLUGIN_PACKAGE2, UPDATE_SPEC: UPDATE_SPEC2, UPDATE_ATTEMPTS: UPDATE_ATTEMPTS2, isNewerVersion, updateBell, PAGE_CSS });
     return {
       inject: ["slots", "locale", "configForms", "uiSession"],
       apply(ctx, { settings }) {

@@ -10,7 +10,7 @@ export function createSettingsPage(deps: any) {
   const {
     useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS,
     persistBatch, PLUGIN_VERSION,
-    UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, SELECTS, inputStyle, optionLabel,
+    UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, fetchMirrorRelease, SELECTS, inputStyle, optionLabel,
     FIELD_BY_KEY, SECTIONS, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS,
     isNewerVersion, updateBell, PAGE_CSS,
   } = deps;
@@ -50,6 +50,7 @@ function makePage({ form, t, manager }) {
         });
 
         const { readUpdateCache, checkForUpdate, runOnlineUpdate, deferUpdate } = createUpdateActions({
+          fetchMirrorRelease,
           get UPDATE_CACHE_KEY() { return UPDATE_CACHE_KEY; },
           get PLUGIN_VERSION() { return PLUGIN_VERSION; },
           get isNewerVersion() { return isNewerVersion; },
