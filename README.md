@@ -2,7 +2,7 @@
 
 [English](./README.en.md)
 
-MetaOnticVideo 是 DeepSeek Harness（DSH）的 AI视频创作插件：**新手通过对话快速创作，以分段续拍和本地合并低成本制作长视频。**
+MetaOnticVideo 是 DeepSeek Harness（DSH）的 AI视频创作插件：**帮助新手快速上手 AI 短视频创作，并通过分段续拍和本地合并，低成本制作长视频。**
 
 ## 能做什么
 

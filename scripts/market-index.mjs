@@ -23,6 +23,10 @@ const REPOSITORY = 'https://gitee.com/hackloop/metaontic-video.git';
 const HOMEPAGE = 'https://ai.mybfs.cn';
 const MAX_VERSIONS = 5;
 const NPM_REGISTRY = 'https://registry.npmjs.org/';
+const MARKET_DESCRIPTION = {
+  en: 'An AI video creation plugin for DeepSeek Harness. Helps beginners get started with short videos and offers a lower-cost long-video workflow through segment continuation, resumable progress, and local merging.',
+  zh: '帮助新手快速上手 AI 短视频创作，支持分段续拍、断点续做与本地合并，提供低成本长视频生成方案。',
+};
 
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const withdrawn = new Set(JSON.parse(readFileSync(join(root, 'docs/engineering/withdrawn-releases.json'), 'utf8')));
@@ -74,7 +78,10 @@ for (const tag of tags) {
 const index = {
   format: 1,
   title: { en: 'MetaOntic Video', zh: 'MetaOntic 视频' },
-  description: { en: 'DSH video creation bundles published by MetaOntic.', zh: 'MetaOntic 发布的 DSH 视频创作组合包。' },
+  description: {
+    en: 'For beginners creating AI short videos and creators seeking a lower-cost way to make longer videos with DeepSeek Harness.',
+    zh: '面向 AI 短视频新手与需要低成本长视频方案的 DeepSeek Harness 创作者。',
+  },
   metadata: {
     categories: { video: { title: { en: 'Video', zh: '视频创作' } } },
     labels: {
@@ -88,8 +95,8 @@ const index = {
       name: pkg.name,
       title: { en: 'dsh-metaontic-video', zh: 'dsh-metaontic-video' },
       description: {
-        en: pkg.description,
-        zh: pkg.description,
+        en: MARKET_DESCRIPTION.en,
+        zh: MARKET_DESCRIPTION.zh,
       },
       icon: `data:image/svg+xml;base64,${readFileSync(join(root, 'icon.svg')).toString('base64')}`,
       author: 'MetaOntic',

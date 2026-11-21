@@ -16,7 +16,7 @@ export const locale: PluginLocale = {
   meta: {
     title: 'MetaOnticVideo',
     detail: 'plugin-detail.md',
-    description: 'DeepSeek Harness AI视频创作插件：新手用对话完善创意、审核脚本并制作视频；通过分段续拍、断点续做与本地合并，低成本制作长视频。模型调用单独计费。',
+    description: '帮助新手快速上手 AI 短视频创作，支持分段续拍、断点续做与本地合并，提供低成本长视频生成方案。',
   },
 };
 

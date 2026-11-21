@@ -2,7 +2,7 @@
 
 [简体中文](./README.md)
 
-MetaOnticVideo is a DeepSeek Harness (DSH) AI video generation plugin for **beginner-friendly creation through chat and a low-cost long-video workflow with segment continuation and local merging**.
+MetaOnticVideo is a DeepSeek Harness (DSH) AI video generation plugin that **helps beginners get started with AI short videos and offers a lower-cost long-video workflow through segment continuation and local merging**.
 
 ## What it does
 
