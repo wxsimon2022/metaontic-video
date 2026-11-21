@@ -1,6 +1,6 @@
 <img src="https://ai.mybfs.cn/promo/share-logo.png" width="160" alt="MetaOnticVideo · DeepSeek Harness AI video creation plugin" />
 
-# dsh-metaontic-video · DeepSeek Harness AI Video Plugin
+# dsh-metaontic-video · DeepSeek Harness AI Video Creation Plugin
 
 [简体中文](./README.md)
 

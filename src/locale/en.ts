@@ -5,7 +5,7 @@ export const locale: PluginLocale = {
   meta: {
     title: 'MetaOnticVideo',
     detail: 'plugin-detail.md',
-    description: 'Get started with video creation quickly, even as a beginner: describe an idea and follow the guided script-to-video workflow. Create longer videos with a low-cost segment continuation and local merging workflow.',
+    description: 'An AI video creation plugin for DeepSeek Harness: beginners develop ideas, review scripts and create videos through chat. Build longer videos with a low-cost segment continuation, resume and local merging workflow. Model calls are billed separately.',
   },
 };
 

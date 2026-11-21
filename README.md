@@ -1,10 +1,10 @@
 <img src="https://ai.mybfs.cn/promo/share-logo.png" width="160" alt="MetaOnticVideo · DeepSeek Harness AI 视频创作插件" />
 
-# dsh-metaontic-video · DeepSeek Harness AI 视频插件
+# dsh-metaontic-video · DeepSeek Harness AI视频创作插件
 
 [English](./README.en.md)
 
-MetaOnticVideo 是 DeepSeek Harness（DSH）的 AI 视频生成插件：**新手通过对话快速创作，以分段续拍和本地合并低成本制作长视频。**
+MetaOnticVideo 是 DeepSeek Harness（DSH）的 AI视频创作插件：**新手通过对话快速创作，以分段续拍和本地合并低成本制作长视频。**
 
 ## 能做什么
 
