@@ -129,6 +129,7 @@
                   tailChars: 2048
     - id: preset-promo-video
       name: 'dsh-metaontic-video/presets/promo-video'
+      disabled: true
       config:
         id: promo-video
         name: 宣传视频助手
