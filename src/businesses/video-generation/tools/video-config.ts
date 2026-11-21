@@ -9,7 +9,7 @@ import { RELAY } from '../../../shared/constants/plugin.js';
 
 /** 用户可在插件内改的配置字段。 */
 export const CONFIG_FIELDS = [
-  'canvasEnabled', 'autoCreateCanvas', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel', 'textModel', 'imageUseVideoKey', 'imageApiKey', 'textApiKey',
+  'sidebarAssistantEnabled', 'canvasEnabled', 'autoCreateCanvas', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel', 'textModel', 'imageUseVideoKey', 'imageApiKey', 'textApiKey',
   'duration', 'singleMaxSeconds', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'pollErrorRetries',
@@ -38,6 +38,7 @@ export function configView(config) {
   return {
     stored: maskSecrets(stored),
     effective: {
+      sidebarAssistantEnabled: ref(config, 'sidebarAssistantEnabled', true) !== false,
       canvasEnabled: FLOW_CANVAS_AVAILABLE && ref(config, 'canvasEnabled', false) === true,
       autoCreateCanvas: FLOW_CANVAS_AVAILABLE && ref(config, 'canvasEnabled', false) === true && ref(config, 'autoCreateCanvas', true) === true,
       connectionMode: isVolcengine(config) ? 'volcengine' : 'metaontic',

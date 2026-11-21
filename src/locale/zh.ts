@@ -16,7 +16,7 @@ export const locale: PluginLocale = {
   meta: {
     title: 'MetaOnticVideo',
     detail: 'plugin-detail.md',
-    description: '让新手快速上手视频创作：说出想法，助手带你完善创意、写脚本并确认制作；通过分段续拍与本机合并，提供低成本长视频生成方案。',
+    description: '新手用对话完成创意、脚本审核与视频制作；长视频通过分段续拍和本地合并完成，生成前确认费用。',
   },
 };
 

@@ -26,6 +26,8 @@ const TOKENS = {
       .mov-page { display: flex; flex-direction: column; gap: 16px; padding: 0; color: ${TOKENS.text}; }
       /* 分组卡片：16 个字段摊在一格里太糊，按用途各装一张卡 */
       .mov-section { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
+      .mov-interface .mov-grid { grid-template-columns: minmax(0, 1fr); }
+      .mov-model-card { background: ${TOKENS.cardFill}; }
       .mov-advanced { display: block; }
       .mov-advanced-toggle { cursor: pointer; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       .mov-advanced-toggle .mov-hint { display: block; margin: 5px 0 0 16px; font-weight: 400; }
@@ -39,7 +41,6 @@ const TOKENS = {
       .mov-advanced-tools .mov-grid { grid-template-columns: minmax(0, 1fr); }
       .mov-advanced-tools .mov-label { min-height: 0; }
       .mov-advanced-group[data-group="advancedPicture"] .mov-grid { grid-template-columns: minmax(0, 1fr); }
-      .mov-advanced-group[data-group="advancedPicture"] .mov-switch { justify-content: space-between; flex-direction: row-reverse; }
 
       @container (max-width: 480px) { .mov-advanced-body .mov-grid { grid-template-columns: minmax(0, 1fr); } .mov-advanced-group .mov-label { min-height: 0; } }
       .mov-advanced { container-type: inline-size; }
@@ -48,8 +49,8 @@ const TOKENS = {
       .mov-section-title::before { content: ""; flex: 0 0 auto; width: 3px; height: 13px; border-radius: 2px; background: ${TOKENS.primaryFill}; }
       .mov-section-title::after { content: ""; flex: 1 1 auto; height: 1px; background: ${TOKENS.border}; }
       /* 两列自适应：单列至少 240px，窄面板自动落成一列 */
-      .mov-parameter-group { container-type: inline-size; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-      .mov-parameter-group + .mov-parameter-group { border-top: 1px solid ${TOKENS.border}; padding-top: 16px; }
+      .mov-parameter-group { container-type: inline-size; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+      .mov-parameter-group + .mov-parameter-group { border-top: 1px solid ${TOKENS.border}; padding-top: 12px; }
       .mov-parameter-heading { font-size: 12px; font-weight: 600; color: ${TOKENS.muted}; }
       .mov-parameter-group .mov-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
       @container (max-width: 480px) { .mov-parameter-group .mov-grid { grid-template-columns: minmax(0, 1fr); } }
@@ -66,15 +67,15 @@ const TOKENS = {
       .mov-av-card { display: flex; flex-direction: column; min-width: 0; padding: 12px; gap: 8px; border: 1px solid ${TOKENS.border}; border-radius: 10px; background: ${TOKENS.cardFill}; }
       .mov-av-card > .mov-label { margin-bottom: -2px; }
       .mov-av-card .mov-hint { margin-top: auto; }
-      .mov-av-audio .mov-switch { justify-content: space-between; gap: 12px; padding: 0; border: 0; background: transparent; }
-      .mov-av-audio .mov-switch span { order: 0; }
-      .mov-av-audio .mov-switch input { appearance: none; order: 1; flex: 0 0 34px; width: 34px; height: 20px; margin: 0; border: 1px solid ${TOKENS.border}; border-radius: 999px; background: ${TOKENS.border}; position: relative; transition: background .15s; }
-      .mov-av-audio .mov-switch input::after { content: ''; position: absolute; width: 14px; height: 14px; left: 2px; top: 2px; border-radius: 50%; background: white; transition: transform .15s; }
-      .mov-av-audio .mov-switch input:checked { background: ${TOKENS.primaryFill}; border-color: ${TOKENS.primaryFill}; }
-      .mov-av-audio .mov-switch input:checked::after { transform: translateX(14px); }
-      .mov-av-audio .mov-switch input:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 3px; }
+      .mov-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 0; border: 0; background: transparent; font-size: 13px; color: ${TOKENS.text}; cursor: pointer; }
+      .mov-switch span { order: 0; }
+      .mov-switch input { appearance: none; cursor: pointer; order: 1; flex: 0 0 36px; width: 36px; height: 20px; box-sizing: border-box; padding: 2px; margin: 0; border: 0; border-radius: 999px; background: var(--dsw-alias-border-l3, #8884); position: relative; }
+      .mov-switch input::after { content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px; border-radius: 50%; background: var(--dsw-alias-switch-thumb, #fff); transition: transform .12s ease; }
+      .mov-switch input:checked { background: var(--dsw-alias-brand-primary, #247bbf); }
+      .mov-switch input:checked::after { transform: translateX(16px); background: var(--dsw-alias-label-primary-foreground, #fff); }
+      .mov-switch input:focus-visible { outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary, #247bbf)); outline-offset: 2px; }
       @container (max-width: 480px) { .mov-av-grid { grid-template-columns: minmax(0, 1fr); } }
-      @media (prefers-reduced-motion: reduce) { .mov-av-audio .mov-switch input, .mov-av-audio .mov-switch input::after { transition: none; } }
+      @media (prefers-reduced-motion: reduce) { .mov-switch input, .mov-switch input::after { transition: none; } }
 
       /* 开关没有标签行，靠底对齐才能跟旁边输入框的控制线齐平 */
       .mov-field-switch { justify-content: flex-end; }
@@ -90,10 +91,6 @@ const TOKENS = {
       .mov-input:focus, .mov-input:focus-visible { outline: none; border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 3px rgba(36, 123, 191, .18); }
       /* 模型 ID 与可执行文件路径很长：等宽字体 + 省略，不把整行撑变形 */
       .mov-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
-      /* 开关做成跟输入框同高的小方块，和周围控件一条线 */
-      .mov-switch { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 36px; box-sizing: border-box; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.controlFill}; font-size: 13px; color: ${TOKENS.text}; cursor: pointer; }
-      .mov-switch:hover { border-color: ${TOKENS.primaryFill}; }
-      .mov-switch input { width: 15px; height: 15px; accent-color: ${TOKENS.primaryFill}; cursor: pointer; }
       .mov-card { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
       .mov-current-version { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 120px; }
       .mov-update-bell { display: inline-flex; flex: 0 0 auto; color: ${TOKENS.primaryFill}; transform-origin: 50% 10%; animation: mov-bell-swing 1.6s ease-in-out infinite; }

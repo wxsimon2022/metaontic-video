@@ -226,3 +226,5 @@ Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.c
 专业创作断点：先查真实session与project.json，区分user abort和接口失败。创意/剧本只由film_project approve弹窗，不能先通用问卷再审批；同版本已批准的重复approve直接返回下一任务，不重复弹窗，旧expectedRevision仍拒绝。read/approve返回continuation提示继续尚未保存的剧本，不能将规划文字当剧本已交付。
 
 冗余治理：tsconfig启用noUnusedLocals/noUnusedParameters；保留公共函数参数位置，明确未使用参数以_前缀标记。八角色统一从src/agents/<role>/index.ts加载，不增加roles重复包装。build.mjs从真实FLOW_CANVAS_AVAILABLE读构建常量并做语法折叠，隐藏画布界面与自动同步不进入成品，历史画布存储与native恢复接口仍保留。宣传页检查归sync-promo-address独立工具，release不导入。
+
+中国镜像包介绍：成品不含README.md时，npm会回退读取README.en.md，导致中文镜像显示英文。build将中文README写入package.json标准readme元数据，所有图片必须HTTPS绝对地址，文档相对链接转换仓库绝对链接；不得依赖npmmirror unpkg单文件权限。宿主meta.detail继续指向空plugin-detail.md，避免把仓库README重新塞进插件设置页。公开npm同版本成品不可覆盖，修改随下次明确发版生效。

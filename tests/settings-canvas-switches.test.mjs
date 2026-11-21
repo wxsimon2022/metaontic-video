@@ -56,3 +56,13 @@ test('设置页隐藏全部画布开关，旧的开启配置也不重新显示',
   form.set('canvasEnabled', false);
   assert.ok(!hasAutoCreateSwitch(render()), '再关掉总开关又隐藏');
 });
+
+test('设置页独立展示界面开关，位于生成参数之后且默认勾选',async()=>{
+ const {render}=await bootSettings({});
+ const html=render();
+ assert.ok(html.includes('显示左侧视频创作助手'));
+ assert.ok(html.indexOf('生成参数')<html.indexOf('界面显示'));
+ assert.match(html,/id="metaontic-video-sidebarAssistantEnabled"[^>]*checked=""/);
+ const disabled=await bootSettings({sidebarAssistantEnabled:false});
+ assert.doesNotMatch(disabled.render(),/id="metaontic-video-sidebarAssistantEnabled"[^>]*checked=""/);
+});

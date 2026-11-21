@@ -1,4 +1,4 @@
-<img src="./logo.svg" width="160" alt="MetaOnticVideo" />
+<img src="https://video.mybfs.cn/promo/share-logo.png" width="160" alt="MetaOnticVideo" />
 
 # dsh-metaontic-video · AI Video Creation Plugin
 

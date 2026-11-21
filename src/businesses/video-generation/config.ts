@@ -7,6 +7,7 @@ export { DATA_DIR, DEFAULT_OUTPUT_DIR } from '../../shared/constants/plugin.js';
 import z from '@deepseek-ai/schemastery';
 
 export const videoConfigFields = {
+  sidebarAssistantEnabled: z.boolean().default(true).description('显示左侧视频创作助手入口（默认开启）；仅控制侧栏与对应面板，不改变会话助手或已有任务。').volatile(),
   // 画布总开关：默认关闭，打开后左侧栏才出现画布入口，画布组件才可用。
   canvasEnabled: z.boolean().default(false).description('流程画布（默认关闭）：打开后左侧栏出现「MetaOnticVideo流程画布」入口，可用独立画布页创作；关闭时左侧栏隐藏入口，已有画布与成果保留在插件数据目录。').volatile(),
   // 自动建图：只在流程画布打开后生效，默认开启，跟着创作自动建图并回填成果。

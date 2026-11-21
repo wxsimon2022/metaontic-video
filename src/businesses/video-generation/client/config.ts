@@ -37,10 +37,12 @@ export function createClientConfig() {
     const SECTIONS = [
       { key: 'sectionConnection', fields: ['connectionMode'] },
       { key: 'sectionModels', fields: ['imageUseVideoKey', 'model', 'metaonticApiKey', 'volcengineApiKey', 'imageModel', 'imageApiKey', 'textModel', 'textApiKey'] },
+      { key: 'sectionInterface', fields: ['sidebarAssistantEnabled'] },
       { key: 'sectionVideo', fields: ['ratio', 'generateAudio'] },
       ...(FLOW_CANVAS_AVAILABLE ? [{ key: 'sectionCanvas', fields: ['canvasEnabled', 'autoCreateCanvas'] }] : []),
     ];
     const FIELDS = [
+      { key: 'sidebarAssistantEnabled', kind: 'switch', wide: true },
       { key: 'connectionMode', kind: 'select', wide: true },
       { key: 'metaonticApiKey', kind: 'text', secret: true, wide: true },
       { key: 'volcengineApiKey', kind: 'text', secret: true, wide: true },
@@ -70,7 +72,7 @@ export function createClientConfig() {
 
     /** 插件自己会写进配置的项：重置时兜底一起清，免得宿主没把它们列进 user。 */
     const PLUGIN_OWNED_KEYS = [
-      'canvasEnabled', 'autoCreateCanvas', 'usageStatsEnabled', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'entryId', 'baseUrl',
+      'sidebarAssistantEnabled', 'canvasEnabled', 'autoCreateCanvas', 'usageStatsEnabled', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'entryId', 'baseUrl',
       'submitPath', 'queryPath', 'imageUseVideoKey', 'imageApiKey', 'imageModel', 'textModel', 'textApiKey', 'model',
       'estimateGroupRatio', 'duration', 'singleMaxSeconds', 'seamTrimSeconds', 'mergeMode', 'bgmFadeSeconds',
       'outputDir', 'keepSegments', 'resumeLockStaleMinutes', 'ffmpegBinary', 'ffprobeBinary', 'mode',

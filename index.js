@@ -16,7 +16,7 @@ var __export = (target, all) => {
 // src/shared/constants/version.ts
 var PLUGIN_VERSION, init_version = __esm({
   "src/shared/constants/version.ts"() {
-    PLUGIN_VERSION = "4.0.10".trim().replace(/^v/i, "");
+    PLUGIN_VERSION = "4.0.11".trim().replace(/^v/i, "");
   }
 });
 
@@ -840,6 +840,7 @@ var videoConfigFields, DEFAULT_MODEL, MAX_SEGMENTS, MIN_SECONDS, MIN_SEGMENT_SEC
     init_plugin();
     init_lib2();
     videoConfigFields = {
+      sidebarAssistantEnabled: Schema.boolean().default(!0).description("显示左侧视频创作助手入口（默认开启）；仅控制侧栏与对应面板，不改变会话助手或已有任务。").volatile(),
       // 画布总开关：默认关闭，打开后左侧栏才出现画布入口，画布组件才可用。
       canvasEnabled: Schema.boolean().default(!1).description("流程画布（默认关闭）：打开后左侧栏出现「MetaOnticVideo流程画布」入口，可用独立画布页创作；关闭时左侧栏隐藏入口，已有画布与成果保留在插件数据目录。").volatile(),
       // 自动建图：只在流程画布打开后生效，默认开启，跟着创作自动建图并回填成果。
@@ -9990,6 +9991,7 @@ init_config();
 init_connection();
 init_plugin();
 var CONFIG_FIELDS = [
+  "sidebarAssistantEnabled",
   "canvasEnabled",
   "autoCreateCanvas",
   "connectionMode",
@@ -10036,6 +10038,7 @@ function configView(config) {
   return {
     stored: maskSecrets(stored),
     effective: {
+      sidebarAssistantEnabled: ref(config, "sidebarAssistantEnabled", !0) !== !1,
       canvasEnabled: FLOW_CANVAS_AVAILABLE && ref(config, "canvasEnabled", !1) === !0,
       autoCreateCanvas: FLOW_CANVAS_AVAILABLE && ref(config, "canvasEnabled", !1) === !0 && ref(config, "autoCreateCanvas", !0) === !0,
       connectionMode: isVolcengine(config) ? "volcengine" : "metaontic",

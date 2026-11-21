@@ -1,5 +1,6 @@
 /** Portable build entry: no POSIX command substitution or shell quoting. */
 import { build } from 'esbuild';
+import { packageDescription } from './package-description.mjs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 const version = JSON.parse(await readFile('package.json', 'utf8')).version;
 const target = process.argv[2] || 'all';
@@ -9,6 +10,14 @@ if (!canvas) throw Error('Missing literal canvas feature flag');
 const defines = { __PLUGIN_VERSION__: JSON.stringify(version), __FLOW_CANVAS_AVAILABLE__: canvas[1] };
 
 if (!['all','locale','host','client'].includes(target)) throw Error('Unknown build target');
+// 成品裁掉README.md后，npm不得回退读取英文README；介绍写入标准元数据。
+const packageFile = JSON.parse(await readFile('package.json','utf8'));
+const readme = packageDescription(await readFile('README.md','utf8'));
+if(packageFile.readme !== readme) {
+  packageFile.readme = readme;
+  await writeFile('package.json', JSON.stringify(packageFile,null,2)+'\n');
+}
+
 if (target === 'all' || target === 'locale') {
   await mkdir('locale', { recursive: true });
   for (const lang of ['zh','en']) {

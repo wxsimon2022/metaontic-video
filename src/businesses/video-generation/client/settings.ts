@@ -136,6 +136,7 @@ function makePage({ form, t, manager }) {
 
         // 少数需要解释的字段：模型选哪个（mini 便宜 / fast 贵一些）
         const hints = {
+          sidebarAssistantEnabled: t('sidebarAssistantEnabledHint'),
           connectionMode: selectedMode === 'metaontic'
             ? [t('connectionMetaonticHint'), ' ', h('a', { key: 'metaontic-register', href: RELAY.signupUrl, target: '_blank', rel: 'noopener noreferrer', style: { textDecoration: 'underline' } }, t('connectionMetaonticRegister'))]
               : directMode && !VOLCENGINE_MODE_AVAILABLE ? t('connectionVolcengineUnavailable') : t('connectionModeHint'),
@@ -237,7 +238,7 @@ function makePage({ form, t, manager }) {
         const settingsRows = () => [
           h('div', { key: 'generation', className: 'mov-section' }, [
             h('div', { key: 'title', className: 'mov-section-title' }, t('sectionGeneration')),
-            ...SECTIONS.map(section =>
+            ...SECTIONS.filter(section => !['sectionInterface', 'sectionVideo'].includes(section.key)).map(section =>
               h('div', { key: section.key, className: 'mov-parameter-group' }, [
                 h('div', { key: 'heading', className: 'mov-parameter-heading' }, t(section.key)),
                 renderGrid(section),
@@ -249,6 +250,10 @@ function makePage({ form, t, manager }) {
               h('span', { key: 'hint', className: 'mov-hint' }, t('sectionCombinedHint')),
             ]),
             h('div', { key: 'body', className: 'mov-advanced-body' }, [
+              h('div', { key: 'sectionVideo', className: 'mov-advanced-group', 'data-group': 'sectionVideo' }, [
+                h('div', { key: 'title', className: 'mov-parameter-heading' }, t('sectionVideo')),
+                renderGrid(SECTIONS.find(section => section.key === 'sectionVideo')),
+              ]),
               ...[
                 { key: 'advancedPicture', fields: ['watermark'] },
                 { key: 'advancedMerge', fields: ['mergeMode', 'seamTrimSeconds'], hint: 'segmentsRetained' },
@@ -261,6 +266,10 @@ function makePage({ form, t, manager }) {
                 group.hint ? h('p', { key: 'hint', className: 'mov-hint', style: { margin: 0 } }, t(group.hint)) : null,
               ])),
             ]),
+          ]),
+          h('div', { key: 'interface', className: 'mov-section mov-interface', 'data-group': 'interface' }, [
+            h('div', { key: 'title', className: 'mov-section-title' }, t('sectionInterface')),
+            renderGrid(SECTIONS.find(section => section.key === 'sectionInterface')),
           ]),
         ];
 

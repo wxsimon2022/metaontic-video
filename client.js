@@ -37,6 +37,57 @@
     };
   }
 
+  // src/ui/components/configured-entries.ts
+  function followConfiguredEntries(form, key, registrations, defaultEnabled = !0) {
+    let active = !1, disposed = !1, known = defaultEnabled, cleanups = [], close = () => {
+      let pending = cleanups;
+      cleanups = [], active = !1;
+      for (let off of pending.reverse())
+        try {
+          off();
+        } catch {
+        }
+    }, sync = () => {
+      if (!disposed) {
+        try {
+          let value = form?.getSnapshot?.()?.value?.[key];
+          known = value === void 0 ? defaultEnabled : value === !0;
+        } catch {
+          return;
+        }
+        if (known !== active) {
+          if (!known) {
+            close();
+            return;
+          }
+          try {
+            for (let register of registrations) {
+              let off = register();
+              typeof off == "function" && cleanups.push(off);
+            }
+            active = !0;
+          } catch (error) {
+            throw close(), error;
+          }
+        }
+      }
+    };
+    sync();
+    let unsubscribe;
+    try {
+      unsubscribe = form?.subscribe?.(sync);
+    } catch {
+    }
+    return () => {
+      disposed = !0;
+      try {
+        typeof unsubscribe == "function" && unsubscribe();
+      } finally {
+        close();
+      }
+    };
+  }
+
   // src/shared/constants/plugin.ts
   var PLUGIN_ID = "metaontic-video", PLUGIN_PACKAGE = "dsh-metaontic-video", PLUGIN_NAMESPACE = PLUGIN_ID;
   var PANEL_ID = PLUGIN_ID, FLOW_CANVAS_AVAILABLE = !1, CANVAS_PANEL_ID = `${PLUGIN_ID}-canvas`, GUIDE_URL = "https://ai.mybfs.cn";
@@ -344,6 +395,8 @@
       .mov-page { display: flex; flex-direction: column; gap: 16px; padding: 0; color: ${TOKENS.text}; }
       /* 分组卡片：16 个字段摊在一格里太糊，按用途各装一张卡 */
       .mov-section { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
+      .mov-interface .mov-grid { grid-template-columns: minmax(0, 1fr); }
+      .mov-model-card { background: ${TOKENS.cardFill}; }
       .mov-advanced { display: block; }
       .mov-advanced-toggle { cursor: pointer; font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       .mov-advanced-toggle .mov-hint { display: block; margin: 5px 0 0 16px; font-weight: 400; }
@@ -357,7 +410,6 @@
       .mov-advanced-tools .mov-grid { grid-template-columns: minmax(0, 1fr); }
       .mov-advanced-tools .mov-label { min-height: 0; }
       .mov-advanced-group[data-group="advancedPicture"] .mov-grid { grid-template-columns: minmax(0, 1fr); }
-      .mov-advanced-group[data-group="advancedPicture"] .mov-switch { justify-content: space-between; flex-direction: row-reverse; }
 
       @container (max-width: 480px) { .mov-advanced-body .mov-grid { grid-template-columns: minmax(0, 1fr); } .mov-advanced-group .mov-label { min-height: 0; } }
       .mov-advanced { container-type: inline-size; }
@@ -366,8 +418,8 @@
       .mov-section-title::before { content: ""; flex: 0 0 auto; width: 3px; height: 13px; border-radius: 2px; background: ${TOKENS.primaryFill}; }
       .mov-section-title::after { content: ""; flex: 1 1 auto; height: 1px; background: ${TOKENS.border}; }
       /* 两列自适应：单列至少 240px，窄面板自动落成一列 */
-      .mov-parameter-group { container-type: inline-size; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-      .mov-parameter-group + .mov-parameter-group { border-top: 1px solid ${TOKENS.border}; padding-top: 16px; }
+      .mov-parameter-group { container-type: inline-size; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+      .mov-parameter-group + .mov-parameter-group { border-top: 1px solid ${TOKENS.border}; padding-top: 12px; }
       .mov-parameter-heading { font-size: 12px; font-weight: 600; color: ${TOKENS.muted}; }
       .mov-parameter-group .mov-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
       @container (max-width: 480px) { .mov-parameter-group .mov-grid { grid-template-columns: minmax(0, 1fr); } }
@@ -384,15 +436,15 @@
       .mov-av-card { display: flex; flex-direction: column; min-width: 0; padding: 12px; gap: 8px; border: 1px solid ${TOKENS.border}; border-radius: 10px; background: ${TOKENS.cardFill}; }
       .mov-av-card > .mov-label { margin-bottom: -2px; }
       .mov-av-card .mov-hint { margin-top: auto; }
-      .mov-av-audio .mov-switch { justify-content: space-between; gap: 12px; padding: 0; border: 0; background: transparent; }
-      .mov-av-audio .mov-switch span { order: 0; }
-      .mov-av-audio .mov-switch input { appearance: none; order: 1; flex: 0 0 34px; width: 34px; height: 20px; margin: 0; border: 1px solid ${TOKENS.border}; border-radius: 999px; background: ${TOKENS.border}; position: relative; transition: background .15s; }
-      .mov-av-audio .mov-switch input::after { content: ''; position: absolute; width: 14px; height: 14px; left: 2px; top: 2px; border-radius: 50%; background: white; transition: transform .15s; }
-      .mov-av-audio .mov-switch input:checked { background: ${TOKENS.primaryFill}; border-color: ${TOKENS.primaryFill}; }
-      .mov-av-audio .mov-switch input:checked::after { transform: translateX(14px); }
-      .mov-av-audio .mov-switch input:focus-visible { outline: 2px solid ${TOKENS.primaryFill}; outline-offset: 3px; }
+      .mov-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 0; border: 0; background: transparent; font-size: 13px; color: ${TOKENS.text}; cursor: pointer; }
+      .mov-switch span { order: 0; }
+      .mov-switch input { appearance: none; cursor: pointer; order: 1; flex: 0 0 36px; width: 36px; height: 20px; box-sizing: border-box; padding: 2px; margin: 0; border: 0; border-radius: 999px; background: var(--dsw-alias-border-l3, #8884); position: relative; }
+      .mov-switch input::after { content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px; border-radius: 50%; background: var(--dsw-alias-switch-thumb, #fff); transition: transform .12s ease; }
+      .mov-switch input:checked { background: var(--dsw-alias-brand-primary, #247bbf); }
+      .mov-switch input:checked::after { transform: translateX(16px); background: var(--dsw-alias-label-primary-foreground, #fff); }
+      .mov-switch input:focus-visible { outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary, #247bbf)); outline-offset: 2px; }
       @container (max-width: 480px) { .mov-av-grid { grid-template-columns: minmax(0, 1fr); } }
-      @media (prefers-reduced-motion: reduce) { .mov-av-audio .mov-switch input, .mov-av-audio .mov-switch input::after { transition: none; } }
+      @media (prefers-reduced-motion: reduce) { .mov-switch input, .mov-switch input::after { transition: none; } }
 
       /* 开关没有标签行，靠底对齐才能跟旁边输入框的控制线齐平 */
       .mov-field-switch { justify-content: flex-end; }
@@ -408,10 +460,6 @@
       .mov-input:focus, .mov-input:focus-visible { outline: none; border-color: ${TOKENS.primaryFill}; box-shadow: 0 0 0 3px rgba(36, 123, 191, .18); }
       /* 模型 ID 与可执行文件路径很长：等宽字体 + 省略，不把整行撑变形 */
       .mov-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
-      /* 开关做成跟输入框同高的小方块，和周围控件一条线 */
-      .mov-switch { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 36px; box-sizing: border-box; border: 1px solid ${TOKENS.border}; border-radius: 8px; background: ${TOKENS.controlFill}; font-size: 13px; color: ${TOKENS.text}; cursor: pointer; }
-      .mov-switch:hover { border-color: ${TOKENS.primaryFill}; }
-      .mov-switch input { width: 15px; height: 15px; accent-color: ${TOKENS.primaryFill}; cursor: pointer; }
       .mov-card { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; border: 1px solid ${TOKENS.border}; background: ${TOKENS.cardFill}; }
       .mov-current-version { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 120px; }
       .mov-update-bell { display: inline-flex; flex: 0 0 auto; color: ${TOKENS.primaryFill}; transform-origin: 50% 10%; animation: mov-bell-swing 1.6s ease-in-out infinite; }
@@ -629,9 +677,11 @@
     }, SECTIONS = [
       { key: "sectionConnection", fields: ["connectionMode"] },
       { key: "sectionModels", fields: ["imageUseVideoKey", "model", "metaonticApiKey", "volcengineApiKey", "imageModel", "imageApiKey", "textModel", "textApiKey"] },
+      { key: "sectionInterface", fields: ["sidebarAssistantEnabled"] },
       { key: "sectionVideo", fields: ["ratio", "generateAudio"] },
       ...FLOW_CANVAS_AVAILABLE ? [{ key: "sectionCanvas", fields: ["canvasEnabled", "autoCreateCanvas"] }] : []
     ], FIELD_BY_KEY = Object.fromEntries([
+      { key: "sidebarAssistantEnabled", kind: "switch", wide: !0 },
       { key: "connectionMode", kind: "select", wide: !0 },
       { key: "metaonticApiKey", kind: "text", secret: !0, wide: !0 },
       { key: "volcengineApiKey", kind: "text", secret: !0, wide: !0 },
@@ -657,6 +707,7 @@
       { key: "ffmpegBinary", kind: "text", mono: !0 },
       { key: "ffprobeBinary", kind: "text", mono: !0 }
     ].map((field) => [field.key, field])), PLUGIN_OWNED_KEYS = [
+      "sidebarAssistantEnabled",
       "canvasEnabled",
       "autoCreateCanvas",
       "usageStatsEnabled",
@@ -843,6 +894,9 @@
       sectionGeneration: "生成参数",
       sectionConnection: "接入与 API密钥",
       sectionVideo: "画面与声音",
+      sectionInterface: "界面显示",
+      sidebarAssistantEnabled: "显示左侧视频创作助手",
+      sidebarAssistantEnabledHint: "默认开启。保存后立即显示或隐藏左侧入口；已有会话、视频任务和插件设置入口保留。",
       sectionCanvas: "流程画布",
       canvasPanelLabel: "MetaOnticVideo流程画布",
       canvasEnabled: "流程画布",
@@ -1026,6 +1080,9 @@
       sectionGeneration: "Generation",
       sectionConnection: "Connection & credentials",
       sectionVideo: "Picture & audio",
+      sectionInterface: "Interface",
+      sidebarAssistantEnabled: "Show video assistant in sidebar",
+      sidebarAssistantEnabledHint: "On by default. Saving shows or hides the sidebar entry immediately. Existing conversations, video tasks and plugin settings remain available.",
       sectionCanvas: "Workflow canvas",
       canvasPanelLabel: "MetaOnticVideo workflow canvas",
       canvasEnabled: "Workflow canvas",
@@ -1174,7 +1231,7 @@
 
   // src/ui/updates/update.service.ts
   function createUpdates({ h, fetchSource }) {
-    let PLUGIN_VERSION = "4.0.10".trim().replace(/^v/i, "");
+    let PLUGIN_VERSION = "4.0.11".trim().replace(/^v/i, "");
     function isNewerVersion(remote, local) {
       let parse = (text) => {
         let m = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(String(text || ""));
@@ -1477,12 +1534,13 @@
       }
     }
     function control(field) {
-      let { draft, value, h, SELECTS, inputStyle, t, snapshot, visibleKey, setVisibleKey, edit, optionLabel } = context, current = field.key === "textModel" && !String(draft[field.key] ?? value[field.key] ?? "").trim() ? (SELECTS.textModel || [])[0] : draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (["imageUseVideoKey", "usageStatsEnabled", "autoCreateCanvas"].includes(field.key) ? !0 : field.key === "canvasEnabled" ? !1 : field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0), secondsField = field.key === "pollIntervalMs" || field.key === "maxWaitMs", displayed = secondsField && current !== void 0 && current !== "" ? Number(current) / 1e3 : current, id = `metaontic-video-${field.key}`;
+      let { draft, value, h, SELECTS, inputStyle, t, snapshot, visibleKey, setVisibleKey, edit, optionLabel } = context, current = field.key === "textModel" && !String(draft[field.key] ?? value[field.key] ?? "").trim() ? (SELECTS.textModel || [])[0] : draft[field.key] !== void 0 ? draft[field.key] : value[field.key] ?? (["sidebarAssistantEnabled", "imageUseVideoKey", "usageStatsEnabled", "autoCreateCanvas"].includes(field.key) ? !0 : field.key === "canvasEnabled" ? !1 : field.key === "pollIntervalMs" ? 5e3 : field.key === "maxWaitMs" ? 6e5 : void 0), secondsField = field.key === "pollIntervalMs" || field.key === "maxWaitMs", displayed = secondsField && current !== void 0 && current !== "" ? Number(current) / 1e3 : current, id = `metaontic-video-${field.key}`;
       if (field.kind === "switch")
         return h("label", { key: "control", htmlFor: id, className: "mov-switch" }, h("input", {
           id,
           "data-field": field.key,
           type: "checkbox",
+          role: "switch",
           checked: !!current,
           onChange: (event) => edit(field.key, event.target.checked)
         }), h("span", null, t(field.key)));
@@ -1544,8 +1602,8 @@
   // package.json
   var package_default = {
     name: "dsh-metaontic-video",
-    version: "4.0.10",
-    description: "面向新手的 AI 视频创作助手：从想法、脚本到视频生成，全程引导；通过分段续拍与本地合并，提供低成本长视频制作方案。",
+    version: "4.0.11",
+    description: "DeepSeek Harness AI 视频创作插件：新手通过对话完善创意、审核脚本并生成视频；长视频采用分段续拍与本地合并，按实际调用确认费用。",
     license: "SEE LICENSE IN LICENSE",
     type: "module",
     keywords: [
@@ -1666,13 +1724,57 @@
     },
     dependencies: {},
     releaseNotes: {
-      version: "4.0.10",
+      version: "4.0.11",
       prerelease: !1,
-      publishedAt: "2026-11-20T14:52:24.678Z",
+      publishedAt: "2026-11-21T00:10:28.830Z",
       items: [
-        "优化：精简插件加载资源，减少成品冗余，保留现有配置、历史任务及恢复能力。"
+        "新增：侧栏视频创作助手显示开关，默认开启。",
+        "优化：设置分组与间距，统一滑动开关，画面与声音移入更多设置。"
       ]
-    }
+    },
+    readme: `<img src="https://video.mybfs.cn/promo/share-logo.png" width="160" alt="MetaOnticVideo" />
+
+# dsh-metaontic-video · AI 视频创作插件
+
+[English](https://github.com/wxsimon2022/metaontic-video/blob/master/README.en.md)
+
+DeepSeek Harness（DSH）AI 视频生成插件 MetaOnticVideo：**新手快速上手，低成本制作长视频。**
+
+## 能做什么
+
+- **快速创作**：说出想法，助手整理脚本，确认后生成并预览视频。
+- **分段制作长视频**：逐段生成与续拍，保留进度，最后在本机合并。
+
+图片与视频按接入渠道用量计费，生成前需确认费用。
+
+## 在线安装
+
+在 Harness「插件 → 添加插件」中粘贴链接，Windows 与 macOS 使用同一个安装包。
+
+Gitee：
+
+\`\`\`text
+https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz
+\`\`\`
+
+GitHub 备用：
+
+\`\`\`text
+https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaontic-video.tgz
+\`\`\`
+
+## 开始使用
+
+1. 打开插件设置，选择 **MetaOntic AI**，填写 API密钥并保存。
+2. 在会话中选择 **视频创作助手**；宣传内容可选择 **宣传视频助手**。
+3. 描述需求，审核脚本并确认费用，再逐段预览制作结果。
+
+例如：“制作一条30秒竖屏720P的视频，表现清晨湖面的宁静。”
+
+## 相关链接
+
+[使用说明](https://ai.mybfs.cn) · [问题反馈](https://github.com/wxsimon2022/metaontic-video/issues) · [更新记录](https://github.com/wxsimon2022/metaontic-video/blob/master/CHANGELOG.md) · [开发文档](https://github.com/wxsimon2022/metaontic-video/blob/master/docs/engineering/development.md) · [许可](https://github.com/wxsimon2022/metaontic-video/blob/master/LICENSE)
+`
   };
 
   // src/businesses/video-generation/client/settings.ts
@@ -1838,6 +1940,7 @@
           renderKeyAction: (field) => showsSharedValidation(field) ? connectionButton() : null,
           confirm: (message) => window.confirm(message)
         }), hints = {
+          sidebarAssistantEnabled: t("sidebarAssistantEnabledHint"),
           connectionMode: selectedMode === "metaontic" ? [t("connectionMetaonticHint"), " ", h("a", { key: "metaontic-register", href: RELAY.signupUrl, target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "underline" } }, t("connectionMetaonticRegister"))] : t(directMode && !VOLCENGINE_MODE_AVAILABLE ? "connectionVolcengineUnavailable" : "connectionModeHint"),
           metaonticApiKey: t("metaonticKeyHint"),
           volcengineApiKey: t("volcengineKeyHint"),
@@ -1913,7 +2016,7 @@
         let settingsRows = () => [
           h("div", { key: "generation", className: "mov-section" }, [
             h("div", { key: "title", className: "mov-section-title" }, t("sectionGeneration")),
-            ...SECTIONS.map((section) => h("div", { key: section.key, className: "mov-parameter-group" }, [
+            ...SECTIONS.filter((section) => !["sectionInterface", "sectionVideo"].includes(section.key)).map((section) => h("div", { key: section.key, className: "mov-parameter-group" }, [
               h("div", { key: "heading", className: "mov-parameter-heading" }, t(section.key)),
               renderGrid(section)
             ]))
@@ -1924,6 +2027,10 @@
               h("span", { key: "hint", className: "mov-hint" }, t("sectionCombinedHint"))
             ]),
             h("div", { key: "body", className: "mov-advanced-body" }, [
+              h("div", { key: "sectionVideo", className: "mov-advanced-group", "data-group": "sectionVideo" }, [
+                h("div", { key: "title", className: "mov-parameter-heading" }, t("sectionVideo")),
+                renderGrid(SECTIONS.find((section) => section.key === "sectionVideo"))
+              ]),
               ...[
                 { key: "advancedPicture", fields: ["watermark"] },
                 { key: "advancedMerge", fields: ["mergeMode", "seamTrimSeconds"], hint: "segmentsRetained" },
@@ -1936,6 +2043,10 @@
                 group.hint ? h("p", { key: "hint", className: "mov-hint", style: { margin: 0 } }, t(group.hint)) : null
               ]))
             ])
+          ]),
+          h("div", { key: "interface", className: "mov-section mov-interface", "data-group": "interface" }, [
+            h("div", { key: "title", className: "mov-section-title" }, t("sectionInterface")),
+            renderGrid(SECTIONS.find((section) => section.key === "sectionInterface"))
           ])
         ], overrides = Object.keys(snapshot.user || {}), footerMessage = status === "saved" ? t("saved") : status === "reset" ? t("resetDone") : status === "failed" ? saveError || t("saveFailed") : pending.length ? t("dirty") : "", footer = pending.length || status !== "idle" ? h("div", { key: "footer", className: "mov-footer" }, [
           footerMessage ? h("span", {
@@ -2823,29 +2934,29 @@
           { className: "mov-rail-hint" },
           [h(PanelIcon, props), h(UpdateHintDot, { key: "dot" })]
         );
-        ctx.effect(() => {
-          let off = ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
+        ctx.effect(() => followConfiguredEntries(form, "sidebarAssistantEnabled", [
+          () => ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
             name: "sidebar.panellist",
             id: PANEL_ID,
             order: 30,
             locale: NS,
             // 左侧那一行显示的名字，比面板标题更完整，方便在图标列表里认出来；有更新只加红点，不改文字。
             label: () => t("panelSidebarLabel")
-          }, railIcon));
-          return updateHint.refresh(!1), () => off?.();
-        }, "metaontic-video: sidebar entry"), ctx.effect(() => ctx.slots.inject("main", () => ctx.slots.register({
-          name: "main",
-          key: PANEL_ID,
-          locale: NS,
-          // 面板要的两个动作都按需取服务：老宿主没有这些服务时按钮自然失效，不报错。
-          inject: () => ({
-            startSession: () => ctx.get("uiWorkspace")?.startSession(void 0, { agentPreset: "video-director" }),
-            openSettings: () => ctx.get("pluginNavigation")?.openBundle(PLUGIN_PACKAGE2),
-            manager: pluginManager,
-            // 面板顶部的更新入口：与设置页同一套两步确认，点左侧栏的「有更新」进来就能更新。
-            updateBanner: () => h(UpdateHintBanner, { key: "update-hint" })
-          })
-        }, VideoPanel)), "metaontic-video: sidebar panel");
+          }, railIcon)),
+          () => ctx.slots.inject("main", () => ctx.slots.register({
+            name: "main",
+            key: PANEL_ID,
+            locale: NS,
+            // 面板要的两个动作都按需取服务：老宿主没有这些服务时按钮自然失效，不报错。
+            inject: () => ({
+              startSession: () => ctx.get("uiWorkspace")?.startSession(void 0, { agentPreset: "video-director" }),
+              openSettings: () => ctx.get("pluginNavigation")?.openBundle(PLUGIN_PACKAGE2),
+              manager: pluginManager,
+              // 面板顶部的更新入口：与设置页同一套两步确认，点左侧栏的「有更新」进来就能更新。
+              updateBanner: () => h(UpdateHintBanner, { key: "update-hint" })
+            })
+          }, VideoPanel))
+        ]), "metaontic-video: sidebar entry and panel follow saved preference"), updateHint.refresh(!1);
         let canvasSwitchOn = () => {
           try {
             return FLOW_CANVAS_AVAILABLE && form?.getSnapshot?.()?.value?.canvasEnabled === !0;

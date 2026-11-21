@@ -1,3 +1,4 @@
+import { followConfiguredEntries } from '../../ui/components/configured-entries.js';
 import { createSupportAction } from '../../ui/components/support-action.js';
 import { registerAuthNotice } from '../../ui/components/auth-notice.js';
 import { createToolResultView } from './client/tool-result.js';
@@ -102,20 +103,16 @@ export function createVideoClient(require) {
         // 左侧栏入口与面板本体是宿主 root 作用域的两个 slot，用同一个 id 关联：
         // sidebar.panellist 只放一行图标（收到 {size, active}），点它切到 main 里同 id 的面板。
         // 老版本宿主没有这两个 slot 时 inject 不会触发，其余界面与工具不受影响。
-        ctx.effect(() => {
-          const off = ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+        ctx.effect(() => followConfiguredEntries(form, 'sidebarAssistantEnabled', [
+          () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
             name: 'sidebar.panellist',
             id: PANEL_ID,
             order: 30,
             locale: NS,
             // 左侧那一行显示的名字，比面板标题更完整，方便在图标列表里认出来；有更新只加红点，不改文字。
             label: () => t('panelSidebarLabel'),
-          }, railIcon));
-          // 开工时静默查一次：查到新版本由圆点自己重渲染，不需要重注册这一行。
-          void updateHint.refresh(false);
-          return () => off?.();
-        }, 'metaontic-video: sidebar entry');
-        ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({
+          }, railIcon)),
+          () => ctx.slots.inject('main', () => ctx.slots.register({
           name: 'main',
           key: PANEL_ID,
           locale: NS,
@@ -127,7 +124,9 @@ export function createVideoClient(require) {
             // 面板顶部的更新入口：与设置页同一套两步确认，点左侧栏的「有更新」进来就能更新。
             updateBanner: () => h(UpdateHintBanner, { key: 'update-hint' }),
           }),
-        }, VideoPanel)), 'metaontic-video: sidebar panel');
+        }, VideoPanel)),
+        ]), 'metaontic-video: sidebar entry and panel follow saved preference');
+        void updateHint.refresh(false);
         // 流程画布是可开关的组件：设置页「流程画布」总开关打开时才注册左侧栏入口与画布页。
         // 关闭后左侧栏不再出现画布入口，已有画布与成果仍留在插件数据目录；开关改动实时生效，不必重开 Harness。
         const canvasSwitchOn = () => {
