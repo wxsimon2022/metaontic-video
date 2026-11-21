@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="610" viewBox="0 0 1040 610" role="img" aria-labelledby="title desc">
+<title id="title">通过中国镜像源安装插件</title>
+<desc id="desc">操作示意图。进入插件添加入口，选择中国镜像源并填写包名 dsh-metaontic-video；安装启用后进入设置并选择视频创作助手。</desc>
+<style>text{font-family:"PingFang SC","Microsoft YaHei",Arial,sans-serif}.h{font-size:28px;font-weight:700;fill:#20242d}.sub{font-size:17px;fill:#737b8b}.label{font-size:21px;font-weight:600;fill:#20242d}.line{font-size:18px;fill:#566174}.code{font-family:Menlo,Consolas,monospace;font-size:23px;fill:#175b9b;font-weight:600}</style>
+<rect width="1040" height="610" rx="12" fill="#f1f3f7"/>
+<text x="32" y="48" class="h">通过中国镜像源安装插件</text>
+<text x="32" y="80" class="sub">Windows / macOS 通用 · 操作示意，菜单名称以实际界面为准</text>
+<rect x="32" y="108" width="976" height="160" rx="10" fill="white" stroke="#dfe3eb"/>
+<rect x="32" y="108" width="5" height="160" rx="2" fill="#247bbf"/>
+<text x="54" y="145" class="label">① 插件 → 添加插件 → 中国镜像源</text>
+<text x="54" y="181" class="line">在包名输入框填写：</text>
+<text x="54" y="222" class="code">dsh-metaontic-video</text>
+<text x="54" y="249" class="sub">按提示安装并启用，无需下载、解压或填写本地目录。</text>
+<rect x="32" y="288" width="976" height="130" rx="10" fill="white" stroke="#dfe3eb"/>
+<rect x="32" y="288" width="5" height="130" rx="2" fill="#247bbf"/>
+<text x="54" y="325" class="label">② 已安装插件 → MetaOnticVideo → 查看</text>
+<text x="54" y="360" class="line">选择 MetaOntic AI，填写 API密钥并保存。</text>
+<text x="54" y="392" class="line">无需在此处下载或解压插件文件。</text>
+<rect x="32" y="438" width="976" height="140" rx="10" fill="white" stroke="#dfe3eb"/>
+<rect x="32" y="438" width="5" height="140" rx="2" fill="#247bbf"/>
+<text x="54" y="475" class="label">③ 在会话中选择“视频创作助手”</text>
+<text x="54" y="511" class="line">描述视频需求，按提示完成脚本与费用确认。</text>
+<text x="54" y="547" class="line">逐段检查生成结果，再合并并保存成片。</text>
+</svg>
