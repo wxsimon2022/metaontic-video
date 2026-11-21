@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {build} from 'esbuild';
 const defines={__PLUGIN_VERSION__:'"test"',__FLOW_CANVAS_AVAILABLE__:'false'};
 test('disabled canvas UI is excluded while host history and recovery endpoints remain',async()=>{
- const client=await build({entryPoints:['src/client.ts'],bundle:true,write:false,metafile:true,minifySyntax:true,format:'iife',platform:'browser',loader:{'.svg':'text'},define:defines});
+ const client=await build({entryPoints:['src/client.ts'],bundle:true,write:false,metafile:true,minifySyntax:true,format:'iife',platform:'browser',loader:{'.svg':'text','.png':'dataurl'},define:defines});
  const clientInputs=Object.values(client.metafile.outputs)[0].inputs;
  assert.equal(clientInputs['src/businesses/video-generation/client/canvas-view.ts']?.bytesInOutput||0,0);
  assert.equal(clientInputs['src/businesses/video-generation/integrations/canvas-stages.ts']?.bytesInOutput||0,0);
