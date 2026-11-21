@@ -141,16 +141,15 @@
           type: "button",
           className: "mov-btn mov-support-action",
           "data-action": "contact-support",
-          icon: h(
-            "svg",
-            { width: 13, height: 13, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, "aria-hidden": !0 },
-            h("path", { d: "M4 13v-1a8 8 0 0 1 16 0v1M4 12H3v6h4v-6H4Zm16 0h1v6h-4v-6h3Zm0 6v1a2 2 0 0 1-2 2h-6" })
-          ),
           style: { alignSelf: "center", whiteSpace: "nowrap" },
           "aria-haspopup": "dialog",
           "aria-expanded": open,
           onClick: () => setOpen(!0)
-        }, t("supportContact")),
+        }, h(
+          "svg",
+          { width: 13, height: 13, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, "aria-hidden": !0 },
+          h("path", { d: "M4 13v-1a8 8 0 0 1 16 0v1M4 12H3v6h4v-6H4Zm16 0h1v6h-4v-6h3Zm0 6v1a2 2 0 0 1-2 2h-6" })
+        ), t("supportContact")),
         open ? h("dialog", {
           ref: dialog,
           className: "mov-support-dialog",
