@@ -13,6 +13,14 @@ MetaOnticVideo is a DeepSeek Harness (DSH) AI video generation plugin for **begi
 
 Image and video generation is billed by your provider, with cost confirmation before generation.
 
+## China mirror installation
+
+In Harness → Plugins → Add plugin, select the China mirror and enter the package name:
+
+```text
+dsh-metaontic-video
+```
+
 ## Online installation
 
 Paste a link into Harness → Plugins → Add plugin. Windows and macOS use the same package.
