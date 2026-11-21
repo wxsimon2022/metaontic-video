@@ -1,4 +1,4 @@
-# <img src="https://ai.mybfs.cn/promo/share-logo.png" width="32" height="32" align="middle" alt="MetaOnticVideo · DeepSeek Harness AI video creation plugin" /> dsh-metaontic-video · DeepSeek Harness AI Video Creation Plugin
+# <img src="https://ai.mybfs.cn/promo/readme-title-en.svg" width="840" height="44" alt="dsh-metaontic-video · DeepSeek Harness AI Video Creation Plugin" />
 
 [简体中文](./README.md)
 
