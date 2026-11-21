@@ -9,7 +9,7 @@ import { RELAY } from '../../../shared/constants/plugin.js';
 export function createSettingsPage(deps: any) {
   const {
     useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS,
-    persistBatch, PLUGIN_VERSION,
+    persistBatch, PLUGIN_VERSION, useVersionPolicy = () => ({ required: false, minimum: '' }),
     UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, fetchMirrorRelease, SELECTS, inputStyle, optionLabel,
     FIELD_BY_KEY, SECTIONS, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS,
     isNewerVersion, updateBell, PAGE_CSS,
@@ -37,7 +37,9 @@ function makePage({ form, t, manager }) {
         // 更新检查只读取正式发行版，实际安装前再次确认。
         const [updateStatus, setUpdateStatus] = React.useState('idle');
         const [updateMessage, setUpdateMessage] = React.useState('');
-        const [updateLatest, setUpdateLatest] = React.useState('');
+        const [checkedLatest, setUpdateLatest] = React.useState('');
+        const versionPolicy = useVersionPolicy();
+        const updateLatest = versionPolicy.required && (!checkedLatest || isNewerVersion(versionPolicy.minimum, checkedLatest)) ? versionPolicy.minimum : checkedLatest;
         const updateRequest = React.useRef(0);
         // 更新说明固定使用本机包内内容，不受远端版本和检查缓存影响。
         const releaseNotes = packageInfo.releaseNotes;
@@ -429,6 +431,7 @@ function makePage({ form, t, manager }) {
           h('style', { key: 'styles' }, PAGE_CSS),
           !notice || snapshot.value ? renderUpdateNotice({
             h, t, available: updateAvailable, latest: updateLatest, deferred: updateDeferred,
+            mandatory: versionPolicy.required, minimum: versionPolicy.minimum,
             status: updateStatus, confirmed: updateConfirm,
             onUpdate: () => { if (updateConfirm) runOnlineUpdate().catch(() => {}); else setUpdateConfirm(true); },
             onLater: deferUpdate,

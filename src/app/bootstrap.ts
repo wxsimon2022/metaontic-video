@@ -3,6 +3,7 @@ import { createToolRegistry } from '../platform/dsh/tool.adapter.js';
 import { PLUGIN_ID } from '../shared/constants/plugin.js';
 import { createAnalyticsReporter } from '../platform/telemetry/reporter.js';
 import { startUpdateLockfileRepair } from '../platform/installation/update-lockfile.js';
+import { createVersionGuard } from '../platform/installation/update-policy.js';
 export interface BusinessModule {
   id: string;
   apply(runtime: BusinessRuntime): void | (() => void);
@@ -43,7 +44,7 @@ export function createPluginRuntime(definitions: { agents: readonly AgentDefinit
     const analytics = createAnalyticsReporter(config);
     defer(() => analytics.dispose());
     defer(bindAgentRegistry(ctx, agents));
-    const tools = createToolRegistry(ctx, agents, analytics, defer);
+    const tools = createToolRegistry(ctx, agents, analytics, defer, createVersionGuard());
     const runtime = { ctx, config, agents, tools, defer };
     try {
       for (const business of businesses.values()) defer(business.apply(runtime));

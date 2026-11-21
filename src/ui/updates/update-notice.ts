@@ -102,7 +102,7 @@ export function createUpdateHint({ version = '', isNewerVersion, fetchRecentVers
 
 /** 与宿主 React 绑定的两块界面：左侧栏图标上的小圆点、面板顶部的更新入口（两步确认）。 */
 export function createUpdateHintView({
-  React, h, t, hint, version, isNewerVersion, manager,
+  React, h, t, hint, version, isNewerVersion, manager, useVersionPolicy = () => ({ required: false, minimum: '' }),
   pluginPackage, updateSpec, updateAttempts, cacheKey, maxAge,
 }: any) {
   /** 订阅 store：新版本出现或消失时，只有用到它的那一小块重渲染。 */
@@ -114,7 +114,10 @@ export function createUpdateHintView({
 
   /** 有更新时画一个小圆点：展开的左侧栏贴在这一行右端（原来写「有更新」的位置），收起时落在图标角上。 */
   function UpdateHintDot() {
-    const state = useUpdateHint();
+    const rawState = useUpdateHint();
+    const policy = useVersionPolicy();
+    const latest = policy.required && (!rawState.latest || isNewerVersion(policy.minimum, rawState.latest)) ? policy.minimum : rawState.latest;
+    const state = { ...rawState, latest, pending: rawState.pending || policy.required };
     if (!state.pending) return null;
     return h('span', { key: 'dot', className: 'mov-rail-dot', 'aria-hidden': true, title: t('sidebarUpdateBadge') });
   }
@@ -124,7 +127,10 @@ export function createUpdateHintView({
    * 第一下把按钮转成「确认更新到 vX」，第二下才真的重装；不提供版本选择与降级。
    */
   function UpdateHintBanner() {
-    const state = useUpdateHint();
+    const rawState = useUpdateHint();
+    const policy = useVersionPolicy();
+    const latest = policy.required && (!rawState.latest || isNewerVersion(policy.minimum, rawState.latest)) ? policy.minimum : rawState.latest;
+    const state = { ...rawState, latest, pending: rawState.pending || policy.required };
     const [status, setStatus] = React.useState('idle');
     const [message, setMessage] = React.useState('');
     const [confirm, setConfirm] = React.useState(false);
@@ -138,7 +144,7 @@ export function createUpdateHintView({
       get UPDATE_ATTEMPTS() { return updateAttempts; },
       get manager() { return manager; },
       get t() { return t; },
-      get updateLatest() { return hint.snapshot().latest; },
+      get updateLatest() { return state.latest; },
       get updateConfirm() { return confirm === true; },
       get forgetUpdateCheck() { return forgetUpdateCheck; },
       setUpdateConfirm(value: any) { setConfirm(value === true); },
@@ -154,6 +160,7 @@ export function createUpdateHintView({
     return h('div', { key: 'update-hint', className: 'mov-panel-update', 'data-field': 'panel-update' }, [
       renderUpdateNotice({
         h, t, available: state.pending, latest: state.latest, deferred: state.deferred,
+        mandatory: policy.required, minimum: policy.minimum,
         status, confirmed: confirm, onLater: () => { setConfirm(false); hint.defer(); },
         onUpdate: () => {
           if (!confirm) { setConfirm(true); return; }

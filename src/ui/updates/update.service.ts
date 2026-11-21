@@ -344,17 +344,17 @@ function deferUpdate() {
 }
 
 /** Ordinary updates are optional: checking and dismissing never install anything. */
-export function renderUpdateNotice({ h, t, available, latest, deferred, status, confirmed, onUpdate, onLater }) {
-  if (!available || deferred === latest || status === 'installing') return null;
+export function renderUpdateNotice({ h, t, available, latest, deferred, status, confirmed, onUpdate, onLater, mandatory = false, minimum = '' }) {
+  if ((!available && !mandatory) || (!mandatory && deferred === latest) || status === 'installing') return null;
   return h('div', { key: 'update-notice', className: 'mov-notice', role: 'status', 'data-field': 'update-notice' }, [
     h('strong', { key: 'title' }, t('versionNew', { version: latest })),
-    h('p', { key: 'optional' }, t('versionOptional')),
+    h('p', { key: 'optional' }, mandatory ? t('versionRequired', { version: minimum }) : t('versionOptional')),
     confirmed ? h('p', { key: 'confirm' }, t('versionUpdateConfirmHint')) : null,
     h('div', { key: 'actions', className: 'mov-cmd-row' }, [
       h('button', { key: 'update', type: 'button', className: 'mov-btn mov-btn-sm mov-btn-primary',
         'data-action': confirmed ? 'update-notice-confirm' : 'update-notice-open', onClick: onUpdate },
         confirmed ? t('versionUpdateConfirm', { version: latest }) : t('versionUpdate')),
-      h('button', { key: 'later', type: 'button', className: 'mov-btn mov-btn-sm', 'data-action': 'update-later', onClick: onLater }, t('versionLater')),
+      mandatory ? null : h('button', { key: 'later', type: 'button', className: 'mov-btn mov-btn-sm', 'data-action': 'update-later', onClick: onLater }, t('versionLater')),
     ]),
   ]);
 }

@@ -32,7 +32,7 @@ const find = (tree, match) => (tree && typeof tree === 'object'
   ? (match(tree) ? tree : (tree.children || []).map((child) => find(child, match)).find(Boolean))
   : undefined);
 
-function setup({ local = '3.26.0', list = ['3.26.1', '3.26.0'] } = {}) {
+function setup({ local = '3.26.0', list = ['3.26.1', '3.26.0'], minimum = '' } = {}) {
   const saved = new Map();
   const state = { reads: 0, installs: 0, version: list[0] };
   const context = vm.createContext({
@@ -54,6 +54,7 @@ function setup({ local = '3.26.0', list = ['3.26.1', '3.26.0'] } = {}) {
     React: react.React, h, t: (key) => key, hint, version: local, isNewerVersion, manager,
     pluginPackage: 'metaontic-video', updateSpec: 'git+https://example.invalid/plugin.git', updateAttempts: 1,
     cacheKey: CACHE, maxAge: 60 * 60 * 1000,
+    useVersionPolicy: () => ({ required: Boolean(minimum), minimum }),
   });
   return { hint, view, react, saved, state, network, context, setList: (next) => { list = next; state.version = next[0]; } };
 }
@@ -67,6 +68,24 @@ test('左侧栏提示只看真实检查结果：没缓存先查一次，缓存�
   assert.equal(hint.snapshot().pending, true, '远端确实更新才提示');
   await hint.refresh(false);
   assert.equal(state.reads, 1, '缓存没过期就不重复联网');
+});
+
+test('强制升级不受稍后缓存影响，且使用不低于最低门槛的版本二次确认安装', async () => {
+  const {view,react,hint,state}=setup({local:'4.1.0',list:['4.1.1'],minimum:'4.1.2'});
+  await hint.refresh(false);
+  hint.defer();
+  react.begin();
+  const first=view.UpdateHintBanner();
+  assert.ok(find(first,node=>node.props?.['data-action']==='update-notice-open'));
+  assert.equal(find(first,node=>node.props?.['data-action']==='update-later'),undefined);
+  find(first,node=>node.props?.['data-action']==='update-notice-open').props.onClick();
+  assert.equal(state.installs,0);
+  state.version='4.1.2';
+  react.begin();
+  find(view.UpdateHintBanner(),node=>node.props?.['data-action']==='update-notice-confirm').props.onClick();
+  await react.flush();
+  for(let i=0;i<5;i++)await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(state.installs,1);
 });
 
 test('「稍后再说」只压住当前这一版，下个版本照旧提示', async () => {

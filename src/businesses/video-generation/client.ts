@@ -10,6 +10,7 @@ import { createClientConfig } from './client/config.js';
 import { createDictionaries } from './client/locale.js';
 import { createSettingsState } from './client/state.js';
 import { createUpdates } from '../../ui/updates/update.service.js';
+import { createPolicyHook } from '../../ui/updates/update-policy.js';
 import { createSettingsPage } from './client/settings.js';
 import { createUpdateHint, createUpdateHintView, ensureUpdateHintStyles } from '../../ui/updates/update-notice.js';
 import { createSidebarPanel } from './client/panel.js';
@@ -32,7 +33,8 @@ export function createVideoClient(require) {
     // 设置页的依赖统一走一个对象：宿主 React（React/h/useSnapshot）、主题与字段
     // （TOKENS/inputStyle/SELECTS/optionLabel/FIELD_BY_KEY/SECTIONS/formatMoney/PAGE_CSS）、
     // 设置状态（same/validateSettings/persistConnection/persistBatch/PLUGIN_OWNED_KEYS）、
-    const { makePage } = createSettingsPage({ useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS, persistBatch, PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, fetchMirrorRelease, SELECTS, inputStyle, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell, PAGE_CSS });
+    const useVersionPolicy = createPolicyHook(React, PLUGIN_VERSION);
+    const { makePage } = createSettingsPage({ useVersionPolicy, useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS, persistBatch, PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, fetchMirrorRelease, SELECTS, inputStyle, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell, PAGE_CSS });
     return {
       inject: ['slots', 'locale', 'configForms', 'uiSession'],
       apply(ctx, { settings }) {
@@ -94,7 +96,7 @@ export function createVideoClient(require) {
         ensureUpdateHintStyles();
         const updateHint = createUpdateHint({ version: PLUGIN_VERSION, isNewerVersion, fetchRecentVersions, cacheKey: UPDATE_CACHE_KEY, maxAge: UPDATE_MAX_AGE_MS });
         const { UpdateHintDot, UpdateHintBanner } = createUpdateHintView({
-          React, h, t, hint: updateHint, version: PLUGIN_VERSION, isNewerVersion, manager: pluginManager,
+          React, h, t, useVersionPolicy, hint: updateHint, version: PLUGIN_VERSION, isNewerVersion, manager: pluginManager,
           pluginPackage: PLUGIN_PACKAGE, updateSpec: UPDATE_SPEC, updateAttempts: UPDATE_ATTEMPTS,
           cacheKey: UPDATE_CACHE_KEY, maxAge: UPDATE_MAX_AGE_MS,
         });

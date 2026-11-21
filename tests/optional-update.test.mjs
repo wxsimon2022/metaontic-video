@@ -67,3 +67,14 @@ test('reminder hides deferred versions, returns for a newer version and exposes 
   assert.ok(find(confirmed, 'update-notice-confirm'));
   assert.equal(h.renderUpdateNotice({ ...props, latest: '3.6.0', status: 'installing' }), null);
 });
+
+test('mandatory updates ignore deferral and hide later while preserving explicit install confirmation', () => {
+  const {h}=setup();
+  const props={h:(tag,props,...children)=>({tag,props,children}),t:key=>key,available:false,latest:'4.1.1',deferred:'4.1.1',status:'ok',confirmed:false,mandatory:true,minimum:'4.1.1',onUpdate(){},onLater(){}};
+  const notice=h.renderUpdateNotice(props);
+  const serialized=JSON.stringify(notice);
+  assert.match(serialized,/versionRequired/);
+  assert.match(serialized,/update-notice-open/);
+  assert.doesNotMatch(serialized,/update-later|update-notice-confirm/);
+  assert.match(JSON.stringify(h.renderUpdateNotice({...props,confirmed:true})),/update-notice-confirm/);
+});
