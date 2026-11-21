@@ -245,3 +245,9 @@ npm run pack:test -- 3.13.9-test.1
 ## 源码与发布目录
 
 业务实现、Agent提示词、预设入口和类型声明统一在`src/`维护：`src/businesses/`、`src/agents/`、`src/app/`、`src/platform/`、`src/shared/`、`src/ui/`、`src/types/`。预设源码在`src/agents/presets/`，由构建生成`presets/*.js`；根目录`index.js`、`client.js`与`locale/*.json`也是安装产物，不能直接编辑或移走。根目录包清单、Cordis配置、静态资源与技能保留发布路径；`scripts/`、`tests/`、`preview/`、`docs/`分别承载工程工具、测试、开发预览与文档，不混入业务源码。
+
+## 一键三端发布
+
+`node scripts/release.mjs X.Y.Z --all --notes release-plan.json` 发布同一份成品到 Gitee、GitHub、npm，并核对中国镜像源同步；也可用 `npm run release:all` 交互输入版本。先完成 Windows/macOS 安装检查，仓库正式发行完成后才发布 npm。需要既有 Gitee、GitHub 与 npm 凭据。默认发布渠道不变，`--both` 仍仅双仓。
+
+npm 版本已存在时核对下载原字节，不覆盖；镜像同步失败或 npm 待批准时保留已完成的仓库版本，批准后执行同版本 `--all --resume`，不重新打包或改标签。三端确认后自动刷新并推送市场 npm 来源索引。`--all` 不与 `--pipeline` 或 `--github-only` 同用。

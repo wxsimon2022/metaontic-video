@@ -118,7 +118,8 @@
     "pack:test": "node scripts/pack-test.mjs",
     "market:index": "node scripts/market-index.mjs",
     "npm:publish": "node scripts/publish-npm.mjs",
-    "npm:token": "node scripts/npm-token.mjs"
+    "npm:token": "node scripts/npm-token.mjs",
+    "release:all": "node scripts/release.mjs --interactive --all"
   },
   "dependencies": {},
   "releaseNotes": {

@@ -61,6 +61,10 @@ test('release dry run changes no files, tags or git index and starts no publicat
   assert.notEqual(conflict.status,0);assert.match(conflict.stderr,/不能同时用/);
   const both=spawnSync(process.execPath,[path.join(dir,'scripts/release.mjs'),'1.0.1','--notes',path.join(dir,'plan.json'),'--dry-run','--both'],{encoding:'utf8',timeout:10000,env});
   assert.equal(both.status,0,both.stderr);assert.match(both.stdout,/Gitee \+ GitHub/);assert.match(both.stdout,/github\.com\/wxsimon2022\/metaontic-video\/releases\/tag\/v1\.0\.1/);
+  const all=spawnSync(process.execPath,[path.join(dir,'scripts/release.mjs'),'1.0.1','--notes',path.join(dir,'plan.json'),'--dry-run','--all'],{encoding:'utf8',timeout:10000,env});
+  assert.equal(all.status,0,all.stderr);assert.match(all.stdout,/Gitee \+ GitHub \+ npm \/ 中国镜像/);assert.match(all.stdout,/中国镜像同步核对/);
+  const invalidAll=spawnSync(process.execPath,[path.join(dir,'scripts/release.mjs'),'1.0.1','--all','--pipeline','--dry-run'],{encoding:'utf8',timeout:10000,env});
+  assert.notEqual(invalidAll.status,0);assert.match(invalidAll.stderr,/--all 不能与 --pipeline/);
   assert.equal(git('status','--porcelain'),before);assert.equal(git('tag'),tags);assert.equal(git('rev-parse','HEAD'),head);assert.equal(await readFile(path.join(dir,'package.json'),'utf8'),pkg);
  }finally{await rm(dir,{recursive:true,force:true});}
 });

@@ -52,10 +52,12 @@ const help = `一键发布（准备好完整说明与指南后执行）：
 发版同步使用说明书；宣传页使用固定最新版安装地址，后续发版不修改宣传页。
   node scripts/release.mjs 3.13.4 --notes release-plan.json
   node scripts/release.mjs 3.13.4 --notes release-plan.json --dry-run
-  node scripts/release.mjs 3.13.4 --resume
+  node scripts/release.mjs 3.13.4 --all --notes release-plan.json
+  node scripts/release.mjs 3.13.4 --all --resume
 默认只发 Gitee，并在本机打包后直接创建 Release、上传核对成品（需要本机 GITEE_TOKEN）。
 想交给 Gitee Go 流水线打包发布时加 --pipeline（--ci 是同义写法）：本机只做准备、提交、打标签并推送，成品打包、制品库归档与 Gitee Release 都由流水线按标签完成，本机不需要 GITEE_TOKEN。
 需要同时同步 GitHub（含双平台安装校验）时加 --both，或 --github <地址>；--both 走本机收尾，不要与 --pipeline 同时用。
+--all 一键发布 Gitee、GitHub、npm 并校验中国镜像同步；需 npm 发布凭据，与 --pipeline / --github-only 互斥。
 可选：--gitee <Gitee仓库地址> --branch master
 --dry-run 只显示范围与计划，不写文件、不改版本、不提交、不联网发布。
 --github-only 仅推送 GitHub 标签并发布 GitHub Release，不写入 Gitee。
@@ -82,12 +84,15 @@ export async function main(argv) {
     else if(key==='--local') opts.local=true;
     // --both 要等 GitHub CI 的成品再收尾，所以仍然在本机打包发布。
     else if(key==='--github-only') { opts.targets='github'; opts.local=true; }
+    else if(key==='--all') { opts.all=true; opts.targets='both'; opts.local=true; }
     else if(key==='--both') { opts.targets='both'; opts.local=true; }
     // GitHub 只在明确要求时同步；不带地址的 --github 表示“连同 GitHub 一起发”。
     else if(key==='--github' && (!argv[i+1] || argv[i+1].startsWith('--'))) opts.targets='both';
     else if(['--notes','--github','--gitee','--branch'].includes(key) && argv[i+1] && !argv[i+1].startsWith('--')) { opts[key.slice(2)]=argv[++i]; if(key==='--github')opts.targets='both'; }
     else throw Error(`未知参数或缺少参数值：${key}`);
   }
+  if(opts.all&&argv.includes('--github-only'))throw Error('--all 不能与 --github-only 同用');
+  if(opts.all&&opts.pipeline)throw Error('--all 不能与 --pipeline 同用');
   if(opts.pipeline&&opts.local)throw Error('--pipeline（或 --ci）与 --local（或 --both）不能同时用：前者交给 Gitee Go 流水线发布，后者在本机打包发布');
   // 发布路径：默认本机打包并发 Release；--pipeline / --ci 才交给 Gitee Go 流水线（本机只推标签）。
   const pipeline=Boolean(opts.pipeline);
@@ -95,7 +100,7 @@ export async function main(argv) {
   const github=repository(opts.github,'github.com'),gitee=repository(opts.gitee,'gitee.com');
   const includeGithub=opts.targets!=='gitee';
   const githubOnly=opts.targets==='github';
-  const channel=githubOnly?'仅 GitHub':includeGithub?'Gitee + GitHub':'仅 Gitee';
+  const channel=opts.all?'Gitee + GitHub + npm / 中国镜像':githubOnly?'仅 GitHub':includeGithub?'Gitee + GitHub':'仅 Gitee';
   // Current workflow mirrors to this configured Gitee repository. Reject silently publishing elsewhere.
   if(gitee.slug!=='hackloop/metaontic-video')throw Error('当前CI绑定hackloop/metaontic-video，变更目标前请同步CI镜像配置');
   process.chdir(root);
@@ -141,7 +146,7 @@ export async function main(argv) {
     const route=pipeline
       ? '提交/标签 → 推送标签 → Gitee Go 流水线按标签构建、测试、打包 → 发布 Gitee Release 并归档制品库'
       : (includeGithub?'打包/核对 → 提交/标签 → 推送 → 等待双平台CI → 核对两处附件':'打包/核对 → 提交/标签 → 推送 → 上传并核对 Gitee Release 附件');
-    console.log(`\nDRY RUN（${channel}）：计划检查 → 构建/测试 → ${route}。`);printLinks();return;
+    console.log(`\nDRY RUN（${channel}）：计划检查 → 构建/测试 → ${route}${opts.all ? ' → npm 成品发布 → 中国镜像同步核对' : ''}。`);printLinks();return;
   }
   // 最新正式版以发布渠道为准：Gitee 单仓发布时不能依赖 GitHub Release 列表。
   const latestOfficial=async()=>{
@@ -167,12 +172,11 @@ export async function main(argv) {
   if(!opts.resume && latest && !newer(version,latest.replace(/^v/,'')))throw Error(`目标必须高于最新正式版${latest}`);
   const exists=run('git',['rev-parse','--verify',`refs/tags/${tag}`],{capture:true,optional:true});
   if(opts.resume) {
-    // 标签之后还会追加一个“刷新插件市场索引”的提交，所以续跑时 HEAD 允许正好是标签加这一个提交。
+    // 标签之后还会追加一个“刷新插件市场索引”的提交，所以续跑允许标签之后只有市场索引的净变更。
     const tagCommit=git('rev-parse',`${tag}^{commit}`),headCommit=git('rev-parse','HEAD');
     const indexRefreshOnly=headCommit!==tagCommit
-      && git('rev-parse','HEAD^')===tagCommit
       && git('diff','--name-only',`${tagCommit}..HEAD`)==='market/index.json';
-    if(!exists||pkg.version!==version||(headCommit!==tagCommit&&!indexRefreshOnly)||dirty)throw Error('续跑要求：标签/版本/HEAD一致（或只多一个市场索引提交）且工作区干净');
+    if(!exists||pkg.version!==version||(headCommit!==tagCommit&&!indexRefreshOnly)||dirty)throw Error('续跑要求：标签/版本/HEAD一致（或只有市场索引变更）且工作区干净');
   } else {
     if(exists)throw Error('标签已存在，禁止覆盖；如仅重试发布请使用--resume');
     run(process.execPath,['scripts/check-active-video.mjs']);
@@ -313,6 +317,19 @@ export async function main(argv) {
   if (!await push(gitee,'gitee.com','Gitee 标签',[tag])) throw Error('Gitee 标签推送失败；保留同版成品后续跑');
   for(const name of assets)await publishGitee({token,tag,archive:path.join(out,name),notes:notesText,prerelease:false});
   console.log(`双平台CI通过，GitHub与Gitee已发布同一成品：${assets.join('、')}`);
+  if(opts.all) {
+    const {publishNpmRelease}=await import('./publish-npm-release.mjs');
+    try { await publishNpmRelease({name:pkg.name,version,archive:path.join(out,assets[0])}); }
+    catch(error) { throw Error(`仓库发行版已完成，npm/中国镜像未完成：${error.message}；若 npm 提示 staged，请在 npm 批准后以同版本 --all --resume 续跑，不改标签`); }
+    run(process.execPath,['scripts/market-index.mjs']);
+    if(git('status','--short','--','market/index.json')) {
+      run('git',['add','market/index.json']);run('git',['commit','-m',`chore(market): 切换 ${tag} 到 npm 来源`]);
+      if(!await push(gitee,'gitee.com','Gitee 市场索引',[target]))throw Error('npm 已完成但 Gitee 索引未推送');
+      if(!await push(github,'github.com','GitHub 市场索引',[target]))throw Error('npm 已完成但 GitHub 索引未推送');
+    }
+    console.log('三端发布完成：中国镜像已核对目标版本、组合包声明和成品完整性。');
+  }
+
 
 }
 if(process.argv[1] && realpathSync(process.argv[1])===fileURLToPath(import.meta.url))main(process.argv.slice(2)).catch(error=>{console.error(`发布停止：${error.message}`);process.exitCode=1;});
