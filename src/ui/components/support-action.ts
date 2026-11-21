@@ -14,7 +14,9 @@ export function createSupportAction({ React, t, PAGE_CSS }: any) {
     if (!ownBundle) return null;
     return h(React.Fragment, null,
       h('style', null, PAGE_CSS),
-      h('button', { type: 'button', className: 'mov-btn mov-btn-sm', 'data-action': 'contact-support',
+      h('button', { type: 'button', className: 'mov-btn mov-support-action', 'data-action': 'contact-support',
+        icon: h('svg', { width: 13, height: 13, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, 'aria-hidden': true },
+          h('path', { d: 'M4 13v-1a8 8 0 0 1 16 0v1M4 12H3v6h4v-6H4Zm16 0h1v6h-4v-6h3Zm0 6v1a2 2 0 0 1-2 2h-6' })),
         style: { alignSelf: 'center', whiteSpace: 'nowrap' }, 'aria-haspopup': 'dialog', 'aria-expanded': open,
         onClick: () => setOpen(true),
       }, t('supportContact')),

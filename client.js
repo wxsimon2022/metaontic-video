@@ -139,8 +139,13 @@
         h("style", null, PAGE_CSS),
         h("button", {
           type: "button",
-          className: "mov-btn mov-btn-sm",
+          className: "mov-btn mov-support-action",
           "data-action": "contact-support",
+          icon: h(
+            "svg",
+            { width: 13, height: 13, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, "aria-hidden": !0 },
+            h("path", { d: "M4 13v-1a8 8 0 0 1 16 0v1M4 12H3v6h4v-6H4Zm16 0h1v6h-4v-6h3Zm0 6v1a2 2 0 0 1-2 2h-6" })
+          ),
           style: { alignSelf: "center", whiteSpace: "nowrap" },
           "aria-haspopup": "dialog",
           "aria-expanded": open,
@@ -469,6 +474,8 @@
       .mov-card-title { font-size: 13px; font-weight: 600; color: ${TOKENS.text}; }
       .mov-hint { font-size: 12px; color: ${TOKENS.muted}; line-height: 1.5; }
       .mov-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; flex: 0 0 120px; width: 120px; min-width: 120px; height: 36px; min-height: 36px; padding: 4px 10px; border-radius: 8px; border: 1px solid ${TOKENS.border}; background: transparent; color: ${TOKENS.text}; font: inherit; font-size: 12px; line-height: 1.2; text-align: center; cursor: pointer; white-space: normal; overflow-wrap: anywhere; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
+      .mov-support-action { flex: 0 0 auto; width: auto; min-width: 0; height: 28px; min-height: 28px; gap: 4px; padding: 0 10px; border: .5px solid transparent; box-shadow: inset 0 0 0 var(--dsh-hairline-width, .5px) var(--dsh-button-outline-color, var(--dsw-alias-border-l3)); border-radius: var(--dsw-radius-sm, 6px); font-size: 12px; line-height: 18px; white-space: nowrap; }
+      .mov-support-action > svg { box-sizing: content-box; flex: 0 0 13px; padding: 1.5px; }
       .mov-btn:hover:not(:disabled) { border-color: ${TOKENS.primaryFill}; color: ${TOKENS.primaryFill}; }
       .mov-btn:disabled { opacity: .5; cursor: default; }
       .mov-btn-primary { border-color: ${TOKENS.primaryFill}; background: ${TOKENS.primaryFill}; color: #fff; font-weight: 600; }
