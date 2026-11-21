@@ -1,6 +1,4 @@
-<img src="https://ai.mybfs.cn/promo/share-logo.png" width="160" alt="MetaOnticVideo · DeepSeek Harness AI 视频创作插件" />
-
-# dsh-metaontic-video · DeepSeek Harness AI视频创作插件
+# <img src="https://ai.mybfs.cn/promo/share-logo.png" width="32" height="32" alt="MetaOnticVideo · DeepSeek Harness AI视频创作插件" /> dsh-metaontic-video · DeepSeek Harness AI视频创作插件
 
 [English](./README.en.md)
 
