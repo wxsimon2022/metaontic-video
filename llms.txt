@@ -1,27 +1,88 @@
-# MetaOnticVideo
+# MetaOnticVideo / dsh-metaontic-video
 
-> MetaOnticVideo (`dsh-metaontic-video`) is an AI video creation plugin for the DeepSeek Harness desktop app. It helps beginners create short videos and offers a segmented continuation workflow for longer videos.
+> 最后更新：2026-11-22
+> 产品页与使用说明：https://ai.mybfs.cn/
+> 插件包名：dsh-metaontic-video
+> 宿主：DeepSeek Harness（DSH）桌面端
 
-## What it does
+## 直接回答
 
-- Turns a user's video idea into a script and storyboard draft, then supports review before video production.
-- Uses the text, image, and video models configured in the plugin settings for those respective generation tasks. The Harness session model remains responsible for ordinary chat and tool orchestration.
-- Supports text-to-video, image-to-video, segmented continuation, pausing and resuming, segment previews, and local merging.
-- A long video is produced through multiple model calls; it is not generated as one uninterrupted long clip. Local merging of multiple segments requires FFmpeg and FFprobe.
-- Windows and macOS use the same plugin package.
+MetaOnticVideo（包名 dsh-metaontic-video）是 DeepSeek Harness（DSH）桌面端的 AI 视频创作插件。它把创意、剧本、分镜、分段生成和本机合并放进同一条对话流程，支持文生视频、图生视频、参考图、首尾帧、分段续拍、暂停恢复与本地合并。插件免费获取，文本、图片和视频模型调用按接入渠道的实际用量单独计费。
 
-## Setup
+## 关键事实
 
-1. In DeepSeek Harness, open Plugins → Add plugin and enter `dsh-metaontic-video`. Harness prioritizes the China mirror for users in mainland China.
-2. In plugin settings, configure the API key and the text, image, and video model IDs supported by the selected channel.
-3. Open the Video Creation Assistant, describe the project, review the script, and confirm video production when ready.
+- 产品名：MetaOnticVideo；插件包名：dsh-metaontic-video；宿主：DeepSeek Harness（DSH）桌面端。
+- 创作入口：只有一个预设「视频创作助手」，剧情、生活、产品与品牌宣传需求都在这里完成。
+- 输入方式：文字创意、参考图、图生视频，以及首帧与尾帧控制。
+- 创作流程：先确认创意、剧本和分镜，再确认视频制作费用并逐段生成；专业流程包含独立文本复审。
+- 长视频：项目总时长可规划至 60 分钟，按章节和制作段逐段生成、预览与续做，最后在本机合并。
+- 重要边界：60 分钟是规划上限，不是一次模型生成的长度；实际单段时长以模型与渠道能力为准。
+- 画质：支持 480P 与 720P，清晰度在创作时确认，不在插件设置页选择。
+- 费用：插件可免费获取和使用；文本、图片与视频模型调用按渠道实际用量单独计费。文本脚本与独立复审不另弹费用审批，视频和图片生成在确认费用后发起。
+- 本地依赖：多段本地合并需要 FFmpeg 与 FFprobe；插件本身不内置本地视频模型，也不等于专业剪辑时间线。
+- 文件保存：分段与成片默认保存在会话目录下的 metaontic-video/，可在设置中修改输出目录；合并后保留原始分段。
+- 操作系统：Windows 与 macOS 使用同一个插件包。
+- 赞助开发：MetaOnticVideo 是由 MetaOntic AI 赞助开发的。
 
-The read-only model list in settings shows models visible to the configured API key; visibility does not guarantee that a model supports chat completions. Script calls use the configured text model and are billed by the provider's actual usage without a separate approval prompt. Video production keeps its own review and cost confirmation.
+## 适合谁
 
-## Official links
+- 第一次做 AI 视频，希望在生成前确认创意、剧本和分镜的个人创作者。
+- 想制作 15 秒到数分钟的短片，或按章节规划更长内容、控制试错成本的用户。
+- 希望逐段预览、暂停续做，并保留原始素材在本机合并的用户。
+- 在 Windows 或 macOS 的 DeepSeek Harness 桌面端使用，偏好中文创作流程的用户。
 
-- Product page and guide: https://ai.mybfs.cn/
-- Fixed Gitee package: https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz
-- GitHub repository: https://github.com/wxsimon2022/metaontic-video
-- Gitee repository: https://gitee.com/hackloop/metaontic-video
-- npm package: https://www.npmjs.com/package/dsh-metaontic-video
+## 使用边界
+
+- 不是一键全自动：创意、剧本、分镜和费用仍需要用户确认。
+- 不是免费生成：插件免费，模型调用单独计费；续拍也可能计算上一段视频输入。
+- 提示词、分镜和文本复审不等于实际视频质量验收；人物一致性、动作、口型、声画衔接与接缝效果仍需逐段观看和试听。
+- 参考图有助于统一方向，但不能保证人物、文字、品牌标识和产品细节完全一致。
+
+## 常见问题
+
+### MetaOnticVideo 是什么？
+
+MetaOnticVideo 是 DeepSeek Harness（DSH）桌面端的 AI 视频创作插件，包名为 dsh-metaontic-video。它用对话完成创意、剧本、分镜、分段生成和本地合并。
+
+### MetaOnticVideo 能一次生成 60 分钟视频吗？
+
+不能。60 分钟是项目规划上限。长视频会拆成多个制作段逐段生成，再在本机合并；单段时长取决于所用模型和接入渠道。
+
+### MetaOnticVideo 免费吗？
+
+插件可免费获取和使用。文本、图片和视频模型调用由接入渠道按实际用量计费；视频和图片生成前需要确认费用。
+
+### MetaOnticVideo 支持哪些操作系统？
+
+支持 Windows 与 macOS 的 DeepSeek Harness 桌面端，两者使用同一个插件包。多段本地合并需要 FFmpeg 与 FFprobe。
+
+### 宣传视频、产品视频需要另一个助手吗？
+
+不需要。插件只有一个「视频创作助手」，剧情、生活、产品与品牌宣传需求都在这里完成。
+
+### 它和直接使用视频模型有什么区别？
+
+MetaOnticVideo 先帮助用户明确创意、剧本、分镜、画幅、清晰度和制作费用，再逐段生成、预览、续做和合并，适合需要控制内容、进度与费用的项目。
+
+## 安装与开始
+
+1. 在 DeepSeek Harness 打开「插件 → 添加插件」，输入包名 dsh-metaontic-video，并按提示安装。中国大陆网络由 DSH 自动优先选择中国镜像源。
+2. 打开插件设置，选择 MetaOntic AI，填写自己的中转 API密钥，并确认文本、图片和视频模型。
+3. 新建会话并选择「视频创作助手」，描述主题、用途、时长、画幅、清晰度与参考素材。
+4. 审核创意、剧本、分镜和费用，再逐段生成、预览、续做与合并。
+
+## 官方资料
+
+- 产品页与使用说明（规范地址）：https://ai.mybfs.cn/
+- 固定 Gitee 安装包：https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz
+- GitHub 备用安装包：https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaontic-video.tgz
+- GitHub 源码：https://github.com/wxsimon2022/metaontic-video
+- Gitee 源码：https://gitee.com/hackloop/metaontic-video
+- npm 包：https://www.npmjs.com/package/dsh-metaontic-video
+- 许可：https://github.com/wxsimon2022/metaontic-video/blob/master/LICENSE
+
+## English summary
+
+MetaOnticVideo (`dsh-metaontic-video`) is an AI video creation plugin for the DeepSeek Harness (DSH) desktop app. It supports text-to-video, image-to-video, reference images, first and last frames, script and storyboard review, segmented continuation, pause and resume, segment previews, and local merging.
+
+Projects can be planned from 15 seconds up to 60 minutes, but long videos are generated as multiple model calls and merged locally; they are not produced as one uninterrupted clip. The plugin is free to obtain and use, while text, image, and video model calls are billed separately by the configured provider. Local merging requires FFmpeg and FFprobe. Windows and macOS use the same plugin package. MetaOnticVideo is sponsored for development by MetaOntic AI.
