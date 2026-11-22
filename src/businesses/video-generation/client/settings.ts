@@ -101,8 +101,9 @@ function makePage({ form, t, manager }) {
         const pending = Object.entries(draft).filter(([key, next]) => !same(value[key], next));
         // 一有新的改动就把上一条「已保存」收起来，免得看着像这次的改动也存过了
         const edit = (key, next) => {
-          // 选择文本模型不会改变接口或密钥，保留刚探测到的完整候选清单；修改连接参数时清空旧清单。
-          checkController.current.invalidate(key !== 'textModel');
+          // 仅连接方式、地址、密钥或共用密钥开关变化时清空模型清单；其它设置改动不影响候选。
+          const connectionChanged = ['connectionMode', 'baseUrl', 'metaonticApiKey', 'volcengineApiKey', 'textApiKey', 'imageUseVideoKey'].includes(key);
+          checkController.current.invalidate(connectionChanged);
           clearStatusTimer();
           setStatus((current) => (current === 'idle' ? current : 'idle'));
           setDraft((current) => ({ ...current, [key]: next }));

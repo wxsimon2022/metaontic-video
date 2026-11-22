@@ -33,8 +33,8 @@ export const VOLCENGINE_MODE_AVAILABLE = VOLCENGINE.modeAvailable;
 /**
  * 文本模型（写脚本、分镜与逐段提示词）：与视频模型同一中转站、同一个 API密钥，按 /v1/chat/completions 调用。
  *
- * 和中转站在售候选保持一致：设置页只提供这几支（见 client/config.ts 的 SELECTS），
- * 这里同时给出默认值与归一：留空、或存着已下线型号时按默认值生效，避免把下线的型号提交上去。
+ * 设置页先提供离线默认候选，验证连接后再合并中转站返回的完整模型清单。
+ * 这里给出默认值与旧型号归一：留空、或存着已下线型号时按默认值生效，避免提交已下线型号。
  */
 export function resolveImageModel(value) {
   const model = String(value ?? '').trim();
