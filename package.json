@@ -47,10 +47,7 @@
     "./package.json": "./package.json",
     "./presets/video-director": "./presets/video-director.js",
     "./presets/video-director/locale/*.json": "./locale/presets/video-director/*.json",
-    "./presets/promo-video": "./presets/promo-video.js",
-    "./presets/promo-video/locale/*.json": "./locale/presets/promo-video/*.json",
     "./presets/video-director/icon": "./presets/icons/video-director.svg",
-    "./presets/promo-video/icon": "./presets/icons/promo-video.svg"
   },
   "files": [
     "index.js",

@@ -177,11 +177,11 @@ Windows解压目录安装在更新时出现空目录/locale缺失：先核对成
 
 流水线发版（2026-11-15）：Gitee 侧的打包 + 发版都放在 Gitee Go 流水线 `.workflow/MetaOnticVideo.yml`——`v*` 标签触发时，打包步骤末尾执行 `node scripts/ci-release.mjs --dist dist --tag "$TAG"`，发行说明从 package.json 的 releaseNotes 生成并发布 Gitee Release（只发正式版；ci- 演练标签、分支与 PR 只出制品）。手动运行时可在 Gitee「运行流水线」里填 RELEASE_TAG（要发布的标签）与 RELEASE_NOTES（发版描述，逐行「新增：…」「优化：…」或整段发行版正文，合计≤100 字；都不填就按 git 标签与 package.json 的 releaseNotes 走）；描述与仓库 releaseNotes 不一致时照常发布但要在日志里提示同步回仓库。令牌配在流水线变量里（GITEE_TOKEN，别名 TOKEN_GITEE 等），绝不写进仓库或流水线 YAML——`.workflow/流水线-202611031408.yml`（Gitee 界面导出的空壳流水线）里原来写死过明文 TOKEN_GITEE，2026-11-16 已连同文件一起删除；旧值仍留在 git 历史与 Gitee 侧的流水线变量里，必须在 Gitee 上吊销换新，只删文件不算修好。发版默认在本机打包发布：`node scripts/release.mjs X.Y.Z --notes release-plan.json` 直接建 Gitee Release 并核对附件；要交给流水线就加 `--pipeline`（`--ci` 同义），本机只做准备、提交并推标签，不本地打包、不需要 GITEE_TOKEN。`--both` 是本机收尾、不要与 `--pipeline` 同用。幂等靠 publish-gitee 的「已有同名附件只核对不覆盖」：本机发布后流水线又按标签跑一遍也不会互相覆盖，成品以先发布的那份为准。流水线发版失败先看 ci-release.mjs 日志里的标签与包版本、成品路径、令牌来源与 sha256，不要重打版本。打包步骤里的 `artifacts` 只是当次运行的暂存构建物（会过期），成品要长期留档必须靠同一 stage 的「上传制品」步骤 `publish@general_artifacts`（制品名 metaontic-video）。正式版还会在 Gitee Release 之后把标签推到 GitHub（流水线变量 `GITHUB_TOKEN`，细粒度令牌需 contents:write，勾选私密）：publish.yml 发现 Gitee 已有该版本就用同一个 tgz 镜像发布并跑双平台安装检查，不重新打包；没配令牌时只打印提示、不影响 Gitee 发布。
 
-宣传预设promo-video与video-director复用YAML插件列表锚点和公共工具/审批，仅宣传模式注入promo专题。作用域判断以当前预设registry为准，标准/未知预设不得注入。预设新增后核对宿主YAML解析、技能入包和动态模式切换；旧会话固定身份不追溯修改。
+当前仅注册video-director宿主预设；剧情、风景、产品及品牌宣传等题材均由该助手按项目意图处理。新增独立预设时核对宿主YAML解析、技能入包和动态模式切换；旧会话固定身份不追溯修改。
 
-组件中文名称：宿主包含组件列表按row.moduleName读取<完整模块名>/locale/en.json及同目录语言文件，不读预设config.name。两个预设用metaontic-video/presets/<id>独立入口转导出宿主dsh-agent-preset，并导出对应locale；不修改宿主文件，不改预设id。打包核对wrapper与locale均纳入，宿主解析名称而非仅模式列表名称。
+组件中文名称：宿主包含组件列表按row.moduleName读取<完整模块名>/locale/en.json及同目录语言文件，不读预设config.name。视频创作助手预设用dsh-metaontic-video/presets/video-director独立入口转导出宿主dsh-agent-preset，并导出对应locale；不修改宿主文件。打包核对wrapper与locale均纳入，宿主解析名称而非仅模式列表名称。
 
-Agent组件图标使用<完整预设模块>/icon导出，SVG在presets/icons，场记板蓝紫/扩音器橙红区分两个预设；需核对宿主readPluginMeta返回各自图标、成品入包和24/40px明暗背景显示，不修改插件总Logo。
+Agent组件图标使用<完整预设模块>/icon导出，SVG在presets/icons；需核对宿主readPluginMeta返回图标、成品入包和24/40px明暗背景显示，不修改插件总Logo。
 
 鉴权提示分层：聊天“本轮运行失败/API密钥无效”来自宿主AUTH turn-error，与视频接口工具错误不同。客户端通过conversation.chat.node官方keyed扩展包装原renderer，仅AUTH使用友好提示并引导Harness模型设置，其余code里再认一类「工具参数不是合法 JSON」：模型把 480p、16:9 这类值裸写、不带引号时，宿主只在解析参数阶段抛 Json 报错，用户只看到「本轮运行失败」；这类换成「没真正调用工具、也没产生费用，回一句按原参数重试」的说法并保留原始报错，其他消息原样委托原组件。参数说明与动态提示词都要写明枚举值要带引号，试算/画布侧还要把 480、480P 这类写法归一成 480p，双保险；不得覆盖宿主词典或写宿主安装文件。视频HTTP401/403在classifyError中保留provider_auth与状态码，提示插件设置及客服，不直断密钥无效、不回显原始鉴权报错，不改轮询重试与防重。
 

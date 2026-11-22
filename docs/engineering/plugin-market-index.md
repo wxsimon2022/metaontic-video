@@ -23,7 +23,7 @@
 - 文件：`market/index.json`，随仓库主干发布。
 - 索引源地址（用户要粘贴的就是这一行）：
   `https://gitee.com/hackloop/metaontic-video/raw/master/market/index.json`
-- 条目：`metaontic-video`，分类 `video`，标签 `video-director`（视频导演）、`promo-video`（宣传短片），
+- 条目：`dsh-metaontic-video`，分类 `video`，标签 `video-director`（视频创作），
   图标内联为 `data:` SVG（不依赖外部主机），`repository` 指向 Gitee 主仓库，`homepage` 指向 `https://ai.mybfs.cn`。
 - 安装来源：已发布到 npm 的版本用 `npm` 来源（大陆自动走 `registry.npmmirror.com`），
   其余版本用 `git` 来源固定到发布提交，例如

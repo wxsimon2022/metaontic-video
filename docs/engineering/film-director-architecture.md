@@ -9,7 +9,7 @@
 | 参考目录 | 当前落点 | 实际职责 |
 | --- | --- | --- |
 | agents | src/agents/<role>/prompt.ts、src/businesses/film-production/roles | 八角色提示词与当前阶段契约，逻辑职责切换 |
-| skills | skills/video-director、skills/promo-video | 阶段方法与按需参考文档 |
+| skills | skills/video-director | 阶段方法与按需参考文档；覆盖剧情、风景、产品及品牌宣传创作 |
 | workflows | film-production/workflows/workflow.engine.ts | 依赖、下一动作及制作编译 |
 | contracts | film-production/contracts、validation | 字段、结构、时间轴与交叉引用检查 |
 | project | film-production/projects/project.service.ts | 项目规格、原始要求与配置修订 |

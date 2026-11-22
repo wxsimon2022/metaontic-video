@@ -27,8 +27,7 @@ src/
 │   └── internal/             隐藏的内部视频开发能力
 └── agents/
     ├── index.ts              Agent 清单
-    ├── video-director/        视频创作助手定义
-    └── promo-video/           宣传助手定义与专题提示词
+    └── video-director/        视频创作助手定义，覆盖多题材视频创作
 ```
 
 ## 新增同业务 Agent
@@ -38,7 +37,7 @@ src/
 3. 同步 Harness 静态资源：在 `cordis.patch.yml` 添加独立预设；在 `src/agents/presets/<id>.ts` 创建预设源码并将其加入构建预设清单，生成 `presets/<id>.js` 包装入口、`locale/presets/<id>/{zh,en}.json` 和图标；在 `package.json.exports` 添加预设、locale、icon 导出。同业务可复用现有 YAML 插件锚点，但独立 Agent 身份与 persona 必须符合自己的业务。
 4. 需要新技能时在 `skills/<id>/` 添加。Agent 描述是框架清单，不会自动生成 Harness YAML、技能或包导出；这些静态资源仍须显式同步并通过安装检查。
 
-当前宣传助手复用视频业务，只有 `agents/promo-video/instructions.ts` 提供专题规则。
+当前由视频创作助手统一承接不同题材；品牌、产品及活动宣传属于创作题材，不再单独注册宿主助手。
 
 ## 新增不同业务
 
@@ -93,4 +92,4 @@ Windows/macOS共用打包入口，运行时不读取源码目录；本次本地�
 
 脚本展示与确认补充：分镜捕获仅使用最近一条完整脚本消息，审核复用磁盘稿件，防止累计正文混合多稿并覆盖修订。明确的“待确认事项/问题”章节在脚本审核前触发实际提问；答复仅用于改稿，不等于审核通过，取消或未答保持阻断。风险与建议不自动归入此检查。路径仍使用 node:path，无新增平台命令；本次仅本机自动回归，未进行 Windows 桌面验证。
 
-预设创建回归：skill-filesystem 的模块解析必须使用当前 package.json 的 name（dsh-metaontic-video），历史配置命名空间 metaontic-video 不代表 npm 包名。两预设共用同一技能目录锚点；增加测试核对 YAML 中 package.json 引用与实际可解析的包名，避免仅检查入口导出而漏掉会话挂载。此路径通过 node:path 组合，Windows/macOS 共用；本机安装验证不代表 Windows 桌面实测。
+预设创建回归：skill-filesystem 的模块解析必须使用当前 package.json 的 name（dsh-metaontic-video），历史配置命名空间 metaontic-video 不代表 npm 包名。视频创作助手使用独立预设入口与技能目录锚点；增加测试核对 YAML 中 package.json 引用与实际可解析的包名，避免仅检查入口导出而漏掉会话挂载。此路径通过 node:path 组合，Windows/macOS 共用；本机安装验证不代表 Windows 桌面实测。

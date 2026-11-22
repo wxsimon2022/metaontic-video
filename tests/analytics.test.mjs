@@ -82,7 +82,7 @@ test('身份文件坏掉或对不上时按主文件为准并自愈，两边都�
 });
 test('analytics payload contains only allowlisted metadata and approved basic device fields',async()=>{
  let body;const r=fixture(async(_url,options)=>{assert.equal(options.redirect,'error');assert.equal(options.credentials,'omit');assert.deepEqual(Object.keys(options.headers),['Content-Type']);body=JSON.parse(options.body);return{ok:true};});
- try{r.record('tool_finished',{tool:'video_generate',mode:'promo-video',status:'succeeded',durationMs:12,prompt:'private story',apiKey:'secret',videoUrl:'private-url',hostname:'private-host',errorCode:'unknown private details'});await r.flush();
+ try{r.record('tool_finished',{tool:'video_generate',mode:'video-director',status:'succeeded',durationMs:12,prompt:'private story',apiKey:'secret',videoUrl:'private-url',hostname:'private-host',errorCode:'unknown private details'});await r.flush();
  assert.equal(body.installationId,id);assert.equal(body.device.arch,'arm64');assert.equal(body.events[0].errorCode,'other');
  assert.doesNotMatch(JSON.stringify(body),/private|secret/);assert.equal(body.events[0].attempts,undefined);
  }finally{r.dispose();}

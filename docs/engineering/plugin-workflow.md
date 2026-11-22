@@ -11,7 +11,7 @@
 
 ## 装配与角色
 
-`src/index.ts` 通过 `app/bootstrap.ts` 装配 `video` 与 `film-director` 两个业务，注册视频创作助手、宣传视频助手两个宿主预设。`src/client.ts` 装配浏览器界面及安装迁移保护。专业提示词位于 `src/agents/<role>/prompt.ts`，由 `film-production/roles` 加入当前阶段契约、类型配置和专业方法；`skills/` 提供按需参考。
+`src/index.ts` 通过 `app/bootstrap.ts` 装配 `video` 与 `film-director` 两个业务，注册「视频创作助手」一个宿主预设。该助手可创作剧情、风景、产品及品牌宣传等不同类型内容。`src/client.ts` 装配浏览器界面及安装迁移保护。专业提示词位于 `src/agents/<role>/prompt.ts`，由 `film-production/roles` 加入当前阶段契约、类型配置和专业方法；`skills/` 提供按需参考。
 
 Director、Creative、Screenwriter、Character、Scene、Storyboard、Prompt Engineer、Reviewer 是同一宿主助手的八个逻辑职责，不代表八个独立模型、后台任务或自动并行调用。
 

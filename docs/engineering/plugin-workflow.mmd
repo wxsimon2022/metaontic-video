@@ -1,9 +1,9 @@
 flowchart TD
   HOST[DeepSeek Harness 对话与插件设置] --> APP[app/bootstrap.ts 装配与工具注册]
   HOST --> UI[src/client.ts → ui + video-generation/client]
-  APP --> ENTRY[视频创作助手 / 宣传视频助手]
+  APP --> ENTRY[视频创作助手]
   ENTRY --> LOGIC[同一宿主助手按阶段切换八个专业角色]
-  SKILL[skills/video-director + promo-video 按需方法与参考] -.-> LOGIC
+  SKILL[skills/video-director 按需方法与参考] -.-> LOGIC
   PROFILE[题材 / 形式 / 目的 / 风格配置] -.-> LOGIC
   LOGIC --> F[film_project 专业创作与版本管理]
   F --> C[Creative 创意方案]
