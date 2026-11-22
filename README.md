@@ -13,15 +13,11 @@ MetaOnticVideo 是 DeepSeek Harness（DSH）的 AI视频创作插件：**帮助�
 
 ## 在线安装
 
-在 Harness「插件 → 添加插件」中粘贴安装链接。中国大陆用户优先使用中国镜像源；Windows 与 macOS 使用同一个安装包。
+在 Harness「插件 → 添加插件」中直接输入包名 `dsh-metaontic-video`。中国大陆网络由 DSH 自动优先选择中国镜像源；Windows 与 macOS 使用同一个安装包。
 
-中国镜像源（优先）：
+备用在线安装链接：
 
-```text
-https://registry.npmmirror.com/dsh-metaontic-video/-/dsh-metaontic-video-4.1.2.tgz
-```
-
-Gitee 备用：
+Gitee：
 
 ```text
 https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz
