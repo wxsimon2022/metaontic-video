@@ -1,19 +1,23 @@
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { GITEE_QUOTA_KEEP, isGiteeQuotaError, recoverGiteeQuota } from './gitee-quota.mjs';
 
 export const GITEE_STABLE_URL = 'https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz';
 const root = 'https://gitee.com/hackloop/metaontic-video';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 
 // 从已公开版本包复制原字节，避免本机与流水线重复打包造成两份不同成品。
-export async function publishGiteeStableAlias({ token, tag, request = fetch, log = console.log }) {
+export async function publishGiteeStableAlias({ token, tag, request = fetch, quotaKeep = GITEE_QUOTA_KEEP, quotaCleanup = recoverGiteeQuota, log = console.log }) {
   if (!token) throw new Error('Missing GITEE_TOKEN.');
   if (!/^v\d+\.\d+\.\d+$/.test(tag)) throw new Error('A stable version tag is required.');
   async function api(path, body) {
     const url = new URL(`${root.replace('gitee.com/', 'gitee.com/api/v5/repos/')}${path}`);
     if (!body) url.searchParams.set('access_token', token);
     const response = await request(url, { method: body ? 'POST' : 'GET', body, signal: AbortSignal.timeout(body ? 300000 : 60000) });
-    if (!response.ok) throw new Error(`Gitee stable asset: HTTP ${response.status}`);
+    if (!response.ok) {
+      const detail = await response.text?.().catch(() => '') ?? '';
+      throw new Error(`Gitee stable asset: HTTP ${response.status}${detail ? ' ' + detail.slice(0, 300) : ''}`);
+    }
     return response.json();
   }
   async function download(name) {
@@ -33,14 +37,27 @@ export async function publishGiteeStableAlias({ token, tag, request = fetch, log
   const source = await download(sourceName);
   const sha256 = digest(source);
   if (!list.some(item => (item.name || item.file_name) === 'metaontic-video.tgz')) {
-    const form = new FormData();
-    form.set('access_token', token);
-    form.set('file', new Blob([source]), 'metaontic-video.tgz');
-    try { await api(path, form); }
-    catch (error) {
-      // 上传结果不明先复查，不盲目重放上传；并发发布同名文件也只接受原成品。
-      const current = await api(path);
-      if (!Array.isArray(current) || !current.some(item => (item.name || item.file_name) === 'metaontic-video.tgz')) throw error;
+    let quotaRecovered = false;
+    for (;;) {
+      try {
+        const form = new FormData();
+        form.set('access_token', token);
+        form.set('file', new Blob([source]), 'metaontic-video.tgz');
+        await api(path, form);
+        break;
+      } catch (error) {
+        // 上传结果不明先复查，不盲目重放上传；并发发布同名文件也只接受原成品。
+        const current = await api(path);
+        if (Array.isArray(current) && current.some(item => (item.name || item.file_name) === 'metaontic-video.tgz')) break;
+        if (!quotaRecovered && isGiteeQuotaError(error)) {
+          quotaRecovered = true;
+          log(`Gitee 附件配额已满，按保留最近 ${quotaKeep} 个正式版的规则自动清理旧发行版…`);
+          try { await quotaCleanup({ token, request, log, keep: quotaKeep, protectedTags: [tag] }); }
+          catch (cleanupError) { throw new Error(`${error.message}；自动清理旧发行版失败：${cleanupError.message}`); }
+          continue;
+        }
+        throw error;
+      }
     }
   }
   if (digest(await download('metaontic-video.tgz')) !== sha256) throw new Error('Gitee stable asset checksum mismatch; existing asset was not overwritten.');
