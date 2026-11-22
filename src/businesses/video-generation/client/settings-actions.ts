@@ -1,4 +1,4 @@
-import { RETIRED_TEXT_MODELS, VOLCENGINE_MODE_AVAILABLE } from '../connection-defaults.js';
+import { RETIRED_TEXT_MODELS, VOLCENGINE_MODE_AVAILABLE, isTextModelCandidate } from '../connection-defaults.js';
 // 下架某个接入方式时，把它填进这里：设置页用一个隐藏项显示已有取值，列表里选不到它，
 // 也不会把它显示成别的渠道。在售时为空气（候选见 SELECTS.connectionMode）。
 const HIDDEN_CONNECTION_MODES = [
@@ -97,8 +97,9 @@ export function createSettingsActions(context: any) {
             const retiredImageModel = field.key === 'imageModel' && !options.includes(String(current || ''));
             // 文本模型的旧默认值同样已下线：存量配置按实际生效的候选显示，用户不用自己改。
             const retiredTextModel = field.key === 'textModel' && RETIRED_TEXT_MODELS.includes(String(current || ''));
+            const invalidTextModel = field.key === 'textModel' && !isTextModelCandidate(current);
             const removedMode = field.key === 'connectionMode' && !['metaontic', 'volcengine'].includes(String(current || ''));
-            const list = !removedMode && current && !options.includes(current) && !hiddenModel && !hiddenMode && !legacyMerge && !retiredImageModel && !retiredTextModel ? [...options, current] : options;
+            const list = !removedMode && current && !options.includes(current) && !hiddenModel && !hiddenMode && !legacyMerge && !retiredImageModel && !retiredTextModel && !invalidTextModel ? [...options, current] : options;
             return h('select', {
                 key: 'control',
                 id,
@@ -106,7 +107,7 @@ export function createSettingsActions(context: any) {
                 className: `mov-input${field.mono ? ' mov-mono' : ''}`,
                 style: inputStyle,
                 title: field.key === 'textModel' || field.key === 'model' ? String(current ?? '') : undefined,
-                value: removedMode ? '' : legacyMerge ? 'copy' : (retiredImageModel || retiredTextModel) ? options[0] ?? '' : current ?? '',
+                value: removedMode ? '' : legacyMerge ? 'copy' : (retiredImageModel || retiredTextModel || invalidTextModel) ? options[0] ?? '' : current ?? '',
                 onChange: (event) => edit(field.key, event.target.value),
             }, [
                 removedMode ? h('option', { key: 'select-connection', value: '', disabled: true }, t('unknownConnection')) : null,

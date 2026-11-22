@@ -1,4 +1,5 @@
 import { imageConfig, textConfig, snapshotConfig, resolveApiKey, resolveBaseUrl, resolveModel, resolveTextModel, resolveQueryPath, isVolcengine } from './connection.js';
+import { isTextModelCandidate } from '../connection-defaults.js';
 export const CONNECTION_CHECK_TIMEOUT_MS=12000;
 /** 只读诊断。仅读取已保存配置，绝不提交模型任务或返回上游错误/密钥。 */
 export async function checkConnections(liveConfig:any,options:any={}) {
@@ -56,8 +57,10 @@ export async function checkConnections(liveConfig:any,options:any={}) {
     const model=target==='image'?cfg.imageModel:target==='text'?resolveTextModel(cfg):resolveModel(cfg);
     const result=await probe(cfg);
     const {ids,...safe}=result;
-    return {target,model,...safe,...(ids&&!ids.has(model)?{code:'model_not_listed',level:'warning'}:{}),
-      ...(target==='text'&&ids?{availableModels:[...ids].sort()}: {})};
+    const currentModelAvailable=Boolean(ids&&ids.has(model)&&(target!=='text'||isTextModelCandidate(model)));
+    const availableModels=target==='text'&&ids?[...ids].filter(isTextModelCandidate).sort():undefined;
+    return {target,model,...safe,...(ids&&!currentModelAvailable?{code:'model_not_listed',level:'warning'}:{}),
+      ...(availableModels?{availableModels}: {})};
   }));
   return {checks,scope:'read_only',generation_tested:false};
 }

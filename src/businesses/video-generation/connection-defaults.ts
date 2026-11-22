@@ -47,6 +47,13 @@ export function normalizeTextModel(value) {
   return model;
 }
 
+/** /v1/models 会返回令牌可见的多模态型号；文本选择器排除视频、图片及非对话专用型号。 */
+export function isTextModelCandidate(value) {
+  const model = String(value ?? '').trim();
+  if (!model) return false;
+  return !/(seedance|seedream|(?:^|[-_.\s])(?:video|image|veo|sora|kling|runway|vidu|wanx?|t2v|i2v|embedding|rerank|tts|asr|speech|music)(?:$|[-_.\s]))/i.test(model);
+}
+
 export function connectionDefaults(values) {
   const text = (key, fallback) => String(values[key] ?? '').trim() || fallback;
   const volc = values.connectionMode === 'volcengine';

@@ -2,7 +2,7 @@
 export function createDictionaries() {
 const zh = {
       connectionCheckTitle: "API 连接验证",
-      connectionCheckButton: "验证连接并刷新模型",
+      connectionCheckButton: "验证KEY",
       connectionChecking: "正在验证并读取模型…",
       connectionCheckSaveFirst: "有未保存的修改，请先保存后验证。",
       connectionCheckHint: "验证已保存的接口并刷新文本模型候选列表，只读查询不提交生成任务；模型清单不代表每个型号都支持文本对话。",
@@ -81,7 +81,7 @@ const zh = {
       textApiKey: '文本模型 API密钥',
       resolution: '视频清晰度',
       imageModelHint: 'Seedream可生成角色图；遇真人限制时，经同意可转换参考图。图片调用单独计费，结果需审核。',
-      textModelHint: '脚本与分镜由此处选定的模型生成，普通对话仍使用 Harness 会话模型。点击“验证连接并刷新模型”读取当前 API密钥可访问的模型候选，也可直接输入渠道支持的模型 ID（例如 GLM 型号）。模型清单只证明密钥可见，不保证型号支持文本对话；脚本调用按渠道实际文本用量计费，不单独弹审批。',
+      textModelHint: '脚本与分镜由此处选定的模型生成，普通对话仍使用 Harness 会话模型。点击“验证KEY”读取当前 API密钥可访问的文本模型，再从下拉列表中选择。模型清单只证明密钥可见，不保证型号支持文本对话；脚本调用按渠道实际文本用量计费，不单独弹审批。',
       modelHint: 'mini 侧重成本，fast 侧重生成速度。实际价格以所选渠道为准。',
       mergeMode: '合并方式',
       mergeModeSeamless: '直接拼接（旧配置兼容）',
@@ -197,7 +197,7 @@ const zh = {
 
     const en = {
       connectionCheckTitle: "API connection check",
-      connectionCheckButton: "Check connection and refresh models",
+      connectionCheckButton: "Verify key",
       connectionChecking: "Checking and loading models…",
       connectionCheckSaveFirst: "Save your changes before checking.",
       connectionCheckHint: "Checks the saved endpoint and refreshes text-model suggestions with a read-only request. It does not submit generation tasks; a listed model is not guaranteed to support chat completions.",
@@ -276,7 +276,7 @@ const zh = {
       textApiKey: 'Text model key',
       resolution: 'Video resolution',
       imageModelHint: 'Seedream creates character images or, with consent after a real-person restriction, stylizes references. Image calls are billed separately and results require review.',
-      textModelHint: 'This model generates scripts and storyboards; regular chat still uses the Harness session model. Click “Check connection and refresh models” to load models visible to the saved API key, or enter a channel-supported model ID such as a GLM model. Listing visibility does not guarantee chat-completion support. Script calls are billed by actual text usage and do not show a separate approval prompt.',
+      textModelHint: 'This model generates scripts and storyboards; regular chat still uses the Harness session model. Click “Verify key” to load text models visible to the saved API key, then select one from the list. Listing visibility does not guarantee chat-completion support. Script calls are billed by actual text usage and do not show a separate approval prompt.',
       modelHint: 'mini focuses on cost; fast focuses on generation speed. Actual prices depend on your provider.',
       mergeMode: 'Merge mode',
       mergeModeSeamless: 'Direct concat (legacy setting)',

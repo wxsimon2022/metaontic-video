@@ -2,7 +2,7 @@ import { capabilityChannel,readCapabilityObservations } from '../video-generatio
 import { reportDigest } from './reviews/review.provenance.js';
 import { sourceRevisions } from './contracts/index.js';
 import { defineChapters, submitChapter } from './chapters/chapter.service.js';
-import { independentReviewInput, runIndependentReview, reviewBatches, reviewCacheKey } from './reviews/independent-review.js';
+import { independentReviewInput, runIndependentReview } from './reviews/independent-review.js';
 import { presentChineseToolCall } from '../../shared/utils/tool-presentation.js';
 import { channelCapabilities } from '../video-generation/providers/capabilities.js';
 import { withFilmDiagnostics } from './validation/budget.validator.js';
@@ -109,14 +109,6 @@ export const filmDirectorBusiness: BusinessModule = {
             const checkpointFile=path.join(dir,'review-checkpoints.json');
             let cache:any={};
             try{cache=JSON.parse(await readFile(checkpointFile,'utf8'));}catch(error:any){if(error.code!=='ENOENT')throw Error('REVIEW_CHECKPOINT_UNREADABLE');}
-            const reviewRequests=reviewBatches(state).filter(b=>!cache[reviewCacheKey(runtime.config,b)]).length;
-            if(reviewRequests>0) {
-            const service=runtime.ctx.get?.('userQuestions') || (exec.agent as any)?.ctx?.get?.('userQuestions');
-            if(!service?.ask)return {status:'needs_input',reason:'独立文本审核需要确认文本模型调用费用；确认服务不可用'};
-            const answer=await service.ask({agent:exec.agent,signal:exec.signal,questions:[{id:'independent_review_cost',header:'独立审核',question:`使用当前文本模型，预计${reviewRequests}次文本请求，在不带聊天历史的独立上下文审核当前创作方案。文本调用按渠道计费；不生成视频、不替代创意/剧本批准或视频费用确认。是否执行？`,multiSelect:false,options:[{label:'执行独立审核',description:'同意本次文本模型调用费用'},{label:'暂不执行',description:'保留已有创作进度，不发起文本调用'}]}]});
-            const decision=answer?.answers?.find(a=>a.id==='independent_review_cost');
-            if(exec.signal?.aborted||decision?.custom||decision?.selected?.length!==1||decision.selected[0]!=='执行独立审核')return {status:'needs_input',reason:'未授权独立文本审核，未调用模型'};
-            }
             const report=await runIndependentReview(runtime.config,state,{signal:exec.signal,cache,onCheckpoint:async(key,report)=>{
               cache[key]=report;
               cache=Object.fromEntries(Object.entries(cache).slice(-64));
