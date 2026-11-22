@@ -1,5 +1,5 @@
 import { PLUGIN_PACKAGE, RELAY, SUPPORT_URL } from '../../shared/constants/plugin.js';
-import sponsorLogo from '../../../zanzhu.png';
+import sponsorLogo from '../../assets/sponsors/metaontic-ai.png';
 
 const SPONSOR_LINKS = [
   { id: 'metaontic-ai', href: RELAY.signupUrl, logo: sponsorLogo, tooltip: '多模型聚合平台', ariaLabel: '多模型聚合平台' },
