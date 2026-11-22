@@ -1,9 +1,9 @@
 /** 仅压缩工具返回，完整材料仍原样持久化；下一阶段输入不截断。 */
 export function projectResponse(state:any,nextTask:any,mode:string='full',extra:any={}) {
  const continuation = nextTask?.action==='submit' && nextTask?.stage==='script'
-  ? {project_id:state.project_id,expected_revision:state.revision,action:'WRITE_AND_SUBMIT_SCRIPT',instructions:'创意已批准，完整输入见nextTask。现在完成并展示剧本，使用本project_id和expected_revision提交script；不重复创意审批，不新建项目，不以准备开始结束本轮。中断恢复时沿用此状态。'}
+  ? {project_id:state.project_id,expected_revision:state.revision,action:'WRITE_AND_SUBMIT_SCRIPT',instructions:'创意已批准，完整输入见nextTask。完成剧本后先用本project_id和expected_revision提交script；提交成功后立即调用film_project approve(stage:"script")。完整剧本会在原生审批卡片中展示，聊天正文只简短提示已保存并等待审批，不要再粘贴完整剧本，避免重复展示。不要重复创意审批，不新建项目，不以准备开始结束本轮。中断恢复时沿用此状态。'}
   : nextTask?.action==='approve'
-  ? {project_id:state.project_id,expected_revision:state.revision,action:'REQUEST_NATIVE_APPROVAL',instructions:'展示当前保存稿后直接调用film_project approve，由工具发起唯一人工审批；不要先用ask_user_question重复询问是否批准。'}
+  ? {project_id:state.project_id,expected_revision:state.revision,action:'REQUEST_NATIVE_APPROVAL',instructions:nextTask.stage==='creative'?'先确认当前对话已完整展示本版创意方案；如果尚未展示，先展示完整方案。随后直接调用film_project approve，由原生卡片确认本版，不重复展示创意正文，也不要先用ask_user_question重复询问是否批准。':'直接调用film_project approve，由工具原生审批卡片展示当前已保存剧本并发起唯一人工审批；聊天正文不要重复粘贴完整剧本，不要先用ask_user_question重复询问是否批准。'}
   : undefined;
  if(mode!=='compact')return {...state,...extra,...(continuation?{continuation}:{}),nextTask};
  return {

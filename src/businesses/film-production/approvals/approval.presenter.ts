@@ -16,6 +16,9 @@ function readable(value:any,depth=0):string {
 }
 export function approvalPreview(stage:string,artifact:any):string {
  const data=artifact.data||{};
+ if(stage==='creative') {
+  return `创意方案 · 修订 ${artifact.revision}\n\n完整方案应已在当前对话正文展示，请回看并按该版本作出决定。若当前对话没有展示完整方案，应先由助手补充展示，再进行审批。此卡片只确认版本，不重复渲染提案。`;
+ }
  const title=stage==='creative'?'创意方案':'正式剧本';
  let content=readable(data);
  if(stage==='script'&&typeof data.screenplay==='string'&&data.screenplay.trim()) {

@@ -136,9 +136,11 @@ test('真实工具创建、审批、改类型及重读保存一致，旧批准�
   assert.equal(questions,1);assert.equal(duplicate.revision,approvedRevision);
   assert.equal(duplicate.nextTask.stage,'script');
   await assert.rejects(()=>tool.execute({action:'approve',projectId:id,stage:'creative',expectedRevision:0},exec),/INVALID_APPROVAL_REVISION/);
-  assert.match(approvalText,/创意方案（修订 1）/);
-  assert.match(approvalText,/核心表达：细节发现/);
-  assert.match(approvalText,/15 秒/);
+  assert.match(approvalText,/创意方案 · 修订 1/);
+  assert.match(approvalText,/完整方案应已在当前对话正文展示/);
+  assert.match(approvalText,/此卡片只确认版本，不重复渲染提案/);
+  assert.doesNotMatch(approvalText,/核心表达：细节发现/);
+  assert.doesNotMatch(approvalText,/15 秒/);
   assert.ok(!approvalText.includes(JSON.stringify(data)));
   assert.ok(!approvalText.includes('"duration_ms"'));
   await assert.rejects(()=>tool.execute({action:'configure_profile',projectId:id,expectedRevision:0,projectSpec:JSON.stringify({work_type:'COMEDY'})},exec),/REVISION_CONFLICT/);
