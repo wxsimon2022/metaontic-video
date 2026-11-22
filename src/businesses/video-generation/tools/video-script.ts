@@ -5,7 +5,7 @@ import { clampInteger } from '../../../shared/utils/validation.js';
 import { appendRequestLog } from '../../../shared/utils/logging.js';
 import { diagnosticError } from '../../../shared/utils/timing.js';
 
-/** 使用插件设置的文本模型生成脚本；工具调用前由宿主费用确认守卫拦截。 */
+/** 使用插件设置的文本模型生成脚本；文本调用按渠道实际用量计费，不单独弹费用审批。 */
 export function scriptTool(config: any) {
   return {
     name: 'video_script',

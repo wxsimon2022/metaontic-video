@@ -229,6 +229,6 @@ Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.c
 
 中国镜像包介绍：成品不含README.md时，npm会回退读取README.en.md，导致中文镜像显示英文。build将中文README写入package.json标准readme元数据，所有图片必须HTTPS绝对地址，文档相对链接转换仓库绝对链接；不得依赖npmmirror unpkg单文件权限。宿主meta.detail继续指向空plugin-detail.md，避免把仓库README重新塞进插件设置页。公开npm同版本成品不可覆盖，修改随下次明确发版生效。
 
-创作质量维护：新专业项目canonical_v1从场次/节拍/对白渲染正文；chapter_v1长片使用chapter_plan/chapter_submit保存连续性，不能把部分章当完成。isolated_v1终审通过independent_review真实文本请求，先确认文本费用，隔离聊天与自评，运行时摘要绑定报告；手工submit不能绕过。大型稿件分章完整审阅，成功报告按输入/模型/地址/提示词断点复用；失败或未知调用不擅自重放。六维艺术结论必须有场次证据，离线自动项不能冒充艺术通过。渠道能力按地址摘要隔离，成功样本不推断上限。新用例film-architecture.test.mjs，具体边界见creation-quality-architecture.md。
+创作质量维护：新专业项目canonical_v1从场次/节拍/对白渲染正文；chapter_v1长片使用chapter_plan/chapter_submit保存连续性，不能把部分章当完成。isolated_v1终审通过independent_review真实文本请求，文本按渠道实际用量计费且不另弹费用审批，隔离聊天与自评，运行时摘要绑定报告；手工submit不能绕过。大型稿件分章完整审阅，成功报告按输入/模型/地址/提示词断点复用；失败或未知调用不擅自重放。六维艺术结论必须有场次证据，离线自动项不能冒充艺术通过。渠道能力按地址摘要隔离，成功样本不推断上限。新用例film-architecture.test.mjs，具体边界见creation-quality-architecture.md。
 
 最低支持版本维护：config/update-policy.json 通过双仓 contents API 下发；先发布可安装正式版，再提高 minimum_version 并递增 revision。普通更新可跳过，强制提示不接受稍后缓存；工具装配层统一阻断新创作与付费提交，不阻断已有任务查询、图片取件、结果核对/回写和导出。resume 会新增付费调用，不能豁免。断网保留已验证策略，首次离线无缓存不封禁；撤销门槛须用更大 revision。旧版无此协议不能追溯控制，本地修改不等于策略已经公开。详见 mandatory-updates.md。
