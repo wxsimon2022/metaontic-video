@@ -57,6 +57,8 @@ const TOKENS = {
       .mov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 14px 18px; }
       .mov-field { display: flex; flex-direction: column; min-width: 0; }
       .mov-model-settings { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+      .mov-model-input { display: block; width: 100%; min-width: 0; }
+      .mov-model-input .mov-input { display: block; width: 100%; min-width: 0; }
       .mov-model-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
       .mov-model-grid-single { grid-template-columns: minmax(0, 1fr); }
       .mov-model-card { display: flex; flex-direction: column; gap: 14px; padding: 12px; border: 1px solid ${TOKENS.border}; border-radius: 10px; min-width: 0; }

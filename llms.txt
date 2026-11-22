@@ -1,0 +1,27 @@
+# MetaOnticVideo
+
+> MetaOnticVideo (`dsh-metaontic-video`) is an AI video creation plugin for the DeepSeek Harness desktop app. It helps beginners create short videos and offers a segmented continuation workflow for longer videos.
+
+## What it does
+
+- Turns a user's video idea into a script and storyboard draft, then supports review before video production.
+- Uses the text, image, and video models configured in the plugin settings for those respective generation tasks. The Harness session model remains responsible for ordinary chat and tool orchestration.
+- Supports text-to-video, image-to-video, segmented continuation, pausing and resuming, segment previews, and local merging.
+- A long video is produced through multiple model calls; it is not generated as one uninterrupted long clip. Local merging of multiple segments requires FFmpeg and FFprobe.
+- Windows and macOS use the same plugin package.
+
+## Setup
+
+1. In DeepSeek Harness, open Plugins → Add plugin and enter `dsh-metaontic-video`. Harness prioritizes the China mirror for users in mainland China.
+2. In plugin settings, configure the API key and the text, image, and video model IDs supported by the selected channel.
+3. Open the Video Creation Assistant, describe the project, review the script, and confirm video production when ready.
+
+The read-only model list in settings shows models visible to the configured API key; visibility does not guarantee that a model supports chat completions. Script calls use the configured text model and are billed by the provider's actual usage without a separate approval prompt. Video production keeps its own review and cost confirmation.
+
+## Official links
+
+- Product page and guide: https://ai.mybfs.cn/
+- Fixed Gitee package: https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz
+- GitHub repository: https://github.com/wxsimon2022/metaontic-video
+- Gitee repository: https://gitee.com/hackloop/metaontic-video
+- npm package: https://www.npmjs.com/package/dsh-metaontic-video

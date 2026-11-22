@@ -181,17 +181,17 @@ function makePage({ form, t, manager }) {
             const shared = (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
             const common = !directMode
               ? [fieldCell(FIELD_BY_KEY.imageUseVideoKey), ...(shared ? [fieldCell(FIELD_BY_KEY.metaonticApiKey)] : [])] : [];
-            // 共用密钥时文本模型（写脚本）跟视频模型同一张卡片；关了共用就单开一张，各自配自己的密钥。
-            const videoFields = ['model', ...(shared ? ['textModel'] : []), ...((directMode || !shared) ? [directMode ? 'volcengineApiKey' : 'metaonticApiKey'] : [])];
+            // 文本模型独立占满一行，完整显示长模型 ID；关闭共用密钥时同时显示文本 API密钥。
+            const videoFields = ['model', ...((directMode || !shared) ? [directMode ? 'volcengineApiKey' : 'metaonticApiKey'] : [])];
             const imageFields = ['imageModel', ...(!shared ? ['imageApiKey'] : [])];
-            const textFields = !directMode && !shared ? ['textModel', 'textApiKey'] : [];
+            const textFields = !directMode ? ['textModel', ...(!shared ? ['textApiKey'] : [])] : [];
             return h('div', { key: section.key, className: 'mov-model-settings' }, [
               ...common,
               h('div', { key: 'models', className: `mov-model-grid${directMode ? ' mov-model-grid-single' : ''}` }, [
                 h('div', { key: 'video', className: 'mov-model-card', 'data-group': 'video-model' }, videoFields.map(key => fieldCell(FIELD_BY_KEY[key]))),
                 !directMode ? h('div', { key: 'image', className: 'mov-model-card', 'data-group': 'image-model' }, imageFields.map(key => fieldCell(FIELD_BY_KEY[key]))) : null,
-                textFields.length ? h('div', { key: 'text', className: 'mov-model-card', 'data-group': 'text-model' }, textFields.map(key => fieldCell(FIELD_BY_KEY[key]))) : null,
               ]),
+              !directMode && textFields.length ? h('div', { key: 'text', className: 'mov-model-card', 'data-group': 'text-model' }, textFields.map(key => fieldCell(FIELD_BY_KEY[key]))) : null,
             ]);
           }
           if (section.key === 'sectionVideo') {

@@ -9,6 +9,8 @@ MetaOnticVideo is a DeepSeek Harness (DSH) AI video generation plugin that **hel
 - **Create videos quickly**: describe an idea or provide reference images, review the script, then generate and preview your video.
 - **Build longer videos**: generate and continue segments, save progress, and merge them locally.
 
+Scripts, images, and videos use the text, image, and video models configured in plugin settings. Regular chat still uses the Harness session model. Text script calls are billed by actual provider usage without a separate approval prompt; video production still requires review and cost confirmation.
+
 Image and video generation is billed by your provider, with cost confirmation before generation.
 
 ## Online installation
@@ -33,10 +35,10 @@ https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaonti
 
 1. Open plugin settings, choose **MetaOntic AI**, enter your API key and save.
 2. Select **视频创作助手** in a conversation. For promotional content, enable **宣传视频助手** in the plugin components first.
-3. Describe your video, review the script and confirm costs, then preview each generated segment.
+3. Describe your video, review the script, confirm video production costs, then preview each segment.
 
 Example: “Make a 30-second vertical 720P video showing a peaceful lake at dawn.”
 
 ## Links
 
-[Website & user guide](https://ai.mybfs.cn) · [Issues](https://github.com/wxsimon2022/metaontic-video/issues) · [Changelog](./CHANGELOG.md) · [Development](./docs/engineering/development.md) · [License](./LICENSE)
+[Website & user guide](https://ai.mybfs.cn) · [AI-readable product summary](./llms.txt) · [Issues](https://github.com/wxsimon2022/metaontic-video/issues) · [Changelog](./CHANGELOG.md) · [Development](./docs/engineering/development.md) · [License](./LICENSE)

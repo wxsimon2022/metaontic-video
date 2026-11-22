@@ -127,6 +127,7 @@ export function createSettingsActions(context: any) {
             type: field.kind === 'number' ? 'number' : (field.secret && !revealed ? 'password' : 'text'),
             list: field.kind === 'model' ? `${id}-options` : undefined,
             value: displayed ?? '',
+            title: field.kind === 'model' ? String(current ?? '') : undefined,
             min: secondsField ? 1 : undefined,
             step: secondsField ? 0.001 : undefined,
             placeholder: field.secret && (snapshot.secrets?.[field.key] || value[field.key]) ? t('apiKeyConfigured') : '',
