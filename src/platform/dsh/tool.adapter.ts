@@ -1,6 +1,7 @@
 interface ToolAgentResolver { resolve(context: any, ctx?: any): { id: string; businesses: readonly string[] } | null; }
 import { withUsageAnalytics } from '../telemetry/reporter.js';
 import { withStageTiming } from '../../shared/utils/timing.js';
+import { presentChineseToolCall } from '../../shared/utils/tool-presentation.js';
 /** 公共工具装配负责命名冲突、Agent 业务边界和旁路统计；审批由业务提供。 */
 export function createToolRegistry(ctx: DshContext, agents: ToolAgentResolver, analytics: any, defer: (dispose: unknown) => void = () => {}, versionGuard?: (name: string, args: any) => Promise<void>) {
   const owners = new Map<string, string>();
@@ -12,7 +13,7 @@ export function createToolRegistry(ctx: DshContext, agents: ToolAgentResolver, a
   function register(business: string, tool: DshToolDefinition, registrationContext: DshContext = ctx) {
     if (owners.has(tool.name)) throw new Error(`工具名称重复：${tool.name}`);
     owners.set(tool.name, business);
-    const guarded = { ...tool, async execute(args: any, exec: any) {
+    const guarded = { ...tool, presentCall: tool.presentCall ?? ((args: unknown) => presentChineseToolCall(tool.name, args)), async execute(args: any, exec: any) {
       if (!allowed(business, exec)) throw new Error('当前助手未启用此业务，请切换到对应助手后重试。');
       await versionGuard?.(tool.name, args);
       return tool.execute(args, exec);

@@ -67,6 +67,7 @@ interface DshToolDefinition {
   description: string;
   parameters?: unknown;
   output?: { schema?: unknown; render?: (args: unknown, value: any) => unknown };
+  presentCall?: (args: unknown) => { card: 'generic'; title: string } | undefined;
   timeoutMs?: number;
   isConcurrencySafe?: () => boolean;
   execute(args?: any, exec?: DshToolExec): Promise<any> | any;
