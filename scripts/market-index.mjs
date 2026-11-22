@@ -86,7 +86,6 @@ const index = {
     categories: { video: { title: { en: 'Video', zh: '视频创作' } } },
     labels: {
       'video-director': { title: { en: 'Video director', zh: '视频导演' } },
-      'promo-video': { title: { en: 'Promo video', zh: '宣传短片' } },
     },
     sortKeys: {},
   },
@@ -102,7 +101,7 @@ const index = {
       author: 'MetaOntic',
       homepage: HOMEPAGE,
       repository: { url: REPOSITORY.replace(/\.git$/, '') },
-      metadata: { category: 'video', keywords: pkg.keywords ?? [], labels: ['video-director', 'promo-video'], sortKeys: {} },
+      metadata: { category: 'video', keywords: pkg.keywords ?? [], labels: ['video-director'], sortKeys: {} },
       'dist-tags': { latest: versions[0].version },
       versions,
     },

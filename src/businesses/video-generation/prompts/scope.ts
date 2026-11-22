@@ -4,6 +4,3 @@ import { registryForContext } from '../../../app/registry/agent.registry.js';
 export function isVideoDirector(context: any, ctx: any) {
   return registryForContext(ctx, agentRegistry).hasBusiness(context, ctx, 'video');
 }
-export function isPromoVideoAssistant(context: any, ctx: any) {
-  return registryForContext(ctx, agentRegistry).resolve(context, ctx)?.id === 'promo-video';
-}

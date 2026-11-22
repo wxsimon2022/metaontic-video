@@ -68,7 +68,7 @@ export async function analyticsIdentity() {
 export function analyticsFields(input: any = {}) {
   const value: any = {};
   if (TOOLS.has(input.tool)) value.tool = input.tool;
-  if (['video-director', 'promo-video', 'standard'].includes(input.mode)) value.mode = input.mode;
+  if (['video-director', 'standard'].includes(input.mode)) value.mode = input.mode;
   if (STATUSES.has(input.status)) value.status = input.status;
   if (typeof input.durationMs === 'number' && Number.isFinite(input.durationMs)) value.durationMs = Math.round(Math.max(0, Math.min(86400000, input.durationMs)));
   if (typeof input.errorCode === 'string') value.errorCode = ERRORS.has(input.errorCode) ? input.errorCode : 'other';
