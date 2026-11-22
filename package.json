@@ -1,6 +1,6 @@
 {
   "name": "dsh-metaontic-video",
-  "version": "4.2.1",
+  "version": "4.2.2",
   "description": "MetaOnticVideo（dsh-metaontic-video）是 DeepSeek Harness（DSH）的 AI 视频创作插件：支持剧本与分镜审核、文生/图生视频、分段续拍、断点续做与本地合并，帮助新手快速完成短视频并规划更长内容。",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
@@ -121,11 +121,11 @@
   },
   "dependencies": {},
   "releaseNotes": {
-    "version": "4.2.1",
+    "version": "4.2.2",
     "prerelease": false,
-    "publishedAt": "2026-11-22T09:48:11.714Z",
+    "publishedAt": "2026-11-22T10:23:24.736Z",
     "items": [
-      "优化：专业创作的独立文本审核不再单独确认文本费用，仍按渠道实际用量计费。"
+      "优化：重复提交相同创意或剧本不再产生新版本或重复审批；独立文本审核增加总超时保护，卡住时更快返回可重试提示。"
     ]
   },
   "readme": "# <img src=\"https://ai.mybfs.cn/promo/readme-title-zh.svg\" width=\"840\" height=\"44\" alt=\"dsh-metaontic-video · DeepSeek Harness AI视频创作插件\" />\n\n[English](https://github.com/wxsimon2022/metaontic-video/blob/master/README.en.md)\n\nMetaOnticVideo 是 DeepSeek Harness（DSH）的 AI视频创作插件：**帮助新手快速上手AI短视频创作，并通过分段续拍和本地合并，低成本制作长视频。**\n\n## 能做什么\n\n- **快速创作**：说出想法或提供参考图片，助手整理脚本，确认后生成并预览视频。\n- **分段制作长视频**：逐段生成与续拍，保留进度，最后在本机合并。\n\n脚本、图片和视频分别使用插件设置中配置的文本、图片和视频模型；普通对话仍使用 Harness 会话模型。文本脚本调用按渠道实际用量计费，不单独弹审批；视频生成仍须审核并确认费用。\n\n图片与视频按接入渠道用量计费，生成前需确认费用。\n\n## 在线安装\n\n在 Harness「插件 → 添加插件」中直接输入包名 `dsh-metaontic-video`。中国大陆网络由 DSH 自动优先选择中国镜像源；Windows 与 macOS 使用同一个安装包。\n\n备用在线安装链接：\n\nGitee：\n\n```text\nhttps://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz\n```\n\nGitHub 备用：\n\n```text\nhttps://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaontic-video.tgz\n```\n\n## 开始使用\n\n1. 打开插件设置，选择 **MetaOntic AI**，填写 API密钥并保存。\n2. 在会话中选择 **视频创作助手**，直接描述想制作的内容，包括品牌、产品或活动宣传需求。\n3. 描述需求，审核脚本，再确认视频制作费用并逐段预览结果。\n\n例如：“制作一条30秒竖屏720P的视频，表现清晨湖面的宁静。”\n\n## 相关链接\n\n[官网与使用说明](https://ai.mybfs.cn) · [AI 可读产品摘要](https://github.com/wxsimon2022/metaontic-video/blob/master/llms.txt) · [问题反馈](https://github.com/wxsimon2022/metaontic-video/issues) · [更新记录](https://github.com/wxsimon2022/metaontic-video/blob/master/CHANGELOG.md) · [开发文档](https://github.com/wxsimon2022/metaontic-video/blob/master/docs/engineering/development.md) · [许可](https://github.com/wxsimon2022/metaontic-video/blob/master/LICENSE)\n"
