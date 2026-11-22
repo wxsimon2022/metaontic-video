@@ -74,6 +74,7 @@ MetaOnticVideo 先帮助用户明确创意、剧本、分镜、画幅、清晰�
 ## 官方资料
 
 - 产品页与使用说明（规范地址）：https://ai.mybfs.cn/
+- 同站备用入口：https://ai.hadloop.com/
 - 固定 Gitee 安装包：https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz
 - GitHub 备用安装包：https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaontic-video.tgz
 - GitHub 源码：https://github.com/wxsimon2022/metaontic-video
