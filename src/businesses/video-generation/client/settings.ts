@@ -135,7 +135,7 @@ function makePage({ form, t, manager }) {
           saveInFlight, connectionBusy, setSaveError, setStatus, form, draft, same,
           validateSettings, persistConnection, persistBatch, setDraft, flashStatus, settingsError,
           t, snapshot, PLUGIN_OWNED_KEYS, setVisibleKey, value, h,
-          SELECTS: { ...SELECTS, textModel: [...new Set([...(SELECTS.textModel || []), 'glm-4.6', ...(connectionCheck.textModels || [])])] }, inputStyle,
+          SELECTS: { ...SELECTS, textModel: [...new Set([...(SELECTS.textModel || []), ...(connectionCheck.textModels || [])])] }, inputStyle,
           optionLabel, edit, visibleKey, renderKeyAction: field => showsSharedValidation(field) ? connectionButton() : null, confirm: message => window.confirm(message),
         });
 

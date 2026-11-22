@@ -80,7 +80,25 @@ export function createUpdates({ h, fetchSource }: any) {
       }));
       const versions = [...new Set(results.flatMap(r => r.status === 'fulfilled' ? r.value : []))]
         .sort((a,b) => isNewerVersion(a,b) ? -1 : isNewerVersion(b,a) ? 1 : 0).slice(0,3);
-      if (!versions.length) throw new Error('no published stable releases available');
+      // Release API 可能因匿名限流或跨域故障同时不可用；用仓库主分支的正式包清单兜底。
+      // 仅接受 package.version 与 releaseNotes.version 一致且明确标记为正式版的清单。
+      if (!versions.length) {
+        const manifests = [
+          `${GITEE.web}/raw/master/package.json`,
+          `https://raw.githubusercontent.com/${GITHUB.slug}/master/package.json`,
+        ];
+        const fallback = await Promise.allSettled(manifests.map(async url => {
+          const manifest = await (await (fetchSource || fetchUpdateSource)(url, 6000)).json();
+          const version = String(manifest?.version || '');
+          if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)
+            || manifest?.releaseNotes?.version !== version
+            || manifest?.releaseNotes?.prerelease !== false) throw new Error('invalid stable manifest');
+          return version;
+        }));
+        versions.push(...new Set(fallback.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])));
+      }
+      if (!versions.length) throw new Error('no published stable releases available; release APIs and manifest fallbacks are unavailable');
+      versions.sort((a,b) => isNewerVersion(a,b) ? -1 : isNewerVersion(b,a) ? 1 : 0);
       return versions;
     }
     async function fetchLatestVersion() {
