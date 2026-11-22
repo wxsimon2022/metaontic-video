@@ -1,9 +1,10 @@
 import { publishGiteeStableAlias } from './publish-gitee-stable-alias.mjs';
+import { GITEE_QUOTA_KEEP, isGiteeQuotaError, recoverGiteeQuota } from './gitee-quota.mjs';
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export async function publishGitee({ token, tag, archive, notes, prerelease = false, request = fetch, retry = { attempts: 4, delayMs: 20000 }, log = console.log }) {
+export async function publishGitee({ token, tag, archive, notes, prerelease = false, request = fetch, retry = { attempts: 4, delayMs: 20000 }, quotaKeep = GITEE_QUOTA_KEEP, quotaCleanup = recoverGiteeQuota, log = console.log }) {
   if (!token) throw new Error('Missing GITEE_TOKEN. Add it to GitHub Actions repository secrets.');
   if (!/^v\d+\.\d+\.\d+(?:-beta\.[1-9]\d*)?$/.test(tag)) throw new Error('A version tag is required.');
   const base = 'https://gitee.com/api/v5/repos/hackloop/metaontic-video';
@@ -56,12 +57,21 @@ export async function publishGitee({ token, tag, archive, notes, prerelease = fa
     // 失败先复查附件表（Gitee 可能在客户端放弃后才收完），再按退避重试，避免整次发布因一次慢上传失败。
     const attempts = Math.max(1, Number(retry?.attempts) || 1);
     const delayMs = Math.max(0, Number(retry?.delayMs) || 0);
-    let failure;
+    let failure, quotaRecovered = false;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try { await api(path, { method: 'POST', file: bytes }); failure = undefined; break; }
       catch (error) {
         failure = error;
         if (stored(await api(path).catch(() => null))) { failure = undefined; break; }
+        if (!quotaRecovered && isGiteeQuotaError(error)) {
+          quotaRecovered = true;
+          log(`Gitee 附件配额已满，按保留最近 ${quotaKeep} 个正式版的规则自动清理旧发行版…`);
+          try { await quotaCleanup({ token, request, log, keep: quotaKeep, protectedTags: [tag] }); }
+          catch (cleanupError) { failure = new Error(`${error.message}；自动清理旧发行版失败：${cleanupError.message}`); break; }
+          // 清理成功后重试同一次上传；成功前不会再次触发清理，避免循环删除。
+          attempt -= 1;
+          continue;
+        }
         if (attempt < attempts && delayMs) await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     }
