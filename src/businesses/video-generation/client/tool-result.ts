@@ -3,7 +3,7 @@
  *  这里给它们换成插件自己的摘要卡片：默认只列关键结论，原始返回折叠在下面，按普通正文换行显示，不铺代码块。 */
 
 /** 需要摘要卡片的结构化工具。<key> 是工具名，值是卡片标题。 */
-const SUMMARY_TOOLS: Record<string, string> = { video_project: '脚本审核', video_estimate: '费用试算' };
+const SUMMARY_TOOLS: Record<string, string> = { video_project: '脚本审核', video_estimate: '费用试算', video_script: '脚本生成' };
 const ACTION_LABELS: Record<string, string> = { prepare: '准备项目', review: '脚本审核', review_segment: '分段结果审核', status: '读取项目状态' };
 const STATUS_LABELS: Record<string, string> = { approved: '已通过', draft: '待修改', pending: '待确认', blocked: '未通过校验', running: '进行中' };
 /** 画布同步结果的人话标签；`disabled` 是默认关闭自动投影的常态，不占用卡片一行。 */
@@ -35,6 +35,13 @@ export function toolSummary(toolName: string, block: any) {
   if (!data) return { title, state: 'done', stateLabel: '已完成', rows: [] as string[][], raw };
   const rows: string[][] = [];
   const push = (label: string, value: any) => { if (value !== undefined && value !== null && String(value) !== '') rows.push([label, String(value)]); };
+  if (toolName === 'video_script') {
+    push('文本模型', data.model);
+    push('目标时长', data.totalSeconds ? `${data.totalSeconds} 秒` : '');
+    push('分段数', data.segments);
+    push('输出状态', data.truncated ? '可能被截断，请检查完整性' : '脚本草稿已生成');
+    return { title, state: data.truncated ? 'warn' : 'ok', stateLabel: data.truncated ? '需检查' : '已完成', rows, raw };
+  }
   if (toolName === 'video_estimate') {
     push('目标时长', data.duration ? `${data.duration} 秒` : '');
     push('画幅 / 清晰度', [data.ratio, data.resolution && String(data.resolution).toUpperCase()].filter(Boolean).join(' · '));

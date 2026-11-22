@@ -50,7 +50,7 @@ export function createClientConfig() {
       { key: 'model', kind: 'select', wide: true },
       { key: 'imageModel', kind: 'select', wide: true },
       // 文本模型（写脚本）：与视频模型同一把密钥，候选见 SELECTS（TEXT_MODELS）
-      { key: 'textModel', kind: 'select', wide: true },
+      { key: 'textModel', kind: 'model', wide: true },
       { key: 'imageUseVideoKey', kind: 'switch', wide: true },
       { key: 'imageApiKey', kind: 'text', secret: true, wide: true },
       { key: 'textApiKey', kind: 'text', secret: true, wide: true },

@@ -25,7 +25,7 @@ function makePage({ form, t, manager }) {
         React.useEffect(() => { setVisibleKey(''); }, [selectedMode]);
         const [status, setStatus] = React.useState('idle');
         const [saveError, setSaveError] = React.useState('');
-        const [connectionCheck,setConnectionCheck]=React.useState({status:'idle',checks:[]});
+        const [connectionCheck,setConnectionCheck]=React.useState({status:'idle',checks:[],textModels:[]});
         const checkController=React.useRef(null);
         if(!checkController.current)checkController.current=createConnectionCheckController({setState:setConnectionCheck,readSnapshot:()=>form.getSnapshot()});
         React.useEffect(()=>{checkController.current.invalidate();return ()=>checkController.current.dispose();},[snapshot.revision]);
@@ -132,7 +132,8 @@ function makePage({ form, t, manager }) {
         const { save, reset, control } = createSettingsActions({
           saveInFlight, connectionBusy, setSaveError, setStatus, form, draft, same,
           validateSettings, persistConnection, persistBatch, setDraft, flashStatus, settingsError,
-          t, snapshot, PLUGIN_OWNED_KEYS, setVisibleKey, value, h, SELECTS, inputStyle,
+          t, snapshot, PLUGIN_OWNED_KEYS, setVisibleKey, value, h,
+          SELECTS: { ...SELECTS, textModel: [...new Set([...(SELECTS.textModel || []), 'glm-4.6', ...(connectionCheck.textModels || [])])] }, inputStyle,
           optionLabel, edit, visibleKey, renderKeyAction: field => showsSharedValidation(field) ? connectionButton() : null, confirm: message => window.confirm(message),
         });
 
@@ -154,8 +155,8 @@ function makePage({ form, t, manager }) {
         };
 
         function showsSharedValidation(field) {
-          return !directMode && field.key === 'metaonticApiKey'
-            && (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
+          const shared = (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
+          return !directMode && ((field.key === 'metaonticApiKey' && shared) || (field.key === 'textApiKey' && !shared));
         }
 
         /** 一个可编辑字段：标签 + 控件（开关自带标签，就不重复画）。 */

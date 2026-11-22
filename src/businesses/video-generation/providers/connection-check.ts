@@ -57,7 +57,7 @@ export async function checkConnections(liveConfig:any,options:any={}) {
     const result=await probe(cfg);
     const {ids,...safe}=result;
     return {target,model,...safe,...(ids&&!ids.has(model)?{code:'model_not_listed',level:'warning'}:{}),
-      ...(target==='text'&&ids?{availableModels:[...ids].sort()}: {})};
+      ...(target==='text'&&ids?{availableModels:[...ids].sort().slice(0,300)}: {})};
   }));
   return {checks,scope:'read_only',generation_tested:false};
 }

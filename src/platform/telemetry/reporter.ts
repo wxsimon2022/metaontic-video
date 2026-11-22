@@ -12,7 +12,7 @@ import { ANALYTICS_URL, DATA_DIR, PLUGIN_ID } from '../../shared/constants/plugi
 export { ANALYTICS_URL } from '../../shared/constants/plugin.js';
 const STATE = Symbol.for(`${PLUGIN_ID}.analytics.process`);
 const EVENTS = new Set(['plugin_started', 'tool_started', 'tool_finished', 'video_task_created', 'video_task_finished']);
-const TOOLS = new Set(['video_generate', 'video_extend', 'video_status', 'video_project', 'video_prepare_image', 'video_estimate', 'video_config', 'video_setup', 'video_stage', 'media_submission', 'video_canvas', 'video_hyperframes']);
+const TOOLS = new Set(['video_generate', 'video_extend', 'video_status', 'video_project', 'video_prepare_image', 'video_estimate', 'video_script', 'video_config', 'video_setup', 'video_stage', 'media_submission', 'video_canvas', 'video_hyperframes']);
 const STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'unknown', 'timeout', 'approved', 'pending', 'paused', 'prepared', 'draft', 'blocked', 'review_required', 'submission_unknown', 'ok']);
 const ERRORS = new Set(['provider_auth', 'provider_failed', 'provider_network_error', 'provider_rate_limited', 'provider_quota_exceeded', 'provider_price_config_error', 'provider_bad_response', 'content_rejected', 'real_person_rejected', 'submission_unknown', 'waiting_stopped', 'ABORTED']);
 function processState() {

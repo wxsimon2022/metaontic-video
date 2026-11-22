@@ -77,7 +77,7 @@ export const VIDEO_MODEL_OPTIONS = [
 ];
 export const IMAGE_MODEL = 'doubao-seedream-5-0-pro-260628';
 export const RETIRED_IMAGE_MODELS = ['doubao-seedream-5-0-260128'];
-export const TEXT_MODELS = ['deepseek v4.1 flash', 'deepseekv4pro'];
+export const TEXT_MODELS = ['deepseek v4.1 flash', 'deepseekv4pro', 'glm-4.6'];
 export const TEXT_MODEL = TEXT_MODELS[0];
 export const RETIRED_TEXT_MODELS = ['doubao-seed-1-6-250615'];
 
