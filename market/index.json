@@ -79,16 +79,26 @@
         "sortKeys": {}
       },
       "dist-tags": {
-        "latest": "4.1.3"
+        "latest": "4.2.0"
       },
       "versions": [
         {
-          "version": "4.1.3",
-          "publishTimestamp": 1795311720,
+          "version": "4.2.0",
+          "publishTimestamp": 1795334714,
           "source": {
             "type": "git",
             "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "d535e135d7f346616746699bf28bf33aca9d4ff3"
+            "commit": "5f67f42a904ef12e59c3f243497d3d7c2d9c449b"
+          },
+          "engines": {
+            "dsh": ">=0.2.0"
+          }
+        },
+        {
+          "version": "4.1.3",
+          "publishTimestamp": 1795311945,
+          "source": {
+            "type": "npm"
           },
           "engines": {
             "dsh": ">=0.2.0"
@@ -96,11 +106,9 @@
         },
         {
           "version": "4.1.2",
-          "publishTimestamp": 1795305886,
+          "publishTimestamp": 1795306112,
           "source": {
-            "type": "git",
-            "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "dd024580048405c87f084ae6ea1c336ac3724611"
+            "type": "npm"
           },
           "engines": {
             "dsh": ">=0.2.0"
@@ -108,11 +116,9 @@
         },
         {
           "version": "4.1.1",
-          "publishTimestamp": 1795266667,
+          "publishTimestamp": 1795267094,
           "source": {
-            "type": "git",
-            "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "06d568c7da75f643138c1b181c53c362612104ec"
+            "type": "npm"
           },
           "engines": {
             "dsh": ">=0.2.0"
@@ -120,23 +126,9 @@
         },
         {
           "version": "4.1.0",
-          "publishTimestamp": 1795225923,
+          "publishTimestamp": 1795226172,
           "source": {
-            "type": "git",
-            "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "482e6791571cc85828fc059192a31021e4dcdbfe"
-          },
-          "engines": {
-            "dsh": ">=0.2.0"
-          }
-        },
-        {
-          "version": "4.0.11",
-          "publishTimestamp": 1795219834,
-          "source": {
-            "type": "git",
-            "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "143c9aebfffa8e248f1f1c9235186b9bc87f0bf2"
+            "type": "npm"
           },
           "engines": {
             "dsh": ">=0.2.0"
