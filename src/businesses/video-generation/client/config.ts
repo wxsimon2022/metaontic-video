@@ -49,8 +49,8 @@ export function createClientConfig() {
       // 模型用下拉选（候选见 MODEL_OPTIONS），占一整行显示完整型号
       { key: 'model', kind: 'select', wide: true },
       { key: 'imageModel', kind: 'select', wide: true },
-      // 文本模型（写脚本）：与视频模型同一把密钥，候选见 SELECTS（TEXT_MODELS）
-      { key: 'textModel', kind: 'model', wide: true },
+      // 文本模型（写脚本）：下拉候选包含内置型号与连接验证刷新到的中转站型号。
+      { key: 'textModel', kind: 'select', wide: true },
       { key: 'imageUseVideoKey', kind: 'switch', wide: true },
       { key: 'imageApiKey', kind: 'text', secret: true, wide: true },
       { key: 'textApiKey', kind: 'text', secret: true, wide: true },

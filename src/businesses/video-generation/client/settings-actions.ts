@@ -105,6 +105,7 @@ export function createSettingsActions(context: any) {
                 'data-field': field.key,
                 className: `mov-input${field.mono ? ' mov-mono' : ''}`,
                 style: inputStyle,
+                title: field.key === 'textModel' || field.key === 'model' ? String(current ?? '') : undefined,
                 value: removedMode ? '' : legacyMerge ? 'copy' : (retiredImageModel || retiredTextModel) ? options[0] ?? '' : current ?? '',
                 onChange: (event) => edit(field.key, event.target.value),
             }, [
@@ -125,9 +126,7 @@ export function createSettingsActions(context: any) {
             className: `mov-input${field.mono ? ' mov-mono' : ''}`,
             style: inputStyle,
             type: field.kind === 'number' ? 'number' : (field.secret && !revealed ? 'password' : 'text'),
-            list: field.kind === 'model' ? `${id}-options` : undefined,
             value: displayed ?? '',
-            title: field.kind === 'model' ? String(current ?? '') : undefined,
             min: secondsField ? 1 : undefined,
             step: secondsField ? 0.001 : undefined,
             placeholder: field.secret && (snapshot.secrets?.[field.key] || value[field.key]) ? t('apiKeyConfigured') : '',
@@ -135,12 +134,6 @@ export function createSettingsActions(context: any) {
                 ? (secondsField ? Math.round(Number(event.target.value) * 1000) : Number(event.target.value))
                 : event.target.value),
         });
-        if (field.kind === 'model') {
-            return h('div', { key: 'control', className: 'mov-model-input' }, [
-                input,
-                h('datalist', { key: 'options', id: `${id}-options` }, (SELECTS[field.key] || []).map((model: string) => h('option', { key: model, value: model }))),
-            ]);
-        }
         if (!canReveal)
             return input;
         return h('div', { key: 'control', className: 'mov-key-control' }, [

@@ -17,7 +17,14 @@ export function scriptTool(config: any) {
       ratio: { type: 'string', enum: ['16:9', '9:16'] },
       workType: { type: 'string', description: '已解析的作品类型/创作 profile 标识' },
     }, required: ['idea', 'totalSeconds', 'ratio'] },
-    output: { schema: { type: 'object' } },
+    output: {
+      schema: { type: 'object' },
+      render(_args: any, value: any) {
+        const header = [`文本模型：${String(value?.model || '未注明')}`, `目标时长：${Number(value?.totalSeconds) || 0} 秒`];
+        if (value?.truncated === true) header.push('警告：模型输出可能被截断，请先检查并补齐脚本。');
+        return [{ type: 'text', text: `${header.join('\n')}\n\n${String(value?.script || '')}` }];
+      },
+    },
     isConcurrencySafe() { return false; },
     async execute(args: any, exec: any) {
       const live = snapshotConfig(config);

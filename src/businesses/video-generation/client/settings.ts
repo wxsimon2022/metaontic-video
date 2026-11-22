@@ -101,7 +101,8 @@ function makePage({ form, t, manager }) {
         const pending = Object.entries(draft).filter(([key, next]) => !same(value[key], next));
         // 一有新的改动就把上一条「已保存」收起来，免得看着像这次的改动也存过了
         const edit = (key, next) => {
-          checkController.current.invalidate();
+          // 选择文本模型不会改变接口或密钥，保留刚探测到的完整候选清单；修改连接参数时清空旧清单。
+          checkController.current.invalidate(key !== 'textModel');
           clearStatusTimer();
           setStatus((current) => (current === 'idle' ? current : 'idle'));
           setDraft((current) => ({ ...current, [key]: next }));
@@ -191,7 +192,9 @@ function makePage({ form, t, manager }) {
                 h('div', { key: 'video', className: 'mov-model-card', 'data-group': 'video-model' }, videoFields.map(key => fieldCell(FIELD_BY_KEY[key]))),
                 !directMode ? h('div', { key: 'image', className: 'mov-model-card', 'data-group': 'image-model' }, imageFields.map(key => fieldCell(FIELD_BY_KEY[key]))) : null,
               ]),
-              !directMode && textFields.length ? h('div', { key: 'text', className: 'mov-model-card', 'data-group': 'text-model' }, textFields.map(key => fieldCell(FIELD_BY_KEY[key]))) : null,
+              !directMode && textFields.length ? h('div', { key: 'text', className: 'mov-model-card', 'data-group': 'text-model' }, [
+                ...textFields.map(key => fieldCell(FIELD_BY_KEY[key])),
+              ]) : null,
             ]);
           }
           if (section.key === 'sectionVideo') {
@@ -424,7 +427,7 @@ function makePage({ form, t, manager }) {
         // 配置读不出来（没有表单 / 不可写）时只显示提示，配置项与卡片一律不渲染。
         const blobs = notice && !snapshot.value
           ? []
-          : [footer, versionBox, resetRow];
+          : [versionBox, footer, resetRow];
 
         return h('div', { className: 'mov-page' }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
