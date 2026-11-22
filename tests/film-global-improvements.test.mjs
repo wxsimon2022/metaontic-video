@@ -160,10 +160,7 @@ test('new professional project completes approved evidence chain and persists co
   const report={review_id:'r',review_stage:'FINAL_REVIEW',review_scope:Object.keys(revisions),reviewed_revisions:revisions,unverified_items:[],scores,score_evidence:Object.fromEntries(Object.keys(scores).map(k=>[k,'s1递杯，s2接受，关照通过动作呈现'])),theme_evidence:[{scene_id:'s1',evidence:'杯子沿桌面递出'}],issues:[],review_status:'PASS',delivery_allowed:true,dimension_review:{profile_revision:'1',checks:[{dimension:'genre',profile_id:'drama',status:'PASS',evidence:'动作和接受建立因果'}]},story_assessment:{reviewer:'isolated_mock',criteria:['theme_expression','causal_progression','character_credibility','dialogue_function','visual_specificity','ending_payoff'].map(id=>({id,status:'PASS',evidence:[{scene_id:'s1',reason:'杯子移动后被接住，关照通过行为体现'}]}))}};
   let reviewCalls=0;
   globalThis.fetch=async (_url,options)=>{reviewCalls++;const body=JSON.parse(options.body);assert.equal(body.messages.length,2);return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({model:'mock-review',choices:[{message:{content:JSON.stringify(report)}}],usage:{prompt_tokens:100,completion_tokens:50}})};};
-  runtime.ctx.get=()=>({ask:async()=>({answers:[{id:'independent_review_cost',selected:['暂不执行']}]})});
-  const denied=await tool.execute({action:'independent_review',projectId,expectedRevision:state.revision},exec);
-  assert.equal(denied.status,'needs_input');assert.equal(reviewCalls,0);
-  runtime.ctx.get=()=>({ask:async()=>({answers:[{id:'independent_review_cost',selected:['执行独立审核']}]})});
+  runtime.ctx.get=()=>({ask:async()=>{throw new Error('文本审核不应再弹独立费用审批');}});
   state=await tool.execute({action:'independent_review',projectId,expectedRevision:state.revision},exec);
   assert.equal(reviewCalls,1);assert.equal(state.nextTask.action,'compile');
   state=await tool.execute({action:'compile',projectId,expectedRevision:state.revision,ratio:'16:9',resolution:'480p'},exec);

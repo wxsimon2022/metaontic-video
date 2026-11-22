@@ -112,7 +112,7 @@ test('文本模型默认值：设置页选的型号优先，其次环境变量�
 test('文本模型候选与中转站在售一致：设置页下拉可选，已下线的旧默认值读到就归一到默认项', () => {
   const ctx = vm.createContext({});
   vm.runInContext(sourceOf('businesses/video-generation/connection-defaults', 'businesses/video-generation/client/config') + '\nObject.assign(globalThis, createClientConfig());\nObject.assign(globalThis, { TEXT_MODELS, TEXT_MODEL, normalizeTextModel, connectionDefaults });', ctx);
-  assert.deepEqual(Array.from(ctx.TEXT_MODELS), ['deepseek v4.1 flash', 'deepseekv4pro'], '候选就是中转站在售的文本模型');
+  assert.deepEqual(Array.from(ctx.TEXT_MODELS), ['deepseek v4.1 flash', 'deepseekv4pro', 'GLM5.3flash', 'GLMv5.2', 'GLM-5.3'], '候选包含设置中已支持的在售文本模型');
   assert.deepEqual(Array.from(ctx.SELECTS.textModel), Array.from(ctx.TEXT_MODELS), '设置页按同一份候选做下拉');
   assert.equal(ctx.FIELD_BY_KEY.textModel.kind, 'select', '文本模型和视频/图片模型一样用下拉选择');
   assert.equal(ctx.SECTIONS.find((section) => section.key === 'sectionModels').fields.includes('textModel'), true);
@@ -138,11 +138,11 @@ test('设置页文本模型是下拉：候选就是视频/图片模型那种在�
   assert.equal(field.kind, 'select', '文本模型跟视频/图片模型一样是下拉，不是自由填写');
   const rendered = control(field);
   assert.equal(rendered.type, 'select');
-  assert.deepEqual([...rendered.children].map((option) => option.props.value), ['deepseek v4.1 flash', 'deepseekv4pro'], '下拉里只有在售候选');
+  assert.deepEqual([...rendered.children].map((option) => option.props.value), ['deepseek v4.1 flash', 'deepseekv4pro', 'GLM5.3flash', 'GLMv5.2', 'GLM-5.3'], '下拉包含支持的文本模型');
   assert.equal(rendered.props.value, 'deepseek v4.1 flash', '没配过时下拉就落在默认项上');
   const stored = { ...context, value: { textModel: 'doubao-seed-1-6-250615' } };
   const withRetired = scope.createSettingsActions(stored).control(field);
-  assert.deepEqual([...withRetired.children].map((option) => option.props.value), ['deepseek v4.1 flash', 'deepseekv4pro'], '已下线的旧型号不再作为候选出现');
+  assert.deepEqual([...withRetired.children].map((option) => option.props.value), ['deepseek v4.1 flash', 'deepseekv4pro', 'GLM5.3flash', 'GLMv5.2', 'GLM-5.3'], '已下线的旧型号不再作为候选出现');
   assert.equal(withRetired.props.value, 'deepseek v4.1 flash', '存量旧型号按实际生效的默认项显示');
   const custom = { ...context, value: { textModel: 'my-relay-model' } };
   const withCustom = scope.createSettingsActions(custom).control(field);
