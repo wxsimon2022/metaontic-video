@@ -13,15 +13,21 @@ Image and video generation is billed by your provider, with cost confirmation be
 
 ## Online installation
 
-Paste a link into Harness → Plugins → Add plugin. Windows and macOS use the same package.
+Paste an installation link into Harness → Plugins → Add plugin. For users in mainland China, use the China mirror first. Windows and macOS use the same package.
 
-Gitee:
+China mirror (recommended):
+
+```text
+https://registry.npmmirror.com/dsh-metaontic-video/-/dsh-metaontic-video-4.1.2.tgz
+```
+
+Gitee fallback:
 
 ```text
 https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz
 ```
 
-GitHub mirror:
+GitHub fallback:
 
 ```text
 https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaontic-video.tgz
