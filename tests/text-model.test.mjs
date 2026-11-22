@@ -101,6 +101,18 @@ test('文本模型写脚本：连接假死按增量上限提前报错，不必�
   assert.ok(Date.now() - started < 5000, '卡住时按增量上限立刻报错');
 });
 
+test('文本模型带宿主信号时仍受总超时约束', async () => {
+  const stalled = async (url, options) => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('data: '));
+      options.signal.addEventListener('abort', () => controller.error(new Error('文本模型连接被中止')), { once: true });
+    },
+  }), { headers: { 'content-type': 'text/event-stream' } });
+  const started = Date.now();
+  await assert.rejects(() => api.writeScript(config, { idea: 'x' }, { fetcher: stalled, signal: new AbortController().signal, idleTimeoutMs: 10000, timeoutMs: 80 }), /没有完成/);
+  assert.ok(Date.now() - started < 5000, '宿主信号不能覆盖总超时');
+});
+
 test('文本模型默认值：设置页选的型号优先，其次环境变量，最后内置默认值', () => {
   assert.equal(api.resolveTextModel({ ...config, textModel: 'my-relay-model' }), 'my-relay-model');
   assert.equal(api.resolveTextModel(config), 'deepseek v4.1 flash');

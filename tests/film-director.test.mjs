@@ -14,6 +14,20 @@ test('创意未批准阻止剧本，旧版本不能覆盖，改稿失效下游',
  state=api.commitArtifact(state,'creative',{theme:'新主题',logline:'故事'},2);
  assert.equal(state.artifacts.script.stale,true);assert.equal(state.approvals.creative,undefined);
 });
+test('相同创意或剧本重复提交不新增版本，也不清除已批准状态',()=>{
+ let state=api.commitArtifact(initial(),'creative',{theme:'主题',logline:'故事'},0);
+ state.approvals.creative=state.artifacts.creative.revision;
+ const creativeRevision=state.revision;
+ state=api.commitArtifact(state,'creative',{logline:'故事',theme:'主题'},state.revision);
+ assert.equal(state.revision,creativeRevision);assert.equal(state.approvals.creative,state.artifacts.creative.revision);
+ state=api.commitArtifact(state,'script',{screenplay:'正文',chapters:[{duration_ms:15000}]},state.revision);
+ state.approvals.script=state.artifacts.script.revision;
+ const scriptRevision=state.revision,scriptArtifactRevision=state.artifacts.script.revision;
+ state=api.commitArtifact(state,'script',{chapters:[{duration_ms:15000}],screenplay:'正文'},state.revision);
+ assert.equal(state.revision,scriptRevision);assert.equal(state.artifacts.script.revision,scriptArtifactRevision);assert.equal(state.approvals.script,scriptArtifactRevision);
+ state=api.commitArtifact(state,'script',{screenplay:'正文有改动',chapters:[{duration_ms:15000}]},state.revision);
+ assert.equal(state.revision,scriptRevision+1);assert.equal(state.approvals.script,undefined);
+});
 test('时间轴拒绝缺口、重复镜号与总时长错误',()=>{
  api.validateTimeline([{shot_id:'s1',start_ms:0,end_ms:15000}],15000);
  assert.throws(()=>api.validateTimeline([{shot_id:'s1',start_ms:200,end_ms:15000}],15000),/GAP_OR_OVERLAP/);

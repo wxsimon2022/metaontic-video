@@ -125,8 +125,11 @@ export async function writeScript(config: any, brief: any, options: any = {}) {
   const fetcher = options.fetcher || fetch;
   const idleMs = Number(options.idleTimeoutMs) > 0 ? Number(options.idleTimeoutMs) : TEXT_IDLE_TIMEOUT_MS;
   const idleSeconds = Math.max(1, Math.round(idleMs / 1000));
+  const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : TEXT_TIMEOUT_MS;
+  const timeoutSeconds = Math.max(1, Math.round(timeoutMs / 1000));
   const controller = new AbortController();
-  const outer = options.signal || AbortSignal.timeout(TEXT_TIMEOUT_MS);
+  const timeout = AbortSignal.timeout(timeoutMs);
+  const outer = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
   let idleAborted = false;
   let timer: any = null;
   const bump = () => {
@@ -157,6 +160,8 @@ export async function writeScript(config: any, brief: any, options: any = {}) {
   } catch (error: any) {
     stop();
     if (idleAborted) throw new Error(`文本模型 ${idleSeconds} 秒没有输出，已中止本次写脚本：可以重试，或在设置页换一个文本模型。`);
+    if (options.signal?.aborted) throw new Error('文本模型调用已取消。');
+    if (timeout.aborted) throw new Error(`文本模型 ${timeoutSeconds} 秒内没有完成，已中止本次请求：可以重试，或在设置页换一个文本模型。`);
     throw new Error(`文本模型没有返回结果：${String(error?.message || '请求失败').slice(0, 120)}`);
   }
   const type = String(response.headers?.get?.('content-type') || '');
@@ -176,6 +181,8 @@ export async function writeScript(config: any, brief: any, options: any = {}) {
     }
   } catch (error: any) {
     if (idleAborted) throw new Error(`文本模型 ${idleSeconds} 秒没有输出，已中止本次写脚本：可以重试，或在设置页换一个文本模型。`);
+    if (options.signal?.aborted) throw new Error('文本模型调用已取消。');
+    if (timeout.aborted) throw new Error(`文本模型 ${timeoutSeconds} 秒内没有完成，已中止本次请求：可以重试，或在设置页换一个文本模型。`);
     const message = String(error?.message || '请求失败');
     throw new Error(message.startsWith('文本模型') ? message : `文本模型写脚本失败：${message.slice(0, 160)}`);
   } finally { stop(); }

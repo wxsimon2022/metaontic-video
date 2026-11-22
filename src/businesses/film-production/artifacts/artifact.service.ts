@@ -14,6 +14,11 @@ import { validateProfileArtifact } from '../profiles/index.js';
 /** V2 创作数据与确定性校验。执行阶段独立于现有视频任务。 */
 export const STAGES = ['creative', 'script', 'assets', 'shots', 'prompts', 'review'] as const;
 export const ROLES = ['director', 'creative', 'screenwriter', 'character', 'scene', 'storyboard', 'prompt-engineer', 'reviewer'] as const;
+function canonicalJson(value: any): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  return JSON.stringify(value) ?? 'null';
+}
 export function validateArtifact(stage: string, value: any, state: any) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('INVALID_ARTIFACT');
   const nonempty = (key: string) => { if (typeof value[key] !== 'string' || !value[key].trim()) throw Error(`MISSING_FIELD:${key}`); };
@@ -89,6 +94,10 @@ export function commitArtifact(state: any, stage: string, value: any, expected: 
   }
   value=normalizeScript(state,stage,value);
   validateArtifact(stage,value,state);
+  const previous=state.artifacts[stage];
+  if (['creative','script'].includes(stage) && previous && !previous.stale
+    && canonicalJson(previous.data)===canonicalJson(value)
+    && canonicalJson(previous.source_revisions||{})===canonicalJson(sourceRevisions(state,stage))) return state;
   const next = structuredClone(state);
   next.revision++;
   if(stage==='review' && state.schema_version==='3.1.0') updateIssueRegistry(next,value);
