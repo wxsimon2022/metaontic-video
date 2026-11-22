@@ -9,8 +9,9 @@ MetaOnticVideo v4.2.1
 
 验证
 - 本地构建及测试通过。
-- 成品打包与 Gitee Release 由 Gitee Go 流水线按标签完成（scripts/ci-release.mjs，幂等：已有同大小附件只核对不覆盖）；成品同时由流水线的「上传制品」步骤归档到仓库制品库。本机未打包、未上传附件。
-- 本条按仅 Gitee 发布处理：未运行 GitHub 双平台 CI，也没做 Windows 桌面实测，Windows 兼容性只有构建与打包层面的保证。
+- 本机成品打包后直传 Gitee Release，版本包与固定最新包均核对通过，SHA-256 为 `1bae8f48a0ee05a2b0bce0333ca3eec59ca44a61e2c4eae730384d8f19fc9297`；Gitee Go 流水线按标签触发并保持同附件幂等。
+- GitHub Actions 的 `windows-latest` 与 `macos-latest` 安装检查通过，GitHub 镜像版本包和固定最新包与本地成品字节一致。
+- npm 正式版 `4.2.1` 已发布，npm 官方与中国镜像的 `latest`、`dsh.bundle` 声明及成品完整性均核对通过。
 - 桌面GUI与付费调用未由发布脚本自动验证。
 
 指南核对：逐项核对安装、配置、脚本、专业创作、独立复审和费用确认说明；独立文本审核已写明不单独弹审批，指南与当前版本一致，Markdown与PDF均无需改动。
