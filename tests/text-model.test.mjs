@@ -24,15 +24,13 @@ test('文本模型写脚本：请求走同一中转站的 chat 接口，提示�
   const prompt = calls[0].body.messages[1].content;
   assert.ok(prompt.includes('青旅天台的清晨') && prompt.includes('9:16'), prompt.slice(0, 80));
   assert.ok(prompt.includes('| 镜号 | 镜别 | 视角 | 运镜 | 画面 | 时长 | 台词 |'), '把分镜表表头写死，分段解析才有依据');
-  assert.ok(prompt.includes('镜别列只填一个标准景别词'), '镜别单独成列，不能用运镜代替');
-  assert.ok(prompt.includes('视角列只填一个标准视角词') && prompt.includes('第一人称主观（POV）') && prompt.includes('过肩') && prompt.includes('荷兰角（倾斜）'), '视角单独成列，并给出标准视角词表');
-  assert.ok(prompt.includes('视角由这一段的内容和场景决定，不要硬加') && prompt.includes('平视是默认'), '视角要符合场景，不为变化硬加');
-  assert.ok(prompt.includes('封闭室内不写航拍'), '场景里没有的条件不许写');
-  assert.ok(prompt.includes('运镜列写这一段镜头怎么动'), '运镜写清方式、方向与速度');
-  assert.ok(prompt.includes('画面列是这一段要拍的详情') && prompt.includes('用「先…随后…最后…」'), '画面列要求写全主体、动作、环境、光线与氛围，并能写段内的推进');
-  assert.ok(prompt.includes('每段必须推进一件事') && prompt.includes('不机械规定切镜次数'), '变化来自事件与信息，不强制轮换景别');
-  assert.ok(prompt.includes('不为求变化硬换视角'), '要求变化仍要符合场景，不是硬凑');
-  assert.ok(prompt.includes('正好 2 行'), '段数写死');
+  assert.ok(prompt.includes('景别每格只选远景、全景、中景、近景、特写或大特写之一'), '景别字段使用明确选项');
+  assert.ok(prompt.includes('视角只选平视、俯视、仰视') && prompt.includes('默认平视和固定机位'), '视角与机位采用克制的默认值');
+  assert.ok(prompt.includes('不组合互斥视角或添加不存在的机位条件'), '避免互斥或无法执行的机位要求');
+  assert.ok(prompt.includes('动作起点→过程→环境或道具反馈→结束状态'), '画面细节遵循可观察动作顺序');
+  assert.ok(prompt.includes('不写“同上”，不堆形容词，不重复展示同一信息'), '避免跨段省略和重复填充');
+  assert.ok(prompt.includes('每行对应一个生成段') && prompt.includes('不因切镜增加生成段'), '段落对应实际生成分段而非镜头数');
+  assert.ok(prompt.includes('恰好 2 行'), '分镜表行数与生成段数一致');
   assert.equal(result.script.startsWith('# 青旅的清晨'), true, '去掉代码块围栏');
   assert.equal(result.script.includes('```'), false);
   assert.equal(result.model, 'deepseek v4.1 flash');
@@ -170,7 +168,7 @@ test('关了共用密钥以后文本模型用自己那把 API密钥，没填就�
   assert.deepEqual(calls, ['Bearer text-key']);
 });
 
-test('画布写脚本按专业导演口径：先定观众与记忆点，再交可直接开拍的镜头与声音', async () => {
+test('独立脚本提示词聚焦故事、时长策略、动作细节与制作分镜', async () => {
   const calls = [];
   const fetcher = async (url, options) => {
     calls.push(JSON.parse(options.body));
@@ -178,13 +176,15 @@ test('画布写脚本按专业导演口径：先定观众与记忆点，再交�
   };
   await api.writeScript(config, { idea: '深夜面馆的最后一碗面', totalSeconds: 15, segmentSeconds: 15, segments: 1 }, { fetcher });
   const prompt = calls[0].messages[1].content;
-  assert.ok(prompt.includes('先讲清发生的事') && prompt.indexOf('故事与场景剧本') < prompt.indexOf('必须输出一个 Markdown 分镜表'), '先写完整场景剧本，再编排制作表格');
-  for (const needle of ['导演前置', '观众与记忆点', '情绪曲线', '视觉母题', '一条主线']) {
+  assert.ok(prompt.includes('先让故事成立') && prompt.indexOf('故事与场景剧本') < prompt.indexOf('固定表头的 Markdown 分镜表'), '先写完整场景剧本，再编排制作表格');
+  for (const needle of ['核心表达', '内容主线', '结尾变化', '聚焦一个核心事件']) {
     assert.ok(prompt.includes(needle), needle);
   }
-  for (const needle of ['不机械规定切镜次数', '固定机位、一镜到底和必要留白可以成立', '表演与情绪',
-    '声音必须和画面一起设计', '开场和结尾都要具体', '不要写：抽象空词']) {
+  for (const needle of ['动作起点→过程→环境或道具反馈→结束状态', '对白自然、完整',
+    '预算包括发声、停顿、动作与反应', '交稿前检查主题是否能从事件看出']) {
     assert.ok(prompt.includes(needle), needle);
   }
-  assert.ok(prompt.includes('按每秒 3–4 字估时长'), '台词按时长预算，不靠倍速硬塞');
+  const longPrompt = api.scriptPrompt({ idea: '人物多年的愿望', totalSeconds: 180, segmentSeconds: 15, segments: 12 });
+  assert.ok(longPrompt.includes('按章节和场次推进'), '长片按章节规划内容');
+  assert.ok(!longPrompt.includes('聚焦一个核心事件和一个情绪落点'), '长片不套短视频的单事件约束');
 });

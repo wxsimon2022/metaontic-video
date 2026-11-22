@@ -96,7 +96,7 @@ test('画布需求恢复所选类型，写作采用同一类型策略并保持Ma
  assert.equal(node.data.metaonticRequirementSpec.work_type,'LIFESTYLE');
  const prompt=api.scriptPrompt({idea:'河岸观察',totalSeconds:30,segments:2,work_type:node.data.metaonticRequirementSpec.work_type});
  assert.ok(prompt.includes(api.resolveProfile(state('LIFESTYLE').project_spec).strategy));
- assert.ok(prompt.includes('正好 2 行'));assert.ok(prompt.includes('不输出type_details或审核JSON'));
+ assert.ok(prompt.includes('恰好 2 行'));assert.ok(prompt.includes('不输出type_details或审核JSON'));
  assert.throws(()=>api.scriptPrompt({idea:'x',work_type:'INVALID'}),/UNKNOWN_WORK_TYPE/);
  assert.equal(api.requirementNodeData('x',15,15,'16:9','720p').metaonticRequirementSpec.work_type,undefined);
 });
