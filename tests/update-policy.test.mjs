@@ -56,7 +56,7 @@ test('unpublished versions cannot lock clients; lower revision cannot replace ca
   next=policy('4.1.0',3); await store.refresh(true); assert.equal(store.snapshot().required,false);
 });
 
-test('conflicting mirror policies are rejected and failed cache writes never bypass a restriction', async () => {
+test('conflicting repository policies are rejected and failed cache writes never bypass a restriction', async () => {
   const api=setup();
   const conflict=api.createUpdatePolicy({version:'4.1.0',request:async url=>document(policy(url.includes('gitee')?'4.1.1':'4.1.2')),verify:async()=>true});
   await conflict.refresh(); assert.equal(conflict.snapshot().required,false);

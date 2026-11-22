@@ -65,13 +65,7 @@ export async function publishedPolicyVersion(version: string, request: typeof fe
         typeof (asset.browser_download_url || asset.direct_asset_url) === 'string' &&
         (asset.browser_download_url || asset.direct_asset_url).startsWith(`${channel.web}/releases/`));
   };
-  const mirror = async () => {
-    const data = await policyJson(`https://registry.npmmirror.com/${PLUGIN_PACKAGE}/${version}`, request);
-    return data.name === PLUGIN_PACKAGE && data.version === version && Boolean(data.dsh?.bundle?.patch) &&
-      data.releaseNotes?.prerelease !== true &&
-      data.dist?.tarball === `https://registry.npmmirror.com/${PLUGIN_PACKAGE}/-/${PLUGIN_PACKAGE}-${version}.tgz`;
-  };
-  const results = await Promise.allSettled([mirror(), release(GITEE), release(GITHUB)]);
+  const results = await Promise.allSettled([release(GITEE), release(GITHUB)]);
   return results.some(result => result.status === 'fulfilled' && result.value === true);
 }
 

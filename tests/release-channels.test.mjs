@@ -68,11 +68,12 @@ test('public runtime dependencies exclude build tools and internal rendering', a
 });
 
 test('recent list merges sources, sorts numerically, deduplicates and caps at three',async()=>{
- const ctx=setup([]);
- ctx.fetch=async url=>({ok:true,json:async()=>String(url).includes('gitee')
+ const ctx=setup([]),requested=[];
+ ctx.fetch=async url=>{requested.push(String(url));return {ok:true,json:async()=>String(url).includes('gitee')
    ? [{tag_name:'v3.9.0'},{tag_name:'v3.10.0'},{tag_name:'v3.8.2'},{tag_name:'v3.8.1'}]
-   : [{tag_name:'v3.11.0'},{tag_name:'v3.10.0'},{tag_name:'v9.0.0',prerelease:true}]});
+   : [{tag_name:'v3.11.0'},{tag_name:'v3.10.0'},{tag_name:'v9.0.0',prerelease:true}]};};
  assert.deepEqual(Array.from(await ctx.fetchRecentVersions()),['3.11.0','3.10.0','3.9.0']);
+ assert.equal(requested.some(url=>url.includes('npmmirror.com')),false);
 });
 test('older and identical versions cannot install even if the action is called directly',async()=>{
  const ctx=setup([]);
@@ -100,35 +101,17 @@ test('higher-version installation reports a successful update',async()=>{
  await actions.runOnlineUpdate();assert.equal(messages.at(-1),'versionUpdateDone');
 });
 
-test('中国镜像独立检测正式版本，并拒绝错包、预发布和不可信下载地址',async()=>{
- const ctx=setup([]);
- const release={name:'dsh-metaontic-video',version:'4.0.12',dsh:{bundle:{patch:'./cordis.patch.yml'}},dist:{tarball:'https://registry.npmmirror.com/dsh-metaontic-video/-/dsh-metaontic-video-4.0.12.tgz',integrity:'sha512-YWJjZA=='}};
- let current=release;
- ctx.fetch=async url=>{
-  if(!String(url).includes('npmmirror'))throw Error('repository unavailable');
-  return {ok:true,json:async()=>current};
- };
- assert.equal(await ctx.fetchLatestVersion(),'4.0.12');
- assert.equal((await ctx.fetchMirrorRelease('4.0.12')).url,release.dist.tarball);
- for(const bad of [{...release,name:'other'},{...release,version:'4.0.12-beta.1'},{...release,dist:{...release.dist,tarball:'https://example.invalid/package.tgz'}},{...release,stub:true},{...release,dsh:{}}]){
-  current=bad;await assert.rejects(()=>ctx.fetchMirrorRelease('4.0.12'));
- }
- current={...release,version:'4.0.11'};
- await assert.rejects(()=>ctx.fetchMirrorRelease('4.0.12'));
-});
-
-test('更新优先安装已核对版本的中国镜像包，镜像未同步时回退 Gitee',async()=>{
- for(const available of [true,false]){
-  const ctx=setup([]),specs=[];
-  const mirror='https://registry.npmmirror.com/dsh-metaontic-video/-/dsh-metaontic-video-3.10.0.tgz';
-  const actions=ctx.createUpdateActions({updateConfirm:true,updateLatest:'3.10.0',availableVersions:['3.10.0'],
-   fetchMirrorRelease:async version=>{assert.equal(version,'3.10.0');if(!available)throw Error('not synced');return {url:mirror};},
-   setUpdateConfirm(){},setUpdateStatus(){},setUpdateMessage(){},t:key=>key,
-   PLUGIN_PACKAGE:'dsh-metaontic-video',UPDATE_ATTEMPTS:1,
-   manager:()=>({manager:{listBundles:async()=>[{name:'dsh-metaontic-video',installed:true,source:'https://example.invalid/plugin.tgz'}],
-    installBundle:async spec=>{specs.push(spec);return {ok:false,error:{message:'Could not resolve'}};},
-    removeBundle:()=>assert.fail('must not uninstall')}})});
-  await actions.runOnlineUpdate();
-  assert.equal(specs[0],available?mirror:'https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz?version=3.10.0');
- }
+test('在线更新仅使用 Gitee，并在 Gitee 无法解析时回退 GitHub',async()=>{
+ const ctx=setup([]),specs=[];
+ const actions=ctx.createUpdateActions({updateConfirm:true,updateLatest:'3.10.0',availableVersions:['3.10.0'],
+  setUpdateConfirm(){},setUpdateStatus(){},setUpdateLatest(){},setUpdateMessage(){},t:key=>key,
+  PLUGIN_PACKAGE:'dsh-metaontic-video',UPDATE_ATTEMPTS:1,
+  manager:()=>({manager:{listBundles:async()=>[{name:'dsh-metaontic-video',installed:true,source:'https://example.invalid/plugin.tgz'}],
+   installBundle:async spec=>{specs.push(spec);return specs.length===1?{ok:false,error:{message:'Could not resolve'}}:{ok:true,value:{application:'applied',version:'3.10.0'}};},
+   removeBundle:()=>assert.fail('must not uninstall')}})});
+ await actions.runOnlineUpdate();
+ assert.deepEqual(specs,[
+  'https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz?version=3.10.0',
+  'https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaontic-video.tgz?version=3.10.0',
+ ]);
 });

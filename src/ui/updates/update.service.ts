@@ -65,32 +65,19 @@ export function createUpdates({ h, fetchSource }: any) {
       }
     }
 
-    /** 只接受中国镜像已公开、声明可安装的正式成品，版本和下载路径必须一致。 */
-    async function fetchMirrorRelease(version?: string) {
-      const target = version || 'latest';
-      if (version && !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) throw new Error('invalid stable version');
-      const data = await (await (fetchSource || fetchUpdateSource)(`https://registry.npmmirror.com/${PLUGIN_PACKAGE}/${target}`, 6000)).json();
-      const actual = String(data?.version || '');
-      if (data?.name !== PLUGIN_PACKAGE || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(actual)
-          || (version && actual !== version) || data.stub || !data.dsh?.bundle?.patch || data.releaseNotes?.prerelease === true) throw new Error('invalid mirror release');
-      const expected = `https://registry.npmmirror.com/${PLUGIN_PACKAGE}/-/${PLUGIN_PACKAGE}-${actual}.tgz`;
-      if (data.dist?.tarball !== expected || !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(data.dist?.integrity || '')) throw new Error('invalid mirror archive');
-      return { version: actual, url: expected };
-    }
-
-    /** 优先发起中国镜像检测，同时核对 Gitee/GitHub；合并正式版，镜像延迟不遮蔽仓库新版。 */
+    /** 版本检查只读取正式版仓库，不请求 npm 中国镜像。 */
     async function fetchRecentVersions() {
       const urls = [
         `${GITEE.api}/releases?per_page=100`,
         `${GITHUB.api}/releases?per_page=100`,
       ];
-      const results = await Promise.allSettled([fetchMirrorRelease().then(release => [release.version]), ...urls.map(async url => {
+      const results = await Promise.allSettled(urls.map(async url => {
         const body = await (await (fetchSource || fetchUpdateSource)(url, 6000)).json();
         if (!Array.isArray(body)) throw new Error('invalid releases');
         return body.filter(r => !r.draft && !r.prerelease)
           .map(r => String(r.tag_name || '').replace(/^v/, ''))
           .filter(version => /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version));
-      })]);
+      }));
       const versions = [...new Set(results.flatMap(r => r.status === 'fulfilled' ? r.value : []))]
         .sort((a,b) => isNewerVersion(a,b) ? -1 : isNewerVersion(b,a) ? 1 : 0).slice(0,3);
       if (!versions.length) throw new Error('no published stable releases available');
@@ -100,7 +87,7 @@ export function createUpdates({ h, fetchSource }: any) {
       return (await fetchRecentVersions())[0];
     }
 
-  return { PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, fetchRecentVersions, fetchMirrorRelease, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell };
+  return { PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, fetchRecentVersions, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell };
 }
 
 export function createUpdateActions(context: any) {
@@ -249,10 +236,7 @@ async function runOnlineUpdate() {
         context.setUpdateMessage(context.t('versionCheckFirst'));
         return;
     }
-    let mirror: { url: string } | null = null;
-    try { mirror = await context.fetchMirrorRelease?.(context.updateLatest); } catch { /* 镜像同步延迟或不可用时使用仓库正式包。 */ }
     const candidates = [
-      ...(mirror ? [mirror.url] : []),
       releaseDownloadUrl(context.updateLatest, 'gitee'),
       releaseDownloadUrl(context.updateLatest, 'github'),
     ];
@@ -287,7 +271,7 @@ async function runOnlineUpdate() {
                 await new Promise((resolve) => window.setTimeout(resolve, round * 1200));
                 continue;
             }
-            return { failure: text, next: (mirror?.url === spec && transient) || (!transient && specUnresolvable(text)) };
+            return { failure: text, next: !transient && specUnresolvable(text) };
         }
         return { failure: 'unknown' };
     };
