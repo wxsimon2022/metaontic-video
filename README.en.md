@@ -41,4 +41,4 @@ Example: “Make a 30-second vertical 720P video showing a peaceful lake at dawn
 
 ## Links
 
-[Website & user guide](https://ai.mybfs.cn) · [AI-readable product summary](./llms.txt) · [Issues](https://github.com/wxsimon2022/metaontic-video/issues) · [Changelog](./CHANGELOG.md) · [Development](./docs/engineering/development.md) · [License](./LICENSE)
+[Website & user guide](https://ai.mybfs.cn) · [AI-readable product summary](https://ai.mybfs.cn/llms.txt) · [Issues](https://github.com/wxsimon2022/metaontic-video/issues) · [Changelog](./CHANGELOG.md) · [Development](./docs/engineering/development.md) · [License](./LICENSE)
