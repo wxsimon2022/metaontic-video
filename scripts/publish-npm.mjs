@@ -29,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REGISTRY = 'https://registry.npmjs.org/';
 const TOKEN_FILE = join(ROOT, '.local', 'npm-token');
+const CURRENT_PACKAGE = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name;
 
 /** 本地令牌文件位置：放在 .local/ 下，随仓库一起被忽略，不进发布包。 */
 export function tokenPath(root = ROOT) {
@@ -97,6 +98,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const archive = join(ROOT, '.local', 'releases', version, `metaontic-video-${version}.tgz`);
   if (!existsSync(archive)) throw new Error(`缺少成品包 ${archive}；先按 README 的发布规范产出该版本`);
   const manifest = validateNpmBundle(readFileSync(archive), { version });
+  if (manifest.name !== CURRENT_PACKAGE) throw new Error(`发布包名必须是 ${CURRENT_PACKAGE}；旧包名 ${manifest.name} 不再发布`);
   const entries = tarEntries(gunzipSync(readFileSync(archive)));
   if (!entries.includes('package/package.json')) throw new Error(`${archive} 里没有 package/package.json，不是可发布的成品包`);
   if (entries.includes('package/README.md')) throw new Error(`${archive} 仍带 package/README.md，宿主插件页会把它当详细介绍渲染；先跑 scripts/strip-package-readme.py`);

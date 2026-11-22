@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { validateNpmBundle } from './npm-bundle.mjs';
 const mirror = 'https://registry.npmmirror.com';
+const currentPackage = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).name;
 
 /** 同步任务成功不代表镜像可安装；必须核对 latest、声明、成品和完整性。 */
 export async function syncNpmMirror({ name, version, request = fetch, attempts = 12, delayMs = 5000, wait = ms => new Promise(r => setTimeout(r,ms)), log = console.log }) {
+  if (name !== currentPackage) throw Error(`Only the current package ${currentPackage} is synced to the China mirror; legacy package ${name || '(missing)'} is not updated`);
   if (!/^(?:@[a-z0-9._-]+\/)?[a-z0-9][a-z0-9._-]*$/.test(name || '')) throw Error('Invalid npm package name');
   const escaped = encodeURIComponent(name);
   async function metadata(host) {

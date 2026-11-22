@@ -2,9 +2,11 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { main as publishNpm } from './publish-npm.mjs';
 import { syncNpmMirror } from './sync-npm-mirror.mjs';
+const currentPackage = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).name;
 
 /** 续跑不覆盖 npm 版本；已存在时核对原字节，再验证中国镜像同步。 */
 export async function publishNpmRelease({name,version,archive,request=fetch,publish=publishNpm,sync=syncNpmMirror}) {
+  if (name !== currentPackage) throw Error(`Only ${currentPackage} is published and mirrored by this release workflow; legacy package ${name || '(missing)'} is disabled`);
   const response=await request(`https://registry.npmjs.org/${encodeURIComponent(name)}/${version}`,{signal:AbortSignal.timeout(15000)});
   if(response.status===404) { await publish([version]);return; }
   if(!response.ok)throw Error(`npm 版本查询失败：HTTP ${response.status}；保留已完成的仓库发行版，使用 --all --resume 续跑`);
