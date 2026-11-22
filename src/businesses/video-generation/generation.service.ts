@@ -33,6 +33,7 @@ import { GATED_TOOLS } from './config.js';
 import { preflightGate } from './workflow/approval.js';
 import { ffmpegInstallOptions } from './media/ffmpeg.js';
 import { isManualKey, connectionLabel } from './providers/connection.js';
+import { scriptTool } from './tools/video-script.js';
 
 
 /**
@@ -83,6 +84,7 @@ function applyVideoBusiness(runtime: BusinessRuntime) {
   const project = projectTool(config, ctx, storyboardReview, generation.parameters.properties, extension.parameters.properties, segmentReview, canvasProjects?.sync);
   register(jsonSafeTool(canvasProjects ? canvasProjects.wrapProject(project) : project));
   register(jsonSafeTool(estimateTool(config)));
+  register(jsonSafeTool(scriptTool(config)));
   register(jsonSafeTool(submissionTool(config)));
   register(jsonSafeTool(wrapCanvas(prepareImageTool(config))));
   register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(generation, config), config)), 'video_generate', config), deliveryOrder.remember));

@@ -56,7 +56,8 @@ export async function checkConnections(liveConfig:any,options:any={}) {
     const model=target==='image'?cfg.imageModel:target==='text'?resolveTextModel(cfg):resolveModel(cfg);
     const result=await probe(cfg);
     const {ids,...safe}=result;
-    return {target,model,...safe,...(ids&&!ids.has(model)?{code:'model_not_listed',level:'warning'}:{})};
+    return {target,model,...safe,...(ids&&!ids.has(model)?{code:'model_not_listed',level:'warning'}:{}),
+      ...(target==='text'&&ids?{availableModels:[...ids].sort()}: {})};
   }));
   return {checks,scope:'read_only',generation_tested:false};
 }
