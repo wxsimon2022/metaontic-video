@@ -24,8 +24,8 @@ const HOMEPAGE = 'https://ai.mybfs.cn';
 const MAX_VERSIONS = 5;
 const NPM_REGISTRY = 'https://registry.npmjs.org/';
 const MARKET_DESCRIPTION = {
-  en: 'An AI video creation plugin for DeepSeek Harness (DSH): develop ideas, scripts, and storyboards in conversation, then use text-to-video, image-to-video, segmented continuation, resumable progress, and local merging.',
-  zh: 'DeepSeek Harness（DSH）的 AI 视频创作插件：新手可用对话完成创意、剧本与分镜，支持文生/图生视频、分段续拍、断点续做与本地合并。',
+  en: 'Guided AI video creation with script review, segmented continuation, and local merging for long-form videos.',
+  zh: '引导式 AI 视频创作，支持脚本审核、分段续拍与本地合并制作长视频。',
 };
 
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
@@ -79,8 +79,8 @@ const index = {
   format: 1,
   title: { en: 'MetaOntic Video', zh: 'MetaOntic 视频' },
   description: {
-    en: 'For beginners creating AI short videos and creators seeking a lower-cost way to make longer videos with DeepSeek Harness.',
-    zh: '面向 AI 短视频新手与需要低成本长视频方案的 DeepSeek Harness 创作者。',
+    en: 'For DeepSeek Harness creators who want guided scripts, segmented continuation, and local merging for longer videos.',
+    zh: '面向需要脚本审核、分段续拍与本地合并长视频的 DeepSeek Harness 创作者。',
   },
   metadata: {
     categories: { video: { title: { en: 'Video', zh: '视频创作' } } },
