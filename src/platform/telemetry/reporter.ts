@@ -83,7 +83,9 @@ export function installSourceOf(source: unknown) {
   if (/^link:|^file:|^[a-z]:[\\/]|^[\\/]|^~[\\/]/i.test(value)) return 'directory';
   if (/\.(?:tgz|tar\.gz)(?:[?#].*)?$/i.test(value)) return 'tgz';
   if (/^(?:git\+|git:|ssh:|git@)/i.test(value) || /\.git(?:[?#].*)?$/i.test(value)) return 'git';
-  if (/^npm:/i.test(value) || /@\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/.test(value)
+  if (/^npm:/i.test(value) || value === PLUGIN_PACKAGE
+    || /^dsh-metaontic-video@(?:latest|next|\^|~|>=?|\*)$/i.test(value)
+    || /@\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/.test(value)
     || /^(?:latest|next|\^|~|>=?|\*)/i.test(value)) return 'npm';
   return 'unknown';
 }
@@ -100,7 +102,7 @@ async function currentInstallSource(ctx: any, timeoutMs = 1000) {
     ]);
     const rows = Array.isArray(listed) ? listed : listed?.ok === true && Array.isArray(listed.value) ? listed.value : [];
     const bundle = rows.find((item: any) => item?.name === PLUGIN_PACKAGE && item?.installed === true);
-    return installSourceOf(bundle?.source);
+    return bundle ? installSourceOf(bundle.source) : 'unknown';
   } catch { return 'unknown'; }
   finally { clearTimeout(timer); }
 }
@@ -178,7 +180,10 @@ export function createAnalyticsReporter(config, options: any = {}) {
       const rawTime = Date.parse(String(input.occurredAt || ''));
       const occurredAt = Number.isFinite(rawTime) && rawTime <= Date.now() + 300000 && rawTime >= Date.now() - 30 * 86400000
         ? new Date(rawTime).toISOString() : new Date().toISOString();
-      const event = { eventId: randomUUID(), name, occurredAt, version: PLUGIN_VERSION,
+      // 更新安装时监听器仍运行在旧版本；安装事件应记录宿主操作实际装上的版本。
+      const installedVersion = name === 'plugin_installed' ? String(input.version || '').trim().replace(/^v/i, '') : '';
+      const version = /^\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/.test(installedVersion) ? installedVersion : PLUGIN_VERSION;
+      const event = { eventId: randomUUID(), name, occurredAt, version,
         platform: ['darwin', 'win32', 'linux'].includes(process.platform) ? process.platform : 'other',
         ...fields, attempts: 0 };
       // taskId只在本地参与散列，服务端不接收原任务ID。
@@ -207,10 +212,10 @@ export function createAnalyticsReporter(config, options: any = {}) {
         try {
           if (!operation || operation.phase !== 'settled' || operation.reason !== 'install'
             || operation.target !== PLUGIN_PACKAGE || operation.stage !== 'enable' || operation.changed !== true
-            || operation.errorCode || ['failed', 'cancelled'].includes(operation.application)) return;
+            || operation.errorCode || !['applied', 'restart-required'].includes(operation.application)) return;
           const key = String(operation.id || `${operation.time || ''}:${operation.version || ''}`);
           void currentInstallSource(ctx).then(installSource => {
-            try { record('plugin_installed', { installSource, occurredAt: operation.time }, key); }
+            try { record('plugin_installed', { installSource, occurredAt: operation.time, version: operation.version }, key); }
             catch { /* 安装统计失败不影响插件 */ }
           }).catch(() => {});
         } catch { /* 监听器自身失败不影响宿主安装流程 */ }
