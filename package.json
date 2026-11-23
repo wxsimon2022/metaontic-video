@@ -2,7 +2,7 @@
   "name": "dsh-metaontic-video",
   "version": "4.2.2",
   "description": "MetaOnticVideo（dsh-metaontic-video）是 DeepSeek Harness（DSH）的 AI 视频创作插件：支持剧本与分镜审核、文生/图生视频、分段续拍、断点续做与本地合并，帮助新手快速完成短视频并规划更长内容。",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "type": "module",
   "keywords": [
     "dsh-metaontic-video",

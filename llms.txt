@@ -80,7 +80,7 @@ MetaOnticVideo 先帮助用户明确创意、剧本、分镜、画幅、清晰�
 - GitHub 源码：https://github.com/wxsimon2022/metaontic-video
 - Gitee 源码：https://gitee.com/hackloop/metaontic-video
 - npm 包：https://www.npmjs.com/package/dsh-metaontic-video
-- 许可：https://github.com/wxsimon2022/metaontic-video/blob/master/LICENSE
+- MIT 许可：https://github.com/wxsimon2022/metaontic-video/blob/master/LICENSE
 
 ## English summary
 

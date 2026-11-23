@@ -41,4 +41,4 @@ https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaonti
 
 ## 相关链接
 
-[官网与使用说明](https://ai.mybfs.cn) · [AI 可读产品摘要](https://ai.mybfs.cn/llms.txt) · [问题反馈](https://github.com/wxsimon2022/metaontic-video/issues) · [更新记录](./CHANGELOG.md) · [开发文档](./docs/engineering/development.md) · [许可](./LICENSE)
+[官网与使用说明](https://ai.mybfs.cn) · [AI 可读产品摘要](https://ai.mybfs.cn/llms.txt) · [问题反馈](https://github.com/wxsimon2022/metaontic-video/issues) · [更新记录](./CHANGELOG.md) · [开发文档](./docs/engineering/development.md) · [MIT 许可](./LICENSE)
