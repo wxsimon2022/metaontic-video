@@ -73,8 +73,23 @@ interface DshToolDefinition {
   execute(args?: any, exec?: DshToolExec): Promise<any> | any;
 }
 
+/** 宿主插件管理服务的安装操作结果；只声明安装统计实际读取的字段。 */
+interface DshPluginOperation {
+  id?: string;
+  time?: string;
+  reason?: 'plugin' | 'bundle' | 'install' | 'remove';
+  target?: string | null;
+  stage?: 'install' | 'enable' | 'remove';
+  version?: string;
+  phase?: 'started' | 'settled' | 'unknown';
+  application?: 'applied' | 'restart-required' | 'overridden' | 'failed' | 'cancelled';
+  changed?: boolean;
+  errorCode?: string;
+}
+
 interface DshContext {
   tools: { register(tool: DshToolDefinition): () => void };
+  on(event: 'plugin-manager/operation', listener: (operation: DshPluginOperation) => unknown): () => void;
   on(event: string, listener: (exec: DshToolExec, next: () => Promise<DshPreExecuteDecision>) => unknown): () => void;
   get(name: string): any;
   /** 注入可选服务：宿主没有这些服务时回调根本不跑（返回值不是清理函数）。 */

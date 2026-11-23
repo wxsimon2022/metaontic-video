@@ -136,6 +136,35 @@ test('device fields never carry characters the ingest whitelist rejects',async()
  assert.match(body.device.osRelease,/^[a-zA-Z0-9.+_ -]{1,64}$/);assert.match(body.device.harnessVersion,/^[a-zA-Z0-9.+_-]{1,64}$/);
  }finally{r.dispose();}
 });
+test('host install completion is reported asynchronously with a bounded source enum',async()=>{
+ let body;const listeners={};const time=new Date().toISOString();
+ const ctx={get:()=>({listBundles:async()=>[{name:'dsh-metaontic-video',installed:true,source:'dsh-metaontic-video@4.2.2'}]}),on:(name,listener)=>{listeners[name]=listener;return()=>{delete listeners[name];};}};
+ const r=fixture(async(_u,o)=>{body=JSON.parse(o.body);return{ok:true};});
+ try{
+  const stop=r.watchInstallOperations(ctx);assert.equal(typeof stop,'function');
+  listeners['plugin-manager/operation']({id:'private-operation-id',time,reason:'install',target:'dsh-metaontic-video',stage:'enable',phase:'settled',application:'applied',changed:true,version:'4.2.2'});
+  await tick();await r.flush();
+  assert.equal(body.events.length,1);assert.equal(body.events[0].name,'plugin_installed');assert.equal(body.events[0].installSource,'npm');assert.equal(body.events[0].occurredAt,time);assert.equal(body.events[0].tool,undefined);assert.doesNotMatch(JSON.stringify(body),/private-operation-id/);
+ }finally{r.dispose();}
+});
+test('failed, cancelled and unrelated host operations do not create install events',async()=>{
+ let calls=0;const listeners={};
+ const ctx={get:()=>({listBundles:async()=>[]}),on:(name,listener)=>{listeners[name]=listener;return()=>{};}};
+ const r=fixture(async()=>{calls++;return{ok:true};});
+ try{
+  r.watchInstallOperations(ctx);const fire=operation=>listeners['plugin-manager/operation']({id:JSON.stringify(operation),time:new Date().toISOString(),reason:'install',target:'dsh-metaontic-video',stage:'enable',phase:'settled',changed:true,application:'applied',...operation});
+  fire({application:'failed'});fire({application:'cancelled'});fire({errorCode:'operation-error'});fire({target:'another-plugin'});fire({reason:'bundle'});
+  await tick();await r.flush();assert.equal(calls,0);assert.equal(r.pending(),0);
+ }finally{r.dispose();}
+});
+test('install source classification never carries the raw URL, path or credential',()=>{
+ const cases={
+  'dsh-metaontic-video@4.2.2':'npm','npm:dsh-metaontic-video@4.2.2':'npm','latest':'npm',
+  'https://example.com/metaontic-video.tgz?token=private':'tgz','link:/private/workspace':'directory','file:C:\\private\\plugin':'directory','~/private/plugin':'directory',
+  'git+https://user:private@example.com/repo.git':'git','git@example.com:private/repo.git':'git','':'bundled','private-value':'unknown',
+ };
+ for(const [value,expected] of Object.entries(cases))assert.equal(api.installSourceOf(value),expected,value);
+});
 test('test builds and unversioned dev builds never report anything',async()=>{
  for(const version of ['3.24.1','v3.24.1'])assert.equal(api.isReleaseVersion(version),true);
  for(const version of ['3.22.9-test.2','3.24.1-rc.1','3.24.1+build.5','','dev','3.24'])assert.equal(api.isReleaseVersion(version),false);

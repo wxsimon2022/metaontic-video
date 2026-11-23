@@ -43,6 +43,7 @@ export function createPluginRuntime(definitions: { agents: readonly AgentDefinit
     };
     const analytics = createAnalyticsReporter(config);
     defer(() => analytics.dispose());
+    defer(analytics.watchInstallOperations(ctx));
     defer(bindAgentRegistry(ctx, agents));
     const tools = createToolRegistry(ctx, agents, analytics, defer, createVersionGuard());
     const runtime = { ctx, config, agents, tools, defer };

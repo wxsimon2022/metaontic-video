@@ -7,14 +7,15 @@ import os from 'node:os';
 import { dshHome } from '../../shared/paths/index.js';
 import { PLUGIN_VERSION } from '../../shared/constants/version.js';
 import { ref } from '../settings/value.js';
-import { ANALYTICS_URL, DATA_DIR, PLUGIN_ID } from '../../shared/constants/plugin.js';
+import { ANALYTICS_URL, DATA_DIR, PLUGIN_ID, PLUGIN_PACKAGE } from '../../shared/constants/plugin.js';
 
 export { ANALYTICS_URL } from '../../shared/constants/plugin.js';
 const STATE = Symbol.for(`${PLUGIN_ID}.analytics.process`);
-const EVENTS = new Set(['plugin_started', 'tool_started', 'tool_finished', 'video_task_created', 'video_task_finished']);
+const EVENTS = new Set(['plugin_started', 'plugin_installed', 'tool_started', 'tool_finished', 'video_task_created', 'video_task_finished']);
 const TOOLS = new Set(['video_generate', 'video_extend', 'video_status', 'video_project', 'video_prepare_image', 'video_estimate', 'video_script', 'video_config', 'video_setup', 'video_stage', 'media_submission', 'video_canvas', 'video_hyperframes']);
 const STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'unknown', 'timeout', 'approved', 'pending', 'paused', 'prepared', 'draft', 'blocked', 'review_required', 'submission_unknown', 'ok']);
 const ERRORS = new Set(['provider_auth', 'provider_failed', 'provider_network_error', 'provider_rate_limited', 'provider_quota_exceeded', 'provider_price_config_error', 'provider_bad_response', 'content_rejected', 'real_person_rejected', 'submission_unknown', 'waiting_stopped', 'ABORTED']);
+const INSTALL_SOURCES = new Set(['npm', 'tgz', 'directory', 'git', 'bundled', 'unknown']);
 function processState() {
   const owner = globalThis as any;
   return owner[STATE] ||= { identities: new Map(), started: new Set() };
@@ -68,11 +69,40 @@ export async function analyticsIdentity() {
 export function analyticsFields(input: any = {}) {
   const value: any = {};
   if (TOOLS.has(input.tool)) value.tool = input.tool;
+  if (INSTALL_SOURCES.has(input.installSource)) value.installSource = input.installSource;
   if (['video-director', 'standard'].includes(input.mode)) value.mode = input.mode;
   if (STATUSES.has(input.status)) value.status = input.status;
   if (typeof input.durationMs === 'number' && Number.isFinite(input.durationMs)) value.durationMs = Math.round(Math.max(0, Math.min(86400000, input.durationMs)));
   if (typeof input.errorCode === 'string') value.errorCode = ERRORS.has(input.errorCode) ? input.errorCode : 'other';
   return value;
+}
+/** 安装来源只保留固定枚举；完整 URL、路径与凭据永远不进入上报字段。 */
+export function installSourceOf(source: unknown) {
+  const value = typeof source === 'string' ? source.trim() : '';
+  if (!value) return 'bundled';
+  if (/^link:|^file:|^[a-z]:[\\/]|^[\\/]|^~[\\/]/i.test(value)) return 'directory';
+  if (/\.(?:tgz|tar\.gz)(?:[?#].*)?$/i.test(value)) return 'tgz';
+  if (/^(?:git\+|git:|ssh:|git@)/i.test(value) || /\.git(?:[?#].*)?$/i.test(value)) return 'git';
+  if (/^npm:/i.test(value) || /@\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/.test(value)
+    || /^(?:latest|next|\^|~|>=?|\*)/i.test(value)) return 'npm';
+  return 'unknown';
+}
+/** 读取宿主安装记录时失败就返回 unknown；调用方永远不会等待它完成。 */
+async function currentInstallSource(ctx: any, timeoutMs = 1000) {
+  let timer: any;
+  try {
+    const manager = ctx?.get?.('pluginManager') || ctx?.get?.('remote.pluginManager')
+      || ctx?.get?.('remote')?.pluginManager || ctx?.remote?.pluginManager;
+    if (!manager || typeof manager.listBundles !== 'function') return 'unknown';
+    const listed = await Promise.race([
+      Promise.resolve(manager.listBundles()),
+      new Promise(resolve => { timer = setTimeout(() => resolve(undefined), timeoutMs); timer.unref?.(); }),
+    ]);
+    const rows = Array.isArray(listed) ? listed : listed?.ok === true && Array.isArray(listed.value) ? listed.value : [];
+    const bundle = rows.find((item: any) => item?.name === PLUGIN_PACKAGE && item?.installed === true);
+    return installSourceOf(bundle?.source);
+  } catch { return 'unknown'; }
+  finally { clearTimeout(timer); }
 }
 /** 设备字段只保留服务端白名单允许的字符；清空后回退 unknown，避免一条越界字段让整批 422 被拒。 */
 function deviceText(value: unknown, allowSpace: boolean) {
@@ -85,7 +115,7 @@ export function isReleaseVersion(version: unknown) {
 export function createAnalyticsReporter(config, options: any = {}) {
   const releaseBuild = options.releaseBuild || (() => isReleaseVersion(PLUGIN_VERSION));
   // 测试版连匿名身份文件都不写、定时器也不起，统计流量完全为零。
-  if (!releaseBuild()) return { record() {}, start() {}, dispose() {}, flush: async () => {}, pending: () => 0 };
+  if (!releaseBuild()) return { record() {}, start() {}, watchInstallOperations: () => () => {}, dispose() {}, flush: async () => {}, pending: () => 0 };
   const enabled = options.enabled || (() => process.env.METAONTIC_VIDEO_ANALYTICS_DISABLED !== '1' && ref(config, 'usageStatsEnabled', true) !== false);
   const request = options.request || ((...args) => (globalThis.fetch as any)(...args));
   const identity = options.identity || analyticsIdentity;
@@ -138,14 +168,17 @@ export function createAnalyticsReporter(config, options: any = {}) {
       if (allowed() && queue.length) schedule(queue[0].attempts ? Math.min(30000, 1000 * 5 ** queue[0].attempts) : delay);
     }
   }
-  function record(name, input = {}, dedupeKey = '') {
+  function record(name, input: any = {}, dedupeKey = '') {
     try {
       if (!allowed()) { queue = []; return; }
       if (!EVENTS.has(name)) return;
       // 服务端事件契约尚未声明的新业务工具不混入批次，避免一条未知事件拖累整批。
       const fields = analyticsFields(input);
-      if (name !== 'plugin_started' && !fields.tool) return;
-      const event = { eventId: randomUUID(), name, occurredAt: new Date().toISOString(), version: PLUGIN_VERSION,
+      if (!['plugin_started', 'plugin_installed'].includes(name) && !fields.tool) return;
+      const rawTime = Date.parse(String(input.occurredAt || ''));
+      const occurredAt = Number.isFinite(rawTime) && rawTime <= Date.now() + 300000 && rawTime >= Date.now() - 30 * 86400000
+        ? new Date(rawTime).toISOString() : new Date().toISOString();
+      const event = { eventId: randomUUID(), name, occurredAt, version: PLUGIN_VERSION,
         platform: ['darwin', 'win32', 'linux'].includes(process.platform) ? process.platform : 'other',
         ...fields, attempts: 0 };
       // taskId只在本地参与散列，服务端不接收原任务ID。
@@ -166,8 +199,26 @@ export function createAnalyticsReporter(config, options: any = {}) {
       if (!starts.has(id)) { starts.add(id); record('plugin_started'); }
     }).catch(() => {});
   }
+  /** 宿主的真实安装结果在插件激活后发出；这里只旁路监听，不参与安装与加载。 */
+  function watchInstallOperations(ctx: any) {
+    try {
+      if (!ctx || typeof ctx.on !== 'function') return () => {};
+      return ctx.on('plugin-manager/operation', (operation: any) => {
+        try {
+          if (!operation || operation.phase !== 'settled' || operation.reason !== 'install'
+            || operation.target !== PLUGIN_PACKAGE || operation.stage !== 'enable' || operation.changed !== true
+            || operation.errorCode || ['failed', 'cancelled'].includes(operation.application)) return;
+          const key = String(operation.id || `${operation.time || ''}:${operation.version || ''}`);
+          void currentInstallSource(ctx).then(installSource => {
+            try { record('plugin_installed', { installSource, occurredAt: operation.time }, key); }
+            catch { /* 安装统计失败不影响插件 */ }
+          }).catch(() => {});
+        } catch { /* 监听器自身失败不影响宿主安装流程 */ }
+      });
+    } catch { return () => {}; }
+  }
   function dispose() { disposed = true; queue = []; clearTimeout(timer); controller?.abort(); }
-  return { record, start, dispose, flush, pending: () => queue.length };
+  return { record, start, watchInstallOperations, dispose, flush, pending: () => queue.length };
 }
 export function reportUsage(exec, name, fields, key = '') {
   try { exec?.metaonticAnalytics?.record(name, fields, key); } catch { /* optional */ }
