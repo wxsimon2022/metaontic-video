@@ -24,8 +24,8 @@ const HOMEPAGE = 'https://ai.mybfs.cn';
 const MAX_VERSIONS = 5;
 const NPM_REGISTRY = 'https://registry.npmjs.org/';
 const MARKET_DESCRIPTION = {
-  en: 'Guided AI video creation with script review, segmented continuation, and local merging for long-form videos.',
-  zh: '引导式 AI 视频创作，支持脚本审核、分段续拍与本地合并制作长视频。',
+  en: 'Conversational AI long-form video creation: review scripts, continue in segments, and merge locally—beginner-friendly, controllable, and cost-efficient.',
+  zh: '对话式 AI 长视频创作：脚本先审、分段续拍、本机合并，新手易上手、流程可控、成本更省。',
 };
 
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
@@ -79,8 +79,8 @@ const index = {
   format: 1,
   title: { en: 'MetaOntic Video', zh: 'MetaOntic 视频' },
   description: {
-    en: 'For DeepSeek Harness creators who want guided scripts, segmented continuation, and local merging for longer videos.',
-    zh: '面向需要脚本审核、分段续拍与本地合并长视频的 DeepSeek Harness 创作者。',
+    en: 'A beginner-friendly long-form video workflow with script review, segmented continuation, and local merging—controlled and cost-efficient.',
+    zh: '面向新手的长视频创作方案：脚本审核、分段续拍、本地合并，流程可控且更省成本。',
   },
   metadata: {
     categories: { video: { title: { en: 'Video', zh: '视频创作' } } },
