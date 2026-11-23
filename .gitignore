@@ -29,14 +29,6 @@ Desktop.ini
 .env.*
 !.env.example
 
-# 构建生成的安装入口：由 npm run build 生成，成品包仍包含
-/index.js
-/client.js
-/locale/en.json
-/locale/zh.json
-/presets/promo-video.js
-/presets/video-director.js
-
 # 可由源文件导出的工程图及旧版品牌设计素材，仅保留本地
 /docs/engineering/plugin-workflow.png
 /docs/engineering/plugin-workflow.pdf
@@ -57,7 +49,7 @@ preview/.build/
 /*价格对比*
 /比价视频/
 
-# 本地待发布说明，由一键发布脚本读取
+# 旧版本地待发布说明路径；新位置为 .local/release-plan.json
 /release-plan.json
 
 # 本机一次性清理脚本，可能含接口令牌，不提交
@@ -69,4 +61,3 @@ preview/.build/
 /MetaOnticVideo使用说明书.md
 /MetaOnticVideo使用说明书.pdf
 /docs/guide/
-MetaOnticVideo插件介绍.md

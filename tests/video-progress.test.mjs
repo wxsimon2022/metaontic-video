@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-const source = readFileSync(new URL('../client.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../dist/client.js', import.meta.url), 'utf8');
 test('video views register immediately when the host declares the tool slot and clean up', () => {
   let entry;
   vm.runInNewContext(source, { window: { __ModuleLoader__: { load(x) { entry = x; } } } });

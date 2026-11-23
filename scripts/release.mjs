@@ -50,9 +50,9 @@ const help = `一键发布（准备好完整说明与指南后执行）：
 版本号按改动量选：修复、样式/文案/交互微调等小改只升第三位（如 3.29.1），成规模的新增或行为变化才升第二位，别习惯性升第二位。
 说明要求：只写「新增」与「优化」两类（修复并入优化），合计不超过 ${NOTES_LIMIT} 字。
 发版同步使用说明书；宣传页使用固定最新版安装地址，后续发版不修改宣传页。
-  node scripts/release.mjs 3.13.4 --notes release-plan.json
-  node scripts/release.mjs 3.13.4 --notes release-plan.json --dry-run
-  node scripts/release.mjs 3.13.4 --all --notes release-plan.json
+  node scripts/release.mjs 3.13.4 --notes .local/release-plan.json
+  node scripts/release.mjs 3.13.4 --notes .local/release-plan.json --dry-run
+  node scripts/release.mjs 3.13.4 --all --notes .local/release-plan.json
   node scripts/release.mjs 3.13.4 --all --resume
 默认只发 Gitee，并在本机打包后直接创建 Release、上传核对成品（需要本机 GITEE_TOKEN）。
 想交给 Gitee Go 流水线打包发布时加 --pipeline（--ci 是同义写法）：本机只做准备、提交、打标签并推送，成品打包、制品库归档与 Gitee Release 都由流水线按标签完成，本机不需要 GITEE_TOKEN。
@@ -69,7 +69,7 @@ export async function main(argv) {
     const {createInterface}=await import('node:readline/promises');
     const input=createInterface({input:process.stdin,output:process.stdout});
     let entered;
-    try { console.log('正式发布：请先填写release-plan.json并同步指南；默认在本机打包并发布 Gitee Release（加 --pipeline 交给流水线）。'); entered=(await input.question('请输入正式版本号（小改升第三位，如3.13.4；留空退出）：')).trim(); } finally { input.close(); }
+    try { console.log('正式发布：请先填写 .local/release-plan.json 并同步指南；默认在本机打包并发布 Gitee Release（加 --pipeline 交给流水线）。'); entered=(await input.question('请输入正式版本号（小改升第三位，如3.13.4；留空退出）：')).trim(); } finally { input.close(); }
     if(!entered)return;
     return main([entered,...argv.slice(1)]);
   }
@@ -125,9 +125,10 @@ export async function main(argv) {
   const pkg=JSON.parse(readFileSync('package.json','utf8'));
   let plan;
   if(opts.notes) plan=JSON.parse(readFileSync(path.resolve(opts.notes),'utf8'));
+  else if(existsSync('.local/release-plan.json'))plan=JSON.parse(readFileSync('.local/release-plan.json','utf8'));
   else if(existsSync('release-plan.json'))plan=JSON.parse(readFileSync('release-plan.json','utf8'));
   else if(opts.resume)plan={items:pkg.releaseNotes?.items,guideReview:'沿用已提交的发布核对'};
-  else throw Error('缺少release-plan.json；复制docs/engineering/release-plan.example.json并填写完整更新内容及guideReview');
+  else throw Error('缺少 .local/release-plan.json；复制docs/engineering/release-plan.example.json并填写完整更新内容及guideReview');
   const sections=notesFor(version,plan.items);
   if(plan.items.some(x=>/请填写|请替换|占位/.test(x))||/请替换/.test(plan.guideReview||''))throw Error('请先替换发布计划中的模板占位文字');
   if(typeof plan.guideReview!=='string'||plan.guideReview.trim().length<8)throw Error('请填写具体guideReview，记录本次指南核对结果');

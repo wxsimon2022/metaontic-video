@@ -1,18 +1,19 @@
 /**
- * 把 `src/locale/<lang>.ts` 生成 `locale/<lang>.json`。
+ * 把 `src/locale/<lang>.ts` 生成 `dist/locale/<lang>.json`。
  *
  * 插件元信息（插件页显示的标题 / 描述）源码写成 TS，但 DSH 是按 `./locale/*.json`
- * 这个导出路径读的，运行时只认 JSON——所以跟 index.js / client.js 一个路子：
+ * 这个导出路径读的，运行时只认 JSON——所以跟 dist/index.js / dist/client.js 一个路子：
  * 源码全是 TS，运行时用构建产物。
  */
 import { build } from 'esbuild';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 
 const LANGS = ['zh', 'en'];
 
 for (const lang of LANGS) {
   const entry = `src/locale/${lang}.ts`;
-  const outfile = `locale/${lang}.json`;
+  const outfile = `dist/locale/${lang}.json`;
+  await mkdir('dist/locale', { recursive: true });
   const result = await build({
     entryPoints: [entry],
     bundle: true,

@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { test } from 'node:test';
-import * as plugin from '../index.js';
+import * as plugin from '../dist/index.js';
 import { sourceOf } from './source.mjs';
 
 async function fixture(run) {

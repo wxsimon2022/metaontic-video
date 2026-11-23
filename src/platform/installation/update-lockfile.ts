@@ -95,11 +95,12 @@ export function stripUnverifiableEntries(text) {
   return { text: lines.join(newline), removed: [...removed] };
 }
 
-/** 插件安装目录里的 profile 根：<profile>/node_modules/metaontic-video/index.js 往上三级。 */
+/** 插件安装目录里的 profile 根：从最近一级 node_modules 往上截取，兼容入口位于 dist/ 或包根目录。 */
 export function locateProfileDir(moduleUrl) {
-  let dir = fileURLToPath(moduleUrl);
-  for (let up = 0; up < 3; up += 1) dir = path.dirname(dir);
-  return dir;
+  const entry = fileURLToPath(moduleUrl);
+  const marker = `${path.sep}node_modules${path.sep}`;
+  const index = entry.lastIndexOf(marker);
+  return index < 0 ? path.dirname(entry) : entry.slice(0, index);
 }
 
 /**

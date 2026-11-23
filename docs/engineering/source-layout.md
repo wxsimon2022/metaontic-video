@@ -74,7 +74,7 @@ src/businesses/film-production/
 
 `skills/` 存按阶段加载的专业方法；`tests/` 存实际使用的测试与辅助模块；`scripts/` 存构建、预览、验证和发布工具；`docs/engineering/` 存开发说明与验证记录。这些目录不混入项目运行状态。
 
-根目录 `index.js`、`client.js`、`locale/`、`presets/` 是现有包入口或构建资源，按 package.json 的导出和 Harness 约定保留。改源文件后用 `npm run build` 同步产物，不手工编辑构建包。仅移动源码不会改变安装目录、用户配置或运行项目数据；本次不更新版本、不发版、不自动安装。
+`dist/` 存放构建生成的宿主入口、浏览器入口、语言包和预设；`package.json` 的导出与 `files` 均指向该目录。`locale/presets/` 与 `presets/icons/` 是继续保留在根目录的静态资源。改源文件后用 `npm run build` 同步产物，不手工编辑构建包。仅移动源码不会改变安装目录、用户配置或运行项目数据；本次不更新版本、不发版、不自动安装。
 
 ## 验证边界
 

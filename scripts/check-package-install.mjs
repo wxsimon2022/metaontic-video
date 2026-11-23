@@ -123,17 +123,17 @@ try {
   await rename(downloaded, `${downloaded}.saved`);
   const pkg = JSON.parse(await readFile(path.join(installed, 'package.json'), 'utf8'));
   assert.deepEqual(pkg.dependencies || {}, {}, 'No extra runtime npm dependencies');
-  const locales = await readdir(path.join(installed, 'locale'));
+  const locales = await readdir(path.join(installed, 'dist', 'locale'));
   for (const locale of ['en.json', 'zh.json']) {
     assert.ok(locales.includes(locale), `Missing locale/${locale}`);
-    const parsed = JSON.parse(await readFile(path.join(installed, 'locale', locale), 'utf8'));
+    const parsed = JSON.parse(await readFile(path.join(installed, 'dist', 'locale', locale), 'utf8'));
     assert.ok(parsed.meta?.title, `Missing ${locale} metadata title`);
   }
-  for (const file of ['index.js', 'client.js', 'cordis.patch.yml', 'MetaOnticVideo使用说明书.md', 'MetaOnticVideo使用说明书.pdf']) {
+  for (const file of ['dist/index.js', 'dist/client.js', 'cordis.patch.yml', 'MetaOnticVideo使用说明书.md', 'MetaOnticVideo使用说明书.pdf']) {
     assert.ok((await readFile(path.join(installed, file))).length, `Missing ${file}`);
   }
   assert.ok((await readdir(path.join(installed, 'skills'))).length);
-  const plugin = await import(pathToFileURL(path.join(installed, 'index.js')).href);
+  const plugin = await import(pathToFileURL(path.join(installed, 'dist', 'index.js')).href);
   assert.equal(typeof plugin.apply, 'function');
   assert.ok(plugin.Config);
   console.log(`PASS ${process.platform}: managed package installation and bundled-client migration contract (not desktop UI), settings/tasks preserved, Unicode/spaces, locale metadata, resources, source relocation and entry import (${pkg.version})`);

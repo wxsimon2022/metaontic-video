@@ -11,7 +11,7 @@ const current = {name:'dsh-metaontic-video',installed:true,enabled:true};
 function setup({rows=[legacy,current], reject=false, restart=false, wrapper=false, unavailable=false, queryTimeoutMs=8000}={}) {
   rows=rows.map(row=>({...row}));
   let entry, consent;const actions={};const calls=[];const components={},dictionaries={},cleanups=[];
-  vm.runInNewContext(readFileSync(new URL('../client.js',import.meta.url),'utf8'),{AbortController,setTimeout:(fn,delay,...args)=>setTimeout(fn,delay===8000?queryTimeoutMs:delay,...args),clearTimeout,window:{__ModuleLoader__:{load(x){entry=x;}}}});
+  vm.runInNewContext(readFileSync(new URL('../dist/client.js',import.meta.url),'utf8'),{AbortController,setTimeout:(fn,delay,...args)=>setTimeout(fn,delay===8000?queryTimeoutMs:delay,...args),clearTimeout,window:{__ModuleLoader__:{load(x){entry=x;}}}});
   const react={...React,createElement(type,props,...children){if(type==='button' && props?.['data-migration-action'])actions[props['data-migration-action']]=props.onClick;if(type==='input' && props?.['data-migration-consent'])consent=props.onChange;return React.createElement(type,props,...children);}};
   const plugin=entry.factory(name=>{assert.equal(name,'react');return react;});
   const host=createPreviewHost({form:{getSnapshot:()=>({status:'ready',value:{connectionMode:'metaontic'},writable:true}),subscribe:()=>()=>{}},components,dictionaries,getLocale:()=> 'zh',onUpdate(){}});

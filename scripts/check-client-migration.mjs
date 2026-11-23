@@ -11,7 +11,7 @@ import { createPreviewHost } from '../preview/host.mjs';
 
 export async function checkClientMigration(installed, manager) {
   let entry;
-  vm.runInNewContext(await readFile(path.join(installed, 'client.js'), 'utf8'), {
+  vm.runInNewContext(await readFile(path.join(installed, 'dist/client.js'), 'utf8'), {
     AbortController, setTimeout, clearTimeout,
     window: { __ModuleLoader__: { load(value) { entry = value; } } },
   });

@@ -15,4 +15,4 @@
 
 角色入口 `src/businesses/film-production/roles/` 保留兼容转导出；角色选择、运行数据协议和类型策略仍由运行代码管理。短视频专项规则位于 `src/businesses/film-production/prompts/short-video.ts`，按时长与角色注入。
 
-提示词随构建嵌入插件 `index.js`，安装后不需要读取源码目录。修改正文时同步根目录 `Agent_Prompts.md`，运行构建与测试；测试核对八个角色与文档一致，并检查专项加载范围。
+提示词随构建嵌入插件 `dist/index.js`，安装后不需要读取源码目录。修改正文时同步 `docs/engineering/agent-prompts.md`，运行构建与测试；测试核对八个角色与文档一致，并检查专项加载范围。

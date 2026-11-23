@@ -92,10 +92,12 @@ test('Windows 的 CRLF 锁文件保持同样的换行风格', () => {
   assert.doesNotMatch(text, /[^\r]\n/);
 });
 
-test('profile 目录从插件安装路径往上三级推出，Windows 盘符同样适用', () => {
+test('profile 目录从最近一级 node_modules 推出，兼容 dist 入口与 Windows 盘符', () => {
   assert.equal(locateProfileDir('file:///Users/name/.dsh/profiles/desktop/node_modules/metaontic-video/index.js'),
     path.normalize('/Users/name/.dsh/profiles/desktop'));
-  // Windows 盘符在 macOS 上会被 fileURLToPath 认成 /C:/…，这里只核对往上三级这一步
+  assert.equal(locateProfileDir('file:///Users/name/.dsh/profiles/desktop/node_modules/metaontic-video/dist/index.js'),
+    path.normalize('/Users/name/.dsh/profiles/desktop'));
+  // Windows 盘符在 macOS 上会被 fileURLToPath 认成 /C:/…，这里只核对 profile 根目录这一步
   assert.equal(path.basename(locateProfileDir('file:///C:/Users/name/.dsh/profiles/desktop/node_modules/metaontic-video/index.js')),
     'desktop');
 });
@@ -108,7 +110,7 @@ test('修复真实锁文件：清掉坏记录、留备份、再跑一次是 clea
   await mkdir(path.join(dir, 'node_modules', 'metaontic-video'), { recursive: true });
   await writeFile(path.join(dir, 'package.json'), '{"name":"dsh-profile-desktop","private":true}\n');
   await writeFile(path.join(dir, 'pnpm-lock.yaml'), lockfile(url => `{tarball: ${url}}`));
-  const moduleUrl = new URL('index.js', `file://${dir}/node_modules/metaontic-video/`).href;
+  const moduleUrl = new URL('dist/index.js', `file://${dir}/node_modules/metaontic-video/`).href;
   try {
     const lines = [];
     const first = repairUpdateLockfile(moduleUrl, message => lines.push(message));
@@ -139,7 +141,7 @@ test('定期检查只认变化过的锁文件，dispose 后不再动手', async 
   await writeFile(path.join(dir, 'package.json'), '{"name":"dsh-profile-desktop","private":true}\n');
   const lockfilePath = path.join(dir, 'pnpm-lock.yaml');
   await writeFile(lockfilePath, lockfile(url => `{integrity: sha512-AAA=, tarball: ${url}}`));
-  const moduleUrl = new URL('index.js', `file://${dir}/node_modules/metaontic-video/`).href;
+  const moduleUrl = new URL('dist/index.js', `file://${dir}/node_modules/metaontic-video/`).href;
   try {
     const stop = startUpdateLockfileRepair(moduleUrl, 20);
     await writeFile(lockfilePath, lockfile(url => `{tarball: ${url}}`));

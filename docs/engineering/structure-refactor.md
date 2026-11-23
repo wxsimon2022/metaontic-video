@@ -34,7 +34,7 @@ src/
 
 1. 在 `src/agents/<id>/index.ts` 定义 `AgentDefinition`，声明 `id/name/businesses/skills/icon`，可选 `prompt(config)` 提供专题规则。视频 Agent 的 `businesses` 填 `['video']`，不用修改视频作用域判断。
 2. 加入 `src/agents/index.ts` 的清单。
-3. 同步 Harness 静态资源：在 `cordis.patch.yml` 添加独立预设；在 `src/agents/presets/<id>.ts` 创建预设源码并将其加入构建预设清单，生成 `presets/<id>.js` 包装入口、`locale/presets/<id>/{zh,en}.json` 和图标；在 `package.json.exports` 添加预设、locale、icon 导出。同业务可复用现有 YAML 插件锚点，但独立 Agent 身份与 persona 必须符合自己的业务。
+3. 同步 Harness 静态资源：在 `cordis.patch.yml` 添加独立预设；在 `src/agents/presets/<id>.ts` 创建预设源码并将其加入构建预设清单，生成 `dist/presets/<id>.js` 包装入口、`locale/presets/<id>/{zh,en}.json` 和图标；在 `package.json.exports` 添加预设、locale、icon 导出。同业务可复用现有 YAML 插件锚点，但独立 Agent 身份与 persona 必须符合自己的业务。
 4. 需要新技能时在 `skills/<id>/` 添加。Agent 描述是框架清单，不会自动生成 Harness YAML、技能或包导出；这些静态资源仍须显式同步并通过安装检查。
 
 当前由视频创作助手统一承接不同题材；品牌、产品及活动宣传属于创作题材，不再单独注册宿主助手。

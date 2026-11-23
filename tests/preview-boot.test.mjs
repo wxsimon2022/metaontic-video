@@ -17,7 +17,7 @@ function switchForm(value = {}) {
 
 async function boot(form) {
   let entry;
-  vm.runInNewContext(readFileSync(new URL('../client.js', import.meta.url), 'utf8'), {
+  vm.runInNewContext(readFileSync(new URL('../dist/client.js', import.meta.url), 'utf8'), {
     AbortController, setTimeout, clearTimeout,
     window: { __ModuleLoader__: { load(value) { entry = value; } } },
   });

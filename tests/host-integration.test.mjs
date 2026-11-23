@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { test } from 'node:test';
-import * as plugin from '../index.js';
+import * as plugin from '../dist/index.js';
 
 // Harness only accepts scalar type strings; nullable unions must use oneOf.
 function assertScalarSchemaTypes(schema) {

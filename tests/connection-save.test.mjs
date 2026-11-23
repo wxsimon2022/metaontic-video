@@ -136,7 +136,7 @@ test('save preserves custom relay address and models without copying hidden secr
  });
 
 test('真实配置声明约束下整批保存不写已移除字段', async () => {
-  const { Config } = await import('../index.js');
+  const { Config } = await import('../dist/index.js');
   const fields = Config.dict;
   const disk = {};
   await context.persistConnection({
@@ -155,7 +155,7 @@ test('真实配置声明约束下整批保存不写已移除字段', async () =>
 });
 
 test('重置仅提交当前声明字段，不把旧用户字段带入批量写入', async () => {
-  const { Config } = await import('../index.js');
+  const { Config } = await import('../dist/index.js');
   const { api } = await import('./module-test-api.mjs');
   const scope = vm.createContext({window:{navigator:{}}, VOLCENGINE_MODE_AVAILABLE:false, IMAGE_MODEL:'image', TEXT_MODELS:['deepseek v4.1 flash','deepseekv4pro']});
   vm.runInContext(sourceOf('businesses/video-generation/client/config') + '\nglobalThis.keys = createClientConfig().PLUGIN_OWNED_KEYS;', scope);

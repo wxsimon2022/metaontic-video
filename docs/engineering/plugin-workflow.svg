@@ -8,7 +8,7 @@
 <rect x="40" y="115" width="1480" height="115" rx="14" fill="#eaf1ff" stroke="#d2ddeb"/>
 <text x="60" y="149" class="head">宿主与入口</text>
 <text x="60" y="180" class="body">DeepSeek Harness：对话、userQuestions 人工审批、工具权限、插件设置与媒体预览</text>
-<text x="60" y="207" class="body">视频创作助手 video-director；发布入口 index.js + client.js</text>
+<text x="60" y="207" class="body">视频创作助手 video-director；发布入口 dist/index.js + dist/client.js</text>
 <path class="edge" d="M780 230 L780 255"/>
 <rect x="40" y="255" width="1480" height="115" rx="14" fill="#eaf1ff" stroke="#d2ddeb"/>
 <text x="60" y="289" class="head">应用装配 · src/app</text>

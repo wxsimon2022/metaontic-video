@@ -4,7 +4,7 @@ import {test} from 'node:test';
 import {mkdtemp,rm} from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import * as plugin from '../index.js';
+import * as plugin from '../dist/index.js';
 
 test('an existing prompt registration reads current configuration on each request', async () => {
  const dir=await mkdtemp(path.join(os.tmpdir(),'meta-prompt-'));const prior=process.env.DSH_HOME;

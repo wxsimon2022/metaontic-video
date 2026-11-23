@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { apply } from '../index.js';
+import { apply } from '../dist/index.js';
 import { workflowApi as api } from './workflow-test-api.mjs';
 
 async function fixture(run) {

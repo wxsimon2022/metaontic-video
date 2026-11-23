@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {build} from 'esbuild';
-import {apply} from '../index.js';
+import {apply} from '../dist/index.js';
 import {workflowApi} from './workflow-test-api.mjs';
 const dir=await mkdtemp(path.join(os.tmpdir(),'流程回归 '));
 after(()=>rm(dir,{recursive:true,force:true}));

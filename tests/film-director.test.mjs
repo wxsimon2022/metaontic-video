@@ -98,7 +98,7 @@ test('新版审核保存失败报告但不放行，评分和阻断数不能伪�
  api.validateArtifact('review',{...report,review_status:'PASS',issues:[],blocking_issue_count:0,delivery_allowed:true},state);
 });
 test('全部角色使用已提供的完整版本且职责独立',()=>{
- const blocks=[...readFileSync('Agent_Prompts.md','utf8').matchAll(/```markdown\n([\s\S]*?)\n```/g)].map(m=>m[1]);
+ const blocks=[...readFileSync('docs/engineering/agent-prompts.md','utf8').matchAll(/```markdown\n([\s\S]*?)\n```/g)].map(m=>m[1]);
  assert.equal(blocks.length,9);
  for(const [i,role] of ['director','creative','screenwriter','character','scene','storyboard','prompt-engineer','reviewer'].entries()) {
   assert.ok(api.ROLE_PROMPTS[role].startsWith(blocks[i+1]));

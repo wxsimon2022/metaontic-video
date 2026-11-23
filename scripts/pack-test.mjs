@@ -67,7 +67,7 @@ if (!TEST_VERSION.test(version)) {
     if (beforeLock !== undefined) writeFileSync(lockPath, beforeLock);
     run(process.execPath, ['scripts/build.mjs']);
     if (readFileSync('package.json', 'utf8') !== beforePackage) throw Error('package.json 未还原，请检查');
-    for (const file of ['package.json', 'package-lock.json', 'index.js', 'client.js']) {
+    for (const file of ['package.json', 'package-lock.json', 'dist/index.js', 'dist/client.js']) {
       if (existsSync(file) && readFileSync(file, 'utf8').includes(version)) throw Error(`${file} 仍残留测试版版本号 ${version}`);
     }
     // 构建产物会内嵌 package.json（脚本清单等），因此只提示工作区差异，不据此判失败

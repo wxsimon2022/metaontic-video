@@ -9,7 +9,7 @@ import {execFileSync} from 'node:child_process';
 test('released host bundle loads and registers without node_modules or external schema dependency',async()=>{
  const dir=await mkdtemp(path.join(tmpdir(),'meta-standalone-'));
  try{
- await copyFile('index.js',path.join(dir,'index.js'));await writeFile(path.join(dir,'package.json'),'{"type":"module"}');
+ await copyFile('dist/index.js',path.join(dir,'index.js'));await writeFile(path.join(dir,'package.json'),'{"type":"module"}');
  const probe=`import {Config,apply} from './index.js'; const names=[];const dispose=apply({tools:{register(t){names.push(t.name);return ()=>{};}},inject(){},on(){}},{}); if(names.length!==11 || names.includes('video_canvas') || !names.includes('video_project') || !names.includes('video_script')) throw Error('missing standalone tools'); if(!Config[Symbol.for('schemastery')]) throw Error('missing schema brand'); const result=Config['~standard'].validate({}); if(result.issues) throw Error('config validation failed'); dispose();console.log('standalone OK');`;
  await writeFile(path.join(dir,'probe.mjs'),probe);
  const output=execFileSync(process.execPath,['probe.mjs'],{cwd:dir,env:{...process.env,NODE_PATH:''},encoding:'utf8'});

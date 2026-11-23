@@ -7,7 +7,7 @@ import vm from 'node:vm';
 import { EventEmitter } from 'node:events';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { apply } from '../index.js';
+import { apply } from '../dist/index.js';
 
 test('Hyperframes is hidden unless the internal environment flag is explicit', () => {
   const key = 'METAONTIC_VIDEO_INTERNAL_HYPERFRAMES';

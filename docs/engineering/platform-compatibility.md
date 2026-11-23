@@ -8,7 +8,7 @@
 - 启动进程优先execFile/spawn参数数组，不用字符串拼接命令；按平台识别可执行文件及.cmd。PowerShell和bash示例分别标明，不把Unix命令直接给Windows用户。
 - 不硬编码 /Users、/tmp、盘符或用户目录；使用系统目录API及现有配置。Windows文件占用、权限、原子替换失败应明确报错，不通过删除原文件或清空目录来恢复。
 - FFmpeg/ffprobe按平台发现并检测路径；配置有空格或中文时正常调用。缺失只引导检查/获准后安装，不自行执行brew或winget。
-- 成品包含入口、客户端、locale/en.json、locale/zh.json、预设、技能及用户指南；运行时不依赖开发机node_modules，不引入构建脚本运行依赖。
+- 成品包含dist/index.js、dist/client.js、dist/locale/en.json、dist/locale/zh.json、预设、技能及用户指南；运行时不依赖开发机node_modules，不引入构建脚本运行依赖。
 
 ## 安装与在线更新
 

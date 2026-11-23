@@ -1,7 +1,7 @@
 import './no-network-analytics.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { apply } from '../index.js';
+import { apply } from '../dist/index.js';
 function setup(config) {
  const tools = new Map(); let prompt;
  apply({tools:{register(t){tools.set(t.name,t);return ()=>{};}},inject(names,fn){if(names.includes('systemPrompt'))return fn({systemPrompt:{section(v){prompt=v;return ()=>{};}}});},on(){return ()=>{};}},config);

@@ -372,7 +372,7 @@ test('自动创建流程画布默认关闭：没配过时不建图不同步，vi
   const disabled = await sync.sync('any-project', { agent: { session: { id: 's', header: { cwd: os.tmpdir() } } } });
   assert.equal(disabled.status, 'disabled');
   assert.match(disabled.reason, /默认关闭/);
-  const { Config } = await import('../index.js');
+  const { Config } = await import('../dist/index.js');
   assert.equal(Config.dict.canvasEnabled.meta.default, false, '流程画布总开关 schema 默认值就是关闭（设置页没配过时按它走）');
   assert.equal(Config.dict.autoCreateCanvas.meta.default, true, '自动创建画布默认开启，打开流程画布后才生效');
 });

@@ -11,7 +11,7 @@ Harness 默认启用 HMR 配置重载，但不监听本地插件源码。对于�
   disabled: false
   config:
     base: /你的路径/metaontic-video
-    root: [index.js]
+    root: [dist/index.js]
 ```
 
 `base` 使用本机插件目录绝对路径，仅配置在本机 profile，不写入插件发布配置。已有 HMR 配置时合并调整，保留其他项目的监听需求。配置由运行中的宿主加载；之后修改 TypeScript 并执行 `npm run build`，宿主入口热替换，客户端通过宿主 Client HMR 更新。构建失败先修复，不通过重启解决语法错误。`package.json` 的依赖或加载入口变化可能仍需按宿主提示重新安装或重启；插件规则变化在现有对话的下一轮请求生效，旧确认窗口需重新发起。正在生成视频时先等任务返回，再构建或更新，避免热替换中断当前调用；已有任务按任务 ID 查询或续做，勿重复提交。
@@ -24,7 +24,7 @@ Harness 默认启用 HMR 配置重载，但不监听本地插件源码。对于�
 
 仓库保留源码、测试、构建与发布脚本、必要静态资源和工程文档。首次检出后执行 `npm ci`、`npm run build`，再运行测试或准备安装包。
 
-根目录 `index.js`、`client.js`、`locale/en.json`、`locale/zh.json` 和 `presets/*.js` 由构建生成，不提交 Git；安装路径与 `package.json.files` 保持不变，正式成品仍包含这些文件。`locale/presets/` 和 `presets/icons/` 是静态资源，继续跟踪。
+`dist/index.js`、`dist/client.js`、`dist/locale/en.json`、`dist/locale/zh.json` 和 `dist/presets/*.js` 由构建生成，不提交 Git；正式成品仍包含这些文件。`locale/presets/` 和 `presets/icons/` 是静态资源，继续跟踪。
 
 `.local/`、`metaontic-video/` 任务目录、日志、缓存、安装包、操作系统临时文件与本地凭据不入库。流程图以 Markdown、Mermaid 和 SVG 为维护源，导出的 PNG/PDF 仅留本地。旧版 Logo 草稿和生成提示仅留本地；当前品牌资源继续保留。取消跟踪不删除本地原文件，也不重写历史版本。
 
@@ -41,7 +41,7 @@ src/
 └── locale/              # 插件元信息字典
 ```
 
-根目录 `index.js`、`client.js` 和 `locale/*.json` 是构建产物。宿主模块打包进 `index.js`，浏览器模块打包进 `client.js`，安装与热加载入口保持不变。Agent 在 Harness 中的静态预设入口仍由 `cordis.patch.yml`、`presets/`、`locale/presets/` 声明；技能仍位于 `skills/`，公共框架不依赖视频业务模块。
+`dist/index.js`、`dist/client.js` 和 `dist/locale/*.json` 是构建产物。宿主模块打包进 `dist/index.js`，浏览器模块打包进 `dist/client.js`，包导出与热加载入口统一指向该目录。Agent 在 Harness 中的静态预设入口仍由 `cordis.patch.yml`、`dist/presets/`、`locale/presets/` 声明；技能仍位于 `skills/`，公共框架不依赖视频业务模块。
 
 ```bash
 npm install
@@ -107,7 +107,7 @@ git show --no-patch "v<版本>"
 
 版本包在 [GitHub Releases](https://github.com/wxsimon2022/metaontic-video/releases) 或 [Gitee Releases](https://gitee.com/hackloop/metaontic-video/releases) 下载，通用插件包为 `metaontic-video-<版本>.tgz`。Windows与Mac使用同一个 `.tgz`，不再发布ZIP；指南和PDF已包含在通用包中。不再向 npm 注册表发布，无需配置 `NPM_TOKEN` 或 Trusted Publishing。
 
-`v*` 标签触发完整构建与测试，通过双平台安装检查后，使用 GitHub 自动令牌上传通用tgz。`--both`发布脚本再下载这个同一成品，用本地 `GITEE_TOKEN` 发布Gitee；CI未通过时不上传Gitee，不将单仓成功报告为双仓成功。手动运行工作流时须选择与包版本匹配的标签。发版默认仍由本机打包发布：`node scripts/release.mjs X.Y.Z --notes release-plan.json` 在本机构建、测试、打包后直接建 Gitee Release 并核对附件（需要本机 `GITEE_TOKEN`）；要让流水线打包发布则加 `--pipeline`（`--ci` 是同义写法），本机只做准备、提交并推标签，打包、制品库归档与 Gitee Release 都交给流水线，本地不需要 `GITEE_TOKEN`。两条路径不会互相覆盖：同标签已有同名附件时后到的一方只核对、不再上传，成品以先发布的那份为准。
+`v*` 标签触发完整构建与测试，通过双平台安装检查后，使用 GitHub 自动令牌上传通用tgz。`--both`发布脚本再下载这个同一成品，用本地 `GITEE_TOKEN` 发布Gitee；CI未通过时不上传Gitee，不将单仓成功报告为双仓成功。手动运行工作流时须选择与包版本匹配的标签。发版默认仍由本机打包发布：`node scripts/release.mjs X.Y.Z --notes .local/release-plan.json` 在本机构建、测试、打包后直接建 Gitee Release 并核对附件（需要本机 `GITEE_TOKEN`）；要让流水线打包发布则加 `--pipeline`（`--ci` 是同义写法），本机只做准备、提交并推标签，打包、制品库归档与 Gitee Release 都交给流水线，本地不需要 `GITEE_TOKEN`。两条路径不会互相覆盖：同标签已有同名附件时后到的一方只核对、不再上传，成品以先发布的那份为准。
 
 某次发布只补齐镜像时，手动运行 `sync-gitee` 工作流并填写对应标签；它从 GitHub Release 取回该版本的 通用 `.tgz`，逐个补传到 Gitee 发布页并核对大小，不会覆盖或改动已有附件。
 
@@ -206,7 +206,7 @@ Gitee 企业附件配额自愈是发布流程的一部分：`publish-gitee.mjs` 
 
 首次在开发环境安装 Node.js、Git、GitHub CLI、Python 3，并执行 `gh auth login`；两个仓库的推送权限及 GitHub Actions 的 `GITEE_TOKEN` 需先配置好。它们仅用于开发发布，插件用户不需要安装。
 
-发布前把 [说明模板](../../docs/engineering/release-plan.example.json) 复制为根目录 `release-plan.json`，填写本次**全部尚未发布**的更新条目及具体指南核对结果，删除占位文字。同步使用说明书、配图和 PDF。此本地计划文件不会提交到仓库。
+发布前把 [说明模板](../../docs/engineering/release-plan.example.json) 复制为 `.local/release-plan.json`，填写本次**全部尚未发布**的更新条目及具体指南核对结果，删除占位文字。同步使用说明书、配图和 PDF。此本地计划文件不会提交到仓库。
 
 只检查计划、不修改文件或发布：
 
@@ -214,7 +214,7 @@ Gitee 企业附件配额自愈是发布流程的一部分：`publish-gitee.mjs` 
 npm run release -- 3.13.3 --dry-run
 ```
 
-也可双击根目录 `release.cmd`（Windows），或双击 `release.command`（Mac；也可运行 `bash release.command`），按提示输入版本号。它们会执行正式发布，不是预览；需要先准备好 `release-plan.json`。
+也可双击根目录 `release.cmd`（Windows），或双击 `release.command`（Mac；也可运行 `bash release.command`），按提示输入版本号。它们会执行正式发布，不是预览；需要先准备好 `.local/release-plan.json`。
 
 一键正式发布（示例版本号需改为实际目标；小改只升第三位，成规模的新增或行为变化才升第二位）：
 
@@ -256,10 +256,10 @@ npm run pack:test -- 3.13.9-test.1
 
 ## 源码与发布目录
 
-业务实现、Agent提示词、预设入口和类型声明统一在`src/`维护：`src/businesses/`、`src/agents/`、`src/app/`、`src/platform/`、`src/shared/`、`src/ui/`、`src/types/`。预设源码在`src/agents/presets/`，由构建生成`presets/*.js`；根目录`index.js`、`client.js`与`locale/*.json`也是安装产物，不能直接编辑或移走。根目录包清单、Cordis配置、静态资源与技能保留发布路径；`scripts/`、`tests/`、`preview/`、`docs/`分别承载工程工具、测试、开发预览与文档，不混入业务源码。
+业务实现、Agent提示词、预设入口和类型声明统一在`src/`维护：`src/businesses/`、`src/agents/`、`src/app/`、`src/platform/`、`src/shared/`、`src/ui/`、`src/types/`。预设源码在`src/agents/presets/`，由构建生成`dist/presets/*.js`；`dist/index.js`、`dist/client.js`与`dist/locale/*.json`也是安装产物，不能直接编辑。根目录包清单、Cordis配置、静态资源与技能保留发布路径；`scripts/`、`tests/`、`preview/`、`docs/`分别承载工程工具、测试、开发预览与文档，不混入业务源码。
 
 ## 一键三端发布
 
-`node scripts/release.mjs X.Y.Z --all --notes release-plan.json` 发布同一份成品到 Gitee、GitHub、npm，并核对中国镜像源同步；也可用 `npm run release:all` 交互输入版本。先完成 Windows/macOS 安装检查，仓库正式发行完成后才发布 npm。需要既有 Gitee、GitHub 与 npm 凭据。默认发布渠道不变，`--both` 仍仅双仓。
+`node scripts/release.mjs X.Y.Z --all --notes .local/release-plan.json` 发布同一份成品到 Gitee、GitHub、npm，并核对中国镜像源同步；也可用 `npm run release:all` 交互输入版本。先完成 Windows/macOS 安装检查，仓库正式发行完成后才发布 npm。需要既有 Gitee、GitHub 与 npm 凭据。默认发布渠道不变，`--both` 仍仅双仓。
 
 npm 版本已存在时核对下载原字节，不覆盖；镜像同步失败或 npm 待批准时保留已完成的仓库版本，批准后执行同版本 `--all --resume`，不重新打包或改标签。三端确认后自动刷新并推送市场 npm 来源索引。`--all` 不与 `--pipeline` 或 `--github-only` 同用。
