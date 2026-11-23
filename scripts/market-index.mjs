@@ -24,8 +24,8 @@ const HOMEPAGE = 'https://ai.mybfs.cn';
 const MAX_VERSIONS = 5;
 const NPM_REGISTRY = 'https://registry.npmjs.org/';
 const MARKET_DESCRIPTION = {
-  en: 'Conversational AI long-form video creation: review scripts, continue in segments, and merge locally—beginner-friendly, controllable, and cost-efficient.',
-  zh: '对话式 AI 长视频创作：脚本先审、分段续拍、本机合并，新手易上手、流程可控、成本更省。',
+  en: 'Helping beginners quickly start AI short-video creation, with segmented continuation, resumable progress, and local merging for a lower-cost long-form video workflow.',
+  zh: '帮助新手快速上手 AI 短视频创作，支持分段续拍、断点续做与本地合并，提供低成本长视频生成方案。',
 };
 
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
