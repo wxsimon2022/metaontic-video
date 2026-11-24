@@ -16,3 +16,9 @@ MetaOnticVideo v4.2.4
 - 桌面GUI与付费调用未由发布脚本自动验证。
 
 指南核对：逐项核对配置入口、申请密钥、等待状态、创意与剧本先正文展示再批准、分段审核恢复及Gitee反馈入口；移除过时接入选择及小乌龟估算进度说明，同步本地Markdown和PDF，保留必要计费提示。
+
+完成结果：GitHub Actions 45309258377 成功，同一成品在 Windows/macOS 完成安装与旧版升级检查；GitHub、Gitee、npm 正式版均已发布，中国镜像的版本、组合包声明和成品完整性核对通过。npm 初次上传后短暂未就绪，latest 生效后以同版本续跑完成，未改标签或重新打包。市场索引已切换到 npm 来源并同步两仓。
+
+CI：https://github.com/wxsimon2022/metaontic-video/actions/runs/45309258377
+
+未执行真实桌面GUI、付费调用或本地成品安装；自动runner结果不代表桌面实测。宣传页未更新。
