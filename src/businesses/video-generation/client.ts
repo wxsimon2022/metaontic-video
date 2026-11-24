@@ -122,6 +122,7 @@ export function createVideoClient(require) {
           inject: () => ({
             startSession: () => ctx.get('uiWorkspace')?.startSession(undefined, { agentPreset: 'video-director' }),
             openSettings: () => ctx.get('pluginNavigation')?.openBundle(PLUGIN_PACKAGE),
+            form,
             manager: pluginManager,
             // 面板顶部的更新入口：与设置页同一套两步确认，点左侧栏的「有更新」进来就能更新。
             updateBanner: () => h(UpdateHintBanner, { key: 'update-hint' }),

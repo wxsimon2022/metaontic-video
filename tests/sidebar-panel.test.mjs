@@ -207,3 +207,24 @@ test('视频创作面板不再内嵌流程画布，也没有第三方画布安�
   assert.doesNotMatch(source, /openCanvasPage/, '面板不再转交画布页入口');
   assert.equal(find(tree, (node) => node.type === 'section' && node.props.className === 'movc'), null, '面板里没有画布容器');
 });
+
+test('未配置密钥时主入口引导设置，不启动付费创作', () => {
+  const context = vm.createContext({});
+  vm.runInContext(sourceOf('businesses/video-generation/client/panel'), context);
+  let opened = 0;
+  let started = 0;
+  const panel = context.createSidebarPanel({
+    React: { useSyncExternalStore: (_subscribe, get) => get() },
+    h: (type, props, children) => ({ type, props: props || {}, children: Array.isArray(children) ? children : [children] }),
+    TOKENS, PAGE_CSS: '', t: key => key, PANEL_ID: 'video', GUIDE_URL,
+  });
+  const render = value => panel.VideoPanel({ form: { getSnapshot: () => ({ value }), subscribe() {} },
+    openSettings: () => opened++, startSession: () => started++ });
+  const missing = render({ connectionMode: 'metaontic', metaonticApiKey: '' });
+  find(missing, node => node.props?.className === 'mov-btn mov-btn-primary').props.onClick();
+  assert.equal(opened, 1);
+  assert.equal(started, 0);
+  const ready = render({ connectionMode: 'metaontic', metaonticApiKey: 'configured' });
+  find(ready, node => node.props?.className === 'mov-btn mov-btn-primary').props.onClick();
+  assert.equal(started, 1);
+});

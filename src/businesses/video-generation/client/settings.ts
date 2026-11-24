@@ -179,6 +179,10 @@ function makePage({ form, t, manager }) {
 
         // 配置区分成几节，每节一个标题 + 一个自适应网格。
         const renderGrid = (section) => {
+          if (section.key === 'sectionConnection') return h('a', {
+            key: 'apply-key', href: RELAY.signupUrl, target: '_blank', rel: 'noopener noreferrer',
+            className: 'mov-apply-key',
+          }, [t('connectionMetaonticRegister'), h('span', { key: 'arrow', 'aria-hidden': true }, ' ↗')]);
           if (section.key === 'sectionModels') {
             const shared = (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
             const common = !directMode
@@ -247,7 +251,7 @@ function makePage({ form, t, manager }) {
             h('div', { key: 'title', className: 'mov-section-title' }, t('sectionGeneration')),
             ...SECTIONS.filter(section => !['sectionInterface', 'sectionVideo'].includes(section.key)).map(section =>
               h('div', { key: section.key, className: 'mov-parameter-group' }, [
-                h('div', { key: 'heading', className: 'mov-parameter-heading' }, t(section.key)),
+                section.key !== 'sectionConnection' ? h('div', { key: 'heading', className: 'mov-parameter-heading' }, t(section.key)) : null,
                 renderGrid(section),
               ])),
           ]),
@@ -371,8 +375,8 @@ function makePage({ form, t, manager }) {
               onClick: () => { checkForUpdate(false).catch(() => {}); },
             }, updateStatus === 'working' ? t('versionChecking') : t('versionCheck')),
           ]),
-          releaseNotes?.items?.length ? h('div', { key: 'release-notes', 'data-field': 'releaseNotes' }, [
-            h('div', { key: 'heading', style: { display: 'flex', alignItems: 'baseline', gap: 12 } }, [
+          releaseNotes?.items?.length ? h('details', { key: 'release-notes', 'data-field': 'releaseNotes' }, [
+            h('summary', { key: 'heading', style: { cursor: 'pointer' } }, [
               h('span', { key: 'title', className: 'mov-card-title' }, `${releaseNotes.version} · ${t('releaseNotesTitle')}`),
               formatReleaseTime(releaseNotes.publishedAt) ? h('span', { key: 'published-at', 'data-field': 'releasePublishedAt', className: 'mov-foot-note' }, t('releaseUpdatedAt', { time: formatReleaseTime(releaseNotes.publishedAt) })) : null,
             ]),
@@ -432,7 +436,11 @@ function makePage({ form, t, manager }) {
 
         return h('div', { className: 'mov-page' }, [
           // hover / focus 这类效果内联样式写不出来，集中在这张样式表里（class 都带 mov- 前缀）。
-          h('style', { key: 'styles' }, PAGE_CSS),
+          h('style', { key: 'styles' }, PAGE_CSS + `
+.mov-apply-key { display:inline-flex; align-items:center; gap:4px; width:fit-content; color:${TOKENS.primaryFill}; font-size:13px; line-height:1.6; text-decoration:none; border-radius:4px; padding:3px 0; }
+.mov-apply-key:hover { text-decoration:underline; text-underline-offset:3px; }
+.mov-apply-key:focus-visible { outline:2px solid ${TOKENS.primaryFill}; outline-offset:4px; }
+`),
           !notice || snapshot.value ? renderUpdateNotice({
             h, t, available: updateAvailable, latest: updateLatest, deferred: updateDeferred,
             mandatory: versionPolicy.required, minimum: versionPolicy.minimum,

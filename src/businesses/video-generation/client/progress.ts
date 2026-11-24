@@ -93,7 +93,7 @@ export function createVideoProgress({ React, h, TOKENS }: any) {
         const status = '正在生成 · 等待结果';
         const duration = block.args?.duration;
         const estimatedWait = estimatedVideoWait(duration);
-        const progress = estimatedVideoProgress(elapsed, duration);
+        const overdue = elapsed > estimatedWait;
         const waitingDots = '.'.repeat((elapsed % 3) + 1);
         const title = toolName === 'video_extend' ? '视频续拍' : '视频生成';
         return h('div', { className: 'mov-task mov-task-running', 'data-field': 'video-task-progress' }, [
@@ -125,14 +125,11 @@ export function createVideoProgress({ React, h, TOKENS }: any) {
                 h('span', { key: 'elapsed', style: { marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' } }, `已等待 ${Math.floor(elapsed / 60)}分${String(elapsed % 60).padStart(2, '0')}秒`),
             ]),
             h('div', { key: 'progress', className: 'mov-task-rail' }, [
-                h('div', { className: 'mov-task-track mov-task-active', role: 'progressbar', 'aria-label': '估算进度', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': progress }, h('div', { className: 'mov-task-fill', style: { width: `${progress}%` } })),
-                // 装饰用的小乌龟：跟着进度条填充的右端一起从左往右爬，只表示「还在忙」，不代表真实进度；屏幕阅读器不读它。
-                h('span', { key: 'turtle', className: 'mov-task-turtle', style: { left: `${progress}%` }, 'aria-hidden': true }, '🐢'),
+                h('div', { className: 'mov-task-track mov-task-active', role: 'progressbar', 'aria-label': '等待上游生成结果', 'aria-valuetext': '处理中，上游未提供完成百分比' }, h('div', { className: 'mov-task-fill', style: { width: '100%' } })),
             ]),
-            h('div', { key: 'percent', className: 'mov-task-note' }, `${progress}% · 估算进度`),
             h('div', { key: 'note', className: 'mov-task-note' }, [
                 h('span', { key: 'live', className: 'mov-task-live', 'aria-hidden': true }),
-                `${duration ? `目标 ${duration} 秒 · 预计等待约 ${Math.round(estimatedWait)} 秒 · ` : ''}${progress >= 99 ? '任务仍在等待结果，进度停在99%不表示失败。' : '任务处理中，完成后自动显示结果。'}请勿重复提交。`,
+                `${duration ? `本次请求时长 ${duration} 秒 · ` : ''}${overdue ? '等待已超过参考时间，上游状态仍待确认，不代表生成失败。' : '正在等待上游返回；下载与合并将在生成成功后进行。'}请勿重复提交。`,
             ]),
         ]);
     }

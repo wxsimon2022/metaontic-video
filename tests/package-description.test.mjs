@@ -12,3 +12,9 @@ test('relative or insecure images cannot enter registry metadata',()=>{
  assert.throws(()=>packageDescription('![Logo](./logo.svg)'));
  assert.throws(()=>packageDescription('![Logo](http://example.com/logo.png)'));
 });
+test('plugin detail excludes installation instructions and preserves usage',()=>{
+ const result=packageDescription('# 插件\n\n## 在线安装\n输入包名\n\n```text\nhttps://example.com/plugin.tgz\n```\n\n## 开始使用\n填写密钥\n');
+ assert.doesNotMatch(result,/在线安装|输入包名|plugin\.tgz/);
+ assert.match(result,/## 开始使用\n填写密钥/);
+ assert.equal(packageDescription('# 插件\n## 在线安装\n安装步骤'), '# 插件\n');
+});

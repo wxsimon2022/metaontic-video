@@ -1,3 +1,4 @@
+import { videoResultState } from '../workflow/result-state.js';
 /** 工具结果和运行进度分开：完成后只显示成果预览，不显示生成进度。
  *  脚本审核、费用试算这类只返回结构化数据的工具没有自定义卡片时，宿主会用默认卡片把返回 JSON 铺成代码块；
  *  这里给它们换成插件自己的摘要卡片：默认只列关键结论，原始返回折叠在下面，按普通正文换行显示，不铺代码块。 */
@@ -97,7 +98,25 @@ export function createToolResultView({ h, MediaPreview, VideoTaskProgress }: any
   }
   function ToolResultView(props: any) {
     if (toolSummary(props?.toolName, props?.block)) return summaryView(props);
-    if (props.block && 'kind' in props.block) return h(MediaPreview, props);
+    if (props.block && 'kind' in props.block) {
+      const media = h(MediaPreview, props);
+      if (!['video_generate', 'video_extend', 'video_status'].includes(props.toolName)) return media;
+      const data = parseJson(textOf(props.block));
+      if (!data) return media;
+      const state = videoResultState(data);
+      const guidance: Partial<Record<typeof state.phase, string>> = {
+        task_pending: '任务状态待确认，可能已产生费用。请让助手查询原任务；核实前不要重新提交。',
+        delivery_pending: '生成结果需要继续下载或合并。请让助手恢复原任务的交付，不要重新生成。',
+        segment_review: '请先查看已完成片段并告诉助手审核意见；确认继续后再制作下一段，新增片段仍需计费。',
+        partial: '已有部分成果。请让助手核对原任务和已完成片段，再决定是否继续；新增生成仍需确认费用。',
+        reference_review: '请先核对转换后的参考图，确认后再继续视频制作。',
+        failed: '本次未完成。请让助手核对原任务状态和费用，再决定下一步。',
+      };
+      const note = guidance[state.phase];
+      return note ? h('div', { 'data-field': 'video-recovery-guidance' }, [media,
+        h('p', { key: 'recovery', role: 'status', className: 'mov-summary-text' }, note),
+      ]) : media;
+    }
     if (!['video_generate', 'video_extend'].includes(props.toolName)) return null;
     return h(VideoTaskProgress, props);
   }

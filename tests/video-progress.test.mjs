@@ -41,13 +41,10 @@ test('progress renders only for active video generation and disappears on comple
   assert.doesNotMatch(JSON.stringify(running), /max-width:420px/);
   assert.equal(context.VideoTaskProgress({ block: { phase: 'preparing', name: 'video_generate' }, callId: 'a' }), null);
   assert.equal(context.VideoTaskProgress({ block: { phase: 'start', name: 'video_generate' }, callId: 'a' }), null, 'native start is recorded before approval');
-  assert.match(JSON.stringify(running), /🐢/, '执行中进度条上有跟着进度走的小乌龟');
-  assert.match(JSON.stringify(running), /mov-task-turtle/);
   const runningJson = JSON.stringify(running);
-  const percent = /"aria-valuenow":(\d+)/.exec(runningJson)[1];
-  assert.match(runningJson, new RegExp(`"left":"${percent}%"`), '小乌龟位置跟着当前进度百分比');
-  assert.doesNotMatch(runningJson, /mov-task-bee/);
-  assert.match(runningJson, /\.mov-task-turtle \{[^}]*scaleX\(-1\)/, '乌龟要镜像成头朝右');
+  assert.doesNotMatch(runningJson, /aria-valuenow/);
+  assert.match(runningJson, /上游未提供完成百分比/);
+  assert.match(runningJson, /下载与合并将在生成成功后进行/);
   assert.match(runningJson, /"className":"mov-task mov-task-running"/, '执行中给卡片加上呼吸灯类');
   assert.match(runningJson, /@keyframes mov-task-breath/, '外边框呼吸灯动画');
   const finished = context.VideoTaskProgress({ block: { kind: 'result', content: [{ type: 'text', text: 'succeeded' }] } });

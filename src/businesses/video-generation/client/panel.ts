@@ -1,5 +1,5 @@
 /** 浏览器端左侧栏面板：由入口注入宿主 React 与共享依赖。 */
-export function createSidebarPanel({ h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG }: any) {
+export function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL, LOGO_SVG }: any) {
     // 插件图标（icon.svg）由打包器当文本内联进来，转成 data URI 后用 <img> 渲染：
     // 不依赖宿主能否按路径取到插件资源，也不会和页面里其他 svg 的渐变 id 撞名。
     const LOGO_SRC = LOGO_SVG ? `data:image/svg+xml,${encodeURIComponent(LOGO_SVG)}` : '';
@@ -151,6 +151,11 @@ export function createSidebarPanel({ h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL
      * 这里只做引导，不显示也不修改配置——配置统一在插件设置页看和改。
      */
     function VideoPanel(props: any) {
+      const snapshot = React.useSyncExternalStore && props?.form
+        ? React.useSyncExternalStore((listener) => props.form.subscribe(listener), () => props.form.getSnapshot(), () => props.form.getSnapshot())
+        : null;
+      const values = snapshot?.value;
+      const needsSetup = values && !String(values[values.connectionMode === 'volcengine' ? 'volcengineApiKey' : 'metaonticApiKey'] || '').trim();
       const flow = [
         { icon: 'idea', title: t('panelStep1Title'), desc: t('panelStep1Desc') },
         { icon: 'script', title: t('panelStep2Title'), desc: t('panelStep2Desc') },
@@ -194,11 +199,12 @@ export function createSidebarPanel({ h, TOKENS, PAGE_CSS, t, PANEL_ID, GUIDE_URL
         ]),
         h('section', { key: 'start', className: 'mov-section' }, [
           h('div', { key: 'start-label', className: 'mov-section-title' }, t('panelStart')),
+          h('p', { key: 'readiness', className: 'mov-hint' }, needsSetup ? '请先在插件设置中填写并保存 API密钥，再检查连接。' : '描述你的想法即可开始。脚本文本调用按渠道用量计费；视频制作前会确认费用。'),
           h('div', { key: 'start-actions', className: 'mov-panel-actions' }, [
             h('button', {
               key: 'new', type: 'button', className: 'mov-btn mov-btn-primary',
-              onClick: () => props?.startSession?.(),
-            }, t('panelNew')),
+              onClick: () => needsSetup ? props?.openSettings?.() : props?.startSession?.(),
+            }, needsSetup ? '完成配置，开始创作' : t('panelNew')),
             h('button', {
               key: 'settings', type: 'button', className: 'mov-btn', disabled: typeof props?.openSettings !== 'function',
               onClick: () => props?.openSettings?.(),
