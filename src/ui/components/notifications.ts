@@ -1,9 +1,19 @@
 import { NOTIFICATIONS_URL } from '../../shared/constants/plugin.js';
 
-export type PluginNotice = { id: string; title: string; content: string };
+export type PluginNotice = { id: string; title: string; content: string; action_url: string };
 const CACHE_KEY = 'metaontic-video.notifications.v1';
 const DISMISS_KEY = 'metaontic-video.dismissed-notifications.v1';
 export const NOTICE_POLL_MS = 5 * 60 * 1000;
+
+/** 只允许用户主动打开普通网页，拒绝脚本、文件与带凭据地址。 */
+export function safeNoticeLink(value: unknown): string {
+  if (typeof value !== 'string' || value.length > 1000 || /[\s\\\u0000-\u001f\u007f]/.test(value)) return '';
+  try {
+    const url = new URL(value);
+    return /^https?:\/\//i.test(value) && ['https:', 'http:'].includes(url.protocol) &&
+      !url.username && !url.password ? url.href : '';
+  } catch { return ''; }
+}
 
 /** 只接收有界纯文字；异常数据不渲染，不执行远端 HTML。 */
 export function parseNotices(value: any): PluginNotice[] {
@@ -16,7 +26,7 @@ export function parseNotices(value: any): PluginNotice[] {
         typeof row.content !== 'string' || !row.content.trim() || row.content.length > 1000) continue;
     if (row.enabled !== true) continue;
     ids.add(row.id);
-    result.push({ id: row.id, title: row.title, content: row.content });
+    result.push({ id: row.id, title: row.title, content: row.content, action_url: safeNoticeLink(row.action_url) });
   }
   return result;
 }
@@ -97,17 +107,24 @@ export function createNotificationBanner({ React, h, TOKENS, store = createNotic
     if (!row) return null;
     const english = typeof document !== 'undefined' && document.documentElement.lang?.startsWith('en');
     return h('aside', { 'aria-label': english ? 'Announcements' : '活动通知', style: {
-      padding: '14px 16px', border: `1px solid ${TOKENS.border}`, borderRadius: 12,
+      position: 'relative', border: `1px solid ${TOKENS.border}`, borderRadius: 12,
       background: TOKENS.cardFill, color: TOKENS.text, overflowWrap: 'anywhere',
     } }, [
-      h('div', { key: 'head', style: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'start' } }, [
-        h('strong', { key: 'title', style: { fontSize: 13 } }, row.title),
-        h('button', { key: 'close', type: 'button', onClick: () => store.dismiss(row.id),
-          'aria-label': english ? 'Dismiss announcement' : '关闭此通知', title: english ? 'Dismiss' : '关闭后不再提醒',
-          style: { cursor: 'pointer', color: TOKENS.muted, background: 'transparent', border: 0, padding: '0 4px', fontSize: 18, lineHeight: 1 } }, '×'),
+      // 关闭按钮与链接是同级元素；关闭不触发导航，链接可用键盘聚焦。
+      h(row.action_url ? 'a' : 'div', { key: 'message',
+        ...(row.action_url ? { href: row.action_url, target: '_blank', rel: 'noopener noreferrer',
+          title: english ? 'Open link' : '点击查看详情' } : {}),
+        style: { display: 'block', padding: '14px 44px 14px 16px', color: 'inherit',
+          textDecoration: 'none', borderRadius: 12, cursor: row.action_url ? 'pointer' : 'default' },
+      }, [
+        h('strong', { key: 'title', style: { fontSize: 13 } }, row.title,
+          row.action_url ? h('span', { 'aria-hidden': true, style: { marginLeft: 6, color: TOKENS.primaryFill } }, '↗') : null),
+        h('p', { key: 'body', style: { margin: '7px 0 0', whiteSpace: 'pre-wrap', fontSize: 12, lineHeight: 1.6, color: TOKENS.muted } }, row.content),
       ]),
-      h('p', { key: 'body', style: { margin: '7px 0 0', whiteSpace: 'pre-wrap', fontSize: 12, lineHeight: 1.6, color: TOKENS.muted } }, row.content),
-
+      h('button', { key: 'close', type: 'button', onClick: () => store.dismiss(row.id),
+        'aria-label': english ? 'Dismiss announcement' : '关闭此通知', title: english ? 'Dismiss' : '关闭后不再提醒',
+        style: { position: 'absolute', top: 10, right: 10, cursor: 'pointer', color: TOKENS.muted,
+          background: 'transparent', border: 0, padding: '4px 6px', fontSize: 18, lineHeight: 1 } }, '×'),
     ]);
   };
 }

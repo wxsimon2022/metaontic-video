@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { build } from 'esbuild';
 const built = await build({ entryPoints: ['src/ui/components/notifications.ts'], bundle: true, write: false, format: 'esm', platform: 'browser' });
-const { createNoticeStore, parseNotices, NOTICE_POLL_MS } = await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString('base64')}`);
+const { createNoticeStore, createNotificationBanner, parseNotices, safeNoticeLink, NOTICE_POLL_MS } = await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString('base64')}`);
 const notice = (extra = {}) => ({ id: 'activity-1', title: '活动', content: '活动正文', enabled: true, ...extra });
 function fixture() {
   const data = new Map();
@@ -62,4 +62,42 @@ test('HTTP错误、异常业务响应、损坏JSON与连接挂起均静默，不
     const empty = createNoticeStore({...f.options, request, timeoutMs: 5, storage: () => null});
     await assert.doesNotReject(empty.refresh()); assert.equal(empty.current(), null);
   }
+});
+
+test('消息链接校验：只允许完整网页地址，非法链接退回普通消息', () => {
+  for (const value of ['javascript:alert(1)', 'file:///tmp/a', '//example.com',
+    'https://u:p@example.com', 'https://example.com:bad', 'https://example.com/a b',
+    'https://example.com/\\evil', 'data:text/html,test']) assert.equal(safeNoticeLink(value), '');
+  assert.equal(safeNoticeLink('https://example.com/event'), 'https://example.com/event');
+  assert.equal(safeNoticeLink('http://example.com/event'), 'http://example.com/event');
+  const [row] = parseNotices({items: [notice({action_url: 'javascript:alert(1)'})]});
+  assert.equal(row.action_url, '');
+});
+test('配置链接则整条消息可跳转，未配置不跳转；关闭按钮独立且不会导航', () => {
+  const h = (type, props, ...children) => ({type, props: props || {}, children: children.flat()});
+  const React = {useState: () => [0, () => {}], useEffect: () => {}};
+  const dismissed = [];
+  for (const url of ['', 'https://example.com/event']) {
+    const store = {current: () => ({...notice(), action_url: url}), dismiss: id => dismissed.push(id)};
+    const Banner = createNotificationBanner({React, h, TOKENS: {}, store});
+    const rendered = Banner();
+    const [message, close] = rendered.children;
+    assert.equal(message.type, url ? 'a' : 'div');
+    assert.equal(message.props.href, url || undefined);
+    if (url) { assert.equal(message.props.target, '_blank'); assert.equal(message.props.rel, 'noopener noreferrer'); }
+    assert.equal(close.type, 'button'); assert.equal(close.props.href, undefined);
+    assert.equal(message.children.some(child => child?.type === 'button'), false);
+    close.props.onClick();
+  }
+  assert.deepEqual(dismissed, ['activity-1', 'activity-1']);
+});
+test('链接随消息缓存在本地，旧版无链接缓存继续显示', async () => {
+  const f = fixture();
+  f.setItems([notice({action_url: 'https://example.com/event'})]);
+  await createNoticeStore(f.options).refresh();
+  f.offline();
+  const reopened = createNoticeStore(f.options);
+  assert.equal(reopened.current().action_url, 'https://example.com/event');
+  await reopened.refresh(); assert.equal(reopened.current().action_url, 'https://example.com/event');
+  assert.equal(parseNotices({items: [notice()]})[0].action_url, '');
 });
