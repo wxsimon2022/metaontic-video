@@ -39,7 +39,7 @@ function sniffImageMime(buffer: Buffer): string | null {
  * 目标画幅的像素尺寸：ratio + 720P 算出来，参考图适配画幅时用。
  * adaptive 表示「让模型按参考图自己决定画幅」，没有固定目标，不参与适配。
  */
-const CANVAS_SIZES: Record<string, [number, number]> = {
+const IMAGE_TARGET_SIZES: Record<string, [number, number]> = {
   '16:9': [1280, 720],
   '9:16': [720, 1280],
   '4:3': [960, 720],
@@ -47,8 +47,8 @@ const CANVAS_SIZES: Record<string, [number, number]> = {
   '1:1': [720, 720],
 };
 
-export function canvasSize(ratio) {
-  return CANVAS_SIZES[String(ratio ?? '').trim()] || null;
+export function imageTargetSize(ratio) {
+  return IMAGE_TARGET_SIZES[String(ratio ?? '').trim()] || null;
 }
 
 /** 适配后的参考图放这里：同一张图反复提交时不必每次重跑 ffmpeg。 */
@@ -117,7 +117,7 @@ async function pruneReferenceCache(dir, { now = Date.now(), force = false } = {}
 /** 同一张图的适配任务：并发调用共用同一个 Promise，避免同时开 N 个 ffmpeg 写同一个文件。 */
 const fitInFlight = new Map();
 
-async function fitImageToCanvas(absPath, size, config, signal) {
+async function fitImageToFrame(absPath, size, config, signal) {
   const [width, height] = size;
   const media = await probeMedia(absPath, config, signal);
   if (media?.width === width && media?.height === height) return absPath;
@@ -325,7 +325,7 @@ export async function resolveImageInput(value, label, fit = null) {
 
   // 先适配画幅，再按「真正要发出去的那张图」做大小与格式校验
   const submitPath = fit?.size
-    ? await fitImageToCanvas(abs, fit.size, fit.config, fit.signal)
+    ? await fitImageToFrame(abs, fit.size, fit.config, fit.signal)
     : abs;
   let size = info.size;
   if (submitPath !== abs) {

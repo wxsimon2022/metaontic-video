@@ -75,11 +75,11 @@ test('conversation stays inside video creation and configuration is read-only in
 test('refine guidance asks for a richer pass instead of rewording the same idea', async () => {
   const host = harness({ connectionMode: 'metaontic', metaonticApiKey: 'test' }, '/tmp');
   const prompt = host.prompt();
-  for (const needle of ['按六项补齐', '场景与道具', '主体外形与状态', '动作层次与反应', '同一场景按叙事需要保持或改变机位', '已确认时长内的事件节奏']) {
+  for (const needle of ['需求澄清只收集当前缺失信息', '完善仅补原意细节与可拍性', '不改人物关系、核心情节', '不连续弹窗', '按当前展示契约交付']) {
     assert.ok(prompt.includes(needle), needle);
   }
-  assert.ok(prompt.includes('不借完善加人物或支线'), '丰富不等于加人物或支线');
-  assert.ok(prompt.includes('不为变化硬加视角'), '丰富仍不许硬加视角');
+  assert.ok(prompt.includes('不改人物关系、核心情节、结尾、关键对白或增加付费分段'), '丰富不等于加人物或支线');
+  assert.ok(prompt.includes('不机械规定切镜次数'), '丰富仍不许硬加视角');
   const skill = await readFile(new URL('../skills/video-director/SKILL.md', import.meta.url), 'utf8');
   assert.match(skill, /完善要够丰富/, '技能里同样写明完善要够丰富');
   assert.match(skill, /不靠加镜头数代替丰富度|不借完善加人物、支线或付费分段/);
@@ -262,7 +262,7 @@ test('service: bundled host serves the server method again instead of refusing i
 test('script writing starts from a director pass instead of a checklist', async () => {
   const host = harness({ connectionMode: 'metaontic', metaonticApiKey: 'test' }, '/tmp');
   const prompt = host.prompt();
-  for (const needle of ['导演工作法', '观众与记忆点', '情绪曲线', '视觉母题', '不展示给用户']) {
+  for (const needle of ['导演工作法', 'scriptwriting.md', '只加载本阶段所需', '不展示内部推演']) {
     assert.ok(prompt.includes(needle), needle);
   }
   const skill = await readFile(new URL('../skills/video-director/SKILL.md', import.meta.url), 'utf8');
@@ -288,4 +288,19 @@ test('hidden canvas ignores legacy enabled flags without changing the saved conf
   assert.equal(config.canvasEnabled,true);assert.equal(config.autoCreateCanvas,true);
   assert.doesNotMatch(host.prompt(),/先在插件设置页打开「流程画布」|工具会自动建流程画布项目/);
  }finally{host.dispose();if(previous===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=previous;await rm(home,{recursive:true,force:true});}
+});
+
+// 这些断言检查实际注入的流程契约；不把静态检查当成模型行为实测。
+for (const [scenario, rules] of [
+  ['已给30秒竖屏720P不重复问规格', ['已确认的时长、画幅和清晰度不重复问', '禁止省略已确认值导致工具重复提问']],
+  ['批准后推进已有nextTask', ['批准成功→按返回nextTask继续', '没有nextTask才next']],
+  ['先交付片段再审核', ['视频返回paused→先给真实片段链接，再单独review_segment']],
+  ['提交不明禁止重放', ['submission_unknown/查询超时/状态不明', '禁止重新付费提交']],
+  ['局部修改保留范围', ['局部修改→route定位稳定ID，只更新受影响材料']],
+  ['静态机位不强加切镜', ['固定机位、一镜到底和必要留白可以成立']],
+  ['普通专业不重复生成', ['普通流程调用video_script', '不额外调用video_script生成第二份剧本']],
+  ['无对白与无音频区别', ['只要求无对白时不添加人声，环境声和配乐仍按已批准方案']],
+]) test(`提示词场景契约：${scenario}`, () => {
+  const host = harness({connectionMode:'metaontic',metaonticApiKey:'test'}, '/tmp');
+  try { for(const rule of rules) assert.ok(host.prompt().includes(rule), rule); } finally { host.dispose(); }
 });

@@ -1,4 +1,3 @@
-import { FLOW_CANVAS_AVAILABLE } from '../../../shared/constants/plugin.js';
 /** 浏览器端 config：由入口注入宿主 React 与共享依赖。 */
 import { VOLCENGINE_MODE_AVAILABLE, IMAGE_MODEL, TEXT_MODELS } from '../connection-defaults.js';
 import { PLUGIN_NAMESPACE, VIDEO_MODEL_OPTIONS } from '../../../shared/constants/plugin.js';
@@ -39,7 +38,6 @@ export function createClientConfig() {
       { key: 'sectionModels', fields: ['imageUseVideoKey', 'model', 'metaonticApiKey', 'volcengineApiKey', 'imageModel', 'imageApiKey', 'textModel', 'textApiKey'] },
       { key: 'sectionInterface', fields: ['sidebarAssistantEnabled'] },
       { key: 'sectionVideo', fields: ['ratio', 'generateAudio'] },
-      ...(FLOW_CANVAS_AVAILABLE ? [{ key: 'sectionCanvas', fields: ['canvasEnabled', 'autoCreateCanvas'] }] : []),
     ];
     const FIELDS = [
       { key: 'sidebarAssistantEnabled', kind: 'switch', wide: true },
@@ -58,9 +56,6 @@ export function createClientConfig() {
       { key: 'generateAudio', kind: 'switch' },
       { key: 'watermark', kind: 'switch' },
       { key: 'usageStatsEnabled', kind: 'switch' },
-      // 流程画布总开关；打开后设置页才显示「自动创建画布」这一项。
-      { key: 'canvasEnabled', kind: 'switch', wide: true },
-      { key: 'autoCreateCanvas', kind: 'switch', wide: true },
       { key: 'seamTrimSeconds', kind: 'text' },
       { key: 'mergeMode', kind: 'select', wide: true },
       { key: 'pollIntervalMs', kind: 'number' },
@@ -72,7 +67,7 @@ export function createClientConfig() {
 
     /** 插件自己会写进配置的项：重置时兜底一起清，免得宿主没把它们列进 user。 */
     const PLUGIN_OWNED_KEYS = [
-      'sidebarAssistantEnabled', 'canvasEnabled', 'autoCreateCanvas', 'usageStatsEnabled', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'entryId', 'baseUrl',
+      'sidebarAssistantEnabled', 'usageStatsEnabled', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'entryId', 'baseUrl',
       'submitPath', 'queryPath', 'imageUseVideoKey', 'imageApiKey', 'imageModel', 'textModel', 'textApiKey', 'model',
       'estimateGroupRatio', 'duration', 'singleMaxSeconds', 'seamTrimSeconds', 'mergeMode', 'bgmFadeSeconds',
       'outputDir', 'keepSegments', 'resumeLockStaleMinutes', 'ffmpegBinary', 'ffprobeBinary', 'mode',

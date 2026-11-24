@@ -1,5 +1,4 @@
 import { logDiagnostics } from '../../../shared/utils/logging.js';
-import { FLOW_CANVAS_AVAILABLE } from '../../../shared/constants/plugin.js';
 import { IMAGE_MODEL, resolveImageModel } from '../connection-defaults.js';
 /** tools/video-config：从宿主入口拆出的独立职责模块。 */
 import { ref } from '../config.js';
@@ -9,7 +8,7 @@ import { RELAY } from '../../../shared/constants/plugin.js';
 
 /** 用户可在插件内改的配置字段。 */
 export const CONFIG_FIELDS = [
-  'sidebarAssistantEnabled', 'canvasEnabled', 'autoCreateCanvas', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel', 'textModel', 'imageUseVideoKey', 'imageApiKey', 'textApiKey',
+  'sidebarAssistantEnabled', 'connectionMode', 'metaonticApiKey', 'volcengineApiKey', 'baseUrl', 'submitPath', 'queryPath', 'model', 'imageModel', 'textModel', 'imageUseVideoKey', 'imageApiKey', 'textApiKey',
   'duration', 'singleMaxSeconds', 'ratio', 'generateAudio', 'watermark',
   'extraParams', 'pollIntervalMs', 'maxWaitMs',
   'pollErrorRetries',
@@ -39,8 +38,6 @@ export function configView(config) {
     stored: maskSecrets(stored),
     effective: {
       sidebarAssistantEnabled: ref(config, 'sidebarAssistantEnabled', true) !== false,
-      canvasEnabled: FLOW_CANVAS_AVAILABLE && ref(config, 'canvasEnabled', false) === true,
-      autoCreateCanvas: FLOW_CANVAS_AVAILABLE && ref(config, 'canvasEnabled', false) === true && ref(config, 'autoCreateCanvas', true) === true,
       connectionMode: isVolcengine(config) ? 'volcengine' : 'metaontic',
       baseUrl: resolveBaseUrl(config),
       submitPath: resolveSubmitPath(config),

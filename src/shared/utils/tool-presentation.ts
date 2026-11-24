@@ -8,7 +8,6 @@ const TOOL_TITLES: Record<string, string> = {
   video_setup: '检查视频生成环境',
   video_stage: '记录制作进度',
   media_submission: '登记最终成片',
-  video_canvas: '读取创作项目画布',
   video_hyperframes: '渲染本地视频',
 };
 

@@ -12,7 +12,7 @@ function harness() {
     resolveModel: config => config.model,
     isVolcengine: config => config.connectionMode === 'volcengine',
     ref: (config, key, fallback) => config[key] ?? fallback,
-    canvasSize: () => null,
+    imageTargetSize: () => null,
     buildGenerationPrompt: ({ prompt }) => prompt,
     parseExtraParams: config => config.extraParams ?? {},
     resolveImageInput: async (value, label) => {
@@ -22,7 +22,7 @@ function harness() {
   });
   context.resolveResolution = api.resolveResolution;
   context.isOmniExtendModel = api.isOmniExtendModel;
-  const mocks = {validateImageRoles: api.validateImageRoles, canvasSize: context.canvasSize, resolveImageInput: context.resolveImageInput};
+  const mocks = {validateImageRoles: api.validateImageRoles, imageTargetSize: context.imageTargetSize, resolveImageInput: context.resolveImageInput};
   vm.runInContext(sourceOf('businesses/video-generation/media/references','businesses/video-generation/providers/seedance'), context);
   Object.assign(context,mocks);
   return { context, resolved };

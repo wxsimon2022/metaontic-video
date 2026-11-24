@@ -1,4 +1,3 @@
-import { FLOW_CANVAS_AVAILABLE } from '../../shared/constants/plugin.js';
 import { registerConnectionCheck } from './integrations/connection-check.js';
 import type { BusinessModule, BusinessRuntime } from '../../app/bootstrap.js';
 import { withMediaPreview } from './workflow/media-preview.js';
@@ -16,10 +15,6 @@ import { withVideoExecution } from './workflow/execution.js';
 import { withResumeLock } from './workflow/resume.js';
 import { jsonSafeTool } from '../../shared/utils/json.js';
 import { submissionTool } from './tools/media-submission.js';
-import { createCanvasBridge } from './integrations/canvas.js';
-import { createCanvasProjectSync } from './integrations/canvas-project.js';
-import { registerCanvasNative } from './integrations/canvas-native.js';
-import { registerBuiltinCanvas } from './integrations/canvas-builtin.js';
 import { prepareImageTool } from './tools/video-prepare-image.js';
 import { videoTool } from './tools/video-generate.js';
 import { extendTool } from './tools/video-extend.js';
@@ -47,8 +42,6 @@ function asDisposer(value: unknown): (() => void) | undefined {
 function applyVideoBusiness(runtime: BusinessRuntime) {
   const { ctx, config } = runtime;
   runtime.defer(registerConnectionCheck(ctx,config));
-  runtime.defer(registerCanvasNative(ctx, config));
-  runtime.defer(registerBuiltinCanvas(ctx));
   // 可选服务的宿主对象（会话工作目录等），拿到就放进来
   const deps: Record<string, any> = {};
   const segmentReview = createSegmentReview(ctx);
@@ -72,21 +65,15 @@ function applyVideoBusiness(runtime: BusinessRuntime) {
     } };
     return runtime.tools.register('video', withMediaPreview(guarded));
   };
-  const canvasBridge = (typeof __FLOW_CANVAS_AVAILABLE__ !== 'undefined' ? __FLOW_CANVAS_AVAILABLE__ : FLOW_CANVAS_AVAILABLE) ? createCanvasBridge(undefined, config) : null;
-  const wrapCanvas = tool => canvasBridge ? canvasBridge.wrap(tool) : tool;
-  const canvasProjects = (typeof __FLOW_CANVAS_AVAILABLE__ !== 'undefined' ? __FLOW_CANVAS_AVAILABLE__ : FLOW_CANVAS_AVAILABLE) ? createCanvasProjectSync(undefined, config, { get: session => (ctx.get?.('sessionTitle'))?.get(session) }) : null;
-  // 会话标题通常首轮之后才生成：标题落定或被改写时，把自动画布的项目名对齐成同一个名字。
-  if (canvasProjects) runtime.defer((ctx as any).on('session/event', canvasProjects.followTitle));
-  const generation = wrapCanvas(videoTool(config, deps, ctx));
-  const extension = wrapCanvas(extendTool(config, deps, ctx));
-  if (canvasBridge) register(jsonSafeTool(canvasBridge.tool));
+  const generation = videoTool(config, deps, ctx);
+  const extension = extendTool(config, deps, ctx);
   register(jsonSafeTool(stageTool()));
-  const project = projectTool(config, ctx, storyboardReview, generation.parameters.properties, extension.parameters.properties, segmentReview, canvasProjects?.sync);
-  register(jsonSafeTool(canvasProjects ? canvasProjects.wrapProject(project) : project));
+  const project = projectTool(config, ctx, storyboardReview, generation.parameters.properties, extension.parameters.properties, segmentReview);
+  register(jsonSafeTool(project));
   register(jsonSafeTool(estimateTool(config)));
   register(jsonSafeTool(scriptTool(config)));
   register(jsonSafeTool(submissionTool(config)));
-  register(jsonSafeTool(wrapCanvas(prepareImageTool(config))));
+  register(jsonSafeTool(prepareImageTool(config)));
   register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(generation, config), config)), 'video_generate', config), deliveryOrder.remember));
   register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(extension, config), config)), 'video_extend', config), deliveryOrder.remember));
   register(withVideoExecution(jsonSafeTool(withActualCost(taskTool(config), config))));

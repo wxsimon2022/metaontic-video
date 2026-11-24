@@ -151,8 +151,6 @@ function makePage({ form, t, manager }) {
           imageModel: t('imageModelHint'),
           textModel: t('textModelHint'),
           seamTrimSeconds: t('seamTrimSecondsHint'),
-          canvasEnabled: t('canvasEnabledHint'),
-          autoCreateCanvas: t('autoCreateCanvasHint'),
           maxWaitMs: t('waitSecondsHint'),
         };
 
@@ -217,8 +215,6 @@ function makePage({ form, t, manager }) {
           }
           const shared = (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) !== false;
           const videoKey = directMode ? 'volcengineApiKey' : 'metaonticApiKey';
-          // 「自动创建画布」只在「流程画布」打开后才有意义，关闭时整项不显示，避免误解成两件事。
-          const canvasOn = (draft.canvasEnabled ?? value.canvasEnabled ?? false) === true;
           const fields = section.key === 'sectionModels'
             ? directMode ? ['model', videoKey]
               : shared ? ['imageUseVideoKey', videoKey, 'model', 'imageModel']
@@ -229,7 +225,7 @@ function makePage({ form, t, manager }) {
             && (!['imageModel', 'imageUseVideoKey', 'imageApiKey'].includes(key) || !directMode)
             && (key !== 'imageApiKey' || (draft.imageUseVideoKey ?? value.imageUseVideoKey ?? true) === false)
             && (key !== 'metaonticApiKey' || selectedMode === 'metaontic')
-            && (key !== 'autoCreateCanvas' || canvasOn))
+            )
             .map((key) => fieldCell(FIELD_BY_KEY[key])).filter(Boolean));
         };
         function connectionButton() {

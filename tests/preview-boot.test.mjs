@@ -65,7 +65,6 @@ test('standalone preview host mounts the real client and registers settings and 
   // 流程画布是插件自己的独立页面：单独的左侧栏入口与 main 键位槽。
   assert.equal(components['sidebar.panellist:metaontic-video-canvas'], undefined, '画布页隐藏');
   // 左侧栏那一行的名字：带上产品名，方便在图标列表里认出来。
-  assert.equal(host.locale.bind('settings.metaonticVideo')('canvasPanelLabel'), 'MetaOnticVideo流程画布');
   assert.equal(components['main:metaontic-video-canvas'], undefined, '流程画布页面隐藏');
   const panel = components['main:metaontic-video:props']();
   panel.startSession();

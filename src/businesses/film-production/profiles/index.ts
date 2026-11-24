@@ -23,7 +23,7 @@ export function profileRevision(workType:string) {
   if(!Object.hasOwn(REGISTRY,workType))throw Error('UNKNOWN_WORK_TYPE');
   return REGISTRY[workType].revision;
 }
-/** 画布写作仍交Markdown；复用同一配置，不冒充专业项目的审批和JSON提交。 */
+/** 普通脚本写作交Markdown；复用同一配置，不冒充专业项目的审批和JSON提交。 */
 export function writingProfileInstructions(workType?:string) {
   if(!workType)return '作品类型未指定：尊重想法中的内容形式，不默认剧情、强加人物冲突或反转。';
   const p=resolveProfile({work_type:workType,profile_revision:profileRevision(workType)});

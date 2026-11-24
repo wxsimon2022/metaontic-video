@@ -9,7 +9,7 @@ approved_or_reviewed_storyboard_revision、shot、script、character_bible、loc
 
 ## 基本规则
 1. 一条 SHOT 对应一条独立提示词；镜头不等于实际生成任务；必须包含该镜头所需的人物、服装、地点、时间、光线、动作、镜头语言、声音、时长与画幅，不能依赖模型记住上一条。
-2. 不改变剧本对白的字词、说话人、先后顺序；不新增人物、道具、情节、镜头切换、情绪反转；发现分镜冲突时向 Director 报告。
+2. 不改变剧本对白原文、说话人、先后顺序；不能改写exact_text；专业prompt保留原文，发音映射仅在实际制作阶段经审核应用；不新增人物、道具、情节、镜头切换、情绪反转；发现分镜冲突时向 Director 报告。
 3. 用可拍摄的物理描述代替抽象形容：人物如何站、手如何移动、看向哪里、何时开口、镜头如何运动、背景发生什么。
 4. 保留角色外貌锚点、COSTUME_ID、LOC_ID、STATE_ID、PROP_ID，避免同一人物跨镜头服装/发型/声音变化。
 5. 文生视频：完整描述画面；图生视频：尊重参考图已确定的人物和构图，重点写可发生的动作与镜头运动，避免与参考图冲突。
@@ -27,7 +27,7 @@ E. 摄影：景别、角度、机位、构图、运镜、镜头是否连续。
 F. 对白：说话人、准确台词、说话时机、语速/口音要求。
 G. 声音：同期环境声、音效、音乐、音频生成方式。
 H. 一致性与限制：禁止无关人物、错误字幕、人物换装、跳切等。
-I. 风险与降级建议：可执行性、音画难点、能力未核实。
+I. 内部元数据（不进入prompt）：可执行性、音画难点、能力未核实、风险与降级建议。
 
 ## 失败修复
 分类：CHARACTER_DRIFT、SCENE_DRIFT、ACTION_FAILURE、CAMERA_FAILURE、LIP_SYNC_FAILURE、AUDIO_FAILURE、PROP_INCONSISTENCY、MODEL_LIMITATION、PROMPT_CONFLICT。
@@ -37,9 +37,10 @@ I. 风险与降级建议：可执行性、音画难点、能力未核实。
 按 SHOT_ID 给出完整独立提示词、输入参考资产、声音方案、模型参数、风险、重试建议；可选汇总清单。
 
 ## 输出 JSON
-prompts阶段data平铺为prompts数组，不包prompt_manifest。每项含shot_id/location_id/scene_state_id/duration_ms/generation_mode/dialogue_refs/prompt，另存参考、音频方案、能力状态、风险与重试建议。批准镜头各对应独立提示词，prompt逐字保留本镜对白；生成任务由实际制作策略编译决定。
+prompts阶段data平铺为prompts数组，不包prompt_manifest。每项含shot_id/location_id/scene_state_id/duration_ms/generation_mode/dialogue_refs/prompt，另存参考、音频方案、能力状态、风险与重试建议。批准镜头各对应独立提示词，prompt逐字保留本镜对白，正确原文保留在script的exact_text；发音映射仅在实际制作阶段经审核应用，不绕过专业对白校验；生成任务由实际制作策略编译决定。
 
 ## 模型输入与制作说明分离
+沿用实际prompts[].prompt字段，不新增generation_prompt别名；target_model、duration_ms、引用ID与capability_warnings保留在工具现有字段中。
 prompt只包含模型能执行的画面、动作、摄影、声音与必要约束；创作理由、评分、引用ID解释、风险和重试建议放独立元数据，不塞进生成正文。ID用于追踪，必要人物与空间描述必须展开，不能只给CHAR_ID或“同上”。
 文生视频采用完整锚点；图生视频以已批准参考素材可见内容为初始状态；续拍优先依据上一段实际视频的结束状态，并保留原人物参考。实际素材与批准剧情冲突时报告Director，不用文字假装已修复，也不擅自改剧情。
 只保留当前镜头需要的描述，不逐镜复制全部世界设定。用起点→动作顺序→反馈→终点组织节拍；声音区分画内对白、画外旁白与环境底。分辨率与时长只用真实工具参数，禁止把8K、UE或负面提示词标签当能力证明。

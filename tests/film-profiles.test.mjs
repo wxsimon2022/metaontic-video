@@ -12,7 +12,7 @@ export * from './src/businesses/film-production/workflows/workflow.engine.ts';
 export * from './src/businesses/film-production/artifacts/artifact.service.ts';
 export * from './src/businesses/film-production/approvals/approval.service.ts';
 export * from './src/businesses/video-generation/providers/text.ts';
-export * from './src/businesses/video-generation/integrations/canvas-stages.ts';`,resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
+`,resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
 const api=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
 const state=(type)=>({revision:0,status:'REQUIREMENT_ANALYSIS',source_brief:'安静河岸的观察',duration_ms:15000,project_spec:api.createProjectSpec('作品','安静河岸的观察',15000,type?{work_type:type,visual_style:'千禧MiniDV',narrative_mode:'OBSERVATIONAL'}:{}),artifacts:{},approvals:{},decisions:[]});
 const creative=(p)=>({theme:'细节发现',logline:'一次观察',type_details:Object.fromEntries(Object.keys(p.creative_fields).map(k=>[k,'河面细小变化与观察回应']))});
@@ -90,15 +90,11 @@ test('类型终审覆盖、版本、证据和未评估状态有确定性卡口�
  report.type_review.checks[0].issue_id='I1';report.issues=[{issue_id:'I1',severity:'MINOR'}];report.review_status='PASS_WITH_WARNINGS';
  api.validateProfileArtifact('review',report,s);
 });
-test('画布需求恢复所选类型，写作采用同一类型策略并保持Markdown和分段契约',()=>{
- const data=api.requirementNodeData('河岸观察',30,15,'16:9','720p','LIFESTYLE');
- const node=api.requirementNodeOf({nodes:{n:{id:'n',data}}});
- assert.equal(node.data.metaonticRequirementSpec.work_type,'LIFESTYLE');
- const prompt=api.scriptPrompt({idea:'河岸观察',totalSeconds:30,segments:2,work_type:node.data.metaonticRequirementSpec.work_type});
+test('普通脚本采用所选类型策略并保持Markdown和分段契约',()=>{
+ const prompt=api.scriptPrompt({idea:'河岸观察',totalSeconds:30,segments:2,work_type:'LIFESTYLE'});
  assert.ok(prompt.includes(api.resolveProfile(state('LIFESTYLE').project_spec).strategy));
  assert.ok(prompt.includes('恰好 2 行'));assert.ok(prompt.includes('不输出type_details或审核JSON'));
  assert.throws(()=>api.scriptPrompt({idea:'x',work_type:'INVALID'}),/UNKNOWN_WORK_TYPE/);
- assert.equal(api.requirementNodeData('x',15,15,'16:9','720p').metaonticRequirementSpec.work_type,undefined);
 });
 test('真实工具创建、审批、改类型及重读保存一致，旧批准与产物不能继续用',async()=>{
  const home=await mkdtemp(path.join(tmpdir(),'film-type-中文 '));const prior=process.env.DSH_HOME;

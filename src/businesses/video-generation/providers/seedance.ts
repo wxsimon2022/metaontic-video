@@ -8,7 +8,7 @@ import { clampInteger } from '../../../shared/utils/validation.js';
 import { MIN_SEGMENT_SECONDS, ref, resolveResolution } from '../config.js';
 import { modelMaxSeconds } from '../workflow/planning.js';
 import { buildExtensionPrompt, buildGenerationPrompt } from '../prompts/generation.js';
-import { validateImageRoles, canvasSize, resolveImageInput } from '../media/references.js';
+import { validateImageRoles, imageTargetSize, resolveImageInput } from '../media/references.js';
 import { type TaskResult } from './types.js';
 import { waitForCompletion } from './transport.js';
 import { extractTaskId } from './response.js';
@@ -80,8 +80,8 @@ export async function buildGenerationBody(config, args, seconds, options: { sign
   const { refs } = validateImageRoles(args, resolveModel(config));
   const prompt = String(args.prompt ?? '').trim();
   const ratio = args.ratio || ref(config, 'ratio', 'adaptive');
-  const canvas = canvasSize(ratio);
-  const fit = canvas ? { size: canvas, config, signal: options.signal } : null;
+  const frameSize = imageTargetSize(ratio);
+  const fit = frameSize ? { size: frameSize, config, signal: options.signal } : null;
 
   // 文本项 + 可选图片，形状由上游决定，这里只保证顺序与字段名
   const content: Array<Record<string, unknown>> = [

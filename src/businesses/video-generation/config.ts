@@ -8,10 +8,6 @@ import z from '@deepseek-ai/schemastery';
 
 export const videoConfigFields = {
   sidebarAssistantEnabled: z.boolean().default(true).description('显示左侧视频创作助手入口（默认开启）；仅控制侧栏与对应面板，不改变会话助手或已有任务。').volatile(),
-  // 画布总开关：默认关闭，打开后左侧栏才出现画布入口，画布组件才可用。
-  canvasEnabled: z.boolean().default(false).description('流程画布（默认关闭）：打开后左侧栏出现「MetaOnticVideo流程画布」入口，可用独立画布页创作；关闭时左侧栏隐藏入口，已有画布与成果保留在插件数据目录。').volatile(),
-  // 自动建图：只在流程画布打开后生效，默认开启，跟着创作自动建图并回填成果。
-  autoCreateCanvas: z.boolean().default(true).description('自动创建画布（流程画布打开后有效，默认开启）：创作时自动建图，审核前同步剧本、分镜与制作计划，生成后回填成果；关闭后不自动建图，仅在用户明确选中画布节点时联动。').volatile(),
   connectionMode: z.union(['metaontic', 'volcengine']).default('metaontic')
     .description('接入方式：MetaOntic AI（metaontic）；火山引擎直连（volcengine，当前设置页暂不提供选择）').volatile(),
   metaonticApiKey: z.string().default('').description('MetaOntic AI API密钥').volatile(),

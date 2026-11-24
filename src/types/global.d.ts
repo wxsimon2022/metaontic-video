@@ -1,3 +1,2 @@
 
 /** 构建器注入隐藏画布常量；源码测试未注入时使用真实功能开关。 */
-declare const __FLOW_CANVAS_AVAILABLE__: boolean;

@@ -1,6 +1,6 @@
 /** workflow/storyboard-shots：从脚本正文里解析真实分镜表。
  *  只认表头里同时有「镜号/镜头」与「画面」的 Markdown 表；没有就返回空，不编造镜头或秒数。
- *  渲染分镜示意图与画布投影共用这一份解析。 */
+ *  渲染分镜示意图使用这一份解析。 */
 /** 提取真实剧本分镜表；没有明确的镜头/画面列时不编造镜头或秒数。 */
 export function scriptStoryboardShots(script: string) {
   const lines = script.split(/\r?\n/), shots = [];

@@ -14,9 +14,6 @@ export const PLUGIN_PACKAGE = 'dsh-metaontic-video';
 export const PLUGIN_NAMESPACE = PLUGIN_ID;
 export const PLUGIN_NAME = 'MetaOnticVideo';
 export const PANEL_ID = PLUGIN_ID;
-/** 暂隐藏流程画布：保留历史数据和内部恢复实现，不开放创作入口。 */
-export const FLOW_CANVAS_AVAILABLE = false;
-export const CANVAS_PANEL_ID = `${PLUGIN_ID}-canvas`;
 
 /** 线上地址：使用说明、匿名统计、客服、更新日志。 */
 export const GUIDE_URL = 'https://ai.mybfs.cn';

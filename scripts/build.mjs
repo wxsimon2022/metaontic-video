@@ -4,10 +4,7 @@ import { packageDescription } from './package-description.mjs';
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 const version = JSON.parse(await readFile('package.json', 'utf8')).version;
 const target = process.argv[2] || 'all';
-const flags = await readFile('src/shared/constants/plugin.ts','utf8');
-const canvas = /export const FLOW_CANVAS_AVAILABLE = (true|false);/.exec(flags);
-if (!canvas) throw Error('Missing literal canvas feature flag');
-const defines = { __PLUGIN_VERSION__: JSON.stringify(version), __FLOW_CANVAS_AVAILABLE__: canvas[1] };
+const defines = { __PLUGIN_VERSION__: JSON.stringify(version) };
 
 if (!['all','locale','host','client'].includes(target)) throw Error('Unknown build target');
 for (const file of ['index.js','client.js','locale/en.json','locale/zh.json','presets/video-director.js']) {
