@@ -76,7 +76,7 @@ function applyVideoBusiness(runtime: BusinessRuntime) {
   register(jsonSafeTool(prepareImageTool(config)));
   register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(generation, config), config)), 'video_generate', config), deliveryOrder.remember));
   register(withVideoExecution(withResumeLock(jsonSafeTool(withActualCost(withProjectApproval(extension, config), config)), 'video_extend', config), deliveryOrder.remember));
-  register(withVideoExecution(jsonSafeTool(withActualCost(taskTool(config), config)), deliveryOrder.remember));
+  register(withVideoExecution(jsonSafeTool(withActualCost(taskTool(config), config))));
   register(jsonSafeTool(setupTool(config)));
   // 雪藏功能：默认不注册，不进入对外技能和提示词，仅供内部显式启用。
   if (process.env.METAONTIC_VIDEO_INTERNAL_HYPERFRAMES === '1') {

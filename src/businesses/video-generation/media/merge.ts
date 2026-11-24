@@ -281,7 +281,8 @@ export async function downloadSegmentsAndMerge(config, {
 
   // 各段文件互相独立，下载与探测都可以并发：串行时 4 段要等 4 轮「下载完成 + ffprobe 完成」，
   // 长视频的收尾时间几乎都花在这里。并发跑完后再按段号顺序处理结果，保证下面的判定语义不变。
-  const downloaded = await mapLimit(segments, SEGMENT_TASK_CONCURRENCY, async (segment) => {
+  let downloaded;
+  try { downloaded = await mapLimit(segments, SEGMENT_TASK_CONCURRENCY, async (segment) => {
     const dest = destOf(segment);
     try {
       // 已经下过的分段（接着做时复用）直接用现成文件：上游链接可能已经过期。
@@ -294,6 +295,10 @@ export async function downloadSegmentsAndMerge(config, {
       return { failure };
     }
   });
+  } catch (failure) {
+    report('retrieve', failure?.code === 'ABORTED' ? 'cancelled' : 'failed', downloadBegan, failure);
+    throw failure;
+  }
   // mapLimit 按原下标返回，取到的就是段号最靠前的失败，报错内容和串行时一致。
   const failed = downloaded.find((item) => item.failure);
   if (failed) {
@@ -400,8 +405,8 @@ export async function downloadSegmentsAndMerge(config, {
     report('merge', 'succeeded', mergeBegan);
     return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: merged.mode, videoPath: finalPath, seamCuts: prepared.cuts, actualSeconds: actual?.durationSeconds };
   } catch (failure) {
-    if (failure?.code === 'ABORTED') throw failure;
     report('merge', failure?.code === 'ABORTED' ? 'cancelled' : 'failed', mergeBegan, failure);
+    if (failure?.code === 'ABORTED') throw failure;
     let reason = `分段已生成，但合并失败：${failure?.message || failure}`;
     let installHint;
     if (failure?.code === 'ffmpeg_missing') {

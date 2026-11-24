@@ -206,7 +206,7 @@ export function createAnalyticsReporter(config, options: any = {}) {
         if (['film_project', 'video_script'].includes(input.tool)) fields.tool = input.tool;
         if (CATEGORIES.has(input.errorCategory)) fields.errorCategory = input.errorCategory;
         for (const [key, max] of [['segmentCount', 1000], ['videoDurationSec', 86400]] as const) {
-          if (typeof input[key] === 'number' && Number.isFinite(input[key]) && input[key] > 0) fields[key] = Math.min(max, Math.round(input[key] * 100) / 100);
+          if (typeof input[key] === 'number' && Number.isFinite(input[key]) && input[key] > 0) fields[key] = Math.min(max, key === 'segmentCount' ? Math.round(input[key]) : Math.round(input[key] * 100) / 100);
         }
       }
       if (!extended && !['plugin_started', 'plugin_installed'].includes(name) && !fields.tool) return;
@@ -223,18 +223,17 @@ export function createAnalyticsReporter(config, options: any = {}) {
         void Promise.resolve().then(() => identity()).then(async id => {
           if (!id || !allowed() || !await claimRegistration(id) || !allowed()) return;
           // 两种登记入口共用同一事件ID，避免客户端旧状态或重复接收导致重复计数。
-          if (extended && input.flowKey) (event as any).flowId = createHash('sha256').update(`${id}:flow:${input.flowKey}`).digest('hex');
           event.eventId = createHash('sha256').update(`${id}:device_registration`).digest('hex');
           queue.push(event); queue = queue.slice(-maxQueue); schedule();
         }).catch(() => {});
         return;
       }
       // taskId只在本地参与散列，服务端不接收原任务ID。
-      if (dedupeKey) {
+      if (dedupeKey || extended && input.flowKey) {
         void Promise.resolve().then(() => identity()).then(id => {
           if (!id || !allowed()) return;
           if (extended && input.flowKey) (event as any).flowId = createHash('sha256').update(`${id}:flow:${input.flowKey}`).digest('hex');
-          event.eventId = createHash('sha256').update(`${id}:${name}:${dedupeKey}`).digest('hex');
+          if (dedupeKey) event.eventId = createHash('sha256').update(`${id}:${name}:${dedupeKey}`).digest('hex');
           queue.push(event); queue = queue.slice(-maxQueue); schedule();
         }).catch(() => {});
       } else { queue.push(event); queue = queue.slice(-maxQueue); schedule(); }
@@ -254,6 +253,22 @@ export function createAnalyticsReporter(config, options: any = {}) {
       if (!ctx || typeof ctx.on !== 'function') return () => {};
       return ctx.on('plugin-manager/operation', (operation: any) => {
         try {
+          if (operation?.phase === 'settled' && operation.target === PLUGIN_PACKAGE
+            && ['install', 'update'].includes(operation.reason) && operation.id) {
+            const application = operation.application;
+            const status = operation.errorCode || application === 'failed' ? 'failed'
+              : application === 'cancelled' ? 'cancelled'
+              : ['applied', 'restart-required'].includes(application) && operation.changed === true ? 'succeeded' : null;
+            if (status) {
+              const code = String(operation.errorCode || '');
+              const errorCategory = status !== 'failed' ? undefined
+                : /INTEGRITY|VERIFY/.test(code) ? 'validation'
+                : /NETWORK|TIMEOUT|FETCH/.test(code) ? 'network'
+                : /PERMISSION|EACCES|EPERM|SPACE|ENOSPC/.test(code) ? 'filesystem' : 'other';
+              record('outcome_finished', { stage: operation.reason, action: operation.reason,
+                status, errorCategory, occurredAt: operation.time }, `operation:${operation.id}`);
+            }
+          }
           if (!operation || operation.phase !== 'settled' || operation.reason !== 'install'
             || operation.target !== PLUGIN_PACKAGE || operation.stage !== 'enable' || operation.changed !== true
             || operation.errorCode || !['applied', 'restart-required'].includes(operation.application)) return;

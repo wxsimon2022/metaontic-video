@@ -48,7 +48,7 @@ export function createDeliveryOrderGuard() {
       if (target && await sizeOf(target) > 0) {
         const key = String(value?.segmentsDir || value?.resumeDir || target);
         const fields = { stage: 'generation', action: 'generate', status: 'succeeded', flowKey: key,
-          segmentCount: value?.segments?.length || 1, videoDurationSec: value?.actualSeconds };
+          segmentCount: value?.segments?.length || 1, videoDurationSec: value?.actualSeconds || (value?.segments?.length === 1 ? value.segments[0].durationSeconds : undefined) };
         reportOutcome(exec, 'video_ready', fields, `ready:${key}`);
         const known = finalVideos.get(session) || [];
         if (!known.some(item => item.path === target)) known.push({ path: target, key, exec, fields });

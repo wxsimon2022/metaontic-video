@@ -140,18 +140,18 @@ test('device fields never carry characters the ingest whitelist rejects',async()
 test('host install completion is reported asynchronously with a bounded source enum',async()=>{
  let body;const listeners={};const time=new Date().toISOString();
  const ctx={get:()=>({listBundles:async()=>[{name:'dsh-metaontic-video',installed:true,source:'dsh-metaontic-video@4.2.2'}]}),on:(name,listener)=>{listeners[name]=listener;return()=>{delete listeners[name];};}};
- const r=fixture(async(_u,o)=>{body=JSON.parse(o.body);return{ok:true};});
+ const r=fixture(async(_u,o)=>{if(_u.endsWith('/events'))body=JSON.parse(o.body);return{ok:true};});
  try{
   const stop=r.watchInstallOperations(ctx);assert.equal(typeof stop,'function');
   listeners['plugin-manager/operation']({id:'private-operation-id',time,reason:'install',target:'dsh-metaontic-video',stage:'enable',phase:'settled',application:'applied',changed:true,version:'4.3.0'});
-  await tick();await r.flush();
+  await tick();await r.flush();await r.flush();
   assert.equal(body.events.length,1);assert.equal(body.events[0].name,'plugin_installed');assert.equal(body.events[0].installSource,'npm');assert.equal(body.events[0].version,'4.3.0');assert.equal(body.events[0].occurredAt,time);assert.equal(body.events[0].tool,undefined);assert.doesNotMatch(JSON.stringify(body),/private-operation-id/);
  }finally{r.dispose();}
 });
 test('failed, cancelled, overridden and unrelated host operations do not create install events',async()=>{
  let calls=0;const listeners={};
  const ctx={get:()=>({listBundles:async()=>[]}),on:(name,listener)=>{listeners[name]=listener;return()=>{};}};
- const r=fixture(async()=>{calls++;return{ok:true};});
+ const r=fixture(async(url)=>{if(url.endsWith('/events'))calls++;return{ok:true};});
  try{
   r.watchInstallOperations(ctx);const fire=operation=>listeners['plugin-manager/operation']({id:JSON.stringify(operation),time:new Date().toISOString(),reason:'install',target:'dsh-metaontic-video',stage:'enable',phase:'settled',changed:true,application:'applied',...operation});
   fire({application:'failed'});fire({application:'cancelled'});fire({application:'overridden'});fire({application:undefined});fire({errorCode:'operation-error'});fire({target:'another-plugin'});fire({reason:'bundle'});
@@ -161,11 +161,11 @@ test('failed, cancelled, overridden and unrelated host operations do not create 
 test('a successful host operation without a matching bundle reports unknown instead of bundled',async()=>{
  let body;const listeners={};const time=new Date().toISOString();
  const ctx={get:()=>({listBundles:async()=>[]}),on:(name,listener)=>{listeners[name]=listener;return()=>{};}};
- const r=fixture(async(_u,o)=>{body=JSON.parse(o.body);return{ok:true};});
+ const r=fixture(async(_u,o)=>{if(_u.endsWith('/events'))body=JSON.parse(o.body);return{ok:true};});
  try{
   r.watchInstallOperations(ctx);
   listeners['plugin-manager/operation']({id:'no-bundle',time,reason:'install',target:'dsh-metaontic-video',stage:'enable',phase:'settled',application:'applied',changed:true,version:'4.2.2'});
-  await tick();await r.flush();
+  await tick();await r.flush();await r.flush();
   assert.equal(body.events[0].name,'plugin_installed');assert.equal(body.events[0].installSource,'unknown');
  }finally{r.dispose();}
 });
@@ -211,4 +211,52 @@ test('设备登记网络结果不明不重试，工具事件仍可按原策略�
   r.record('plugin_installed');await tick();await r.flush();assert.equal(calls,1);
   r.record('tool_started',{tool:'video_generate'});await r.flush();assert.equal(r.pending(),1);
  }finally{r.dispose();}
+});
+test('扩展事件与旧协议分批，旧服务404后只停用扩展统计',async()=>{
+ const requests=[];
+ const r=fixture(async(url,o)=>{requests.push({url,body:JSON.parse(o.body)});return url.endsWith('/outcomes')?{ok:false,status:404}:{ok:true};});
+ try{
+  r.record('outcome_finished',{tool:'film_project',stage:'script',action:'submit',status:'succeeded',flowKey:'/private/story',content:'secret'},'private-call');
+  r.record('tool_started',{tool:'video_generate'});await tick();await r.flush();await r.flush();
+  assert.equal(requests.length,2);
+  const extra=requests.find(x=>x.url.endsWith('/outcomes')).body.events[0];
+  assert.match(extra.flowId,/^[a-f0-9]{64}$/);assert.doesNotMatch(JSON.stringify(requests),/secret|private/);
+  assert.deepEqual(requests.find(x=>x.url.endsWith('/events')).body.events.map(x=>x.name),['tool_started']);
+  r.record('outcome_finished',{stage:'install',action:'install',status:'failed'});await r.flush();assert.equal(requests.length,2);
+  r.record('tool_started',{tool:'video_status'});await r.flush();assert.equal(requests.length,3);
+ }finally{r.dispose();}
+});
+test('同一成片散列稳定且按设备隔离，字段只允许计量与分类',async()=>{
+ const bodies=[];const r=fixture(async(_url,o)=>{bodies.push(JSON.parse(o.body));return{ok:true};});
+ try{
+  for(let i=0;i<2;i++)r.record('video_ready',{tool:'video_generate',stage:'generation',action:'generate',status:'succeeded',flowKey:'private-dir',segmentCount:2,videoDurationSec:30.2,files:['private-file'],errorCategory:'raw-private-error'},'ready:private-dir');
+  await tick();await r.flush();const [a,b]=bodies[0].events;
+  assert.equal(a.eventId,b.eventId);assert.equal(a.flowId,b.flowId);assert.equal(a.segmentCount,2);
+  assert.equal(a.errorCategory,undefined);assert.doesNotMatch(JSON.stringify(bodies),/private/);
+ }finally{r.dispose();}
+});
+test('创作阶段状态取真实结果，read/status不能当完成',()=>{
+ assert.equal(api.toolOutcome('film_project',{action:'read',stage:'script'}),null);
+ assert.equal(api.toolOutcome('video_project',{action:'status'}),null);
+ assert.equal(api.toolOutcome('video_status',{}, {status:'succeeded',videoUrl:'private'}),null);
+ for(const [result,status] of [[{approvals:{script:2}},'approved'],[{status:'needs_input'},'pending'],[{status:'SCRIPT_REVISE'},'draft'],[{status:'STOPPED'},'cancelled']])
+  assert.equal(api.toolOutcome('film_project',{action:'approve',stage:'script'},result).status,status);
+ assert.equal(api.toolOutcome('video_script',{}, {script:'private',truncated:true}).status,'pending');
+ assert.equal(api.toolOutcome('video_generate',{resume:'private'}, {status:'succeeded',paused:true}).status,'paused');
+ assert.equal(api.toolOutcome('video_generate',{},null,{code:'ABORTED',message:'private'}).status,'cancelled');
+});
+test('只对存在的完整本地成片记就绪，真实宿主展示后才记交付',async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'成片统计 '));const target=path.join(root,'final.mp4');
+ const events=[];const exec={name:'video_generate',metaonticAnalytics:{record:(...args)=>events.push(args)}};
+ const session={header:{cwd:root}};const guard=api.createDeliveryOrderGuard();
+ const value={status:'succeeded',videoPath:target,segmentsDir:root,merged:true,segments:[{status:'succeeded',localPath:target,durationSeconds:12}]};
+ try{
+  await guard.remember(session,value,exec);assert.equal(events.length,0,'不存在的路径不计入');
+  await writeFile(target,'video-fixture');
+  await guard.remember(session,{...value,paused:true},exec);assert.equal(events.length,0,'暂停预览不计入');
+  await guard.remember(session,value,exec);assert.equal(events[0][0],'video_ready');assert.equal(events[0][1].videoDurationSec,12);
+  guard.observe(session,{type:'deliverables/presented',data:{files:[{path:path.join(root,'other.mp4')}]}});assert.equal(events.length,1);
+  guard.observe(session,{type:'deliverables/presented',data:{files:[{path:target}]}});assert.equal(events[1][0],'video_delivered');
+  guard.observe(session,{type:'deliverables/presented',data:{files:[{path:target}]}});assert.equal(events[1][2],events[2][2],'重复展示使用相同幂等键');
+ }finally{await rm(root,{recursive:true,force:true});}
 });

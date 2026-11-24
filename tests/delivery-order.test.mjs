@@ -9,7 +9,7 @@ const stat=async target=>{
  if(!sizes.has(target)){const error=new Error(`ENOENT ${target}`);error.code='ENOENT';throw error;}
  return {isFile:()=>true,size:sizes.get(target)};
 };
-const ctx=vm.createContext({path,process,stat,appendRequestLog:async()=>{}});
+const ctx=vm.createContext({path,process,stat,reportOutcome:()=>{},appendRequestLog:async()=>{}});
 vm.runInContext(sourceOf('businesses/video-generation/workflow/result-state','businesses/video-generation/workflow/delivery-order')+'\nObject.assign(globalThis,{createDeliveryOrderGuard});',ctx);
 
 const merged='/w/merged-30s.mp4';
@@ -151,7 +151,7 @@ test('单段暂停时成片就是这一段本身，只有一条记录不涉及�
  assert.equal(await guard.gate({name:'present',agent:{session:other},arguments:{files:[{path:merged},{path:segments[0]}]}}),null);
 });
 
-const wiring=vm.createContext({path,process,stat,appendRequestLog:async()=>{}});
+const wiring=vm.createContext({path,process,stat,reportOutcome:()=>{},appendRequestLog:async()=>{}});
 vm.runInContext(sourceOf('businesses/video-generation/workflow/result-state','businesses/video-generation/workflow/delivery-order','businesses/video-generation/workflow/execution').replaceAll('import.meta.url',"'file:///tmp/metaontic-video.js'")
  +'\nObject.assign(globalThis,{createDeliveryOrderGuard,withVideoExecution});',wiring);
 

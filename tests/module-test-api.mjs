@@ -17,6 +17,8 @@ export * from './src/businesses/film-production/profiles/index.ts';
 export {projectTool} from './src/businesses/video-generation/tools/video-project.ts';
 export {createProject,writeProject,readProject} from './src/businesses/video-generation/workflow/project.ts';
 export * from './src/platform/telemetry/reporter.ts';
+export * from './src/platform/telemetry/outcomes.ts';
+export {createDeliveryOrderGuard} from './src/businesses/video-generation/workflow/delivery-order.ts';
 export {classifyError} from './src/businesses/video-generation/utils/errors.ts';
 export * from './src/businesses/video-generation/client/tool-result.ts';
 export * from './src/businesses/video-generation/client/settings-actions.ts';

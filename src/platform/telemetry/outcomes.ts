@@ -21,8 +21,7 @@ export function toolOutcome(tool: string, args: any, result?: any, error?: any) 
     if (!['creative', 'script', 'assets', 'shots', 'prompts', 'review'].includes(stage)) return null;
   } else if (tool === 'video_script') { stage = 'script'; action = 'create'; }
   else if (tool === 'video_project' && ['review', 'review_segment'].includes(args?.action)) { stage = 'review'; action = 'approve'; }
-  else if (['video_generate', 'video_extend'].includes(tool) && args?.resume) { stage = 'resume'; action = 'resume'; }
-  else if (tool === 'video_status') { stage = 'retrieve'; action = 'retrieve'; }
+  else if (['video_generate', 'video_extend'].includes(tool)) { stage = args?.resume ? 'resume' : 'generation'; action = args?.resume ? 'resume' : 'generate'; }
   else return null;
   let status = 'unknown';
   if (error) status = error?.code === 'ABORTED' ? 'cancelled' : 'failed';
@@ -36,6 +35,6 @@ export function toolOutcome(tool: string, args: any, result?: any, error?: any) 
     else if (['succeeded', 'failed', 'cancelled', 'unknown', 'timeout', 'approved', 'pending', 'draft', 'blocked', 'review_required'].includes(result.status)) status = result.status;
     else if (tool === 'film_project' && action === 'submit') status = result.artifacts?.[stage] || result.artifact_summary?.[stage] ? 'succeeded' : 'unknown';
   }
-  return { stage, action, status, errorCategory: error ? outcomeError(error) : undefined,
-    flowKey: args?.projectId || result?.project_id || result?.projectId || args?.resume || undefined };
+  return { stage, action, status, errorCategory: error ? outcomeError(error) : result?.errorCode ? outcomeError({ code: result.errorCode }) : undefined,
+    flowKey: result?.segmentsDir || result?.resumeDir || args?.projectId || result?.project_id || result?.projectId || args?.resume || undefined };
 }
