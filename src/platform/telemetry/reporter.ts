@@ -65,6 +65,17 @@ export async function analyticsIdentity() {
   })().catch(() => { state.identities.delete(dir); return null; }));
   return state.identities.get(dir);
 }
+/** 先独占落盘再排队：结果未知也不重报，跨进程/更新/普通重装复用标记。 */
+export async function claimDeviceRegistration(id: string) {
+  if (!/^[a-f0-9-]{36}$/i.test(id)) return false;
+  const { dir } = identityFiles();
+  try {
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    const key = createHash('sha256').update(id).digest('hex');
+    await writeFile(path.join(dir, `registered-${key}.json`), JSON.stringify({ registered: true }), { flag: 'wx', mode: 0o600 });
+    return true;
+  } catch { return false; } // 无法确认是否登记过时宁可少报，不解锁重试。
+}
 /** 上报数据只允许固定枚举和有界数值，禁止透传执行参数/异常/提示词。 */
 export function analyticsFields(input: any = {}) {
   const value: any = {};
@@ -121,6 +132,7 @@ export function createAnalyticsReporter(config, options: any = {}) {
   const enabled = options.enabled || (() => process.env.METAONTIC_VIDEO_ANALYTICS_DISABLED !== '1' && ref(config, 'usageStatsEnabled', true) !== false);
   const request = options.request || ((...args) => (globalThis.fetch as any)(...args));
   const identity = options.identity || analyticsIdentity;
+  const claimRegistration = options.claimRegistration || claimDeviceRegistration;
   const device = options.device || (() => ({
     arch: ['arm64', 'x64', 'ia32', 'arm'].includes(os.arch()) ? os.arch() : 'other',
     osRelease: deviceText(os.release(), true),
@@ -162,7 +174,7 @@ export function createAnalyticsReporter(config, options: any = {}) {
       if (!response?.ok) throw new Error('analytics rejected');
     } catch {
       if (allowed()) {
-        const retry = batch.map(event => ({ ...event, attempts: event.attempts + 1 })).filter(event => event.attempts < 3);
+        const retry = batch.filter(event => !['plugin_started', 'plugin_installed'].includes(event.name)).map(event => ({ ...event, attempts: event.attempts + 1 })).filter(event => event.attempts < 3);
         queue = [...retry, ...queue].slice(-maxQueue);
       }
     } finally {
@@ -186,6 +198,15 @@ export function createAnalyticsReporter(config, options: any = {}) {
       const event = { eventId: randomUUID(), name, occurredAt, version,
         platform: ['darwin', 'win32', 'linux'].includes(process.platform) ? process.platform : 'other',
         ...fields, attempts: 0 };
+      if (['plugin_started', 'plugin_installed'].includes(name)) {
+        void Promise.resolve().then(() => identity()).then(async id => {
+          if (!id || !allowed() || !await claimRegistration(id) || !allowed()) return;
+          // 两种登记入口共用同一事件ID，避免客户端旧状态或重复接收导致重复计数。
+          event.eventId = createHash('sha256').update(`${id}:device_registration`).digest('hex');
+          queue.push(event); queue = queue.slice(-maxQueue); schedule();
+        }).catch(() => {});
+        return;
+      }
       // taskId只在本地参与散列，服务端不接收原任务ID。
       if (dedupeKey) {
         void Promise.resolve().then(() => identity()).then(id => {

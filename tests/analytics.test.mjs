@@ -7,7 +7,8 @@ import path from 'node:path';
 import {api} from './module-test-api.mjs';
 const id='42acda42-69d1-49d9-b60a-955ba8da12b4';
 function fixture(request=async()=>({ok:true}),extra={}){
- return api.createAnalyticsReporter({}, {enabled:()=>true,identity:async()=>id,delayMs:100000,timeoutMs:15,request,started:new Set(),device:()=>({arch:'arm64',osRelease:'25.1.0',memoryGb:16,harnessVersion:'0.2.0'}),...extra});
+ const registered = new Set();
+ return api.createAnalyticsReporter({}, {claimRegistration:async id => {if(registered.has(id))return false;registered.add(id);return true;},enabled:()=>true,identity:async()=>id,delayMs:100000,timeoutMs:15,request,started:new Set(),device:()=>({arch:'arm64',osRelease:'25.1.0',memoryGb:16,harnessVersion:'0.2.0'}),...extra});
 }
 const UUID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 /** 匿名身份的两个落盘位置：主文件 + 冗余锚点。测试全部走真实实现，不注入 identity。 */
@@ -182,4 +183,32 @@ test('test builds and unversioned dev builds never report anything',async()=>{
  let calls=0;const r=fixture(async()=>{calls++;return{ok:true};},{releaseBuild:()=>false});
  try{r.start();r.record('plugin_started');r.record('tool_finished',{tool:'video_generate',status:'succeeded'});await r.flush();
  assert.equal(calls,0);assert.equal(r.pending(),0);}finally{r.dispose();}
+});
+test('设备登记在落盘后只放行一次，并发与重新创建上报器都不能重复发送',async()=>{
+ await withHome(async()=>{
+  const results=await Promise.all(Array.from({length:12},()=>api.claimDeviceRegistration(id)));
+  assert.equal(results.filter(Boolean).length,1);
+  assert.equal(await api.claimDeviceRegistration(id),false);
+ });
+ await withHome(async()=>{
+  let calls=0;
+  const make=()=>fixture(async()=>{calls++;return{ok:true};},{claimRegistration:api.claimDeviceRegistration});
+  let r=make();
+  r.record('plugin_started');r.record('plugin_installed',{version:'4.2.4'});
+  await new Promise(resolve=>setTimeout(resolve,50));await r.flush();r.dispose();
+  assert.equal(calls,1);
+  r=make();r.start();r.record('plugin_installed',{version:'4.2.5'});
+  await new Promise(resolve=>setTimeout(resolve,50));await r.flush();r.dispose();
+  assert.equal(calls,1,'重启、更新或普通重装保留标记，不能重复登记');
+ });
+});
+test('设备登记网络结果不明不重试，工具事件仍可按原策略重试',async()=>{
+ let calls=0;
+ const r=fixture(async()=>{calls++;throw Error('response lost');});
+ try{
+  r.record('plugin_started');await tick();await r.flush();
+  assert.equal(calls,1);assert.equal(r.pending(),0);
+  r.record('plugin_installed');await tick();await r.flush();assert.equal(calls,1);
+  r.record('tool_started',{tool:'video_generate'});await r.flush();assert.equal(r.pending(),1);
+ }finally{r.dispose();}
 });

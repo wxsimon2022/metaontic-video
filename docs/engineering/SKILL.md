@@ -236,3 +236,5 @@ Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.c
 专业剧本批准前展示：submit/read/next返回待script批准时，full与compact均携带approval_material（绑定已保存剧本修订号和完整Markdown）。助手先独立正文完整展示，再单独film_project approve；不再要求仅在审批卡片展示全文。未展示不能沿用批准，应补展示后重新审核。不重建项目、不重做已批准创意。
 
 审批展示补齐：创意也返回完整approval_material；next及read(stage)不能丢失同版材料。问题服务缺失/未答返回材料并保持未批准。专业展示目前为流程契约，非正文事件强制守卫，不把工具返回当用户已看见；见approval-presentation-audit.md。
+
+设备数优先：plugin_started/plugin_installed共用持久化独占登记标记和确定性eventId，每匿名设备只尝试登记一次。标记先落盘，结果不明不重试，失败不清标记；工具与任务统计仍按原逻辑。普通重装保留状态不重报，清空全部身份状态不能保证物理设备去重。不更新版本或发版除非用户明确要求。
