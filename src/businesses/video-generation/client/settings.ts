@@ -12,7 +12,7 @@ export function createSettingsPage(deps: any) {
     persistBatch, PLUGIN_VERSION, useVersionPolicy = () => ({ required: false, minimum: '' }),
     UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, SELECTS, inputStyle, optionLabel,
     FIELD_BY_KEY, SECTIONS, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS,
-    isNewerVersion, updateBell, PAGE_CSS,
+    isNewerVersion, updateBell, PAGE_CSS, NotificationBanner,
   } = deps;
 function makePage({ form, t, manager }) {
       return function ConfigPage(props) {
@@ -444,6 +444,7 @@ function makePage({ form, t, manager }) {
             onUpdate: () => { if (updateConfirm) runOnlineUpdate().catch(() => {}); else setUpdateConfirm(true); },
             onLater: deferUpdate,
           }) : null,
+          NotificationBanner ? h(NotificationBanner, { key: 'activity-notice' }) : null,
           notice ? h('p', { key: 'notice', className: 'mov-notice' }, notice) : null,
           ...(notice && !snapshot.value ? [] : settingsRows()),
           ...blobs,

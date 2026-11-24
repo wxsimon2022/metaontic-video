@@ -1,3 +1,4 @@
+import { createNotificationBanner } from '../../ui/components/notifications.js';
 import { followConfiguredEntries } from '../../ui/components/configured-entries.js';
 import { createSupportAction } from '../../ui/components/support-action.js';
 import { registerAuthNotice } from '../../ui/components/auth-notice.js';
@@ -32,8 +33,9 @@ export function createVideoClient(require) {
     // 设置页的依赖统一走一个对象：宿主 React（React/h/useSnapshot）、主题与字段
     // （TOKENS/inputStyle/SELECTS/optionLabel/FIELD_BY_KEY/SECTIONS/formatMoney/PAGE_CSS）、
     // 设置状态（same/validateSettings/persistConnection/persistBatch/PLUGIN_OWNED_KEYS）、
+    const NotificationBanner = createNotificationBanner({ React, h, TOKENS });
     const useVersionPolicy = createPolicyHook(React, PLUGIN_VERSION);
-    const { makePage } = createSettingsPage({ useVersionPolicy, useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS, persistBatch, PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, SELECTS, inputStyle, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell, PAGE_CSS });
+    const { makePage } = createSettingsPage({ NotificationBanner, useVersionPolicy, useSnapshot, React, h, TOKENS, same, validateSettings, persistConnection, PLUGIN_OWNED_KEYS, persistBatch, PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, SELECTS, inputStyle, optionLabel, FIELD_BY_KEY, SECTIONS, formatMoney, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell, PAGE_CSS });
     return {
       inject: ['slots', 'locale', 'configForms', 'uiSession'],
       apply(ctx, { settings }) {
@@ -122,6 +124,7 @@ export function createVideoClient(require) {
             form,
             manager: pluginManager,
             // 面板顶部的更新入口：与设置页同一套两步确认，点左侧栏的「有更新」进来就能更新。
+            noticeBanner: () => h(NotificationBanner, { key: 'activity-notice' }),
             updateBanner: () => h(UpdateHintBanner, { key: 'update-hint' }),
           }),
         }, VideoPanel)),

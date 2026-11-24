@@ -17,6 +17,7 @@ export const PANEL_ID = PLUGIN_ID;
 
 /** 线上地址：使用说明、匿名统计、客服、更新日志。 */
 export const GUIDE_URL = 'https://ai.mybfs.cn';
+export const NOTIFICATIONS_URL = 'https://video.mybfs.cn/api/v1/notifications';
 export const ANALYTICS_URL = 'https://video.mybfs.cn/api/v1/analytics/events';
 export const SUPPORT_URL = 'https://work.weixin.qq.com/kfid/kfcd6fc4ca793eeac18';
 

@@ -180,6 +180,7 @@ export function createSidebarPanel({ React, h, TOKENS, PAGE_CSS, t, PANEL_ID, GU
         h('style', { key: 'styles' }, PAGE_CSS + PANEL_CSS),
         // 有更新时面板最上面插一条提示：入口由 client.ts 用真实 React 渲染，面板本身不持有更新状态。
         props?.updateBanner?.() || null,
+        props?.noticeBanner?.() || null,
         h('header', { key: 'hero', className: 'mov-panel-hero' }, [
           h('span', { key: 'mark', className: 'mov-panel-mark' },
             LOGO_SRC
