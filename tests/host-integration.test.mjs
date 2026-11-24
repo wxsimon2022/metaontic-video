@@ -274,14 +274,14 @@ test('script writing starts from a director pass instead of a checklist', async 
   host.dispose();
 });
 
-test('hidden canvas ignores legacy enabled flags without changing the saved config or ordinary project flow',async()=>{
+test('removed canvas ignores legacy config and ordinary projects work without it',async()=>{
  const previous=process.env.DSH_HOME;const home=await mkdtemp(path.join(os.tmpdir(),'hidden-canvas-'));process.env.DSH_HOME=home;
  const config={canvasEnabled:true,autoCreateCanvas:true,connectionMode:'metaontic'};
  const host=harness(config,home);
  try {
   assert.equal(host.tools.has('video_canvas'),false);
   const view=await host.tools.get('video_config').execute({action:'get'});
-  assert.equal(view.stored.canvasEnabled,true);assert.equal(view.effective.canvasEnabled,false);assert.equal(view.effective.autoCreateCanvas,false);
+  assert.equal(view.stored.canvasEnabled,undefined);assert.equal(view.effective.canvasEnabled,undefined);assert.equal(view.effective.autoCreateCanvas,undefined);
   const result=await host.tools.get('video_project').execute({action:'prepare',subjectType:'scenery',duration:15},{agent:{session:{id:'hidden-canvas',header:{cwd:home}}}});
   assert.equal(result.status,'prepared');assert.equal(result.canvasProject,undefined);
   assert.equal(host.tools.get('video_generate').parameters.properties.canvas,undefined);

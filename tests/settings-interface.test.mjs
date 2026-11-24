@@ -6,10 +6,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createPreviewHost } from '../preview/host.mjs';
 
-/**
- * 设置页两个画布开关的显示联动：总开关「流程画布」关着时不该出现「自动创建画布」，
- * 打开后立刻出现，再关掉又隐藏。用真实客户端组件做服务端渲染，不连宿主、不写配置。
- */
+/** 实际设置页SSR：遗留配置不能恢复已移除的入口。 */
 async function bootSettings(initial) {
   globalThis.window = {
     navigator: { userAgent: 'node' },
@@ -41,8 +38,8 @@ async function bootSettings(initial) {
 }
 
 /** 只看开关本身：用各自提示语结尾判断，避免命中更新说明里的同名字样。 */
-const hasAutoCreateSwitch = (html) => html.includes('流程画布打开后有效');
-const hasCanvasSwitch = (html) => html.includes('关闭时左侧栏不出现');
+const hasAutoCreateSwitch = (html) => html.includes('id="metaontic-video-autoCreateCanvas"');
+const hasCanvasSwitch = (html) => html.includes('id="metaontic-video-canvasEnabled"');
 
 test('设置页隐藏全部画布开关，旧的开启配置也不重新显示', async () => {
   const { render, form } = await bootSettings({ canvasEnabled: false });

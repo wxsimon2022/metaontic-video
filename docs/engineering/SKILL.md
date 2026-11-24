@@ -109,8 +109,8 @@ MetaOntic AI 使用手填 API密钥。界面保存及video_config写入须原子
 
 估价按真实输入区分档位：首段生成无视频输入（参考图/首尾帧仍为无视频输入），每个续拍段有视频输入，用上一段完整视频时长加本段输出时长计token，切换到含视频输入单价；不把累计成片时长当上一段输入。脚本费用预估逐段列档位、输入/输出时长、单价与金额再合计；制作确认和恢复预检同口径，外部视频时长不明就明确无法可靠估价，不按纯生成费用兜底，不调用付费任务试算。
 
-生成脚本提速（2026-11-15，实测见 docs/engineering/infinite-canvas-integration.md 的 3.24.0-canvas.14 一节）：慢的不是插件而是模型生成，真实一轮 139 秒里插件工具调用不到 1 秒，可省的两段是「助手手写 15.6KB 的 draw_storyboard.py 画分镜」（31.0 秒）与「正文把整份脚本再复述一遍」（10.7 秒）。改法：分镜示意图一律由插件本地渲染（video_project action:storyboard，落 storyboard-vN.svg，不调用付费出图模型、不写绘图代码）；脚本只在用户可见正文写一次，captureScript:true 让插件落 script.md 并记 script_saved；提示词要求同一轮把可并行的只读调用一起发（video_project 仍是 isConcurrencySafe:false，省的是模型往返不是并发）。画布内「AI 写脚本」走 providers/text.ts：默认流式 + max_tokens（按段数）+ 增量 30 秒无输出即报错，finish_reason=length 回报 truncated；客户端 RPC 超时必须是分钟级（TEXT_WRITE_TIMEOUT_MS=180000，默认 20 秒会把 40–70 秒的写脚本直接掐掉），并显示已等待秒数、记 text_model_progress/text_model_done/text_model_failed。排查「写脚本慢」先看 requests.jsonl 的 script_design/storyboard_design/script_present 与 text_model_* 记录，不要猜。
-脚本按导演口径写（2026-11-16）：两条链路口径是分开的——画布「写脚本」走 providers/text.ts 的 scriptPrompt()，它不读技能文件也不读动态提示词，所以导演前置（观众与记忆点、情绪曲线、视觉母题、一条主线）、表演与情绪、声音设计、开场与结尾、禁止项都写在这一份里；对话路径由 skills/video-director/references/scriptwriting.md 的「导演工作法」承担，SKILL.md 写脚本一步与动态提示词都指向它，且要求这套推演只在内部用、不展示给用户。硬约束没有放松：分镜表表头、正好 N 行、镜别与视角的标准词表由 scriptStoryboardShots → splitScriptPrompts 解析，改这些必须同步 tests/text-model.test.mjs（锁 scriptPrompt 原文）与 tests/host-integration.test.mjs（锁技能与动态提示词原文）。因为一行就是一次生成，段内切镜只能写进画面列的「先…随后…最后…」，不要为凑变化加行。
+生成脚本提速（2026-11-15，实测见 docs/engineering/infinite-canvas-integration.md 的 3.24.0-canvas.14 一节）：慢的不是插件而是模型生成，真实一轮 139 秒里插件工具调用不到 1 秒，可省的两段是「助手手写 15.6KB 的 draw_storyboard.py 画分镜」（31.0 秒）与「正文把整份脚本再复述一遍」（10.7 秒）。改法：分镜示意图一律由插件本地渲染（video_project action:storyboard，落 storyboard-vN.svg，不调用付费出图模型、不写绘图代码）；脚本只在用户可见正文写一次，captureScript:true 让插件落 script.md 并记 script_saved；提示词要求同一轮把可并行的只读调用一起发（video_project 仍是 isConcurrencySafe:false，省的是模型往返不是并发）。普通脚本生成走 providers/text.ts：默认流式 + max_tokens（按段数）+ 增量 30 秒无输出即报错，finish_reason=length 回报 truncated；客户端 RPC 超时必须是分钟级（TEXT_WRITE_TIMEOUT_MS=180000，默认 20 秒会把 40–70 秒的写脚本直接掐掉），并显示已等待秒数、记 text_model_progress/text_model_done/text_model_failed。排查「写脚本慢」先看 requests.jsonl 的 script_design/storyboard_design/script_present 与 text_model_* 记录，不要猜。
+脚本按导演口径写（2026-11-16）：两条链路口径是分开的——普通脚本生成走 providers/text.ts 的 scriptPrompt()，它不读技能文件也不读动态提示词，所以导演前置（观众与记忆点、情绪曲线、视觉母题、一条主线）、表演与情绪、声音设计、开场与结尾、禁止项都写在这一份里；对话路径由 skills/video-director/references/scriptwriting.md 的「导演工作法」承担，SKILL.md 写脚本一步与动态提示词都指向它，且要求这套推演只在内部用、不展示给用户。硬约束没有放松：分镜表表头、正好 N 行、镜别与视角的标准词表由 scriptStoryboardShots → splitScriptPrompts 解析，改这些必须同步 tests/text-model.test.mjs（锁 scriptPrompt 原文）与 tests/host-integration.test.mjs（锁技能与动态提示词原文）。因为一行就是一次生成，段内切镜只能写进画面列的「先…随后…最后…」，不要为凑变化加行。
 
 脚本审核展示防漏：监听session/event，必须有assistant/message正文text内嵌本版分镜图（绝对路径解析后文件仍存在），才放行脚本审核ask_user_question。present 不再参与分镜展示——交付卡片只登记最终成片，present 登记的分镜图对用户不产生可见展示，只被留作提示；reasoning、工具看图、文字描述都不算。改稿是否发新版按同目录 mtime 判断：目录里存在比内嵌那张更新的分镜图（文件名含 storyboard/分镜/示意）就 deny stale_storyboard_version，避免改稿后仍发旧图。交付卡片在轮次结束后才可见，故先发独立图片正文再提问。只观测事件，不新增已弃用的session同步日志读取。反向漏问（2026-11-04 实例）：正文单独成一条消息且不带任何工具调用时，助手在正文后直接stop结束回合，审核窗不弹。对照同模型成功轮次，正文消息都同时带着video_stage调用（收口script_present/开始script_review_wait）；失败那轮把start script_present提到present之前、提前用掉了这条锚点。因此提示词要求正文消息内必须带收口调用，禁止在present前提前start/finish；守卫在turn/end（或下一轮首个事件）见到已present未提问就记storyboard_review_missing，便于判断修复是否生效。正文脚本比对按覆盖率而不是逐字相等（2026-11-15 实例）：`video_project(action:review)` 传的 requiredScriptText 之前要求正文逐字包含，助手把脚本整理成带标题、「· 第 1 版」的展示版就在第一个差异点被拦，插件返回 blocked、审核窗一直不弹，用户看到的是助手空转。按真实会话还原该轮：script.md 3,880 字、展示版逐字比对失败，但相邻两字覆盖率 0.850，各段 0.71–1.00，即内容没漏、只是改写排版。现改为 `scriptCoverage(script, visible)`（`readableText` 去掉 Markdown 标记与空白并保留链接文字，比相邻两字集合）配 `SCRIPT_COVERAGE_MIN = 0.7`：整理排版 0.960、去掉 Markdown 标记 1.000、加标题补解说 1.000 全放行；只贴分镜表 0.272、只贴开头 120 字 0.232、摘要 0.015、只给链接与打招呼 0 仍拦下。拦下时 deny 理由带实际百分比并写明「排版差异不算问题、不要改写措辞删段或只给链接」，同时记 storyboard_review_blocked（reason script_text_mismatch，带 coverage），便于回溯。
 
@@ -183,7 +183,7 @@ Windows解压目录安装在更新时出现空目录/locale缺失：先核对成
 
 Agent组件图标使用<完整预设模块>/icon导出，SVG在presets/icons；需核对宿主readPluginMeta返回图标、成品入包和24/40px明暗背景显示，不修改插件总Logo。
 
-鉴权提示分层：聊天“本轮运行失败/API密钥无效”来自宿主AUTH turn-error，与视频接口工具错误不同。客户端通过conversation.chat.node官方keyed扩展包装原renderer，仅AUTH使用友好提示并引导Harness模型设置，其余code里再认一类「工具参数不是合法 JSON」：模型把 480p、16:9 这类值裸写、不带引号时，宿主只在解析参数阶段抛 Json 报错，用户只看到「本轮运行失败」；这类换成「没真正调用工具、也没产生费用，回一句按原参数重试」的说法并保留原始报错，其他消息原样委托原组件。参数说明与动态提示词都要写明枚举值要带引号，试算/画布侧还要把 480、480P 这类写法归一成 480p，双保险；不得覆盖宿主词典或写宿主安装文件。视频HTTP401/403在classifyError中保留provider_auth与状态码，提示插件设置及客服，不直断密钥无效、不回显原始鉴权报错，不改轮询重试与防重。
+鉴权提示分层：聊天“本轮运行失败/API密钥无效”来自宿主AUTH turn-error，与视频接口工具错误不同。客户端通过conversation.chat.node官方keyed扩展包装原renderer，仅AUTH使用友好提示并引导Harness模型设置，其余code里再认一类「工具参数不是合法 JSON」：模型把 480p、16:9 这类值裸写、不带引号时，宿主只在解析参数阶段抛 Json 报错，用户只看到「本轮运行失败」；这类换成「没真正调用工具、也没产生费用，回一句按原参数重试」的说法并保留原始报错，其他消息原样委托原组件。参数说明与动态提示词都要写明枚举值要带引号，试算侧还要把 480、480P 这类写法归一成 480p，双保险；不得覆盖宿主词典或写宿主安装文件。视频HTTP401/403在classifyError中保留provider_auth与状态码，提示插件设置及客服，不直断密钥无效、不回显原始鉴权报错，不改轮询重试与防重。
 
 说明书源码仓库政策：用户要求MD/PDF及其docs/guide配图仅留本地。git rm --cached保留本地，.gitignore阻止误提交；README统一链接https://ai.mybfs.cn，不重写历史。成品包是否附带属于独立范围，未明确要求时不擅自移除包内说明书。
 
@@ -194,7 +194,7 @@ Agent组件图标使用<完整预设模块>/icon导出，SVG在presets/icons；�
 
 边界补充：独立镜头shotFrames按完整shotDurations保存和恢复，全局首尾帧仅首镜/末镜，首帧不提升为共享人物参考。hasProjectImages与角色选择共用素材判断。video_project status和审核答复后均核对filmSource版本/摘要/模型。视觉visual_style/style_profile仅失效资产与下游，tone默认叙事变化，显式change_scope=visual_only才保留故事批准且不能混改内容字段。合并混合音轨须补静音、统一时间戳及长度，音频编码失败不能退无声。写锁/恢复锁元数据完整后硬链接独占发布；恢复者中断时递归清理同机死亡token，未知/空/异机/活跃锁不得自动删除。跨平台硬链接不支持时明确失败，不降级为不安全抢锁。
 
-流程画布暂隐藏：FLOW_CANVAS_AVAILABLE统一控制左侧栏、main页面、设置画布节、video_canvas注册及动态引导；旧canvasEnabled/autoCreateCanvas不触发自动建图或标题同步，保留原配置与历史数据。内部存储、媒体和原任务恢复实现保留，普通对话的专业创作/审批/估价/生成/结果审核/合并不依赖画布；恢复入口开放前需重新验收。
+流程画布已完整移除：不恢复任何入口、开关、工具、原生接口、历史读取或自动同步代码。既有本地文件保留，不删除用户资料；普通视频任务按原taskId/resume继续查询和交付。参考图画幅适配不是流程画布。见canvas-hidden.md。
 
 README 不展示各版本更新条目；发布脚本只同步其在线安装链接，更新内容写入 CHANGELOG、包内 releaseNotes 与 Release。包名为 dsh-metaontic-video，配置命名空间与历史数据目录仍为 metaontic-video；发布附件文件名保持 metaontic-video-X.Y.Z.tgz。市场索引只收录清单包名匹配的标签，不能将旧包名版本伪装成新包名版本。
 
@@ -225,10 +225,14 @@ Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.c
 
 专业创作断点：先查真实session与project.json，区分user abort和接口失败。创意/剧本只由film_project approve弹窗，不能先通用问卷再审批；同版本已批准的重复approve直接返回下一任务，不重复弹窗，旧expectedRevision仍拒绝。read/approve返回continuation提示继续尚未保存的剧本，不能将规划文字当剧本已交付。
 
-冗余治理：tsconfig启用noUnusedLocals/noUnusedParameters；保留公共函数参数位置，明确未使用参数以_前缀标记。八角色统一从src/agents/<role>/index.ts加载，不增加roles重复包装。build.mjs从真实FLOW_CANVAS_AVAILABLE读构建常量并做语法折叠，隐藏画布界面与自动同步不进入成品，历史画布存储与native恢复接口仍保留。宣传页检查归sync-promo-address独立工具，release不导入。
+冗余治理：tsconfig启用noUnusedLocals/noUnusedParameters；保留公共函数参数位置，明确未使用参数以_前缀标记。八角色统一从src/agents/<role>/index.ts加载，不增加roles重复包装。流程画布代码已移除，构建不再使用相关功能开关。宣传页检查归sync-promo-address独立工具，release不导入。
 
 中国镜像包介绍：成品不含README.md时，npm会回退读取README.en.md，导致中文镜像显示英文。build将中文README写入package.json标准readme元数据，所有图片必须HTTPS绝对地址，文档相对链接转换仓库绝对链接；不得依赖npmmirror unpkg单文件权限。宿主meta.detail继续指向空plugin-detail.md，避免把仓库README重新塞进插件设置页。公开npm同版本成品不可覆盖，修改随下次明确发版生效。
 
 创作质量维护：新专业项目canonical_v1从场次/节拍/对白渲染正文；chapter_v1长片使用chapter_plan/chapter_submit保存连续性，不能把部分章当完成。isolated_v1终审通过independent_review真实文本请求，文本按渠道实际用量计费且不另弹费用审批，隔离聊天与自评，运行时摘要绑定报告；手工submit不能绕过。大型稿件分章完整审阅，成功报告按输入/模型/地址/提示词断点复用；失败或未知调用不擅自重放。六维艺术结论必须有场次证据，离线自动项不能冒充艺术通过。渠道能力按地址摘要隔离，成功样本不推断上限。新用例film-architecture.test.mjs，具体边界见creation-quality-architecture.md。
 
 最低支持版本维护：config/update-policy.json 通过双仓 contents API 下发；先发布可安装正式版，再提高 minimum_version 并递增 revision。普通更新可跳过，强制提示不接受稍后缓存；工具装配层统一阻断新创作与付费提交，不阻断已有任务查询、图片取件、结果核对/回写和导出。resume 会新增付费调用，不能豁免。断网保留已验证策略，首次离线无缓存不封禁；撤销门槛须用更大 revision。旧版无此协议不能追溯控制，本地修改不等于策略已经公开。详见 mandatory-updates.md。
+
+专业剧本批准前展示：submit/read/next返回待script批准时，full与compact均携带approval_material（绑定已保存剧本修订号和完整Markdown）。助手先独立正文完整展示，再单独film_project approve；不再要求仅在审批卡片展示全文。未展示不能沿用批准，应补展示后重新审核。不重建项目、不重做已批准创意。
+
+审批展示补齐：创意也返回完整approval_material；next及read(stage)不能丢失同版材料。问题服务缺失/未答返回材料并保持未批准。专业展示目前为流程契约，非正文事件强制守卫，不把工具返回当用户已看见；见approval-presentation-audit.md。

@@ -27,3 +27,12 @@ export function approvalPreview(stage:string,artifact:any):string {
  }
  return `${title}（修订 ${artifact.revision}）\n\n${content}\n\n是否批准本版进入下一阶段？`;
 }
+
+/** 正文材料独立于审批卡片：创意不能复用只提示回看的短卡。 */
+export function approvalMaterial(stage:string, artifact:any) {
+ if (!['creative','script'].includes(stage) || !artifact || artifact.stale) return {};
+ const markdown = stage === 'creative'
+  ? `创意方案（修订 ${artifact.revision}）\n\n${readable(artifact.data || {})}`
+  : approvalPreview(stage, artifact);
+ return {approval_material:{stage,revision:artifact.revision,markdown}};
+}

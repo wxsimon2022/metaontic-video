@@ -8,7 +8,7 @@ import { channelCapabilities } from '../video-generation/providers/capabilities.
 import { withFilmDiagnostics } from './validation/budget.validator.js';
 import { productionDigest } from './production.binding.js';
 import { hasContentProfile } from './profiles/profile.resolver.js';
-import { approvalPreview } from './approvals/approval.presenter.js';
+import { approvalPreview, approvalMaterial } from './approvals/approval.presenter.js';
 import { checkSubmission } from './contracts/submission.js';
 import { projectResponse } from './production.responses.js';
 import { resolveModel } from '../video-generation/providers/connection.js';
@@ -91,7 +91,7 @@ export const filmDirectorBusiness: BusinessModule = {
           if (args.action === 'read') {
             if(args.stage) {
               if(!STAGES.includes(args.stage))throw Error('INVALID_STAGE');
-              return {project_id:id,revision:state.revision,status:state.status,stage:args.stage,artifact:state.artifacts[args.stage]||null,approvals:state.approvals};
+              return {project_id:id,revision:state.revision,status:state.status,stage:args.stage,artifact:state.artifacts[args.stage]||null,...approvalMaterial(args.stage,state.artifacts[args.stage]),approvals:state.approvals};
             }
             return projectResponse(state,taskFor(),args.responseMode,{work_profile:profileContext(state)});
           }
@@ -99,7 +99,11 @@ export const filmDirectorBusiness: BusinessModule = {
             if(!STAGES.includes(args.stage))throw Error('INVALID_STAGE');
             return checkSubmission(state,args.stage,args.content);
           }
-          if (args.action === 'next') return taskFor();
+          if (args.action === 'next') {
+            const task=taskFor();
+            const response=projectResponse(state,task,'compact');
+            return {...task,...(response.approval_material?{approval_material:response.approval_material,continuation:response.continuation}: {})};
+          }
           if (args.action === 'route') return {...routeIntent(state,args.intent,args.entityIds),model_profile:currentCapabilities(),execution_plan:executionContext()};
           if (['revise','schedule','task_result','verify_issue','configure_profile','chapter_plan','chapter_submit','independent_review'].includes(args.action) && state.revision!==args.expectedRevision) throw Error('REVISION_CONFLICT');
           if(args.action==='chapter_plan')state=defineChapters(state,JSON.parse(args.content),args.expectedRevision);
@@ -157,10 +161,10 @@ export const filmDirectorBusiness: BusinessModule = {
             if(state.approvals?.[args.stage]===artifact.revision)return projectResponse(state,taskFor(),args.responseMode||'compact');
             if(args.stage==='creative'&&state.project_spec&&Object.hasOwn(state.project_spec,'work_type')&&!hasContentProfile(state.project_spec))throw Error('WORK_TYPE_REQUIRED_BEFORE_APPROVAL');
             const service=runtime.ctx.get?.('userQuestions') || (exec.agent as any)?.ctx?.get?.('userQuestions');
-            if (!service?.ask) return {status:'needs_input',reason:'人工确认服务不可用'};
+            if (!service?.ask) return {status:'needs_input',projectId:id,...approvalMaterial(args.stage,artifact),reason:'人工确认服务不可用；先展示本版完整材料，恢复后再审核'};
             const answer=await service.ask({agent:exec.agent,signal:exec.signal,questions:[{id:'film_approval',header:'创作审核',question:approvalPreview(args.stage,artifact),multiSelect:false,options:[{label:'批准本版',description:'继续下一创作阶段'},{label:'需要修改',description:'保留草稿并修改'},{label:'拒绝当前方案',description:'停止当前创作流程，保留已有资料'}]}]});
             const decision=answer?.answers?.find(a=>a.id==='film_approval');
-            if (exec.signal?.aborted || decision?.custom || decision?.selected?.length!==1 || !['批准本版','需要修改','拒绝当前方案'].includes(decision.selected[0])) return {status:'needs_input',projectId:id};
+            if (exec.signal?.aborted || decision?.custom || decision?.selected?.length!==1 || !['批准本版','需要修改','拒绝当前方案'].includes(decision.selected[0])) return {status:'needs_input',projectId:id,...approvalMaterial(args.stage,artifact),reason:'未取得批准；保留当前材料，完整展示后再审核，不默认同意'};
             state=recordApprovalDecision(state,args.stage,{'批准本版':'APPROVED','需要修改':'REVISE','拒绝当前方案':'REJECTED'}[decision.selected[0]],args.expectedRevision);
           }
           if (!['create','submit','approve','compile','revise','schedule','task_result','verify_issue','configure_profile','chapter_plan','chapter_submit','independent_review'].includes(args.action)) throw Error('INVALID_ACTION');

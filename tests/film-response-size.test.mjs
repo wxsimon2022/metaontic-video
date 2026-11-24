@@ -12,3 +12,24 @@ test('精简响应保留下一阶段完整依赖、修订与批准，不再重�
  assert.equal(full.artifacts.creative.data.premise,state.artifacts.creative.data.premise);assert.deepEqual(state,before);
  assert.ok(Buffer.byteLength(JSON.stringify(compact))<Buffer.byteLength(JSON.stringify(full))/2);
 });
+test('剧本待批准响应携带同版本完整正文，并要求先展示再批准',()=>{
+ const screenplay='第一场：清晨递杯。\n对白：慢慢来。\n'+ '完整场次内容\n'.repeat(400);
+ const state={project_id:'p',revision:8,artifacts:{script:{revision:7,data:{screenplay,dialogue:[{exact_text:'慢慢来。'}]}}}};
+ for(const mode of ['compact','full']) {
+  const response=projectResponse(state,{action:'approve',stage:'script'},mode);
+  assert.equal(response.approval_material.revision,7);
+  assert.ok(response.approval_material.markdown.includes(screenplay));
+  assert.match(response.continuation.instructions,/先在用户可见正文完整展示/);
+  assert.match(response.continuation.instructions,/再单独调用film_project approve/);
+ }
+ assert.equal(projectResponse(state,{action:'submit',stage:'assets'},'compact').approval_material,undefined);
+});
+
+test('创意待批准返回完整可读正文，过期材料不作为审批正文返回',()=>{
+ const state={project_id:'p',revision:3,artifacts:{creative:{revision:3,data:{theme:'看见身边人',logline:'伸手接住掉落的杯子',structure:[{beats:['先倾斜','再接住']}],must_preserve:['结局不变']}}}};
+ const result=projectResponse(state,{action:'approve',stage:'creative'},'compact');
+ for(const text of ['看见身边人','先倾斜','再接住','结局不变']) assert.ok(result.approval_material.markdown.includes(text));
+ assert.equal(result.approval_material.revision,3);
+ state.artifacts.creative.stale=true;
+ assert.equal(projectResponse(state,{action:'approve',stage:'creative'},'compact').approval_material,undefined);
+});

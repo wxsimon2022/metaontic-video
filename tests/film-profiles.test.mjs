@@ -122,6 +122,11 @@ test('真实工具创建、审批、改类型及重读保存一致，旧批准�
   const full=await tool.execute({action:'read',projectId:id,responseMode:'full'},exec);assert.deepEqual(full.artifacts.creative.data,data);
   const saved=await tool.execute({action:'read',projectId:id,stage:'creative'},exec);
   assert.deepEqual(saved.artifact.data,data);
+  assert.ok(saved.approval_material.markdown.includes(data.theme));
+  assert.equal(saved.approval_material.revision,s.artifact_summary.creative.revision);
+  const nextApproval=await tool.execute({action:'next',projectId:id},exec);
+  assert.equal(nextApproval.approval_material.markdown,saved.approval_material.markdown);
+  assert.match(nextApproval.continuation.instructions,/先在用户可见正文完整展示/);
   s=await tool.execute({action:'approve',projectId:id,stage:'creative',expectedRevision:s.revision},exec);
   assert.equal(questions,1);assert.equal(s.approvals.creative,1);
   const approvedRevision=s.revision;

@@ -17,7 +17,7 @@ export const ROLE_PROMPTS = Object.fromEntries(Object.entries(ROLE_TEXTS).map(([
 export function roleInstructions(state:any,role:string) {return ROLE_TEXTS[role]+'\n'+TASK_CONTRACT+runtimeContract(role)+'\n'+profileInstructions(state,role)
  + (state.duration_ms > 0 && state.duration_ms <= 60000 ? '\n'+SHORT_VIDEO_COMMON+'\n'+(SHORT_VIDEO_ROLE[role] || '') : '')
  + (state.script_policy==='canonical_v1'&&role==='screenwriter'?'\n当前项目采用canonical_v1：场次、动作节拍beats和对白是唯一剧情来源；正文由工具生成，screenplay可以省略，不能维护另一份剧情。beats按表演顺序列action或dialogue_ref，每句对白须且只须引用一次；局部修改可revise(stage:script)替换scenes/dialogue/characters/chapters并重新审批。':'')
- + (role==='screenwriter'?'\n【剧本单次展示】专业项目的完整剧本由film_project approve(stage:"script")原生审批卡片展示。先提交结构化剧本并核对保存成功，再立即调用审批；聊天正文只用一句话说明剧本已保存、请在审批卡片查看全文，不要把完整剧本或JSON再贴到聊天中。':'');}
+ + (role==='screenwriter'?'\n【剧本单次展示】先提交结构化剧本并核对保存成功，在用户可见正文完整展示返回的approval_material.markdown，再单独调用film_project approve(stage:"script")。只给摘要、路径或说已保存不算展示；不得先弹窗后补全文。':'');}
 export const INTENTS = ['new_project','develop_idea','write_script','revise_dialogue','revise_story','design_character','revise_character','design_scene','revise_scene','design_shots','revise_camera','revise_timing','write_prompts','adapt_model','review','verify_facts','resume','produce','clarify'] as const;
 const ROUTES = {
  new_project:['director',null],develop_idea:['creative','creative'],write_script:['screenwriter','script'],revise_dialogue:['screenwriter','script'],revise_story:['screenwriter','script'],
