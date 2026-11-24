@@ -1,3 +1,4 @@
+import { toolOutcome } from './outcomes.js';
 /** 旁路匿名统计：调用方不等待网络；队列、超时、重试与退出均有界。 */
 import { randomUUID, createHash } from 'node:crypto';
 import { acquireFileLock } from '../../shared/utils/file-lock.js';
@@ -12,7 +13,11 @@ import { ANALYTICS_URL, DATA_DIR, PLUGIN_ID, PLUGIN_PACKAGE } from '../../shared
 export { ANALYTICS_URL } from '../../shared/constants/plugin.js';
 const STATE = Symbol.for(`${PLUGIN_ID}.analytics.process`);
 const EVENTS = new Set(['plugin_started', 'plugin_installed', 'tool_started', 'tool_finished', 'video_task_created', 'video_task_finished']);
-const TOOLS = new Set(['video_generate', 'video_extend', 'video_status', 'video_project', 'video_prepare_image', 'video_estimate', 'video_script', 'video_config', 'video_setup', 'video_stage', 'media_submission', 'video_hyperframes']);
+const OUTCOMES = new Set(['outcome_started', 'outcome_finished', 'video_ready', 'video_delivered', 'first_segment_ready']);
+const STAGES = new Set(['creative', 'script', 'assets', 'shots', 'prompts', 'review', 'generation', 'resume', 'retrieve', 'merge', 'install', 'update']);
+const ACTIONS = new Set(['create', 'submit', 'approve', 'independent_review', 'generate', 'resume', 'retrieve', 'merge', 'install', 'update']);
+const CATEGORIES = new Set(['cancelled', 'authentication', 'network', 'validation', 'conflict', 'provider', 'filesystem', 'internal', 'missing_dependency', 'other']);
+const TOOLS = new Set(['video_generate', 'video_extend', 'video_status', 'video_project', 'video_prepare_image', 'video_estimate', 'video_config', 'video_setup', 'video_stage', 'media_submission', 'video_hyperframes']);
 const STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'unknown', 'timeout', 'approved', 'pending', 'paused', 'prepared', 'draft', 'blocked', 'review_required', 'submission_unknown', 'ok']);
 const ERRORS = new Set(['provider_auth', 'provider_failed', 'provider_network_error', 'provider_rate_limited', 'provider_quota_exceeded', 'provider_price_config_error', 'provider_bad_response', 'content_rejected', 'real_person_rejected', 'submission_unknown', 'waiting_stopped', 'ABORTED']);
 const INSTALL_SOURCES = new Set(['npm', 'tgz', 'directory', 'git', 'bundled', 'unknown']);
@@ -143,7 +148,7 @@ export function createAnalyticsReporter(config, options: any = {}) {
   const timeout = options.timeoutMs ?? 1500;
   const maxQueue = options.maxQueue ?? 200;
   let queue: any[] = [], timer: any, controller: AbortController | null = null;
-  let disposed = false, sending = false;
+  let disposed = false, sending = false, outcomesSupported = true;
   const allowed = () => { try { return !disposed && enabled(); } catch { return false; } };
   function schedule(ms = delay) {
     if (!allowed() || timer || sending || !queue.length) return;
@@ -154,7 +159,10 @@ export function createAnalyticsReporter(config, options: any = {}) {
     if (!allowed()) { queue = []; return; }
     if (sending || !queue.length) return;
     sending = true;
-    const batch = queue.splice(0, 20);
+    const extended = OUTCOMES.has(queue[0].name);
+    const batch = queue.filter(event => OUTCOMES.has(event.name) === extended).slice(0, 20);
+    const chosen = new Set(batch);
+    queue = queue.filter(event => !chosen.has(event));
     let watchdog: any;
     try {
       const installationId = await identity();
@@ -165,12 +173,15 @@ export function createAnalyticsReporter(config, options: any = {}) {
         watchdog = setTimeout(() => { controller?.abort(); reject(new Error('analytics timeout')); }, timeout);
         watchdog.unref?.();
       });
-      const response: any = await Promise.race([Promise.resolve().then(() => request(ANALYTICS_URL, {
+      const response: any = await Promise.race([Promise.resolve().then(() => request(extended ? ANALYTICS_URL.replace(/\/events$/, '/outcomes') : ANALYTICS_URL, {
         method: 'POST', redirect: 'error', credentials: 'omit',
         headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
         body: JSON.stringify({ installationId, device: device(), events: batch.map(({ attempts, ...event }) => event) }),
       })), abort]);
       try { void response?.body?.cancel()?.catch(() => {}); } catch { /* optional response body */ }
+      if (extended && [404, 405].includes(response?.status)) {
+        outcomesSupported = false; queue = queue.filter(event => !OUTCOMES.has(event.name)); return;
+      }
       if (!response?.ok) throw new Error('analytics rejected');
     } catch {
       if (allowed()) {
@@ -185,10 +196,20 @@ export function createAnalyticsReporter(config, options: any = {}) {
   function record(name, input: any = {}, dedupeKey = '') {
     try {
       if (!allowed()) { queue = []; return; }
-      if (!EVENTS.has(name)) return;
+      const extended = OUTCOMES.has(name);
+      if (!EVENTS.has(name) && !extended || extended && !outcomesSupported) return;
       // 服务端事件契约尚未声明的新业务工具不混入批次，避免一条未知事件拖累整批。
       const fields = analyticsFields(input);
-      if (!['plugin_started', 'plugin_installed'].includes(name) && !fields.tool) return;
+      if (extended) {
+        if (!STAGES.has(input.stage) || !ACTIONS.has(input.action)) return;
+        fields.stage = input.stage; fields.action = input.action;
+        if (['film_project', 'video_script'].includes(input.tool)) fields.tool = input.tool;
+        if (CATEGORIES.has(input.errorCategory)) fields.errorCategory = input.errorCategory;
+        for (const [key, max] of [['segmentCount', 1000], ['videoDurationSec', 86400]] as const) {
+          if (typeof input[key] === 'number' && Number.isFinite(input[key]) && input[key] > 0) fields[key] = Math.min(max, Math.round(input[key] * 100) / 100);
+        }
+      }
+      if (!extended && !['plugin_started', 'plugin_installed'].includes(name) && !fields.tool) return;
       const rawTime = Date.parse(String(input.occurredAt || ''));
       const occurredAt = Number.isFinite(rawTime) && rawTime <= Date.now() + 300000 && rawTime >= Date.now() - 30 * 86400000
         ? new Date(rawTime).toISOString() : new Date().toISOString();
@@ -202,6 +223,7 @@ export function createAnalyticsReporter(config, options: any = {}) {
         void Promise.resolve().then(() => identity()).then(async id => {
           if (!id || !allowed() || !await claimRegistration(id) || !allowed()) return;
           // 两种登记入口共用同一事件ID，避免客户端旧状态或重复接收导致重复计数。
+          if (extended && input.flowKey) (event as any).flowId = createHash('sha256').update(`${id}:flow:${input.flowKey}`).digest('hex');
           event.eventId = createHash('sha256').update(`${id}:device_registration`).digest('hex');
           queue.push(event); queue = queue.slice(-maxQueue); schedule();
         }).catch(() => {});
@@ -211,6 +233,7 @@ export function createAnalyticsReporter(config, options: any = {}) {
       if (dedupeKey) {
         void Promise.resolve().then(() => identity()).then(id => {
           if (!id || !allowed()) return;
+          if (extended && input.flowKey) (event as any).flowId = createHash('sha256').update(`${id}:flow:${input.flowKey}`).digest('hex');
           event.eventId = createHash('sha256').update(`${id}:${name}:${dedupeKey}`).digest('hex');
           queue.push(event); queue = queue.slice(-maxQueue); schedule();
         }).catch(() => {});
@@ -254,12 +277,19 @@ export function withUsageAnalytics(tool, reporter, mode = (_exec) => 'standard')
     const started = Date.now();
     let selected = 'standard';
     try { selected = mode(exec); } catch { /* optional preset registry */ }
+    const outcome = (result?, error?) => {
+      try { const fields = toolOutcome(tool.name, args, result, error);
+        if (fields) reporter.record('outcome_finished', { ...fields, tool: tool.name, mode: selected, durationMs: Date.now() - started }, exec?.callId ? `${tool.name}:${exec.callId}` : '');
+      } catch { /* isolated */ }
+    };
     try { reporter.record('tool_started', { tool: tool.name, mode: selected }); } catch { /* isolated */ }
     try {
       const result = await tool.execute(args, { ...exec, name: tool.name, metaonticAnalytics: reporter, metaonticMode: selected });
       try { reporter.record('tool_finished', { tool: tool.name, mode: selected, status: result?.status || 'ok', durationMs: Date.now() - started, errorCode: result?.errorCode }); } catch { /* isolated */ }
+      outcome(result);
       return result;
     } catch (error) {
+      outcome(undefined, error);
       try { reporter.record('tool_finished', { tool: tool.name, mode: selected, status: 'failed', durationMs: Date.now() - started, errorCode: error?.code || 'other' }); } catch { /* isolated */ }
       throw error;
     }

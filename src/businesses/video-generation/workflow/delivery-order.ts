@@ -1,3 +1,4 @@
+import { reportOutcome } from '../../../platform/telemetry/outcomes.js';
 import { videoResultState } from './result-state.js';
 /** workflow/delivery-order：把「交付卡片只登记最终成片」从提示词要求升级成提交前的真实校验。 */
 import path from 'node:path';
@@ -18,6 +19,7 @@ type Mark = { role: 'film' | 'segment'; path: string };
  * 其余情况一律拦下，让助手改走正文内联展示；交付时成片被改名或换目录也能靠字节数认领。
  */
 export function createDeliveryOrderGuard() {
+  const finalVideos = new WeakMap<object, Array<{ path: string; key: string; exec: any; fields: any }>>();
   const sessions = new WeakMap<object, { turn?: number; mergedShownTurn?: number; groups: Group[] }>();
 
   function stateFor(session) {
@@ -39,8 +41,20 @@ export function createDeliveryOrderGuard() {
   }
 
   /** 工具真实返回过哪些分段与成片：只认下载成功的分段和与分段不同的合并文件。 */
-  async function remember(session, value) {
+  async function remember(session, value, exec?: any) {
     if (!session || typeof session !== 'object') return;
+    if (videoResultState(value).canPresent) {
+      const target = absolute(session, value?.videoPath || value?.segments?.find(item => item.localPath)?.localPath);
+      if (target && await sizeOf(target) > 0) {
+        const key = String(value?.segmentsDir || value?.resumeDir || target);
+        const fields = { stage: 'generation', action: 'generate', status: 'succeeded', flowKey: key,
+          segmentCount: value?.segments?.length || 1, videoDurationSec: value?.actualSeconds };
+        reportOutcome(exec, 'video_ready', fields, `ready:${key}`);
+        const known = finalVideos.get(session) || [];
+        if (!known.some(item => item.path === target)) known.push({ path: target, key, exec, fields });
+        finalVideos.set(session, known.slice(-100));
+      }
+    }
     const segments = (value?.segments || [])
       .filter(segment => segment?.status === 'succeeded' && segment?.localPath)
       .map(segment => absolute(session, segment.localPath)).filter(Boolean);
@@ -69,6 +83,9 @@ export function createDeliveryOrderGuard() {
     if (Number.isInteger(data.turn)) state.turn = data.turn;
     if (event.type !== 'deliverables/presented') return;
     const shown = (data.files || []).map(file => absolute(session, file?.path)).filter(Boolean);
+    for (const final of finalVideos.get(session) || []) {
+      if (shown.includes(final.path)) reportOutcome(final.exec, 'video_delivered', final.fields, `delivered:${final.key}`);
+    }
     if (shown.some(target => state.groups.some(group => group.merges.some(item => item.path === target || nameOf(item.path) === nameOf(target))))) {
       state.mergedShownTurn = data.turn;
     }

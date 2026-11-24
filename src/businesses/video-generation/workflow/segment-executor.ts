@@ -1,3 +1,4 @@
+import { reportOutcome } from '../../../platform/telemetry/outcomes.js';
 /** 生成与续拍共用的执行边界：持久化、原任务查询、结果记录、逐段暂停与中断收尾。 */
 import { runTask, normalizeReferenceUrl } from '../providers/seedance.js';
 import { approvedCharacterReferences } from './character-references.js';
@@ -20,6 +21,7 @@ export async function executeSegmentPlan({ config, ctx, exec, args, plan, doneBe
     const state: SegmentExecutionState = {
         ...initial, status: 'succeeded', paused: Boolean(initial.paused), interrupted: false,
     };
+    if (!args?.resume && !doneBefore) reportOutcome(exec, 'outcome_started', { stage: 'generation', action: 'generate', flowKey: segmentsDir }, `generation:${segmentsDir}`);
     const checkpoint = () => save(state);
     if (persistBeforeRun)
         await checkpoint();
@@ -38,6 +40,7 @@ export async function executeSegmentPlan({ config, ctx, exec, args, plan, doneBe
             const { body, seconds } = saved.originalBody
                 ? { body: saved.originalBody, seconds: step.seconds }
                 : await buildStep({ step, position, state });
+            const firstWait = position === 0 && !state.pendingTask && !saved.originalTaskId ? Date.now() : null;
             const final = await runTask(config, body, exec?.signal, {
                 ctx, exec, state: saved, saveState: checkpoint,
                 scope: `${segmentsDir}:${position}`,
@@ -48,6 +51,7 @@ export async function executeSegmentPlan({ config, ctx, exec, args, plan, doneBe
                     await checkpoint();
                 },
             });
+            if (firstWait !== null && final.status === 'succeeded' && final.videoUrl) reportOutcome(exec, 'first_segment_ready', { stage: 'generation', action: 'generate', status: 'succeeded', flowKey: segmentsDir, durationMs: Date.now() - firstWait }, `first:${segmentsDir}`);
             if (final.status === 'succeeded') {
                 state.characterReferences = approvedCharacterReferences(state.characterReferences, saved);
                 await checkpoint();

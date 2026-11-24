@@ -1,3 +1,4 @@
+import { reportOutcome, outcomeError } from '../../../platform/telemetry/outcomes.js';
 import { timedStage } from '../../../shared/utils/timing.js';
 /** media/merge：从宿主入口拆出的独立职责模块。 */
 import { type RunOptions } from '../providers/types.js';
@@ -263,8 +264,10 @@ async function mapLimit(items, limit, worker) {
  *   merged + videoPath + mergeMode（成功）。
  */
 export async function downloadSegmentsAndMerge(config, {
-  segments, segmentsDir, outDir, stamp, notes = [], keepSingleFile = false, signal,
+  segments, segmentsDir, outDir, stamp, notes = [], keepSingleFile = false, signal, analyticsExec = undefined,
 }) {
+  const report = (stage, status, began, error?) => reportOutcome(analyticsExec, 'outcome_finished', { stage, action: stage, status, durationMs: Date.now() - began, errorCategory: error ? outcomeError(error) : undefined, flowKey: segmentsDir });
+  const downloadBegan = Date.now();
   const files = [];
   const deliveredSeconds = segments.reduce((sum, item) => sum + (item.seconds || 0), 0);
   // 多段才需要合成；本机没有 ffmpeg 就早点说清楚，别白跑一遍合并再报错。
@@ -300,10 +303,12 @@ export async function downloadSegmentsAndMerge(config, {
       segments[index].localPath = item.dest;
       files.push(item.dest);
     }
+    report('retrieve', 'failed', downloadBegan, failed.failure);
     const reason = `分段已生成，但下载失败：${failed.failure?.message || failed.failure}`;
     notes.push(reason);
     return { files, segmentsDir, deliveredSeconds, error: reason };
   }
+  report('retrieve', 'succeeded', downloadBegan);
   const dests = downloaded.map((item) => item.dest);
   const probed = await mapLimit(dests, SEGMENT_TASK_CONCURRENCY,
     (dest) => timedStage('segment_probe', () => probeMedia(dest, config, signal)));
@@ -347,6 +352,7 @@ export async function downloadSegmentsAndMerge(config, {
     // 缺 ffmpeg 不是失败：分段照样交付，但必须把「怎么装」交出去。
     const guide = ffmpegInstallHint(config);
     notes.push(`分段文件都已下载到 ${segmentsDir}。`);
+    report('merge', 'blocked', Date.now(), { code: 'FFMPEG_MISSING' });
     notes.push(guide.hint);
     return {
       files, segmentsDir, deliveredSeconds, merged: false,
@@ -354,6 +360,7 @@ export async function downloadSegmentsAndMerge(config, {
     };
   }
 
+  const mergeBegan = Date.now();
   const finalPath = path.join(outDir, `${stamp}-${deliveredSeconds}s.mp4`);
   try {
     if (files.length === 1 && keepSingleFile) {
@@ -390,9 +397,11 @@ export async function downloadSegmentsAndMerge(config, {
         + '已裁齐后再拼接，避免接缝处缺一小段画面。',
       );
     }
+    report('merge', 'succeeded', mergeBegan);
     return { files, segmentsDir, deliveredSeconds, merged: true, mergeMode: merged.mode, videoPath: finalPath, seamCuts: prepared.cuts, actualSeconds: actual?.durationSeconds };
   } catch (failure) {
     if (failure?.code === 'ABORTED') throw failure;
+    report('merge', failure?.code === 'ABORTED' ? 'cancelled' : 'failed', mergeBegan, failure);
     let reason = `分段已生成，但合并失败：${failure?.message || failure}`;
     let installHint;
     if (failure?.code === 'ffmpeg_missing') {

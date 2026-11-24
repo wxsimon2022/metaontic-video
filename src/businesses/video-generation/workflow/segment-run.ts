@@ -106,6 +106,7 @@ export async function runSegmentDelivery({
   const delivery = await downloadSegmentsAndMerge(config, {
     segments: previewOnly ? completed.slice(-1) : completed,
     segmentsDir,
+    analyticsExec: exec,
     outDir,
     stamp,
     notes,
