@@ -2,3 +2,6 @@
 export const PLUGIN_VERSION = typeof __PLUGIN_VERSION__ === 'string'
   ? __PLUGIN_VERSION__.trim().replace(/^v/i, '')
   : '';
+
+/** Same content identity in host/client and the packaged build manifest. */
+export const PLUGIN_BUILD_ID = typeof __PLUGIN_BUILD_ID__ === 'string' ? __PLUGIN_BUILD_ID__ : '';

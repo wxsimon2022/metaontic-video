@@ -1,5 +1,6 @@
 /** Cross-platform release smoke test. No paid API calls or real Harness profile writes. */
 import assert from 'node:assert/strict';
+import { BUILD_OUTPUTS, digest } from './build-identity.mjs';
 import { checkClientMigration } from './check-client-migration.mjs';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { execFileSync } from 'node:child_process';
@@ -138,6 +139,11 @@ try {
   }
   assert.ok((await readdir(path.join(installed, 'skills'))).length);
   const plugin = await import(pathToFileURL(path.join(installed, 'dist', 'index.js')).href);
+  const buildInfo=JSON.parse(await readFile(path.join(installed,'dist/build-info.json'),'utf8'));
+  assert.equal(buildInfo.version,pkg.version,'Build manifest version must match installed package');
+  assert.match(buildInfo.buildId,/^[a-f0-9]{64}$/);
+  for(const file of ['dist/index.js','dist/client.js'])assert.ok((await readFile(path.join(installed,file),'utf8')).includes(JSON.stringify(buildInfo.buildId)),`Compiled identity missing in ${file}`);
+  for(const file of BUILD_OUTPUTS)assert.equal(digest(await readFile(path.join(installed,file))),buildInfo.files[file],`Installed artifact identity: ${file}`);
   assert.equal(typeof plugin.apply, 'function');
   assert.ok(plugin.Config);
   console.log(`PASS ${process.platform}: managed package installation and bundled-client migration contract (not desktop UI), settings/tasks preserved, Unicode/spaces, locale metadata, resources, source relocation and entry import (${pkg.version})`);

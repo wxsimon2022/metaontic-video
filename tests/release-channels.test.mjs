@@ -38,7 +38,7 @@ test('old channel response cannot overwrite new selection',async()=>{
 });
 test('installation never falls back to master, even when a release tag fails to resolve',async()=>{
  const ctx=setup([]);const specs=[];
- const actions=ctx.createUpdateActions({updateConfirm:true,updateLatest:'3.10.0',availableVersions:['3.10.0','3.8.2'],
+ const actions=ctx.createUpdateActions({verifyRuntime:async()=>true,updateConfirm:true,updateLatest:'3.10.0',availableVersions:['3.10.0','3.8.2'],
  setUpdateConfirm(){},setUpdateStatus(){},setUpdateMessage(){},t:key=>key,UPDATE_SPEC:'git+https://gitee.com/hackloop/metaontic-video.git',
  PLUGIN_PACKAGE:'metaontic-video',UPDATE_ATTEMPTS:1,manager:()=>({manager:{
  listBundles: async () => ({ok:true,value:[{name:'metaontic-video',installed:true,source:'https://example.invalid/metaontic-video.tgz'}]}), installBundle:async spec=>{specs.push(spec);return {ok:false,error:{message:'Could not resolve'}};},
@@ -94,7 +94,7 @@ test('new check does not default to downgrading an installed newer version',asyn
 });
 test('higher-version installation reports a successful update',async()=>{
  const ctx=setup([]);const messages=[];
- const actions=ctx.createUpdateActions({PLUGIN_VERSION:'3.8.2',isNewerVersion:ctx.isNewerVersion,
+ const actions=ctx.createUpdateActions({verifyRuntime:async()=>true,PLUGIN_VERSION:'3.8.2',isNewerVersion:ctx.isNewerVersion,
  updateConfirm:true,updateLatest:'3.10.0',availableVersions:['3.10.0','3.9.0','3.8.2'],
  setUpdateConfirm(){},setUpdateStatus(){},setUpdateMessage:key=>messages.push(key),setUpdateLatest(){},t:key=>key,
  UPDATE_ATTEMPTS:1,PLUGIN_PACKAGE:'metaontic-video',manager:()=>({manager:{listBundles: async () => ({ok:true,value:[{name:'metaontic-video',installed:true,source:'https://example.invalid/metaontic-video.tgz'}]}), installBundle:async()=>({ok:true,value:{application:'applied',version:'3.10.0'}})}})});
@@ -103,7 +103,7 @@ test('higher-version installation reports a successful update',async()=>{
 
 test('在线更新仅使用 Gitee，并在 Gitee 无法解析时回退 GitHub',async()=>{
  const ctx=setup([]),specs=[];
- const actions=ctx.createUpdateActions({updateConfirm:true,updateLatest:'3.10.0',availableVersions:['3.10.0'],
+ const actions=ctx.createUpdateActions({verifyRuntime:async()=>true,updateConfirm:true,updateLatest:'3.10.0',availableVersions:['3.10.0'],
   setUpdateConfirm(){},setUpdateStatus(){},setUpdateLatest(){},setUpdateMessage(){},t:key=>key,
   PLUGIN_PACKAGE:'dsh-metaontic-video',UPDATE_ATTEMPTS:1,
   manager:()=>({manager:{listBundles:async()=>[{name:'dsh-metaontic-video',installed:true,source:'https://example.invalid/plugin.tgz'}],

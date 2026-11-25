@@ -1,9 +1,10 @@
+import { sourceIdentity, digest, BUILD_OUTPUTS } from './build-identity.mjs';
 /** Portable build entry: no POSIX command substitution or shell quoting. */
 import { build } from 'esbuild';
 import { packageDescription } from './package-description.mjs';
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 const version = JSON.parse(await readFile('package.json', 'utf8')).version;
-const target = process.argv[2] || 'all';
+let target = process.argv[2] || 'all';
 const defines = { __PLUGIN_VERSION__: JSON.stringify(version) };
 
 if (!['all','locale','host','client'].includes(target)) throw Error('Unknown build target');
@@ -17,6 +18,13 @@ if(packageFile.readme !== readme) {
   packageFile.readme = readme;
   await writeFile('package.json', JSON.stringify(packageFile,null,2)+'\n');
 }
+
+// Any input change upgrades a partial build to a full build: host/client share one identity.
+const buildId = await sourceIdentity();
+defines.__PLUGIN_BUILD_ID__ = JSON.stringify(buildId);
+try { const previous=JSON.parse(await readFile('dist/build-info.json','utf8'));if(previous.buildId!==buildId)target='all'; }
+catch { target='all'; }
+await rm('dist/build-info.json',{force:true});
 
 if (target === 'all' || target === 'locale') {
   await rm('dist/locale', { recursive: true, force: true });
@@ -52,3 +60,6 @@ if (target === 'all' || target === 'host') {
     await build({entryPoints:[`src/agents/presets/${preset}.ts`],bundle:true,charset:'utf8',format:'esm',platform:'node',target:'node20',external:['@deepseek-ai/dsh-agent-preset'],outfile:`dist/presets/${preset}.js`});
   }
 }
+
+const files=Object.fromEntries(await Promise.all(BUILD_OUTPUTS.map(async file=>[file,digest(await readFile(file))])));
+await writeFile('dist/build-info.json',JSON.stringify({version,buildId,files},null,2)+'\n');

@@ -1,3 +1,4 @@
+import {registerRuntimeVersion} from '../platform/installation/runtime-version.js';
 import { bindAgentRegistry, createAgentRegistry, type AgentDefinition } from './registry/agent.registry.js';
 import { createToolRegistry } from '../platform/dsh/tool.adapter.js';
 import { PLUGIN_ID } from '../shared/constants/plugin.js';
@@ -59,6 +60,7 @@ export function createPluginRuntime(definitions: { agents: readonly AgentDefinit
       })));
       try { defer(startUpdateLockfileRepair(import.meta.url, undefined, message => ctx.logger?.warn?.(`metaontic-video: ${message}`))); }
       catch { ctx.logger?.warn?.('metaontic-video: 安装目录锁文件自愈未启用。'); }
+      defer(registerRuntimeVersion(ctx));
       analytics.start();
       return dispose;
     } catch (error) { dispose(); throw error; }

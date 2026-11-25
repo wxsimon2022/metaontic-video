@@ -105,7 +105,28 @@ export function createUpdates({ h, fetchSource }: any) {
       return (await fetchRecentVersions())[0];
     }
 
-  return { PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, fetchRecentVersions, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell };
+  const PLUGIN_BUILD_ID=typeof __PLUGIN_BUILD_ID__==='string'?__PLUGIN_BUILD_ID__:'';
+  return { PLUGIN_BUILD_ID, PLUGIN_VERSION, UPDATE_CACHE_KEY, UPDATE_MAX_AGE_MS, fetchLatestVersion, fetchRecentVersions, PLUGIN_PACKAGE, UPDATE_SPEC, UPDATE_ATTEMPTS, isNewerVersion, updateBell };
+}
+
+/** Only a live response matching both installed version and build identity proves activation. */
+export async function verifyRuntimeInstallation(version:string,options:any={}) {
+ const get=options.fetcher||(typeof fetch==='function'?fetch:null);
+ if(!get)return false;
+ for(let i=0;i<(options.attempts??3);i++){
+  let timer:any;
+  const controller=typeof AbortController==='function'?new AbortController():null;
+  try{
+   const result:any=await Promise.race([
+    (async()=>{const response=await get('/metaontic-video/runtime-version',{cache:'no-store',credentials:'same-origin',signal:controller?.signal});return response.ok?await response.json():null;})(),
+    new Promise(resolve=>{timer=setTimeout(()=>{controller?.abort();resolve(null);},options.timeoutMs??1500);}),
+   ]);
+   const running=result?.running,installed=result?.installed;
+   if(running?.version===version&&installed?.version===version&&/^[a-f0-9]{64}$/.test(running?.buildId||'')&&running.buildId===installed.buildId)return true;
+  }catch{}finally{if(timer!==undefined)clearTimeout(timer);}
+  if(i+1<(options.attempts??3))await (options.wait?options.wait():new Promise(resolve=>setTimeout(resolve,400)));
+ }
+ return false;
 }
 
 export function createUpdateActions(context: any) {
@@ -332,10 +353,11 @@ async function runOnlineUpdate() {
     forgetUpdateCheck();
     const version = outcome.version || context.updateLatest;
     context.setUpdateLatest('');
-    context.setUpdateStatus(outcome.application === 'restart-required' ? 'restart' : 'applied');
+    const applied=outcome.application==='applied' && await (context.verifyRuntime||verifyRuntimeInstallation)(version);
+    context.setUpdateStatus(outcome.application === 'restart-required' ? 'restart' : applied ? 'applied' : 'pending');
     context.setUpdateMessage(outcome.application === 'restart-required'
         ? context.t('versionUpdateRestart', { version })
-        : context.t(outcome.application === 'applied' ? 'versionUpdateDone' : 'versionUpdatePending', { version }));
+        : context.t(applied ? 'versionUpdateDone' : 'versionUpdatePending', { version }));
 }
 function deferUpdate() {
     context.setUpdateConfirm(false);

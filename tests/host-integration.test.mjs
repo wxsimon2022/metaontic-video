@@ -42,6 +42,17 @@ test('published host preserves schema, tool registration, live configuration and
   const config = { connectionMode: 'metaontic', metaonticApiKey: 'test', model: 'seedance-2-0' };
   const host = harness(config, '/tmp');
   assert.deepEqual([...host.tools.keys()].sort(), ['film_project', 'media_submission', 'video_config', 'video_estimate', 'video_extend', 'video_generate', 'video_prepare_image', 'video_project', 'video_script', 'video_setup', 'video_stage', 'video_status']);
+  for (const [name, tool] of host.tools) {
+    const view = tool.presentCall({});
+    assert.equal(view?.card, 'generic', name);
+    assert.match(view.title, /[\u4e00-\u9fff]/, `Missing Chinese call title: ${name}`);
+    assert.ok(!view.title.includes(name), `Wire name leaked into title: ${name}`);
+  }
+  const film=host.tools.get('film_project');
+  for(const action of film.parameters.properties.action.enum) {
+    const title=film.presentCall({action}).title;
+    assert.notEqual(title,'专业创作项目',`Missing action title: ${action}`);
+  }
   assert.match(host.tools.get('film_project').description, /不另弹文本费用审批/);
   assert.doesNotMatch(host.tools.get('film_project').description, /弹窗确认文本费用/);
   assert.match(host.tools.get('video_script').description, /不弹文本调用审批/);

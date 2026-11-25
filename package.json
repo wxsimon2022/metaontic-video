@@ -49,6 +49,7 @@
   "files": [
     "dist/index.js",
     "dist/client.js",
+    "dist/build-info.json",
     "dist/locale/*.json",
     "dist/presets/*.js",
     "cordis.patch.yml",
@@ -118,7 +119,9 @@
     "npm:publish": "node scripts/publish-npm.mjs",
     "npm:token": "node scripts/npm-token.mjs",
     "release:all": "node scripts/release.mjs --interactive --all",
-    "eval:film": "node scripts/evaluate-film.mjs"
+    "eval:film": "node scripts/evaluate-film.mjs",
+    "prepack": "node scripts/verify-build.mjs",
+    "install:local": "node scripts/install-local.mjs"
   },
   "dependencies": {},
   "releaseNotes": {

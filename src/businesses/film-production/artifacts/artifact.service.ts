@@ -1,3 +1,4 @@
+import { readable } from '../approvals/approval.presenter.js';
 import { evaluateStory } from '../evaluation/story-evaluation.js';
 import { validateReviewProvenance } from '../reviews/review.provenance.js';
 import { normalizeScript } from '../scripts/script.document.js';
@@ -109,5 +110,9 @@ export function commitArtifact(state: any, stage: string, value: any, expected: 
   return next;
 }
 export function exportMarkdown(state: any) {
-  return `# ${state.title}\n\nRevision: ${state.revision}\n\n` + STAGES.filter(s => state.artifacts[s]).map(s => `## ${s}${state.artifacts[s].stale ? ' (stale)' : ''}\n\n\`\`\`json\n${JSON.stringify(state.artifacts[s].data,null,2)}\n\`\`\``).join('\n\n');
+ const names={creative:'创意提案',script:'正式剧本',assets:'人物与场景档案',shots:'导演分镜',prompts:'视频生成提示词',review:'质量审核'};
+ return `# ${state.title}\n\n修订：${state.revision}\n\n`+STAGES.filter(stage=>state.artifacts[stage]).map(stage=>{
+  const artifact=state.artifacts[stage];
+  return `## ${names[stage]}${artifact.stale?'（待更新）':''}\n\n${readable(artifact.data)}`;
+ }).join('\n\n');
 }

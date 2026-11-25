@@ -47,12 +47,13 @@ export function createNoticeStore({ request = globalThis.fetch, storage = () => 
   try { rows = parseNotices(JSON.parse(storage()?.getItem(CACHE_KEY) || 'null')); }
   catch { /* 没有缓存时等待首次同步 */ }
   function emit() { for (const listener of listeners) listener(); }
-  function current() {
+  function visible() {
     readDismissed();
     // 消息仅缓存在插件本机；关闭记录不回传服务端。
     return parseNotices({ items: rows.map(row => ({ ...row, enabled: true })) })
-      .find(row => !dismissed.has(row.id)) || null;
+      .filter(row => !dismissed.has(row.id));
   }
+  function current() { return visible()[0] || null; }
   function dismiss(id: string) {
     readDismissed(); dismissed.add(id);
     try { storage()?.setItem(DISMISS_KEY, JSON.stringify([...dismissed])); } catch { /* 会话内仍生效 */ }
@@ -83,11 +84,11 @@ export function createNoticeStore({ request = globalThis.fetch, storage = () => 
     })();
     try { await pending; } finally { pending = null; }
   }
-  return { current, dismiss, refresh, subscribe(fn: () => void) { listeners.add(fn); return () => listeners.delete(fn); } };
+  return { current, visible, dismiss, refresh, subscribe(fn: () => void) { listeners.add(fn); return () => listeners.delete(fn); } };
 }
 
 export function createNotificationBanner({ React, h, TOKENS, store = createNoticeStore() }: any) {
-  return function NotificationBanner() {
+  return function NotificationBanner({ multiple = false }: { multiple?: boolean } = {}) {
     const [, redraw] = React.useState(0);
     React.useEffect(() => {
       const off = store.subscribe(() => redraw((value: number) => value + 1));
@@ -103,10 +104,10 @@ export function createNotificationBanner({ React, h, TOKENS, store = createNotic
         globalThis.removeEventListener?.('storage', onStorage);
       };
     }, []);
-    const row = store.current();
-    if (!row) return null;
+    const rows: PluginNotice[] = multiple ? store.visible() : [store.current()].filter(Boolean);
+    if (!rows.length) return null;
     const english = typeof document !== 'undefined' && document.documentElement.lang?.startsWith('en');
-    return h('aside', { 'aria-label': english ? 'Announcements' : '活动通知', style: {
+    const renderRow = (row: PluginNotice) => h('aside', { key: row.id, 'aria-label': multiple ? row.title : english ? 'Announcements' : '活动通知', style: {
       position: 'relative', border: `1px solid ${TOKENS.border}`, borderRadius: 12,
       background: TOKENS.cardFill, color: TOKENS.text, overflowWrap: 'anywhere',
     } }, [
@@ -126,5 +127,7 @@ export function createNotificationBanner({ React, h, TOKENS, store = createNotic
         style: { position: 'absolute', top: 10, right: 10, cursor: 'pointer', color: TOKENS.muted,
           background: 'transparent', border: 0, padding: '4px 6px', fontSize: 18, lineHeight: 1 } }, '×'),
     ]);
+    return multiple ? h('section', { 'aria-label': english ? 'Announcements' : '活动通知',
+      style: { display: 'grid', gap: 8, maxHeight: 320, overflowY: 'auto', minWidth: 0 } }, rows.map(renderRow)) : renderRow(rows[0]);
   };
 }

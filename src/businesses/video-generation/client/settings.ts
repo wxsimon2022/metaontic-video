@@ -337,7 +337,7 @@ function makePage({ form, t, manager }) {
             ? updateMessage
             : (updateStatus === 'installing'
               ? t('versionUpdating')
-              : ((updateStatus === 'restart' || updateStatus === 'applied')
+              : ((updateStatus === 'restart' || updateStatus === 'applied' || updateStatus === 'pending')
                 ? updateMessage
                 : (updateStatus === 'ok'
                   ? (updateAvailable ? t('versionNew', { version: updateLatest }) : t('versionLatest'))
@@ -444,7 +444,7 @@ function makePage({ form, t, manager }) {
             onUpdate: () => { if (updateConfirm) runOnlineUpdate().catch(() => {}); else setUpdateConfirm(true); },
             onLater: deferUpdate,
           }) : null,
-          NotificationBanner ? h(NotificationBanner, { key: 'activity-notice' }) : null,
+          NotificationBanner ? h(NotificationBanner, { key: 'activity-notice', multiple: true }) : null,
           notice ? h('p', { key: 'notice', className: 'mov-notice' }, notice) : null,
           ...(notice && !snapshot.value ? [] : settingsRows()),
           ...blobs,

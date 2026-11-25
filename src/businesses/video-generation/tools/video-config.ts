@@ -1,3 +1,4 @@
+import {PLUGIN_VERSION,PLUGIN_BUILD_ID} from '../../../shared/constants/version.js';
 import { logDiagnostics } from '../../../shared/utils/logging.js';
 import { IMAGE_MODEL, resolveImageModel } from '../connection-defaults.js';
 /** tools/video-config：从宿主入口拆出的独立职责模块。 */
@@ -35,6 +36,7 @@ export function configView(config) {
   const stored = {};
   for (const key of CONFIG_FIELDS) stored[key] = ref(config, key, undefined);
   return {
+    runtime: {version:typeof PLUGIN_VERSION==='string'?PLUGIN_VERSION:'',buildId:typeof PLUGIN_BUILD_ID==='string'?PLUGIN_BUILD_ID:''},
     stored: maskSecrets(stored),
     effective: {
       sidebarAssistantEnabled: ref(config, 'sidebarAssistantEnabled', true) !== false,

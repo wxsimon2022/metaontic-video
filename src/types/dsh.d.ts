@@ -117,3 +117,5 @@ declare module '@deepseek-ai/dsh-agent-preset' {
   const preset: unknown;
   export default preset;
 }
+
+declare const __PLUGIN_BUILD_ID__: string;

@@ -1,4 +1,5 @@
 const TOOL_TITLES: Record<string, string> = {
+  video_script: '生成视频脚本',
   video_generate: '视频生成',
   video_extend: '视频续拍',
   video_estimate: '视频费用预估',
@@ -19,7 +20,7 @@ const FILM_ACTION_TITLES: Record<string, string> = {
   approve: '审核创意或剧本',
   export: '导出创作资料',
   next: '推进创作阶段',
-  compile: '编译视频制作方案',
+  compile: '准备视频制作方案',
   revise: '修订创作内容',
   schedule: '安排创作任务',
   task_result: '更新创作任务状态',
@@ -33,6 +34,8 @@ const FILM_ACTION_TITLES: Record<string, string> = {
   review_context: '读取审核资料',
   independent_review: '独立质量审核',
   capabilities: '查询模型能力',
+  review_requests: '查看审核请求状态',
+  retry_review: '确认重新审核',
 };
 
 const FILM_STAGE_ROLES: Record<string, string> = {

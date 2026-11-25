@@ -101,3 +101,29 @@ test('链接随消息缓存在本地，旧版无链接缓存继续显示', async
   await reopened.refresh(); assert.equal(reopened.current().action_url, 'https://example.com/event');
   assert.equal(parseNotices({items: [notice()]})[0].action_url, '');
 });
+
+test('设置页同时展示多条通知，关闭只移除对应一条并持久化；首页仍展示最新一条', async () => {
+  const f = fixture();
+  f.setItems([notice({id:'newest',title:'最新活动',action_url:'https://example.com/new'}),notice({id:'second',title:'第二条'}),notice({id:'third',title:'第三条'})]);
+  const store = createNoticeStore(f.options);await store.refresh();
+  const h = (type, props, ...children) => ({type,props:props||{},children:children.flat()});
+  const React = {useState:()=>[0,()=>{}],useEffect:()=>{}};
+  const Banner = createNotificationBanner({React,h,TOKENS:{},store});
+  let list=Banner({multiple:true});assert.equal(list.type,'section');assert.equal(list.children.length,3);
+  assert.equal(list.props.style.overflowY,'auto');
+  assert.deepEqual(list.children.map(row=>row.props.key),['newest','second','third']);
+  assert.equal(list.children[0].children[0].type,'a');assert.equal(list.children[1].children[0].type,'div');
+  list.children[1].children[1].props.onClick();
+  list=Banner({multiple:true});assert.deepEqual(list.children.map(row=>row.props.key),['newest','third']);
+  assert.deepEqual(createNoticeStore(f.options).visible().map(row=>row.id),['newest','third']);
+  assert.equal(Banner().type,'aside');assert.equal(Banner().props.key,'newest');
+  list.children[0].children[1].props.onClick();assert.equal(Banner().props.key,'third');
+  Banner({multiple:true}).children[0].children[1].props.onClick();assert.equal(Banner({multiple:true}),null);
+});
+test('多条通知离线重开保留顺序，下架后仅移除下架项且仍复用已关闭记录',async()=>{
+ const f=fixture();f.setItems([notice({id:'first'}),notice({id:'second'}),notice({id:'third'})]);
+ const store=createNoticeStore(f.options);await store.refresh();store.dismiss('second');f.offline();
+ const reopened=createNoticeStore(f.options);await reopened.refresh();assert.deepEqual(reopened.visible().map(row=>row.id),['first','third']);
+ f.online();f.setItems([notice({id:'second'}),notice({id:'third'})]);f.advance();await reopened.refresh();
+ assert.deepEqual(reopened.visible().map(row=>row.id),['third']);
+});

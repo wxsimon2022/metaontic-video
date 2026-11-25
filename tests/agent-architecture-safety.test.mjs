@@ -107,3 +107,33 @@ test('编译中断恢复复用同一目标，保留已写制作审批，不重�
  project.filmSource.plan_digest='corrupt';await api.atomicJson(file,project);await assert.rejects(()=>api.bindCompiledProject(state,plan,exec,path.join(home,'source.json'),'model'),/COMPILE_RECOVERY_CONFLICT/);
  }finally{if(previous===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=previous;}
 });
+
+test('创意改写或漏项只补缺失栏目，不重贴已展示正文，补齐前仍不能审批',()=>{
+ const g=api.createFilmPresentationGuard(),session={},a={revision:4,data:{theme:'黄沙中的鲜果',logline:'一颗果实从枝头来到饭桌。',assumptions:['只出现手部，依据是聚焦果实，不虚构人物身份。']}};
+ g.remember(session,{project_id:'p',artifacts:{creative:a}});
+ const full=api.approvalMaterial('creative',a).approval_material.markdown;
+ const prefix=full.slice(0,full.indexOf('### 一句话故事'));
+ g.observe(session,visible(prefix+'\n### 一句话故事\n一颗果实来到餐桌。\n\n### 创作假设\n只出现手部。'));
+ assert.equal(g.shown(session,'p','creative',a),false);
+ const repair=g.repair(session,'p','creative',a).approval_material;
+ assert.equal(repair.partial,true);assert.equal(repair.revision,4);
+ assert.ok(!repair.markdown.includes('黄沙中的鲜果'));
+ assert.ok(repair.markdown.includes(a.data.logline));assert.ok(repair.markdown.includes(a.data.assumptions[0]));
+ g.observe(session,visible(repair.markdown));assert.equal(g.shown(session,'p','creative',a),true);
+ assert.deepEqual(g.repair(session,'p','creative',a),{});
+ const revised={...a,revision:5,data:{...a.data,logline:'修改后，果实留在枝头。'}};
+ g.remember(session,{project_id:'p',artifacts:{creative:revised}});
+ g.observe(session,visible(full));assert.equal(g.shown(session,'p','creative',revised),false);
+ assert.ok(g.repair(session,'p','creative',revised).approval_material.markdown.includes(revised.data.logline));
+});
+
+test('长创意补展示从未完成页继续，不重发已展示页且不允许跳页',()=>{
+ const g=api.createFilmPresentationGuard(),session={},a={revision:6,data:{theme:'完整长稿',logline:'甲'.repeat(18000)+'乙'.repeat(18000)}};
+ const full=api.approvalMaterial('creative',a).approval_material.markdown,pages=api.approvalChunks(full);
+ g.remember(session,{project_id:'p',artifacts:{creative:a}});g.observe(session,visible(pages[0]));
+ const repair=g.repair(session,'p','creative',a).approval_material;
+ assert.equal(repair.part,2);assert.equal(repair.markdown,pages[1]);
+ g.observe(session,visible(pages.at(-1)));assert.equal(g.shown(session,'p','creative',a),false);
+ for(const page of pages.slice(1))g.observe(session,visible(page));
+ assert.equal(g.shown(session,'p','creative',a),true);
+});

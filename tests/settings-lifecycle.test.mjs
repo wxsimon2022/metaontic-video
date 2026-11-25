@@ -112,12 +112,12 @@ test('online updates report hot application, required restart and inactive insta
   for (const [application, status, message] of [
     ['applied', 'applied', 'versionUpdateDone'],
     ['restart-required', 'restart', 'versionUpdateRestart'],
-    ['overridden', 'applied', 'versionUpdatePending'],
+    ['overridden', 'pending', 'versionUpdatePending'],
     ['cancelled', 'ok', 'versionUpdateCancelled'],
   ]) {
     const states = [], messages = [];
     const ctx = vm.createContext({
-      setUpdateConfirm() {}, setUpdateStatus: value => states.push(value), setUpdateMessage: value => messages.push(value),
+      verifyRuntime:async()=>true, setUpdateConfirm() {}, setUpdateStatus: value => states.push(value), setUpdateMessage: value => messages.push(value),
       manager: () => ({ manager: { listBundles: async () => ({ok:true,value:[{name:'metaontic-video',installed:true,source:'https://example.invalid/metaontic-video.tgz'}]}), installBundle: async () => ({ ok: true, value: { application, version: '3.4.0' } }) } }),
       PLUGIN_PACKAGE: 'metaontic-video', UPDATE_SPEC: 'git+https://example.invalid/plugin.git', UPDATE_ATTEMPTS: 2,
       updateConfirm: true, updateCommit: { current: '' }, updateLatest: '3.4.0', setUpdateLatest() {}, forgetUpdateCheck() {},

@@ -200,14 +200,14 @@ export const filmDirectorBusiness: BusinessModule = {
             if(state.approvals?.[args.stage]===artifact.revision)return respond(state,taskFor(),args.responseMode||'compact');
             if(!presentation.shown(exec?.agent?.session,id,args.stage,artifact)) {
               presentation.remember(exec?.agent?.session,state);
-              return {status:'needs_input',projectId:id,...approvalPage(args.stage,artifact),reason:'当前版本完整材料尚未在真实对话正文展示，审批未打开。请先单独完整展示approval_material.markdown，再沿原项目与修订号重试approve；不重写或重新生成。'};
+              return {status:'needs_input',projectId:id,...presentation.repair(exec?.agent?.session,id,args.stage,artifact),reason:'当前版本仍有材料尚未在真实对话正文完整展示，审批未打开。仅原样补充approval_material.markdown返回的缺失原文段落或待展示页面，已展示部分不要重贴；补齐后沿原项目与修订号重试approve。'};
             }
             if(args.stage==='creative'&&state.project_spec&&Object.hasOwn(state.project_spec,'work_type')&&!hasContentProfile(state.project_spec))throw Error('WORK_TYPE_REQUIRED_BEFORE_APPROVAL');
             const service=runtime.ctx.get?.('userQuestions') || (exec.agent as any)?.ctx?.get?.('userQuestions');
-            if (!service?.ask) return {status:'needs_input',projectId:id,...approvalPage(args.stage,artifact),reason:'人工确认服务不可用；先展示本版完整材料，恢复后再审核'};
+            if (!service?.ask) return {status:'needs_input',projectId:id,reason:'人工确认服务不可用；本版材料已完整展示，恢复服务后再审核，无需重贴正文'};
             const answer=await service.ask({agent:exec.agent,signal:exec.signal,questions:[{id:'film_approval',header:'创作审核',question:approvalPreview(args.stage,artifact),multiSelect:false,options:[{label:'批准本版',description:'继续下一创作阶段'},{label:'需要修改',description:'保留草稿并修改'},{label:'拒绝当前方案',description:'停止当前创作流程，保留已有资料'}]}]});
             const decision=answer?.answers?.find(a=>a.id==='film_approval');
-            if (exec.signal?.aborted || decision?.custom || decision?.selected?.length!==1 || !['批准本版','需要修改','拒绝当前方案'].includes(decision.selected[0])) return {status:'needs_input',projectId:id,...approvalPage(args.stage,artifact),reason:'未取得批准；保留当前材料，完整展示后再审核，不默认同意'};
+            if (exec.signal?.aborted || decision?.custom || decision?.selected?.length!==1 || !['批准本版','需要修改','拒绝当前方案'].includes(decision.selected[0])) return {status:'needs_input',projectId:id,reason:'未取得批准；保留已展示的当前材料，不重贴正文，不默认同意，等待用户决定'};
             state=recordApprovalDecision(state,args.stage,{'批准本版':'APPROVED','需要修改':'REVISE','拒绝当前方案':'REJECTED'}[decision.selected[0]],args.expectedRevision);
           }
           if (!['create','submit','approve','compile','revise','schedule','task_result','verify_issue','configure_profile','chapter_plan','chapter_submit','independent_review'].includes(args.action)) throw Error('INVALID_ACTION');

@@ -14,6 +14,7 @@ export function buildPromptGuidance(config) {
   const segmentSeconds = resolveSegmentSeconds(config);
   return [
     WORKFLOW_DECISION_GUIDANCE,
+    '【用户展示】用户正文使用清楚的中文标题与标签，按创意、剧情、人物场景、镜头、费用或审核分组。短要点用列表，只有时间轴等需要对照的信息用表格，不把长段正文塞进宽表格。不原样贴内部 JSON、英文键名或状态枚举；将其含义解释成中文。错误先说明当前影响和可行的下一步，不让用户修复协议字段。台词、原文、提示词、专名、模型名、链接及必要引用编号保留原文；不笼统删除英文。待批准材料按工具返回的完整 approval_material 展示，不自行缩写或改写。',
     '【阶段适用范围】专业film_project当前阶段以next/route返回的角色职责为准。以下全链路方法按阶段应用：Creative不写正式剧本，Screenwriter不提前写最终分镜与模型提示词。关于示意图、制作脚本、两项费用预算、角色图和video_project审核的要求，仅用于普通制作或专业项目编译进入实际制作时，不得提前施加到创意/编剧批准。不要把所有环节压缩成一次填表输出。',
     CREATIVE_GUIDANCE,
     REVIEW_REPAIR_GUIDANCE,

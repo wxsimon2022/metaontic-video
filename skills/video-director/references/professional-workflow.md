@@ -63,3 +63,5 @@ INVALID_TOOL_OUTPUT / value is not lossless JSON 是宿主输出协议错误，�
 独立审核请求调用前登记、原始回包先保存；异常先review_requests查看状态，结果不明或无效回包不自动重复请求。用户接受可能重复计费时retry_review经原生卡片确认，再independent_review，仅重试该项。逐章终审后还需跨章因果、人物变化、连续性、铺垫回收和需求检查，通过当前版本全片结构审核后才编译。
 
 制作review拦截补展示时，仅按presentation.missingMaterials补缺失材料；当前剧本已完整展示而分镜缺失时，只贴返回的分镜图片和链接，不重复剧本。PNG自行转换图不能代替项目绑定原图，应直接展示storyboard返回的markdown。
+
+用户展示：工具数据保留英文协议键名，面向用户的正文使用中文标题和标签；按内容分组，短要点用列表，长正文不挤入表格。不得原样贴出 type_details、recognizable_identity 等内部字段名或审核状态枚举。台词、提示词、专名、链接与必要编号保留原文。审批材料按 approval_material 完整展示，不擅自改写。

@@ -11,7 +11,7 @@ function setup(manager) {
   const sandbox=vm.createContext({window:{localStorage:{removeItem(){}}}});
   vm.runInContext(sourceOf('ui/updates/update.service'),sandbox);
   const api={...manager,installBundle:async()=>{state.calls++;return {ok:true,value:{application:'applied',version:'3.13.2'}};}};
-  const context={updateConfirm:true,PLUGIN_VERSION:'3.13.1',updateLatest:'3.13.2',availableVersions:['3.13.2'],
+  const context={verifyRuntime:async()=>true,updateConfirm:true,PLUGIN_VERSION:'3.13.1',updateLatest:'3.13.2',availableVersions:['3.13.2'],
     PLUGIN_PACKAGE:'metaontic-video',UPDATE_ATTEMPTS:1,UPDATE_CACHE_KEY:'test',
     manager:()=>({manager:api}),isNewerVersion:()=>true,setUpdateConfirm(){},setUpdateLatest(){},
     setUpdateStatus:v=>{state.status=v;},setUpdateMessage:v=>{state.message=v;},setUpdateAt(){},t:key=>key};
@@ -88,4 +88,14 @@ test('cached latest asset with a different installed version is not reported as 
   await sandbox.createUpdateActions(context).runOnlineUpdate();
   assert.equal(state.status, 'failed');
   assert.match(state.message, /4\.0\.6.*4\.0\.7.*不一致/);
+});
+
+test('host applied without live activation proof stays pending; verified runtime permits success',async()=>{
+ for(const verified of [false,true]){
+  const state={};const sandbox=vm.createContext({window:{localStorage:{removeItem(){}}}});
+  vm.runInContext(sourceOf('ui/updates/update.service'),sandbox);
+  const manager={listBundles:async()=>[{name:'metaontic-video',installed:true,source:'https://example.com/pkg.tgz'}],installBundle:async()=>({ok:true,value:{application:'applied',version:'4.2.6'}})};
+  await sandbox.createUpdateActions({updateConfirm:true,PLUGIN_VERSION:'4.2.5',updateLatest:'4.2.6',PLUGIN_PACKAGE:'metaontic-video',UPDATE_ATTEMPTS:1,UPDATE_CACHE_KEY:'test',manager:()=>({manager}),isNewerVersion:()=>true,verifyRuntime:async()=>verified,setUpdateConfirm(){},setUpdateLatest(){},setUpdateStatus:value=>state.status=value,setUpdateMessage:value=>state.message=value,t:key=>key}).runOnlineUpdate();
+  assert.equal(state.status,verified?'applied':'pending');assert.equal(state.message,verified?'versionUpdateDone':'versionUpdatePending');
+ }
 });

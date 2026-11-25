@@ -246,3 +246,11 @@ Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.c
 设置页README回退根因：宿主dsh-plugin-detail直接read包内locale/<语言>.json，不走package.exports。build必须同时生成dist/locale与物理locale两处相同JSON，files纳入locale/*.json及空plugin-detail.md；局部build:host/client不能删除物理locale。仅有dist/locale与exports映射不够，安装检查必须断言物理文件、meta.detail及空正文，避免每次重装回退README。组件元信息仍通过原导出路径读取；npm中文readme元数据独立保留。
 
 本地同版本反复打包安装时必须使用新的成品路径；覆盖原tgz再pnpm add同路径可能仍复用旧缓存（exit0但added0、托管dist哈希仍旧）。复制同一已验证成品到新安装批次目录后再通过dsh plugin add安装，核对托管dist和物理locale哈希，不能只看CLI成功。
+
+运行代码更新验收：同版本dsh plugin add成功、磁盘哈希一致都不证明已加载。profile HMR root=[]且启用bundle列表未变时，宿主manifest刷新可能直接返回并保留旧模块。检查无执行中视频后，备份并只调整本插件已安装入口的HMR监听；保留其他监听与业务配置。以真实工具响应的新协议字段或宿主明确HMR事件验收，无法读取运行状态时说明未实测，不无证要求重启。
+
+用户可读材料：不得将type_details英文键名或review_status等枚举直接当正文标签。审批和新旧导出共用approval.presenter的readable；新增类型字段同步中文标签，六类配置回归覆盖。用户正文分组、要点列表，保留对白/提示词/专名原文；JSON工具协议不翻译。构建与运行身份及内容寻址安装见build-identity.md，npm pack前必须通过源码与文件摘要校验，磁盘安装不等于运行模块已切换。
+
+工具调用中文标题通过宿主ToolDefinition.presentCall返回generic卡片title，公共tool.adapter统一注入并由计时/统计包装保留；不能直接将name改为中文，以免破坏模型协议与历史记录。新增工具及film_project动作须同步shared/utils/tool-presentation.ts，真实构建注册覆盖见host-integration.test.mjs。工具展开后的技术标识与原始参数仍由宿主控制，插件不修改宿主文件。
+
+创意重复展示先比对真实assistant正文与保存稿，不把“自行润色省略后被守卫拦截”误判成卡片重复。首次原样展示已排版approval_material，短稿补缺按完整原文段落，不再退回整篇；长稿继续严格逐页，不能语义相似度放行。故事结构使用标题加累计时间范围和内容分组，不堆段落/标题/时长字段；未知时长不补造后续时间点。
