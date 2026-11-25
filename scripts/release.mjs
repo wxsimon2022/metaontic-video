@@ -58,6 +58,7 @@ const help = `一键发布（准备好完整说明与指南后执行）：
 想交给 Gitee Go 流水线打包发布时加 --pipeline（--ci 是同义写法）：本机只做准备、提交、打标签并推送，成品打包、制品库归档与 Gitee Release 都由流水线按标签完成，本机不需要 GITEE_TOKEN。
 需要同时同步 GitHub（含双平台安装校验）时加 --both，或 --github <地址>；--both 走本机收尾，不要与 --pipeline 同时用。
 --all 一键发布 Gitee、GitHub、npm 并校验中国镜像同步；需 npm 发布凭据，与 --pipeline / --github-only 互斥。
+三端共享构建与双平台安装检查，通过后启动三个独立进程并行发布；失败端同版本续跑，已完成端仅核验。
 可选：--gitee <Gitee仓库地址> --branch master
 --dry-run 只显示范围与计划，不写文件、不改版本、不提交、不联网发布。
 --github-only 仅推送 GitHub 标签并发布 GitHub Release，不写入 Gitee。
@@ -147,7 +148,7 @@ export async function main(argv) {
     const route=pipeline
       ? '提交/标签 → 推送标签 → Gitee Go 流水线按标签构建、测试、打包 → 发布 Gitee Release 并归档制品库'
       : (includeGithub?'打包/核对 → 提交/标签 → 推送 → 等待双平台CI → 核对两处附件':'打包/核对 → 提交/标签 → 推送 → 上传并核对 Gitee Release 附件');
-    console.log(`\nDRY RUN（${channel}）：计划检查 → 构建/测试 → ${route}${opts.all ? ' → npm 成品发布 → 中国镜像同步核对' : ''}。`);printLinks();return;
+    console.log(`\nDRY RUN（${channel}）：计划检查 → 构建/测试 → ${route}${opts.all ? ' → 双平台检查后 GitHub/Gitee/npm 三进程并行发布 → 中国镜像同步核对' : ''}。`);printLinks();return;
   }
   // 最新正式版以发布渠道为准：Gitee 单仓发布时不能依赖 GitHub Release 列表。
   const latestOfficial=async()=>{
@@ -300,6 +301,26 @@ export async function main(argv) {
   }
   if(!workflow) {printLinks();throw Error('已推送，但尚未找到匹配CI；稍后用--resume续跑');}
   if(workflow.conclusion==='failure' && opts.resume)run('gh',['run','rerun',String(workflow.databaseId),'--failed','--repo',github.slug]);
+  if(opts.all) {
+    const {waitForPlatformChecks,runReleaseChannels}=await import('./release-parallel.mjs');
+    await waitForPlatformChecks({expectedSha:git('rev-parse',`${tag}^{commit}`),inspect:async()=>JSON.parse(gh('run','view',String(workflow.databaseId),'--repo',github.slug,'--json','headSha,status,jobs'))});
+    const archive=path.join(out,assets[0]);
+    const localDigest=createHash('sha256').update(readFileSync(archive)).digest('hex');
+    // Check the exact package validated by CI before any parallel public mutations.
+    const stagedDir=path.join(out,'verified-staged');mkdirSync(stagedDir,{recursive:true});
+    run('gh',['release','download',tag,'--repo',github.slug,'--dir',stagedDir,'--pattern',assets[0],'--clobber']);
+    const stagedDigest=createHash('sha256').update(readFileSync(path.join(stagedDir,assets[0]))).digest('hex');
+    if(stagedDigest!==localDigest)throw Error('双平台已检验成品与本地成品不一致，停止三端发布');
+    if(!await push(gitee,'gitee.com','Gitee 标签',[tag]))throw Error('Gitee 标签推送失败；同版本续跑');
+    await runReleaseChannels({common:{version,tag,archive,out,sha256:localDigest,notes:notesText,githubRepo:github.slug,workflowId:workflow.databaseId}});
+    run(process.execPath,['scripts/market-index.mjs']);
+    if(git('status','--short','--','market/index.json')) {
+      run('git',['add','market/index.json']);run('git',['commit','-m',`chore(market): 切换 ${tag} 到 npm 来源`]);
+      if(!await push(gitee,'gitee.com','Gitee 市场索引',[target]))throw Error('三端已完成但 Gitee 索引未推送');
+      if(!await push(github,'github.com','GitHub 市场索引',[target]))throw Error('三端已完成但 GitHub 索引未推送');
+    }
+    console.log('三端并行发布完成：中国镜像已核对目标版本、组合包声明和成品完整性。');printLinks();return;
+  }
   const watched=run('gh',['run','watch',String(workflow.databaseId),'--exit-status','--interval','10','--repo',github.slug],{optional:true});
   const release=run('gh',['release','view',tag,'--repo',github.slug,'--json','assets,isPrerelease,body'],{capture:true,optional:true});
   const data=release?JSON.parse(release):null;
@@ -319,18 +340,6 @@ export async function main(argv) {
   if (!await push(gitee,'gitee.com','Gitee 标签',[tag])) throw Error('Gitee 标签推送失败；保留同版成品后续跑');
   for(const name of assets)await publishGitee({token,tag,archive:path.join(out,name),notes:notesText,prerelease:false});
   console.log(`双平台CI通过，GitHub与Gitee已发布同一成品：${assets.join('、')}`);
-  if(opts.all) {
-    const {publishNpmRelease}=await import('./publish-npm-release.mjs');
-    try { await publishNpmRelease({name:pkg.name,version,archive:path.join(out,assets[0])}); }
-    catch(error) { throw Error(`仓库发行版已完成，npm/中国镜像未完成：${error.message}；若 npm 提示 staged，请在 npm 批准后以同版本 --all --resume 续跑，不改标签`); }
-    run(process.execPath,['scripts/market-index.mjs']);
-    if(git('status','--short','--','market/index.json')) {
-      run('git',['add','market/index.json']);run('git',['commit','-m',`chore(market): 切换 ${tag} 到 npm 来源`]);
-      if(!await push(gitee,'gitee.com','Gitee 市场索引',[target]))throw Error('npm 已完成但 Gitee 索引未推送');
-      if(!await push(github,'github.com','GitHub 市场索引',[target]))throw Error('npm 已完成但 GitHub 索引未推送');
-    }
-    console.log('三端发布完成：中国镜像已核对目标版本、组合包声明和成品完整性。');
-  }
 
 
 }
