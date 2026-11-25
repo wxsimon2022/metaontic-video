@@ -222,7 +222,7 @@ npm run release -- 3.13.3 --dry-run
 npm run release -- 3.13.3
 ```
 
-脚本显示待发布范围与说明，更新版本、锁文件和发布元数据，构建、测试、打包，创建提交及附注标签，推送仓库（默认只推 Gitee，加 `--both` 时与 GitHub 并行推送、各自失败退避重试三次）。默认随后在本机用 `GITEE_TOKEN` 直接创建 Gitee Release 并上传核对通用 `.tgz`；加 `--pipeline` 才把打包与发布交给 Gitee Go 流水线（本机只推标签，制品库归档也在流水线）；带 `--both` 时还会等待 GitHub Actions 的双平台安装/升级检查与附件上传。最后输出发布页及 `.tgz` 安装地址。使用说明书不写入版本记录。失败立即停止，不强推或覆盖旧标签。
+脚本显示待发布范围与说明，更新版本、锁文件和发布元数据，构建、测试、打包，创建提交及附注标签，推送仓库（默认只推 Gitee，加 `--both` 时与 GitHub 并行推送、各自失败退避重试三次）。默认随后在本机用 `GITEE_TOKEN` 直接创建 Gitee Release 并上传核对通用 `.tgz`；加 `--pipeline` 才把打包与发布交给 Gitee Go 流水线（本机只推标签，制品库归档也在流水线）；带 `--both` 时还会等待 GitHub Actions 的双平台安装/升级检查与附件上传。最后输出发布页及 `.tgz` 安装地址。使用说明书不写入版本记录。共享准备失败立即停止；并行上传阶段汇总全部结果，不强推或覆盖旧标签。
 
 发布文件已提交但上传中断时，保留同一版本续跑：
 
@@ -260,6 +260,6 @@ npm run pack:test -- 3.13.9-test.1
 
 ## 一键三端发布
 
-`node scripts/release.mjs X.Y.Z --all --notes .local/release-plan.json` 发布同一份成品到 Gitee、GitHub、npm，并核对中国镜像源同步；也可用 `npm run release:all` 交互输入版本。先完成 Windows/macOS 安装检查，仓库正式发行完成后才发布 npm。需要既有 Gitee、GitHub 与 npm 凭据。默认发布渠道不变，`--both` 仍仅双仓。
+`node scripts/release.mjs X.Y.Z --all --notes .local/release-plan.json` 发布同一份成品到 Gitee、GitHub、npm，并核对中国镜像源同步；也可用 `npm run release:all` 交互输入版本。先完成 Windows/macOS 对同一成品的安装检查并核对 CI 暂存包摘要，再启动三个独立 Node 进程并行处理 GitHub、Gitee、npm；GitHub 任务直接公开已验证成品并核对附件，Gitee 和 npm 不等待彼此上传；托管流水线同时收尾时复用并核对已有附件。需要既有 Gitee、GitHub 与 npm 凭据。默认发布渠道不变，`--both` 仍仅双仓。
 
-npm 版本已存在时核对下载原字节，不覆盖；镜像同步失败或 npm 待批准时保留已完成的仓库版本，批准后执行同版本 `--all --resume`，不重新打包或改标签。三端确认后自动刷新并推送市场 npm 来源索引。`--all` 不与 `--pipeline` 或 `--github-only` 同用。
+每端的结果写入 `.local/releases/<版本>/channels.json`，任一端失败仍等待其他端完成并保留结果；同版本 `--all --resume` 续跑时，已完成端只核验已有成品，不覆盖或重传。npm 提交前保存版本与成品摘要记录，平台处理中、响应丢失或镜像未就绪时只轮询公开状态，不根据临时404重复提交。并发 npm 发布受本地独占锁保护；若发布进程意外中断留下锁，先核对该进程已结束和 npm 提交记录，再移除对应版本目录下的 `npm-publish.lock`，不能清除提交记录来绕过防重。三端及中国镜像全部确认后，才自动刷新并推送市场 npm 来源索引。`--all` 不与 `--pipeline` 或 `--github-only` 同用。

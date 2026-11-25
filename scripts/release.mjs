@@ -312,7 +312,7 @@ export async function main(argv) {
     const stagedDigest=createHash('sha256').update(readFileSync(path.join(stagedDir,assets[0]))).digest('hex');
     if(stagedDigest!==localDigest)throw Error('双平台已检验成品与本地成品不一致，停止三端发布');
     if(!await push(gitee,'gitee.com','Gitee 标签',[tag]))throw Error('Gitee 标签推送失败；同版本续跑');
-    await runReleaseChannels({common:{version,tag,archive,out,sha256:localDigest,notes:notesText,githubRepo:github.slug,workflowId:workflow.databaseId}});
+    await runReleaseChannels({common:{version,tag,archive,out,sha256:localDigest,notes:notesText,githubRepo:github.slug,workflowId:workflow.databaseId,expectedSha:git('rev-parse',`${tag}^{commit}`)}});
     run(process.execPath,['scripts/market-index.mjs']);
     if(git('status','--short','--','market/index.json')) {
       run('git',['add','market/index.json']);run('git',['commit','-m',`chore(market): 切换 ${tag} 到 npm 来源`]);

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { publishStableAlias, STABLE_ASSET } from '../scripts/publish-stable-alias.mjs';
 
-function fixture(t, { existing = false, corrupt = false, newer = false } = {}) {
+function fixture(t, { existing = false, corrupt = false, newer = false, raced = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'stable-alias-test-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const archive = join(dir, 'original.tgz');
@@ -21,7 +21,7 @@ function fixture(t, { existing = false, corrupt = false, newer = false } = {}) {
       const name = args[args.indexOf('--pattern') + 1];
       writeFileSync(join(args[args.indexOf('--dir') + 1], name), assets.get(name));
     }
-    if (args[1] === 'upload') assets.set(STABLE_ASSET, readFileSync(args[3]));
+    if (args[1] === 'upload') { assets.set(STABLE_ASSET, raced && corrupt ? Buffer.from('wrong bytes') : readFileSync(args[3])); if (raced) throw Error('already exists'); }
     return '';
   };
   return { calls, assets, invoke: () => publishStableAlias({ tag: 'v4.0.6', archive, repo: 'owner/repo', run }) };
@@ -48,4 +48,15 @@ test('backfilling an old release cannot move latest backwards', t => {
 });
 test('prerelease tag fails before invoking GitHub', () => {
   assert.throws(() => publishStableAlias({ tag: 'v4.0.6-beta.1', run: () => assert.fail('must not run') }), /Only stable/);
+});
+
+test('concurrent hosted/local alias upload verifies the winner without overwriting it', t => {
+ const h = fixture(t, { raced: true }); h.invoke();
+ assert.equal(h.calls.filter(args => args[1] === 'upload').length, 1);
+ assert.equal(h.calls.at(-1)[1], 'edit');
+});
+test('concurrent alias upload with different bytes cannot publish', t => {
+ const h = fixture(t, { raced: true, corrupt: true });
+ assert.throws(h.invoke, /checksum mismatch/);
+ assert.equal(h.calls.some(args => args[1] === 'edit'), false);
 });

@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateNpmBundle } from './npm-bundle.mjs';
+import { platformCheckState } from './release-parallel.mjs';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 function gh(args, optional = false) {
@@ -11,9 +12,14 @@ function gh(args, optional = false) {
   if (result.error || result.status !== 0) { if (optional) return null; throw Error(`GitHub ${args[0]} ${args[1]} 失败`); }
   return result.stdout.trim();
 }
-async function verifyGithub(config) {
-  const { tag, githubRepo: repo, workflowId, archive, out, notes, sha256 } = config;
-  gh(['run', 'watch', String(workflowId), '--repo', repo, '--exit-status', '--interval', '10']);
+async function publishGithub(config) {
+  const { tag, githubRepo: repo, workflowId, expectedSha, archive, out, notes, sha256 } = config;
+  const checked = JSON.parse(gh(['run', 'view', String(workflowId), '--repo', repo, '--json', 'headSha,status,jobs']));
+  if (!platformCheckState(checked, expectedSha)) throw Error('双平台检查未完成，不能公开 GitHub 正式版');
+  const { publishStableAlias } = await import('./publish-stable-alias.mjs');
+  // This worker publishes GitHub directly, rather than making the other channels
+  // wait for the hosted publication job. Both paths verify and reuse the bytes.
+  publishStableAlias({ tag, archive, repo });
   const release = JSON.parse(gh(['release', 'view', tag, '--repo', repo, '--json', 'isDraft,isPrerelease,assets,body']));
   if (release.isDraft || release.isPrerelease || release.body.trim() !== notes.trim()) throw Error('GitHub 正式版状态或说明不一致');
   const dir = path.join(out, 'verify-github-parallel'); mkdirSync(dir, { recursive: true });
@@ -32,6 +38,7 @@ export async function publishNpmChannel(config, { publish, verify, wait = ms => 
   // Fail closed for concurrent publishers; a crashed lock requires inspecting the receipt.
   mkdirSync(lock);
   try {
+    writeFileSync(path.join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, version: config.version, sha256: config.sha256 }) + '\n', { mode: 0o600 });
     if (existsSync(receipt)) {
       const prior = JSON.parse(readFileSync(receipt, 'utf8'));
       if (prior.version !== config.version || prior.sha256 !== config.sha256) throw Error('npm 提交记录与成品不一致');
@@ -57,7 +64,7 @@ export async function publishChannel(config) {
   const bytes = readFileSync(archive);
   if (digest(bytes) !== sha256) throw Error('发布前成品摘要改变');
   const manifest = validateNpmBundle(bytes, { version });
-  if (channel === 'github') return verifyGithub(config);
+  if (channel === 'github') return publishGithub(config);
   if (channel === 'gitee') {
     const { publishGiteeWithAlias } = await import('./publish-gitee.mjs');
     return publishGiteeWithAlias({ token: process.env.GITEE_TOKEN, tag, archive, notes: config.notes, prerelease: false });

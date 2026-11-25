@@ -29,7 +29,13 @@ export function publishStableAlias({ tag, archive, repo, run = command }) {
     const alias = join(dir, STABLE_ASSET);
     if (!remote.assets.some(asset => asset.name === STABLE_ASSET)) {
       copyFileSync(archive, alias);
-      run(['release', 'upload', tag, alias, '--repo', repo]);
+      try { run(['release', 'upload', tag, alias, '--repo', repo]); }
+      catch (error) {
+        // The local parallel worker and hosted job can reach this together.
+        // An already-created alias is accepted only after downloading its bytes below.
+        const current = JSON.parse(run(['release', 'view', tag, '--repo', repo, '--json', 'assets']));
+        if (!current.assets.some(asset => asset.name === STABLE_ASSET)) throw error;
+      }
       rmSync(alias);
     }
     // Existing assets are verified, never overwritten, including on a resumed run.
