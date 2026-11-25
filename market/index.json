@@ -76,9 +76,21 @@
         "sortKeys": {}
       },
       "dist-tags": {
-        "latest": "4.2.6"
+        "latest": "4.2.7"
       },
       "versions": [
+        {
+          "version": "4.2.7",
+          "publishTimestamp": 1795602933,
+          "source": {
+            "type": "git",
+            "url": "https://gitee.com/hackloop/metaontic-video.git",
+            "commit": "3a78a8d2eb3ab797f4d17fececbd76ef1203951b"
+          },
+          "engines": {
+            "dsh": ">=0.2.0"
+          }
+        },
         {
           "version": "4.2.6",
           "publishTimestamp": 1795584346,
@@ -101,11 +113,9 @@
         },
         {
           "version": "4.2.4",
-          "publishTimestamp": 1795485655,
+          "publishTimestamp": 1795485925,
           "source": {
-            "type": "git",
-            "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "19d873b63c2438690a0a5a9774df0f63efa26fda"
+            "type": "npm"
           },
           "engines": {
             "dsh": ">=0.2.0"
@@ -113,19 +123,7 @@
         },
         {
           "version": "4.2.3",
-          "publishTimestamp": 1795439990,
-          "source": {
-            "type": "git",
-            "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "1a06ac31fadb467e29e59241b2f355ac1ff305a2"
-          },
-          "engines": {
-            "dsh": ">=0.2.0"
-          }
-        },
-        {
-          "version": "4.2.2",
-          "publishTimestamp": 1795343719,
+          "publishTimestamp": 1795440578,
           "source": {
             "type": "npm"
           },
