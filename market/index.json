@@ -81,11 +81,9 @@
       "versions": [
         {
           "version": "4.2.7",
-          "publishTimestamp": 1795602933,
+          "publishTimestamp": 1795605135,
           "source": {
-            "type": "git",
-            "url": "https://gitee.com/hackloop/metaontic-video.git",
-            "commit": "3a78a8d2eb3ab797f4d17fececbd76ef1203951b"
+            "type": "npm"
           },
           "engines": {
             "dsh": ">=0.2.0"
