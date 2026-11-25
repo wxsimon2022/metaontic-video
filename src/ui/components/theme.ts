@@ -117,6 +117,7 @@ const TOKENS = {
       .mov-support-dialog::backdrop { background: rgba(0, 0, 0, .45); }
       .mov-support-content { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
       .mov-support-content p { margin: 0; }
+      .mov-community-qr { display: block; width: min(100%, 320px); height: auto; align-self: center; background: white; }
       .mov-support-frame { width: 100%; height: min(480px, 62vh); border: 0; border-radius: 8px; background: white; }
       .mov-trailing { margin-left: auto; }
       /* 额度：三个数字块，一眼分清剩余 / 已用 / 总额度 */

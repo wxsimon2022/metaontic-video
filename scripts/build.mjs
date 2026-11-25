@@ -50,7 +50,7 @@ if (target === 'all' || target === 'host') {
 if (target === 'all' || target === 'client') {
   await rm('dist/client.js', { force: true });
   await mkdir('dist', { recursive: true });
-  await build({entryPoints:['src/client.ts'],bundle:true,charset:'utf8',format:'iife',platform:'browser',target:'es2022',loader:{'.svg':'text','.png':'dataurl'},minifySyntax:true,define:defines,outfile:'dist/client.js'});
+  await build({entryPoints:['src/client.ts'],bundle:true,charset:'utf8',format:'iife',platform:'browser',target:'es2022',loader:{'.svg':'text','.png':'dataurl','.jpg':'dataurl'},minifySyntax:true,define:defines,outfile:'dist/client.js'});
 }
 
 // 预设入口源码统一放 src；发布目录仅保留构建产物与静态资源。
