@@ -130,16 +130,17 @@ test('independent real executor pauses, resumes exactly once and creates no refe
 });
 test('new professional project completes approved evidence chain and persists compiled binding; reads remain available during approval',async()=>{
  const home=await mkdtemp(path.join(dir,'项目 '));const prior=process.env.DSH_HOME;process.env.DSH_HOME=home;
- let tool,unlock,asked;
+ let tool,observe,unlock,asked;
  const waiting=new Promise(r=>asked=r);
  const fetchBefore=globalThis.fetch;
- const runtime={config:{model,connectionMode:'metaontic',metaonticApiKey:'mock-only',baseUrl:'https://review.invalid'},tools:{register(_,t){tool=t;}},ctx:{get(){return {ask:async()=>{asked();await new Promise(r=>unlock=r);return {answers:[{id:'film_approval',selected:['批准本版']}]};}};}}};
+ const runtime={config:{model,connectionMode:'metaontic',metaonticApiKey:'mock-only',baseUrl:'https://review.invalid'},tools:{register(_,t){tool=t;}},ctx:{on(_event,listener){observe=listener;},get(){return {ask:async()=>{asked();await new Promise(r=>unlock=r);return {answers:[{id:'film_approval',selected:['批准本版']}]};}};}}};
  const exec={agent:{session:{id:'global-project'}}};api.filmDirectorBusiness.apply(runtime);
  try {
   let state=await tool.execute({action:'create',title:'递杯',sourceBrief:'两个地点的一次关照',durationSeconds:15,projectSpec:JSON.stringify({genre:'drama',target_model:model,production_strategy:'independent_shots'})},exec);
   const projectId=state.project_id;
   const submit=async(stage,data)=>{state=await tool.execute({action:'submit',projectId,expectedRevision:state.revision,stage,content:JSON.stringify(data)},exec);};
   await submit('creative',{theme:'关照',logline:'递杯再接受',structure:[{section_id:'s',purpose:'递杯表达关照',visual_evidence:['杯子被接受'],duration_ms:15000}],must_preserve:[],assumptions:[]});
+  observe(exec.agent.session,{type:'assistant/message',data:{message:{content:[{type:'text',text:state.approval_material.markdown}]}}});
   const pending=tool.execute({action:'approve',projectId,stage:'creative',expectedRevision:state.revision},exec);
   await waiting;
   assert.equal((await tool.execute({action:'diagnose',projectId},exec)).lock.status,'active');
@@ -150,6 +151,7 @@ test('new professional project completes approved evidence chain and persists co
   const data=legacyFilm().artifacts;
   const script={...data.script.data,characters:[],dialogue:[],scenes:data.script.data.scenes.map(s=>({...s,scene_goal:'观察杯子',entry_state:'杯子在桌上',exit_state:'杯子被移动',key_actions:['杯子沿桌面移动']}))};
   await submit('script',script);
+  observe(exec.agent.session,{type:'assistant/message',data:{message:{content:[{type:'text',text:state.approval_material.markdown}]}}});
   state=await tool.execute({action:'approve',projectId,stage:'script',expectedRevision:state.revision},exec);
   await submit('assets',data.assets.data);
   await submit('shots',{shots:data.shots.data.shots.map(s=>({...s,chapter_id:'c',narrative_purpose:'呈现杯子的移动',costume_ids:[],dialogue_refs:[]}))});
@@ -163,6 +165,17 @@ test('new professional project completes approved evidence chain and persists co
   runtime.ctx.get=()=>({ask:async()=>{throw new Error('文本审核不应再弹独立费用审批');}});
   state=await tool.execute({action:'independent_review',projectId,expectedRevision:state.revision},exec);
   assert.equal(reviewCalls,1);assert.equal(state.nextTask.action,'compile');
+  const journal=await tool.execute({action:'review_requests',projectId},exec);
+  assert.equal(journal.requests.length,1);assert.equal(journal.requests[0].status,'response_saved');
+  runtime.ctx.get=()=>({ask:async()=>({answers:[{id:'review_retry',selected:['先不重试']}]})});
+  const declined=await tool.execute({action:'retry_review',projectId,expectedRevision:state.revision,requestKey:journal.requests[0].key},exec);
+  assert.equal(declined.status,'pending');assert.equal(reviewCalls,1);
+  runtime.ctx.get=()=>({ask:async()=>({answers:[{id:'review_retry',selected:['确认重新请求']}]})});
+  const authorized=await tool.execute({action:'retry_review',projectId,expectedRevision:state.revision,requestKey:journal.requests[0].key},exec);
+  assert.equal(authorized.status,'prepared');assert.equal(reviewCalls,1);
+  state=await tool.execute({action:'independent_review',projectId,expectedRevision:state.revision},exec);
+  assert.equal(reviewCalls,2);
+
   state=await tool.execute({action:'compile',projectId,expectedRevision:state.revision,ratio:'16:9',resolution:'480p'},exec);
   assert.equal(state.production.strategy,'independent_shots');
   const video=await workflowApi.readProject(state.production.videoProjectId,exec);

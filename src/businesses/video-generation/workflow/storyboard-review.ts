@@ -133,7 +133,7 @@ export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     // 只要真的发起了审核提问就不再算漏问；放行与否仍由下面的展示检查决定。
     if (review && state) state.awaitingReview = false;
     if (!review || (!args.requireStoryboard && !state?.active)) return null;
-    if (args.requiredScriptText) {
+    if (args.requiredScriptText && !args.requiredProjectId) {
       // 以前要求正文逐字包含 script.md：助手把脚本整理成带标题、加「· 第 1 版」的展示版就会被误拦，
       // 审核窗一直开不出来。改成按覆盖率判断，仍能挡下摘要、删段与只给链接。
       const coverage = scriptCoverage(args.requiredScriptText, args.requiredProjectId ? state?.messages.join('\n') : state?.text);
@@ -146,17 +146,20 @@ export function createStoryboardReviewGuard({ log = appendRequestLog } = {}) {
     }
     if(args.requiredProjectId) {
       const binding=args.requiredStoryboard;
+      const scriptShown=!!state?.messages.some(text=>readableText(text).includes(readableText(args.requiredScriptText)));
       if(!binding || binding.projectId!==args.requiredProjectId || binding.scriptHash!==args.requiredScriptHash
         || path.resolve(binding.scriptPath)!==path.resolve(args.requiredScriptPath)) {
-        return {kind:'deny',reason:'本项目分镜未绑定当前脚本版本，请先调用storyboard生成并展示本版分镜。'};
-      }
-      if(!state?.messages.some(text=>readableText(text).includes(readableText(args.requiredScriptText)))) {
-        return {kind:'deny',reason:'当前版本脚本尚未完整展示，不能用旧稿或多条摘要拼接通过。请完整展示当前稿件一次。'};
+        return {kind:'deny',missingMaterials:[...(scriptShown?[]:['script']),'storyboard'],reason:'本项目分镜未绑定当前脚本版本，请先调用storyboard生成并展示本版分镜。'};
       }
       const shownHash=await state?.images.get(binding.path);
       const currentHash=await readFile(binding.path).then(bytes=>createHash('sha256').update(bytes).digest('hex')).catch(()=>'');
-      if(!shownHash || shownHash!==binding.imageHash || currentHash!==binding.imageHash) {
-        return {kind:'deny',reason:'本项目当前版本分镜尚未实际展示，或图片已改变。'+linkHint(binding.path)};
+      const storyboardShown=!!shownHash && shownHash===binding.imageHash && currentHash===binding.imageHash;
+      const missingMaterials=[...(scriptShown?[]:['script']),...(storyboardShown?[]:['storyboard'])];
+      if(!scriptShown) {
+        return {kind:'deny',missingMaterials,reason:'当前版本脚本尚未完整展示，不能用旧稿或多条摘要拼接通过。请完整展示当前稿件一次。'};
+      }
+      if(!storyboardShown) {
+        return {kind:'deny',missingMaterials,reason:'本项目当前版本分镜尚未实际展示，或图片已改变。'+linkHint(binding.path)+'当前剧本已完整展示，无需重复贴出。'};
       }
       return null;
     }

@@ -19,7 +19,7 @@ for (const cumulative of [false, true]) for (const cuts of [false, true]) for(co
       const context = vm.createContext({
         timedStage: async (_stage, operation) => operation(),
         ref: (config, key, fallback) => config[key] ?? fallback,
-        path, ...fs, appendRequestLog: async () => {}, exists: async file => { try { await fs.stat(file); return true; } catch { return false; } },
+        path, ...fs, reportOutcome: () => {}, outcomeError: () => "other", appendRequestLog: async () => {}, exists: async file => { try { await fs.stat(file); return true; } catch { return false; } },
         hasFfmpeg: async () => true,
         probeMedia: async file => ({durationSeconds: file === originals[1] && cumulative ? 30 : 15}),
         CUMULATIVE_TOLERANCE_MIN_SECONDS: 1.5, CUMULATIVE_TOLERANCE_RATIO: 0.25,

@@ -29,6 +29,8 @@ export function toolOutcome(tool: string, args: any, result?: any, error?: any) 
     if (tool === 'film_project' && action === 'approve') {
       status = result.approvals?.[stage] != null ? 'approved'
         : result.status === 'STOPPED' ? 'cancelled' : String(result.status || '').endsWith('_REVISE') ? 'draft' : 'pending';
+    } else if (tool === 'film_project' && action === 'independent_review') {
+      status = result.status === 'FINAL_DELIVERY' ? 'succeeded' : result.status === 'REVISE_REQUIRED' ? 'draft' : result.status === 'BLOCKED' ? 'blocked' : 'pending';
     } else if (tool === 'video_script') status = result.truncated ? 'pending' : result.script ? 'succeeded' : 'unknown';
     else if (result.deliveryError || result.ffmpegMissing) status = 'failed';
     else if (result.paused) status = 'paused';

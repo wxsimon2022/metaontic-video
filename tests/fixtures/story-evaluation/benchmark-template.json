@@ -1,0 +1,47 @@
+{
+  "description": "离线记录模板：请将空script替换为实际保存稿，添加真实评阅和用量；不代表已测基线。",
+  "records": [
+    {
+      "case_id": "comedy_30",
+      "script": {
+        "scenes": [],
+        "dialogue": []
+      }
+    },
+    {
+      "case_id": "life_30",
+      "script": {
+        "scenes": [],
+        "dialogue": []
+      }
+    },
+    {
+      "case_id": "commercial_15",
+      "script": {
+        "scenes": [],
+        "dialogue": []
+      }
+    },
+    {
+      "case_id": "promotion_60",
+      "script": {
+        "scenes": [],
+        "dialogue": []
+      }
+    },
+    {
+      "case_id": "documentary_60",
+      "script": {
+        "scenes": [],
+        "dialogue": []
+      }
+    },
+    {
+      "case_id": "chapter_600",
+      "script": {
+        "scenes": [],
+        "dialogue": []
+      }
+    }
+  ]
+}

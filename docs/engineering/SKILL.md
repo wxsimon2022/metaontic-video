@@ -235,6 +235,14 @@ Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.c
 
 专业剧本批准前展示：submit/read/next返回待script批准时，full与compact均携带approval_material（绑定已保存剧本修订号和完整Markdown）。助手先独立正文完整展示，再单独film_project approve；不再要求仅在审批卡片展示全文。未展示不能沿用批准，应补展示后重新审核。不重建项目、不重做已批准创意。
 
-审批展示补齐：创意也返回完整approval_material；next及read(stage)不能丢失同版材料。问题服务缺失/未答返回材料并保持未批准。专业展示目前为流程契约，非正文事件强制守卫，不把工具返回当用户已看见；见approval-presentation-audit.md。
+审批展示补齐：创意也返回完整approval_material；next及read(stage)不能丢失同版材料。问题服务缺失/未答返回材料并保持未批准。专业展示由当前会话assistant/message文本事件强制匹配当前修订号材料；创意和剧本都先submit再展示，长稿按approval_material分页顺序展示全部页后批准，不把工具返回或推理当用户已看见；见approval-presentation-audit.md。
 
 设备数优先：plugin_started/plugin_installed共用持久化独占登记标记和确定性eventId，每匿名设备只尝试登记一次。标记先落盘，结果不明不重试，失败不清标记；工具与任务统计仍按原逻辑。普通重装保留状态不重报，清空全部身份状态不能保证物理设备去重。不更新版本或发版除非用户明确要求。
+
+专业Agent执行可靠性：create默认按会话与规范化需求复用，operationId用于显式重试/另建，冲突不得覆盖。compile固定制作ID并在一次原子写入中保存完整绑定，中断恢复校验来源、修订号、模型与摘要。独立审核先落本地review-requests，再调用模型；原始回包先保存后解析，结果不明或解析失败不自动重放。review_requests只返回状态摘要；retry_review必须经原生问题窗确认可能重复计费，仅清该项checkpoint并授权再次请求。上下文80,000字符预算超限返回scope_required或阻断审核，不静默截断；逐章终审后增加有跨章证据的全片结构审核。离线compare评测须覆盖六案例，约束、艺术结论、用量和人工偏好都需要证据；无记录保持未知。见creation-quality-architecture.md。
+
+制作review补展示必须按missingMaterials独立计算正文与绑定图状态，只缺分镜时返回图片和链接，不重贴已展示的同版剧本。旧稿不可复用新版展示事实，转换PNG不能代替绑定SVG；回归film-output-contract.test.mjs。
+
+设置页README回退根因：宿主dsh-plugin-detail直接read包内locale/<语言>.json，不走package.exports。build必须同时生成dist/locale与物理locale两处相同JSON，files纳入locale/*.json及空plugin-detail.md；局部build:host/client不能删除物理locale。仅有dist/locale与exports映射不够，安装检查必须断言物理文件、meta.detail及空正文，避免每次重装回退README。组件元信息仍通过原导出路径读取；npm中文readme元数据独立保留。
+
+本地同版本反复打包安装时必须使用新的成品路径；覆盖原tgz再pnpm add同路径可能仍复用旧缓存（exit0但added0、托管dist哈希仍旧）。复制同一已验证成品到新安装批次目录后再通过dsh plugin add安装，核对托管dist和物理locale哈希，不能只看CLI成功。

@@ -163,11 +163,13 @@ export function projectTool(config, ctx, reviewGuard, generationProperties, exte
           const currentBoard=board?.projectId===data.id && board.scriptHash===scriptHash
             && path.resolve(board.scriptPath)===scriptPath
             && await scriptDigest(board.path).catch(()=>'')===board.imageHash;
+          const missingMaterials=gate.missingMaterials || ['script','storyboard'];
+          const needsScript=missingMaterials.includes('script'),needsStoryboard=missingMaterials.includes('storyboard');
+          const markdown=[...(needsScript?[scriptBody]:[]),...(needsStoryboard?[`![分镜示意图](<${board?.path}>)\n\n[打开原图](<${board?.path}>)`]:[])].join('\n\n');
           return {projectId:data.id,status:'blocked',reason:gate.reason,
             repairAction:currentBoard?'present_current_materials':'regenerate_storyboard',
-            ...(currentBoard?{presentation:{scriptPath,storyboardPath:board.path,
-              markdown:scriptBody+`\n\n![分镜示意图](<${board.path}>)\n\n[打开原图](<${board.path}>)`}}:{}),
-            nextAction:currentBoard?'将presentation.markdown原样放在一条用户可见正文中（不要省略项目行、改写或自行转图），然后沿用同一projectId、scriptPath和specification重试review；不重建项目、不重写文件、不重复捕获脚本。':'本项目分镜缺失或已过期。沿用本projectId与scriptPath调用storyboard，展示返回的原图后再review；不使用其他项目或自行转换的图片。'};
+            ...(currentBoard?{presentation:{scriptPath,storyboardPath:board.path,missingMaterials,markdown}}:{}),
+            nextAction:currentBoard?`只补展示presentation.missingMaterials列出的材料，将presentation.markdown原样放在一条用户可见正文中（不要改写或自行转图）；${needsScript?'按当前保存稿补齐正文':'当前剧本已完整展示，不要重复贴剧本'}，${needsStoryboard?'补齐绑定分镜原图':'当前分镜已展示，无需重复'}。然后沿用同一projectId、scriptPath和specification重试review；不重建项目、不重写文件、不重复捕获脚本。`:'本项目分镜缺失或已过期。沿用本projectId与scriptPath调用storyboard，展示返回的原图后再review；已展示的同版剧本无需重复，不使用其他项目或自行转换的图片。'};
         }
         const service = ctx.get?.('userQuestions') || exec.agent?.ctx?.get?.('userQuestions');
         if (!service?.ask || approvalPolicy(ctx, exec) === 'never') return { projectId: data.id, status: 'pending',  reason: '无法取得脚本审核答复，未生成。' };

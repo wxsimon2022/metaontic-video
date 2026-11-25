@@ -2,7 +2,7 @@
  * 插件在「插件」页里显示的标题与描述（中文）。
  *
  * 源码写在 TS 里，构建时由 `scripts/build.mjs` 生成 `dist/locale/zh.json`——
- * DSH 是按 `./locale/*.json` 这个导出路径读元信息的，运行时只认 JSON。
+ * 组件元信息按导出路径读取；详情服务直接读取包内 locale/*.json。构建必须同步生成两处 JSON。
  */
 export interface PluginLocale {
   meta: {

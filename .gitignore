@@ -61,3 +61,6 @@ preview/.build/
 /MetaOnticVideo使用说明书.md
 /MetaOnticVideo使用说明书.pdf
 /docs/guide/
+
+# 宿主详情读取的物理语言文件，由build与dist/locale同步生成
+/locale/*.json

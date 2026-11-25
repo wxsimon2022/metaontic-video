@@ -10,6 +10,7 @@ import { sourceOf } from './source.mjs';
 function harness({ segments }) {
   const state = { inFlight: 0, peak: 0, downloads: [], probes: [], saved: [] };
   const context = vm.createContext({
+    reportOutcome: () => {}, outcomeError: () => "other",
     timedStage: async (_stage, operation) => operation(),
     ref: (config, key, fallback) => config[key] ?? fallback,
     path, ...fs,

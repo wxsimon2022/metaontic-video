@@ -109,10 +109,10 @@ test('渠道与地址隔离样本，仅真实成功任务写入，不推断音�
  }finally{if(prior===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=prior;}
 });
 test('长稿逐章审核不截正文，合并报告覆盖全片场次并保持输入不变',async()=>{
- const s=ready();s.artifacts.script.data={characters:[],chapters:[chapter('1'),chapter('2')],scenes:[{...scene('1'),key_actions:['甲'.repeat(45000)]},{...scene('2'),key_actions:['乙'.repeat(45000)]}],dialogue:[]};
- const original=JSON.stringify(s);const batches=api.reviewBatches(s);assert.equal(batches.length,2);assert.equal(batches[0].input.inputs.script.data.scenes.length,1);assert.equal(batches[0].input.inputs.script.data.scenes[0].key_actions[0].length,45000);
- let calls=0;const r=await api.runIndependentReview({},s,{complete:async(_cfg,_brief,opts)=>{calls++;const input=JSON.parse(opts.taskMessages[1].content);const result=report(s);for(const c of result.story_assessment.criteria)c.evidence[0].scene_id=input.inputs.script.data.scenes[0].scene_id;return {script:JSON.stringify(result),model:'mock'};}});
- assert.equal(calls,2);assert.equal(r.chapter_reviews.length,2);assert.deepEqual(new Set(r.story_assessment.criteria[0].evidence.map(e=>e.scene_id)),new Set(['s1','s2']));assert.equal(JSON.stringify(s),original);
+ const s=ready();s.artifacts.script.data={characters:[],chapters:[chapter('1'),chapter('2')],scenes:[{...scene('1'),screenplay_detail:'甲'.repeat(45000)},{...scene('2'),screenplay_detail:'乙'.repeat(45000)}],dialogue:[]};
+ const original=JSON.stringify(s);const batches=api.reviewBatches(s);assert.equal(batches.length,2);assert.equal(batches[0].input.inputs.script.data.scenes.length,1);assert.equal(batches[0].input.inputs.script.data.scenes[0].screenplay_detail.length,45000);
+ let calls=0;const cache={};const r=await api.runIndependentReview({},s,{cache,onCheckpoint:async(key,value)=>{cache[key]=value;},complete:async(_cfg,_brief,opts)=>{calls++;const input=JSON.parse(opts.taskMessages[1].content);if(input.review_scope==='CROSS_CHAPTER_STRUCTURE')return {script:JSON.stringify({status:'PASS',checks:['causal_progression','character_arc','continuity','setup_payoff','requirements'].map(id=>({id,status:'PASS',evidence:[{scene_id:'s1',reason:'前章动作'},{scene_id:'s2',reason:'后章回收'}]}))}),model:'mock'};const result=report(s);for(const c of result.story_assessment.criteria)c.evidence[0].scene_id=input.inputs.script.data.scenes[0].scene_id;return {script:JSON.stringify(result),model:'mock'};}});
+ assert.equal(calls,3);assert.equal(r.global_review.status,'PASS');assert.equal(r.chapter_reviews.length,2);const replay=await api.runIndependentReview({},s,{cache,complete:async()=>{throw Error('不得重放成功审核');}});assert.equal(replay.execution_provenance.requests,0);assert.equal(replay.execution_provenance.reused_requests,3);assert.deepEqual(new Set(r.story_assessment.criteria[0].evidence.map(e=>e.scene_id)),new Set(['s1','s2']));assert.equal(JSON.stringify(s),original);
 });
 test('前章修改会使后章连续性草稿失效，禁止带旧输入继续汇总',()=>{
  let s=api.defineChapters(state(),[{chapter_id:'1',duration_ms:10000},{chapter_id:'2',duration_ms:10000},{chapter_id:'3',duration_ms:10000}],1);
@@ -124,4 +124,9 @@ test('场景局部上下文通过地点引用找到场次；没有人物出场�
  const s=ready();s.artifacts.script.data={characters:[{character_id:'c'}],chapters:[chapter('1'),chapter('2')],scenes:[scene('1'),scene('2')],dialogue:[]};s.artifacts.assets.data.scenes=[{scene_id:'s1',location_id:'loc1'},{scene_id:'s2',location_id:'loc2'}];
  const input=api.scopedInputs(s,'assets','scene',['loc2']);assert.deepEqual(input.script.data.scenes.map(s=>s.scene_id),['s2']);assert.equal(input.script.data.characters.length,1);
  const unknown=api.scopedInputs(s,'assets','character',['c']);assert.equal(unknown.script.data.scenes.length,2);
+});
+
+test('单章审核超限在调用前阻断，不能截断正文或产生请求',async()=>{
+ const s=ready();s.artifacts.script.data.scenes[0].key_actions=['完整正文'.repeat(25000)];let calls=0;
+ await assert.rejects(()=>api.runIndependentReview({},s,{complete:async()=>{calls++;}}),/REVIEW_CONTEXT_BUDGET_EXCEEDED|CHAPTER_REVIEW_CONTEXT_TOO_LARGE/);assert.equal(calls,0);
 });

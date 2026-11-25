@@ -44,3 +44,20 @@ flowchart TD
 ## 平台与付费验证范围
 
 文件路径通过 node:path、导入通过 pathToFileURL，用户状态沿用宿主数据目录；断点使用私有文件和原子替换。两平台共享同一 tgz。开发机的 macOS 自动化及本地安装不能代替 Windows 桌面验证；本次没有调用真实付费生成接口，也没有伪造真实视频验收。
+
+## Agent执行边界强化
+
+- 展示批准：创意与剧本先保存，再由真实助手正文事件匹配同会话当前稿；分页按顺序完整展示，工具/推理/摘要不能放行。已批准同版本继续复用。
+- 可重入操作：创建以规范化需求和会话生成稳定ID，显式operationId支持重试与另建；同操作不同需求拒绝覆盖。编译固定制作项目ID，一次保存完整来源绑定；专业文件提交前崩溃后复用目标，来源或摘要冲突停止。
+- 审核请求日志：请求前私有原子落盘，原始回包保存后解析。未知请求阻断自动重放；坏JSON复用原回包，避免解析错误触发第二笔调用。review_requests只提供摘要，retry_review由原生弹窗说明重复计费风险，授权仅限所选请求并删除其缓存，其他结果保留。更改输入/模型/端点/指令会形成新请求标识。
+- 上下文预算：任务序列化及独立审核输入受80,000字符保守预算限制，字符预算不是渠道token上限证明。超限返回scope_required、实体清单及分章/缩小范围指引；稿件保留完整，不静默截断。独立章节审核在请求前检查全部章节预算；全片结构审核还会独立检查预算。
+- 跨章审核：逐章结果后增加独立全片结构请求，核查因果、人物变化、连续性、铺垫回收和需求。每项要求跨两个章节的真实场次证据；有疑问或未评估产生阻断问题，不能以章节通过代替全片通过。全片请求结果同样持久化和复用；超预算不会硬塞，需细化材料结构。
+- 命令边界：公共film_project保持兼容，contracts/commands按动作解析与校验；请求日志、展示守卫和编译事务移至独立模块，避免审批、文件与模型副作用混在参数处理里。
+
+## 离线成对评测
+
+`node scripts/evaluate-film.mjs compare baseline.json candidate.json report.json`，输入是覆盖cases.json全部六个案例的数组，或含records数组的对象。复制benchmark-template.json填入真实保存稿，分别留作基线与候选；模板空稿不是已完成的质量基线。原有单案例评测入口保持兼容。
+
+每条记录包含case_id、script，可附assessment（六维艺术评阅）、constraints（reviewer及items，逐项原始must_preserve、PRESERVED/VIOLATED/UNKNOWN、真实场次evidence）、measurements（source为recorded/manual，tool_calls、revision_rounds、cost及三位currency）。候选对象可附preference：reviewer和每案例choice（baseline/candidate/tie/unrated）、reason。比较产物、约束、调用数、修订轮次、同币种成本及人工偏好；缺少证据或记录的项目保持未知，不填零、不算通过。本轮没有真实模型链路的成对样本，因此不宣称艺术效果提升或成本降低。
+
+安全回归见agent-architecture-safety.test.mjs、film-architecture.test.mjs及真实专业工具链测试。Windows/macOS共享Node文件与事件接口，自动检查和macOS本地安装不能替代Windows桌面验证；没有调用真实付费接口。

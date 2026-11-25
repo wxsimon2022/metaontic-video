@@ -128,6 +128,10 @@ try {
     assert.ok(locales.includes(locale), `Missing locale/${locale}`);
     const parsed = JSON.parse(await readFile(path.join(installed, 'dist', 'locale', locale), 'utf8'));
     assert.ok(parsed.meta?.title, `Missing ${locale} metadata title`);
+    const physical = JSON.parse(await readFile(path.join(installed, 'locale', locale), 'utf8'));
+    assert.deepEqual(physical, parsed, `Physical locale/${locale} must match exported metadata`);
+    assert.equal(physical.meta.detail, 'plugin-detail.md');
+    assert.equal((await readFile(path.join(installed, physical.meta.detail), 'utf8')).trim(), '', 'Installed detail must remain empty without README fallback');
   }
   for (const file of ['dist/index.js', 'dist/client.js', 'cordis.patch.yml', 'MetaOnticVideo使用说明书.md', 'MetaOnticVideo使用说明书.pdf']) {
     assert.ok((await readFile(path.join(installed, file))).length, `Missing ${file}`);

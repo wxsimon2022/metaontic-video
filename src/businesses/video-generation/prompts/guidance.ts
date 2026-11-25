@@ -121,4 +121,4 @@ export function buildPromptGuidance(config) {
   ].join('\n');
 }
 
-export const REVIEW_REPAIR_GUIDANCE = 'review若返回blocked且带presentation，按nextAction将presentation.markdown原样展示一次，再以同项目同稿件重试review；这是补齐未完整展示，不是改稿。不再自行读取守卫源码、重新编写脚本或转换分镜图片，不把blocked当作工具不可用。repairAction为regenerate_storyboard时仅用原项目与稿件重新storyboard，不能新建项目或跳过审核。';
+export const REVIEW_REPAIR_GUIDANCE = 'review若返回blocked且带presentation，只补展示presentation.missingMaterials列出的材料，按nextAction将presentation.markdown原样展示一次；同版本已展示的剧本或分镜不得重复贴出，再以同项目同稿件重试review；这是补齐未完整展示，不是改稿。不再自行读取守卫源码、重新编写脚本或转换分镜图片，不把blocked当作工具不可用。repairAction为regenerate_storyboard时仅用原项目与稿件重新storyboard，不能新建项目或跳过审核。';

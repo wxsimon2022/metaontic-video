@@ -99,13 +99,18 @@ test('普通脚本采用所选类型策略并保持Markdown和分段契约',()=>
 test('真实工具创建、审批、改类型及重读保存一致，旧批准与产物不能继续用',async()=>{
  const home=await mkdtemp(path.join(tmpdir(),'film-type-中文 '));const prior=process.env.DSH_HOME;
  process.env.DSH_HOME=home;
- let tool,questions=0,approvalText='';
- const runtime={config:{},tools:{register(_business,value){tool=value;}},ctx:{get(){return {ask:async(request)=>{questions++;approvalText=request.questions[0].question;return {answers:[{id:'film_approval',selected:['批准本版']}]};}};}}};
+ let tool,observe,questions=0,approvalText='';
+ const runtime={config:{},tools:{register(_business,value){tool=value;}},ctx:{on(_event,listener){observe=listener;},get(){return {ask:async(request)=>{questions++;approvalText=request.questions[0].question;return {answers:[{id:'film_approval',selected:['批准本版']}]};}};}}};
  const exec={agent:{session:{id:'film-profile-test'}}};
  try{
   api.filmDirectorBusiness.apply(runtime);
   let s=await tool.execute({action:'create',title:'河岸观察',sourceBrief:'只看水波',durationSeconds:15,projectSpec:JSON.stringify({work_type:'LIFESTYLE'})},exec);
   const id=s.project_id;const p=api.resolveProfile(s.project_spec);
+  const repeated=await tool.execute({action:'create',title:'河岸观察',sourceBrief:'只看水波',durationSeconds:15,projectSpec:JSON.stringify({work_type:'LIFESTYLE'})},exec);
+  assert.equal(repeated.project_id,id);assert.equal(repeated.reused,true);
+  const another=await tool.execute({action:'create',title:'河岸观察',sourceBrief:'只看水波',durationSeconds:15,projectSpec:JSON.stringify({work_type:'LIFESTYLE'}),operationId:'separate'},exec);
+  assert.notEqual(another.project_id,id);
+  await assert.rejects(()=>tool.execute({action:'create',title:'不同需求',sourceBrief:'只看水波',durationSeconds:15,projectSpec:JSON.stringify({work_type:'LIFESTYLE'}),operationId:'separate'},exec),/OPERATION_ID_CONFLICT/);
   const invalid=await tool.execute({action:'validate',projectId:id,stage:'creative',content:'{}x'},exec);
   assert.equal(invalid.valid,false);assert.equal(invalid.error_code,'INVALID_ARTIFACT_JSON');
   assert.equal((await tool.execute({action:'read',projectId:id},exec)).revision,s.revision);
@@ -127,6 +132,9 @@ test('真实工具创建、审批、改类型及重读保存一致，旧批准�
   const nextApproval=await tool.execute({action:'next',projectId:id},exec);
   assert.equal(nextApproval.approval_material.markdown,saved.approval_material.markdown);
   assert.match(nextApproval.continuation.instructions,/先在用户可见正文完整展示/);
+  const blocked=await tool.execute({action:'approve',projectId:id,stage:'creative',expectedRevision:s.revision},exec);
+  assert.equal(blocked.status,'needs_input');assert.equal(questions,0);
+  observe(exec.agent.session,{type:'assistant/message',data:{message:{content:[{type:'text',text:saved.approval_material.markdown}]}}});
   s=await tool.execute({action:'approve',projectId:id,stage:'creative',expectedRevision:s.revision},exec);
   assert.equal(questions,1);assert.equal(s.approvals.creative,1);
   const approvedRevision=s.revision;

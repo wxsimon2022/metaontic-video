@@ -19,7 +19,7 @@ export function projectResponse(state:any,nextTask:any,mode:string='full',extra:
   task_summary:(state.tasks||[]).map(t=>({key:t.key,task_id:t.task_id,stage:t.stage,status:t.status,attempts:t.attempts,error_code:t.error_code})),
   ...(state.production?{production:state.production,production_stale:state.production.source_revision!==state.revision}:{}),
   ...(continuation?{continuation}:{}),
-  ...(extra.sha256?{sha256:extra.sha256}:{}),nextTask,
+  ...(extra.sha256?{sha256:extra.sha256}:{}),...(extra.reused?{reused:true}:{}),nextTask,
   read_hint:'完整材料已保存。nextTask 含本阶段完整所需输入，可直接继续，不必再 next/read。补查单个产物用 read + stage；需要全部历史时用 read + responseMode:"full"。',
  };
 }

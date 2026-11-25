@@ -1,21 +1,69 @@
-MIT License
+MetaOnticVideo 源码可见许可协议 1.0
+MetaOnticVideo Source-Available License 1.0
 
-Copyright (c) 2026 wxsimon2022
+Copyright (c) 2026 wxsimon2022. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+本协议允许查看源码，但不是 MIT 协议，也不是符合 OSI 定义的开源许可证。
+使用、复制或分发本协议覆盖的材料，必须严格遵守以下条款；另有权利人书面授权的除外。
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. 适用范围
+本协议仅适用于版权人有权以本协议许可、并明确以本协议提供的 MetaOnticVideo
+原创源码、文档及对应成品（以下称“本软件”）。第三方材料及历史授权见第5、6条。
+本协议不代表其他贡献者同意对其享有权利的内容重新许可；未经相应权利人授权的
+贡献仍适用其原有许可。
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. 允许的行为
+在遵守本协议的前提下，允许查看、学习和备份源码，安装、运行未经修改的本软件，
+以及免费分享未经修改的完整副本。分享时必须保留本协议、版权声明及第三方许可声明，
+不得声称拥有本软件的著作权或有权授予本协议未授予的权利。
+允许为安装和运行进行不改变源码内容与功能逻辑的编译、依赖安装及打包。
+正常填写配置、API密钥，保存任务与生成结果，不属于修改源码。
+使用未经修改的软件开展业务，以及使用或销售生成的作品，不因本协议被禁止；
+生成作品仍受适用法律、模型服务条款及相关素材权利约束。
+
+3. 禁止修改源码
+未经相应权利人事先书面授权，禁止修改、改写、删减、合并、移植本协议覆盖的源码，
+禁止基于该源码制作或分发修改版、派生版本、换壳版本或移除限制的版本。
+禁止删除、篡改或隐藏版权、许可、作者署名及第三方声明。
+
+4. 禁止销售源码
+未经相应权利人事先书面授权，禁止出售、转售、出租或有偿再许可本协议覆盖的源码，
+禁止将其作为付费源码包、付费下载、付费会员资源、课程附件、模板或项目交付物提供。
+禁止通过改名、换壳、捆绑销售或名为“服务费”“交付费”的方式变相收费提供源码。
+免费分享也必须遵守第2条，不能据此授予他人修改或销售源码的权限。
+本条针对源码交易，不改变第2条对正常软件使用及生成作品的约定。
+
+5. 第三方许可
+第三方库、第三方代码及其他独立许可材料仍适用各自原有许可。
+THIRD_PARTY_NOTICES.md 及相关材料中的许可和版权声明必须完整保留。
+本协议不限制第三方许可已经授予的权利，不得以本协议替代第三方许可。
+
+6. 历史版本
+本协议仅适用于明确以本协议提供的材料，不追溯变更此前已按 MIT 或其他许可提供的副本。
+本次变更不撤销或限制接收者依据原许可已经取得的权利，也不使旧副本自动改用本协议。
+历史材料与新增材料分别按各自适用的许可处理。
+
+7. 未授权行为与责任
+本协议未明确授予的权利由相应权利人保留。违反条款的行为不在本协议授权范围内；
+权利人可依据适用法律要求停止侵害并追究相应责任，不预设固定赔偿额。
+法律明确允许且不能通过合同排除的权利不受本协议限制。
+
+8. 免责声明
+在适用法律允许的范围内，本软件按“现状”提供，不提供适销性、特定用途适用性、
+不侵权或持续可用等保证。版权人不对使用本软件导致的损失承担法律允许排除的责任。
+本条不排除适用法律不得排除的责任。
+
+English summary (the Chinese terms above govern):
+This is a source-available license, not an MIT or OSI-approved open-source license.
+You may inspect, study, back up, build and run unmodified software, and share complete,
+unmodified copies for free with all license, copyright and third-party notices intact.
+Unless the relevant rights holder gives prior written permission, you may not modify
+covered source code or create modified, derivative or rebranded versions. You may not
+sell, resell, rent, sublicense for a fee, or supply the covered source code through paid
+bundles, memberships, courses, templates or project deliveries, including disguised fees.
+Normal configuration and use of unmodified software, including business use and sales of
+generated works, are not prohibited by this license; other applicable rights still apply.
+Third-party licenses and permissions previously granted under MIT or other licenses remain
+unaffected. This license covers only materials the relevant rights holder is entitled to
+license under these terms. All other rights are reserved, subject to mandatory law.
+The software is provided as is, without warranties, to the extent permitted by law.

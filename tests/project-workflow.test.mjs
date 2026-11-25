@@ -82,7 +82,7 @@ for(const response of [null,'需要修改'])test(`review ${response} never grant
 test('review requires full script and inline storyboard, not a summary or file path',()=>fixture(async h=>{
   const p=await h.prepare();await h.show(false);
   const result=await h.project.execute({action:'review',projectId:p.projectId,scriptPath:h.script,specification:h.spec},h.exec);
-  assert.equal(result.status,'blocked');assert.equal(h.asks,0);assert.match(result.reason,/只在本轮用户可见正文里出现 \d+%/);
+  assert.equal(result.status,'blocked');assert.equal(h.asks,0);assert.match(result.reason,/分镜未绑定当前脚本版本/);assert.equal(result.repairAction,'regenerate_storyboard');
 }));
 
 test('脚本只在正文生成一次：storyboard 落盘并渲染示意图，review 直接放行',()=>fixture(async h=>{

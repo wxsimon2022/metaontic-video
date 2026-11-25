@@ -36,3 +36,29 @@ export function approvalMaterial(stage:string, artifact:any) {
   : approvalPreview(stage, artifact);
  return {approval_material:{stage,revision:artifact.revision,markdown}};
 }
+
+/** 分页仅影响传输与展示，持久化稿件保持完整；每页按顺序真实展示。 */
+export function approvalChunks(markdown: string, size = 16000) {
+ const chunks: string[] = [];
+ let current = '';
+ for (const line of markdown.split(/(?<=\n)/)) {
+  if (current.length + line.length > size && current) { chunks.push(current); current = ''; }
+  for (let offset = 0; offset < line.length; offset += size) {
+   const piece = line.slice(offset, offset + size);
+   if (current.length + piece.length > size && current) { chunks.push(current); current = ''; }
+   current += piece;
+  }
+ }
+ if (current) chunks.push(current);
+ return chunks.length ? chunks : [''];
+}
+export function approvalPage(stage: string, artifact: any, part = 1) {
+ const material = approvalMaterial(stage, artifact).approval_material;
+ if (!material) return {};
+ const pages = approvalChunks(material.markdown);
+ if (!Number.isSafeInteger(part) || part < 1 || part > pages.length) throw Error('INVALID_MATERIAL_PART');
+ return { approval_material: { ...material, markdown: pages[part - 1], part, parts: pages.length,
+  ...(pages.length > 1 ? { instructions: part < pages.length
+   ? `先单独正文展示第${part}/${pages.length}部分；随后read(stage:"${stage}",materialPart:${part + 1})读取下一部分。全部按顺序展示后再approve，不拼接摘要。`
+   : '这是最后一部分。先单独正文展示，再沿原项目和当前修订号approve。' } : {}) } };
+}

@@ -1,5 +1,8 @@
 # Third-party notices
 
+The project’s source-available LICENSE applies only to covered original materials.
+The third-party licenses below remain unchanged and continue to govern their respective materials.
+
 The plugin host bundle includes the following MIT-licensed packages:
 
 ## @deepseek-ai/schemastery

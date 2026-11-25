@@ -7,7 +7,7 @@ const target = process.argv[2] || 'all';
 const defines = { __PLUGIN_VERSION__: JSON.stringify(version) };
 
 if (!['all','locale','host','client'].includes(target)) throw Error('Unknown build target');
-for (const file of ['index.js','client.js','locale/en.json','locale/zh.json','presets/video-director.js']) {
+for (const file of ['index.js','client.js','presets/video-director.js']) {
   await rm(file, { force: true });
 }
 // 成品裁掉README.md后，npm不得回退读取英文README；介绍写入标准元数据。
@@ -21,12 +21,16 @@ if(packageFile.readme !== readme) {
 if (target === 'all' || target === 'locale') {
   await rm('dist/locale', { recursive: true, force: true });
   await mkdir('dist/locale', { recursive: true });
+  await mkdir('locale', { recursive: true });
   for (const lang of ['zh','en']) {
     const result = await build({entryPoints:[`src/locale/${lang}.ts`],bundle:true,charset:'utf8',format:'esm',platform:'node',write:false});
     const module = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
     const value = module.default ?? module.locale;
     if (!value) throw Error(`Missing ${lang} locale`);
-    await writeFile(`dist/locale/${lang}.json`, JSON.stringify(value,null,2)+'\n');
+    const metadata = JSON.stringify(value,null,2)+'\n';
+    await writeFile(`dist/locale/${lang}.json`, metadata);
+    // 详情服务直接读物理locale路径；模块导出映射仅用于组件元信息。
+    await writeFile(`locale/${lang}.json`, metadata);
   }
 }
 if (target === 'all' || target === 'host') {

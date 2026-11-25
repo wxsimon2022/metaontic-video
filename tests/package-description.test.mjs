@@ -1,3 +1,4 @@
+import {readFile} from 'node:fs/promises';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {packageDescription} from '../scripts/package-description.mjs';
@@ -17,4 +18,15 @@ test('plugin detail excludes installation instructions and preserves usage',()=>
  assert.doesNotMatch(result,/在线安装|输入包名|plugin\.tgz/);
  assert.match(result,/## 开始使用\n填写密钥/);
  assert.equal(packageDescription('# 插件\n## 在线安装\n安装步骤'), '# 插件\n');
+});
+
+test('宿主物理locale路径与导出元信息一致，设置详情使用空白页并随包保留',async()=>{
+ const pkg=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
+ assert.ok(pkg.files.includes('locale/*.json'));assert.ok(pkg.files.includes('plugin-detail.md'));
+ for(const lang of ['zh','en']){
+  const physical=JSON.parse(await readFile(new URL(`../locale/${lang}.json`,import.meta.url),'utf8'));
+  const exported=JSON.parse(await readFile(new URL(`../dist/locale/${lang}.json`,import.meta.url),'utf8'));
+  assert.deepEqual(physical,exported);assert.equal(physical.meta.detail,'plugin-detail.md');
+  assert.equal((await readFile(new URL('../'+physical.meta.detail,import.meta.url),'utf8')).trim(),'');
+ }
 });

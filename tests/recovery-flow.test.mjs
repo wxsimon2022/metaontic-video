@@ -21,7 +21,7 @@ async function fixture(run) {
   const ctx = { tools: { register(tool) { tools.set(tool.name, tool); return () => {}; } },
     inject(names, install) {
       if (names.includes('workingDirectory')) return install({ workingDirectory: { ensure: async () => directory } });
-    }, on(_name, listener) { gate = listener; return () => {}; } };
+    }, on(name, listener) { if(name==='tools/pre-execute') gate = listener; return () => {}; } };
   const dispose = plugin.apply(ctx, config);
   for (const name of ['video_generate','video_extend']) tools.set(name,workflowApi.lowLevelVideo(name,config,ctx));
   const state = { creates: 0, downloads: 0, failDownload: false, stopController: null, queryFailure: false };

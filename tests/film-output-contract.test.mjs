@@ -38,7 +38,25 @@ test('review blockage supplies canonical saved text and original bound image; re
   const args={action:'review',projectId:project.id,scriptPath:file,specification:spec};
   const denied=await tool.execute(args,exec);assert.equal(denied.status,'blocked');assert.equal(asks,0);
   assert.equal(denied.repairAction,'present_current_materials');assert.ok(denied.presentation.markdown.includes(body));assert.ok(denied.presentation.markdown.includes(board.path));
-  guard.observe(exec.agent.session,{type:'assistant/message',data:{turn:2,message:{content:[{type:'text',text:denied.presentation.markdown}]}}});
+  assert.deepEqual(denied.presentation.missingMaterials,['script','storyboard']);
+  // Reproduce the latest dialogue: current script was fully shown, but an unbound PNG was embedded.
+  guard.observe(exec.agent.session,{type:'assistant/message',data:{turn:2,message:{content:[{type:'text',text:body}]}}});
+  const png=path.join(home,'storyboard-converted.png');await writeFile(png,'converted preview');
+  guard.observe(exec.agent.session,{type:'assistant/message',data:{turn:2,message:{content:[{type:'text',text:`![分镜](<${png}>)`}]}}});
+  const missingImage=await tool.execute(args,exec);
+  assert.equal(missingImage.status,'blocked');assert.deepEqual(missingImage.presentation.missingMaterials,['storyboard']);
+  assert.ok(!missingImage.presentation.markdown.includes(body));assert.ok(missingImage.presentation.markdown.includes(board.path));
+  assert.match(missingImage.nextAction,/不要重复贴剧本/);assert.equal(asks,0);
+  guard.observe(exec.agent.session,{type:'assistant/message',data:{turn:3,message:{content:[{type:'text',text:missingImage.presentation.markdown}]}}});
   assert.equal((await tool.execute(args,exec)).status,'approved');assert.equal(asks,1);assert.equal(await readFile(file,'utf8'),body);
+  // New script versions cannot borrow the old display fact; only the missing new script is returned.
+  const updated=body+'\n新版本：水鸟掠过水面，留下一条涟漪。';await writeFile(file,updated);
+  const newBoard=await tool.execute({action:'storyboard',projectId:project.id,scriptPath:file},exec);
+  guard.observe(exec.agent.session,{type:'assistant/message',data:{turn:4,message:{content:[{type:'text',text:`![分镜](<${newBoard.path}>)`}]}}});
+  const missingScript=await tool.execute(args,exec);
+  assert.equal(missingScript.status,'blocked');assert.deepEqual(missingScript.presentation.missingMaterials,['script']);
+  assert.equal(missingScript.presentation.markdown,updated);assert.equal(asks,1);
+  guard.observe(exec.agent.session,{type:'assistant/message',data:{turn:4,message:{content:[{type:'text',text:missingScript.presentation.markdown}]}}});
+  assert.equal((await tool.execute(args,exec)).status,'approved');assert.equal(asks,2);
  }finally{if(old===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=old;await rm(home,{recursive:true,force:true});}
 });

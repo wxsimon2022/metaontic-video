@@ -1,4 +1,4 @@
-import { TASK_CONTRACT, promptMetrics, scopedInputs } from './context.composer.js';
+import { TASK_CONTRACT, promptMetrics, scopedInputs, boundedTask } from './context.composer.js';
 import { COMMON_CONTRACT, sourceRevisions, STAGE_DEPS, projectContext, modelProfile } from '../contracts/index.js';
 import director from '../../../agents/director/index.js';
 import creative from '../../../agents/creative/index.js';
@@ -40,6 +40,6 @@ export function routeIntent(state: any, intent: string, entityIds: string[] = []
  if(ids && entityIds.some(id=>!ids.includes(id))) throw Error('UNKNOWN_ENTITY');
  const inputs=stage?scopedInputs(state,stage,role,entityIds):{};
  const instructions=roleInstructions(state,role)+(entityIds.length?'\n本次只修改指定ID；保留其他内容，不重写整片。':'');
- return {submission_contract:stage?submissionContract(stage):null,intent,role,stage,scope:{entity_ids:entityIds},status:missing.length||approvals.length||scopeRequired?'needs_input':'ready',missing,approval_required:approvals,scope_required:scopeRequired,...projectContext(state),work_profile:profileContext(state),input_revisions:sourceRevisions(state,stage),model_profile:modelProfile(state),expectedRevision:state.revision,instructions,inputs,context_metrics:promptMetrics(instructions,inputs),
-   next_action:scopeRequired?'明确修改对象ID；不要猜测或改写全片':missing.length||approvals.length?'完成缺失上游或批准后再修改':'按职责生成候选；提交仍受现有状态机与审批约束'};
+ return boundedTask({submission_contract:stage?submissionContract(stage):null,intent,role,stage,scope:{entity_ids:entityIds},status:missing.length||approvals.length||scopeRequired?'needs_input':'ready',missing,approval_required:approvals,scope_required:scopeRequired,...projectContext(state),work_profile:profileContext(state),input_revisions:sourceRevisions(state,stage),model_profile:modelProfile(state),expectedRevision:state.revision,instructions,inputs,context_metrics:promptMetrics(instructions,inputs),
+   next_action:scopeRequired?'明确修改对象ID；不要猜测或改写全片':missing.length||approvals.length?'完成缺失上游或批准后再修改':'按职责生成候选；提交仍受现有状态机与审批约束'});
 }
