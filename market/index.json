@@ -76,9 +76,21 @@
         "sortKeys": {}
       },
       "dist-tags": {
-        "latest": "4.2.5"
+        "latest": "4.2.6"
       },
       "versions": [
+        {
+          "version": "4.2.6",
+          "publishTimestamp": 1795583781,
+          "source": {
+            "type": "git",
+            "url": "https://gitee.com/hackloop/metaontic-video.git",
+            "commit": "e05f4c87bdcfbb88f42804ce8393e704adb9ec22"
+          },
+          "engines": {
+            "dsh": ">=0.2.0"
+          }
+        },
         {
           "version": "4.2.5",
           "publishTimestamp": 1795497719,
@@ -112,16 +124,6 @@
         {
           "version": "4.2.2",
           "publishTimestamp": 1795343719,
-          "source": {
-            "type": "npm"
-          },
-          "engines": {
-            "dsh": ">=0.2.0"
-          }
-        },
-        {
-          "version": "4.2.1",
-          "publishTimestamp": 1795341334,
           "source": {
             "type": "npm"
           },
