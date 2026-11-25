@@ -1,9 +1,11 @@
+import { createAssetLibrary, registerAssetLibrary } from './client/asset-library.js';
 import { createNotificationBanner } from '../../ui/components/notifications.js';
 import { followConfiguredEntries } from '../../ui/components/configured-entries.js';
 import { createSupportAction } from '../../ui/components/support-action.js';
 import { registerAuthNotice } from '../../ui/components/auth-notice.js';
 import { createToolResultView } from './client/tool-result.js';
 import { createMediaPreview } from './client/media-preview.js';
+import { createComposerMedia } from './client/composer-media.js';
 /** Harness 浏览器入口：装配设置页、进度视图和宿主服务。 */
 import { createTheme } from '../../ui/components/theme.js';
 import { createVideoProgress } from './client/progress.js';
@@ -45,6 +47,12 @@ export function createVideoClient(require) {
         }), 'metaontic-video: actual video execution');
         const t = ctx.locale.bind(NS);
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'metaontic-video: dictionaries');
+        const AssetLibrary = createAssetLibrary({ React, h, MediaPreview, t });
+        ctx.effect(() => ctx.slots.inject('conversation.view', () => registerAssetLibrary(ctx, AssetLibrary, t)), 'metaontic-video: session asset library');
+        const ComposerMedia = createComposerMedia({ React, h, t });
+        ctx.effect(() => ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
+          name: 'conversation.input.dock', id: 'metaontic-video-draft-media', order: -21,
+        }, ComposerMedia)), 'metaontic-video: referenced media preview');
         const SupportAction = createSupportAction({ React, t, PAGE_CSS });
         ctx.effect(() => ctx.slots.inject('plugins.detail.actions', () => ctx.slots.register({
           name: 'plugins.detail.actions', id: 'metaontic-video-support', locale: NS,

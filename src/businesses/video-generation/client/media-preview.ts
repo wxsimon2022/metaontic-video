@@ -30,8 +30,19 @@ export function previewMediaFromBlock(block, toolName) {
   return media;
 }
 export function createMediaPreview({ React, h }: any) {
-  function MediaItem({ item }) {
-    const sources = [...new Set([localMediaUrl(item.localPath, document.baseURI), remoteMediaUrl(item.url)].filter(Boolean))];
+  function MediaItem({ item, loadImage, onUse, renderActions }: any) {
+    const [attachmentUrl, setAttachmentUrl] = React.useState('');
+    React.useEffect(() => {
+      let active = true;
+      setAttachmentUrl('');
+      if (item.attachment && typeof loadImage === 'function') {
+        Promise.resolve().then(() => loadImage(item.attachment)).then(url => {
+          if (active && typeof url === 'string' && (/^blob:/.test(url) || /^data:image\/(?:png|jpeg|webp|gif|avif);/i.test(url) || remoteMediaUrl(url))) setAttachmentUrl(url);
+        }).catch(() => {});
+      }
+      return () => { active = false; };
+    }, [item.attachment, loadImage]);
+    const sources = [...new Set([localMediaUrl(item.localPath, document.baseURI), remoteMediaUrl(item.url), attachmentUrl].filter(Boolean))];
     const signature = sources.join('\n');
     const [index, setIndex] = React.useState(0);
     const [failed, setFailed] = React.useState(false);
@@ -52,19 +63,21 @@ export function createMediaPreview({ React, h }: any) {
       h('div', { key: 'body', className: 'mov-media-surface' }, media),
       sources.length ? h('div', { key: 'links', className: 'mov-media-links' }, [
         h('a', { key: 'open', href: source || sources[0], target: '_blank', rel: 'noopener noreferrer', referrerPolicy: 'no-referrer' }, item.kind === 'image' ? '打开原图' : '打开原视频'),
+        item.localPath && onUse ? h('button', { key: 'use', type: 'button', onClick: () => onUse(item) }, '用于当前对话') : null,
         item.localPath && remoteMediaUrl(item.url) ? h('a', { key: 'remote', href: remoteMediaUrl(item.url), target: '_blank', rel: 'noopener noreferrer', referrerPolicy: 'no-referrer' }, '上游链接') : null,
       ]) : null,
+      renderActions ? renderActions(item) : null,
       zoom && item.kind === 'image' ? h('dialog', { key: 'zoom', ref: dialog, className: 'mov-media-dialog', 'aria-label': label, onCancel: () => setZoom(false), onClose: () => setZoom(false), onClick: e => { if (e.target === e.currentTarget) setZoom(false); } }, [
         h('button', { key: 'close', type: 'button', className: 'mov-media-close', onClick: () => { dialog.current?.close(); setZoom(false); }, 'aria-label': '关闭图片预览' }, '关闭'),
         h('img', { key: 'image', src: source, alt: label, className: 'mov-media-zoom', referrerPolicy: 'no-referrer', onError: error }),
       ]) : null,
     ]);
   }
-  function MediaPreview({ block, toolName }) {
-    const items = previewMediaFromBlock(block, toolName);
+  function MediaPreview({ block, toolName, items: suppliedItems, initialLimit = 2, loadImage, onUse, renderActions }: any) {
+    const items = suppliedItems || previewMediaFromBlock(block, toolName);
     const [expanded, setExpanded] = React.useState(false);
     if (!items.length) return null;
-    const visible = expanded ? items : items.slice(0, 2);
+    const visible = expanded ? items : items.slice(0, initialLimit);
     return h('section', { className: 'mov-media-preview', 'aria-label': '生成结果预览', 'data-field': 'media-preview' }, [
       h('style', { key: 'styles' }, `
         .mov-media-preview{margin-top:12px;min-width:0;color:var(--dsw-alias-label-primary,inherit)}
@@ -85,8 +98,8 @@ export function createMediaPreview({ React, h }: any) {
         .mov-media-close{position:absolute;top:8px;right:10px;background:transparent;color:inherit;border:1px solid var(--dsw-alias-border-l2,#dfe3eb);border-radius:6px;padding:4px 10px;cursor:pointer}
         .mov-media-image-button:focus-visible,.mov-media-more:focus-visible,.mov-media-close:focus-visible{outline:2px solid #247bbf;outline-offset:-2px}
       `),
-      h('div', { key: 'grid', className: 'mov-media-grid' }, visible.map(item => h(MediaItem, { key: `${item.kind}:${item.localPath || item.url}`, item }))),
-      items.length > 2 ? h('button', { key: 'more', type: 'button', className: 'mov-media-more', onClick: () => setExpanded(!expanded), 'aria-expanded': expanded }, expanded ? '收起其他成果' : `展开其他成果（${items.length - 2}）`) : null,
+      h('div', { key: 'grid', className: 'mov-media-grid' }, visible.map(item => h(MediaItem, { key: `${item.kind}:${item.id || item.localPath || item.url}`, item, loadImage, onUse, renderActions }))),
+      items.length > initialLimit ? h('button', { key: 'more', type: 'button', className: 'mov-media-more', onClick: () => setExpanded(!expanded), 'aria-expanded': expanded }, expanded ? '收起其他成果' : `展开其他成果（${items.length - initialLimit}）`) : null,
     ]);
   }
   return { MediaPreview };

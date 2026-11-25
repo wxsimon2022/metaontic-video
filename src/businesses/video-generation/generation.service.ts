@@ -1,3 +1,4 @@
+import { registerLibraryAssets } from './integrations/assets.js';
 import { registerConnectionCheck } from './integrations/connection-check.js';
 import type { BusinessModule, BusinessRuntime } from '../../app/bootstrap.js';
 import { withMediaPreview } from './workflow/media-preview.js';
@@ -42,6 +43,7 @@ function asDisposer(value: unknown): (() => void) | undefined {
 function applyVideoBusiness(runtime: BusinessRuntime) {
   const { ctx, config } = runtime;
   runtime.defer(registerConnectionCheck(ctx,config));
+  runtime.defer(registerLibraryAssets(ctx));
   // 可选服务的宿主对象（会话工作目录等），拿到就放进来
   const deps: Record<string, any> = {};
   const segmentReview = createSegmentReview(ctx);
