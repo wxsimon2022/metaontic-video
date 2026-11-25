@@ -100,12 +100,12 @@ git push origin master "v<版本>"
 git show --no-patch "v<版本>"
 ```
 
-当前 `origin` 配置有GitHub与Gitee两个推送地址；其他开发环境须自行核对 `git remote -v`，确保两边均已推送。
+发布目标以 `scripts/release.mjs` 的参数与实际远端核对为准；三端发布使用 `--all`，核对 Gitee、GitHub、npm 与中国镜像，不依赖本地 origin 配置推断发布结果。
 `v*` 标签会触发 GitHub Actions 构建插件包并上传到 GitHub Release。不要为补写说明强制覆盖已经公开的旧标签；从下次发布起采用附注标签。
 
 ### 插件包下载
 
-版本包在 [GitHub Releases](https://github.com/wxsimon2022/metaontic-video/releases) 或 [Gitee Releases](https://gitee.com/hackloop/metaontic-video/releases) 下载，通用插件包为 `metaontic-video-<版本>.tgz`。Windows与Mac使用同一个 `.tgz`，不再发布ZIP；指南和PDF已包含在通用包中。不再向 npm 注册表发布，无需配置 `NPM_TOKEN` 或 Trusted Publishing。
+版本包在 [GitHub Releases](https://github.com/wxsimon2022/metaontic-video/releases) 或 [Gitee Releases](https://gitee.com/hackloop/metaontic-video/releases) 下载，通用插件包为 `metaontic-video-<版本>.tgz`。Windows与Mac使用同一个 `.tgz`，不再发布ZIP；指南和PDF已包含在通用包中。三端发布会将同一份成品发布到 npm 官方并核对中国镜像同步；凭据优先取 `NPM_TOKEN`、本地 `.local/npm-token`，再取 npm 登录态。
 
 `v*` 标签触发完整构建与测试，通过双平台安装检查后，使用 GitHub 自动令牌上传通用tgz。`--both`发布脚本再下载这个同一成品，用本地 `GITEE_TOKEN` 发布Gitee；CI未通过时不上传Gitee，不将单仓成功报告为双仓成功。手动运行工作流时须选择与包版本匹配的标签。发版默认仍由本机打包发布：`node scripts/release.mjs X.Y.Z --notes .local/release-plan.json` 在本机构建、测试、打包后直接建 Gitee Release 并核对附件（需要本机 `GITEE_TOKEN`）；要让流水线打包发布则加 `--pipeline`（`--ci` 是同义写法），本机只做准备、提交并推标签，打包、制品库归档与 Gitee Release 都交给流水线，本地不需要 `GITEE_TOKEN`。两条路径不会互相覆盖：同标签已有同名附件时后到的一方只核对、不再上传，成品以先发布的那份为准。
 
