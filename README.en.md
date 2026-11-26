@@ -34,7 +34,7 @@ https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaonti
 ## Get started
 
 1. Open plugin settings, choose **MetaOntic AI**, enter your API key and save.
-2. Select **视频创作助手** in a conversation and describe what you want to create, including a brand, product, or event promotion.
+2. Choose **视频创作助手** to make videos, or **Creative Video Designer** to design video prompts independently.
 3. Confirm requirements, review the complete script, storyboard and estimate, then approve production costs and preview the results.
 
 Example: “Make a 30-second vertical 720P video showing a peaceful lake at dawn.”
