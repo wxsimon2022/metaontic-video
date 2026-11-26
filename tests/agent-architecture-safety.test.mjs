@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 const root=process.cwd(),folder=await mkdtemp(path.join(tmpdir(),'agent-architecture-'));
-const modules=['approvals/presentation.guard','approvals/approval.presenter','projects/operation.repository','contracts/commands','roles/context.composer','reviews/global-review','evaluation/benchmark','workflows/compile.handler'];
+const modules=['approvals/presentation.guard','approvals/approval.presenter','projects/operation.repository','contracts/commands','projects/project.service','roles/context.composer','reviews/global-review','evaluation/benchmark','workflows/compile.handler'];
 await build({stdin:{contents:modules.map(m=>`export * from '${root}/src/businesses/film-production/${m}.ts';`).join('\n'),resolveDir:root},outfile:path.join(folder,'api.mjs'),bundle:true,platform:'node',format:'esm'});
 const api=await import(pathToFileURL(path.join(folder,'api.mjs')).href);
 after(()=>rm(folder,{recursive:true,force:true}));
@@ -136,4 +136,31 @@ test('长创意补展示从未完成页继续，不重发已展示页且不允�
  g.observe(session,visible(pages.at(-1)));assert.equal(g.shown(session,'p','creative',a),false);
  for(const page of pages.slice(1))g.observe(session,visible(page));
  assert.equal(g.shown(session,'p','creative',a),true);
+});
+
+test('项目规格数组错误给出正确形状，不静默拆分用户硬约束',()=>{
+ for(const key of ['hard_constraints','soft_preferences','references']) {
+  const input={[key]:'保留历史；保留文化'};const before=structuredClone(input);
+  assert.throws(()=>api.createProjectSpec('武威','城市介绍',45000,input),/INVALID_PROJECT_SPEC:.*字符串数组/);
+  assert.deepEqual(input,before);
+  const values=['保留历史；保留文化'];const spec=api.createProjectSpec('武威','城市介绍',45000,{[key]:values});
+  assert.deepEqual(spec[key],values);
+ }
+});
+test('所有项目动作均要求外层ID，内容内ID不补填，版本与内容形状给出修正指引',()=>{
+ const id='12345678-1234-1234-1234-123456789abc';
+ for(const action of api.FILM_ACTIONS.filter(a=>a!=='create')) {
+  assert.throws(()=>api.parseFilmCommand({action,content:JSON.stringify({project_id:id})}),/INVALID_PROJECT_ID:.*顶层传projectId/);
+ }
+ const input={action:'submit',projectId:id,stage:'creative',expectedRevision:0,content:'{"theme":"原始内容"}'};
+ assert.equal(api.parseFilmCommand(input).projectId,id);assert.equal(api.parseFilmCommand(input).content,input.content);
+ for(const action of ['revise','chapter_plan'])assert.throws(()=>api.parseFilmCommand({...input,action,content:'{}'}),/必须是JSON数组/);
+ assert.throws(()=>api.parseFilmCommand({...input,content:'[]'}),/必须是JSON对象/);
+ assert.throws(()=>api.parseFilmCommand({...input,expectedRevision:undefined}),/EXPECTED_REVISION_REQUIRED:.*项目revision/);
+});
+test('章节连续性在入口校验，无效形状不进入持久化',()=>{
+ const args={action:'chapter_submit',projectId:'12345678-1234-1234-1234-123456789abc',stage:'script',chapterId:'one',expectedRevision:0,content:'{}'};
+ for(const continuity of [undefined,'null','[]','{}','{"established_facts":[],"unresolved_threads":[],"character_state":[]}'])assert.throws(()=>api.parseFilmCommand({...args,continuity}),/CHAPTER_CONTINUITY_REQUIRED/);
+ const continuity=JSON.stringify({established_facts:[],unresolved_threads:[],character_state:{}});
+ assert.equal(api.parseFilmCommand({...args,continuity}).continuity,continuity);
 });

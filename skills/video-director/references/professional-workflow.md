@@ -62,8 +62,12 @@ INVALID_TOOL_OUTPUT / value is not lossless JSON 是宿主输出协议错误，�
 
 创意和剧本都先submit保存，再展示当前approval_material正文，长稿按parts顺序read(stage,materialPart)展示全部页；只有真实会话正文完整匹配才能approve，摘要、工具结果和推理不算。已批准同版本复用，不重问。create重试沿用operationId，同会话同需求默认复用，另建才换标识；编译中断可沿原项目重复compile复用稳定制作目标。scope_required沿原项目分章或route/read配entityIds缩小范围，不能静默截断。
 
-独立审核请求调用前登记、原始回包先保存；异常先review_requests查看状态，结果不明或无效回包不自动重复请求。用户接受可能重复计费时retry_review经原生卡片确认，再independent_review，仅重试该项。逐章终审后还需跨章因果、人物变化、连续性、铺垫回收和需求检查，通过当前版本全片结构审核后才编译。
+独立审核请求调用前登记、原始回包先保存；异常先review_requests查看状态，结果不明或无效回包不自动重复请求。需要重新请求时retry_review后再independent_review，仅重试该项，不弹文本费用或重试确认窗。逐章终审后还需跨章因果、人物变化、连续性、铺垫回收和需求检查，通过当前版本全片结构审核后才编译。
 
 制作review拦截补展示时，仅按presentation.missingMaterials补缺失材料；当前剧本已完整展示而分镜缺失时，只贴返回的分镜图片和链接，不重复剧本。PNG自行转换图不能代替项目绑定原图，应直接展示storyboard返回的markdown。
 
 用户展示：工具数据保留英文协议键名，面向用户的正文使用中文标题和标签；按内容分组，短要点用列表，长正文不挤入表格。不得原样贴出 type_details、recognizable_identity 等内部字段名或审核状态枚举。台词、提示词、专名、链接与必要编号保留原文。审批材料按 approval_material 完整展示，不擅自改写。
+
+参数形状：除create外均须在工具参数顶层传projectId（复制project_id），content内同名编号不能替代；写操作expectedRevision使用最新项目版本，不能用产物版本。hard_constraints/soft_preferences/references为字符串数组；revise、chapter_plan的content为数组，submit、chapter_submit为对象；章节提交须带continuity对象的JSON字符串。参数校验失败只修对应字段，保留原材料，不另建项目。
+
+正式剧本按中文场景与全片时间顺序展示，动作和对白只出现一次，核对区仅补充未在正文展示的说明；工具继续保留完整编号与版本，审批卡只确认当前版本，不重复剧本全文。

@@ -90,7 +90,7 @@ export function projectTool(config, ctx, reviewGuard, generationProperties, exte
         await writeProject(project);
         return { path: target, version, shots: scriptStoryboardShots(script).length, bytes: Buffer.byteLength(svg, 'utf8'),
           markdown: `![分镜示意图](<${target}>)`, link: `[打开原图](<${target}>)`,
-          hint: '脚本已保存，后续review只传scriptPath，不传captureScript，也不重复展示同版脚本。把 markdown 内嵌进本轮正文、link 一并给出，再调用review；示意图由插件本地渲染，不要自己写绘图代码或 SVG，也不要调用付费出图模型。' };
+          hint: '脚本已保存，后续review只传scriptPath，不传captureScript，也不重复展示同版脚本。把 markdown 与 link 原样放进用户可见正文一次，再调用review；不要预判SVG无法显示，不自行转PNG、截图或运行浏览器/系统转换命令，自行转换图不能替代审核绑定原图。补展示只贴presentation.markdown，不追加已经展示的图片或其他格式副本。示意图由插件本地渲染，不要自己写绘图代码或 SVG，也不要调用付费出图模型。' };
         });
       }
       if (!['prepare', 'review'].includes(args.action)) throw new Error('未知项目操作');
@@ -169,7 +169,7 @@ export function projectTool(config, ctx, reviewGuard, generationProperties, exte
           return {projectId:data.id,status:'blocked',reason:gate.reason,
             repairAction:currentBoard?'present_current_materials':'regenerate_storyboard',
             ...(currentBoard?{presentation:{scriptPath,storyboardPath:board.path,missingMaterials,markdown}}:{}),
-            nextAction:currentBoard?`只补展示presentation.missingMaterials列出的材料，将presentation.markdown原样放在一条用户可见正文中（不要改写或自行转图）；${needsScript?'按当前保存稿补齐正文':'当前剧本已完整展示，不要重复贴剧本'}，${needsStoryboard?'补齐绑定分镜原图':'当前分镜已展示，无需重复'}。然后沿用同一projectId、scriptPath和specification重试review；不重建项目、不重写文件、不重复捕获脚本。`:'本项目分镜缺失或已过期。沿用本projectId与scriptPath调用storyboard，展示返回的原图后再review；已展示的同版剧本无需重复，不使用其他项目或自行转换的图片。'};
+            nextAction:currentBoard?`只补展示presentation.missingMaterials列出的材料，将presentation.markdown原样放在一条用户可见正文中（不要改写或自行转图，也不要追加已展示图片或其他格式副本）；${needsScript?'按当前保存稿补齐正文':'当前剧本已完整展示，不要重复贴剧本'}，${needsStoryboard?'补齐绑定分镜原图':'当前分镜已展示，无需重复'}。然后沿用同一projectId、scriptPath和specification重试review；不重建项目、不重写文件、不重复捕获脚本。`:'本项目分镜缺失或已过期。沿用本projectId与scriptPath调用storyboard，展示返回的原图后再review；已展示的同版剧本无需重复，不使用其他项目或自行转换的图片。'};
         }
         const service = ctx.get?.('userQuestions') || exec.agent?.ctx?.get?.('userQuestions');
         if (!service?.ask || approvalPolicy(ctx, exec) === 'never') return { projectId: data.id, status: 'pending',  reason: '无法取得脚本审核答复，未生成。' };

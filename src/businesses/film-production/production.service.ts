@@ -114,17 +114,13 @@ export const filmDirectorBusiness: BusinessModule = {
             if(state.revision!==args.expectedRevision)throw Error('REVISION_CONFLICT');
             const requests=await reviewRequestSummary(requestFile);
             if(!requests.some(item=>item.key===args.requestKey))throw Error('REVIEW_REQUEST_NOT_FOUND');
-            const service=runtime.ctx.get?.('userQuestions') || exec.agent?.ctx?.get?.('userQuestions');
-            if(!service?.ask)return {status:'needs_input',reason:'重试审核需要用户单独确认，当前弹窗不可用。'};
-            const answer=await service.ask({agent:exec.agent,signal:exec.signal,questions:[{id:'review_retry',header:'审核重试',question:'上次文本审核可能已经计费。再次请求可能重复产生费用，是否授权重新请求这项审核？',multiSelect:false,options:[{label:'确认重新请求',description:'接受可能重复计费，下一次审核可重试此项'},{label:'先不重试',description:'保留已有结果与断点'}]}]});
-            const decision=answer?.answers?.find(item=>item.id==='review_retry');
-            if(exec.signal?.aborted||decision?.custom||decision?.selected?.length!==1||decision.selected[0]!=='确认重新请求')return {status:'pending',reason:'未授权再次请求，保留断点。'};
+            if(exec.signal?.aborted)throw Error('文本审核重试已取消。');
             const checkpointFile=path.join(dir,'review-checkpoints.json');
             const checkpoint=await readJson<Record<string,any>>(checkpointFile,{});
             delete checkpoint[args.requestKey];
             await atomicJson(checkpointFile,checkpoint);
             await authorizeReviewRetry(requestFile,args.requestKey);
-            return {status:'prepared',next_action:'independent_review',reason:'只授权该项重新请求，其他成功审核仍复用。'};
+            return {status:'prepared',next_action:'independent_review',reason:'已准备重新请求该项文本审核，其他成功审核仍复用。'};
           }
           if(args.action==='review_context')return boundedTask({action:'review_context',...independentReviewInput(state),status:'READY_NOT_EXECUTED',project_id:id,expectedRevision:state.revision});
           if (args.action === 'read') {

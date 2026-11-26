@@ -167,10 +167,7 @@ test('new professional project completes approved evidence chain and persists co
   assert.equal(reviewCalls,1);assert.equal(state.nextTask.action,'compile');
   const journal=await tool.execute({action:'review_requests',projectId},exec);
   assert.equal(journal.requests.length,1);assert.equal(journal.requests[0].status,'response_saved');
-  runtime.ctx.get=()=>({ask:async()=>({answers:[{id:'review_retry',selected:['先不重试']}]})});
-  const declined=await tool.execute({action:'retry_review',projectId,expectedRevision:state.revision,requestKey:journal.requests[0].key},exec);
-  assert.equal(declined.status,'pending');assert.equal(reviewCalls,1);
-  runtime.ctx.get=()=>({ask:async()=>({answers:[{id:'review_retry',selected:['确认重新请求']}]})});
+  runtime.ctx.get=()=>({ask:async()=>{throw new Error('文本审核重试不得弹确认窗');}});
   const authorized=await tool.execute({action:'retry_review',projectId,expectedRevision:state.revision,requestKey:journal.requests[0].key},exec);
   assert.equal(authorized.status,'prepared');assert.equal(reviewCalls,1);
   state=await tool.execute({action:'independent_review',projectId,expectedRevision:state.revision},exec);

@@ -34,7 +34,7 @@ export async function journaledReview(file: string, key: string, complete: () =>
   const attempts = journal[key] || [];
   const previous = attempts.at(-1);
   if (previous?.status === 'response_saved') return previous.response;
-  if (previous?.status === 'in_flight') throw Error('REVIEW_REQUEST_UNCERTAIN:上次文本审核结果不明，未重复调用。先查看review_requests；核对后需要重试时用retry_review单独确认可能重复计费。');
+  if (previous?.status === 'in_flight') throw Error('REVIEW_REQUEST_UNCERTAIN:上次文本审核结果不明，未重复调用。先查看review_requests；核对后需要重试时调用retry_review后再执行independent_review，不弹额外确认窗。');
   const attempt: ReviewAttempt = { status: 'in_flight', at: new Date().toISOString() };
   attempts.push(attempt); journal[key] = attempts;
   await atomicJson(file, journal);

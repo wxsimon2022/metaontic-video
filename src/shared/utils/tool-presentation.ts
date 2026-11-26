@@ -35,7 +35,7 @@ const FILM_ACTION_TITLES: Record<string, string> = {
   independent_review: '独立质量审核',
   capabilities: '查询模型能力',
   review_requests: '查看审核请求状态',
-  retry_review: '确认重新审核',
+  retry_review: '准备重新审核',
 };
 
 const FILM_STAGE_ROLES: Record<string, string> = {

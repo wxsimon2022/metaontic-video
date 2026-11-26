@@ -200,3 +200,35 @@ test('独立脚本提示词聚焦故事、时长策略、动作细节与制作�
   assert.ok(longPrompt.includes('按章节和场次推进'), '长片按章节规划内容');
   assert.ok(!longPrompt.includes('聚焦一个核心事件和一个情绪落点'), '长片不套短视频的单事件约束');
 });
+
+test('流式尾行无换行且中文跨字节传输时保留正文，不重复请求',async()=>{
+ const bytes=new TextEncoder().encode('data: '+JSON.stringify({choices:[{delta:{content:'# 兰州清晨'},finish_reason:'stop'}]}));
+ let calls=0;
+ const result=await api.writeScript(config,{idea:'兰州'}, {fetcher:async()=>{
+  calls++;return new Response(new ReadableStream({start(c){for(let i=0;i<bytes.length;i++)c.enqueue(bytes.slice(i,i+1));c.close();}}),{headers:{'content-type':'text/event-stream'}});
+ }});
+ assert.equal(result.script,'# 兰州清晨');assert.equal(calls,1);
+});
+
+test('空文本区分推理、输出上限和内容策略，推理不充当正文且不自动重试',async()=>{
+ for(const stream of [true,false])for(const [message,finish,reason] of [
+  [{content:null,reasoning_content:'internal reasoning'},'stop','只返回了推理过程'],
+  [{content:null,reasoning_content:'internal reasoning'},'length','已达到输出上限'],
+  [{content:null},'content_filter','正文被上游内容策略拦截'],
+ ]){
+  let calls=0;
+  await assert.rejects(()=>api.writeScript(config,{idea:'x'},{stream,fetcher:async()=>{
+   calls++;return stream?sseResponse([{choices:[{delta:message,finish_reason:finish}]}]):response({choices:[{message,finish_reason:finish}]});
+  }}),error=>error.message.includes(reason)&&!error.message.includes('internal reasoning'));
+  assert.equal(calls,1);
+ }
+});
+
+test('可切换思考的DeepSeek型号请求正文，未知模型与reasoner不发送专有参数',async()=>{
+ for(const [model,disabled] of [['deepseek v4.1 flash',true],['deepseek-v4-pro',true],['deepseek-flash',true],['deepseek-reasoner',false],['other-model',false]]){
+  let body;
+  await api.writeScript({...config,textModel:model},{idea:'x'},{fetcher:async(_url,opts)=>{body=JSON.parse(opts.body);return response({choices:[{message:{content:'# 正文'}}]});}});
+  assert.equal(body.model,model);
+  assert.deepEqual(body.thinking,disabled?{type:'disabled'}:undefined);
+ }
+});

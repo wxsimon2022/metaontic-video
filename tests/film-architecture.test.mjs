@@ -44,7 +44,7 @@ test('逐章保存不冒充整片完成，恢复指向未写章，汇总后才�
  assert.equal(s.status,'SCRIPT_PARTIAL');assert.equal(s.artifacts.script,undefined);assert.equal(s.approvals.script,undefined);
  const task=api.chapterTask(s,{stage:'script',action:'submit',instructions:'写作'});assert.equal(task.chapter.chapter_id,'2');assert.deepEqual(task.previous_chapters[0].continuity,continuity);
  s=api.submitChapter(s,'script','2',piece('2'),continuity,s.revision);
- assert.equal(s.artifacts.script.data.scenes.length,2);assert.equal(s.artifacts.script.data.chapters.reduce((n,c)=>n+c.duration_ms,0),30000);assert.match(s.artifacts.script.data.screenplay,/s1/);assert.match(s.artifacts.script.data.screenplay,/s2/);assert.equal(s.approvals.script,undefined);
+ assert.equal(s.artifacts.script.data.scenes.length,2);assert.equal(s.artifacts.script.data.chapters.reduce((n,c)=>n+c.duration_ms,0),30000);assert.match(s.artifacts.script.data.screenplay,/0–15 秒/);assert.match(s.artifacts.script.data.screenplay,/15–30 秒/);assert.deepEqual(s.artifacts.script.data.scenes.map(scene=>scene.scene_id),['s1','s2']);assert.equal(s.approvals.script,undefined);
 });
 test('章节预算、连续性、错章与旧版本均阻断',()=>{
  assert.throws(()=>api.defineChapters(state(),[chapter('1')],1),/INVALID_CHAPTER_PLAN/);
@@ -88,7 +88,7 @@ test('六类评测题覆盖事实边界、短片与长片，不通过流量词�
  const cases=JSON.parse(await readFile('tests/fixtures/story-evaluation/cases.json','utf8'));assert.equal(new Set(cases.map(c=>c.id)).size,6);assert.ok(cases.some(c=>c.genre==='documentary'));assert.ok(cases.some(c=>c.duration_ms>=600000));assert.ok(cases.every(c=>c.must_preserve.length&&c.review_focus.length));
 });
 test('角色按阶段组合上下文，记录明确标注的估算成本，局部镜头只带相关场次',()=>{
- const s=ready();const instructions=api.roleInstructions(s,'screenwriter');assert.ok(Buffer.byteLength(instructions)<12000);assert.doesNotMatch(instructions,/# COMMON_CONTRACT V4.0/);
+ const s=ready();const instructions=api.roleInstructions(s,'screenwriter');assert.match(instructions,/canonical_v1/);assert.doesNotMatch(instructions,/# COMMON_CONTRACT V4.0/);
  s.artifacts.script.data={characters:[],chapters:[chapter('1'),chapter('2')],scenes:[scene('1'),scene('2')],dialogue:[],screenplay:'WHOLE_SCRIPT'};
  s.artifacts.shots.data.shots=[{shot_id:'a',scene_id:'s1',character_ids:[]},{shot_id:'b',scene_id:'s2',character_ids:[]}];
  const input=api.scopedInputs(s,'shots','storyboard',['a']);assert.equal(input.shots.data.shots.length,1);assert.equal(input.script.data.scenes.length,1);assert.ok(!JSON.stringify(input).includes('WHOLE_SCRIPT'));
@@ -129,4 +129,40 @@ test('场景局部上下文通过地点引用找到场次；没有人物出场�
 test('单章审核超限在调用前阻断，不能截断正文或产生请求',async()=>{
  const s=ready();s.artifacts.script.data.scenes[0].key_actions=['完整正文'.repeat(25000)];let calls=0;
  await assert.rejects(()=>api.runIndependentReview({},s,{complete:async()=>{calls++;}}),/REVIEW_CONTEXT_BUDGET_EXCEEDED|CHAPTER_REVIEW_CONTEXT_TOO_LARGE/);assert.equal(calls,0);
+});
+
+test('审核去掉机器生成正文与重复动作，保留节拍对白顺序、独立旧稿和未知证据',()=>{
+ const s=ready();
+ const script={...piece('1'),document_source:'structured_script_v1',characters:[{character_id:'c',name:'父亲'}],dialogue:[{dialogue_id:'d',scene_id:'s1',speaker_id:'c',exact_text:'先别坐。'}]};
+ script.scenes[0].beats=[{action:'拧紧螺丝'},{dialogue_ref:'d'}];
+ script.scenes[0].unknown_evidence='木纹仍然清楚';
+ script.screenplay=api.renderScript(script);
+ s.artifacts.script.data=script;const before=structuredClone(s);
+ const projected=api.independentReviewInput(s).input.inputs.script.data;
+ assert.equal(projected.screenplay,undefined);assert.equal(projected.scenes[0].key_actions,undefined);
+ assert.deepEqual(projected.scenes[0].beats,script.scenes[0].beats);assert.deepEqual(projected.dialogue,script.dialogue);
+ assert.equal(projected.scenes[0].unknown_evidence,'木纹仍然清楚');assert.deepEqual(s,before);
+ assert.ok(JSON.stringify(projected).length<JSON.stringify(script).length);
+ script.scenes[0].key_actions=['必须保留的独立行动'];
+ assert.deepEqual(api.independentReviewInput(s).input.inputs.script.data.scenes[0].key_actions,['必须保留的独立行动']);
+ delete script.document_source;script.screenplay='独立旧稿不可删';
+ assert.equal(api.independentReviewInput(s).input.inputs.script.data.screenplay,'独立旧稿不可删');
+});
+
+test('分章保持净化后的上下文，并保留同场次次要地点及镜头引用',()=>{
+ const s=ready();s.artifacts.script.data={characters:[],chapters:[chapter('1'),chapter('2')],scenes:[{...scene('1'),detail:'甲'.repeat(41000)},{...scene('2'),detail:'乙'.repeat(41000)}],dialogue:[],document_source:'structured_script_v1',screenplay:'重复机器正文',self_review:{secret:'AUTHOR_SCORE'}};
+ s.artifacts.assets.data={characters:[],props:[],scenes:[{scene_id:'s1',location_id:'primary',scene_state_id:'p'}],locations:[{location_id:'primary'},{location_id:'secondary'},{location_id:'unrelated'}],scene_states:[{scene_state_id:'p',location_id:'primary',scene_id:'s1'},{scene_state_id:'alt',location_id:'secondary',scene_id:'s1'},{scene_state_id:'other',location_id:'unrelated',scene_id:'s2'}]};
+ s.artifacts.shots.data.shots=[{shot_id:'h',scene_id:'s1',location_id:'secondary',scene_state_id:'alt'}];
+ const before=structuredClone(s),b=api.reviewBatches(s);
+ assert.equal(b.length,2);assert.doesNotMatch(JSON.stringify(b),/AUTHOR_SCORE|重复机器正文/);
+ assert.deepEqual(b[0].input.inputs.assets.data.locations.map(v=>v.location_id),['primary','secondary']);
+ assert.ok(b[0].input.inputs.assets.data.scene_states.some(v=>v.scene_state_id==='alt'));assert.deepEqual(s,before);
+});
+
+test('已知文本上下文预留输出预算，超限不发请求，未知容量不借用视频模型',async()=>{
+ assert.equal(api.reviewInputBudget(),80000);
+ assert.ok(api.reviewInputBudget({modelProfile:{context_window:16000,max_output_tokens:4000}})<80000);
+ let calls=0;
+ await assert.rejects(()=>api.runIndependentReview({},ready(),{modelProfile:{context_window:1000},complete:async()=>{calls++;}}),/REVIEW_CONTEXT_BUDGET_EXCEEDED/);
+ assert.equal(calls,0);
 });

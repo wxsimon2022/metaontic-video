@@ -27,11 +27,8 @@ src/businesses/film-production/
 │   └── reviewer.ts
 ├── profiles/                 # 六种作品类型、配置版本、扩展字段及类型检查
 ├── prompts/                  # 共用创作指导与写作方法
-│   ├── guidance.ts
-│   ├── content-quality.ts
 │   ├── short-video.ts
-│   ├── script-craft.ts
-│   └── narrative-enhancement.ts
+│   └── guidance.ts # 详细角色方法位于src/agents及skills/video-director
 ├── contracts/                # 共同数据契约、结构和交叉引用校验
 │   ├── index.ts
 │   ├── schema.ts

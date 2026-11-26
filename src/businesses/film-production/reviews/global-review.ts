@@ -13,7 +13,7 @@ export function globalReviewInput(state: any, chapterReports: any[], snapshot: a
     inputs: { creative: snapshot.inputs.creative, script: { revision: snapshot.inputs.script.revision,
       data: { characters: script.characters, chapters: script.chapters, dialogue: script.dialogue,
         scenes: script.scenes.map(scene => ({ scene_id: scene.scene_id, chapter_id: scene.chapter_id, duration_ms: scene.duration_ms,
-          scene_goal: scene.scene_goal, key_actions: scene.key_actions, entry_state: scene.entry_state, exit_state: scene.exit_state })) } } },
+          scene_goal: scene.scene_goal, key_actions: scene.key_actions||scene.beats?.map(beat=>beat.action).filter(Boolean), entry_state: scene.entry_state, exit_state: scene.exit_state })) } } },
     continuity: Object.entries(state.chapter_workbench?.entries || {}).map(([chapter_id, entry]: [string, any]) => ({ chapter_id, continuity: entry.script?.continuity || null })),
     chapter_reviews: chapterReports.map(report => ({ review_status: report.review_status, issues: report.issues, story_assessment: report.story_assessment })) };
   return { input, digest: createHash('sha256').update(JSON.stringify(input)).digest('hex') };

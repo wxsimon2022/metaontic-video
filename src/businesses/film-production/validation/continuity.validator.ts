@@ -44,7 +44,10 @@ export function validateReferences(stage: string, value: any, state: any) {
       if(script?.scenes && !script.scenes.some(s=>s.scene_id===scene.scene_id)) throw Error('SCRIPT_SCENE_REF_MISMATCH');
     }
     if(script?.scenes?.some(s=>!scenes.has(s.scene_id))) throw Error('MISSING_SCRIPT_SCENE');
-    for(const current of assets.scene_states || []) check(current);
+    for(const current of assets.scene_states || []) {
+      check(current);
+      if(current.scene_id!==undefined&&!scenes.has(current.scene_id))throw Error('INVALID_REFERENCE:scene_state_scene');
+    }
     for(const costume of costumes.values()) if(costume.character_id!==undefined&&!characters.has(costume.character_id)) throw Error('INVALID_REFERENCE:costume_owner');
     if(script?.characters) {
       const cast=registry(script.characters,'character_id');
@@ -62,7 +65,10 @@ export function validateReferences(stage: string, value: any, state: any) {
       if(stage==='shots') {
         const scene=scenes.get(shot.scene_id);
         if(!scene) throw Error('INVALID_REFERENCE:scene');
-        if(shot.location_id!==undefined && scene.location_id!==shot.location_id) throw Error('SHOT_LOCATION_MISMATCH');
+        const current=states?.get(shot.scene_state_id);
+        if(current?.scene_id!==undefined&&current.scene_id!==shot.scene_id)throw Error(`SHOT_SCENE_STATE_MISMATCH:镜头 ${shot.shot_id} 的地点状态不属于场次 ${shot.scene_id}，请引用该场次已登记的状态，不要仅替换地点编号。`);
+        const registeredLocation=current?.scene_id===shot.scene_id&&current?.location_id===shot.location_id;
+        if(shot.location_id!==undefined && scene.location_id!==shot.location_id&&!registeredLocation) throw Error(`SHOT_LOCATION_MISMATCH:镜头 ${shot.shot_id} 的地点 ${shot.location_id} 未绑定场次 ${shot.scene_id}；请选择场次主地点 ${scene.location_id} 或该场次已登记的地点状态，不要为通过校验随意修改画面地点。`);
         if(shot.chapter_id!==undefined && script?.scenes && !script.scenes.some(s=>s.scene_id===shot.scene_id&&s.chapter_id===shot.chapter_id)) throw Error('SHOT_CHAPTER_MISMATCH');
         for(const id of shot.costume_ids || []) if(!shot.character_ids.includes(costumes.get(id)?.character_id)) throw Error('COSTUME_CHARACTER_MISMATCH');
       }

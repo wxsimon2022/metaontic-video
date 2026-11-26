@@ -239,7 +239,7 @@ Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.c
 
 设备数优先：plugin_started/plugin_installed共用持久化独占登记标记和确定性eventId，每匿名设备只尝试登记一次。标记先落盘，结果不明不重试，失败不清标记；工具与任务统计仍按原逻辑。普通重装保留状态不重报，清空全部身份状态不能保证物理设备去重。不更新版本或发版除非用户明确要求。
 
-专业Agent执行可靠性：create默认按会话与规范化需求复用，operationId用于显式重试/另建，冲突不得覆盖。compile固定制作ID并在一次原子写入中保存完整绑定，中断恢复校验来源、修订号、模型与摘要。独立审核先落本地review-requests，再调用模型；原始回包先保存后解析，结果不明或解析失败不自动重放。review_requests只返回状态摘要；retry_review必须经原生问题窗确认可能重复计费，仅清该项checkpoint并授权再次请求。上下文80,000字符预算超限返回scope_required或阻断审核，不静默截断；逐章终审后增加有跨章证据的全片结构审核。离线compare评测须覆盖六案例，约束、艺术结论、用量和人工偏好都需要证据；无记录保持未知。见creation-quality-architecture.md。
+专业Agent执行可靠性：create默认按会话与规范化需求复用，operationId用于显式重试/另建，冲突不得覆盖。compile固定制作ID并在一次原子写入中保存完整绑定，中断恢复校验来源、修订号、模型与摘要。独立审核先落本地review-requests，再调用模型；原始回包先保存后解析，结果不明或解析失败不自动重放。review_requests只返回状态摘要；retry_review按用户最新要求不弹文本费用确认窗，仅清该项checkpoint并准备再次请求；结果不明仍不自动重放。上下文80,000字符预算超限返回scope_required或阻断审核，不静默截断；逐章终审后增加有跨章证据的全片结构审核。离线compare评测须覆盖六案例，约束、艺术结论、用量和人工偏好都需要证据；无记录保持未知。见creation-quality-architecture.md。
 
 制作review补展示必须按missingMaterials独立计算正文与绑定图状态，只缺分镜时返回图片和链接，不重贴已展示的同版剧本。旧稿不可复用新版展示事实，转换PNG不能代替绑定SVG；回归film-output-contract.test.mjs。
 
@@ -258,3 +258,7 @@ Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.c
 三端并行发布：release.mjs --all 在共享构建、测试、Windows/macOS安装检查和CI暂存包摘要核对之后，启动GitHub/Gitee/npm三个独立Node子进程，避免同步npm/gh命令堵塞其他渠道。Promise.allSettled保留各端结果并写channels.json；续跑按同版成品核验已完成端，不改标签或覆盖附件。npm提交前落npm-submission.json，平台处理中或提交结果不明时不因404重放，核对公开包与镜像；npm-publish.lock防止同版本并发提交。进程异常留下锁时先核对进程和提交状态，不清提交记录绕过防重。回归见release-parallel.test.mjs；该调整属于工程工具，不单独发版或写入用户更新说明。
 
 提示词分阶段维护：具体约定与验证见prompt-optimization.md。用户明确改稿先改新版再审，不补弹旧稿；常驻不再附完整导演角色和全阶段字段，film_project成功结果切创作规则、compile或video_project切制作规则，失败不切。schema/质量证据按角色分发，canonical_v1不另写screenplay，chapter_v1沿chapter_submit汇总。提示词评测中的字符缩减不当作实际token、费用、延迟或艺术质量提升。
+
+遗留代码与剧本排版维护见code-cleanup-and-script-presentation.md。不得恢复未使用ROLE_PROMPTS/COMMON_CONTRACT运行副本或Windows ZIP脚本；测试用实际roleInstructions和renderDeliverables。film_project的projectId/expectedRevision是外层参数，JSON数组要求须在字段描述中写清；章节continuity入口校验。结构化剧本正文按中文场景和累计时间投影，核对区保留未展示的语义扩展但不重复场次动作/对白；审批卡只确认版本，完整材料及分页守卫继续严格执行。
+
+审核上下文去重：仅删除structured_script_v1机器投影正文及与beats动作严格一致的key_actions，独立旧稿、对白、未知证据保留；分章必须从净化快照切分，地点依赖覆盖同场次次要状态与镜头引用。明确文本能力时预留输出预算，未知时不借用视频能力，超限零调用。详见creation-quality-architecture.md审核上下文节。

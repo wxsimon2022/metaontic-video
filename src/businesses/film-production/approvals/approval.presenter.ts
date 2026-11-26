@@ -1,3 +1,4 @@
+import { renderScript } from '../scripts/script.document.js';
 /** 审批展示与机器数据分开；不截断关键内容，不改变批准绑定的版本。 */
 const LABELS:Record<string,string>={
  target_model:'生成模型',
@@ -238,7 +239,7 @@ function storyStructure(items:any[],depth:number):string {
  let elapsed:number|null=0;
  return items.map((item,index)=>{
   if(!item||typeof item!=='object'||Array.isArray(item)){elapsed=null;return readable(item,depth+1);}
-  const {title,section_id,duration_ms,purpose,beats,visual_evidence,emotion,transition_logic,...extra}=item;
+  const {title,section_id:_sectionId,duration_ms,purpose,beats,visual_evidence,emotion,transition_logic,...extra}=item;
   const duration=Number.isSafeInteger(duration_ms)&&duration_ms>0?duration_ms:null;
   const range=duration!==null&&elapsed!==null?`${elapsed/1000}–${(elapsed+duration)/1000} 秒`:duration!==null?`${duration/1000} 秒`:'时长待确认';
   elapsed=duration!==null&&elapsed!==null?elapsed+duration:null;
@@ -255,8 +256,6 @@ function storyStructure(items:any[],depth:number):string {
   add('情绪变化',emotion,'emotion');
   add('如何接下一段',transition_logic,'transition_logic');
   if(Object.keys(extra).length)parts.push(readable(extra,depth+1));
-  // 编号保留供后续定位，不再占据一整组“段落/标题/时长”字段。
-  if(section_id!==undefined)parts.push(`段落编号：${section_id}`);
   return parts.join('\n\n');
  }).join('\n\n');
 }
@@ -265,7 +264,7 @@ export function readable(value:any,depth=0,field=''):string {
  if(typeof value==='boolean')return value?'是':'否';
  if(typeof value!=='object')return ENUM_FIELDS.has(field)?VALUES[String(value)]||String(value):String(value);
  if(Array.isArray(value)&&['structure','narrative_beats'].includes(field))return value.length?storyStructure(value,depth):'无';
- if(Array.isArray(value))return value.length?value.map((v,i)=>typeof v==='object'&&v!==null?`**${({scenes:'场次',chapters:'章节',characters:'人物',shots:'镜头',issues:'问题',structure:'段落',checks:'核对项'} as Record<string,string>)[field]||'条目'} ${i+1}**\n\n${readable(v,depth+1,field)}`:`- ${readable(v,depth+1,field)}`).join('\n\n'):'无';
+ if(Array.isArray(value))return value.length?value.map((v,i)=>typeof v==='object'&&v!==null?`**${({scenes:'场次',chapters:'章节',characters:'人物',shots:'镜头',issues:'问题',structure:'段落',checks:'核对项'} as Record<string,string>)[field]||'条目'} ${i+1}**\n\n${readable(v,depth+1,field)}`:`- ${readable(v,depth+1,field)}`).join(value.every(v=>v===null||typeof v!=='object')?'\n':'\n\n'):'无';
  return Object.entries(value).filter(([key])=>!META.has(key)).map(([key,v])=>{
   // 扩展字段仍保留内容，但不把内部协议名交给用户阅读。
   const label=LABELS[key]||(/^[A-Z]+[\d_-]*\d[\w-]*$/.test(key)?key:'补充说明');
@@ -274,26 +273,45 @@ export function readable(value:any,depth=0,field=''):string {
  }).join('\n\n');
 }
 
+/** canonical正文已包含场次、动作和对白；只补尚未展示的语义信息，不重复机器清单。 */
+export function scriptContent(data:any):string {
+ const {screenplay,...rest}=data;
+ if(data.document_source!=='structured_script_v1'||!['characters','chapters','scenes','dialogue'].every(key=>Array.isArray(data[key]))) {
+  const details=readable(rest);
+  return [screenplay||'',details?'### 补充说明\n\n'+details:''].filter(Boolean).join('\n\n');
+ }
+ const title=String(screenplay||'').match(/^# ([^\r\n]+)/)?.[1]||'影视剧本';
+ const omit=(item:any,keys:string[])=>Object.fromEntries(Object.entries(item).filter(([key])=>!keys.includes(key)));
+ const details=omit(rest,['synopsis','scenes','chapters','dialogue']);
+ const names=new Map(data.characters.map((c:any)=>[c.character_id,c.name||'未命名人物']));
+ details.characters=data.characters.map(c=>omit(c,['character_id']));
+ for(const [field,keys]of Object.entries({
+  scenes:['scene_id','chapter_id','location_id','loc_id','title','location','time_of_day','time','duration_ms','beats','key_actions','exit_state'],
+  chapters:['chapter_id','title','duration_ms','scene_ids'],
+  dialogue:['dialogue_id','scene_id','speaker_id','exact_text'],
+ })) {
+  const extras=data[field].flatMap((item,index)=>{
+   const extra=omit(item,keys);
+   if(field==='scenes'&&Array.isArray(extra.characters))extra.characters=extra.characters.map(id=>typeof id==='string'?(names.get(id)||'未命名人物'):id);
+   if(!Object.keys(extra).length)return [];
+   return [{title:item.title||(field==='scenes'?'场景 '+(index+1):field==='chapters'?'章节 '+(index+1):'对白 '+(index+1)),...extra}];
+  });
+  if(extras.length)details[field]=extras;
+ }
+ if(!data.characters.length)delete details.characters;
+ const supplement=readable(details);
+ return [renderScript(data,title),supplement?'## 核对与补充\n\n'+supplement:''].filter(Boolean).join('\n\n');
+}
 export function approvalPreview(stage:string,artifact:any):string {
- const data=artifact.data||{};
- if(stage==='creative') {
-  return `创意方案 · 修订 ${artifact.revision}\n\n完整方案应已在当前对话正文展示，请回看并按该版本作出决定。若当前对话没有展示完整方案，应先由助手补充展示，再进行审批。此卡片只确认版本，不重复渲染提案。`;
- }
  const title=stage==='creative'?'创意方案':'正式剧本';
- let content=readable(data);
- if(stage==='script'&&typeof data.screenplay==='string'&&data.screenplay.trim()) {
-  const {screenplay,...details}=data;
-  content=screenplay+'\n\n### 剧本核对资料\n\n'+readable(details);
- }
- return `${title}（修订 ${artifact.revision}）\n\n${content}\n\n是否批准本版进入下一阶段？`;
+ return `${title} · 修订 ${artifact.revision}\n\n完整方案应已在当前对话正文展示，请回看并按该版本作出决定。若当前对话没有展示完整方案，应先由助手补充展示，再进行审批。此卡片只确认版本，不重复渲染提案或剧本。`;
 }
 
-/** 正文材料独立于审批卡片：创意不能复用只提示回看的短卡。 */
+/** 正文材料独立于审批卡片，卡片只确认当前版本。 */
 export function approvalMaterial(stage:string, artifact:any) {
  if (!['creative','script'].includes(stage) || !artifact || artifact.stale) return {};
- const markdown = stage === 'creative'
-  ? `创意方案（修订 ${artifact.revision}）\n\n${readable(artifact.data || {})}`
-  : approvalPreview(stage, artifact);
+ const title=stage==='creative'?'创意方案':'正式剧本';
+ const markdown=`${title}（修订 ${artifact.revision}）\n\n${stage==='creative'?readable(artifact.data||{}):scriptContent(artifact.data||{})}`;
  return {approval_material:{stage,revision:artifact.revision,markdown,instructions:'本次正文只展示此markdown一次，原样保留标题、文字、标点与完整内容；它已完成中文排版，不再另写一版创意或剧本，不概括、不润色、不先展示草稿。随后单独调用approve；已展示同版时直接请求批准。'}};
 }
 

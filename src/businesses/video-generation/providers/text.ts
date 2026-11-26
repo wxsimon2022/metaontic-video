@@ -72,36 +72,53 @@ function contentOf(message: any) {
   return Array.isArray(content) ? content.map((part: any) => part?.text || '').join('') : String(content ?? '');
 }
 
+/** DeepSeek 可切换思考的型号直接请求正文，避免默认推理占满输出预算。未知模型不附加专有参数。 */
+export function textGenerationPolicy(model:string) {
+  return /(?:^|\/)deepseek[\s_-]*(?:v4(?:\.\d+)?(?:[\s_-]*(?:flash|pro))?|flash|chat)$/i.test(model.trim())
+    ? { thinking: { type: 'disabled' } } : {};
+}
+
 /** 流式收口：SSE 增量边收边拼，顺手攒 usage、结束原因与上游错误。
  *  每收到一段就重置「卡住」计时器，所以连接假死能在 idle 上限内报错，而不是等满总超时。 */
 async function readStream(response: any, bump: any, onProgress: any) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '', content = '', usage: any = null, model = '', truncated = false, failure = '', chunks = 0;
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    bump();
-    buffer += decoder.decode(value, { stream: true });
-    let cut;
-    while ((cut = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, cut).replace(/\r$/, ''); buffer = buffer.slice(cut + 1);
-      if (!line.startsWith('data:')) continue;
-      const payload = line.slice(5).trim();
-      if (!payload || payload === '[DONE]') continue;
-      let part: any = null;
-      try { part = JSON.parse(payload); } catch { continue; }
-      if (part?.error) { failure = String(part.error?.message || part.error); continue; }
-      if (part?.model) model = String(part.model);
-      if (part?.usage) usage = tokenUsage(part.usage);
-      const choice = part?.choices?.[0];
-      const piece = contentOf({ content: choice?.delta?.content ?? choice?.message?.content });
-      if (piece) { content += piece; chunks += 1; }
-      if (choice?.finish_reason === 'length') truncated = true;
+  let reasoningOnly = false, finishReason = '';
+  const accept = (line:string) => {
+    if (!line.startsWith('data:')) return;
+    const payload = line.slice(5).trim();
+    if (!payload || payload === '[DONE]') return;
+    let part: any;
+    try { part = JSON.parse(payload); } catch { return; }
+    if (part?.error) { failure = String(part.error?.message || part.error); return; }
+    if (part?.model) model = String(part.model);
+    if (part?.usage) usage = tokenUsage(part.usage);
+    const choice = part?.choices?.[0];
+    const message = choice?.delta || choice?.message;
+    const piece = contentOf({content:choice?.delta?.content ?? choice?.message?.content});
+    if (piece) { content += piece; chunks += 1; }
+    if (message?.reasoning_content || message?.reasoning) reasoningOnly = true;
+    if (choice?.finish_reason) finishReason = String(choice.finish_reason);
+    if (finishReason === 'length') truncated = true;
+  };
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      bump();
+      buffer += decoder.decode(value, { stream: true });
+      let cut;
+      while ((cut = buffer.indexOf('\n')) >= 0) {
+        accept(buffer.slice(0, cut).replace(/\r$/, '')); buffer = buffer.slice(cut + 1);
+      }
+      if (chunks) onProgress?.({ characters: content.length, chunks });
     }
-    if (chunks) onProgress?.({ characters: content.length, chunks });
-  }
-  return { content, usage, model, truncated, failure };
+    // Some compatible relays close the final data line without a newline.
+    buffer += decoder.decode();
+    if (buffer.trim()) accept(buffer.replace(/\r$/, ''));
+  } finally { reader.releaseLock(); }
+  return { content, usage, model, truncated, failure, reasoningOnly, finishReason };
 }
 
 /** 写脚本：返回 Markdown 剧本正文；失败时抛出可直接展示的原因，不伪造脚本。
@@ -137,7 +154,7 @@ export async function writeScript(config: any, brief: any, options: any = {}) {
     response = await fetcher(textEndpoint(cfg), {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, temperature: 0.6, max_tokens: (() => {
+      body: JSON.stringify({ model, temperature: 0.6, ...textGenerationPolicy(model), max_tokens: (() => {
         const requested = options.taskMaxTokens ? Math.min(16000, Math.max(1000, options.taskMaxTokens)) : textMaxTokens(brief?.segments);
         const modelLimit = Number(options.modelProfile?.max_output_tokens ?? options.modelProfile?.maxOutputTokens);
         return Number.isFinite(modelLimit) && modelLimit > 0 ? Math.min(requested, Math.floor(modelLimit)) : requested;
@@ -157,18 +174,19 @@ export async function writeScript(config: any, brief: any, options: any = {}) {
   }
   const type = String(response.headers?.get?.('content-type') || '');
   const incremental = Boolean(stream && response.body && typeof response.body.getReader === 'function' && (!type || type.includes('event-stream')));
-  let content = '', usage: any = null, spoken = '', truncated = false;
+  let content = '', usage: any = null, spoken = '', truncated = false, reasoningOnly = false, finishReason = '';
   try {
     if (incremental) {
       const read = await readStream(response, bump, options.onProgress);
       if (read.failure) throw new Error(`文本模型调用失败：${read.failure.slice(0, 200)}`);
       if (!response.ok) throw new Error(`文本模型调用失败：${response.status}`);
-      content = read.content; usage = read.usage; spoken = read.model; truncated = read.truncated;
+      content = read.content; usage = read.usage; spoken = read.model; truncated = read.truncated; reasoningOnly = read.reasoningOnly; finishReason = read.finishReason;
     } else {
       const body = await response.json().catch(() => null);
       if (!response.ok || body?.error) throw new Error(`文本模型调用失败：${String(body?.error?.message || body?.error || response.status).slice(0, 200)}`);
       content = contentOf(body?.choices?.[0]?.message); usage = body?.usage ? tokenUsage(body.usage) : null;
-      spoken = String(body?.model || ''); truncated = body?.choices?.[0]?.finish_reason === 'length';
+      spoken = String(body?.model || ''); finishReason = String(body?.choices?.[0]?.finish_reason || ''); truncated = finishReason === 'length';
+      reasoningOnly = !!(body?.choices?.[0]?.message?.reasoning_content || body?.choices?.[0]?.message?.reasoning);
     }
   } catch (error: any) {
     if (idleAborted) throw new Error(`文本模型 ${idleSeconds} 秒没有输出，已中止本次写脚本：可以重试，或在设置页换一个文本模型。`);
@@ -178,6 +196,11 @@ export async function writeScript(config: any, brief: any, options: any = {}) {
     throw new Error(message.startsWith('文本模型') ? message : `文本模型写脚本失败：${message.slice(0, 160)}`);
   } finally { stop(); }
   const script = stripFence(content);
-  if (!script) throw new Error('文本模型返回了空脚本，请重试或换个文本模型。');
+  if (!script) {
+    const reason = finishReason === 'content_filter' ? '正文被上游内容策略拦截'
+      : truncated ? '已达到输出上限，但尚未返回正文'
+      : reasoningOnly ? '只返回了推理过程，没有返回正文' : '未返回可用正文';
+    throw new Error(`文本模型${reason}（空脚本）。本次未取得可用文本，已有项目与稿件保持不变。请检查文本模型的输出上限及渠道响应；需要时重新请求，不自动切换模型或重复调用。`);
+  }
   return { script, model: spoken || model, usage: usage || { promptTokens: 0, completionTokens: 0 }, truncated, characters: script.length };
 }
