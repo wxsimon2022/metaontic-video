@@ -1,7 +1,9 @@
-# 在线更新来源统一
+# 在线更新来源统一与宿主契约
 
-设置页与侧边栏共用createUpdateActions，确认更新后统一传installBundle("dsh-metaontic-video@X.Y.Z")；不使用latest范围或自动回退tgz/Git。中国镜像由宿主选择，包未同步时失败并保留现有配置。市场索引已使用npm来源。
+设置页与侧边栏共用createUpdateActions。已安装npm包必须调用pluginManager.updateBundle(name,version,{requestId})，不能调用新增installBundle；当前宿主带HMR时，installBundle会拒绝所有已存在的包名，不区分是否有新版本。
 
-现有目录链接来源继续阻止直接替换，托管tgz与历史仓库来源可在升级时迁移为npm来源；不更改已安装记录来伪装来源，不追溯覆盖已发布版本。开发本地安装仍使用实际构建包，保证安装的是本次代码。
+原生升级结果结构为RemoteResult.value.result，含from/to、step以及可能的restore；仅完成install阶段且结果成功才能进入运行版本核验。失败恢复由宿主管理，客户端不直接卸载或改变包管理策略。通信异常不重放请求。目标已安装或already-installed竞态时重新读取版本，并验证运行构建，不能仅凭错误码报告成功。
 
-Windows和macOS使用同一宿主API与固定npm规格，不引入平台路径或外部命令；保留二次确认、只升正式版、版本核对、锁文件安全重试和运行激活校验。模拟测试覆盖托管tgz迁移、精确版本参数和404不换源；未进行实际桌面升级，后续发版仍须双平台同成品CI检查。
+固定版本仍记录为dsh-metaontic-video@X.Y.Z，由宿主选择镜像。宿主不支持将tgz或历史链接来源直接按npm升级，界面给出一次性迁移指引；目录链接保留原阻止直接替换规则。开发成品仍记录真实来源，不能伪装为正式npm包。
+
+Windows与macOS使用相同宿主API，没有新增路径或外部命令。回归覆盖原生返回结构、准确版本/阶段、已装目标、竞态、旧来源、通信不明、失败恢复与不直接卸载。模拟检查不等同实际桌面升级；发版须通过双平台成品安装CI。
