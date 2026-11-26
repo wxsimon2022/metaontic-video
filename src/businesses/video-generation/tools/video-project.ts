@@ -108,7 +108,7 @@ export function projectTool(config, ctx, reviewGuard, generationProperties, exte
           if (args.resetCharacterChoice) { data.choice = ''; data.approved = null; await writeProject(data); }
           if (data.subjectType === 'scenery' || data.subjectType === 'provided_images') {
             data.choice = data.subjectType === 'scenery' ? 'not_needed' : 'provided_images'; await writeProject(data);
-            return { projectId: data.id, status: 'prepared', duration: data.duration, choice: data.choice };
+            return { projectId: data.id, status: 'prepared', duration: data.duration, choice: data.choice, nextAction: data.filmSource ? '沿用编译方案，展示本版完整材料后review。' : '调用video_script准备完整脚本与分镜，补齐估价后在正文展示一次；storyboard返回绑定图片后展示，再review一次。无需另建film_project或单独批准创意、剧本；审核通过后由视频工具确认费用。' };
           }
           const gate = await characterChoiceGate(ctx, config, { ...exec, name: 'video_generate' }, { projectId: data.id, preparation: true, resetCharacterChoice: args.resetCharacterChoice });
           const saved = await readProject(data.id, exec);

@@ -19,12 +19,13 @@ test('an existing prompt registration reads current configuration on each reques
   assert.equal(typeof section.text,'function');
   assert.match(section.text(director),/总时长 ≤ 15 秒/);
   const prompt=section.text(director);
-  assert.match(prompt,/完善创意的同一轮用ask_user_question合并询问所有缺失信息/);
+  assert.match(prompt,/仅在需求缺失时用ask_user_question一次合并询问所有必要信息/);
   assert.match(prompt,/等用户回答后才调用video_project/);
   assert.match(prompt,/15秒、30秒、45秒、60秒和“自定义时长”/);
   assert.doesNotMatch(prompt,/需求阶段先调用video_project|用video_project\(action:prepare\)省略duration/);
   assert.match(prompt,/禁止省略已确认值导致工具重复提问/);
-  assert.match(prompt,/无论创意是否完整/);
+  assert.match(prompt,/需求完整时直接准备方案/);
+  assert.match(prompt,/新建15–60秒短片默认走video_project直接制作/);
   assert.match(prompt,/用户创意原文已写明时长、横竖屏或分辨率时，直接记录对应值/);
   assert.match(prompt,/这三项都不出现在提问中/);
   assert.doesNotMatch(prompt,/地址、时长等/);
@@ -32,7 +33,7 @@ test('an existing prompt registration reads current configuration on each reques
   assert.match(prompt,/工具参数必须是合法 JSON/);
   assert.match(prompt,/把 480p、16:9 这类枚举值裸写（不加引号）会让本轮调用在解析参数时就失败/);
   assert.match(prompt,/按原参数补齐引号重试一次/);
-  assert.doesNotMatch(prompt,/完整方案不增加完善询问|不完善且尚未授权时/);
+  assert.doesNotMatch(prompt,/无论创意是否完整|目标15–3600秒时优先使用film_project/);
   assert.equal(section.text({}),'');
   assert.equal(section.text({agent:{session:{header:{agentPreset:null}}}}),'');
   config.model='seedance-2.5';assert.match(section.text(director),/总时长 ≤ 30 秒/);
