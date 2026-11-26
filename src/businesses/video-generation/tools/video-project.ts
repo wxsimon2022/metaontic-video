@@ -81,7 +81,7 @@ export function projectTool(config, ctx, reviewGuard, generationProperties, exte
         const script = await readFile(scriptPath, 'utf8').catch(() => '');
         if (!String(script).trim()) throw new Error('还没读到脚本文件：先在正文贴出完整脚本并传captureScript，或先把脚本写到scriptPath。');
         const version = nextStoryboardVersion(await readdir(path.dirname(scriptPath)).catch(() => []));
-        const svg = renderStoryboardSvg(script, { version });
+        const svg = renderStoryboardSvg(script, { version, ratio: args.specification?.ratio });
         const target = path.join(path.dirname(scriptPath), storyboardFileName(version));
         await writeFile(target, svg, { mode: 0o600,flag:'wx' });
         project.storyboard={projectId:project.id,path:target,scriptPath,scriptHash:await scriptDigest(scriptPath),imageHash:await scriptDigest(target),version};
