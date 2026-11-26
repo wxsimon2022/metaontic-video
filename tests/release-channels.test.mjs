@@ -1,3 +1,4 @@
+import {hostUpdateResult} from './update-host-fixture.mjs';
 import { sourceOf } from './source.mjs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
@@ -41,7 +42,7 @@ test('installation never falls back to master or URLs when a fixed npm version f
  const actions=ctx.createUpdateActions({verifyRuntime:async()=>true,updateConfirm:true,updateLatest:'3.10.0',availableVersions:['3.10.0','3.8.2'],
  setUpdateConfirm(){},setUpdateStatus(){},setUpdateMessage(){},t:key=>key,UPDATE_SPEC:'git+https://gitee.com/hackloop/metaontic-video.git',
  PLUGIN_PACKAGE:'metaontic-video',UPDATE_ATTEMPTS:1,manager:()=>({manager:{
- listBundles: async () => ({ok:true,value:[{name:'metaontic-video',installed:true,source:'https://example.invalid/metaontic-video.tgz'}]}), installBundle:async spec=>{specs.push(spec);return {ok:false,error:{message:'Could not resolve'}};},
+ listBundles: async () => ({ok:true,value:[{name:'metaontic-video',installed:true,source:'metaontic-video@3.0.0'}]}), updateBundle:async (name,version)=>{const spec=`${name}@${version}`;specs.push(spec);return {ok:false,error:{message:'Could not resolve'}};},
  removeBundle:()=>assert.fail('must not uninstall'),}})});
  await actions.runOnlineUpdate();assert.deepEqual(specs,['metaontic-video@3.10.0']);
 });
@@ -81,7 +82,7 @@ test('older and identical versions cannot install even if the action is called d
   let installs=0;
   const actions=ctx.createUpdateActions({PLUGIN_VERSION:'3.10.0',isNewerVersion:ctx.isNewerVersion,
    updateConfirm:true,updateLatest:target,setUpdateConfirm(){},setUpdateStatus(){},setUpdateMessage(){},t:key=>key,
-   manager:()=>({manager:{listBundles: async () => ({ok:true,value:[{name:'metaontic-video',installed:true,source:'https://example.invalid/metaontic-video.tgz'}]}), installBundle:async()=>{installs++;}}})});
+   manager:()=>({manager:{listBundles: async () => ({ok:true,value:[{name:'metaontic-video',installed:true,source:'metaontic-video@3.0.0'}]}), updateBundle:async()=>{installs++;}}})});
   await actions.runOnlineUpdate();assert.equal(installs,0);
  }
 });
@@ -97,7 +98,7 @@ test('higher-version installation reports a successful update',async()=>{
  const actions=ctx.createUpdateActions({verifyRuntime:async()=>true,PLUGIN_VERSION:'3.8.2',isNewerVersion:ctx.isNewerVersion,
  updateConfirm:true,updateLatest:'3.10.0',availableVersions:['3.10.0','3.9.0','3.8.2'],
  setUpdateConfirm(){},setUpdateStatus(){},setUpdateMessage:key=>messages.push(key),setUpdateLatest(){},t:key=>key,
- UPDATE_ATTEMPTS:1,PLUGIN_PACKAGE:'metaontic-video',manager:()=>({manager:{listBundles: async () => ({ok:true,value:[{name:'metaontic-video',installed:true,source:'https://example.invalid/metaontic-video.tgz'}]}), installBundle:async()=>({ok:true,value:{application:'applied',version:'3.10.0'}})}})});
+ UPDATE_ATTEMPTS:1,PLUGIN_PACKAGE:'metaontic-video',manager:()=>({manager:{listBundles: async () => ({ok:true,value:[{name:'metaontic-video',installed:true,source:'metaontic-video@3.0.0'}]}), updateBundle:async()=>(hostUpdateResult({application:'applied',version:'3.10.0'}))}})});
  await actions.runOnlineUpdate();assert.equal(messages.at(-1),'versionUpdateDone');
 });
 
@@ -106,8 +107,8 @@ test('在线更新缺包时保持npm来源，不回退Gitee或GitHub',async()=>{
  const actions=ctx.createUpdateActions({verifyRuntime:async()=>true,updateConfirm:true,updateLatest:'3.10.0',availableVersions:['3.10.0'],
   setUpdateConfirm(){},setUpdateStatus(){},setUpdateLatest(){},setUpdateMessage(){},t:key=>key,
   PLUGIN_PACKAGE:'dsh-metaontic-video',UPDATE_ATTEMPTS:1,
-  manager:()=>({manager:{listBundles:async()=>[{name:'dsh-metaontic-video',installed:true,source:'https://example.invalid/plugin.tgz'}],
-   installBundle:async spec=>{specs.push(spec);return specs.length===1?{ok:false,error:{message:'Could not resolve'}}:{ok:true,value:{application:'applied',version:'3.10.0'}};},
+  manager:()=>({manager:{listBundles:async()=>[{name:'dsh-metaontic-video',installed:true,source:'dsh-metaontic-video@3.0.0'}],
+   updateBundle:async (name,version)=>{const spec=`${name}@${version}`;specs.push(spec);return specs.length===1?{ok:false,error:{message:'Could not resolve'}}:hostUpdateResult({application:'applied',version:'3.10.0'});},
    removeBundle:()=>assert.fail('must not uninstall')}})});
  await actions.runOnlineUpdate();
  assert.deepEqual(specs,['dsh-metaontic-video@3.10.0']);

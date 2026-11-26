@@ -1,3 +1,4 @@
+import {hostUpdateResult} from './update-host-fixture.mjs';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
@@ -46,8 +47,8 @@ function setup({ local = '3.26.0', list = ['3.26.1', '3.26.0'], minimum = '' } =
   const network = async () => { state.reads += 1; return list; };
   const hint = context.createUpdateHint({ version: local, isNewerVersion, fetchRecentVersions: network, cacheKey: CACHE, maxAge: 60 * 60 * 1000 });
   const manager = () => ({ manager: {
-    listBundles: async () => ({ ok: true, value: [{ name: 'metaontic-video', installed: true, source: 'https://example.invalid/metaontic-video-9.9.9.tgz' }] }),
-    installBundle: async () => { state.installs += 1; return { ok: true, value: { application: 'applied', version: state.version } }; },
+    listBundles: async () => ({ ok: true, value: [{ name: 'metaontic-video', installed: true, source: 'metaontic-video@3.0.0' }] }),
+    updateBundle: async () => { state.installs += 1; return hostUpdateResult({ application: 'applied', version: state.version }); },
   } });
   const react = makeReact();
   const view = context.createUpdateHintView({

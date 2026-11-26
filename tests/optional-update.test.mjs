@@ -1,3 +1,4 @@
+import {hostUpdateResult} from './update-host-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -16,7 +17,7 @@ function setup() {
     setUpdateDeferred: value => { state.deferred = value; }, setUpdateConfirm: value => { state.confirmed = value; },
     setUpdateLatest: value => { state.latest = value; }, setUpdateStatus() {}, setUpdateMessage() {}, setUpdateAt() {},
     fetchLatestVersion: async () => { state.reads++; return '3.5.0'; }, fetchLatestCommit: async () => 'abc',
-    manager: () => ({ manager: { listBundles: async () => ({ok:true,value:[{name:'metaontic-video',installed:true,source:'https://example.invalid/metaontic-video.tgz'}]}), installBundle: async () => { state.installs++; return { ok: true, value: { application: 'applied', version: '3.5.0' } }; } } }),
+    manager: () => ({ manager: { listBundles: async () => ({ok:true,value:[{name:'metaontic-video',installed:true,source:'metaontic-video@3.0.0'}]}), updateBundle: async () => { state.installs++; return hostUpdateResult({ application: 'applied', version: '3.5.0' }); } } }),
     PLUGIN_PACKAGE: 'metaontic-video', UPDATE_SPEC: 'git+https://example.invalid/plugin.git', UPDATE_ATTEMPTS: 1,
     t: key => key,
   };

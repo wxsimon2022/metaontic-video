@@ -221,13 +221,14 @@ async function runOnlineUpdate() {
     context.setUpdateMessage('');
     const probe = context.manager ? context.manager() : { manager: null, tried: ['未注入'] };
     const pluginManager = probe.manager;
-    if (!pluginManager || typeof pluginManager.installBundle !== 'function') {
+    if (!pluginManager || typeof pluginManager.updateBundle !== 'function') {
         context.setUpdateStatus('failed');
         context.setUpdateMessage(context.t('versionUpdateUnavailable', { detail: probe.tried.join('，') }));
         return;
     }
     // Local directory links/junctions must never be replaced in-place by pnpm.
     // Inspect the actual recorded source, not navigator.platform or the UI version.
+    let installedBundle;
     try {
         if (typeof pluginManager.listBundles !== 'function') throw new Error('source-unavailable');
         const listed = await pluginManager.listBundles();
@@ -244,83 +245,69 @@ async function runOnlineUpdate() {
             return;
         }
         if (bundle.error || bundle.meta?.error) throw new Error('metadata-unavailable');
+        installedBundle = bundle;
     } catch {
         context.setUpdateStatus('failed');
         context.setUpdateMessage('无法核实插件安装来源或元信息，已停止更新，未执行替换。请保留现有配置和安装目录，核对安装状态后再处理；不要重置 API密钥或先卸载。');
         return;
     }
-    const requestId = `${context.PLUGIN_PACKAGE}-update-${Date.now()}`;
-    const install = async (spec) => {
-        try {
-            return await pluginManager.installBundle(spec, { enabled: true, requestId });
-        }
-        catch (error) {
-            return { ok: false, error: { message: error?.message || String(error) } };
-        }
-    };
-    /** 宿主两种失败回包（调用失败 / 安装阶段失败）里那句可以给人看的话。 */
-    const failureText = (result) => String(result?.error?.message
-        ?? result?.value?.error?.diagnostic
-        ?? result?.value?.error?.code
-        ?? 'unknown');
-    /** 过一会儿可能就好的失败：Gitee 排队（429）、超时、连接被掐。 */
-    const worthRetrying = (text) => /429|queue overflowed|timed out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|unable to access|network|fetch/i.test(text);
-    /** 安装目录锁文件里留着缺 integrity 的记录：换地址、换版本都没用，必须先清掉那条记录。 */
-    const lockfileUnverifiable = (text) => /MISSING_TARBALL_INTEGRITY/i.test(text);
-    // 按已检查的正式版本安装npm包；由宿主选择中国镜像，来源记录为包名@版本。
-    if (!/^\d+\.\d+\.\d+$/.test(context.updateLatest || '')
-        || (context.availableVersions && !context.availableVersions.includes(context.updateLatest))) {
+    const target = context.updateLatest;
+    if (!/^\d+\.\d+\.\d+$/.test(target || '')
+        || (context.availableVersions && !context.availableVersions.includes(target))) {
         context.setUpdateStatus('failed');
         context.setUpdateMessage(context.t('versionCheckFirst'));
         return;
     }
-    const spec = `${context.PLUGIN_PACKAGE}@${context.updateLatest}`;
-    /** 限流/超时有界重试；已安装不先卸载，保留本地配置。 */
-    const trySpec = async (spec) => {
-        for (let round = 1; round <= context.UPDATE_ATTEMPTS; round += 1) {
-            let result = await install(spec);
-            if (result?.ok === true && result.value?.error?.code === 'already-installed') {
-                // 同一版本已安装时保持现状，不卸载。
-                return { failure: failureText(result) };
-            }
-            if (result?.ok === true && result.value?.application !== 'failed') {
-                return { outcome: result.value || {} };
-            }
-            const text = failureText(result);
-            // 安装目录锁文件里残留了缺 integrity 的记录时，pnpm 在解析前就会拒绝整份锁文件：换镜像地址、
-            // 换版本、原地重试都是同样的失败。插件每 2 秒会清掉本插件那条坏记录，这里等它清完再重试，
-            // 用户不必自己数着秒再点一次；始终清不掉时才停下并给出针对性提示。
-            if (lockfileUnverifiable(text)) {
-                if (round < context.UPDATE_ATTEMPTS) {
-                    context.setUpdateMessage(context.t('versionUpdateRetry', { attempt: round + 1, total: context.UPDATE_ATTEMPTS }));
-                    await new Promise((resolve) => window.setTimeout(resolve, 5000));
-                    continue;
-                }
-                return { failure: text, lockfile: true };
-            }
-            const transient = worthRetrying(text);
-            if (transient && round < context.UPDATE_ATTEMPTS) {
-                context.setUpdateMessage(context.t('versionUpdateRetry', { attempt: round + 1, total: context.UPDATE_ATTEMPTS }));
-                await new Promise((resolve) => window.setTimeout(resolve, round * 1200));
-                continue;
-            }
-            return { failure: text };
+    const fail = (message) => { context.setUpdateStatus('failed'); context.setUpdateMessage(message); };
+    let outcome;
+    // 已安装目标版本时只验证运行状态，不能再次安装或误报失败。
+    if (installedBundle.version === target) {
+        outcome = { application: 'applied', version: target };
+    } else {
+        if (installedBundle.version && context.isNewerVersion?.(target, installedBundle.version) !== true) {
+            fail(`目标版本 ${target} 不高于已安装的 ${installedBundle.version}，未执行替换。请重新检查更新；配置与任务保留。`);
+            return;
         }
-        return { failure: 'unknown' };
-    };
-    const attempt = await trySpec(spec);
-    const outcome = attempt.outcome;
-    const failure = attempt.failure || '';
-    if (!outcome) {
-        context.setUpdateStatus('failed');
-        context.setUpdateMessage([
-            lockfileUnverifiable(failure) ? context.t('versionUpdateLockfile') : '',
-            context.t('versionUpdateFailed', { message: failure }),
-            worthRetrying(failure) || /429|queue overflowed/i.test(failure)
-                ? context.t('versionUpdateRateLimited')
-                : '',
-        ].filter(Boolean).join(' '));
-        return;
+        const source = String(installedBundle.source || '').trim();
+        const ownSource = source.startsWith(`${context.PLUGIN_PACKAGE}@`) ? source.slice(context.PLUGIN_PACKAGE.length + 1) : source;
+        const registrySource = source === context.PLUGIN_PACKAGE || (source.startsWith(`${context.PLUGIN_PACKAGE}@`)
+            && !/[/:\\]/.test(ownSource) && !/\.git(?:#|$)/i.test(ownSource));
+        if (!registrySource) {
+            fail(`当前安装来源尚未迁移为npm包，宿主不支持直接按包名升级此来源。请先将来源迁移为 ${context.PLUGIN_PACKAGE}@${target}；保留现有配置，不要先卸载。完成迁移后即可使用在线更新。`);
+            return;
+        }
+        let response;
+        try {
+            // 宿主更新接口负责目标版本检查、安装及失败恢复。新增安装接口会拒绝所有已存在的包。
+            // 通信结果不明不能证明没有执行，禁止自动重放更新请求。
+            response = await pluginManager.updateBundle(context.PLUGIN_PACKAGE, target, {
+                requestId: `${context.PLUGIN_PACKAGE}-update-${Date.now()}`,
+            });
+        } catch {
+            fail('更新请求的通信结果未确认，请核对实际安装版本后再操作。未自动重试，配置与任务保留。');
+            return;
+        }
+        const value = response?.ok === true ? response.value : null;
+        outcome = value?.result;
+        const error = response?.error || outcome?.error;
+        if (error?.code === 'already-installed' || error?.code === 'plugin-manager/already-installed') {
+            try {
+                const listed = await pluginManager.listBundles();
+                const rows = Array.isArray(listed) ? listed : listed?.ok === true ? listed.value : null;
+                const current = rows?.find(row => row.name === context.PLUGIN_PACKAGE && row.installed === true);
+                if (current?.version === target && !current.error && !current.meta?.error) outcome = {application:'applied',version:target};
+                else { fail('宿主提示包已存在，但尚未确认目标版本已安装。请刷新安装状态后再操作；配置与任务保留。'); return; }
+            } catch { fail('无法核实已安装版本，请刷新安装状态后再操作；配置与任务保留。'); return; }
+        } else if (error || !outcome || outcome.application === 'failed' || value?.step !== 'install') {
+            const detail = String(error?.diagnostic || error?.message || error?.code || 'unknown');
+            const restore = value?.restore;
+            fail([
+                /MISSING_TARBALL_INTEGRITY/i.test(detail) ? context.t('versionUpdateLockfile') : '',
+                context.t('versionUpdateFailed', {message: detail}),
+                restore?.application === 'failed' ? '原版本恢复未完成，请保留配置与文件并检查宿主安装状态。' : '',
+            ].filter(Boolean).join(' '));
+            return;
+        }
     }
     if (outcome.application === 'cancelled') {
         context.setUpdateStatus('ok');
