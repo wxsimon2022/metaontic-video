@@ -55,3 +55,29 @@ test('断行按显示宽度：中文算一个字宽，长句收成省略号，�
   assert.ok(lines[1].endsWith('…'), '超出上限时末行用省略号收口');
   assert.deepEqual(api.wrapText('   ', 8), [], '空内容不产出行');
 });
+
+test('真实分镜有对应主体草图，未知主体明确留白，不把符号当实拍预览', () => {
+  const visuals = ['铜奔马蹄下飞鸟', '天梯山石窟大佛侧脸，晨光', '文庙红墙', '鼓手击鼓', '面碗热气', '倒酒入夜光杯', '城门夜景', '未知物件<独特外形>'];
+  const svg = api.renderStoryboardSvg('# 武威\n画幅：16:9', { shots: visuals.map(visual => ({ visual, camera: '近景', duration: 4 })) });
+  assert.deepEqual([...svg.matchAll(/data-sketch="([^"]+)"/g)].map(m => m[1]), ['horse', 'statue', 'architecture', 'drum', 'bowl', 'cup', 'architecture', 'unknown']);
+  assert.ok(svg.includes('主体待细化') && svg.includes('符号示意，非精确构图'));
+  assert.ok(svg.includes('&lt;独特外形&gt;'));
+  assert.doesNotMatch(svg, /<script|<image|foreignObject|href=/);
+});
+
+test('画框遵循明确规格，竖屏不画成横屏，长对白与运镜仍在卡片内', () => {
+  const shots = [{ visual: '人物站在画面左侧', camera: '高角度俯拍 · 缓慢推近'.repeat(14), dialogue: [{ line: '对白'.repeat(45) }], sfx: '音乐'.repeat(45), duration: 5 }];
+  for (const [ratio, expected] of [['9:16', [185.625, 330]], ['16:9', [330 * 16 / 9, 330]], ['1:1', [330, 330]]]) {
+    const svg = api.renderStoryboardSvg(`# 测试\n画幅：${ratio}`, { shots });
+    const frame = /<svg x="[^"]+" y="[^"]+" width="([^"]+)" height="([^"]+)"[^>]*data-sketch/.exec(svg);
+    assert.ok(frame);
+    assert.ok(Math.abs(Number(frame[1]) - expected[0]) < 1e-9);
+    assert.ok(Math.abs(Number(frame[2]) - expected[1]) < 1e-9);
+    const card = /<rect x="44" y="132" width="1472" height="(\d+)"/.exec(svg);
+    const ys = [...svg.matchAll(/<text x="768" y="(\d+)"/g)].map(m => Number(m[1]));
+    assert.ok(ys.length > 3 && Math.max(...ys) < 132 + Number(card[1]));
+  }
+  const override = api.renderStoryboardSvg('画幅：9:16', { shots, ratio: '16:9' });
+  const frame = /<svg x="[^"]+" y="[^"]+" width="([^"]+)" height="([^"]+)"[^>]*data-sketch/.exec(override);
+  assert.ok(Math.abs(Number(frame[1]) / Number(frame[2]) - 16 / 9) < 1e-9);
+});

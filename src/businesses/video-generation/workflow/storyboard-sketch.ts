@@ -5,7 +5,7 @@ export function storyboardSketch(visual: string, camera: string) {
   if (/铜奔马|马踏飞燕|骏马|马匹/.test(text)) {
     kind = 'horse'; label = '马形主体';
     shape = '<path d="M110 110 Q150 85 195 104 L212 65 L231 52 L245 66 L230 83 L224 119 L194 130 L211 159 L233 165 M183 126 L160 163 L137 168 M132 123 L109 152 L88 147 M119 104 L95 90 L76 101"/><path d="M215 62 L217 47 L227 55"/>';
-  } else if (/佛像|佛面|佛陀|佛首/.test(text)) {
+  } else if (/佛像|佛面|佛陀|佛首|大佛|石佛/.test(text)) {
     kind = 'statue'; label = '佛像主体';
     shape = '<ellipse cx="160" cy="83" rx="25" ry="34"/><path d="M139 110 Q113 132 112 161 Q160 181 208 161 Q207 132 181 110 M133 133 L160 153 L188 133 M121 161 L199 161"/>';
   } else if (/鼓手|击鼓|打鼓|鼓面/.test(text)) {

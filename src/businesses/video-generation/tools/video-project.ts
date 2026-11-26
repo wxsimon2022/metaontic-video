@@ -90,7 +90,7 @@ export function projectTool(config, ctx, reviewGuard, generationProperties, exte
         await writeProject(project);
         return { path: target, version, shots: scriptStoryboardShots(script).length, bytes: Buffer.byteLength(svg, 'utf8'),
           markdown: `![分镜示意图](<${target}>)`, link: `[打开原图](<${target}>)`,
-          hint: '脚本已保存，后续review只传scriptPath，不传captureScript，也不重复展示同版脚本。把 markdown 与 link 原样放进用户可见正文一次，再调用review；不要预判SVG无法显示，不自行转PNG、截图或运行浏览器/系统转换命令，自行转换图不能替代审核绑定原图。补展示只贴presentation.markdown，不追加已经展示的图片或其他格式副本。示意图由插件本地渲染，不要自己写绘图代码或 SVG，也不要调用付费出图模型。' };
+          hint: '脚本已保存，后续review只传scriptPath，不传captureScript，也不重复展示同版脚本。把 markdown 与 link 原样放进用户可见正文一次，再调用review；不要预判SVG无法显示，不自行转PNG、截图或运行浏览器/系统转换命令，自行转换图不能替代审核绑定原图。补展示只贴presentation.markdown，不追加已经展示的图片或其他格式副本。示意图为本地符号草图，只辅助理解主体类别，不代表精确构图、真实文物外观或生成效果；未知主体会标注待细化。不要自己写绘图代码或 SVG，也不要调用付费出图模型。' };
         });
       }
       if (!['prepare', 'review'].includes(args.action)) throw new Error('未知项目操作');
