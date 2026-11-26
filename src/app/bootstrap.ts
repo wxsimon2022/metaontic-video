@@ -5,10 +5,11 @@ import { PLUGIN_ID } from '../shared/constants/plugin.js';
 import { createAnalyticsReporter } from '../platform/telemetry/reporter.js';
 import { startUpdateLockfileRepair } from '../platform/installation/update-lockfile.js';
 import { createVersionGuard } from '../platform/installation/update-policy.js';
+import { createPromptScope } from './prompt-scope.js';
 export interface BusinessModule {
   id: string;
   apply(runtime: BusinessRuntime): void | (() => void);
-  prompt?: (config: any) => string;
+  prompt?: (config: any, scope?: 'creation' | 'production') => string;
 }
 export interface BusinessRuntime {
   ctx: DshContext;
@@ -46,7 +47,8 @@ export function createPluginRuntime(definitions: { agents: readonly AgentDefinit
     defer(() => analytics.dispose());
     defer(analytics.watchInstallOperations(ctx));
     defer(bindAgentRegistry(ctx, agents));
-    const tools = createToolRegistry(ctx, agents, analytics, defer, createVersionGuard());
+    const promptScope = createPromptScope();
+    const tools = createToolRegistry(ctx, agents, analytics, defer, createVersionGuard(), promptScope.observe);
     const runtime = { ctx, config, agents, tools, defer };
     try {
       for (const business of businesses.values()) defer(business.apply(runtime));
@@ -55,7 +57,7 @@ export function createPluginRuntime(definitions: { agents: readonly AgentDefinit
         text: context => {
           const agent = agents.resolve(context, ctx);
           if (!agent) return '';
-          return [...agent.businesses.map(id => businesses.get(id)?.prompt?.(config) || ''), agent.prompt?.(config) || ''].filter(Boolean).join('\n\n');
+          return [...agent.businesses.map(id => businesses.get(id)?.prompt?.(config, promptScope.read(context)) || ''), agent.prompt?.(config) || ''].filter(Boolean).join('\n\n');
         },
       })));
       try { defer(startUpdateLockfileRepair(import.meta.url, undefined, message => ctx.logger?.warn?.(`metaontic-video: ${message}`))); }

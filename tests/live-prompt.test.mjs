@@ -9,10 +9,10 @@ import * as plugin from '../dist/index.js';
 test('an existing prompt registration reads current configuration on each request', async () => {
  const dir=await mkdtemp(path.join(os.tmpdir(),'meta-prompt-'));const prior=process.env.DSH_HOME;
  process.env.DSH_HOME=dir;
- let section;let dispose;
+ let section;let dispose;const tools=new Map();
  try {
   const config={model:'seedance-2-0-mini'};
-  dispose=plugin.apply({tools:{register:()=>()=>{}},on:()=>()=>{},inject(names,install){
+  dispose=plugin.apply({tools:{register(tool){tools.set(tool.name,tool);return()=>{};}},on:()=>()=>{},inject(names,install){
    if(names.includes('systemPrompt'))return install({systemPrompt:{section(value){section=value;return()=>{};}}});
   }},config);
   const director={agent:{session:{header:{agentPreset:'video-director'}}}};
@@ -36,6 +36,21 @@ test('an existing prompt registration reads current configuration on each reques
   assert.equal(section.text({}),'');
   assert.equal(section.text({agent:{session:{header:{agentPreset:null}}}}),'');
   config.model='seedance-2.5';assert.match(section.text(director),/总时长 ≤ 30 秒/);
+  const current={agent:{session:{id:'prompt-scope-current',header:{agentPreset:'video-director',cwd:dir}}}};
+  const other={agent:{session:{id:'prompt-scope-other',header:{agentPreset:'video-director',cwd:dir}}}};
+  const before=section.text(current);
+  const created=await tools.get('film_project').execute({action:'create',title:'沙葱',sourceBrief:'观察沙葱从沙地到饭桌',durationSeconds:30,responseMode:'compact'},current);
+  const creationPrompt=section.text(current);
+  assert.ok(creationPrompt.length<before.length*0.65,'专业创作不重复携带完整制作及导演角色规则');
+  assert.doesNotMatch(creationPrompt,/【分镜图必须实际可见】|· 真人图生视频：|· 续拍估价口径：|# Director Agent/);
+  assert.match(creationPrompt,/用户提出修改先改稿/);
+  assert.equal(section.text(other),before,'会话之间不串阶段');
+  await assert.rejects(tools.get('film_project').execute({action:'compile',projectId:created.project_id,expectedRevision:created.revision,ratio:'16:9',resolution:'720p'},current));
+  assert.equal(section.text(current),creationPrompt,'失败的编译不切换阶段');
+  await tools.get('video_project').execute({action:'prepare',subjectType:'scenery',duration:30},current);
+  assert.match(section.text(current),/· 续拍估价口径：/,'进入制作后恢复制作规则');
+  await tools.get('film_project').execute({action:'read',projectId:created.project_id,responseMode:'compact'},current);
+  assert.equal(section.text(current),creationPrompt,'恢复创作项目后重新加载创作规则');
  }finally{dispose?.();if(prior===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=prior;await rm(dir,{recursive:true,force:true});}
 });
 

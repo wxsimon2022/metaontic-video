@@ -22,7 +22,7 @@ import { acquireProjectLock, inspectProjectLock, recoverProjectLock, pruneProjec
 import { verifyIssue } from './reviews/issue.service.js';
 import { recordApprovalDecision } from './approvals/approval.service.js';
 import { artifactManifest, renderDeliverables } from './artifacts/artifact.repository.js';
-import { INTENTS, routeIntent, roleInstructions } from './roles/index.js';
+import { INTENTS, routeIntent } from './roles/index.js';
 import { reviseEntities, scheduleTask, taskResult } from './artifacts/artifact.version.js';
 import { nextTask, compileProduction } from './workflows/workflow.engine.js';
 import { estimatePlan } from '../video-generation/workflow/costs.js';
@@ -38,7 +38,7 @@ import type { BusinessModule } from '../../app/bootstrap.js';
 const locks = new Set<string>();
 export const filmDirectorBusiness: BusinessModule = {
   id: 'film-director',
-  prompt: () => roleInstructions({duration_ms:0},'director') + FILM_WORKFLOW_GUIDANCE + ORCHESTRATION_GUIDANCE + INTENT_GUIDANCE + PRODUCTION_STRATEGY_GUIDANCE,
+  prompt: (_config, scope) => FILM_WORKFLOW_GUIDANCE + INTENT_GUIDANCE + (scope === 'creation' ? '' : ORCHESTRATION_GUIDANCE + PRODUCTION_STRATEGY_GUIDANCE),
   apply(runtime) {
     const presentation = createFilmPresentationGuard();
     const dispose = runtime.ctx.on?.('session/event', presentation.observe);

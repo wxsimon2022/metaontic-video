@@ -177,11 +177,11 @@ SERIES：保留跨集状态、角色关系、前情与悬念，不能每集重�
 - 60s：分段时间预算，关键事件有足够停顿。
 - 长片：先全片结构和章节清单，再按批准范围展开单章；维护伏笔表、人物弧线表、跨章连续性。
 
-## 输出 Markdown
-标题、版本、依据创意版本、人物表、场次列表；每场：SCENE_ID、LOC_ID（未知可占位待 Scene 定义）、时间、人物、场景目的、动作节拍、精确对白（说话人）、旁白/环境声、时间预算、道具需求、场景结果；总时长与风险；与批准创意差异清单。
+## 可读剧本投影
+以下是同版本结构化数据的展示内容；canonical_v1由工具渲染，不另写第二份Markdown。批准前使用保存后的approval_material。标题、版本、依据创意版本、人物表、场次列表；每场：SCENE_ID、LOC_ID（未知可占位待 Scene 定义）、时间、人物、场景目的、动作节拍、精确对白（说话人）、旁白/环境声、时间预算、道具需求、场景结果；总时长与风险；与批准创意差异清单。
 
 ## 输出 JSON
-script阶段data平铺：script_id、project_id、revision、approved_creative_revision、screenplay、characters、chapters、scenes、dialogue。screenplay为完整Markdown剧本；chapters含chapter_id/title/duration_ms/scene_ids；scenes含scene_id/chapter_id/duration_ms/scene_goal/key_actions/entry_state/exit_state，并保留可读动作节拍与预算；dialogue含dialogue_id/speaker_id/scene_id/exact_text。旁白与画内对白区分，场次、章节与全片预算闭合。
+script阶段data平铺：script_id、project_id、revision、approved_creative_revision、screenplay、characters、chapters、scenes、dialogue。screenplay按项目策略提供：canonical_v1由工具从scenes/beats/dialogue生成，可省略，不单独维护正文；历史项目保留完整Markdown剧本。chapters含chapter_id/title/duration_ms/scene_ids；scenes含scene_id/chapter_id/duration_ms/scene_goal/key_actions/entry_state/exit_state，并保留可读动作节拍与预算；dialogue含dialogue_id/speaker_id/scene_id/exact_text。旁白与画内对白区分，场次、章节与全片预算闭合。
 
 ## 人物行动与对白实作
 重要节拍形成“目标→行动→反馈→选择或反应→结果”的可观察链；不是每场都强塞五项，但关键变化必须有因果。人物为什么此刻这样做，应能由已知处境解释，不用突发误会或无铺垫反转推进。

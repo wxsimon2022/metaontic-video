@@ -10,10 +10,10 @@ const SPEECH_EXECUTION = '【对白执行】仅在本段已指定对白时发声
 /**
  * 延长提示词。开头用「向后延长视频1」/「向前延长视频1」这类显式说法，
  * 并用「视频1」指代输入素材——写成「参考视频1」容易被上游当成「参考生视频」而不是延长。
- * 正文分五块写清，减少衔接断层：延长方向、剧情发展、主体状态、镜头运动、声音延续。
+ * 按新增内容、接缝状态、镜头与声音、必要限制组织；只加载适用的声音规则。
  */
 export function buildExtensionPrompt({
-  prompt, seconds, startAt, mode, transitionDescription, direction = 'backward', wording = 'extend',
+  prompt, seconds, startAt, mode, transitionDescription, generateAudio = true, direction = 'backward', wording = 'extend',
 }) {
   const forward = direction === 'forward';
   if (transitionDescription !== undefined && typeof transitionDescription !== 'string') throw new Error('过渡描述必须是文字。');
@@ -44,33 +44,16 @@ export function buildExtensionPrompt({
     : (mode === 'closeup' ? CLOSEUP_TRANSITION : CONTINUOUS_TRANSITION);
   return [
     `${head}${span}`,
-    `【延长方向】${forward ? '向前延长（前置剧情，放在视频1之前）' : '向后延长（续拍剧情，接在视频1之后）'}。`,
-    `【剧情发展】${endWithPunctuation(plotPrompt)}${forward
-      ? '只演视频1之前发生的前置剧情，不复述视频1里的情节。'
-      : '只演视频1之后发生的新剧情，不重复视频1里的情节、不重新开场。'}`,
+    `【本段新增内容】${endWithPunctuation(plotPrompt)}`,
     `【过渡画面】${transitionText}`,
-    '【执行要素】按本段已审核的主体、动作细节、场景环境、光影色调、镜头运镜、视觉风格、画质与约束执行；未要求改变的内容沿用视频1，不凭空增加角色、道具或特效。',
-    '【主体状态】' + (forward
-      ? '本段收尾的人物面貌、体型、服装、姿态、手部位置和动作阶段必须能直接接到视频1第一帧；'
-      : '沿用视频1结尾的人物面貌、体型、服装、姿态、手部位置和动作阶段；')
-      + '同一角色保持音色、口音、语速和当前情绪，不换人、不换装，不改变年龄与外貌特征。',
-    '【接触与视线】交接时以视频1实际可见的接触、持物手、物件位置和视线对象为依据；不为恢复文字中的旧姿态让物件回到手中、人物跳位或动作倒放。新动作先有注意或身体准备，再有接触与物体反馈；只落实本段已有动作，不额外添加表演。',
-    plannedCut
-      ? '【镜头运动】按过渡画面描述与本段已审核脚本确定接缝的机位、景别和运镜；明确切镜时允许改变景别与机位，不再强制接缝前后构图、焦段完全相同。未安排切镜时顺接原镜头运动。场景、曝光、白平衡与光源变化必须有脚本依据，不自行压暗、偏色或重建背景。'
-      : '【镜头运动】在接缝处匹配视频1' + (forward ? '开头的' : '结尾的')
-        + '机位、景别、焦段、运镜方向与速度；接缝之外按本段脚本自然运镜或切镜。保持曝光、白平衡、光源方向和场景布局连贯，'
-        + '整段亮度与色调必须与视频1' + (forward ? '开头' : '结尾') + '一致，不要整体压暗或偏色。',
-    '【声音延续】' + (forward
-      ? '本段声音在结尾自然衔接视频1开头，台词只讲前置剧情。'
-      : '本段声音接续视频1结尾，台词只讲后续剧情。')
-      + '保持角色音色一致，环境声按已审核过渡自然延续或交接；没有场景变化时保持底噪一致。每句台词完整说完，不复述原台词。'
-      + '原视频有配乐时保持曲目与节奏连贯；原视频无配乐时不新增配乐。',
-    forward
-      ? '【输出边界】仅输出新增前置片段；原视频开头只用于衔接，不复制原视频画面或已出现的台词。'
-      : '【输出边界】仅输出新增续拍片段；视频1末尾只用于理解当前状态，不把末尾几秒再次输出。起始即推进下一动作，不重做拿起、放下、递手机等已完成动作；不重复上一句对白或其尾音。',
-    SPEECH_EXECUTION,
+    '【接缝状态】以视频1实际可见的接触、持物手、物件位置、视线和动作阶段为准；保持已有主体外观与服装，不为恢复旧姿态让物件回手、人物跳位或动作倒放。',
+    '【镜头与光线】'+(plannedCut
+      ? '明确切镜时允许改变景别与机位；未安排切镜时顺接原镜头。曝光、白平衡与场景变化须有脚本依据。'
+      : '接缝匹配视频1'+(forward ? '开头' : '结尾')+'的机位、景别与运动，接缝之外按已审核脚本执行，不自行压暗或偏色。'),
+    generateAudio === false ? '【声音】关闭音频，不生成对白、环境声或配乐。' :
+      '【声音】'+(forward ? '本段末尾衔接视频1开头' : '接续视频1结尾')+'，环境声与配乐按已审核方案交接；未要求新增配乐时沿用原方案。'+speechExecution(plotPrompt, true),
+    `【必要限制】仅输出新增${forward ? '前置' : '续拍'}片段，不重复上一段动作或台词，不复用原视频画面；不添加未批准的角色、道具或情节。未要求字幕时不生成字幕。本段已审核的运镜、切镜与声音安排优先。`,
     transition,
-    '本段明确指定的运镜和切镜优先，上面的衔接建议不得覆盖已确认的镜头安排。',
   ].join('\n');
 }
 
@@ -92,7 +75,7 @@ export function buildSegmentExecutionPrompt({ prompt, kind, index, count }) {
   ].join('\n');
 }
 
-export function buildGenerationPrompt({ prompt, seconds, model = '' }) {
+export function buildGenerationPrompt({ prompt, seconds, model = '', generateAudio = true }) {
   const timing = isOmniExtendModel(model)
     ? '按本段事件顺序推进；如有时间区间，以本段0秒为起点，区间连续，不遗漏停顿与反应时间。'
     : '按本段事件顺序自然推进，以镜头序号或先后阶段组织内容，不依赖精确时间戳，不为追逐秒点压缩动作或对白。';
@@ -100,9 +83,19 @@ export function buildGenerationPrompt({ prompt, seconds, model = '' }) {
     `生成 ${seconds} 秒视频。`,
     String(prompt).trim(),
     timing,
-    SPEECH_EXECUTION,
-    '人物身份、服装、场景与光线保持连贯；每句台词完整说完。未明确要求时不新增字幕、水印、片头片尾或配乐。',
+    speechExecution(String(prompt), generateAudio),
+    '人物身份、服装、场景与光线按已审核脚本保持连贯；未明确要求时不新增字幕、水印、片头片尾或配乐。',
   ].join('\n');
+}
+
+/** 明确无对白时使用短规则；无法判断时保留完整契约，关闭音频优先。 */
+function speechExecution(prompt: string, generateAudio: boolean) {
+  if (generateAudio === false) return '【声音】关闭音频，不生成对白、环境声或配乐；无对白时不新增人声。';
+  const explicitSpeech = /[{｛“「]|(?:对白|台词|旁白|配音|说|问|回答|唱)[：:]|\b(says?|speaks?|narration)\b/i.test(prompt);
+  const noSpeech = /无对白|无台词|无人声|空镜|仅环境声|\bno (?:dialogue|speech|voices?)\b/i.test(prompt);
+  if (noSpeech && !explicitSpeech) return '仅执行已审核的声音安排；无对白时不新增人声，环境声与配乐按原方案。';
+  // 未标注的自然语言对白仍保留完整契约，不把没识别到格式当成没有对白。
+  return SPEECH_EXECUTION;
 }
 
 /** 把用户给的剧情描述接成完整句子时补个句号，避免两句粘在一起。 */

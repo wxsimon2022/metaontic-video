@@ -256,3 +256,5 @@ Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.c
 创意重复展示先比对真实assistant正文与保存稿，不把“自行润色省略后被守卫拦截”误判成卡片重复。首次原样展示已排版approval_material，短稿补缺按完整原文段落，不再退回整篇；长稿继续严格逐页，不能语义相似度放行。故事结构使用标题加累计时间范围和内容分组，不堆段落/标题/时长字段；未知时长不补造后续时间点。
 
 三端并行发布：release.mjs --all 在共享构建、测试、Windows/macOS安装检查和CI暂存包摘要核对之后，启动GitHub/Gitee/npm三个独立Node子进程，避免同步npm/gh命令堵塞其他渠道。Promise.allSettled保留各端结果并写channels.json；续跑按同版成品核验已完成端，不改标签或覆盖附件。npm提交前落npm-submission.json，平台处理中或提交结果不明时不因404重放，核对公开包与镜像；npm-publish.lock防止同版本并发提交。进程异常留下锁时先核对进程和提交状态，不清提交记录绕过防重。回归见release-parallel.test.mjs；该调整属于工程工具，不单独发版或写入用户更新说明。
+
+提示词分阶段维护：具体约定与验证见prompt-optimization.md。用户明确改稿先改新版再审，不补弹旧稿；常驻不再附完整导演角色和全阶段字段，film_project成功结果切创作规则、compile或video_project切制作规则，失败不切。schema/质量证据按角色分发，canonical_v1不另写screenplay，chapter_v1沿chapter_submit汇总。提示词评测中的字符缩减不当作实际token、费用、延迟或艺术质量提升。

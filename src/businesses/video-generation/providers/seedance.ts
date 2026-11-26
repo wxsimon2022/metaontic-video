@@ -43,7 +43,7 @@ export function buildRequestBody(config, args, referenceVideoUrl) {
   const wording = args.wording === 'after' ? 'after' : 'extend';
 
   const content = [
-    { type: 'text', text: buildExtensionPrompt({ prompt, seconds, startAt, mode, direction, wording, transitionDescription: args.transitionDescription }) },
+    { type: 'text', text: buildExtensionPrompt({ prompt, seconds, startAt, mode, direction, wording, transitionDescription: args.transitionDescription, generateAudio: args.generateAudio ?? ref(config, 'generateAudio', true) }) },
     { type: 'video_url', video_url: { url: referenceVideoUrl }, role: 'reference_video' },
     ...(args.characterReferences || []).map(item => ({ type: 'image_url', image_url: { url: item.image_url.url }, role: 'reference_image' })),
   ];
@@ -85,7 +85,7 @@ export async function buildGenerationBody(config, args, seconds, options: { sign
 
   // 文本项 + 可选图片，形状由上游决定，这里只保证顺序与字段名
   const content: Array<Record<string, unknown>> = [
-    { type: 'text', text: buildGenerationPrompt({ prompt, seconds, model: resolveModel(config) }) },
+    { type: 'text', text: buildGenerationPrompt({ prompt, seconds, model: resolveModel(config), generateAudio: args.generateAudio ?? ref(config, 'generateAudio', true) }) },
   ];
   const images = [];
   const notes: string[] = [];

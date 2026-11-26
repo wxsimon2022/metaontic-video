@@ -3,7 +3,7 @@ import { withUsageAnalytics } from '../telemetry/reporter.js';
 import { withStageTiming } from '../../shared/utils/timing.js';
 import { presentChineseToolCall } from '../../shared/utils/tool-presentation.js';
 /** 公共工具装配负责命名冲突、Agent 业务边界和旁路统计；审批由业务提供。 */
-export function createToolRegistry(ctx: DshContext, agents: ToolAgentResolver, analytics: any, defer: (dispose: unknown) => void = () => {}, versionGuard?: (name: string, args: any) => Promise<void>) {
+export function createToolRegistry(ctx: DshContext, agents: ToolAgentResolver, analytics: any, defer: (dispose: unknown) => void = () => {}, versionGuard?: (name: string, args: any) => Promise<void>, onResult?: (name: string, args: any, result: any, exec: any) => void) {
   const owners = new Map<string, string>();
   function allowed(business: string, exec: any) {
     const agent = agents.resolve({ agent: exec?.agent }, ctx);
@@ -16,7 +16,9 @@ export function createToolRegistry(ctx: DshContext, agents: ToolAgentResolver, a
     const guarded = { ...tool, presentCall: tool.presentCall ?? ((args: unknown) => presentChineseToolCall(tool.name, args)), async execute(args: any, exec: any) {
       if (!allowed(business, exec)) throw new Error('当前助手未启用此业务，请切换到对应助手后重试。');
       await versionGuard?.(tool.name, args);
-      return tool.execute(args, exec);
+      const result = await tool.execute(args, exec);
+      onResult?.(tool.name, args, result, exec);
+      return result;
     } };
     let dispose;
     try {

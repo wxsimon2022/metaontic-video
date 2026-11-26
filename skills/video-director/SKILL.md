@@ -86,3 +86,5 @@ prompts[].prompt只送可执行画面与声音描述，内部引用ID、风险�
 专业创意和剧本均先提交成功，再在独立用户可见正文完整展示工具返回的approval_material.markdown，随后单独调用film_project approve(stage为对应阶段)；不能只说已保存或让用户在审批卡找全文。正文与审批不得并行，不能未展示先批准。
 
 长稿按approval_material.parts顺序read(stage,materialPart)并展示全部页，运行时只认可当前会话当前修订号的真实正文，工具和推理不算展示。超预算scope_required沿原项目分章或传entityIds缩小范围，不截断正文。create重试沿用operationId，同会话同需求默认复用，明确另建才换标识。独立审核先登记请求再调用，异常用review_requests查状态；结果不明或无效回包不会自动重放，用户接受可能重复计费后用retry_review单独确认再independent_review。逐章审核后还须通过跨章全片结构检查，单章通过不代表全片通过。
+
+提示词按阶段加载：专业创作只执行nextTask/route的角色与submission_contract，编译进入制作后再加载示意图、参考图、费用、续拍与交付规则。新项目canonical_v1以场次/节拍/对白为唯一剧情来源，正文由工具渲染；章节项目按chapter_plan/chapter_submit保存，不重提整片。用户明确改稿时先修改并展示新版再审核，不补弹旧稿审批。

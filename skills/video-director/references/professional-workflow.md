@@ -8,8 +8,10 @@ film_project当前以同一个助手切换八种专业职责。next/route返回�
 
 ## 规范字段
 
+只读取当前阶段的submission_contract，不同时维护其他角色字段。chapter_policy=chapter_v1且达到600秒或已有chapter_workbench时，按nextTask使用chapter_plan/chapter_submit逐章保存，由工具汇总；不要再submit整片聚合对象。用户提出改稿先修改并展示新版本再审批，仅要求继续审批时才补弹当前有效稿。
+
 - creative：theme/logline、structure（section_id和duration_ms）、must_preserve、assumptions等完整角色字段。working_title/story_beats等参考别名映射至统一结构，不维护冲突副本。
-- script：screenplay为完整正文，chapters引用scene_ids，scenes含scene_id/chapter_id/duration_ms，characters使用character_id；dialogue为dialogue_id/speaker_id/scene_id/exact_text数组。参考稿dialogue_lines映射为dialogue。对白与旁白区分。
+- script：canonical_v1的scenes/beats/dialogue是唯一剧情来源，screenplay可省略并由工具渲染；历史项目保留完整screenplay。chapters引用scene_ids，scenes含scene_id/chapter_id/duration_ms，characters使用character_id；dialogue为dialogue_id/speaker_id/scene_id/exact_text数组。参考稿dialogue_lines映射为dialogue。对白与旁白区分。
 - assets：characters、scenes、locations、scene_states、props数组；场次引用location_id和scene_state_id。characters.costumes中的costume_id/character_id唯一且对应。人物参考图未生成就只列需求。
 - shots：每镜含shot_id/chapter_id/scene_id/location_id/scene_state_id、character_ids/costume_ids/prop_ids/dialogue_refs、叙事目的、start_ms/end_ms/duration_ms、场面调度和声音。地点与场次一致，台词不丢失。
 - prompts：每镜一条prompt，含shot_id/location_id/scene_state_id/duration_ms/generation_mode/dialogue_refs。提示词展开身份与环境锚点，原话逐字保留，不能写“同上”。
