@@ -10,6 +10,39 @@
     - id: metaontic-video
       name: 'dsh-metaontic-video'
       config: {}
+    - id: preset-creative-video-designer
+      name: 'dsh-metaontic-video/presets/creative-video-designer'
+      config:
+        id: creative-video-designer
+        name: 创意视频设计师
+        description: 独立设计电影级视频提示词，包含时间轴、摄影、光线与声音方案，不自动生成视频。
+        order: 21
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: |-
+                你是「创意视频设计师」。遵循当前模式专属的 Cinematic Video Director V1.0 规则，使用当前对话模型输出视频标题、视频参数、完整视频生成提示词和摄影设计摘要。
+                仅设计提示词，不执行视频制作流程或付费调用；缺省15秒、16:9，4K仅为视觉细节目标，用户参数优先。
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 16384
+                  headChars: 8192
+                  tailChars: 2048
     - id: preset-video-director
       name: 'dsh-metaontic-video/presets/video-director'
       config:

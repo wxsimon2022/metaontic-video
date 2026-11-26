@@ -2,7 +2,7 @@
 import {createHash} from 'node:crypto';
 import {readFile,readdir} from 'node:fs/promises';
 import path from 'node:path';
-export const BUILD_OUTPUTS=['dist/index.js','dist/client.js','dist/presets/video-director.js','dist/locale/en.json','dist/locale/zh.json','locale/en.json','locale/zh.json'];
+export const BUILD_OUTPUTS=['dist/index.js','dist/client.js','dist/presets/video-director.js','dist/presets/creative-video-designer.js','dist/locale/en.json','dist/locale/zh.json','locale/en.json','locale/zh.json'];
 export const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 export async function sourceIdentity(root=process.cwd()){
  const files=['package.json','package-lock.json','LICENSE','THIRD_PARTY_NOTICES.md','cordis.patch.yml','plugin-detail.md','scripts/build.mjs','scripts/build-identity.mjs','scripts/package-description.mjs'];

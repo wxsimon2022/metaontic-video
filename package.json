@@ -44,7 +44,10 @@
     "./package.json": "./package.json",
     "./presets/video-director": "./dist/presets/video-director.js",
     "./presets/video-director/locale/*.json": "./locale/presets/video-director/*.json",
-    "./presets/video-director/icon": "./presets/icons/video-director.svg"
+    "./presets/video-director/icon": "./presets/icons/video-director.svg",
+    "./presets/creative-video-designer": "./dist/presets/creative-video-designer.js",
+    "./presets/creative-video-designer/locale/*.json": "./locale/presets/creative-video-designer/*.json",
+    "./presets/creative-video-designer/icon": "./presets/icons/creative-video-designer.svg"
   },
   "files": [
     "dist/index.js",

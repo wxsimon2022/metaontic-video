@@ -33,8 +33,25 @@ function harness(config, directory) {
     on(event, listener) { if (event === 'session/event') observers.push(listener); else gate = listener; return () => {}; },
   };
   const dispose = plugin.apply(ctx, config);
-  return { tools, observe: (session, event) => Promise.all(observers.map(f => f(session, event))), prompt: () => prompt.text({agent:{session:{header:{agentPreset:'video-director'}}}}), gate: (...args) => gate(...args), dispose, disposed: () => disposed };
+  return { tools, observe: (session, event) => Promise.all(observers.map(f => f(session, event))), prompt: (preset = 'video-director') => prompt.text({agent:{session:{header:{agentPreset:preset}}}}), gate: (...args) => gate(...args), dispose, disposed: () => disposed };
 }
+
+test('创意视频设计师独立注入全部导演规则，不混入制作审批且执行层隔离业务工具', async () => {
+  const host = harness({}, '/tmp');
+  try {
+    const prompt = host.prompt('creative-video-designer');
+    assert.equal((prompt.match(/^## \d+\./gm) || []).length, 19);
+    for (const text of ['Cinematic Video Director V1.0','视频时长：15秒','视频画幅：16:9','4K级视觉细节','### 完整视频生成提示词','### 摄影设计摘要','用户指定的参数始终优先于默认参数','不要输出内部分析过程']) assert.ok(prompt.includes(text), text);
+    assert.doesNotMatch(prompt, /本对话只做视频创作|WORKFLOW|脚本审核通过后|直出上限 15 秒/);
+    const agent = {session:{id:'independent-designer',header:{agentPreset:'creative-video-designer'}}};
+    for (const tool of host.tools.values()) await assert.rejects(tool.execute({}, {agent}), /当前助手未启用此业务/);
+    assert.equal((await host.gate({name:'video_generate',agent}, () => ({kind:'allow'}))).kind,'deny');
+    assert.equal((await host.gate({name:'ask_user_question',agent}, () => ({kind:'allow'}))).kind,'allow');
+    assert.match(host.prompt(), /本对话只做视频创作/);
+    assert.doesNotMatch(host.prompt(), /Cinematic Video Director V1\.0/);
+    assert.equal(host.prompt('standard'), '');
+  } finally { host.dispose(); }
+});
 
 test('published host preserves schema, tool registration, live configuration and cleanup', async () => {
   assert.deepEqual(Object.keys(plugin).sort(), ['Config', 'apply', 'inject']);
