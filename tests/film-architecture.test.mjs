@@ -88,7 +88,7 @@ test('六类评测题覆盖事实边界、短片与长片，不通过流量词�
  const cases=JSON.parse(await readFile('tests/fixtures/story-evaluation/cases.json','utf8'));assert.equal(new Set(cases.map(c=>c.id)).size,6);assert.ok(cases.some(c=>c.genre==='documentary'));assert.ok(cases.some(c=>c.duration_ms>=600000));assert.ok(cases.every(c=>c.must_preserve.length&&c.review_focus.length));
 });
 test('角色按阶段组合上下文，记录明确标注的估算成本，局部镜头只带相关场次',()=>{
- const s=ready();const instructions=api.roleInstructions(s,'screenwriter');assert.ok(Buffer.byteLength(instructions)<Buffer.byteLength(api.ROLE_PROMPTS.screenwriter));
+ const s=ready();const instructions=api.roleInstructions(s,'screenwriter');assert.ok(Buffer.byteLength(instructions)<12000);assert.doesNotMatch(instructions,/# COMMON_CONTRACT V4.0/);
  s.artifacts.script.data={characters:[],chapters:[chapter('1'),chapter('2')],scenes:[scene('1'),scene('2')],dialogue:[],screenplay:'WHOLE_SCRIPT'};
  s.artifacts.shots.data.shots=[{shot_id:'a',scene_id:'s1',character_ids:[]},{shot_id:'b',scene_id:'s2',character_ids:[]}];
  const input=api.scopedInputs(s,'shots','storyboard',['a']);assert.equal(input.shots.data.shots.length,1);assert.equal(input.script.data.scenes.length,1);assert.ok(!JSON.stringify(input).includes('WHOLE_SCRIPT'));

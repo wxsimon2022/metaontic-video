@@ -1,6 +1,6 @@
 /** providers/transport：从宿主入口拆出的独立职责模块。 */
 import { uniqueSuffix } from '../utils/files.js';
-import { isVolcengine, resolveModel, resolveBaseUrl, resolveApiKey, resolveSubmitPath, resolveQueryPath } from './connection.js';
+import { isVolcengine, resolveModel, resolveBaseUrl, resolveApiKey, resolveQueryPath } from './connection.js';
 import { appendRequestLog } from '../../../shared/utils/logging.js';
 import { extractTaskId, extractStatus, findKey, extractVideoUrl, extractImageUrl } from './response.js';
 import { finiteNumber } from '../../../shared/utils/validation.js';
@@ -121,10 +121,6 @@ export function sleep(ms, signal): Promise<void> {
     }
     signal?.addEventListener('abort', onAbort, { once: true });
   });
-}
-
-export function createTask(config, body, signal) {
-  return relayRequest(config, resolveSubmitPath(config), { method: 'POST', body, signal });
 }
 
 export function getTask(config, taskId, signal) {

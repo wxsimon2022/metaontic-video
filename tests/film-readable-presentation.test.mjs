@@ -2,8 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import {readFile} from 'node:fs/promises';
-const result=await build({stdin:{contents:"export * from './src/businesses/film-production/approvals/approval.presenter.ts';export * from './src/businesses/film-production/artifacts/artifact.repository.ts';export {exportMarkdown} from './src/businesses/film-production/artifacts/artifact.service.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
-const {readable,approvalMaterial,renderDeliverables,exportMarkdown}=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
+const result=await build({stdin:{contents:"export * from './src/businesses/film-production/approvals/approval.presenter.ts';export * from './src/businesses/film-production/artifacts/artifact.repository.ts';",resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node'});
+const {readable,approvalMaterial,renderDeliverables}=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
 test('六类创作要点均使用中文标签，正文与机器数据保持原样',async()=>{
  for(const profile of ['drama','comedy','lifestyle','documentary','commercial','promotional']){
   const source=await readFile(`src/businesses/film-production/profiles/legacy/${profile}.ts`,'utf8');
@@ -21,8 +21,7 @@ test('正文、审批、导出统一中文排版；扩展字段内容不丢失�
  const original=structuredClone(data);
  const approval=approvalMaterial('creative',{revision:1,data}).approval_material.markdown;
  const exported=renderDeliverables({title:'沙葱',project_id:'p1',revision:1,artifacts:{creative:{revision:1,data}}});
- const legacy=exportMarkdown({title:'沙葱',revision:1,artifacts:{creative:{revision:1,data}}});
- for(const output of [approval,exported,legacy]){
+ for(const output of [approval,exported]){
   for(const key of ['recognizable_identity','emotional_anchor','scene_goal','narrative_quality','PASS_WITH_WARNINGS','custom_note'])assert.ok(!output.includes(key),key);
   for(const text of ['### 类型创作要点','**辨识特征**：黄沙与翠绿','**情绪落点**：家常饭桌','5 秒','核实地名','保留扩展说明','SC_01','OPEN / https://example.com','PASS'])assert.ok(output.includes(text),text);
  }

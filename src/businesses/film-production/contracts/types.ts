@@ -13,11 +13,8 @@ export interface ScriptData {
  characters:Array<{character_id:string;name?:string;[key:string]:unknown}>;
  chapters:ScriptChapter[]; scenes:ScriptScene[]; dialogue:Dialogue[];
 }
-export interface Artifact<T=Record<string,unknown>> { revision:number; source_revisions:Revisions; data:T; stale:boolean; }
 export interface ReviewIssue { issue_id:string; severity:'CRITICAL'|'MAJOR'|'MINOR'|'INFO'; status:'OPEN'|'IN_PROGRESS'|'RESOLVED'|'VERIFIED'|'WONT_FIX'; description:string; evidence:string; }
 export interface ReviewReport {
  review_status:'PASS'|'PASS_WITH_WARNINGS'|'REVISE_REQUIRED'|'BLOCKED'|'NOT_EVALUATED';
  scores:Record<string,number|null>; issues:ReviewIssue[]; delivery_allowed:boolean; blocking_issue_count?:number; passed?:boolean; weighted_score?:number;
 }
-export interface ApprovalRecord { stage:'creative'|'script'; artifact_revision:number; decision:'APPROVED'|'REVISE'|'REJECTED'; decided_by:'USER'; decision_time:string; }
-export type FilmResult<T> = {status:'completed';value:T}|{status:'needs_input'|'blocked';reason:string};

@@ -1,5 +1,5 @@
 import { TASK_CONTRACT, promptMetrics, scopedInputs, boundedTask } from './context.composer.js';
-import { COMMON_CONTRACT, sourceRevisions, STAGE_DEPS, projectContext, modelProfile } from '../contracts/index.js';
+import { sourceRevisions, STAGE_DEPS, projectContext, modelProfile } from '../contracts/index.js';
 import director from '../../../agents/director/index.js';
 import creative from '../../../agents/creative/index.js';
 import screenwriter from '../../../agents/screenwriter/index.js';
@@ -13,7 +13,6 @@ import { runtimeContract } from './runtime-contract.js';
 import { SHORT_VIDEO_COMMON, SHORT_VIDEO_ROLE } from '../prompts/short-video.js';
 import { submissionContract } from '../contracts/fields.js';
 const ROLE_TEXTS = {director,creative,screenwriter,character,scene,storyboard,'prompt-engineer':promptEngineer,reviewer};
-export const ROLE_PROMPTS = Object.fromEntries(Object.entries(ROLE_TEXTS).map(([key,text])=>[key,text+'\n'+COMMON_CONTRACT+runtimeContract(key)])) as typeof ROLE_TEXTS;
 export function roleInstructions(state:any,role:string) {return ROLE_TEXTS[role]+'\n'+TASK_CONTRACT+runtimeContract(role)+'\n'+profileInstructions(state,role)
  + (state.duration_ms > 0 && state.duration_ms <= 60000 ? '\n'+SHORT_VIDEO_COMMON+'\n'+(SHORT_VIDEO_ROLE[role] || '') : '')
  + (state.script_policy==='canonical_v1'&&role==='screenwriter'?'\n当前项目采用canonical_v1：场次、动作节拍beats和对白是唯一剧情来源；正文由工具生成，screenplay可以省略，不能维护另一份剧情。beats按表演顺序列action或dialogue_ref，每句对白须且只须引用一次；局部修改可revise(stage:script)替换scenes/dialogue/characters/chapters并重新审批。':'')

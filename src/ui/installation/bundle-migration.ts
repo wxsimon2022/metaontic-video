@@ -1,7 +1,7 @@
 import { readBundleInventory, BundleInventoryError } from '../../platform/migration/bundle-inventory.js';
 import { PLUGIN_PACKAGE } from '../../shared/constants/plugin.js';
 import { hasLegacyBundleConflict, hasLegacyBundle, disableLegacyBundle, cleanupLegacyBundle } from '../../platform/migration/bundle-identity.js';
-export { hasLegacyBundleConflict, bundleRows, disableLegacyBundle } from '../../platform/migration/bundle-identity.js';
+export { hasLegacyBundleConflict, disableLegacyBundle } from '../../platform/migration/bundle-identity.js';
 
 export function migrationManager(ctx: any) {
   for (const read of [() => ctx.get?.('remote.pluginManager'), () => ctx.get?.('remote')?.pluginManager, () => ctx.remote?.pluginManager]) {

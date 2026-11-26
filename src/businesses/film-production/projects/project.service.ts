@@ -16,7 +16,7 @@ export function createProjectSpec(title:string,idea:string,duration:number,input
   validateTargetModel(input.target_model);
   if(input.work_type && !WORK_TYPES.includes(input.work_type))throw Error('UNKNOWN_WORK_TYPE');
   if(input.narrative_mode && !NARRATIVE_MODES.includes(input.narrative_mode))throw Error('UNKNOWN_NARRATIVE_MODE');
-  for(const key of ['hard_constraints','soft_preferences','references'])if(input[key]!==undefined&&(!Array.isArray(input[key])||input[key].some(v=>typeof v!=='string'||!v.trim())))throw Error(`INVALID_PROJECT_SPEC:${key}`);
+  for(const key of ['hard_constraints','soft_preferences','references'])if(input[key]!==undefined&&(!Array.isArray(input[key])||input[key].some(v=>typeof v!=='string'||!v.trim())))throw Error(`INVALID_PROJECT_SPEC:${key}必须是非空字符串数组，例如[\"保留用户原台词\"]；没有要求时省略或用[]，不能传一段文字或对象。`);
   const dimensionSelected=['genre','format','purpose','style_profile'].some(k=>input[k]!==undefined);
   assertDimensions({...input,dimension_profile_revision:dimensionSelected?'1':null});
   return {dimension_profile_revision:dimensionSelected?'1':null,title,original_idea:idea,target_duration_ms:duration,...Object.fromEntries(FIELDS.map(k=>[k,input[k] || null])),profile_revision:input.work_type?profileRevision(input.work_type):null,hard_constraints:input.hard_constraints || [],soft_preferences:input.soft_preferences || [],references:input.references || [],provenance:{title:'USER_SPECIFIED',original_idea:'USER_SPECIFIED',target_duration_ms:'USER_SPECIFIED',...Object.fromEntries(FIELDS.map(k=>[k,input[k]?'USER_SPECIFIED':'UNKNOWN']))}};

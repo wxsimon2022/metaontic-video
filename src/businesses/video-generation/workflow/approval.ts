@@ -41,13 +41,6 @@ export function approvalPolicy(ctx, exec) {
   }
 }
 
-/** 把秒数列表写成「15s + 5s」这样的紧凑形式，确认框只有一行文字，不能换行。 */
-export function planSummary(estimate) {
-  if (!estimate) return '时长未知';
-  const sizes = estimate.segments.map((item) => `${item.seconds}s`).join(' + ');
-  return `${estimate.segments.length} 段（${sizes}）共 ${estimate.seconds} 秒`;
-}
-
 /**
  * 装 ffmpeg 前的确认：安装命令要在本机跑，必须让用户先看清楚是什么、再决定装不装。
  * （只检查不安装的调用直接放行，不用打扰用户。）

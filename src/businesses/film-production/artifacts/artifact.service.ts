@@ -1,4 +1,3 @@
-import { readable } from '../approvals/approval.presenter.js';
 import { evaluateStory } from '../evaluation/story-evaluation.js';
 import { validateReviewProvenance } from '../reviews/review.provenance.js';
 import { normalizeScript } from '../scripts/script.document.js';
@@ -14,7 +13,6 @@ import { evaluateReview } from '../reviews/review.rules.js';
 import { validateProfileArtifact } from '../profiles/index.js';
 /** V2 创作数据与确定性校验。执行阶段独立于现有视频任务。 */
 export const STAGES = ['creative', 'script', 'assets', 'shots', 'prompts', 'review'] as const;
-export const ROLES = ['director', 'creative', 'screenwriter', 'character', 'scene', 'storyboard', 'prompt-engineer', 'reviewer'] as const;
 function canonicalJson(value: any): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   if (value && typeof value === 'object') return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
@@ -108,11 +106,4 @@ export function commitArtifact(state: any, stage: string, value: any, expected: 
   for (const approved of ['creative','script']) if (STAGES.indexOf(approved as any) >= index) delete next.approvals[approved];
   next.status = ['creative','script'].includes(stage) ? `WAIT_${stage.toUpperCase()}_APPROVAL` : stage === 'review' ? (value.review_status && !evaluateReview(value).passed ? value.review_status : 'FINAL_DELIVERY') : `${stage.toUpperCase()}_READY`;
   return next;
-}
-export function exportMarkdown(state: any) {
- const names={creative:'创意提案',script:'正式剧本',assets:'人物与场景档案',shots:'导演分镜',prompts:'视频生成提示词',review:'质量审核'};
- return `# ${state.title}\n\n修订：${state.revision}\n\n`+STAGES.filter(stage=>state.artifacts[stage]).map(stage=>{
-  const artifact=state.artifacts[stage];
-  return `## ${names[stage]}${artifact.stale?'（待更新）':''}\n\n${readable(artifact.data)}`;
- }).join('\n\n');
 }

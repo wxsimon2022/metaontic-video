@@ -18,9 +18,6 @@ export const CONFIG_FIELDS = [
   'estimateGroupRatio',
 ];
 
-/** 配置工具仅允许读取，密钥以配置状态显示。 */
-export const READ_ONLY_CONFIG_FIELDS = new Set();
-
 export function maskSecrets(view) {
   return {
     ...view,

@@ -25,7 +25,7 @@ test('六类配置分别加载策略和八角色规则，类型风格叙事方�
   assert.equal(s.project_spec.narrative_mode,'OBSERVATIONAL');assert.equal(s.project_spec.profile_revision,'1');
   const next=api.nextTask(s);assert.equal(next.work_profile.profile.id,type);
   assert.ok(next.instructions.includes(profile.strategy));
-  for(const role of Object.keys(api.ROLE_PROMPTS))assert.ok(api.roleInstructions(s,role).includes(`作品类型 ${type}`));
+  for(const role of ['director','creative','screenwriter','character','scene','storyboard','prompt-engineer','reviewer'])assert.ok(api.roleInstructions(s,role).includes(`作品类型 ${type}`));
   const route=api.routeIntent(s,'develop_idea');assert.equal(route.work_profile.profile.id,type);
   assert.ok(route.instructions.includes(profile.strategy));
  }
@@ -180,7 +180,7 @@ test('四维配置独立组合、按角色注入，未选项不推断且返回�
  assert.ok(r.available_profiles.genre.some(p=>p.id==='animation'));
  assert.equal(api.profileContext(s).status,'SELECTED');
  assert.equal(api.nextTask(s).resolved_profiles.profiles.format.id,'interview');
- for(const role of Object.keys(api.ROLE_PROMPTS))assert.match(api.roleInstructions(s,role),/四维 Profile/);
+ for(const role of ['director','creative','screenwriter','character','scene','storyboard','prompt-engineer','reviewer'])assert.match(api.roleInstructions(s,role),/四维 Profile/);
  assert.match(api.roleInstructions(s,'screenwriter'),/采访问题/);
  assert.match(api.roleInstructions(s,'reviewer'),/dimension_review/);
  const partial=api.resolveDimensions({genre:'romance'});assert.deepEqual(Object.keys(partial.profiles),['genre']);

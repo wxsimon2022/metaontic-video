@@ -22,9 +22,6 @@ function harness({ serviceAvailable = true } = {}) {
     resolveModel: () => 'seedance',
     // 预检确认框里的费用口径（钱包数字格式化 + 额度/汇率兜底）
     finiteNumber: value => (Number.isFinite(Number(value)) ? Number(value) : null),
-    formatMoney: (value, symbol = '¥') => `${symbol}${Number(value).toFixed(2)}`,
-    DEFAULT_QUOTA_PER_UNIT: 500000,
-    DEFAULT_USD_EXCHANGE_RATE: 7.3,
     estimateUsage: () => { throw new Error('must not estimate'); },
     resolveRegisterApi: () => { throw new Error('must not query service'); },
     isServerIssuedKey: () => false,

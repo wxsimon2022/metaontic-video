@@ -13,9 +13,9 @@ export type FilmCommand = BaseCommand & (
 export function parseFilmCommand(raw: any): FilmCommand & Record<string, any> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !FILM_ACTIONS.includes(raw.action)) throw Error('INVALID_ACTION');
   const args = { ...raw };
-  if (args.action !== 'create' && !/^[a-f0-9-]{36}$/.test(args.projectId || '')) throw Error('INVALID_PROJECT_ID');
+  if (args.action !== 'create' && !/^[a-f0-9-]{36}$/.test(args.projectId || '')) throw Error('INVALID_PROJECT_ID:除create外，必须在工具参数顶层传projectId，复制最近返回的project_id；content内部project_id不能替代。保留已有材料，不重新create。');
   if (!READ_ACTIONS.includes(args.action) && !['create', 'recover_lock'].includes(args.action)
-    && (!Number.isSafeInteger(args.expectedRevision) || args.expectedRevision < 0)) throw Error('EXPECTED_REVISION_REQUIRED');
+    && (!Number.isSafeInteger(args.expectedRevision) || args.expectedRevision < 0)) throw Error('EXPECTED_REVISION_REQUIRED:写操作须在工具参数顶层传expectedRevision，使用最近工具返回的项目revision或expectedRevision，不使用产物修订号，不默认填0；状态不明先read原项目。');
   if (args.responseMode !== undefined && !['compact', 'full'].includes(args.responseMode)) throw Error('INVALID_RESPONSE_MODE');
   if (args.operationId !== undefined && (typeof args.operationId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(args.operationId))) throw Error('INVALID_OPERATION_ID');
   if (['submit', 'validate', 'approve', 'revise', 'chapter_submit'].includes(args.action)
@@ -28,8 +28,10 @@ export function parseFilmCommand(raw: any): FilmCommand & Record<string, any> {
     }
   }
   if (args.action === 'chapter_submit') {
-    if (typeof args.chapterId !== 'string' || !args.chapterId.trim()) throw Error('CHAPTER_ID_REQUIRED');
-    if (args.continuity !== undefined) { try { JSON.parse(args.continuity); } catch { throw Error('INVALID_CONTINUITY_JSON'); } }
+    if (typeof args.chapterId !== 'string' || !args.chapterId.trim()) throw Error('CHAPTER_ID_REQUIRED:chapter_submit必须在工具参数顶层传chapterId，使用当前章节任务chapter.chapter_id。');
+    let continuity;
+    try { continuity = JSON.parse(args.continuity); } catch { throw Error('CHAPTER_CONTINUITY_REQUIRED:chapter_submit必须传continuity JSON字符串，包含established_facts数组、unresolved_threads数组、character_state对象。'); }
+    if (!continuity || typeof continuity !== 'object' || Array.isArray(continuity) || !Array.isArray(continuity.established_facts) || !Array.isArray(continuity.unresolved_threads) || !continuity.character_state || typeof continuity.character_state !== 'object' || Array.isArray(continuity.character_state)) throw Error('CHAPTER_CONTINUITY_REQUIRED:continuity必须包含established_facts数组、unresolved_threads数组、character_state对象；只记录已知事实。');
   }
   if (args.action === 'task_result' && (typeof args.taskKey !== 'string' || !args.taskKey || !['running', 'completed', 'failed'].includes(args.taskStatus))) throw Error('INVALID_TASK_RESULT');
   if (args.action === 'verify_issue' && (typeof args.issueId !== 'string' || !args.issueId)) throw Error('ISSUE_ID_REQUIRED');
@@ -42,7 +44,7 @@ export function parseFilmCommand(raw: any): FilmCommand & Record<string, any> {
     if (typeof args[jsonField] !== 'string') throw Error('JSON_CONTENT_REQUIRED');
     try { args.payload = JSON.parse(args[jsonField]); } catch { throw Error(args.action === 'submit' ? 'INVALID_ARTIFACT_JSON' : 'INVALID_COMMAND_JSON'); }
     const array = ['revise', 'chapter_plan'].includes(args.action);
-    if (!args.payload || typeof args.payload !== 'object' || Array.isArray(args.payload) !== array) throw Error('INVALID_COMMAND_PAYLOAD');
+    if (!args.payload || typeof args.payload !== 'object' || Array.isArray(args.payload) !== array) throw Error(`INVALID_COMMAND_PAYLOAD:${args.action}的${jsonField}必须是${array ? 'JSON数组' : 'JSON对象'}字符串，不带Markdown围栏；只修正参数形状，保留原内容与项目。`);
   }
   return args;
 }

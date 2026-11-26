@@ -11,15 +11,6 @@ export const TEXT_TIMEOUT_MS = 120000;
 export const TEXT_IDLE_TIMEOUT_MS = 30000;
 const MAX_BRIEF_CHARS = 4000;
 
-/** 可供调用方复用的分镜视角词表。 */
-export const VIEW_ANGLES: Record<string, string> = {
-  常规: '平视、俯视、仰视',
-  主观代入: '第一人称主观（POV）、过肩、窥视（前景遮挡）',
-  空间与几何: '低角度仰拍、高角度俯拍、荷兰角（倾斜）、纵深引导线',
-  运动: '跟随、环绕、穿越',
-  特殊表达: '镜像、微观特写、广角贴近',
-};
-
 /** 去掉模型偶尔包上的整段代码块围栏，返回 Markdown 正文。 */
 export function stripFence(text: any) {
   const raw = String(text ?? '').trim();

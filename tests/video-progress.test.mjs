@@ -95,14 +95,11 @@ test('execution signals surround only the actual tool body and settle on errors'
   assert.deepEqual(signals, [['test', 'end']]);
 });
 
-test('estimated progress follows video duration and waits for actual success', () => {
+test('estimated wait follows video duration and handles missing duration', () => {
   const context = vm.createContext({});
-  Object.assign(context, {estimatedVideoWait: api.estimatedVideoWait, estimatedVideoProgress: api.estimatedVideoProgress});
+  Object.assign(context, {estimatedVideoWait: api.estimatedVideoWait});
   for (const [duration, wait] of [[5, 120], [10, 135], [15, 150], [30, 195]]) {
     assert.equal(context.estimatedVideoWait(duration), wait);
-    assert.equal(context.estimatedVideoProgress(wait / 2, duration), 50);
-    assert.equal(context.estimatedVideoProgress(wait, duration), 99);
-    assert.equal(context.estimatedVideoProgress(wait * 2, duration), 99);
 
   }
   for (const duration of [undefined, '', 0, -1, 'bad', Infinity]) {

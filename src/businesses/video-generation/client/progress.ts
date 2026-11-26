@@ -3,11 +3,6 @@ export function estimatedVideoWait(duration) {
     // 5 秒视频约 120 秒，15 秒视频约 150 秒；其他时长按同一斜率估算。
     return Number.isFinite(seconds) && seconds > 0 ? 105 + seconds * 3 : 180;
 }
-export function estimatedVideoProgress(elapsed, duration) {
-    const seconds = Math.max(0, Number(elapsed) || 0);
-    // 实际结果返回前始终停在 99%。
-    return Math.min(99, Math.max(1, Math.floor(seconds / estimatedVideoWait(duration) * 100)));
-}
 /** Read active video calls from the current session, including nested dispatch calls. */
 export function activeVideoCalls(chat) {
     const calls = [];

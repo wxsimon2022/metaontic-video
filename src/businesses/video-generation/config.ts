@@ -170,12 +170,6 @@ export const CUMULATIVE_TOLERANCE_RATIO = 0.25;
 
 export const CUMULATIVE_TOLERANCE_MIN_SECONDS = 1.5;
 
-
-/** 额度/汇率兜底：服务端会回真实值，只有拿不到时才用这两个。 */
-export const DEFAULT_QUOTA_PER_UNIT = 500000;
-
-export const DEFAULT_USD_EXCHANGE_RATE = 7.3;
-
 /** 会真正调用视频模型、因而必须人工确认的工具。 */
 export const GATED_TOOLS = ['video_generate', 'video_extend', 'video_setup', 'video_prepare_image', 'media_submission'];
 

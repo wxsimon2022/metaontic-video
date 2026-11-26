@@ -58,8 +58,8 @@ test('生成编译映射跨段镜头，拒绝旧素材和未确认规格',()=>{
 
 test('八个角色独立提示词与全部意图均可路由，不改写项目',()=>{
  const state=initial();const before=JSON.stringify(state);
- assert.equal(Object.keys(api.ROLE_PROMPTS).length,8);
- for(const intent of api.INTENTS){const r=api.routeIntent(state,intent);assert.ok(api.ROLE_PROMPTS[r.role]);assert.ok(r.instructions.includes('共同约束'));}
+ const roles=['director','creative','screenwriter','character','scene','storyboard','prompt-engineer','reviewer'];assert.equal(new Set(api.INTENTS.map(intent=>api.routeIntent(state,intent).role)).size,roles.length);
+ for(const intent of api.INTENTS){const r=api.routeIntent(state,intent);assert.ok(roles.includes(r.role));assert.ok(r.instructions.includes('共同约束'));}
  assert.equal(JSON.stringify(state),before);
  for(const [intent,role] of [['revise_dialogue','screenwriter'],['revise_camera','storyboard'],['revise_character','character'],['revise_scene','scene'],['adapt_model','prompt-engineer'],['verify_facts','reviewer']])assert.equal(api.routeIntent(state,intent).role,role);
 });
@@ -101,15 +101,15 @@ test('全部角色使用已提供的完整版本且职责独立',()=>{
  const blocks=[...readFileSync('docs/engineering/agent-prompts.md','utf8').matchAll(/```markdown\n([\s\S]*?)\n```/g)].map(m=>m[1]);
  assert.equal(blocks.length,9);
  for(const [i,role] of ['director','creative','screenwriter','character','scene','storyboard','prompt-engineer','reviewer'].entries()) {
-  assert.ok(api.ROLE_PROMPTS[role].startsWith(blocks[i+1]));
-  assert.ok(api.ROLE_PROMPTS[role].includes(blocks[0]));
-  assert.match(api.ROLE_PROMPTS[role],/当前工具数据适配/);
+  assert.ok(api.roleInstructions(initial(),role).startsWith(blocks[i+1]));
+  assert.ok(api.roleInstructions(initial(),role).includes('共同约束'));
+  assert.match(api.roleInstructions(initial(),role),/当前工具数据适配/);
  }
- assert.match(api.ROLE_PROMPTS.character,/IDENTITY_LOCK/);
- assert.match(api.ROLE_PROMPTS.scene,/location_id/);
- assert.match(api.ROLE_PROMPTS.storyboard,/action_start/);
- assert.match(api.ROLE_PROMPTS['prompt-engineer'],/一条批准shot_id/);
- assert.match(api.ROLE_PROMPTS.reviewer,/NOT_EVALUATED/);
+ assert.match(api.roleInstructions(initial(),'character'),/IDENTITY_LOCK/);
+ assert.match(api.roleInstructions(initial(),'scene'),/location_id/);
+ assert.match(api.roleInstructions(initial(),'storyboard'),/action_start/);
+ assert.match(api.roleInstructions(initial(),'prompt-engineer'),/一条批准shot_id/);
+ assert.match(api.roleInstructions(initial(),'reviewer'),/NOT_EVALUATED/);
 });
 
 function v31Project(duration=15000) {

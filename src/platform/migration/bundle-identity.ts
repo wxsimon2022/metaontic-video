@@ -6,12 +6,6 @@ export function hasLegacyBundleConflict(rows: any[]) {
     && rows.some(row => row.name === PLUGIN_PACKAGE && row.installed === true && row.enabled === true);
 }
 
-export function bundleRows(result: any) {
-  const rows = Array.isArray(result) ? result : result?.ok === true ? result.value : null;
-  if (!Array.isArray(rows)) throw new Error('Bundle inventory unavailable');
-  return rows;
-}
-
 /** Disable through Host, preserving credentials, task files and the installed package. */
 export async function disableLegacyBundle(manager: any, options: InventoryOptions = {}) {
   if (!hasLegacyBundleConflict(await readBundleInventory(manager, options))) return 'ready';
