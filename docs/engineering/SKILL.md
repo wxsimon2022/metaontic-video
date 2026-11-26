@@ -208,13 +208,13 @@ README 编辑先遵守 docs/engineering/readme-guidelines.md，功能变化不�
 
 ## 市场固定安装包
 
-GitHub 正式版完成双平台安装检查后，通过 `scripts/publish-stable-alias.mjs` 将已验证版本包原字节复制为 `metaontic-video.tgz`，下载复核后公开并维护 Latest；续跑不覆盖附件，补发旧版不倒退 Latest。清理附件时保留该固定名称。市场固定地址首次切换须等待正式版真实具备附件，不能提前提交失效地址；具体流程见 `stable-market-download.md`。内部升级仍使用具体版本成品地址。
+GitHub 正式版完成双平台安装检查后，通过 `scripts/publish-stable-alias.mjs` 将已验证版本包原字节复制为 `metaontic-video.tgz`，下载复核后公开并维护 Latest；续跑不覆盖附件，补发旧版不倒退 Latest。清理附件时保留该固定名称。市场固定地址首次切换须等待正式版真实具备附件，不能提前提交失效地址；具体流程见 `stable-market-download.md`。内部升级现按固定npm包版本安装，见下方更新约定。
 
 ## 专业工具返回与审核补展示
 
 Harness 拒绝带 undefined 的工具输出，错误为 INVALID_TOOL_OUTPUT / value is not lossless JSON；execute 内部成功不等于宿主接收成功。film_project 在返回边界转换为可无损传输的 JSON，回归覆盖 create/read/next/route/export；非有限数字拒绝返回。发生输出错误时不要重复create或未经用户决定降级，应先核对保存状态。审核守卫拦截若返回presentation，按其markdown补齐同一保存稿和绑定原图，沿原projectId与specification重试；分镜失效才重新storyboard，不自行转图或查源码试错。
 
-Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz`。本机、Gitee Go 与手动同步统一调用 publishGiteeWithAlias，先发布版本包，再从线上版本包复制原字节为固定名称并下载校验，不重复打包、不覆盖已有不同内容。宣传页使用固定地址。内部更新按用户新要求使用固定最新地址，附已确认版本参数隔离缓存，宿主返回版本不一致时不可报告成功；此前“内部更新只用具体版本 URL”的约定由本次明确要求调整。
+Gitee 固定最新版包：用户要求后续发版同步维护 `https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz`。本机、Gitee Go 与手动同步统一调用 publishGiteeWithAlias，先发布版本包，再从线上版本包复制原字节为固定名称并下载校验，不重复打包、不覆盖已有不同内容。宣传页使用固定地址。内部更新按用户最新要求使用固定npm包版本（dsh-metaontic-video@X.Y.Z），镜像由宿主选择；不自动回退tgz或Git，失败保留旧插件，宿主返回版本不一致时不可报告成功。该约定替代此前内部更新使用固定最新地址的规则。
 
 宣传页同步约定：用户明确要求后续发版不更新宣传页。release.mjs 不读取或写入服务端宣传页，仅维护正式版固定安装附件；sync-promo-address.mjs 保留为单独维护工具，用户明确要求更新页面时才执行。
 

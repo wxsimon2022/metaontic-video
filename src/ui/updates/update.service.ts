@@ -7,7 +7,6 @@ import {
   UPDATE_CACHE_KEY,
   UPDATE_MAX_AGE_MS,
   UPDATE_SPEC,
-  releaseDownloadUrl,
 } from '../../shared/constants/plugin.js';
 export function createUpdates({ h, fetchSource }: any) {
     // 仓库地址、缓存键与重试次数统一写在 src/shared/constants/plugin.ts。
@@ -268,26 +267,21 @@ async function runOnlineUpdate() {
     const worthRetrying = (text) => /429|queue overflowed|timed out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|unable to access|network|fetch/i.test(text);
     /** 安装目录锁文件里留着缺 integrity 的记录：换地址、换版本都没用，必须先清掉那条记录。 */
     const lockfileUnverifiable = (text) => /MISSING_TARBALL_INTEGRITY/i.test(text);
-    // 使用最新正式版固定成品地址，按已检查版本隔离缓存；禁止回退 master。
+    // 按已检查的正式版本安装npm包；由宿主选择中国镜像，来源记录为包名@版本。
     if (!/^\d+\.\d+\.\d+$/.test(context.updateLatest || '')
         || (context.availableVersions && !context.availableVersions.includes(context.updateLatest))) {
         context.setUpdateStatus('failed');
         context.setUpdateMessage(context.t('versionCheckFirst'));
         return;
     }
-    const candidates = [
-      releaseDownloadUrl(context.updateLatest, 'gitee'),
-      releaseDownloadUrl(context.updateLatest, 'github'),
-    ];
-    /** 这条 spec 装不上时值不值得换下一条：只有「这个 committish 解析不出来」才换。 */
-    const specUnresolvable = (text) => /Could not resolve|No matching version|ERR_PNPM_NO_MATCHING_VERSION|ERR_PNPM_FETCH_40[34]|HTTP[ :]+40[34]|404 Not Found|403 Forbidden/i.test(text);
+    const spec = `${context.PLUGIN_PACKAGE}@${context.updateLatest}`;
     /** 限流/超时有界重试；已安装不先卸载，保留本地配置。 */
     const trySpec = async (spec) => {
         for (let round = 1; round <= context.UPDATE_ATTEMPTS; round += 1) {
             let result = await install(spec);
             if (result?.ok === true && result.value?.error?.code === 'already-installed') {
                 // 同一版本已安装时保持现状，不卸载。
-                return { failure: failureText(result), next: false };
+                return { failure: failureText(result) };
             }
             if (result?.ok === true && result.value?.application !== 'failed') {
                 return { outcome: result.value || {} };
@@ -302,7 +296,7 @@ async function runOnlineUpdate() {
                     await new Promise((resolve) => window.setTimeout(resolve, 5000));
                     continue;
                 }
-                return { failure: text, next: false, lockfile: true };
+                return { failure: text, lockfile: true };
             }
             const transient = worthRetrying(text);
             if (transient && round < context.UPDATE_ATTEMPTS) {
@@ -310,23 +304,13 @@ async function runOnlineUpdate() {
                 await new Promise((resolve) => window.setTimeout(resolve, round * 1200));
                 continue;
             }
-            return { failure: text, next: !transient && specUnresolvable(text) };
+            return { failure: text };
         }
         return { failure: 'unknown' };
     };
-    let outcome = null;
-    let failure = '';
-    for (const spec of candidates) {
-        const attempt = await trySpec(spec);
-        if (attempt.outcome) {
-            outcome = attempt.outcome;
-            break;
-        }
-        failure = attempt.failure || failure;
-        // 换 spec 也没用的失败（限流、断网、权限）就停在这里，别把同一套错误在候选之间跑一遍
-        if (!attempt.next)
-            break;
-    }
+    const attempt = await trySpec(spec);
+    const outcome = attempt.outcome;
+    const failure = attempt.failure || '';
     if (!outcome) {
         context.setUpdateStatus('failed');
         context.setUpdateMessage([

@@ -36,14 +36,14 @@ test('old channel response cannot overwrite new selection',async()=>{
  const pending=actions.checkForUpdate(true);state.updateRequest.current++;state.updateChannel='stable';
  complete('3.10.0-beta.1');assert.equal(await pending,'');assert.deepEqual(seen,[]);
 });
-test('installation never falls back to master, even when a release tag fails to resolve',async()=>{
+test('installation never falls back to master or URLs when a fixed npm version fails to resolve',async()=>{
  const ctx=setup([]);const specs=[];
  const actions=ctx.createUpdateActions({verifyRuntime:async()=>true,updateConfirm:true,updateLatest:'3.10.0',availableVersions:['3.10.0','3.8.2'],
  setUpdateConfirm(){},setUpdateStatus(){},setUpdateMessage(){},t:key=>key,UPDATE_SPEC:'git+https://gitee.com/hackloop/metaontic-video.git',
  PLUGIN_PACKAGE:'metaontic-video',UPDATE_ATTEMPTS:1,manager:()=>({manager:{
  listBundles: async () => ({ok:true,value:[{name:'metaontic-video',installed:true,source:'https://example.invalid/metaontic-video.tgz'}]}), installBundle:async spec=>{specs.push(spec);return {ok:false,error:{message:'Could not resolve'}};},
  removeBundle:()=>assert.fail('must not uninstall'),}})});
- await actions.runOnlineUpdate();assert.equal(specs.length,2);assert.ok(specs.every(spec=>spec.endsWith('/metaontic-video.tgz?version=3.10.0')));
+ await actions.runOnlineUpdate();assert.deepEqual(specs,['metaontic-video@3.10.0']);
 });
 test('release validation prevents mismatched version and prerelease flags',()=>{
  const pkg=(version,prerelease)=>({version,releaseNotes:{version,prerelease}});
@@ -101,7 +101,7 @@ test('higher-version installation reports a successful update',async()=>{
  await actions.runOnlineUpdate();assert.equal(messages.at(-1),'versionUpdateDone');
 });
 
-test('在线更新仅使用 Gitee，并在 Gitee 无法解析时回退 GitHub',async()=>{
+test('在线更新缺包时保持npm来源，不回退Gitee或GitHub',async()=>{
  const ctx=setup([]),specs=[];
  const actions=ctx.createUpdateActions({verifyRuntime:async()=>true,updateConfirm:true,updateLatest:'3.10.0',availableVersions:['3.10.0'],
   setUpdateConfirm(){},setUpdateStatus(){},setUpdateLatest(){},setUpdateMessage(){},t:key=>key,
@@ -110,8 +110,5 @@ test('在线更新仅使用 Gitee，并在 Gitee 无法解析时回退 GitHub',a
    installBundle:async spec=>{specs.push(spec);return specs.length===1?{ok:false,error:{message:'Could not resolve'}}:{ok:true,value:{application:'applied',version:'3.10.0'}};},
    removeBundle:()=>assert.fail('must not uninstall')}})});
  await actions.runOnlineUpdate();
- assert.deepEqual(specs,[
-  'https://gitee.com/hackloop/metaontic-video/releases/download/latest/metaontic-video.tgz?version=3.10.0',
-  'https://github.com/wxsimon2022/metaontic-video/releases/latest/download/metaontic-video.tgz?version=3.10.0',
- ]);
+ assert.deepEqual(specs,['dsh-metaontic-video@3.10.0']);
 });

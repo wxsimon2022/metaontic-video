@@ -37,7 +37,7 @@ export const GITHUB = {
 export const CHANGELOG_URL = `${GITHUB.web}/blob/master/CHANGELOG.md`;
 
 /** 在线更新：检查地址、缓存与重试策略。 */
-export const UPDATE_SPEC = `git+${GITEE.web}.git`;
+export const UPDATE_SPEC = PLUGIN_PACKAGE;
 export const UPDATE_CACHE_KEY = `${PLUGIN_ID}.update-check-v3`;
 export const UPDATE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 export const UPDATE_ATTEMPTS = 3;

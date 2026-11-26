@@ -63,10 +63,31 @@ test('lockfile integrity failure waits for the background cleanup and retries, n
     manager:()=>({manager:api}),isNewerVersion:()=>true,setUpdateConfirm(){},setUpdateLatest(){},
     setUpdateStatus:v=>{state.status=v;},setUpdateMessage:v=>{state.message=v;},setUpdateAt(){},t:key=>key};
   await sandbox.createUpdateActions(context).runOnlineUpdate();
-  assert.equal(state.calls,3);                       // 只在同一个 Gitee 地址上等清理后重试，不换 GitHub 地址
+  assert.equal(state.calls,3);                       // 只在同一个npm版本上等清理后重试，不切换来源
   assert.equal(state.waits,2);                       // 前两次之间各等一次后台清理，第三次才收尾
   assert.equal(state.status,'failed');
   assert.match(state.message,/^versionUpdateLockfile/);
+});
+
+test('更新统一固定npm包名与正式版本，旧tgz来源可迁移，缺包不回退下载链接', async () => {
+ for (const failed of [false, true]) {
+  const calls = [], state = {};
+  const sandbox = vm.createContext({window:{localStorage:{removeItem(){}}}});
+  vm.runInContext(sourceOf('ui/updates/update.service'), sandbox);
+  const manager = {
+   listBundles: async () => [{name:'dsh-metaontic-video',installed:true,source:'https://gitee.com/example/old.tgz'}],
+   installBundle: async (spec, options) => {
+    calls.push({spec, options});
+    return failed ? {ok:false,error:{message:'ERR_PNPM_NO_MATCHING_VERSION 404 Not Found'}} : {ok:true,value:{application:'applied',version:'4.3.2'}};
+   },
+  };
+  const context = {updateConfirm:true,PLUGIN_VERSION:'4.3.1',updateLatest:'4.3.2',availableVersions:['4.3.2'],PLUGIN_PACKAGE:'dsh-metaontic-video',UPDATE_ATTEMPTS:3,UPDATE_CACHE_KEY:'test',manager:()=>({manager}),isNewerVersion:()=>true,verifyRuntime:async()=>true,setUpdateConfirm(){},setUpdateLatest(){},setUpdateStatus:v=>state.status=v,setUpdateMessage:v=>state.message=v,setUpdateAt(){},t:key=>key};
+  await sandbox.createUpdateActions(context).runOnlineUpdate();
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].spec,'dsh-metaontic-video@4.3.2');
+  assert.equal(calls[0].options.enabled,true);
+  assert.equal(state.status,failed?'failed':'applied');
+ }
 });
 
 test('updates use fixed latest assets with a version-specific cache key on both mirrors', () => {
