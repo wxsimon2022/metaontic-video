@@ -51,3 +51,10 @@ test('会话阶段只由成功的工具结果更新，兼容header.id和匿名�
  const anonymous={agent:{session:{}}};scope.observe('film_project',{action:'read'},{revision:1},anonymous);
  assert.equal(scope.read(anonymous),'creation');
 });
+
+ test('默认短片走完整方案一次审核，专业旧项目与独立终审保持明确边界',()=>{
+ assert.match(api.FILM_WORKFLOW_GUIDANCE,/新建15–60秒短片默认用video_project直接制作/);
+ assert.match(api.FILM_WORKFLOW_GUIDANCE,/超过60秒.*专业分阶段或独立终审.*已有film_project/);
+ assert.match(api.FILM_WORKFLOW_GUIDANCE,/不将旧项目静默切换或自动批准/);
+ assert.doesNotMatch(api.FILM_WORKFLOW_GUIDANCE,/目标15–3600秒时优先使用film_project/);
+ });

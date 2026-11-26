@@ -55,6 +55,7 @@ test('real plugin requires project review in both preflight and execution; scene
   assert.equal((await h.gate({...h.exec,name:'video_generate',arguments:args})).kind,'deny');
   await assert.rejects(h.tools.get('video_generate').execute(args,h.exec),/projectId/);
   const p=await h.prepare();assert.equal(h.asks,0);assert.equal(p.choice,'not_needed');
+  assert.match(p.nextAction,/video_script.*review一次/);assert.match(p.nextAction,/无需另建film_project/);
   assert.equal((await h.review(p.projectId)).status,'approved');assert.equal(h.asks,1);
   args.projectId=p.projectId;
   const decision=await h.gate({...h.exec,name:'video_generate',arguments:args});
