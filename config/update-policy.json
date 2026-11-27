@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
   "package_name": "dsh-metaontic-video",
-  "revision": 1,
-  "minimum_version": "4.1.0"
+  "revision": 2,
+  "minimum_version": "4.4.2"
 }
